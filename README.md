@@ -1,6 +1,6 @@
 # TinyDash
 
-A small desktop launcher. This version implements Phases 1 through 3.
+A small desktop launcher. This version implements Phases 1 through 4.
 
 Search installed applications by name, available aliases, or path. Calculate values, convert units, and search local emoji data. Use the keyboard to open an application or copy a result. The app stays running after the window hides.
 
@@ -18,6 +18,8 @@ bun run tauri dev
 ```
 
 The launcher opens on startup. The default global shortcut is `Command+Shift+Space` on macOS and `Ctrl+Shift+Space` on Windows and X11 Linux. The shortcut shows or hides the existing window. The tray menu also opens the launcher, refreshes applications, and quits the app.
+
+After building a new version, quit the running TinyDash process through the tray menu before opening the new build. Hiding or reopening its window keeps the existing code running.
 
 `bun run dev` runs only the frontend in a browser. It displays an empty state because app discovery requires the desktop backend. It does not load test data.
 
@@ -74,7 +76,27 @@ TinyDash writes `settings.json` in its application configuration directory on fi
 
 Set `clearQueryOnOpen` to `false` to keep the previous query and search mode. TinyDash selects that text when the window opens. With the default setting, it clears the query and returns to All mode. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Shortcut changes take effect after restart. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
 
-This small settings file is the only durable state in this phase. SQLite, migrations, usage frequency, and recency ranking belong to Phase 4.
+The settings file remains the editable startup configuration. Usage data is stored separately in SQLite.
+
+## Usage and ranking
+
+Successful app launches and emoji copies update a use count and last-used time. Frequently used and recently used results move higher in the list. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches. A usage bonus cannot add an item that does not match the query.
+
+The frequency bonus is 25 points per use, up to 500 points. The recency bonus starts at 500 points and decreases with the number of days since the last use. Their combined limit is 1,000 points, compared with 10,000 for an exact match and 2,000 for a prefix match. Results with equal scores retain their existing order. Calculator results remain first for valid calculations.
+
+TinyDash stores `result_id`, `use_count`, and `last_used_at` in `tinydash.sqlite3`:
+
+| Platform | Default database location                                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------------------------- |
+| macOS    | `~/Library/Application Support/dev.tinydash.launcher/tinydash.sqlite3`                                              |
+| Windows  | `%APPDATA%\dev.tinydash.launcher\tinydash.sqlite3`                                                                  |
+| Linux    | `$XDG_DATA_HOME/dev.tinydash.launcher/tinydash.sqlite3`, or `~/.local/share/dev.tinydash.launcher/tinydash.sqlite3` |
+
+Opening a location, failed actions, and calculation copies do not change usage counts. Calculation IDs are temporary. Search queries and calculation text are not stored. App usage is tied to the indexed path; moving an app gives it a new ID.
+
+The database loads once on a background worker. Search uses an in-memory copy and performs no database reads while typing. The launcher hides before saving an action. SQLite writes use one connection, a short lock timeout, and explicit transactions for schema migrations. There are no database polling timers. SQLite is bundled through [rusqlite](https://docs.rs/rusqlite/0.40.2/rusqlite/), so users do not need a separate SQLite installation.
+
+If the database cannot load or save, TinyDash shows a warning and keeps ranking changes in memory until exit. It leaves an unreadable or newer database intact. Fix the file access problem and restart to restore persistence. To reset usage, quit TinyDash, move `tinydash.sqlite3` to a backup location, then reopen the app.
 
 ## Build
 
@@ -96,8 +118,8 @@ The release profile preserves symbols in build tools to avoid a [Rust linker iss
 
 The path is `query → SearchManager → providers → ranking → top 30 results → SolidJS`.
 
-- One Rust crate owns discovery, matching, ranking, indexed app IDs, launch actions, window lifecycle, settings, and shortcuts.
-- `SearchManager` reuses a `nucleo-matcher` instance. Names, aliases, and paths are prepared when the app index changes. Matching ignores case and supports Unicode normalization. Exact and prefix matches receive bonuses in `ranking/mod.rs`. Empty queries use a stable alphabetical order.
+- One Rust crate owns discovery, matching, ranking, usage persistence, indexed app IDs, launch actions, window lifecycle, settings, and shortcuts.
+- `SearchManager` reuses a `nucleo-matcher` instance. Names, aliases, and paths are prepared when the app index changes. Matching ignores case and supports Unicode normalization. Match and usage bonuses are applied in `ranking/mod.rs` before selecting the top 30. Unused apps keep a stable alphabetical order when the query is empty.
 - `AppProvider`, `EmojiProvider`, and `CalculatorProvider` return the same result model. Rust parses search modes and prefixes. The emoji index loads on its first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit.
 - Discovery builds a new index off the UI thread. The old index remains available during refresh. Tauri's existing async runtime runs blocking scan, search, and launch work. There are no polling loops or background timers.
 - SolidJS keeps UI state and sends queries without a debounce delay. Rust skips queued requests that are no longer current. Request numbers prevent late replies from replacing newer results. Enter cannot execute an old result while a new query is pending.
@@ -121,6 +143,7 @@ src-tauri/src/
   providers/              App, emoji, and calculator providers
   platform/               macOS, Windows, and Linux discovery and launch
   ranking/mod.rs          Query normalization and score bonuses
+  db/                     SQLite operations and transactional migrations
   settings.rs             Small startup configuration file
   error.rs                Internal errors
 tests/                    Browser tests and native WebDriver checks
@@ -157,7 +180,7 @@ bunx --bun --no-install playwright install chromium
 bun run test:ui
 ```
 
-Rust tests cover normalization, ranking, fuzzy matching, query parsing, provider selection, offline calculations, calculator interruption, emoji data, copy validation, settings, and platform filtering. UI tests cover navigation, actions, mode changes, stale replies, IME input, errors, reopening, and layout widths. Browser tests use Tauri's official IPC mock and cannot prove native shortcut or OS launch behavior.
+Rust tests cover normalization, ranking, fuzzy matching, query parsing, provider selection, offline calculations, calculator interruption, emoji data, copy validation, settings, and platform filtering. Database tests cover migration rollback, upgrades, corrupt files, lock failures, saved usage, and ranking after reopening the database. UI tests cover navigation, actions, mode changes, stale replies, IME input, errors, storage warnings, ranking refresh, reopening, and layout widths. Browser tests use Tauri's official IPC mock and cannot prove native shortcut or OS launch behavior.
 
 Run the optional host discovery check and search timing sample:
 
@@ -167,11 +190,11 @@ cargo test --manifest-path src-tauri/Cargo.toml installed_apps_smoke -- --ignore
 
 The [Checks workflow](.github/workflows/check.yml) builds on macOS, Windows, and Ubuntu 24.04. Each successful build produces a downloadable `TinyDash-<OS>-<architecture>` artifact with the app, commit information, and [desktop check instructions](docs/desktop-checks.md). Artifacts remain available for 14 days. They are unsigned development builds.
 
-After the build jobs pass, the [native check workflow](.github/workflows/native.yml) downloads and tests the Windows and Linux artifacts through `tauri-driver`. The Bun test script checks arithmetic, unit conversion, and emoji search through the real Rust backend. It copies results, reads the OS clipboard to verify their values, and reopens the resident app. It also installs two temporary application entries, checks initial input selection and arrow-key selection, then launches a harmless executable that records which entry was selected. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its app and driver processes when it finishes. CI retains screenshots and failure logs in `native-results-<OS>-<architecture>` artifacts.
+After the build jobs pass, the [native check workflow](.github/workflows/native.yml) downloads and tests the Windows and Linux artifacts through `tauri-driver`. The Bun test script checks arithmetic, unit conversion, and emoji search through the real Rust backend. It copies results, reads the OS clipboard to verify their values, and reopens the resident app. It also installs two temporary application entries, checks initial input selection and arrow-key selection, then launches a harmless executable that records which entry was selected. It verifies that a copied emoji and a launched app move up the result list. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its app and driver processes when it finishes. CI retains screenshots and failure logs in `native-results-<OS>-<architecture>` artifacts.
 
 The native workflow can also test an existing build without compiling it again. Select **Native app checks**, choose **Run workflow**, and enter the Checks run ID that contains the build artifacts. The diagnostics record both the build commit and the test-code commit. This makes native failures faster to reproduce.
 
-To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges. Linux requires `WebKitWebDriver`, `xclip`, and an active X11 session. This check replaces the current clipboard text. Then run:
+To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges and a separate test user profile with no prior TinyDash usage. Linux requires `WebKitWebDriver`, `xclip`, and an active X11 session; its data and configuration directories are isolated by the test. This check replaces the current clipboard text and records test usage. Then run:
 
 ```sh
 cargo install tauri-driver --version 2.0.6 --locked
@@ -187,4 +210,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
 
 ## Next step
 
-Implement Phase 4: SQLite with migrations, usage tracking, and frequency and recency ranking. Keep clipboard history, file search, system commands, filesystem watching, and currency refresh in their specified later phases.
+Implement Phase 5: text clipboard history with SQLite storage, duplicate filtering, a configurable limit, and delete and clear actions. Keep file search, system commands, filesystem watching, and currency refresh in their specified later phases.

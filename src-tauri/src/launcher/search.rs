@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use nucleo_matcher::{
     Config, Matcher,
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
@@ -25,6 +27,7 @@ pub struct SearchManager {
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
     calculator: CalculatorProvider,
+    usage: HashMap<String, ranking::Usage>,
 }
 
 pub struct SearchOutcome {
@@ -39,11 +42,23 @@ impl Default for SearchManager {
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
             calculator: CalculatorProvider::default(),
+            usage: HashMap::new(),
         }
     }
 }
 
 impl SearchManager {
+    pub fn set_usage(&mut self, usage: HashMap<String, ranking::Usage>) {
+        self.usage = usage;
+    }
+
+    pub fn record_usage(&mut self, id: &str, now: i64) -> ranking::Usage {
+        let usage = self.usage.entry(id.to_owned()).or_default();
+        usage.count = usage.count.saturating_add(1);
+        usage.last_used_at = now.max(0);
+        *usage
+    }
+
     pub fn replace_apps(&mut self, apps: AppProvider) {
         self.apps = apps;
     }
@@ -110,6 +125,7 @@ impl SearchManager {
                 Err(_) => {} // Ordinary app names and partial input are not calculator errors.
             }
         }
+        ranking::apply_usage(&mut results, &self.usage, ranking::now());
         Ok(SearchOutcome {
             results: ranking::top_results(results, RESULT_LIMIT),
             notice,
@@ -350,5 +366,91 @@ mod tests {
         assert!(
             matches!(manager.resolve_action("emoji:🚀", Action::Copy), Ok(ResolvedAction::Copy(value)) if value == "🚀")
         );
+    }
+
+    #[test]
+    fn usage_changes_empty_and_fuzzy_results_but_cannot_add_nonmatches() {
+        let mut manager = manager();
+        let id = "app:/apps/Xcode.app";
+        let now = ranking::now();
+        manager.record_usage(id, now);
+        assert_eq!(
+            manager
+                .search("", SearchMode::Apps)
+                .expect("search")
+                .results[0]
+                .id,
+            id
+        );
+        assert_eq!(
+            manager
+                .search("xc", SearchMode::Apps)
+                .expect("search")
+                .results[0]
+                .id,
+            id
+        );
+        assert!(
+            manager
+                .search("unknown-application", SearchMode::Apps)
+                .expect("search")
+                .results
+                .is_empty()
+        );
+        assert_eq!(
+            manager
+                .search("code", SearchMode::Apps)
+                .expect("search")
+                .results[0]
+                .title,
+            "Code"
+        );
+        assert_eq!(manager.record_usage(id, now).count, 2);
+        manager.set_usage(HashMap::from([(
+            id.into(),
+            ranking::Usage {
+                count: u32::MAX,
+                last_used_at: now,
+            },
+        )]));
+        assert_eq!(manager.record_usage(id, now).count, u32::MAX);
+        assert_eq!(
+            manager
+                .search("12 * 8", SearchMode::All)
+                .expect("search")
+                .results[0]
+                .title,
+            "96"
+        );
+    }
+
+    #[test]
+    fn a_new_search_manager_ranks_from_persisted_usage() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("tinydash.sqlite3");
+        let now = ranking::now();
+        let app_id = "app:/apps/Xcode.app";
+        {
+            let mut search = manager();
+            let database = crate::db::Database::open(&path).expect("open");
+            for _ in 0..3 {
+                let usage = search.record_usage(app_id, now);
+                database.save_usage(app_id, usage).expect("save");
+            }
+            let usage = search.record_usage("emoji:🚀", now);
+            database.save_usage("emoji:🚀", usage).expect("save emoji");
+        }
+        let database = crate::db::Database::open(&path).expect("reopen");
+        let mut search = manager();
+        search.set_usage(database.load_usage().expect("load"));
+        assert_eq!(
+            search.search("", SearchMode::Apps).expect("search").results[0].id,
+            app_id
+        );
+        assert_eq!(
+            search.search(":", SearchMode::All).expect("emoji").results[0].id,
+            "emoji:🚀"
+        );
+        assert_eq!(search.record_usage(app_id, now).count, 4);
     }
 }

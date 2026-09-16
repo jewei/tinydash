@@ -1,3 +1,4 @@
+mod db;
 mod error;
 mod launcher;
 mod platform;

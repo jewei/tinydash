@@ -1,4 +1,5 @@
 pub mod actions;
+mod history;
 pub mod query;
 pub mod result;
 pub mod search;
@@ -10,7 +11,7 @@ use std::sync::{
 };
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{error::Error, platform, providers::apps::AppProvider, settings::Settings};
 use query::SearchMode;
@@ -24,6 +25,7 @@ pub struct LauncherState {
     pub settings: Settings,
     pub warnings: Vec<String>,
     pub index_error: Mutex<Option<String>>,
+    pub history: history::History,
     search_version: AtomicU64,
 }
 
@@ -36,6 +38,7 @@ impl LauncherState {
             settings,
             warnings,
             index_error: Mutex::new(None),
+            history: history::History::default(),
             search_version: AtomicU64::new(0),
         }
     }
@@ -50,10 +53,15 @@ pub struct LauncherInfo {
 }
 
 #[tauri::command]
-pub fn launcher_ready(
-    app: AppHandle,
-    state: State<'_, LauncherState>,
-) -> Result<LauncherInfo, String> {
+pub async fn launcher_ready(app: AppHandle) -> Result<LauncherInfo, String> {
+    let worker_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = worker_app.state::<LauncherState>();
+        state.history.initialize(&worker_app, &state.search);
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    let state = app.state::<LauncherState>();
     if !state.ready.swap(true, Ordering::AcqRel) {
         window::show(&app).map_err(|error| error.to_string())?;
     }
@@ -91,6 +99,7 @@ pub async fn search(
         Ok(SearchResponse {
             results: outcome.results,
             notice: outcome.notice,
+            storage_error: state.history.warning(),
             total: search.app_count(),
             indexing: state.scanning.load(Ordering::Acquire),
             index_error: state

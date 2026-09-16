@@ -9,6 +9,8 @@ declare global {
     __launcherTest: {
       calls: { command: string; payload: unknown }[];
       rejectActions: boolean;
+      storageError: string | null;
+      usedAppFirst: boolean;
       emit: typeof emit;
     };
   }
@@ -57,7 +59,13 @@ const emoji: SearchResult = {
 };
 
 window.isTauri = true;
-window.__launcherTest = { calls: [], rejectActions: false, emit };
+window.__launcherTest = {
+  calls: [],
+  rejectActions: false,
+  storageError: null,
+  usedAppFirst: false,
+  emit,
+};
 mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
@@ -97,13 +105,16 @@ mockIPC(
                   ? [apps[1]]
                   : query === "missing"
                     ? []
-                    : apps;
+                    : state.usedAppFirst
+                      ? [apps[1], apps[0], ...apps.slice(2)]
+                      : apps;
       return {
         results,
         total: apps.length,
         indexing: false,
         indexError: null,
         notice: query === "=1 / 0" ? "Division by zero is not allowed." : null,
+        storageError: state.storageError,
       };
     }
     if (command === "execute_action" && state.rejectActions) {
