@@ -17,6 +17,7 @@ use crate::{
         calculator::CalculatorProvider,
         clipboard::{ClipboardEntry, ClipboardProvider},
         emoji::EmojiProvider,
+        files::{FileEntry, FileProvider},
     },
     ranking,
 };
@@ -25,6 +26,7 @@ pub const RESULT_LIMIT: usize = 30;
 
 pub struct SearchManager {
     apps: AppProvider,
+    files: FileProvider,
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
     calculator: CalculatorProvider,
@@ -41,6 +43,7 @@ impl Default for SearchManager {
     fn default() -> Self {
         Self {
             apps: AppProvider::default(),
+            files: FileProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
             calculator: CalculatorProvider::default(),
@@ -70,6 +73,18 @@ impl SearchManager {
         self.apps.len()
     }
 
+    pub fn replace_files(&mut self, files: FileProvider) -> FileProvider {
+        std::mem::replace(&mut self.files, files)
+    }
+
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    fn file(&self, id: &str) -> Result<FileEntry> {
+        self.files.get(id).cloned().ok_or(Error::FileNotFound)
+    }
+
     pub fn app(&self, id: &str) -> Result<AppEntry> {
         self.apps.get(id).cloned().ok_or(Error::AppNotFound)
     }
@@ -80,6 +95,9 @@ impl SearchManager {
 
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
         match action {
+            Action::Open | Action::Reveal if id.starts_with("file:") => {
+                Ok(ResolvedAction::File(self.file(id)?, action))
+            }
             Action::Launch if id.starts_with("app:") => Ok(ResolvedAction::Launch(self.app(id)?)),
             Action::Reveal if id.starts_with("app:") => {
                 Ok(ResolvedAction::Reveal(self.app(id)?.path))
@@ -143,7 +161,21 @@ impl SearchManager {
                 Err(_) => {} // Ordinary app names and partial input are not calculator errors.
             }
         }
-        ranking::apply_usage(&mut results, &self.usage, ranking::now());
+        let now = ranking::now();
+        ranking::apply_usage(&mut results, &self.usage, now);
+        if query.mode == SearchMode::Files
+            || (query.mode == SearchMode::All && !query.text.is_empty())
+        {
+            // File results include usage before their own top-N limit. This
+            // preserves global ranking without allocating a result per file.
+            results.extend(self.files.search(
+                query.text,
+                &mut self.matcher,
+                &self.usage,
+                now,
+                RESULT_LIMIT,
+            ));
+        }
         Ok(SearchOutcome {
             results: ranking::top_results(results, RESULT_LIMIT),
             notice,

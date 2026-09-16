@@ -2,13 +2,17 @@ import { expect, test, type Page } from "@playwright/test";
 import type {} from "./mock-backend";
 
 async function openLauncher(page: Page) {
-  await page.route("**/src/index.tsx", async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({
-      response,
-      body: `import "/tests/mock-backend.ts";\n${await response.text()}`,
-    });
-  });
+  // A reused Vite server can append an HMR timestamp to the entry URL.
+  await page.route(
+    (url) => url.pathname === "/src/index.tsx",
+    async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({
+        response,
+        body: `import "/tests/mock-backend.ts";\n${await response.text()}`,
+      });
+    },
+  );
   await page.goto("/");
   await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
 }
@@ -20,6 +24,93 @@ async function actions(page: Page) {
     ),
   );
 }
+
+test("opens and reveals files by ID, and refreshes files with the mode shortcut", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("files");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await expect(input).toBeFocused();
+  await expect(input).toHaveAttribute(
+    "placeholder",
+    "Search filenames and paths...",
+  );
+  await expect(page.locator(".list-count")).toHaveText("1 file indexed");
+  await expect(page.locator(".result-title")).toHaveText("Launch notes.md");
+  await input.press("Enter");
+  await input.press("Meta+Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "file:/Documents/Launch notes.md", action: "open" },
+      },
+      {
+        command: "execute_action",
+        payload: { id: "file:/Documents/Launch notes.md", action: "reveal" },
+      },
+    ]);
+  await input.press("Meta+r");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls.filter(
+            (call) => call.command === "refresh_files",
+          ).length,
+      ),
+    )
+    .toBe(1);
+  await page.keyboard.press("Meta+k");
+  await expect(page.getByRole("menuitem", { name: "Open file" })).toBeFocused();
+  await expect(
+    page.getByRole("menuitem", { name: "Show in folder" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Refresh files" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.screenshot({ path: "test-results/files.png" });
+});
+
+test("keeps results usable during a file scan and shows scan warnings and empty results", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("files");
+  await page.evaluate(() => {
+    window.__launcherTest.fileIndexing = true;
+    return window.__launcherTest.emit("files-changed", null);
+  });
+  await expect(page.locator(".list-count")).toHaveText("Scanning files...");
+  await expect(
+    page.getByRole("button", { name: "Open", exact: true }),
+  ).toBeEnabled();
+  await page.evaluate(() => {
+    window.__launcherTest.fileIndexing = false;
+    window.__launcherTest.fileWarning =
+      "File scan skipped 1 item. Permission denied.";
+    return window.__launcherTest.emit("files-changed", null);
+  });
+  await expect(page.getByRole("alert")).toContainText("Permission denied");
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("missing");
+  await expect(
+    page.getByRole("heading", { name: "No files found" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("apps");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
 
 test("previews plain text, copies by ID, and deletes without hiding the launcher", async ({
   page,

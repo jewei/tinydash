@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub enum ResultKind {
     App,
+    File,
     Calculation,
     Emoji,
     Clipboard,
@@ -13,6 +14,7 @@ pub enum ResultKind {
 #[serde(rename_all = "camelCase")]
 pub enum Action {
     Launch,
+    Open,
     Reveal,
     Copy,
     Delete,
@@ -40,4 +42,5 @@ pub struct SearchResponse {
     pub index_error: Option<String>,
     pub notice: Option<String>,
     pub storage_error: Option<String>,
+    pub files: super::files::FileStatus,
 }

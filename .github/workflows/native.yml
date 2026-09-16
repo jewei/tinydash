@@ -65,7 +65,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-driver libayatana-appindicator3-1 libxdo3 xvfb openbox dbus-x11 xclip
+          sudo apt-get install -y webkit2gtk-driver libayatana-appindicator3-1 libxdo3 xvfb openbox dbus-x11 xclip xdg-utils desktop-file-utils
       - name: Install native test driver
         run: cargo install tauri-driver --version 2.0.6 --locked
       - name: Install matching WebView2 driver

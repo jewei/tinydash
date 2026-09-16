@@ -24,6 +24,11 @@ export default function ResultIcon(props: { result: SearchResult }) {
           <Icon name="clipboard" size={24} />
         </span>
       </Match>
+      <Match when={props.result.kind === "file"}>
+        <span class="clipboard-icon" aria-hidden="true">
+          <Icon name="file" size={24} />
+        </span>
+      </Match>
     </Switch>
   );
 }

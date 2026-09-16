@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +10,9 @@ pub struct Settings {
     pub shortcut: String,
     pub clipboard_history_enabled: bool,
     pub clipboard_history_limit: u16,
+    pub file_search_roots: Option<Vec<PathBuf>>,
+    pub file_search_limit: u32,
+    pub file_search_excluded_dirs: Vec<String>,
 }
 
 impl Default for Settings {
@@ -20,6 +23,9 @@ impl Default for Settings {
             shortcut: "CommandOrControl+Shift+Space".into(),
             clipboard_history_enabled: true,
             clipboard_history_limit: 100,
+            file_search_roots: None,
+            file_search_limit: 50_000,
+            file_search_excluded_dirs: vec!["node_modules".into(), "target".into()],
         }
     }
 }
@@ -27,6 +33,10 @@ impl Default for Settings {
 impl Settings {
     pub fn clipboard_limit(&self) -> usize {
         usize::from(self.clipboard_history_limit.clamp(1, 500))
+    }
+
+    pub fn file_limit(&self) -> usize {
+        self.file_search_limit.clamp(1, 100_000) as usize
     }
 }
 
@@ -89,5 +99,24 @@ mod tests {
         std::fs::write(&path, "bad json").expect("write");
         assert!(load(dir.path()).is_err());
         assert_eq!(std::fs::read_to_string(path).expect("read"), "bad json");
+    }
+
+    #[test]
+    fn file_defaults_allow_explicit_roots_disable_and_bounded_limits() {
+        let defaults: Settings = serde_json::from_str("{}").expect("settings");
+        assert!(defaults.file_search_roots.is_none());
+        assert_eq!(defaults.file_limit(), 50_000);
+        let disabled: Settings =
+            serde_json::from_str(r#"{"fileSearchRoots":[],"fileSearchLimit":0}"#)
+                .expect("settings");
+        assert_eq!(disabled.file_search_roots, Some(vec![]));
+        assert_eq!(disabled.file_limit(), 1);
+        let custom: Settings = serde_json::from_str(r#"{"fileSearchRoots":["~/Documents"],"fileSearchLimit":999999,"fileSearchExcludedDirs":[]}"#).expect("settings");
+        assert_eq!(
+            custom.file_search_roots,
+            Some(vec![PathBuf::from("~/Documents")])
+        );
+        assert_eq!(custom.file_limit(), 100_000);
+        assert!(custom.file_search_excluded_dirs.is_empty());
     }
 }

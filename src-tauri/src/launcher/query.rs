@@ -8,6 +8,7 @@ pub enum SearchMode {
     #[default]
     All,
     Apps,
+    Files,
     Emoji,
     Calculator,
     Clipboard,

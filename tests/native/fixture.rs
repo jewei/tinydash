@@ -8,8 +8,12 @@ fn main() -> io::Result<()> {
         .next()
         .map(PathBuf::from)
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing marker path"))?;
-    let label = args
-        .next()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Missing app label"))?;
-    fs::write(marker, label.as_encoded_bytes())
+    if let Some(label) = args.next() {
+        fs::write(marker, label.as_encoded_bytes())
+    } else {
+        // The OS document association supplies the opened file as the only arg.
+        // The launcher never reads the document contents to find this marker.
+        let opened = marker.with_extension("opened");
+        fs::write(opened, marker.to_string_lossy().as_bytes())
+    }
 }

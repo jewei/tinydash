@@ -24,6 +24,28 @@ pub fn is_wayland() -> bool {
             || std::env::var("XDG_SESSION_TYPE").is_ok_and(|session| session == "wayland"))
 }
 
+pub fn file_is_hidden(entry: &walkdir::DirEntry) -> std::io::Result<bool> {
+    if entry.file_name().to_string_lossy().starts_with('.') {
+        return Ok(true);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::macos::fs::MetadataExt;
+        // BSD UF_HIDDEN. Finder uses this flag in addition to dot names.
+        Ok(entry.metadata()?.st_flags() & 0x8000 != 0)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM.
+        Ok(entry.metadata()?.file_attributes() & 0x6 != 0)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Ok(false)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
