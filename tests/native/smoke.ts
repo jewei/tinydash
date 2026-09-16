@@ -216,9 +216,15 @@ try {
     script: 5_000,
     pageLoad: 30_000,
   });
-  await until("search input receives startup focus", () =>
+  // The WebView exists before launcher_ready shows the native window. Wait
+  // for the initial search too, so typing cannot precede the first open event.
+  await until("application startup and search input focus", () =>
     observe<boolean>(
-      "return document.activeElement?.getAttribute('role') === 'combobox'",
+      `return document.hasFocus()
+        && document.activeElement?.getAttribute('role') === 'combobox'
+        && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
+        && /\\d+ installed/.test(document.querySelector('.list-count')?.textContent ?? '')
+        && document.querySelectorAll('[role=option]').length > 0`,
     ),
   );
   pass("The actual application opens and focuses its search field");
