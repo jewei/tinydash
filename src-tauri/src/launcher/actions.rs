@@ -3,10 +3,15 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 
 use super::{LauncherState, result::Action, window};
-use crate::{error::Error, platform, providers::apps::AppEntry};
+use crate::{
+    error::Error,
+    platform,
+    providers::{apps::AppEntry, files::FileEntry},
+};
 
 pub enum ResolvedAction {
     Launch(AppEntry),
+    File(FileEntry, Action),
     Reveal(PathBuf),
     Copy(String),
     Delete(i64),
@@ -16,6 +21,7 @@ impl ResolvedAction {
     fn usage_id(&self, id: &str) -> Option<String> {
         match self {
             Self::Launch(entry) => Some(entry.id.clone()),
+            Self::File(entry, Action::Open) => Some(entry.id.clone()),
             Self::Copy(_) if id.starts_with("emoji:") => Some(id.to_owned()),
             // Revealing a location is not a launch. Calculation IDs are temporary.
             _ => None,
@@ -39,6 +45,15 @@ pub async fn execute_action(id: String, action: Action, app: AppHandle) -> Resul
             .map_err(|error| error.to_string())?;
         let usage_id = action.usage_id(&id);
         match action {
+            ResolvedAction::File(entry, action) => {
+                entry.validate().map_err(|error| error.to_string())?;
+                match action {
+                    Action::Open => worker_app.opener().open_path(entry.path, None::<&str>),
+                    Action::Reveal => worker_app.opener().reveal_item_in_dir(entry.path),
+                    _ => return Err(Error::InvalidAction.to_string()),
+                }
+                .map_err(|error| error.to_string())
+            }
             ResolvedAction::Launch(entry) => {
                 platform::launch(&entry).map_err(|error| error.to_string())
             }
@@ -89,7 +104,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_app_launches_and_emoji_copies_have_durable_usage_ids() {
+    fn only_successful_primary_actions_have_durable_usage_ids() {
         let app = AppEntry::new("Test".into(), "/test".into(), vec![]);
         assert_eq!(
             ResolvedAction::Launch(app.clone()).usage_id("ignored"),
@@ -105,6 +120,19 @@ mod tests {
         );
         assert_eq!(
             ResolvedAction::Reveal("/test".into()).usage_id("app:/test"),
+            None
+        );
+        let file = FileEntry {
+            id: "file:/test.txt".into(),
+            name: "test.txt".into(),
+            path: "/test.txt".into(),
+        };
+        assert_eq!(
+            ResolvedAction::File(file.clone(), Action::Open).usage_id("ignored"),
+            Some(file.id.clone())
+        );
+        assert_eq!(
+            ResolvedAction::File(file, Action::Reveal).usage_id("file:/test.txt"),
             None
         );
     }

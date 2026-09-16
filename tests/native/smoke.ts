@@ -6,7 +6,7 @@ import {
   type ChildProcess,
 } from "node:child_process";
 import { closeSync, openSync } from "node:fs";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -178,7 +178,7 @@ async function click(selector: string) {
   );
 }
 
-async function clipboardMode() {
+async function selectMode(mode: "clipboard" | "files") {
   // All mode also matches paths. Windows Start Menu paths can match words
   // such as "second", so clipboard checks must select the intended provider.
   // WebKitWebDriver can change the option without delivering its change
@@ -186,14 +186,18 @@ async function clipboardMode() {
   // This still runs the frontend handler and real Rust IPC; no results are mocked.
   await request(`/session/${session}/execute/sync`, "POST", {
     script: `const select = document.querySelector('select');
-      select.value = 'clipboard';
+      select.value = arguments[0];
       select.dispatchEvent(new Event('input', { bubbles: true }));
       select.dispatchEvent(new Event('change', { bubbles: true }));`,
-    args: [],
+    args: [mode],
   });
-  await until("Clipboard mode is ready", () =>
+  const placeholder =
+    mode === "clipboard"
+      ? "Search clipboard history..."
+      : "Search filenames and paths...";
+  await until(`${mode} mode is ready`, () =>
     observe<boolean>(
-      "return document.querySelector('input')?.placeholder === 'Search clipboard history...' && !!document.querySelector('.clear-history') && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+      `return document.querySelector('input')?.placeholder === ${JSON.stringify(placeholder)} && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
     ),
   );
 }
@@ -461,7 +465,7 @@ try {
 
   const firstClip = `TinyDash clipboard ${fixtures.nonce}\n  Preserve spaces and emoji 🚀`;
   const secondClip = `TinyDash second ${fixtures.nonce}`;
-  await clipboardMode();
+  await selectMode("clipboard");
   setClipboardText(firstClip);
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, `clipboard ${fixtures.nonce}`);
@@ -508,7 +512,7 @@ try {
     "Enter copies a stored clipboard entry through the native clipboard plugin",
   );
   await reopen();
-  await clipboardMode();
+  await selectMode("clipboard");
   await keys(inputId, `clipboard ${fixtures.nonce}`);
   await until(
     "the copied history entry remains available",
@@ -520,7 +524,7 @@ try {
     async () => (await titles()).length === 0,
   );
   await reopen();
-  await clipboardMode();
+  await selectMode("clipboard");
   await keys(inputId, `clipboard ${fixtures.nonce}`);
   await delay(1_200);
   assert.deepEqual(await titles(), []);
@@ -549,6 +553,92 @@ try {
   );
   assert.equal(clipboardText(), firstClip);
   pass("Clear history requires confirmation and preserves the OS clipboard");
+
+  await reopen();
+  await selectMode("files");
+  await until(
+    "the file scan finds only the visible document",
+    async () =>
+      (await titles()).length === 1 &&
+      (await titles())[0] === fixtures.fileName &&
+      (await observe<boolean>(
+        "return document.querySelector('.list-count')?.textContent === '1 file indexed'",
+      )),
+  );
+  pass(
+    "File scanning uses configured roots and excludes hidden files and excluded folders",
+  );
+  await keys(inputId, "bdg nts");
+  await until(
+    "filename fuzzy search finds the document",
+    async () => (await titles())[0] === fixtures.fileName,
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, "files/Budget");
+  await until(
+    "path search finds the document",
+    async () => (await titles())[0] === fixtures.fileName,
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, `Content-only-${fixtures.nonce}`);
+  await until(
+    "file contents are not searchable",
+    async () => (await titles()).length === 0,
+  );
+  pass(
+    "File search matches filenames and paths without indexing file contents",
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, fixtures.fileName);
+  await until("file search is ready to open", () =>
+    observe<boolean>(
+      `return document.querySelector('.result-title')?.textContent === ${JSON.stringify(fixtures.fileName)} && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  await saveScreen("files.png");
+  await keys(inputId, "\uE007");
+  await until(
+    "the OS file association opens the selected document",
+    async () =>
+      (await readFile(fixtures.fileMarker, "utf8")) === fixtures.filePath,
+  );
+  pass("Enter opens the selected file through its OS document association");
+  await reopen();
+  await selectMode("files");
+  await keys(inputId, fixtures.fileName);
+  await until("the indexed file remains searchable", () =>
+    observe<boolean>(
+      `return document.querySelector('.result-title')?.textContent === ${JSON.stringify(fixtures.fileName)} && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  await rm(fixtures.filePath);
+  await rm(fixtures.fileMarker);
+  await keys(inputId, "\uE007");
+  await until("a deleted file produces an action error", () =>
+    observe<boolean>(
+      "return document.querySelector('[role=alert]')?.textContent.includes('This file is no longer available')",
+    ),
+  );
+  pass(
+    "Opening a deleted file reports an error and keeps the launcher available",
+  );
+  const replacement = `Replacement ${fixtures.nonce}.txt`;
+  await writeFile(
+    resolve(fixtures.fileRoot, replacement),
+    "New file after the initial scan\n",
+  );
+  await keys(inputId, "\uE009r\uE000");
+  await until(
+    "refresh removes the deleted path",
+    async () => (await titles()).length === 0,
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, replacement);
+  await until(
+    "refresh finds the new document",
+    async () => (await titles())[0] === replacement,
+  );
+  pass("The Files refresh shortcut replaces the index after file changes");
   await writeFile(
     resolve(output, "result.json"),
     JSON.stringify({ passed }, null, 2),

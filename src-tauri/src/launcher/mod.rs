@@ -1,5 +1,6 @@
 pub mod actions;
 pub mod clipboard;
+pub mod files;
 pub mod query;
 pub mod result;
 pub mod search;
@@ -28,6 +29,7 @@ pub struct LauncherState {
     pub index_error: Mutex<Option<String>>,
     pub storage: storage::Storage,
     pub clipboard: clipboard::Monitor,
+    pub files: files::FileScan,
     search_version: AtomicU64,
 }
 
@@ -42,6 +44,7 @@ impl LauncherState {
             index_error: Mutex::new(None),
             storage: storage::Storage::default(),
             clipboard: clipboard::Monitor::default(),
+            files: files::FileScan::default(),
             search_version: AtomicU64::new(0),
         }
     }
@@ -68,6 +71,7 @@ pub async fn launcher_ready(app: AppHandle) -> Result<LauncherInfo, String> {
     if !state.ready.swap(true, Ordering::AcqRel) {
         clipboard::start(&app);
         window::show(&app).map_err(|error| error.to_string())?;
+        files::scan_files(&app);
     }
     Ok(LauncherInfo {
         settings: state.settings.clone(),
@@ -108,6 +112,7 @@ pub async fn search(
                 .warning()
                 .or_else(|| state.clipboard.warning()),
             total: search.app_count(),
+            files: state.files.status(search.file_count()),
             indexing: state.scanning.load(Ordering::Acquire),
             index_error: state
                 .index_error

@@ -65,6 +65,19 @@ Use test text for these checks. History stores text without encryption. These ch
 
 macOS and Windows read their clipboard change counters once per second. Copies made within the same interval can be missed. Linux uses GTK clipboard events. On Wayland, the compositor can limit access while TinyDash lacks focus; record which changes appear only after opening the launcher.
 
+## Check file search
+
+1. Put a text file in Documents. Give it a name with spaces and Unicode characters. Restart TinyDash, select Files, and wait for the scan to finish.
+2. Search by filename, abbreviation, and part of the full path. Confirm that All mode also finds the file. Confirm that Apps mode does not return it.
+3. Search for text that occurs only inside the file. Confirm that the file does not appear.
+4. Press Enter on the file. Confirm that its default application opens it. Reopen TinyDash and use Command/Ctrl + Enter to show it in the file manager.
+5. Add a second file. Use Refresh files or Command/Ctrl + R in Files mode. Confirm that the new file appears and the existing results remain usable during the scan.
+6. Delete the first file outside TinyDash. Before refreshing, try to open its old result. Confirm that an error appears. Refresh and confirm that the deleted file disappears.
+7. Configure a temporary folder in `fileSearchRoots`. Add hidden files, an excluded `node_modules` folder, and symbolic links. Restart and confirm that the scanner excludes them. Test a folder without read permission and confirm that the app stays usable and shows a warning.
+8. Set `fileSearchLimit` to 2 in a folder with three files. Restart and confirm that the UI reports an incomplete scan. Set `fileSearchRoots` to `[]`, restart, and confirm that Files mode is empty. Restore the settings when finished.
+
+File access depends on OS permissions. On macOS, record any Files and Folders permission prompt or denial. Test Windows redirected Known Folders and Linux XDG user directories if available. Files open through their OS association; a missing or broken association can prevent the target application from opening.
+
 ## Linux session differences
 
 - On X11, test the registered global shortcut directly.

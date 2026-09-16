@@ -15,6 +15,8 @@ declare global {
       clipboardCleared: boolean;
       rejectClear: boolean;
       slowPreview: boolean;
+      fileIndexing: boolean;
+      fileWarning: string | null;
       emit: typeof emit;
     };
   }
@@ -51,6 +53,16 @@ const calculation: SearchResult = {
   primaryAction: "copy",
   secondaryActions: [],
 };
+const file: SearchResult = {
+  id: "file:/Documents/Launch notes.md",
+  kind: "file",
+  title: "Launch notes.md",
+  subtitle: "/Documents/Launch notes.md",
+  score: 2000,
+  icon: null,
+  primaryAction: "open",
+  secondaryActions: ["reveal"],
+};
 const emoji: SearchResult = {
   id: "emoji:🚀",
   kind: "emoji",
@@ -85,6 +97,8 @@ window.__launcherTest = {
   clipboardCleared: false,
   rejectClear: false,
   slowPreview: false,
+  fileIndexing: false,
+  fileWarning: null,
   emit,
 };
 mockIPC(
@@ -100,6 +114,9 @@ mockIPC(
           shortcut: "CommandOrControl+Shift+Space",
           clipboardHistoryEnabled: true,
           clipboardHistoryLimit: 100,
+          fileSearchRoots: null,
+          fileSearchLimit: 50000,
+          fileSearchExcludedDirs: ["node_modules", "target"],
         },
         warnings: [],
       };
@@ -114,29 +131,33 @@ mockIPC(
         );
       // These fixed responses test rendering and IPC order, not TypeScript search.
       const results =
-        mode === "clipboard"
-          ? state.clipboardCleared
+        mode === "files" || query === "Launch notes.md"
+          ? query === "missing"
             ? []
-            : clips.filter(
-                (entry) => !state.clipboardDeleted.includes(entry.id),
-              )
-          : query === "=1 / 0" || (mode === "calculator" && !query)
-            ? []
-            : mode === "emoji" ||
-                query === ":rocket" ||
-                (query === "rocket" && mode !== "apps")
-              ? [emoji]
-              : query === "12 * 8" && mode !== "apps"
-                ? [calculation]
-                : query === "slow"
-                  ? [apps[0]]
-                  : query === "sa"
-                    ? [apps[1]]
-                    : query === "missing"
-                      ? []
-                      : state.usedAppFirst
-                        ? [apps[1], apps[0], ...apps.slice(2)]
-                        : apps;
+            : [file]
+          : mode === "clipboard"
+            ? state.clipboardCleared
+              ? []
+              : clips.filter(
+                  (entry) => !state.clipboardDeleted.includes(entry.id),
+                )
+            : query === "=1 / 0" || (mode === "calculator" && !query)
+              ? []
+              : mode === "emoji" ||
+                  query === ":rocket" ||
+                  (query === "rocket" && mode !== "apps")
+                ? [emoji]
+                : query === "12 * 8" && mode !== "apps"
+                  ? [calculation]
+                  : query === "slow"
+                    ? [apps[0]]
+                    : query === "sa"
+                      ? [apps[1]]
+                      : query === "missing"
+                        ? []
+                        : state.usedAppFirst
+                          ? [apps[1], apps[0], ...apps.slice(2)]
+                          : apps;
       return {
         results,
         total: apps.length,
@@ -144,6 +165,11 @@ mockIPC(
         indexError: null,
         notice: query === "=1 / 0" ? "Division by zero is not allowed." : null,
         storageError: state.storageError,
+        files: {
+          total: 1,
+          indexing: state.fileIndexing,
+          warning: state.fileWarning,
+        },
       };
     }
     if (command === "execute_action" && state.rejectActions) {

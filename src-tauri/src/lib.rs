@@ -19,8 +19,9 @@ use launcher::{LauncherState, window};
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Open TinyDash", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh applications", true, None::<&str>)?;
+    let files = MenuItem::with_id(app, "files", "Refresh files", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit TinyDash", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &refresh, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &refresh, &files, &quit])?;
     // Two small dashes form a legible monochrome menu-bar icon.
     let mut rgba = vec![0_u8; 22 * 22 * 4];
     for y in 0..22 {
@@ -46,6 +47,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                 }
             }
             "refresh" => launcher::scan_apps(app),
+            "files" => launcher::files::scan_files(app),
             "quit" => app.exit(0),
             _ => {}
         })
@@ -142,6 +144,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::launcher_ready,
             launcher::search,
             launcher::refresh_apps,
+            launcher::files::refresh_files,
             launcher::quit_app,
             launcher::actions::execute_action,
             launcher::clipboard::clipboard_preview,

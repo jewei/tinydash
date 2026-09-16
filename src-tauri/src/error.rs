@@ -1,9 +1,11 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("The application index is unavailable. Restart TinyDash.")]
+    #[error("The search index is unavailable. Restart TinyDash.")]
     IndexUnavailable,
     #[error("This application is no longer in the index. Refresh the application list.")]
     AppNotFound,
+    #[error("This file is no longer available. Refresh the file list.")]
+    FileNotFound,
     #[error("This action is not available for the selected result.")]
     InvalidAction,
     #[error("This result has expired. Search again to copy it.")]

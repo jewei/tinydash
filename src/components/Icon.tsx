@@ -4,6 +4,7 @@ type IconName =
   | "search"
   | "return"
   | "folder"
+  | "file"
   | "refresh"
   | "quit"
   | "apps"
@@ -27,6 +28,9 @@ export default function Icon(props: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <Switch>
+        <Match when={props.name === "file"}>
+          <path d="M14 2H5v20h14V7l-5-5Zm0 0v5h5M8 12h8M8 16h6" />
+        </Match>
         <Match when={props.name === "clipboard"}>
           <rect x="7" y="2" width="10" height="5" rx="2" />
           <path d="M7 4H4v18h16V4h-3M8 12h8M8 16h6" />

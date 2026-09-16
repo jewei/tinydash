@@ -14,6 +14,7 @@ import {
   type LauncherInfo,
   type SearchResult,
   type SearchMode,
+  type FileStatus,
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
@@ -29,6 +30,11 @@ export default function App() {
   const [info, setInfo] = createSignal<LauncherInfo>();
   const [total, setTotal] = createSignal(0);
   const [indexing, setIndexing] = createSignal(desktop);
+  const [files, setFiles] = createSignal<FileStatus>({
+    total: 0,
+    indexing: desktop,
+    warning: null,
+  });
   const [pending, setPending] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
@@ -53,6 +59,7 @@ export default function App() {
     notice() ??
     indexError() ??
     storageError() ??
+    (mode() === "all" || mode() === "files" ? files().warning : undefined) ??
     info()?.warnings[0];
   const primaryLabel = () =>
     current()?.kind === "emoji" || mode() === "emoji"
@@ -65,13 +72,15 @@ export default function App() {
   const placeholder = () =>
     mode() === "apps"
       ? "Search applications..."
-      : mode() === "emoji"
-        ? "Search emoji..."
-        : mode() === "calculator"
-          ? "Calculate or convert..."
-          : mode() === "clipboard"
-            ? "Search clipboard history..."
-            : "Search apps, clipboard, emoji...";
+      : mode() === "files"
+        ? "Search filenames and paths..."
+        : mode() === "emoji"
+          ? "Search emoji..."
+          : mode() === "calculator"
+            ? "Calculate or convert..."
+            : mode() === "clipboard"
+              ? "Search clipboard history..."
+              : "Search apps, files, emoji...";
   const focusInput = () => input.focus({ preventScroll: true });
 
   async function search(value = query(), preserveSelection = false) {
@@ -92,6 +101,7 @@ export default function App() {
       );
       setTotal(response.total);
       setIndexing(response.indexing);
+      setFiles(response.files);
       setIndexError(response.indexError ?? undefined);
       setStorageError(response.storageError ?? undefined);
       setNotice(response.notice ?? undefined);
@@ -178,16 +188,22 @@ export default function App() {
     }
   }
 
-  async function refresh() {
+  async function refresh(
+    target: "apps" | "files" = mode() === "files" ? "files" : "apps",
+  ) {
     setMenuOpen(false);
     setError(undefined);
-    setIndexing(true);
+    if (target === "files") setFiles((state) => ({ ...state, indexing: true }));
+    else setIndexing(true);
     focusInput();
     try {
-      await backend.refresh();
+      if (target === "files") await backend.refreshFiles();
+      else await backend.refresh();
       await search();
     } catch (reason) {
-      setIndexing(false);
+      if (target === "files")
+        setFiles((state) => ({ ...state, indexing: false }));
+      else setIndexing(false);
       setError(String(reason));
     }
   }
@@ -325,6 +341,9 @@ export default function App() {
           register("apps-changed", () => {
             void search();
           }),
+          register("files-changed", () => {
+            void search(query(), true);
+          }),
           register("usage-changed", () => {
             void search();
           }),
@@ -381,6 +400,7 @@ export default function App() {
           >
             <option value="all">All</option>
             <option value="apps">Apps</option>
+            <option value="files">Files</option>
             <option value="clipboard">Clipboard</option>
             <option value="emoji">Emoji</option>
             <option value="calculator">Calculator</option>
@@ -425,18 +445,24 @@ export default function App() {
                 ? "Calculator"
                 : mode() === "clipboard"
                   ? "Clipboard history"
-                  : "Applications"}
+                  : mode() === "files"
+                    ? "Files"
+                    : "Applications"}
         </span>
         <span class="list-count" role="status" aria-live="polite">
           {mode() === "calculator"
             ? "Offline"
-            : mode() === "emoji" || mode() === "clipboard"
-              ? `${results().length} shown`
-              : indexing()
-                ? "Finding applications..."
-                : pending()
-                  ? "Searching..."
-                  : `${total()} installed`}
+            : mode() === "files"
+              ? files().indexing
+                ? "Scanning files..."
+                : `${files().total} ${files().total === 1 ? "file" : "files"} indexed`
+              : mode() === "emoji" || mode() === "clipboard"
+                ? `${results().length} shown`
+                : indexing()
+                  ? "Finding applications..."
+                  : pending()
+                    ? "Searching..."
+                    : `${total()} installed`}
         </span>
         <Show when={mode() === "clipboard"}>
           <button
@@ -521,11 +547,17 @@ export default function App() {
                       ? query()
                         ? "No clipboard entries found"
                         : "No saved clipboard text"
-                      : indexing()
-                        ? "Finding your applications"
-                        : query()
-                          ? "No results found"
-                          : "No applications in the index"}
+                      : mode() === "files"
+                        ? files().indexing
+                          ? "Finding your files"
+                          : query()
+                            ? "No files found"
+                            : "No files in the index"
+                        : indexing()
+                          ? "Finding your applications"
+                          : query()
+                            ? "No results found"
+                            : "No applications in the index"}
             </h1>
             <p>
               {!desktop
@@ -540,17 +572,28 @@ export default function App() {
                         : query()
                           ? "Try a word from the text you copied."
                           : "Copy text in any application. It will appear here."
-                      : indexing()
-                        ? "You can start typing while the list loads."
-                        : query()
-                          ? "Try an app name, an emoji name, or a calculation."
-                          : "Refresh the list after you install an application."}
+                      : mode() === "files"
+                        ? files().indexing
+                          ? "You can search applications while the scan runs."
+                          : query()
+                            ? "Try a filename or part of a path."
+                            : info()?.settings.fileSearchRoots?.length === 0
+                              ? "File search is off in settings.json."
+                              : "Check your folders in settings.json, then refresh the file list."
+                        : indexing()
+                          ? "You can start typing while the list loads."
+                          : query()
+                            ? "Try a name, a file path, or a calculation."
+                            : "Refresh the list after you install an application."}
             </p>
             <Show
               when={
                 desktop &&
-                !indexing() &&
-                (query() || mode() === "all" || mode() === "apps")
+                !(mode() === "files" ? files().indexing : indexing()) &&
+                (query() ||
+                  mode() === "all" ||
+                  mode() === "apps" ||
+                  mode() === "files")
               }
             >
               <button
@@ -564,7 +607,11 @@ export default function App() {
                   }
                 }}
               >
-                {query() ? "Clear search" : "Refresh applications"}
+                {query()
+                  ? "Clear search"
+                  : mode() === "files"
+                    ? "Refresh files"
+                    : "Refresh applications"}
               </button>
             </Show>
           </div>
@@ -591,7 +638,9 @@ export default function App() {
                       ? "Enter copies the emoji."
                       : mode() === "clipboard"
                         ? "Enter copies text. Paste it with your usual shortcut."
-                        : "Type a name, : for emoji, or = to calculate."}
+                        : mode() === "files"
+                          ? "Enter opens the file. Refresh after files change."
+                          : "Type a name, : for emoji, or = to calculate."}
               </span>
             </>
           }
@@ -653,7 +702,9 @@ export default function App() {
                     }
                   />
                   {primaryLabel() === "Open"
-                    ? "Open application"
+                    ? current()?.kind === "file"
+                      ? "Open file"
+                      : "Open application"
                     : primaryLabel()}
                   <kbd>↵</kbd>
                 </button>
@@ -695,10 +746,24 @@ export default function App() {
                 <button
                   role="menuitem"
                   disabled={!desktop || indexing()}
-                  onClick={() => void refresh()}
+                  onClick={() => void refresh("apps")}
                 >
                   <Icon name="refresh" />
-                  Refresh applications<kbd>{modifier()} R</kbd>
+                  Refresh applications
+                  <Show when={mode() !== "files"}>
+                    <kbd>{modifier()} R</kbd>
+                  </Show>
+                </button>
+                <button
+                  role="menuitem"
+                  disabled={!desktop || files().indexing}
+                  onClick={() => void refresh("files")}
+                >
+                  <Icon name="refresh" />
+                  Refresh files
+                  <Show when={mode() === "files"}>
+                    <kbd>{modifier()} R</kbd>
+                  </Show>
                 </button>
                 <button
                   role="menuitem"

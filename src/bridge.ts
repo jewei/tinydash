@@ -1,11 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type Action = "launch" | "reveal" | "copy" | "delete";
-export type SearchMode = "all" | "apps" | "emoji" | "calculator" | "clipboard";
+export type Action = "launch" | "open" | "reveal" | "copy" | "delete";
+export type SearchMode =
+  "all" | "apps" | "files" | "emoji" | "calculator" | "clipboard";
+
+export interface FileStatus {
+  total: number;
+  indexing: boolean;
+  warning: string | null;
+}
 
 export interface SearchResult {
   id: string;
-  kind: "app" | "emoji" | "calculation" | "clipboard";
+  kind: "app" | "file" | "emoji" | "calculation" | "clipboard";
   title: string;
   subtitle: string;
   score: number;
@@ -21,6 +28,7 @@ export interface SearchResponse {
   indexError: string | null;
   notice: string | null;
   storageError: string | null;
+  files: FileStatus;
 }
 
 export interface LauncherInfo {
@@ -30,6 +38,9 @@ export interface LauncherInfo {
     shortcut: string;
     clipboardHistoryEnabled: boolean;
     clipboardHistoryLimit: number;
+    fileSearchRoots: string[] | null;
+    fileSearchLimit: number;
+    fileSearchExcludedDirs: string[];
   };
   platform: "macos" | "windows" | "linux";
   warnings: string[];
@@ -53,5 +64,6 @@ export const backend = {
   clearClipboard: () => invoke<void>("clear_clipboard_history"),
   hide: () => invoke<void>("hide_launcher"),
   refresh: () => invoke<void>("refresh_apps"),
+  refreshFiles: () => invoke<void>("refresh_files"),
   quit: () => invoke<void>("quit_app"),
 };

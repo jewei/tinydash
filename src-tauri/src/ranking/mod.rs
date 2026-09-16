@@ -34,11 +34,13 @@ fn usage_bonus(usage: Usage, now: i64) -> u32 {
 pub fn apply_usage(results: &mut [SearchResult], usage: &HashMap<String, Usage>, now: i64) {
     for result in results {
         if result.kind != ResultKind::Calculation {
-            if let Some(stats) = usage.get(&result.id) {
-                result.score = result.score.saturating_add(usage_bonus(*stats, now));
-            }
+            result.score = score_with_usage(result.score, &result.id, usage, now);
         }
     }
+}
+
+pub fn score_with_usage(score: u32, id: &str, usage: &HashMap<String, Usage>, now: i64) -> u32 {
+    score.saturating_add(usage.get(id).map_or(0, |stats| usage_bonus(*stats, now)))
 }
 
 /// Rank after provider collection and before limiting the response.
