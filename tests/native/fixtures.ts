@@ -1,12 +1,22 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 // Install real, temporary OS app entries. The launcher uses its normal scanner.
 export async function installFixtures() {
-  const directory = await mkdtemp(join(tmpdir(), "tinydash-native-"));
+  // Resolve Windows 8.3 temp aliases before comparing paths from native APIs.
+  const directory = await realpath(
+    await mkdtemp(join(tmpdir(), "tinydash-native-")),
+  );
   const marker = join(directory, "launched.txt");
   const binary = join(
     directory,
@@ -163,6 +173,57 @@ export async function installFixtures() {
         timeout: 15_000,
       });
     }
+    // Check the OS association before starting the launcher. A missing handler
+    // is a fixture failure, separate from a failure in TinyDash's open action.
+    if (process.platform === "win32") {
+      execFileSync(
+        "powershell.exe",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "Start-Process -FilePath $env:TINYDASH_TEST_DOCUMENT",
+        ],
+        { env: { ...env, TINYDASH_TEST_DOCUMENT: filePath }, timeout: 10_000 },
+      );
+    } else {
+      console.log(
+        "Document MIME type:",
+        execFileSync("xdg-mime", ["query", "filetype", filePath], {
+          env,
+          encoding: "utf8",
+          timeout: 10_000,
+        }).trim(),
+      );
+      console.log(
+        "Document handler:",
+        execFileSync("xdg-mime", ["query", "default", "text/plain"], {
+          env,
+          encoding: "utf8",
+          timeout: 10_000,
+        }).trim(),
+      );
+      execFileSync("xdg-open", [filePath], {
+        env,
+        timeout: 10_000,
+        stdio: "inherit",
+      });
+    }
+    let opened: string | undefined;
+    for (let attempt = 0; attempt < 50; attempt++) {
+      try {
+        opened = await readFile(fileMarker, "utf8");
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      await delay(100);
+    }
+    if (opened !== filePath)
+      throw new Error(
+        `Document fixture failed: expected ${filePath}, received ${opened ?? "no marker"}`,
+      );
+    await rm(fileMarker);
     return {
       directory,
       prefix,

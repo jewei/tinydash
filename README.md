@@ -51,6 +51,8 @@ The index contains regular files only. It excludes dot files, hidden files, Wind
 
 The default limit is 50,000 files. A scan also stops after visiting 500,000 entries, including folders. The UI reports a limit when the index is incomplete. Use smaller roots if a large directory reaches a limit. Scans and index preparation run on a background worker. The previous index remains searchable until the new scan finishes. Search uses memory, returns at most 30 results, and applies usage scores before limiting file results.
 
+File matching uses Unicode NFC so composed and decomposed accents match. The small [unicode-normalization crate](https://docs.rs/unicode-normalization/0.1.25/unicode_normalization/) supplies canonical normalization. This fixes accented filenames returned by macOS. Display text, file IDs, and open actions keep the original path.
+
 Use Refresh files in the actions or tray menu after adding, moving, or deleting files. Command/Ctrl + R refreshes files in Files mode. A full process restart also scans again. This phase has no filesystem watcher, periodic scan, file content index, or persisted file metadata. Only usage records for opened files are saved in SQLite.
 
 ## Clipboard history
