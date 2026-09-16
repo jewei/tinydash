@@ -164,7 +164,10 @@ try {
   if (process.platform === "win32") {
     // WebView2's launch mode relies on finding a DevToolsActivePort file.
     // Attach to an explicit loopback port so app startup remains observable.
-    const debugPort = await freePort();
+    const debugPort = process.env.TINYDASH_NATIVE_DEBUG_PORT
+      ? Number(process.env.TINYDASH_NATIVE_DEBUG_PORT)
+      : await freePort();
+    assert(Number.isInteger(debugPort) && debugPort > 0 && debugPort <= 65535);
     appLog = openSync(resolve(output, "application.log"), "w");
     application = spawn(binary, [], {
       env: {

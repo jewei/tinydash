@@ -75,7 +75,8 @@ jobs:
       - name: Test native Windows application
         if: runner.os == 'Windows'
         timeout-minutes: 5
-        run: bun run test:native
+        shell: pwsh
+        run: ./scripts/ci/test-windows.ps1
       - name: Test native Linux application
         if: runner.os == 'Linux'
         timeout-minutes: 5
