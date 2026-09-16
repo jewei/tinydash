@@ -254,7 +254,9 @@ File checks scan a temporary folder, test filename and path matching, open a doc
 
 System command checks search the native catalog, cancel the restart dialog, and verify that Rust rejects power requests without confirmation. Rust tests construct Mac Apple events without sending them and check the Windows flags and Linux method mapping. Browser tests cover explicit confirmation, cancellation, extra Enter presses, results changing behind the dialog, duplicate submission, and action errors. CI does not execute lock, sleep, restart, or shutdown. Test those transitions only in a disposable desktop session after saving work; use the desktop check guide.
 
-To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges and a separate test user profile with no prior TinyDash data. Linux requires `WebKitWebDriver`, `xclip`, `xdg-utils`, `desktop-file-utils`, and an active X11 session; its data and configuration directories are isolated by the test. This check replaces the current clipboard text, clears saved clipboard history, and records test usage. Then run:
+Linux test screenshots use `scrot` to capture the focused X11 window. This avoids a WebKit screenshot request that can time out while the page and other driver commands remain responsive. Windows continues to use the WebDriver screenshot API. Screenshot capture errors still fail the check.
+
+To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges and a separate test user profile with no prior TinyDash data. Linux requires `WebKitWebDriver`, `xclip`, `xdg-utils`, `desktop-file-utils`, `scrot`, and an active X11 session; its data and configuration directories are isolated by the test. This check replaces the current clipboard text, clears saved clipboard history, and records test usage. Then run:
 
 ```sh
 cargo install tauri-driver --version 2.0.6 --locked

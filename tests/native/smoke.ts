@@ -125,6 +125,15 @@ function pass(description: string) {
 }
 
 async function saveScreen(name: string) {
+  if (process.platform === "linux") {
+    // WebKit's snapshot request can stall while other driver requests still
+    // work. Capture the focused X11 window without waiting on that renderer.
+    execFileSync("scrot", ["--focused", "--overwrite", resolve(output, name)], {
+      timeout: 5_000,
+      stdio: "pipe",
+    });
+    return;
+  }
   const screenshot = await request<string>(`/session/${session}/screenshot`);
   await writeFile(resolve(output, name), Buffer.from(screenshot, "base64"));
 }
