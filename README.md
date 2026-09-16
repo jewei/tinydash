@@ -17,7 +17,9 @@ bun install --frozen-lockfile
 bun run tauri dev
 ```
 
-The launcher opens on startup. The default global shortcut is `Command+Shift+Space` on macOS and `Ctrl+Shift+Space` on Windows and X11 Linux. The shortcut shows or hides the existing window. The tray menu also opens the launcher, refreshes applications, and quits the app.
+The launcher opens on startup. The default global shortcut is `Control+Shift+Space` on macOS, Windows, and X11 Linux. The shortcut shows or hides the existing window. The tray menu also opens the launcher, refreshes applications, and quits the app.
+
+On macOS, use Control, not Command, for this global shortcut. macOS 27 uses `Command+Shift+Space` for [Siri Visual Intelligence](https://support.apple.com/en-my/102650). The previous TinyDash default can open Siri and cause a "Siri Unavailable" alert.
 
 After building a new version, quit the running TinyDash process through the tray menu before opening the new build. Hiding or reopening its window keeps the existing code running.
 
@@ -95,7 +97,7 @@ TinyDash writes `settings.json` in its application configuration directory on fi
 {
   "clearQueryOnOpen": true,
   "hideOnBlur": true,
-  "shortcut": "CommandOrControl+Shift+Space",
+  "shortcut": "Control+Shift+Space",
   "clipboardHistoryEnabled": true,
   "clipboardHistoryLimit": 100,
   "fileSearchRoots": null,
@@ -105,6 +107,8 @@ TinyDash writes `settings.json` in its application configuration directory on fi
 ```
 
 Set `clearQueryOnOpen` to `false` to keep the previous query and search mode. TinyDash selects that text when the window opens. With the default setting, it clears the query and returns to All mode. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Shortcut changes take effect after restart. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
+
+On macOS, a saved `CommandOrControl+Shift+Space` value from earlier TinyDash versions now uses `Control+Shift+Space`. This compatibility rule keeps the settings file intact, including other user settings. Other custom shortcuts remain unchanged. New settings files contain `Control+Shift+Space`.
 
 Set `clipboardHistoryLimit` to a value between 1 and 500. TinyDash applies the limit on restart and after each capture. Missing settings use their defaults. The settings file remains the editable startup configuration. Usage and clipboard data are stored separately in SQLite.
 

@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+const DEFAULT_SHORTCUT: &str = "Control+Shift+Space";
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
@@ -20,7 +22,7 @@ impl Default for Settings {
         Self {
             clear_query_on_open: true,
             hide_on_blur: true,
-            shortcut: "CommandOrControl+Shift+Space".into(),
+            shortcut: DEFAULT_SHORTCUT.into(),
             clipboard_history_enabled: true,
             clipboard_history_limit: 100,
             file_search_roots: None,
@@ -44,8 +46,17 @@ pub fn load(directory: &Path) -> anyhow::Result<Settings> {
     use anyhow::Context;
     let path = directory.join("settings.json");
     match std::fs::read(&path) {
-        Ok(bytes) => serde_json::from_slice(&bytes)
-            .with_context(|| format!("Read settings from {}", path.display())),
+        Ok(bytes) => {
+            let mut settings: Settings = serde_json::from_slice(&bytes)
+                .with_context(|| format!("Read settings from {}", path.display()))?;
+            // macOS 27 uses Command+Shift+Space for Siri Visual Intelligence.
+            // Upgrade only our old default. Keep custom shortcuts and the file intact.
+            if cfg!(target_os = "macos") && settings.shortcut == "CommandOrControl+Shift+Space" {
+                settings.shortcut = DEFAULT_SHORTCUT.into();
+                tracing::info!("Replaced the old macOS shortcut with Control+Shift+Space");
+            }
+            Ok(settings)
+        }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             let settings = Settings::default();
             std::fs::create_dir_all(directory).context("Create the settings directory")?;
@@ -64,7 +75,9 @@ mod tests {
     #[test]
     fn creates_defaults_and_preserves_user_changes() {
         let dir = tempfile::tempdir().expect("tempdir");
-        assert!(load(dir.path()).expect("defaults").clear_query_on_open);
+        let defaults = load(dir.path()).expect("defaults");
+        assert!(defaults.clear_query_on_open);
+        assert_eq!(defaults.shortcut, "Control+Shift+Space");
         std::fs::write(
             dir.path().join("settings.json"),
             r#"{"clearQueryOnOpen":false}"#,
@@ -73,6 +86,36 @@ mod tests {
         let settings = load(dir.path()).expect("settings");
         assert!(!settings.clear_query_on_open);
         assert!(settings.hide_on_blur);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn legacy_shortcut_avoids_siri_and_preserves_saved_settings() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("settings.json");
+        let saved = r#"{"shortcut":"CommandOrControl+Shift+Space","clearQueryOnOpen":false,"clipboardHistoryEnabled":false,"fileSearchRoots":[],"customSetting":true}"#;
+        std::fs::write(&path, saved).expect("write settings");
+
+        let settings = load(dir.path()).expect("load legacy settings");
+        assert_eq!(settings.shortcut, "Control+Shift+Space");
+        assert!(!settings.clear_query_on_open);
+        assert!(!settings.clipboard_history_enabled);
+        assert_eq!(settings.file_search_roots, Some(vec![]));
+        assert_eq!(std::fs::read_to_string(path).expect("read settings"), saved);
+    }
+
+    #[test]
+    fn preserves_custom_shortcuts() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(
+            dir.path().join("settings.json"),
+            r#"{"shortcut":"Alt+Shift+Space"}"#,
+        )
+        .expect("write settings");
+        assert_eq!(
+            load(dir.path()).expect("custom shortcut").shortcut,
+            "Alt+Shift+Space"
+        );
     }
 
     #[test]

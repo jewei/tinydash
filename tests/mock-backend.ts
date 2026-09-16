@@ -114,7 +114,7 @@ mockIPC(
         settings: {
           clearQueryOnOpen: true,
           hideOnBlur: true,
-          shortcut: "CommandOrControl+Shift+Space",
+          shortcut: "Control+Shift+Space",
           clipboardHistoryEnabled: true,
           clipboardHistoryLimit: 100,
           fileSearchRoots: null,
