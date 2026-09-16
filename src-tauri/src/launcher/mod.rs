@@ -9,7 +9,7 @@ pub mod window;
 
 use std::sync::{
     Mutex,
-    atomic::{AtomicBool, AtomicU64, Ordering},
+    atomic::{AtomicBool, Ordering},
 };
 
 use serde::Serialize;
@@ -30,7 +30,6 @@ pub struct LauncherState {
     pub storage: storage::Storage,
     pub clipboard: clipboard::Monitor,
     pub files: files::FileScan,
-    search_version: AtomicU64,
 }
 
 impl LauncherState {
@@ -45,7 +44,6 @@ impl LauncherState {
             storage: storage::Storage::default(),
             clipboard: clipboard::Monitor::default(),
             files: files::FileScan::default(),
-            search_version: AtomicU64::new(0),
         }
     }
 }
@@ -86,21 +84,12 @@ pub async fn search(
     mode: SearchMode,
     app: AppHandle,
 ) -> Result<SearchResponse, String> {
-    let version = app
-        .state::<LauncherState>()
-        .search_version
-        .fetch_add(1, Ordering::Relaxed)
-        .wrapping_add(1);
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<LauncherState>();
         let mut search = state
             .search
             .lock()
             .map_err(|_| Error::IndexUnavailable.to_string())?;
-        // Do not evaluate obsolete queries queued behind a calculation.
-        if state.search_version.load(Ordering::Relaxed) != version {
-            return Err("A newer search replaced this query.".into());
-        }
         let outcome = search
             .search(&query, mode)
             .map_err(|error| error.to_string())?;

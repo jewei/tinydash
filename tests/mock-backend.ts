@@ -17,6 +17,8 @@ declare global {
       slowPreview: boolean;
       fileIndexing: boolean;
       fileWarning: string | null;
+      holdSearch: boolean;
+      releaseSearch?: () => void;
       emit: typeof emit;
     };
   }
@@ -99,6 +101,7 @@ window.__launcherTest = {
   slowPreview: false,
   fileIndexing: false,
   fileWarning: null,
+  holdSearch: false,
   emit,
 };
 mockIPC(
@@ -123,8 +126,13 @@ mockIPC(
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
-      if (query === "slow" && mode !== "emoji")
-        await new Promise((resolve) => setTimeout(resolve, 250));
+      if (query === "slow" && mode !== "emoji") {
+        if (state.holdSearch)
+          await new Promise<void>((resolve) => {
+            state.releaseSearch = resolve;
+          });
+        else await new Promise((resolve) => setTimeout(resolve, 250));
+      }
       if (query === "error")
         throw new Error(
           "The application index is unavailable. Restart TinyDash.",

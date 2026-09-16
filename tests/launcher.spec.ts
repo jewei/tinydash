@@ -25,6 +25,40 @@ async function actions(page: Page) {
   );
 }
 
+test("keeps only the latest waiting query when input and index events overlap", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.holdSearch = true;
+  });
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("slow");
+  await page.waitForFunction(() => !!window.__launcherTest.releaseSearch);
+  await input.fill("intermediate");
+  await input.fill("sa");
+  await page.evaluate(() => window.__launcherTest.emit("files-changed", null));
+  await expect(
+    page.getByRole("button", { name: "Open", exact: true }),
+  ).toBeDisabled();
+  await page.evaluate(() => window.__launcherTest.releaseSearch?.());
+  await expect(page.locator(".result-title")).toHaveText("Safari");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  const queries = await page.evaluate(() =>
+    window.__launcherTest.calls
+      .filter((call) => call.command === "search")
+      .map((call) => (call.payload as { query: string }).query)
+      .filter(Boolean),
+  );
+  expect(queries).toEqual(["slow", "sa"]);
+  await input.press("Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      { command: "execute_action", payload: { id: "app-1", action: "launch" } },
+    ]);
+});
+
 test("opens and reveals files by ID, and refreshes files with the mode shortcut", async ({
   page,
 }) => {
