@@ -119,6 +119,7 @@ impl AppProvider {
                 icon: None,
                 primary_action: Action::Launch,
                 secondary_actions: vec![Action::Reveal],
+                confirmation: None,
             })
             .collect()
     }

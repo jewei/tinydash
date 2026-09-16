@@ -18,6 +18,7 @@ use crate::{
         clipboard::{ClipboardEntry, ClipboardProvider},
         emoji::EmojiProvider,
         files::{FileEntry, FileProvider},
+        system::SystemCommandProvider,
     },
     ranking,
 };
@@ -29,6 +30,7 @@ pub struct SearchManager {
     files: FileProvider,
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
+    system: Option<SystemCommandProvider>,
     calculator: CalculatorProvider,
     pub clipboard: ClipboardProvider,
     usage: HashMap<String, ranking::Usage>,
@@ -46,6 +48,7 @@ impl Default for SearchManager {
             files: FileProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
+            system: None,
             calculator: CalculatorProvider::default(),
             clipboard: ClipboardProvider::default(),
             usage: HashMap::new(),
@@ -95,6 +98,12 @@ impl SearchManager {
 
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
         match action {
+            Action::Run => self
+                .system
+                .as_ref()
+                .and_then(|provider| provider.get(id))
+                .map(ResolvedAction::System)
+                .ok_or(Error::InvalidAction),
             Action::Open | Action::Reveal if id.starts_with("file:") => {
                 Ok(ResolvedAction::File(self.file(id)?, action))
             }
@@ -161,6 +170,15 @@ impl SearchManager {
                 Err(_) => {} // Ordinary app names and partial input are not calculator errors.
             }
         }
+        if query.mode == SearchMode::System
+            || (query.mode == SearchMode::All && !query.text.is_empty())
+        {
+            results.extend(
+                self.system
+                    .get_or_insert_with(SystemCommandProvider::default)
+                    .search(query.text, &mut self.matcher),
+            );
+        }
         let now = ranking::now();
         ranking::apply_usage(&mut results, &self.usage, now);
         if query.mode == SearchMode::Files
@@ -201,6 +219,72 @@ mod tests {
             AppEntry::new("Notes!".into(), "/apps/notes.app".into(), vec![]),
         ]));
         manager
+    }
+
+    #[test]
+    fn system_search_is_lazy_scoped_and_uses_durable_ranking() {
+        use crate::providers::system::SystemCommand;
+        let mut manager = manager();
+        manager.search("", SearchMode::All).expect("home");
+        assert!(manager.system.is_none());
+        manager.system = Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec()));
+        assert!(
+            manager
+                .search("reboot", SearchMode::Apps)
+                .expect("apps")
+                .results
+                .is_empty()
+        );
+        assert_eq!(
+            manager
+                .search("reboot", SearchMode::All)
+                .expect("all")
+                .results[0]
+                .id,
+            "system:restart"
+        );
+        assert_eq!(
+            manager
+                .search("", SearchMode::System)
+                .expect("commands")
+                .results
+                .len(),
+            5
+        );
+        manager.record_usage("system:settings", ranking::now());
+        assert_eq!(
+            manager
+                .search("", SearchMode::System)
+                .expect("ranked")
+                .results[0]
+                .id,
+            "system:settings"
+        );
+        assert!(
+            manager
+                .search("unknown-command", SearchMode::System)
+                .expect("no match")
+                .results
+                .is_empty()
+        );
+        assert!(matches!(
+            manager.resolve_action("system:restart", Action::Run),
+            Ok(ResolvedAction::System(SystemCommand::Restart))
+        ));
+        for (id, action) in [
+            ("system:arbitrary", Action::Run),
+            ("system:restart", Action::Launch),
+            ("system:restart", Action::Copy),
+            ("app:/apps/Code.app", Action::Run),
+        ] {
+            assert!(manager.resolve_action(id, action).is_err());
+        }
+        manager.system = Some(SystemCommandProvider::new(vec![SystemCommand::Settings]));
+        assert!(
+            manager
+                .resolve_action("system:restart", Action::Run)
+                .is_err()
+        );
     }
 
     #[test]

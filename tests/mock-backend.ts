@@ -18,6 +18,9 @@ declare global {
       fileIndexing: boolean;
       fileWarning: string | null;
       holdSearch: boolean;
+      reverseSystem: boolean;
+      holdAction: boolean;
+      releaseAction?: () => void;
       releaseSearch?: () => void;
       emit: typeof emit;
     };
@@ -55,6 +58,30 @@ const calculation: SearchResult = {
   primaryAction: "copy",
   secondaryActions: [],
 };
+const systemCommands: SearchResult[] = [
+  ["restart", "Restart", "Restart this computer?"],
+  ["shutdown", "Shut down", "Shut down this computer?"],
+  ["sleep", "Sleep", "Put this computer to sleep?"],
+  ["settings", "Open system settings", ""],
+].map(([id, title, question]) => ({
+  id: `system:${id}`,
+  kind: "systemCommand",
+  title,
+  subtitle: question
+    ? "Confirmation required"
+    : "Open your operating system settings",
+  score: 1000,
+  icon: null,
+  primaryAction: "run",
+  secondaryActions: [],
+  confirmation: question
+    ? {
+        title: question,
+        description: "Save your work before you continue.",
+        confirmLabel: title,
+      }
+    : null,
+}));
 const file: SearchResult = {
   id: "file:/Documents/Launch notes.md",
   kind: "file",
@@ -102,6 +129,8 @@ window.__launcherTest = {
   fileIndexing: false,
   fileWarning: null,
   holdSearch: false,
+  reverseSystem: false,
+  holdAction: false,
   emit,
 };
 mockIPC(
@@ -139,33 +168,39 @@ mockIPC(
         );
       // These fixed responses test rendering and IPC order, not TypeScript search.
       const results =
-        mode === "files" || query === "Launch notes.md"
+        mode === "system" || query === "reboot"
           ? query === "missing"
             ? []
-            : [file]
-          : mode === "clipboard"
-            ? state.clipboardCleared
+            : state.reverseSystem
+              ? [...systemCommands].reverse()
+              : systemCommands
+          : mode === "files" || query === "Launch notes.md"
+            ? query === "missing"
               ? []
-              : clips.filter(
-                  (entry) => !state.clipboardDeleted.includes(entry.id),
-                )
-            : query === "=1 / 0" || (mode === "calculator" && !query)
-              ? []
-              : mode === "emoji" ||
-                  query === ":rocket" ||
-                  (query === "rocket" && mode !== "apps")
-                ? [emoji]
-                : query === "12 * 8" && mode !== "apps"
-                  ? [calculation]
-                  : query === "slow"
-                    ? [apps[0]]
-                    : query === "sa"
-                      ? [apps[1]]
-                      : query === "missing"
-                        ? []
-                        : state.usedAppFirst
-                          ? [apps[1], apps[0], ...apps.slice(2)]
-                          : apps;
+              : [file]
+            : mode === "clipboard"
+              ? state.clipboardCleared
+                ? []
+                : clips.filter(
+                    (entry) => !state.clipboardDeleted.includes(entry.id),
+                  )
+              : query === "=1 / 0" || (mode === "calculator" && !query)
+                ? []
+                : mode === "emoji" ||
+                    query === ":rocket" ||
+                    (query === "rocket" && mode !== "apps")
+                  ? [emoji]
+                  : query === "12 * 8" && mode !== "apps"
+                    ? [calculation]
+                    : query === "slow"
+                      ? [apps[0]]
+                      : query === "sa"
+                        ? [apps[1]]
+                        : query === "missing"
+                          ? []
+                          : state.usedAppFirst
+                            ? [apps[1], apps[0], ...apps.slice(2)]
+                            : apps;
       return {
         results,
         total: apps.length,
@@ -180,7 +215,14 @@ mockIPC(
         },
       };
     }
+    if (command === "execute_action" && state.holdAction) {
+      await new Promise<void>((resolve) => {
+        state.releaseAction = resolve;
+      });
+    }
     if (command === "execute_action" && state.rejectActions) {
+      if ((payload as { action: string }).action === "run")
+        throw new Error("The OS denied this system command.");
       throw new Error(
         "Could not open the application. Refresh the application list.",
       );

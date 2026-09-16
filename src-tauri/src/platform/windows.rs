@@ -101,6 +101,153 @@ pub fn launch(entry: &AppEntry) -> Result<()> {
         .map_err(|error| Error::Launch(error.to_string()))
 }
 
+pub fn system_commands() -> Vec<crate::providers::system::SystemCommand> {
+    crate::providers::system::SystemCommand::ALL.to_vec()
+}
+
+pub fn run_system_command(command: crate::providers::system::SystemCommand) -> Result<()> {
+    use crate::providers::system::SystemCommand;
+    use windows_sys::Win32::System::{Power::SetSuspendState, Shutdown::LockWorkStation};
+    match command {
+        SystemCommand::Settings => tauri_plugin_opener::open_url("ms-settings:", None::<&str>)
+            .map_err(|error| Error::SystemCommand(error.to_string())),
+        SystemCommand::Lock => {
+            // SAFETY: No pointers; requests a lock of this interactive session.
+            windows_result(unsafe { LockWorkStation() } != 0)
+        }
+        _ => {
+            // Token privileges belong to the process. Serialize their temporary
+            // changes so simultaneous IPC requests cannot restore stale state.
+            static POWER: std::sync::Mutex<()> = std::sync::Mutex::new(());
+            let _guard = POWER.lock().map_err(|_| {
+                Error::SystemCommand("A power command failed. Restart TinyDash.".into())
+            })?;
+            let _privilege = ShutdownPrivilege::enable()?;
+            // SAFETY: Fixed OS flags, no user pointers, privilege held for the call.
+            if command == SystemCommand::Sleep {
+                windows_result(unsafe { SetSuspendState(false, false, false) })
+            } else {
+                use windows_sys::Win32::System::Shutdown::{
+                    ExitWindowsEx, SHTDN_REASON_FLAG_PLANNED, SHTDN_REASON_MAJOR_APPLICATION,
+                };
+                let flags = shutdown_flags(command)?;
+                windows_result(
+                    unsafe {
+                        ExitWindowsEx(
+                            flags,
+                            SHTDN_REASON_FLAG_PLANNED | SHTDN_REASON_MAJOR_APPLICATION,
+                        )
+                    } != 0,
+                )
+            }
+        }
+    }
+}
+
+fn windows_result(success: bool) -> Result<()> {
+    if success {
+        Ok(())
+    } else {
+        Err(Error::SystemCommand(
+            std::io::Error::last_os_error().to_string(),
+        ))
+    }
+}
+
+fn shutdown_flags(command: crate::providers::system::SystemCommand) -> Result<u32> {
+    use crate::providers::system::SystemCommand;
+    use windows_sys::Win32::System::Shutdown::{EWX_POWEROFF, EWX_REBOOT};
+    // Do not force applications to close. Unsaved work can cancel the request.
+    match command {
+        SystemCommand::Restart => Ok(EWX_REBOOT),
+        SystemCommand::Shutdown => Ok(EWX_POWEROFF),
+        _ => Err(Error::InvalidAction),
+    }
+}
+
+struct ShutdownPrivilege {
+    token: windows_sys::Win32::Foundation::HANDLE,
+    previous: windows_sys::Win32::Security::TOKEN_PRIVILEGES,
+}
+
+impl ShutdownPrivilege {
+    fn enable() -> Result<Self> {
+        use windows_sys::Win32::{
+            Foundation::{ERROR_NOT_ALL_ASSIGNED, GetLastError, LUID},
+            Security::{
+                AdjustTokenPrivileges, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW,
+                SE_PRIVILEGE_ENABLED, SE_SHUTDOWN_NAME, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES,
+                TOKEN_QUERY,
+            },
+            System::Threading::{GetCurrentProcess, OpenProcessToken},
+        };
+        let mut privilege = Self {
+            token: ptr::null_mut(),
+            previous: TOKEN_PRIVILEGES::default(),
+        };
+        let mut luid = LUID::default();
+        // SAFETY: Valid output pointers and an owned token, released on every
+        // path. The buffer holds the one privilege that we request to change.
+        unsafe {
+            windows_result(
+                OpenProcessToken(
+                    GetCurrentProcess(),
+                    TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+                    &mut privilege.token,
+                ) != 0,
+            )?;
+            windows_result(LookupPrivilegeValueW(ptr::null(), SE_SHUTDOWN_NAME, &mut luid) != 0)?;
+            let requested = TOKEN_PRIVILEGES {
+                PrivilegeCount: 1,
+                Privileges: [LUID_AND_ATTRIBUTES {
+                    Luid: luid,
+                    Attributes: SE_PRIVILEGE_ENABLED,
+                }],
+            };
+            let mut length = 0;
+            let success = AdjustTokenPrivileges(
+                privilege.token,
+                0,
+                &requested,
+                size_of::<TOKEN_PRIVILEGES>() as u32,
+                &mut privilege.previous,
+                &mut length,
+            );
+            let error = GetLastError();
+            if success == 0 || error == ERROR_NOT_ALL_ASSIGNED {
+                return Err(Error::SystemCommand(
+                    std::io::Error::from_raw_os_error(error as i32).to_string(),
+                ));
+            }
+        }
+        Ok(privilege)
+    }
+}
+
+impl Drop for ShutdownPrivilege {
+    fn drop(&mut self) {
+        use windows_sys::Win32::{Foundation::CloseHandle, Security::AdjustTokenPrivileges};
+        if !self.token.is_null() {
+            // SAFETY: This object owns the token and the state returned by Win32.
+            unsafe {
+                if self.previous.PrivilegeCount != 0
+                    && AdjustTokenPrivileges(
+                        self.token,
+                        0,
+                        &self.previous,
+                        0,
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                    ) == 0
+                {
+                    tracing::warn!(error = %std::io::Error::last_os_error(), "Could not restore the shutdown privilege");
+                }
+                CloseHandle(self.token);
+            }
+        }
+    }
+}
+
 // Read only after the native counter changes. No window or frequent text polling.
 pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, Option<String>)>> {
     use crate::providers::clipboard::{MAX_TEXT_BYTES, valid_text};
@@ -160,6 +307,24 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn shutdown_requests_never_force_apps_to_close() {
+        use crate::providers::system::SystemCommand;
+        use windows_sys::Win32::System::Shutdown::{
+            EWX_FORCE, EWX_FORCEIFHUNG, EWX_POWEROFF, EWX_REBOOT,
+        };
+        for (command, expected) in [
+            (SystemCommand::Restart, EWX_REBOOT),
+            (SystemCommand::Shutdown, EWX_POWEROFF),
+        ] {
+            let flags = super::shutdown_flags(command).expect("flags");
+            assert_eq!(flags, expected);
+            assert_eq!(flags & (EWX_FORCE | EWX_FORCEIFHUNG), 0);
+        }
+        assert!(super::shutdown_flags(SystemCommand::Sleep).is_err());
+        assert!(super::shutdown_flags(SystemCommand::Lock).is_err());
+    }
+
     #[test]
     fn only_accepts_app_shortcuts_and_executables() {
         assert!(super::is_app_extension(Some("LNK")));

@@ -6,7 +6,7 @@ use super::{LauncherState, result::Action, window};
 use crate::{
     error::Error,
     platform,
-    providers::{apps::AppEntry, files::FileEntry},
+    providers::{apps::AppEntry, files::FileEntry, system::SystemCommand},
 };
 
 pub enum ResolvedAction {
@@ -15,14 +15,23 @@ pub enum ResolvedAction {
     Reveal(PathBuf),
     Copy(String),
     Delete(i64),
+    System(SystemCommand),
 }
 
 impl ResolvedAction {
+    fn check_confirmation(&self, confirmed: bool) -> crate::error::Result<()> {
+        if let Self::System(command) = self {
+            command.check_confirmation(confirmed)?;
+        }
+        Ok(())
+    }
+
     fn usage_id(&self, id: &str) -> Option<String> {
         match self {
             Self::Launch(entry) => Some(entry.id.clone()),
             Self::File(entry, Action::Open) => Some(entry.id.clone()),
             Self::Copy(_) if id.starts_with("emoji:") => Some(id.to_owned()),
+            Self::System(command) => Some(command.id().into()),
             // Revealing a location is not a launch. Calculation IDs are temporary.
             _ => None,
         }
@@ -30,7 +39,12 @@ impl ResolvedAction {
 }
 
 #[tauri::command]
-pub async fn execute_action(id: String, action: Action, app: AppHandle) -> Result<(), String> {
+pub async fn execute_action(
+    id: String,
+    action: Action,
+    confirmed: Option<bool>,
+    app: AppHandle,
+) -> Result<(), String> {
     let keep_open = action == Action::Delete;
     let worker_app = app.clone();
     let usage_id = tauri::async_runtime::spawn_blocking(move || {
@@ -44,7 +58,15 @@ pub async fn execute_action(id: String, action: Action, app: AppHandle) -> Resul
             .resolve_action(&id, action)
             .map_err(|error| error.to_string())?;
         let usage_id = action.usage_id(&id);
+        // Enforce this in Rust as well as in the dialog. Missing IPC fields
+        // never count as consent, including on older frontend builds.
+        action
+            .check_confirmation(confirmed.unwrap_or(false))
+            .map_err(|error| error.to_string())?;
         match action {
+            ResolvedAction::System(command) => {
+                platform::run_system_command(command).map_err(|error| error.to_string())
+            }
             ResolvedAction::File(entry, action) => {
                 entry.validate().map_err(|error| error.to_string())?;
                 match action {
@@ -102,6 +124,28 @@ pub async fn execute_action(id: String, action: Action, app: AppHandle) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolved_power_actions_cannot_skip_confirmation() {
+        for command in [
+            SystemCommand::Sleep,
+            SystemCommand::Restart,
+            SystemCommand::Shutdown,
+        ] {
+            let action = ResolvedAction::System(command);
+            assert!(matches!(
+                action.check_confirmation(false),
+                Err(Error::ConfirmationRequired)
+            ));
+            assert!(action.check_confirmation(true).is_ok());
+            assert_eq!(action.usage_id("ignored"), Some(command.id().into()));
+        }
+        assert!(
+            ResolvedAction::System(SystemCommand::Settings)
+                .check_confirmation(false)
+                .is_ok()
+        );
+    }
 
     #[test]
     fn only_successful_primary_actions_have_durable_usage_ids() {

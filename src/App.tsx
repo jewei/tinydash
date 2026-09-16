@@ -19,7 +19,7 @@ import {
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
 import ClipboardPreview from "./components/ClipboardPreview";
-import ClearHistoryDialog from "./components/ClearHistoryDialog";
+import ConfirmDialog from "./components/ConfirmDialog";
 
 export default function App() {
   const desktop = isTauri();
@@ -43,6 +43,7 @@ export default function App() {
   const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [clearOpen, setClearOpen] = createSignal(false);
+  const [pendingAction, setPendingAction] = createSignal<SearchResult>();
   let input!: HTMLInputElement;
   let menu: HTMLDivElement | undefined;
   let list!: HTMLUListElement;
@@ -62,7 +63,12 @@ export default function App() {
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
   const current = () => results()[selected()];
   const canOpen = () =>
-    desktop && !!current() && !busy() && !pending() && !clearOpen();
+    desktop &&
+    !!current() &&
+    !busy() &&
+    !pending() &&
+    !clearOpen() &&
+    !pendingAction();
   const message = () =>
     error() ??
     notice() ??
@@ -71,25 +77,29 @@ export default function App() {
     (mode() === "all" || mode() === "files" ? files().warning : undefined) ??
     info()?.warnings[0];
   const primaryLabel = () =>
-    current()?.kind === "emoji" || mode() === "emoji"
-      ? "Copy emoji"
-      : current()?.kind === "calculation" || mode() === "calculator"
-        ? "Copy result"
-        : current()?.kind === "clipboard" || mode() === "clipboard"
-          ? "Copy text"
-          : "Open";
+    current()?.kind === "systemCommand" || mode() === "system"
+      ? "Run command"
+      : current()?.kind === "emoji" || mode() === "emoji"
+        ? "Copy emoji"
+        : current()?.kind === "calculation" || mode() === "calculator"
+          ? "Copy result"
+          : current()?.kind === "clipboard" || mode() === "clipboard"
+            ? "Copy text"
+            : "Open";
   const placeholder = () =>
-    mode() === "apps"
-      ? "Search applications..."
-      : mode() === "files"
-        ? "Search filenames and paths..."
-        : mode() === "emoji"
-          ? "Search emoji..."
-          : mode() === "calculator"
-            ? "Calculate or convert..."
-            : mode() === "clipboard"
-              ? "Search clipboard history..."
-              : "Search apps, files, emoji...";
+    mode() === "system"
+      ? "Search system commands..."
+      : mode() === "apps"
+        ? "Search applications..."
+        : mode() === "files"
+          ? "Search filenames and paths..."
+          : mode() === "emoji"
+            ? "Search emoji..."
+            : mode() === "calculator"
+              ? "Calculate or convert..."
+              : mode() === "clipboard"
+                ? "Search clipboard history..."
+                : "Search apps, files, emoji...";
   const focusInput = () => input.focus({ preventScroll: true });
 
   function search(value = query(), preserveSelection = false) {
@@ -162,20 +172,48 @@ export default function App() {
   async function run(action: Action, result = current()) {
     if (!result || !canOpen()) return;
     setMenuOpen(false);
+    setError(undefined);
+    if (result.confirmation && action === result.primaryAction) {
+      // Capture the issued result. Background search updates must not change
+      // the command that the dialog asks the user to confirm.
+      setPendingAction(result);
+      return;
+    }
+    await execute(result, action);
+  }
+
+  async function execute(
+    result: SearchResult,
+    action: Action,
+    confirmed = false,
+  ) {
+    if (busy()) return;
     setBusy(true);
     setError(undefined);
     try {
-      await backend.execute(result.id, action);
+      await backend.execute(result.id, action, confirmed);
+      if (confirmed) setPendingAction(undefined);
       if (action === "delete") {
         await search();
         focusInput();
       }
     } catch (reason) {
       setError(String(reason));
-      focusInput();
+      if (!pendingAction()) focusInput();
     } finally {
       setBusy(false);
     }
+  }
+
+  function closeConfirmation() {
+    setPendingAction(undefined);
+    setError(undefined);
+    focusInput();
+  }
+
+  function confirmAction() {
+    const result = pendingAction();
+    if (result) void execute(result, result.primaryAction, true);
   }
 
   function confirmClear() {
@@ -249,10 +287,13 @@ export default function App() {
 
   function onKey(event: KeyboardEvent) {
     if (event.isComposing || event.keyCode === 229) return;
-    if (clearOpen()) {
+    if (clearOpen() || pendingAction()) {
       if (event.key === "Escape") {
         event.preventDefault();
-        if (!busy()) closeClear();
+        if (!busy()) {
+          if (clearOpen()) closeClear();
+          else closeConfirmation();
+        }
       }
       return;
     }
@@ -380,6 +421,7 @@ export default function App() {
           register("launcher-opened", (clear) => {
             setMenuOpen(false);
             setClearOpen(false);
+            setPendingAction(undefined);
             setError(undefined);
             if (clear === true) {
               setMode("all");
@@ -430,6 +472,7 @@ export default function App() {
             <option value="clipboard">Clipboard</option>
             <option value="emoji">Emoji</option>
             <option value="calculator">Calculator</option>
+            <option value="system">System</option>
           </select>
           <input
             ref={input}
@@ -465,15 +508,17 @@ export default function App() {
         <span>
           {query().trim()
             ? "Search results"
-            : mode() === "emoji"
-              ? "Emoji"
-              : mode() === "calculator"
-                ? "Calculator"
-                : mode() === "clipboard"
-                  ? "Clipboard history"
-                  : mode() === "files"
-                    ? "Files"
-                    : "Applications"}
+            : mode() === "system"
+              ? "System commands"
+              : mode() === "emoji"
+                ? "Emoji"
+                : mode() === "calculator"
+                  ? "Calculator"
+                  : mode() === "clipboard"
+                    ? "Clipboard history"
+                    : mode() === "files"
+                      ? "Files"
+                      : "Applications"}
         </span>
         <span class="list-count" role="status" aria-live="polite">
           {mode() === "calculator"
@@ -482,7 +527,9 @@ export default function App() {
               ? files().indexing
                 ? "Scanning files..."
                 : `${files().total} ${files().total === 1 ? "file" : "files"} indexed`
-              : mode() === "emoji" || mode() === "clipboard"
+              : mode() === "emoji" ||
+                  mode() === "clipboard" ||
+                  mode() === "system"
                 ? `${results().length} shown`
                 : indexing()
                   ? "Finding applications..."
@@ -565,56 +612,60 @@ export default function App() {
             <h1>
               {!desktop
                 ? "TinyDash, one shortcut away."
-                : mode() === "calculator"
-                  ? "Calculate and convert"
-                  : mode() === "emoji"
-                    ? "No emoji found"
-                    : mode() === "clipboard"
-                      ? query()
-                        ? "No clipboard entries found"
-                        : "No saved clipboard text"
-                      : mode() === "files"
-                        ? files().indexing
-                          ? "Finding your files"
-                          : query()
-                            ? "No files found"
-                            : "No files in the index"
-                        : mode() === "all" && files().indexing && query()
-                          ? "No results yet"
-                          : indexing()
-                            ? "Finding your applications"
+                : mode() === "system"
+                  ? "No system commands found"
+                  : mode() === "calculator"
+                    ? "Calculate and convert"
+                    : mode() === "emoji"
+                      ? "No emoji found"
+                      : mode() === "clipboard"
+                        ? query()
+                          ? "No clipboard entries found"
+                          : "No saved clipboard text"
+                        : mode() === "files"
+                          ? files().indexing
+                            ? "Finding your files"
                             : query()
-                              ? "No results found"
-                              : "No applications in the index"}
+                              ? "No files found"
+                              : "No files in the index"
+                          : mode() === "all" && files().indexing && query()
+                            ? "No results yet"
+                            : indexing()
+                              ? "Finding your applications"
+                              : query()
+                                ? "No results found"
+                                : "No applications in the index"}
             </h1>
             <p>
               {!desktop
                 ? "Start the TinyDash desktop app to search this computer."
-                : mode() === "calculator"
-                  ? "Try 12 * 8, sqrt(144), or 5 ft to cm."
-                  : mode() === "emoji"
-                    ? "Try a name, shortcode, or category, such as coffee or food."
-                    : mode() === "clipboard"
-                      ? info()?.settings.clipboardHistoryEnabled === false
-                        ? "Clipboard capture is off in settings.json."
-                        : query()
-                          ? "Try a word from the text you copied."
-                          : "Copy text in any application. It will appear here."
-                      : mode() === "files"
-                        ? files().indexing
-                          ? "You can search applications while the scan runs."
+                : mode() === "system"
+                  ? "Try sleep, restart, or settings."
+                  : mode() === "calculator"
+                    ? "Try 12 * 8, sqrt(144), or 5 ft to cm."
+                    : mode() === "emoji"
+                      ? "Try a name, shortcode, or category, such as coffee or food."
+                      : mode() === "clipboard"
+                        ? info()?.settings.clipboardHistoryEnabled === false
+                          ? "Clipboard capture is off in settings.json."
                           : query()
-                            ? "Try a filename or part of a path."
-                            : info()?.settings.fileSearchRoots?.length === 0
-                              ? "File search is off in settings.json."
-                              : "Check your folders in settings.json, then refresh the file list."
-                        : mode() === "all" && files().indexing && query()
-                          ? "The file scan is still running. You can search applications now."
-                          : indexing()
-                            ? "You can start typing while the list loads."
+                            ? "Try a word from the text you copied."
+                            : "Copy text in any application. It will appear here."
+                        : mode() === "files"
+                          ? files().indexing
+                            ? "You can search applications while the scan runs."
                             : query()
-                              ? "Try a name, a file path, or a calculation."
-                              : "Refresh the list after you install an application."}
+                              ? "Try a filename or part of a path."
+                              : info()?.settings.fileSearchRoots?.length === 0
+                                ? "File search is off in settings.json."
+                                : "Check your folders in settings.json, then refresh the file list."
+                          : mode() === "all" && files().indexing && query()
+                            ? "The file scan is still running. You can search applications now."
+                            : indexing()
+                              ? "You can start typing while the list loads."
+                              : query()
+                                ? "Try a name, a file path, or a calculation."
+                                : "Refresh the list after you install an application."}
             </p>
             <Show
               when={
@@ -664,15 +715,17 @@ export default function App() {
                   ? "Scanning files... You can search apps now."
                   : query()
                     ? `${results().length} ${results().length === 1 ? "result" : results().length === 30 ? "shown" : "results"}`
-                    : mode() === "calculator"
-                      ? "Enter copies the result."
-                      : mode() === "emoji"
-                        ? "Enter copies the emoji."
-                        : mode() === "clipboard"
-                          ? "Enter copies text. Paste it with your usual shortcut."
-                          : mode() === "files"
-                            ? "Enter opens the file. Refresh after files change."
-                            : "Type a name, : for emoji, or = to calculate."}
+                    : mode() === "system"
+                      ? "Power commands require confirmation."
+                      : mode() === "calculator"
+                        ? "Enter copies the result."
+                        : mode() === "emoji"
+                          ? "Enter copies the emoji."
+                          : mode() === "clipboard"
+                            ? "Enter copies text. Paste it with your usual shortcut."
+                            : mode() === "files"
+                              ? "Enter opens the file. Refresh after files change."
+                              : "Type a name, : for emoji, or = to calculate."}
               </span>
             </>
           }
@@ -697,9 +750,11 @@ export default function App() {
             onClick={runPrimary}
           >
             {busy()
-              ? current()?.primaryAction === "copy"
-                ? "Copying..."
-                : "Opening..."
+              ? current()?.primaryAction === "run"
+                ? "Running..."
+                : current()?.primaryAction === "copy"
+                  ? "Copying..."
+                  : "Opening..."
               : primaryLabel()}
             <Icon name="return" size={17} />
           </button>
@@ -815,12 +870,30 @@ export default function App() {
         </div>
       </footer>
       <Show when={clearOpen()}>
-        <ClearHistoryDialog
+        <ConfirmDialog
+          title="Clear clipboard history?"
+          description="This deletes all saved text entries. The current system clipboard stays available."
+          confirmLabel="Clear history"
+          busyLabel="Clearing..."
           busy={busy()}
           error={error()}
           onClose={closeClear}
-          onClear={() => void clearHistory()}
+          onConfirm={() => void clearHistory()}
         />
+      </Show>
+      <Show when={pendingAction()?.confirmation} keyed>
+        {(confirmation) => (
+          <ConfirmDialog
+            title={confirmation.title}
+            description={confirmation.description}
+            confirmLabel={confirmation.confirmLabel}
+            busyLabel="Running..."
+            busy={busy()}
+            error={error()}
+            onClose={closeConfirmation}
+            onConfirm={confirmAction}
+          />
+        )}
       </Show>
     </main>
   );

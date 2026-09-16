@@ -1,8 +1,8 @@
 # TinyDash
 
-A small desktop launcher. This version implements Phases 1 through 6.
+A small desktop launcher. This version implements Phases 1 through 7.
 
-Search installed applications and local filenames or paths. Find saved clipboard text, calculate values, convert units, and search local emoji data. Use the keyboard to open an application or file, or copy a result. The app stays running after the window hides.
+Search installed applications and local filenames or paths. Find saved clipboard text, calculate values, convert units, search local emoji data, and run system commands. The app stays running after the window hides.
 
 ## Run
 
@@ -27,7 +27,7 @@ After building a new version, quit the running TinyDash process through the tray
 
 ## Search
 
-The **All** mode combines application, file, clipboard, emoji, and calculation results. Select **Apps**, **Files**, **Clipboard**, **Emoji**, or **Calculator** to limit the search. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows applications only.
+The **All** mode combines application, file, clipboard, emoji, calculation, and system command results. Select **Apps**, **Files**, **Clipboard**, **Emoji**, **Calculator**, or **System** to limit the search. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows applications only.
 
 | Query            | Result                         |
 | ---------------- | ------------------------------ |
@@ -44,6 +44,22 @@ The **All** mode combines application, file, clipboard, emoji, and calculation r
 Arithmetic and unit conversion work offline. Unit case is preserved. Calculator mode shows errors for invalid expressions. Each query is independent; variables and scripts are not supported. Currency conversion needs exchange rates and remains scheduled for Phase 8.
 
 Enter copies the selected emoji or calculation result and hides the launcher. Paste the value in another application with its normal paste command. TinyDash does not paste automatically. Emoji search uses names, shortcodes, and categories from the local dataset. The list uses the default skin tones; glyph appearance depends on the operating system fonts.
+
+## System commands
+
+Select **System** to see the available commands. Search by name or alias: `reboot` finds Restart, `suspend` finds Sleep, and `preferences` finds Open system settings. The same commands appear in nonempty All searches.
+
+Sleep, Restart, and Shut down require confirmation. Cancel receives focus. Enter on Cancel or Escape closes the dialog without sending a command. Select the named confirmation button to continue. This rule also applies to the numbered result shortcuts and actions menu. Rust rejects power requests without explicit confirmation. The dialog keeps the selected command if background results change.
+
+| Platform | Implementation and limits                                                                                                                                                                                                                                                                                                                                                                           |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS    | Native Apple events request sleep, restart, and shutdown from the system process. Settings opens the installed System Settings or System Preferences app. Lock screen is offered only when Apple's legacy `CGSession` helper exists. It is absent on the macOS 27 development machine; use Control + Command + Q there. TinyDash does not use private lock APIs or request Accessibility access.    |
+| Windows  | Native Win32 APIs request lock, sleep, restart, and shutdown. Power commands temporarily enable the process's shutdown privilege and restore it after the call. Settings uses the `ms-settings:` URI. Permissions and session policy can deny a request.                                                                                                                                            |
+| Linux    | Power commands use the system `login1` D-Bus service and respect session policy and inhibitors. Lock uses an existing GNOME, freedesktop, Cinnamon, or MATE screen-lock service. These services can work on X11 or Wayland; a compositor without one is unsupported. Settings opens a known desktop entry for GNOME, KDE, Xfce, Cinnamon, MATE, LXQt, or COSMIC. Missing services produce an error. |
+
+Commands run on the existing background action worker. They add no polling or startup service queries. TinyDash does not force applications to quit or bypass OS policy. An accepted request does not guarantee completion: the OS, another application, or unsaved work can prevent the transition. Only accepted requests update usage history. Empty trash and volume controls are not part of this command set.
+
+The Mac integration adds the small `objc2-core-services` binding with only the required Apple event modules. Windows and Linux reuse their existing dependencies. Platform APIs follow [Apple's loginwindow lifecycle](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/Lifecycle.html), [Win32 ExitWindowsEx](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-exitwindowsex), and [systemd's login1 interface](https://github.com/systemd/systemd/blob/main/man/org.freedesktop.login1.xml).
 
 ## File search
 
@@ -71,17 +87,17 @@ macOS checks the [pasteboard change counter](https://developer.apple.com/documen
 
 ## Keys
 
-| Key                          | Action                                              |
-| ---------------------------- | --------------------------------------------------- |
-| Up / Down                    | Select a result; wrap at either end                 |
-| Enter                        | Open the app or file, or copy the selected result   |
-| Escape                       | Close the actions menu, or hide the launcher        |
-| Command / Ctrl + 1 through 9 | Run the corresponding result's primary action       |
-| Command / Ctrl + Enter       | Show the selected app or file in its folder         |
-| Command / Ctrl + Backspace   | Delete the selected clipboard entry                 |
-| Command / Ctrl + K           | Open the actions menu                               |
-| Command / Ctrl + R           | Refresh files in Files mode; otherwise refresh apps |
-| Command / Ctrl + Q           | Quit TinyDash                                       |
+| Key                          | Action                                                        |
+| ---------------------------- | ------------------------------------------------------------- |
+| Up / Down                    | Select a result; wrap at either end                           |
+| Enter                        | Run the primary action; power commands ask first              |
+| Escape                       | Cancel a dialog, close the actions menu, or hide the launcher |
+| Command / Ctrl + 1 through 9 | Run the corresponding result's primary action                 |
+| Command / Ctrl + Enter       | Show the selected app or file in its folder                   |
+| Command / Ctrl + Backspace   | Delete the selected clipboard entry                           |
+| Command / Ctrl + K           | Open the actions menu                                         |
+| Command / Ctrl + R           | Refresh files in Files mode; otherwise refresh apps           |
+| Command / Ctrl + Q           | Quit TinyDash                                                 |
 
 ## Settings
 
@@ -116,7 +132,7 @@ Set `fileSearchRoots` to `null` for the default folders, `[]` to disable file sc
 
 ## Usage and ranking
 
-Successful app launches, file opens, and emoji copies update a use count and last-used time. Frequently used and recently used results move higher in the list. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches. A usage bonus cannot add an item that does not match the query.
+Successful app launches, file opens, emoji copies, and accepted system commands update a use count and last-used time. Frequently used and recently used results move higher in the list. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches. A usage bonus cannot add an item that does not match the query.
 
 The frequency bonus is 25 points per use, up to 500 points. The recency bonus starts at 500 points and decreases with the number of days since the last use. Their combined limit is 1,000 points, compared with 10,000 for an exact match and 2,000 for a prefix match. Results with equal scores retain their existing order. Calculator results remain first for valid calculations.
 
@@ -156,11 +172,12 @@ The path is `query → SearchManager → providers → ranking → top 30 result
 
 - One Rust crate owns discovery, matching, ranking, usage persistence, indexed app IDs, launch actions, window lifecycle, settings, and shortcuts.
 - `SearchManager` reuses a `nucleo-matcher` instance. Names, aliases, and paths are prepared when the app index changes. Matching ignores case and supports Unicode normalization. Match and usage bonuses are applied in `ranking/mod.rs` before selecting the top 30. Unused apps keep a stable alphabetical order when the query is empty.
-- `AppProvider`, `FileProvider`, `ClipboardProvider`, `EmojiProvider`, and `CalculatorProvider` return the same result model. Rust parses search modes and prefixes. The emoji index loads on its first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit.
+- `AppProvider`, `FileProvider`, `ClipboardProvider`, `EmojiProvider`, `CalculatorProvider`, and `SystemCommandProvider` return the same result model. Rust parses search modes and prefixes. The emoji index and small system command catalog load on their first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit.
 - Discovery builds a new index off the UI thread. The old index remains available during refresh. Tauri's existing async runtime runs blocking scan, search, and launch work. A dedicated clipboard worker handles observations and database writes. Only macOS and Windows use the one-second clipboard counter timer.
 - Clipboard capture, copy, delete, and clear use the same storage lock. A generation number rejects reads already in progress when an entry is removed. Search never waits for disk access. Linux coalesces pending clipboard observations in a bounded queue. Results include short text summaries; a separate request fetches the selected entry's preview.
 - SolidJS keeps UI state and sends queries without a debounce timer. It sends one search request at a time and retains only the newest waiting query. This prevents IPC arrival order from cancelling the current query when startup events overlap. Request numbers prevent late replies from replacing newer results. Enter cannot execute an old result while a new query is pending.
 - The frontend sends a result ID and an action. Rust resolves app paths, indexed file paths, emoji values, and calculation values. It checks that a file still exists before opening it. A bounded cache holds the last 32 calculation results so copying an issued result does not evaluate it again. The webview has no general shell, opener, filesystem, clipboard, or global-shortcut permissions.
+- System command IDs resolve against the Rust catalog. Rust owns command aliases, confirmation text, and the confirmation rule. The frontend supplies explicit consent after the dialog. Platform modules contain the native API calls; no shell command text comes from the webview.
 - The official global shortcut, opener, and clipboard manager plugins supply desktop integration through Rust. The official single-instance plugin brings the existing process forward when the user starts TinyDash again.
 - App icons use initials in this version. The UI uses system fonts and local CSS. It makes no network requests.
 
@@ -170,15 +187,15 @@ The providers use direct methods. No provider trait is needed. The shared result
 src/
   App.tsx                 Query state, results, keyboard input, actions menu
   bridge.ts               Typed calls to Rust
-  components/             Icons, clipboard preview, and clear confirmation
+  components/             Icons, clipboard preview, and shared confirmation dialog
   styles/app.css          Launcher layout and states
 tokens.css                Colors, fonts, and spacing
 src-tauri/src/
   lib.rs                  Tauri setup, tray, and shortcut
   main.rs                 Process entry and startup error handling
   launcher/               SearchManager, file scan worker, actions, storage, clipboard monitor, window commands
-  providers/              App, file, clipboard, emoji, and calculator providers
-  platform/               OS app discovery, launch, clipboard detection, and hidden file flags
+  providers/              App, file, clipboard, emoji, calculator, and system providers
+  platform/               OS app discovery, launch, clipboard, file flags, and system commands
   ranking/mod.rs          Query normalization and score bonuses
   db/                     SQLite operations and transactional migrations
   settings.rs             Small startup configuration file
@@ -235,6 +252,8 @@ The native checks also copy test text from a separate process, verify capture an
 
 File checks scan a temporary folder, test filename and path matching, open a document through a temporary OS file association, report a deleted file, and refresh after file changes. Windows uses a unique test extension and restores the settings file after the check. Linux uses an isolated MIME association and configuration directory. Rust tests also cover overlapping roots, scan limits, hidden files, symbolic links, inaccessible folders, path validation, and file usage ranking before result limits.
 
+System command checks search the native catalog, cancel the restart dialog, and verify that Rust rejects power requests without confirmation. Rust tests construct Mac Apple events without sending them and check the Windows flags and Linux method mapping. Browser tests cover explicit confirmation, cancellation, extra Enter presses, results changing behind the dialog, duplicate submission, and action errors. CI does not execute lock, sleep, restart, or shutdown. Test those transitions only in a disposable desktop session after saving work; use the desktop check guide.
+
 To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges and a separate test user profile with no prior TinyDash data. Linux requires `WebKitWebDriver`, `xclip`, `xdg-utils`, `desktop-file-utils`, and an active X11 session; its data and configuration directories are isolated by the test. This check replaces the current clipboard text, clears saved clipboard history, and records test usage. Then run:
 
 ```sh
@@ -251,4 +270,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
 
 ## Next step
 
-Implement Phase 7: a small system-command provider with platform-specific actions and confirmation for restart and shutdown. Filesystem watching and cached currency rates remain in Phase 8.
+Implement Phase 8: filesystem watching, cached currency rates with background refresh, and performance measurements. Start with file watcher behavior and scan limits before adding network work.

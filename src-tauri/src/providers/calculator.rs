@@ -66,6 +66,7 @@ impl CalculatorProvider {
             icon: None,
             primary_action: Action::Copy,
             secondary_actions: vec![],
+            confirmation: None,
         })
     }
 

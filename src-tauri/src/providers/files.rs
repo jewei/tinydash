@@ -178,6 +178,7 @@ impl FileProvider {
                     icon: None,
                     primary_action: Action::Open,
                     secondary_actions: vec![Action::Reveal],
+                    confirmation: None,
                 }
             })
             .collect()

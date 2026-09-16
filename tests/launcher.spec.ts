@@ -25,6 +25,146 @@ async function actions(page: Page) {
   );
 }
 
+test("system commands ask before running and extra Enter cancels", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("system");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await expect(input).toHaveAttribute(
+    "placeholder",
+    "Search system commands...",
+  );
+  await expect(page.locator(".list-count")).toHaveText("4 shown");
+  await input.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Restart this computer?" });
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  expect(await actions(page)).toEqual([]);
+  await page.keyboard.press("Meta+2");
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  await expect(input).toBeFocused();
+  expect(await actions(page)).toEqual([]);
+  await page.keyboard.press("Meta+2");
+  await expect(
+    page.getByRole("dialog", { name: "Shut down this computer?" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitem", { name: "Run command" }).click();
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: "test-results/system-confirmation.png" });
+  await page.keyboard.press("Escape");
+  expect(await actions(page)).toEqual([]);
+});
+
+test("confirmation keeps the selected command through a ranking update and prevents duplicate requests", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("reboot");
+  await expect(page.locator(".result-title").first()).toHaveText("Restart");
+  await input.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Restart this computer?" });
+  await page.evaluate(() => {
+    window.__launcherTest.reverseSystem = true;
+    window.__launcherTest.holdAction = true;
+    return window.__launcherTest.emit("usage-changed", null);
+  });
+  await expect(page.locator(".result-title").first()).toHaveText(
+    "Open system settings",
+  );
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Restart", exact: true }).click();
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "system:restart", action: "run", confirmed: true },
+      },
+    ]);
+  await expect(
+    dialog.getByRole("button", { name: "Running..." }),
+  ).toBeDisabled();
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeDisabled();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  expect(await actions(page)).toHaveLength(1);
+  await page.evaluate(() => window.__launcherTest.releaseAction?.());
+  await expect(dialog).toHaveCount(0);
+});
+
+test("system failures remain in the dialog and reopening discards pending confirmation", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("system");
+  await expect(page.locator(".result-title")).toHaveCount(4);
+  await page.keyboard.press("Meta+3");
+  const dialog = page.getByRole("dialog", {
+    name: "Put this computer to sleep?",
+  });
+  await page.evaluate(() => {
+    window.__launcherTest.rejectActions = true;
+  });
+  await dialog.getByRole("button", { name: "Sleep", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText(
+    "The OS denied this system command.",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Sleep", exact: true }),
+  ).toBeEnabled();
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-opened", true),
+  );
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: "Search TinyDash" }),
+  ).toBeFocused();
+  await expect(page.getByRole("combobox", { name: "Search mode" })).toHaveValue(
+    "all",
+  );
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(await actions(page)).toHaveLength(1);
+});
+
+test("settings runs directly and System mode has its own empty state", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("system");
+  await expect(page.locator(".result-title")).toHaveCount(4);
+  await page.keyboard.press("Meta+4");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "system:settings", action: "run" },
+      },
+    ]);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("missing");
+  await expect(
+    page.getByRole("heading", { name: "No system commands found" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Run command" }),
+  ).toBeDisabled();
+});
+
 test("keeps only the latest waiting query when input and index events overlap", async ({
   page,
 }) => {

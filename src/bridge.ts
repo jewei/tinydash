@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type Action = "launch" | "open" | "reveal" | "copy" | "delete";
+export type Action = "launch" | "open" | "reveal" | "copy" | "delete" | "run";
 export type SearchMode =
-  "all" | "apps" | "files" | "emoji" | "calculator" | "clipboard";
+  "all" | "apps" | "files" | "emoji" | "calculator" | "clipboard" | "system";
 
 export interface FileStatus {
   total: number;
@@ -12,13 +12,19 @@ export interface FileStatus {
 
 export interface SearchResult {
   id: string;
-  kind: "app" | "file" | "emoji" | "calculation" | "clipboard";
+  kind:
+    "app" | "file" | "emoji" | "calculation" | "clipboard" | "systemCommand";
   title: string;
   subtitle: string;
   score: number;
   icon: string | null;
   primaryAction: Action;
   secondaryActions: Action[];
+  confirmation?: {
+    title: string;
+    description: string;
+    confirmLabel: string;
+  } | null;
 }
 
 export interface SearchResponse {
@@ -57,8 +63,12 @@ export const backend = {
   ready: () => invoke<LauncherInfo>("launcher_ready"),
   search: (query: string, mode: SearchMode) =>
     invoke<SearchResponse>("search", { query, mode }),
-  execute: (id: string, action: Action) =>
-    invoke<void>("execute_action", { id, action }),
+  execute: (id: string, action: Action, confirmed = false) =>
+    invoke<void>("execute_action", {
+      id,
+      action,
+      ...(confirmed ? { confirmed } : {}),
+    }),
   clipboardPreview: (id: string) =>
     invoke<ClipboardEntry>("clipboard_preview", { id }),
   clearClipboard: () => invoke<void>("clear_clipboard_history"),

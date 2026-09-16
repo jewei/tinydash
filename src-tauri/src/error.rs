@@ -8,6 +8,10 @@ pub enum Error {
     FileNotFound,
     #[error("This action is not available for the selected result.")]
     InvalidAction,
+    #[error("Confirm this system command before running it.")]
+    ConfirmationRequired,
+    #[error("Could not run the system command: {0}")]
+    SystemCommand(String),
     #[error("This result has expired. Search again to copy it.")]
     ResultExpired,
     #[error("Search queries must contain at most 256 characters.")]
