@@ -178,6 +178,17 @@ async function click(selector: string) {
   );
 }
 
+async function clipboardMode() {
+  // All mode also matches paths. Windows Start Menu paths can match words
+  // such as "second", so clipboard checks must select the intended provider.
+  await click('select option[value="clipboard"]');
+  await until("Clipboard mode is ready", () =>
+    observe<boolean>(
+      "return document.querySelector('select')?.value === 'clipboard' && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+    ),
+  );
+}
+
 async function reopen() {
   // Start the executable as a desktop shortcut would. Its single-instance
   // handler must show the resident window and reset the search field.
@@ -441,6 +452,7 @@ try {
 
   const firstClip = `TinyDash clipboard ${fixtures.nonce}\n  Preserve spaces and emoji 🚀`;
   const secondClip = `TinyDash second ${fixtures.nonce}`;
+  await clipboardMode();
   setClipboardText(firstClip);
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, `clipboard ${fixtures.nonce}`);
@@ -487,6 +499,7 @@ try {
     "Enter copies a stored clipboard entry through the native clipboard plugin",
   );
   await reopen();
+  await clipboardMode();
   await keys(inputId, `clipboard ${fixtures.nonce}`);
   await until(
     "the copied history entry remains available",
@@ -498,6 +511,7 @@ try {
     async () => (await titles()).length === 0,
   );
   await reopen();
+  await clipboardMode();
   await keys(inputId, `clipboard ${fixtures.nonce}`);
   await delay(1_200);
   assert.deepEqual(await titles(), []);
@@ -510,16 +524,7 @@ try {
     "the other entry is still available",
     async () => (await titles())[0] === secondClip,
   );
-  await click(".actions-button");
-  await until("the history action is visible", () =>
-    observe<boolean>(
-      "return [...document.querySelectorAll('[role=menuitem]')].some(el => el.textContent.includes('Clear clipboard history'))",
-    ),
-  );
-  const clearItem = await observe<number>(
-    "return [...document.querySelectorAll('[role=menuitem]')].findIndex(el => el.textContent.includes('Clear clipboard history'))",
-  );
-  await click(`[role=menuitem]:nth-of-type(${clearItem + 1})`);
+  await click(".clear-history");
   await until("clear asks for confirmation with Cancel selected", () =>
     observe<boolean>(
       "return !!document.querySelector('dialog[open]') && document.activeElement?.textContent === 'Cancel'",
@@ -527,8 +532,7 @@ try {
   );
   await click("dialog .cancel-button");
   assert.equal((await titles())[0], secondClip);
-  await click(".actions-button");
-  await click(`[role=menuitem]:nth-of-type(${clearItem + 1})`);
+  await click(".clear-history");
   await click("dialog .clear-button");
   await until(
     "confirmed clear removes remaining history",
