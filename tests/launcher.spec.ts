@@ -81,13 +81,19 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("files");
   await page.evaluate(() => {
     window.__launcherTest.fileIndexing = true;
     return window.__launcherTest.emit("files-changed", null);
   });
+  await expect(page.locator(".query-hint")).toContainText("Scanning files...");
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("missing");
+  await expect(
+    page.getByRole("heading", { name: "No results yet" }),
+  ).toBeVisible();
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("");
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("files");
   await expect(page.locator(".list-count")).toHaveText("Scanning files...");
   await expect(
     page.getByRole("button", { name: "Open", exact: true }),
