@@ -1,0 +1,53 @@
+[package]
+name = "tinydash"
+version = "0.1.0"
+description = "A small keyboard-first desktop application launcher"
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+name = "tinydash_lib"
+crate-type = ["lib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.11.5", features = ["tray-icon"] }
+tauri-plugin-global-shortcut = "2.3.2"
+tauri-plugin-opener = "2.5.5"
+tauri-plugin-single-instance = "2.4.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+nucleo-matcher = "0.3.1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+walkdir = "2.5"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+plist = "1.8"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_System_Com"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Use the GIO version already required by Tauri's GTK backend.
+gio = "0.18"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+
+# macOS 27 rejects stripped proc-macro dylibs with some Rust/LLVM versions.
+# Keep build tools intact while still stripping the shipped application.
+# https://github.com/rust-lang/rust/issues/157750
+[profile.release.build-override]
+strip = "none"

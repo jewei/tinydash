@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-16",
+  "existingProject": false,
+  "framework": "SolidJS",
+  "reference": "User-supplied launcher images",
+  "scope": "Desktop app launcher, Phases 1 and 2",
+  "fonts": "Native system fonts for startup speed and OS consistency",
+  "motion": "No idle animations"
+}
