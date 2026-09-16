@@ -13,7 +13,8 @@
     "format:check": "prettier --check .",
     "tauri": "tauri",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "test:native": "bun tests/native/smoke.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

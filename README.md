@@ -102,7 +102,9 @@ src-tauri/src/
   ranking/mod.rs          Query normalization and score bonuses
   settings.rs             Small startup configuration file
   error.rs                Internal errors
-tests/                    Browser tests with a separate mock backend
+tests/                    Browser tests and native WebDriver checks
+scripts/ci/               Platform test setup
+docs/desktop-checks.md    Interactive checks for each desktop
 .github/workflows/        Checks for macOS, Windows, and Linux
 ```
 
@@ -142,7 +144,21 @@ Run the optional host discovery check and search timing sample:
 cargo test --manifest-path src-tauri/Cargo.toml installed_apps_smoke -- --ignored --nocapture
 ```
 
-Native checks should also cover shortcut invocation, immediate input focus, app launch, hide on focus loss, tray access, and starting a second instance. Repeat these checks on each OS. The workflow supplies native build jobs; it does not replace interactive testing.
+The [Checks workflow](.github/workflows/check.yml) builds on macOS, Windows, and Ubuntu 24.04. Each successful build produces a downloadable `TinyDash-<OS>-<architecture>` artifact with the app, commit information, and [desktop check instructions](docs/desktop-checks.md). Artifacts remain available for 14 days. They are unsigned development builds.
+
+Windows and Linux jobs also run the actual release application through `tauri-driver`. The Bun test script installs two temporary application entries, searches through the real Rust backend, checks initial input focus and arrow-key selection, then launches a harmless executable that records which entry was selected. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its driver processes when it finishes. CI retains screenshots and failure logs in `test-results-<OS>-<architecture>` artifacts.
+
+To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime. Linux requires `WebKitWebDriver` and an active X11 session. Then run:
+
+```sh
+cargo install tauri-driver --version 2.0.6 --locked
+bun run tauri build --no-bundle
+bun run test:native
+```
+
+The direct Tauri WebDriver supports Windows and Linux. macOS receives build and Rust test checks in CI; its desktop checks remain manual. See the [Tauri WebDriver setup](https://v2.tauri.app/develop/tests/webdriver/).
+
+Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focus changes, tray controls, single-instance behavior, and Linux Wayland sessions. The Linux native CI test uses a virtual X11 display. It does not replace these interactive checks.
 
 ## Next step
 
