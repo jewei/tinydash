@@ -6,6 +6,24 @@ import Icon from "./Icon";
 export default function ResultIcon(props: { result: SearchResult }) {
   return (
     <Switch>
+      <Match when={props.result.kind === "systemCommand"}>
+        <span class="clipboard-icon" aria-hidden="true">
+          <Icon
+            name={
+              props.result.id === "system:lock"
+                ? "lock"
+                : props.result.id === "system:sleep"
+                  ? "sleep"
+                  : props.result.id === "system:restart"
+                    ? "refresh"
+                    : props.result.id === "system:shutdown"
+                      ? "quit"
+                      : "system"
+            }
+            size={24}
+          />
+        </span>
+      </Match>
       <Match when={props.result.kind === "app"}>
         <AppAvatar name={props.result.title} />
       </Match>

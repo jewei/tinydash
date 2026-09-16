@@ -1,10 +1,14 @@
 import { onMount, Show } from "solid-js";
 
-export default function ClearHistoryDialog(props: {
+export default function ConfirmDialog(props: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  busyLabel: string;
   busy: boolean;
   error?: string;
   onClose: () => void;
-  onClear: () => void;
+  onConfirm: () => void;
 }) {
   let dialog!: HTMLDialogElement;
   let cancel!: HTMLButtonElement;
@@ -15,19 +19,19 @@ export default function ClearHistoryDialog(props: {
   return (
     <dialog
       ref={dialog}
-      class="clear-dialog"
-      aria-labelledby="clear-title"
-      aria-describedby="clear-description"
+      class="confirm-dialog"
+      aria-labelledby="confirm-title"
+      aria-describedby="confirm-description"
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && event.repeat) event.preventDefault();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         if (!props.busy) props.onClose();
       }}
     >
-      <h2 id="clear-title">Clear clipboard history?</h2>
-      <p id="clear-description">
-        This deletes all saved text entries. The current system clipboard stays
-        available.
-      </p>
+      <h2 id="confirm-title">{props.title}</h2>
+      <p id="confirm-description">{props.description}</p>
       <Show when={props.error}>
         <p class="dialog-error" role="alert">
           {props.error}
@@ -43,11 +47,11 @@ export default function ClearHistoryDialog(props: {
           Cancel
         </button>
         <button
-          class="clear-button"
+          class="confirm-button"
           disabled={props.busy}
-          onClick={props.onClear}
+          onClick={props.onConfirm}
         >
-          {props.busy ? "Clearing..." : "Clear history"}
+          {props.busy ? props.busyLabel : props.confirmLabel}
         </button>
       </div>
     </dialog>

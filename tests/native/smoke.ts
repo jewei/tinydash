@@ -185,7 +185,7 @@ async function click(selector: string) {
   );
 }
 
-async function selectMode(mode: "apps" | "clipboard" | "files") {
+async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
   // All mode also matches paths. Isolate the intended provider so temporary
   // file paths do not affect app or clipboard result assertions.
   // WebKitWebDriver can change the option without delivering its change
@@ -202,6 +202,7 @@ async function selectMode(mode: "apps" | "clipboard" | "files") {
     apps: "Search applications...",
     clipboard: "Search clipboard history...",
     files: "Search filenames and paths...",
+    system: "Search system commands...",
   }[mode];
   await until(`${mode} mode is ready`, () =>
     observe<boolean>(
@@ -555,7 +556,7 @@ try {
   await click("dialog .cancel-button");
   assert.equal((await titles())[0], secondClip);
   await click(".clear-history");
-  await click("dialog .clear-button");
+  await click("dialog .confirm-button");
   await until(
     "confirmed clear removes remaining history",
     async () => (await titles()).length === 0,
@@ -648,6 +649,50 @@ try {
     async () => (await titles())[0] === replacement,
   );
   pass("The Files refresh shortcut replaces the index after file changes");
+
+  await reopen();
+  await selectMode("system");
+  assert.equal((await titles()).length, 5);
+  await keys(inputId, "reboot");
+  await until("the system provider resolves the reboot alias", () =>
+    observe<boolean>(
+      "return document.querySelector('.result-title')?.textContent === 'Restart' && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+    ),
+  );
+  await keys(inputId, "\uE007");
+  await until("restart asks for confirmation with Cancel selected", () =>
+    observe<boolean>(
+      "return document.querySelector('dialog[open] h2')?.textContent === 'Restart this computer?' && document.activeElement?.textContent === 'Cancel'",
+    ),
+  );
+  await saveScreen("system-confirmation.png");
+  await click("dialog .cancel-button");
+  await until("cancel returns to search", () =>
+    observe<boolean>(
+      "return !document.querySelector('dialog[open]') && document.activeElement?.tagName === 'INPUT'",
+    ),
+  );
+  pass(
+    "System search resolves aliases and Cancel closes the native confirmation dialog",
+  );
+  // Intentionally omit consent. Never send confirmed:true for power actions
+  // to a real backend: these tests must not disrupt the host or hosted runner.
+  for (const id of ["system:restart", "system:shutdown", "system:sleep"]) {
+    const rejection = await request<string>(
+      `/session/${session}/execute/async`,
+      "POST",
+      {
+        script: `const done = arguments[arguments.length - 1];
+        window.__TAURI_INTERNALS__.invoke('execute_action', { id: arguments[0], action: 'run' })
+          .then(() => done('unexpected success'), error => done(String(error)));`,
+        args: [id],
+      },
+    );
+    assert.match(rejection, /Confirm this system command before running it/);
+  }
+  pass(
+    "Rust rejects sleep, restart, and shutdown IPC requests without explicit confirmation",
+  );
   await writeFile(
     resolve(output, "result.json"),
     JSON.stringify({ passed }, null, 2),

@@ -78,6 +78,19 @@ macOS and Windows read their clipboard change counters once per second. Copies m
 
 File access depends on OS permissions. On macOS, record any Files and Folders permission prompt or denial. Test Windows redirected Known Folders and Linux XDG user directories if available. Files open through their OS association; a missing or broken association can prevent the target application from opening.
 
+## Check system commands
+
+1. Select System. Confirm that the supported commands appear. Search `reboot`, `suspend`, and `preferences`. Confirm that the aliases find Restart, Sleep, and Open system settings. Check the same queries in All mode and confirm that Apps mode excludes system commands.
+2. Select Restart and press Enter. Confirm that the dialog names Restart and Cancel has focus. Press Enter again. Confirm that the dialog closes and the computer remains running.
+3. Select Shut down with its numbered shortcut. Press Escape in the dialog. Confirm that the launcher stays open and no command runs. Repeat through the actions menu.
+4. Open a power confirmation dialog, hide the launcher by clicking another app, then reopen it. Confirm that the old confirmation is gone.
+5. Run Open system settings. Confirm that the correct settings app opens. Reopen TinyDash and confirm that the command's usage ranking has changed.
+6. In a disposable desktop session, save work and test Lock screen if offered. Unlock and confirm that TinyDash can open again. On macOS without the legacy `CGSession` helper, the command is omitted; use Control + Command + Q.
+7. In a disposable desktop session, save work and confirm Sleep, Restart, and Shut down separately. Check the OS transition. Do not run these checks on a hosted CI runner or a computer with active work.
+8. On Linux, test the desktop's policy denial or a missing service. Confirm that TinyDash reports the failure and remains usable. Check X11 and Wayland separately. A standalone compositor must provide a supported screen-lock service for Lock screen to work.
+
+Automated tests cover command search, confirmation, cancellation, and backend rejection of requests without confirmation. They do not prove that a power transition completes. Mark transitions that were not run as pending. An OS can accept a request and then cancel it because of unsaved work or session policy.
+
 ## Linux session differences
 
 - On X11, test the registered global shortcut directly.

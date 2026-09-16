@@ -109,6 +109,137 @@ pub fn launch(entry: &AppEntry) -> Result<()> {
         .map_err(|error| Error::Launch(error.to_string()))
 }
 
+const LOCK_HELPER: &str =
+    "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession";
+
+pub fn system_commands() -> Vec<crate::providers::system::SystemCommand> {
+    use crate::providers::system::SystemCommand;
+    // Recent macOS versions removed CGSession. Do not substitute display sleep
+    // for locking, use private APIs, or require Accessibility for key injection.
+    SystemCommand::ALL
+        .into_iter()
+        .filter(|command| *command != SystemCommand::Lock || Path::new(LOCK_HELPER).is_file())
+        .collect()
+}
+
+pub fn run_system_command(command: crate::providers::system::SystemCommand) -> Result<()> {
+    use crate::providers::system::SystemCommand;
+    match command {
+        SystemCommand::Lock => {
+            let status = std::process::Command::new(LOCK_HELPER)
+                .arg("-suspend")
+                .status()
+                .map_err(|error| {
+                    Error::SystemCommand(format!(
+                        "Screen lock is unavailable. Use Control+Command+Q. {error}"
+                    ))
+                })?;
+            if !status.success() {
+                return Err(Error::SystemCommand(format!(
+                    "Screen lock returned {status}. Use Control+Command+Q."
+                )));
+            }
+            Ok(())
+        }
+        SystemCommand::Settings => {
+            let path = [
+                "/System/Applications/System Settings.app",
+                "/System/Applications/System Preferences.app",
+            ]
+            .into_iter()
+            .find(|path| Path::new(path).is_dir())
+            .ok_or_else(|| Error::SystemCommand("System Settings is unavailable.".into()))?;
+            tauri_plugin_opener::open_path(path, None::<&str>)
+                .map_err(|error| Error::SystemCommand(error.to_string()))
+        }
+        _ => {
+            use objc2_core_services::{AESendMessage, kAENeverInteract, kAENoReply};
+            let event = power_event(command)?;
+            let mut reply = AppleEventDescriptor::empty();
+            // SAFETY: Both descriptors remain owned and valid for the call.
+            // NoReply asks loginwindow to begin the normal OS transition; it
+            // does not force applications to quit or wait for shutdown.
+            let status = unsafe {
+                AESendMessage(
+                    &event.0,
+                    &mut reply.0,
+                    (kAENoReply | kAENeverInteract) as i32,
+                    300,
+                )
+            };
+            apple_event_status(status)
+        }
+    }
+}
+
+struct AppleEventDescriptor(objc2_core_services::AEDesc);
+
+impl AppleEventDescriptor {
+    fn empty() -> Self {
+        Self(objc2_core_services::AEDesc {
+            descriptorType: objc2_core_services::typeNull,
+            dataHandle: std::ptr::null_mut(),
+        })
+    }
+}
+
+impl Drop for AppleEventDescriptor {
+    fn drop(&mut self) {
+        // SAFETY: This descriptor is initialized, uniquely owned, and never
+        // copied. AE accepts empty descriptors as well as allocated ones.
+        unsafe {
+            objc2_core_services::AEDisposeDesc(&mut self.0);
+        }
+    }
+}
+
+fn apple_event_status(status: i32) -> Result<()> {
+    if status == 0 {
+        Ok(())
+    } else {
+        Err(Error::SystemCommand(format!(
+            "macOS rejected the Apple event (status {status}). Use the Apple menu if this command is unavailable."
+        )))
+    }
+}
+
+fn power_event(command: crate::providers::system::SystemCommand) -> Result<AppleEventDescriptor> {
+    use crate::providers::system::SystemCommand;
+    use objc2_core_services::{
+        AECreateAppleEvent, AECreateDesc, kAERestart, kAEShutDown, kAESleep, kAnyTransactionID,
+        kAutoGenerateReturnID, typeProcessSerialNumber,
+    };
+    let event_id = match command {
+        SystemCommand::Sleep => kAESleep,
+        SystemCommand::Restart => kAERestart,
+        SystemCommand::Shutdown => kAEShutDown,
+        _ => return Err(Error::InvalidAction),
+    };
+    // Apple's documented system-process address (ProcessSerialNumber {0, 1}).
+    let address = [0u32, 1u32];
+    let mut target = AppleEventDescriptor::empty();
+    let mut event = AppleEventDescriptor::empty();
+    // SAFETY: The two u32s have the ProcessSerialNumber layout. AE copies their
+    // bytes. All output descriptors are initialized and disposed by their owner.
+    unsafe {
+        apple_event_status(i32::from(AECreateDesc(
+            typeProcessSerialNumber,
+            address.as_ptr().cast(),
+            size_of_val(&address) as i64,
+            &mut target.0,
+        )))?;
+        apple_event_status(i32::from(AECreateAppleEvent(
+            u32::from_be_bytes(*b"aevt"),
+            event_id,
+            &target.0,
+            kAutoGenerateReturnID as i16,
+            kAnyTransactionID,
+            &mut event.0,
+        )))?;
+    }
+    Ok(event)
+}
+
 // Called on the clipboard worker. The counter check does not fetch text.
 pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, Option<String>)>> {
     use crate::providers::clipboard::{MAX_TEXT_BYTES, valid_text};
@@ -135,6 +266,44 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn constructs_system_apple_events_without_sending_them() {
+        use crate::providers::system::SystemCommand;
+        use objc2_core_services::{AEGetAttributePtr, keyEventClassAttr, keyEventIDAttr, typeType};
+        for (command, id) in [
+            (SystemCommand::Sleep, *b"slep"),
+            (SystemCommand::Restart, *b"rest"),
+            (SystemCommand::Shutdown, *b"shut"),
+        ] {
+            let event = power_event(command).expect("create Apple event");
+            for (key, expected) in [(keyEventClassAttr, *b"aevt"), (keyEventIDAttr, id)] {
+                let mut value = 0u32;
+                let mut actual_type = 0;
+                let mut actual_size = 0;
+                // Reads the descriptor only. This test cannot send a power event.
+                let status = unsafe {
+                    AEGetAttributePtr(
+                        &event.0,
+                        key,
+                        typeType,
+                        &mut actual_type,
+                        (&mut value as *mut u32).cast(),
+                        4,
+                        &mut actual_size,
+                    )
+                };
+                assert_eq!(status, 0);
+                assert_eq!(actual_size, 4);
+                assert_eq!(value, u32::from_be_bytes(expected));
+            }
+        }
+        assert!(power_event(SystemCommand::Settings).is_err());
+        assert_eq!(
+            system_commands().contains(&SystemCommand::Lock),
+            Path::new(LOCK_HELPER).is_file()
+        );
+    }
 
     fn bundle(root: &Path, name: &str, extra: &str) -> PathBuf {
         let path = root.join(format!("{name}.app"));

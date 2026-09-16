@@ -8,6 +8,7 @@ pub enum ResultKind {
     Calculation,
     Emoji,
     Clipboard,
+    SystemCommand,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -18,6 +19,15 @@ pub enum Action {
     Reveal,
     Copy,
     Delete,
+    Run,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionConfirmation {
+    pub title: String,
+    pub description: String,
+    pub confirm_label: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -31,6 +41,8 @@ pub struct SearchResult {
     pub icon: Option<String>,
     pub primary_action: Action,
     pub secondary_actions: Vec<Action>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confirmation: Option<ActionConfirmation>,
 }
 
 #[derive(Debug, Serialize)]

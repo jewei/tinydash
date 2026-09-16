@@ -12,6 +12,9 @@ type IconName =
   | "calculator"
   | "clipboard"
   | "delete"
+  | "system"
+  | "lock"
+  | "sleep"
   | "copy";
 
 export default function Icon(props: { name: IconName; size?: number }) {
@@ -28,6 +31,19 @@ export default function Icon(props: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <Switch>
+        <Match when={props.name === "system"}>
+          <path d="M3 6h9m4 0h5M3 12h3m4 0h11M3 18h11m4 0h3" />
+          <circle cx="14" cy="6" r="2" />
+          <circle cx="8" cy="12" r="2" />
+          <circle cx="16" cy="18" r="2" />
+        </Match>
+        <Match when={props.name === "lock"}>
+          <rect x="5" y="10" width="14" height="11" rx="2" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+        </Match>
+        <Match when={props.name === "sleep"}>
+          <path d="M20 15a9 9 0 0 1-11-11 9 9 0 1 0 11 11Z" />
+        </Match>
         <Match when={props.name === "file"}>
           <path d="M14 2H5v20h14V7l-5-5Zm0 0v5h5M8 12h8M8 16h6" />
         </Match>

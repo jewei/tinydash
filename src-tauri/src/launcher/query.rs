@@ -12,6 +12,7 @@ pub enum SearchMode {
     Emoji,
     Calculator,
     Clipboard,
+    System,
 }
 
 pub struct Query<'a> {

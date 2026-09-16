@@ -243,7 +243,7 @@ kbd {
   padding: var(--space-sm) 0 0 var(--space-md);
 }
 .clipboard-preview h2,
-.clear-dialog h2 {
+.confirm-dialog h2 {
   font-size: var(--text-title);
   font-weight: 500;
   margin: 0 0 var(--space-sm);
@@ -274,7 +274,7 @@ kbd {
   font-size: var(--text-xs);
   padding-right: 0;
 }
-.clear-dialog {
+.confirm-dialog {
   width: min(420px, calc(100vw - 32px));
   color: var(--color-ink);
   background: var(--color-raised);
@@ -283,16 +283,16 @@ kbd {
   padding: var(--space-lg);
   box-shadow: 0 8px 28px var(--color-shadow);
 }
-.clear-dialog::backdrop {
+.confirm-dialog::backdrop {
   background: rgb(0 0 0 / 55%);
 }
-.clear-dialog p {
+.confirm-dialog p {
   margin: 0 0 var(--space-md);
   color: var(--color-muted);
   font-size: var(--text-sm);
   line-height: 1.6;
 }
-.clear-dialog .dialog-error {
+.confirm-dialog .dialog-error {
   color: var(--color-error);
 }
 .dialog-actions {
@@ -307,7 +307,7 @@ kbd {
   background: var(--color-field);
   font-size: var(--text-sm);
 }
-.dialog-actions .clear-button {
+.dialog-actions .confirm-button {
   color: var(--color-error);
 }
 .emoji-icon {

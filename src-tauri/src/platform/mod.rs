@@ -6,17 +6,17 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "linux")]
-pub use linux::{discover_apps, launch};
+pub use linux::{discover_apps, launch, run_system_command, system_commands};
 #[cfg(target_os = "linux")]
 pub use linux::{read_clipboard, watch_clipboard};
 #[cfg(target_os = "macos")]
 pub use macos::clipboard_snapshot;
 #[cfg(target_os = "macos")]
-pub use macos::{discover_apps, launch};
+pub use macos::{discover_apps, launch, run_system_command, system_commands};
 #[cfg(target_os = "windows")]
 pub use windows::clipboard_snapshot;
 #[cfg(target_os = "windows")]
-pub use windows::{discover_apps, launch};
+pub use windows::{discover_apps, launch, run_system_command, system_commands};
 
 pub fn is_wayland() -> bool {
     cfg!(target_os = "linux")

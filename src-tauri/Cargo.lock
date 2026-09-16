@@ -2387,6 +2387,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-core-services"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583300ad934cba24ff5292aee751ecc070f7ca6b39a574cc21b7b5e588e06a0b"
+dependencies = [
+ "objc2-core-foundation",
+]
+
+[[package]]
 name = "objc2-core-text"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3990,6 +3999,7 @@ dependencies = [
  "nucleo-matcher",
  "objc2",
  "objc2-app-kit",
+ "objc2-core-services",
  "plist",
  "rusqlite",
  "serde",
