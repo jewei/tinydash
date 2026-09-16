@@ -83,7 +83,7 @@ jobs:
         env:
           GDK_BACKEND: x11
           XDG_SESSION_TYPE: x11
-        run: dbus-run-session -- xvfb-run -a -s "-screen 0 1280x800x24" bash -c 'openbox & exec bun run test:native'
+        run: xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash -c 'openbox & exec bun run test:native'
       - name: Upload native diagnostics
         if: always()
         uses: actions/upload-artifact@v7

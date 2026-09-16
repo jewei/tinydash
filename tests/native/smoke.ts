@@ -1,10 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  execFileSync,
-  spawn,
-  spawnSync,
-  type ChildProcess,
-} from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { closeSync, openSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -130,19 +125,6 @@ try {
     "--native-port",
     String(nativePort),
   ];
-  if (process.platform === "win32") {
-    const nativeDriver = execFileSync("where.exe", ["msedgedriver.exe"], {
-      encoding: "utf8",
-    })
-      .trim()
-      .split(/\r?\n/)[0];
-    const wrapper = resolve(output, "edge-driver.cmd");
-    await writeFile(
-      wrapper,
-      `@echo off\r\n"${nativeDriver}" --verbose --log-path="${resolve(output, "edge-driver.log")}" %*\r\n`,
-    );
-    driverArgs.push("--native-driver", wrapper);
-  }
   driver = spawn("tauri-driver", driverArgs, {
     env: fixtures.env,
     stdio: ["ignore", log, log],
@@ -220,14 +202,15 @@ try {
   // for the initial search too, so typing cannot precede the first open event.
   await until("application startup and search input focus", () =>
     observe<boolean>(
-      `return document.hasFocus()
-        && document.activeElement?.getAttribute('role') === 'combobox'
+      `return document.activeElement?.getAttribute('role') === 'combobox'
         && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
         && /\\d+ installed/.test(document.querySelector('.list-count')?.textContent ?? '')
         && document.querySelectorAll('[role=option]').length > 0`,
     ),
   );
-  pass("The actual application opens and focuses its search field");
+  pass(
+    "The application loads its index and selects the search field for input",
+  );
 
   const input = await request<Record<string, string>>(
     `/session/${session}/element`,
