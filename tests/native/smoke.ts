@@ -29,7 +29,10 @@ const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 let session: string | undefined;
 let driver: ChildProcess | undefined;
 let driverError: Error | undefined;
+let application: ChildProcess | undefined;
+let applicationError: Error | undefined;
 let log: number | undefined;
+let appLog: number | undefined;
 const passed: string[] = [];
 
 async function freePort(): Promise<number> {
@@ -86,6 +89,7 @@ async function until(
   let lastError: unknown;
   while (Date.now() < deadline) {
     if (driverError) throw driverError;
+    if (applicationError) throw applicationError;
     if (driver && driver.exitCode !== null) {
       throw new Error(`tauri-driver exited with code ${driver.exitCode}`);
     }
@@ -154,13 +158,51 @@ try {
     );
     return status.ready;
   });
+  let capabilities: Record<string, unknown> = {
+    "tauri:options": { application: binary },
+  };
+  if (process.platform === "win32") {
+    // WebView2's launch mode relies on finding a DevToolsActivePort file.
+    // Attach to an explicit loopback port so app startup remains observable.
+    const debugPort = await freePort();
+    appLog = openSync(resolve(output, "application.log"), "w");
+    application = spawn(binary, [], {
+      env: {
+        ...fixtures.env,
+        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
+        WEBVIEW2_USER_DATA_FOLDER: resolve(
+          fixtures.directory,
+          "webview-profile",
+        ),
+      },
+      stdio: ["ignore", appLog, appLog],
+    });
+    application.once("error", (error) => (applicationError = error));
+    application.once("exit", (code, signal) => {
+      applicationError = new Error(
+        `TinyDash exited: code=${code}, signal=${signal}`,
+      );
+    });
+    await until("TinyDash starts its WebView2 instance", async () => {
+      const response = await fetch(
+        `http://127.0.0.1:${debugPort}/json/version`,
+        {
+          signal: AbortSignal.timeout(1_000),
+        },
+      );
+      return response.ok;
+    });
+    capabilities = {
+      browserName: "webview2",
+      "ms:edgeChromium": true,
+      "ms:edgeOptions": { debuggerAddress: `127.0.0.1:${debugPort}` },
+    };
+  }
   const created = await request<{ sessionId: string }>(
     "/session",
     "POST",
     {
-      capabilities: {
-        alwaysMatch: { "tauri:options": { application: binary } },
-      },
+      capabilities: { alwaysMatch: capabilities },
     },
     60_000,
   );
@@ -298,6 +340,12 @@ try {
       }
     }
   }
+  if (application?.pid) {
+    spawnSync("taskkill.exe", ["/PID", String(application.pid), "/T", "/F"], {
+      stdio: "ignore",
+    });
+  }
   if (log !== undefined) closeSync(log);
+  if (appLog !== undefined) closeSync(appLog);
   await fixtures.cleanup();
 }

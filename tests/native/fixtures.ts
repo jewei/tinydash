@@ -17,7 +17,12 @@ export async function installFixtures() {
   const env = { ...process.env };
   const cleanup = async () => {
     if (shortcuts) await rm(shortcuts, { recursive: true, force: true });
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   };
 
   try {
@@ -65,7 +70,7 @@ export async function installFixtures() {
         );
       }
     }
-    return { prefix, nonce, marker, env, cleanup };
+    return { directory, prefix, nonce, marker, env, cleanup };
   } catch (error) {
     await cleanup();
     throw error;
