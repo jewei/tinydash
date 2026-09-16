@@ -350,5 +350,12 @@ try {
   }
   if (log !== undefined) closeSync(log);
   if (appLog !== undefined) closeSync(appLog);
-  await fixtures.cleanup();
+  await fixtures.cleanup().catch(async (error: unknown) => {
+    console.error("Failed to remove the temporary application fixtures", error);
+    await writeFile(
+      resolve(output, "cleanup-failure.txt"),
+      String(error instanceof Error ? error.stack : error),
+    );
+    process.exitCode = 1;
+  });
 }

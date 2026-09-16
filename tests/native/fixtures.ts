@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 // Install real, temporary OS app entries. The launcher uses its normal scanner.
 export async function installFixtures() {
@@ -17,12 +18,24 @@ export async function installFixtures() {
   const env = { ...process.env };
   const cleanup = async () => {
     if (shortcuts) await rm(shortcuts, { recursive: true, force: true });
-    await rm(directory, {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 100,
-    });
+    // WebView2 can retain profile files briefly after its host process exits.
+    // Retry explicitly: Bun does not reliably apply rm's maxRetries option here.
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      try {
+        await rm(directory, { recursive: true, force: true });
+        break;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (
+          !["EBUSY", "ENOTEMPTY", "EPERM"].includes(code ?? "") ||
+          Date.now() >= deadline
+        ) {
+          throw error;
+        }
+        await delay(250);
+      }
+    }
   };
 
   try {
