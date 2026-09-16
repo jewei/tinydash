@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import {
+  execFileSync,
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from "node:child_process";
 import { closeSync, openSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -56,6 +61,10 @@ async function request<T>(
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(timeout),
+  }).catch((error: unknown) => {
+    throw new Error(`${method} ${path} failed: ${String(error)}`, {
+      cause: error,
+    });
   });
   const result = (await response.json()) as {
     value: T & { error?: string; message?: string };
@@ -111,15 +120,30 @@ async function saveScreen(name: string) {
 
 try {
   log = openSync(resolve(output, "driver.log"), "w");
-  driver = spawn(
-    "tauri-driver",
-    ["--port", String(port), "--native-port", String(nativePort)],
-    {
-      env: fixtures.env,
-      stdio: ["ignore", log, log],
-      detached: process.platform !== "win32",
-    },
-  );
+  const driverArgs = [
+    "--port",
+    String(port),
+    "--native-port",
+    String(nativePort),
+  ];
+  if (process.platform === "win32") {
+    const nativeDriver = execFileSync("where.exe", ["msedgedriver.exe"], {
+      encoding: "utf8",
+    })
+      .trim()
+      .split(/\r?\n/)[0];
+    const wrapper = resolve(output, "edge-driver.cmd");
+    await writeFile(
+      wrapper,
+      `@echo off\r\n"${nativeDriver}" --verbose --log-path="${resolve(output, "edge-driver.log")}" %*\r\n`,
+    );
+    driverArgs.push("--native-driver", wrapper);
+  }
+  driver = spawn("tauri-driver", driverArgs, {
+    env: fixtures.env,
+    stdio: ["ignore", log, log],
+    detached: process.platform !== "win32",
+  });
   driver.once("error", (error) => (driverError = error));
   await until("WebDriver startup", async () => {
     const status = await request<{ ready: boolean }>(
@@ -227,6 +251,22 @@ try {
   );
 } catch (error) {
   console.error(error);
+  if (process.platform === "win32") {
+    const diagnostic = spawnSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        resolve("scripts/ci/windows-processes.ps1"),
+      ],
+      { encoding: "utf8", timeout: 15_000 },
+    );
+    await writeFile(
+      resolve(output, "windows-processes.txt"),
+      `${diagnostic.stdout ?? ""}\n${diagnostic.stderr ?? ""}`,
+    );
+  }
   await writeFile(
     resolve(output, "failure.txt"),
     String(error instanceof Error ? error.stack : error),
