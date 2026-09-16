@@ -1,8 +1,8 @@
 # TinyDash
 
-A small desktop application launcher. This version implements Phases 1 and 2.
+A small desktop launcher. This version implements Phases 1 through 3.
 
-Search installed applications by name, available aliases, or path. Use the keyboard to open an application or show its location. The app stays running after the window hides.
+Search installed applications by name, available aliases, or path. Calculate values, convert units, and search local emoji data. Use the keyboard to open an application or copy a result. The app stays running after the window hides.
 
 ## Run
 
@@ -21,18 +21,38 @@ The launcher opens on startup. The default global shortcut is `Command+Shift+Spa
 
 `bun run dev` runs only the frontend in a browser. It displays an empty state because app discovery requires the desktop backend. It does not load test data.
 
+## Search
+
+The **All** mode combines application, emoji, and calculation results. Select **Apps**, **Emoji**, or **Calculator** to limit the search. In All mode, start a query with `:` for emoji or `=` for the calculator.
+
+| Query            | Result                         |
+| ---------------- | ------------------------------ |
+| `rocket`         | 🚀, plus matching applications |
+| `:coffee`        | ☕                             |
+| `:laugh`         | 😂                             |
+| `:heart`         | ❤️                             |
+| `12 * 8`         | `96`                           |
+| `sqrt(144)`      | `12`                           |
+| `5 ft to cm`     | `152.4 cm`                     |
+| `20 km/h to mph` | Approximately `12.427 mph`     |
+| `=32 C to F`     | `89.6 °F`                      |
+
+Arithmetic and unit conversion work offline. Unit case is preserved. Calculator mode shows errors for invalid expressions. Each query is independent; variables and scripts are not supported. Currency conversion needs exchange rates and remains scheduled for Phase 8.
+
+Enter copies the selected emoji or calculation result and hides the launcher. Paste the value in another application with its normal paste command. TinyDash does not paste automatically or read clipboard history. Emoji search uses names, shortcodes, and categories from the local dataset. The list uses the default skin tones; glyph appearance depends on the operating system fonts.
+
 ## Keys
 
-| Key                          | Action                                       |
-| ---------------------------- | -------------------------------------------- |
-| Up / Down                    | Select a result; wrap at either end          |
-| Enter                        | Open the selected application                |
-| Escape                       | Close the actions menu, or hide the launcher |
-| Command / Ctrl + 1 through 9 | Open the corresponding result                |
-| Command / Ctrl + Enter       | Show the selected app in its folder          |
-| Command / Ctrl + K           | Open the actions menu                        |
-| Command / Ctrl + R           | Refresh the application index                |
-| Command / Ctrl + Q           | Quit TinyDash                                |
+| Key                          | Action                                        |
+| ---------------------------- | --------------------------------------------- |
+| Up / Down                    | Select a result; wrap at either end           |
+| Enter                        | Open the app or copy the selected result      |
+| Escape                       | Close the actions menu, or hide the launcher  |
+| Command / Ctrl + 1 through 9 | Run the corresponding result's primary action |
+| Command / Ctrl + Enter       | Show the selected app in its folder           |
+| Command / Ctrl + K           | Open the actions menu                         |
+| Command / Ctrl + R           | Refresh the application index                 |
+| Command / Ctrl + Q           | Quit TinyDash                                 |
 
 ## Settings
 
@@ -52,7 +72,7 @@ TinyDash writes `settings.json` in its application configuration directory on fi
 }
 ```
 
-Set `clearQueryOnOpen` to `false` to keep the previous query. TinyDash selects that text when the window opens. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Shortcut changes take effect after restart. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
+Set `clearQueryOnOpen` to `false` to keep the previous query and search mode. TinyDash selects that text when the window opens. With the default setting, it clears the query and returns to All mode. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Shortcut changes take effect after restart. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
 
 This small settings file is the only durable state in this phase. SQLite, migrations, usage frequency, and recency ranking belong to Phase 4.
 
@@ -74,30 +94,31 @@ The release profile preserves symbols in build tools to avoid a [Rust linker iss
 
 ## Architecture
 
-The path is `query → SearchManager → AppProvider → ranking → top 30 results → SolidJS`.
+The path is `query → SearchManager → providers → ranking → top 30 results → SolidJS`.
 
 - One Rust crate owns discovery, matching, ranking, indexed app IDs, launch actions, window lifecycle, settings, and shortcuts.
 - `SearchManager` reuses a `nucleo-matcher` instance. Names, aliases, and paths are prepared when the app index changes. Matching ignores case and supports Unicode normalization. Exact and prefix matches receive bonuses in `ranking/mod.rs`. Empty queries use a stable alphabetical order.
+- `AppProvider`, `EmojiProvider`, and `CalculatorProvider` return the same result model. Rust parses search modes and prefixes. The emoji index loads on its first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit.
 - Discovery builds a new index off the UI thread. The old index remains available during refresh. Tauri's existing async runtime runs blocking scan, search, and launch work. There are no polling loops or background timers.
-- SolidJS keeps UI state and sends queries without a debounce delay. Request numbers prevent late replies from replacing newer results. Enter cannot open an old result while a new query is pending.
-- The frontend sends an indexed app ID and an action. Rust resolves the path. The webview has no general shell, opener, filesystem, or global-shortcut permissions.
-- The official global shortcut and opener plugins supply desktop integration. The official single-instance plugin brings the existing process forward when the user starts TinyDash again.
+- SolidJS keeps UI state and sends queries without a debounce delay. Rust skips queued requests that are no longer current. Request numbers prevent late replies from replacing newer results. Enter cannot execute an old result while a new query is pending.
+- The frontend sends a result ID and an action. Rust resolves app paths, emoji values, and calculation values. A bounded cache holds the last 32 calculation results so copying an issued result does not evaluate it again. The webview has no general shell, opener, filesystem, clipboard, or global-shortcut permissions.
+- The official global shortcut, opener, and clipboard manager plugins supply desktop integration through Rust. The official single-instance plugin brings the existing process forward when the user starts TinyDash again.
 - App icons use initials in this version. The UI uses system fonts and local CSS. It makes no network requests.
 
-No provider trait is needed for one provider. The shared result and action enums contain only implemented variants. Future providers can join `SearchManager` without moving logic into TypeScript.
+The three providers use direct methods. No provider trait is needed. The shared result and action enums contain only implemented variants. Future providers can join `SearchManager` without moving logic into TypeScript.
 
 ```text
 src/
   App.tsx                 Query state, results, keyboard input, actions menu
   bridge.ts               Typed calls to Rust
-  components/             App initials and small SVG controls
+  components/             App initials, result icons, and SVG controls
   styles/app.css          Launcher layout and states
 tokens.css                Colors, fonts, and spacing
 src-tauri/src/
   lib.rs                  Tauri setup, tray, and shortcut
   main.rs                 Process entry and startup error handling
-  launcher/               SearchManager, results, actions, window commands
-  providers/apps.rs       In-memory application index
+  launcher/               SearchManager, query parsing, results, actions, window commands
+  providers/              App, emoji, and calculator providers
   platform/               macOS, Windows, and Linux discovery and launch
   ranking/mod.rs          Query normalization and score bonuses
   settings.rs             Small startup configuration file
@@ -136,7 +157,7 @@ bunx --bun --no-install playwright install chromium
 bun run test:ui
 ```
 
-Rust tests cover normalization, ranking, fuzzy words, aliases, paths, result limits, duplicate IDs, settings, and platform filtering. UI tests cover navigation, actions, stale replies, IME input, errors, reopening, and layout widths. Browser tests use Tauri's official IPC mock and cannot prove native shortcut or OS launch behavior.
+Rust tests cover normalization, ranking, fuzzy matching, query parsing, provider selection, offline calculations, calculator interruption, emoji data, copy validation, settings, and platform filtering. UI tests cover navigation, actions, mode changes, stale replies, IME input, errors, reopening, and layout widths. Browser tests use Tauri's official IPC mock and cannot prove native shortcut or OS launch behavior.
 
 Run the optional host discovery check and search timing sample:
 
@@ -146,11 +167,11 @@ cargo test --manifest-path src-tauri/Cargo.toml installed_apps_smoke -- --ignore
 
 The [Checks workflow](.github/workflows/check.yml) builds on macOS, Windows, and Ubuntu 24.04. Each successful build produces a downloadable `TinyDash-<OS>-<architecture>` artifact with the app, commit information, and [desktop check instructions](docs/desktop-checks.md). Artifacts remain available for 14 days. They are unsigned development builds.
 
-After the build jobs pass, the [native check workflow](.github/workflows/native.yml) downloads and tests the Windows and Linux artifacts through `tauri-driver`. The Bun test script installs two temporary application entries, searches through the real Rust backend, checks initial input focus and arrow-key selection, then launches a harmless executable that records which entry was selected. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its app and driver processes when it finishes. CI retains screenshots and failure logs in `native-results-<OS>-<architecture>` artifacts.
+After the build jobs pass, the [native check workflow](.github/workflows/native.yml) downloads and tests the Windows and Linux artifacts through `tauri-driver`. The Bun test script checks arithmetic, unit conversion, and emoji search through the real Rust backend. It copies results, reads the OS clipboard to verify their values, and reopens the resident app. It also installs two temporary application entries, checks initial input selection and arrow-key selection, then launches a harmless executable that records which entry was selected. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its app and driver processes when it finishes. CI retains screenshots and failure logs in `native-results-<OS>-<architecture>` artifacts.
 
 The native workflow can also test an existing build without compiling it again. Select **Native app checks**, choose **Run workflow**, and enter the Checks run ID that contains the build artifacts. The diagnostics record both the build commit and the test-code commit. This makes native failures faster to reproduce.
 
-To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges. Linux requires `WebKitWebDriver` and an active X11 session. Then run:
+To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges. Linux requires `WebKitWebDriver`, `xclip`, and an active X11 session. This check replaces the current clipboard text. Then run:
 
 ```sh
 cargo install tauri-driver --version 2.0.6 --locked
@@ -166,4 +187,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
 
 ## Next step
 
-Implement Phase 3: local emoji search with `emojis`, and offline arithmetic and unit conversion with `fend-core`. Add only those dependencies when that work starts. Keep currency refresh, SQLite, clipboard history, file search, system commands, and filesystem watching in their specified later phases.
+Implement Phase 4: SQLite with migrations, usage tracking, and frequency and recency ranking. Keep clipboard history, file search, system commands, filesystem watching, and currency refresh in their specified later phases.

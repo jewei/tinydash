@@ -1,13 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type Action = "launch" | "reveal";
+export type Action = "launch" | "reveal" | "copy";
+export type SearchMode = "all" | "apps" | "emoji" | "calculator";
 
 export interface SearchResult {
   id: string;
-  kind: "app";
+  kind: "app" | "emoji" | "calculation";
   title: string;
   subtitle: string;
   score: number;
+  icon: string | null;
   primaryAction: Action;
   secondaryActions: Action[];
 }
@@ -17,6 +19,7 @@ export interface SearchResponse {
   total: number;
   indexing: boolean;
   indexError: string | null;
+  notice: string | null;
 }
 
 export interface LauncherInfo {
@@ -31,7 +34,8 @@ export interface LauncherInfo {
 
 export const backend = {
   ready: () => invoke<LauncherInfo>("launcher_ready"),
-  search: (query: string) => invoke<SearchResponse>("search_apps", { query }),
+  search: (query: string, mode: SearchMode) =>
+    invoke<SearchResponse>("search", { query, mode }),
   execute: (id: string, action: Action) =>
     invoke<void>("execute_action", { id, action }),
   hide: () => invoke<void>("hide_launcher"),

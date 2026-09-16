@@ -1,5 +1,7 @@
 use crate::launcher::result::SearchResult;
 
+pub const CALCULATION_SCORE: u32 = 100_000;
+
 /// Keep ranking and result limits after provider collection. Usage and recency
 /// can adjust these scores here before truncation without changing providers.
 pub fn top_results(mut results: Vec<SearchResult>, limit: usize) -> Vec<SearchResult> {

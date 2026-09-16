@@ -20,10 +20,21 @@ On macOS, extract the inner ZIP and open `TinyDash.app`. On Windows, run the `.e
 6. Click another app. Confirm that TinyDash hides with the default `hideOnBlur` setting.
 7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash.
 8. Start TinyDash again while it is running. Confirm that the existing window appears and a second launcher process does not remain running.
-9. Use Command/Ctrl + Enter on a result. Confirm that the OS file manager shows its location.
-10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search. Confirm that the query remains and its text is selected. Restore the setting after the check.
+9. Use Command/Ctrl + Enter on an app result. Confirm that the OS file manager shows its location.
+10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and returns to All mode.
 
 Use Ctrl on Windows and Linux. Use Command on macOS. If a shortcut conflicts with another application, change it in `settings.json` and repeat the check.
+
+## Check calculations and emoji
+
+1. In All mode, enter `12 * 8`. Confirm that `96` is the first result. Press Enter, then paste into a text editor. Confirm that the pasted text is `96`.
+2. Select Calculator mode. Check `sqrt(144)` → `12`, `5 ft to cm` → `152.4 cm`, and `32 C to F` → `89.6 °F`. Confirm that unit conversion also works with the network disconnected.
+3. Enter `12 +` in Calculator mode. Confirm that an error appears and no copy action is available. Enter `12 + 1` and confirm that the error clears.
+4. In All mode, enter `:rocket`. Confirm that 🚀 is the first result. Press Enter, then paste into a text editor. Confirm that the complete emoji is pasted.
+5. Search for `coffee`, `laugh`, and `heart` in Emoji mode. Check the results and the copy action. Use Command/Ctrl + K to confirm that the actions menu offers Copy and no app-location action.
+6. Change between Apps, Emoji, and Calculator modes while a query is present. Confirm that results follow the selected mode. Reopen TinyDash after each copy and confirm that the input accepts text.
+
+Currency rates and automatic paste are not implemented in this phase. Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details.
 
 ## Linux session differences
 

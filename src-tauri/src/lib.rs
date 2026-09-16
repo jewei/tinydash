@@ -79,6 +79,7 @@ pub fn run() -> anyhow::Result<()> {
             if let Err(error) = window::show(app) { tracing::warn!(%error, "Could not activate existing launcher"); }
         }))
         .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let mut warnings = Vec::new();
             let config = app.path().app_config_dir().map_err(anyhow::Error::from)
@@ -135,7 +136,7 @@ pub fn run() -> anyhow::Result<()> {
         })
         .invoke_handler(tauri::generate_handler![
             launcher::launcher_ready,
-            launcher::search_apps,
+            launcher::search,
             launcher::refresh_apps,
             launcher::quit_app,
             launcher::actions::execute_action,

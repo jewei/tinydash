@@ -10,7 +10,7 @@ async function openLauncher(page: Page) {
     });
   });
   await page.goto("/");
-  await expect(page.getByRole("option")).toHaveCount(8);
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
 }
 
 async function actions(page: Page) {
@@ -25,13 +25,12 @@ test("focuses the query, wraps selection, and launches the selected app", async 
   page,
 }) => {
   await openLauncher(page);
-  const input = page.getByRole("combobox");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await expect(input).toBeFocused();
   await input.press("ArrowUp");
-  await expect(page.getByRole("option").last()).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(
+    page.getByRole("listbox").getByRole("option").last(),
+  ).toHaveAttribute("aria-selected", "true");
   await input.press("ArrowDown");
   await input.press("ArrowDown");
   await input.press("Enter");
@@ -46,7 +45,9 @@ test("uses result shortcuts and the reveal action", async ({ page }) => {
   await openLauncher(page);
   await page.keyboard.press("Meta+3");
   await expect.poll(async () => (await actions(page)).length).toBe(1);
-  await page.getByRole("combobox").press("Meta+Enter");
+  await page
+    .getByRole("combobox", { name: "Search TinyDash" })
+    .press("Meta+Enter");
   await expect
     .poll(() => actions(page))
     .toEqual([
@@ -76,7 +77,9 @@ test("the actions menu keeps native button keyboard behavior and closes with Esc
   await page.keyboard.press("Meta+k");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("menu")).toHaveCount(0);
-  await expect(page.getByRole("combobox")).toBeFocused();
+  await expect(
+    page.getByRole("combobox", { name: "Search TinyDash" }),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect
     .poll(() =>
@@ -94,22 +97,26 @@ test("ignores late results and prevents launching stale results", async ({
   page,
 }) => {
   await openLauncher(page);
-  const input = page.getByRole("combobox");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.fill("slow");
   await input.press("Enter");
   expect(await actions(page)).toHaveLength(0);
   await input.fill("sa");
-  await expect(page.getByRole("option")).toHaveCount(1);
-  await expect(page.getByRole("option")).toContainText("Safari");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await expect(page.getByRole("listbox").getByRole("option")).toContainText(
+    "Safari",
+  );
   await page.waitForTimeout(300);
-  await expect(page.getByRole("option")).toContainText("Safari");
+  await expect(page.getByRole("listbox").getByRole("option")).toContainText(
+    "Safari",
+  );
 });
 
 test("shows action errors, handles empty results, and ignores IME confirmation", async ({
   page,
 }) => {
   await openLauncher(page);
-  const input = page.getByRole("combobox");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.dispatchEvent("keydown", {
     key: "Enter",
     isComposing: true,
@@ -125,20 +132,20 @@ test("shows action errors, handles empty results, and ignores IME confirmation",
   );
   await input.fill("missing");
   await expect(
-    page.getByRole("heading", { name: "No applications found" }),
+    page.getByRole("heading", { name: "No results found" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Open", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Clear search" }).click();
-  await expect(page.getByRole("option")).toHaveCount(8);
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
 });
 
 test("reopening clears or selects the prior query as configured", async ({
   page,
 }) => {
   await openLauncher(page);
-  const input = page.getByRole("combobox");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.fill("sa");
   await page.evaluate(() =>
     window.__launcherTest.emit("launcher-opened", false),
@@ -155,7 +162,7 @@ test("reopening clears or selects the prior query as configured", async ({
     window.__launcherTest.emit("launcher-opened", true),
   );
   await expect(input).toHaveValue("");
-  await expect(page.getByRole("option")).toHaveCount(8);
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
 });
 
 test("the layout fits narrow windows and the desktop window", async ({
@@ -175,4 +182,106 @@ test("the layout fits narrow windows and the desktop window", async ({
   }
   await page.setViewportSize({ width: 720, height: 550 });
   await page.screenshot({ path: "test-results/launcher.png" });
+});
+
+test("copies calculation results and offers only their supported actions", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("12 * 8");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await expect(page.getByRole("listbox").getByRole("option")).toContainText(
+    "96",
+  );
+  await expect(
+    page.getByRole("button", { name: "Copy result", exact: true }),
+  ).toBeEnabled();
+  await page.keyboard.press("Meta+k");
+  await expect(
+    page.getByRole("menuitem", { name: "Copy result" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("menuitem", { name: "Show in folder" }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await input.press("Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "calculation:1", action: "copy" },
+      },
+    ]);
+  await page.screenshot({ path: "test-results/calculator.png" });
+});
+
+test("changes search mode during a pending query and copies an emoji", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("slow");
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("emoji");
+  await expect(input).toBeFocused();
+  await expect(
+    page.getByRole("listbox").getByRole("option").filter({ hasText: "rocket" }),
+  ).toHaveCount(1);
+  await expect(page.locator(".emoji-icon")).toHaveText("🚀");
+  await page.waitForTimeout(300);
+  await expect(page.locator(".result-title")).toHaveText("rocket");
+  await page.keyboard.press("Meta+1");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "emoji:🚀", action: "copy" },
+      },
+    ]);
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-opened", false),
+  );
+  await expect(page.getByRole("combobox", { name: "Search mode" })).toHaveValue(
+    "emoji",
+  );
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-opened", true),
+  );
+  await expect(page.getByRole("combobox", { name: "Search mode" })).toHaveValue(
+    "all",
+  );
+});
+
+test("shows calculator errors and fits both new result types in a narrow window", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("=1 / 0");
+  await expect(page.getByRole("alert")).toContainText("Division by zero");
+  await input.press("Enter");
+  expect(await actions(page)).toHaveLength(0);
+  for (const query of ["12 * 8", ":rocket"]) {
+    await input.fill(query);
+    await expect(page.locator(".result-row")).toHaveCount(1);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await page.setViewportSize({ width: 320, height: 550 });
+    await expect(
+      page.getByRole("combobox", { name: "Search mode" }),
+    ).toBeInViewport();
+    await expect(
+      page.getByRole("button", { name: "Actions" }),
+    ).toBeInViewport();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  }
+  await page.setViewportSize({ width: 720, height: 550 });
+  await page.screenshot({ path: "test-results/emoji.png" });
 });
