@@ -30,7 +30,9 @@ mod tests {
         manager.replace_apps(crate::providers::apps::AppProvider::new(apps));
         let started = std::time::Instant::now();
         for _ in 0..1000 {
-            manager.search("sa").expect("search");
+            manager
+                .search("sa", crate::launcher::query::SearchMode::Apps)
+                .expect("search");
         }
         println!(
             "Discovered {count} apps. 1,000 searches took {:?}.",

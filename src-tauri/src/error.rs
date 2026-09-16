@@ -4,6 +4,10 @@ pub enum Error {
     IndexUnavailable,
     #[error("This application is no longer in the index. Refresh the application list.")]
     AppNotFound,
+    #[error("This action is not available for the selected result.")]
+    InvalidAction,
+    #[error("This result has expired. Search again to copy it.")]
+    ResultExpired,
     #[error("Search queries must contain at most 256 characters.")]
     QueryTooLong,
     #[error("Could not open the application: {0}")]

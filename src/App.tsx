@@ -13,13 +13,15 @@ import {
   type Action,
   type LauncherInfo,
   type SearchResult,
+  type SearchMode,
 } from "./bridge";
 import Icon from "./components/Icon";
-import AppAvatar from "./components/AppAvatar";
+import ResultIcon from "./components/ResultIcon";
 
 export default function App() {
   const desktop = isTauri();
   const [query, setQuery] = createSignal("");
+  const [mode, setMode] = createSignal<SearchMode>("all");
   const [results, setResults] = createSignal<SearchResult[]>([]);
   const [selected, setSelected] = createSignal(0);
   const [info, setInfo] = createSignal<LauncherInfo>();
@@ -29,6 +31,7 @@ export default function App() {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
   const [indexError, setIndexError] = createSignal<string>();
+  const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
   let input!: HTMLInputElement;
   let menu: HTMLDivElement | undefined;
@@ -40,21 +43,38 @@ export default function App() {
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
   const current = () => results()[selected()];
   const canOpen = () => desktop && !!current() && !busy() && !pending();
-  const message = () => error() ?? indexError() ?? info()?.warnings[0];
+  const message = () =>
+    error() ?? notice() ?? indexError() ?? info()?.warnings[0];
+  const primaryLabel = () =>
+    current()?.kind === "emoji" || mode() === "emoji"
+      ? "Copy emoji"
+      : current()?.kind === "calculation" || mode() === "calculator"
+        ? "Copy result"
+        : "Open";
+  const placeholder = () =>
+    mode() === "apps"
+      ? "Search applications..."
+      : mode() === "emoji"
+        ? "Search emoji..."
+        : mode() === "calculator"
+          ? "Calculate or convert..."
+          : "Search apps, emoji, or calculate...";
   const focusInput = () => input.focus({ preventScroll: true });
 
   async function search(value = query()) {
     if (!desktop) return;
     const request = ++sequence;
     setPending(true);
+    setNotice(undefined);
     try {
-      const response = await backend.search(value);
+      const response = await backend.search(value, mode());
       if (disposed || request !== sequence) return;
       setResults(response.results);
       setSelected(0);
       setTotal(response.total);
       setIndexing(response.indexing);
       setIndexError(response.indexError ?? undefined);
+      setNotice(response.notice ?? undefined);
     } catch (reason) {
       if (disposed || request !== sequence) return;
       setResults([]);
@@ -68,6 +88,19 @@ export default function App() {
     setQuery(value);
     setError(undefined);
     void search(value);
+  }
+
+  function changeMode(value: SearchMode) {
+    setMode(value);
+    setMenuOpen(false);
+    setError(undefined);
+    void search();
+    focusInput();
+  }
+
+  function runPrimary() {
+    const result = current();
+    if (result) void run(result.primaryAction, result);
   }
 
   async function run(action: Action, result = current()) {
@@ -188,7 +221,7 @@ export default function App() {
       event.preventDefault();
       if (command && current()?.secondaryActions.includes("reveal"))
         void run("reveal");
-      else if (!command && !event.altKey && !event.shiftKey) void run("launch");
+      else if (!command && !event.altKey && !event.shiftKey) runPrimary();
     }
   }
 
@@ -228,7 +261,10 @@ export default function App() {
           register("launcher-opened", (clear) => {
             setMenuOpen(false);
             setError(undefined);
-            if (clear === true) changeQuery("");
+            if (clear === true) {
+              setMode("all");
+              changeQuery("");
+            }
             focusInput();
             if (clear !== true) input.select();
           }),
@@ -253,23 +289,35 @@ export default function App() {
   });
 
   return (
-    <main class="launcher" aria-label="TinyDash application launcher">
+    <main class="launcher" aria-label="TinyDash launcher">
       <header class="search-header">
         <div class="search-field">
           <Icon name="search" size={23} />
-          <span class="mode-label">Apps</span>
+          <select
+            class="mode-select"
+            aria-label="Search mode"
+            value={mode()}
+            onChange={(event) =>
+              changeMode(event.currentTarget.value as SearchMode)
+            }
+          >
+            <option value="all">All</option>
+            <option value="apps">Apps</option>
+            <option value="emoji">Emoji</option>
+            <option value="calculator">Calculator</option>
+          </select>
           <input
             ref={input}
             type="text"
             role="combobox"
-            aria-label="Search applications"
+            aria-label="Search TinyDash"
             aria-autocomplete="list"
             aria-expanded={results().length > 0}
-            aria-controls="application-results"
+            aria-controls="search-results"
             aria-activedescendant={
               current() ? `result-${selected()}` : undefined
             }
-            placeholder="Search applications..."
+            placeholder={placeholder()}
             autocomplete="off"
             autocapitalize="off"
             spellcheck={false}
@@ -289,23 +337,35 @@ export default function App() {
       </header>
 
       <div class="list-heading">
-        <span>{query().trim() ? "Search results" : "Applications"}</span>
+        <span>
+          {query().trim()
+            ? "Search results"
+            : mode() === "emoji"
+              ? "Emoji"
+              : mode() === "calculator"
+                ? "Calculator"
+                : "Applications"}
+        </span>
         <span class="list-count" role="status" aria-live="polite">
-          {indexing()
-            ? "Finding applications..."
-            : pending()
-              ? "Searching..."
-              : `${total()} installed`}
+          {mode() === "calculator"
+            ? "Offline"
+            : mode() === "emoji"
+              ? `${results().length} shown`
+              : indexing()
+                ? "Finding applications..."
+                : pending()
+                  ? "Searching..."
+                  : `${total()} installed`}
         </span>
       </div>
 
-      <section class="results-area" aria-label="Application search">
+      <section class="results-area" aria-label="Search results">
         <ul
-          id="application-results"
+          id="search-results"
           ref={list}
           class="result-list"
           role="listbox"
-          aria-label="Applications"
+          aria-label="Search results"
           aria-busy={pending()}
         >
           <For each={results()}>
@@ -318,6 +378,7 @@ export default function App() {
                 classList={{
                   selected: index() === selected(),
                   pending: pending(),
+                  "calculation-row": result.kind === "calculation",
                 }}
                 onPointerMove={() => {
                   if (!pending()) setSelected(index());
@@ -325,9 +386,11 @@ export default function App() {
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => void run(result.primaryAction, result)}
               >
-                <AppAvatar name={result.title} />
+                <ResultIcon result={result} />
                 <span class="result-copy">
-                  <span class="result-title">{result.title}</span>
+                  <span class="result-title" title={result.title}>
+                    {result.title}
+                  </span>
                   <span class="result-subtitle" title={result.subtitle}>
                     {result.subtitle}
                   </span>
@@ -350,23 +413,37 @@ export default function App() {
             </div>
             <h1>
               {!desktop
-                ? "Your apps, one shortcut away."
-                : indexing()
-                  ? "Finding your applications"
-                  : query()
-                    ? "No applications found"
-                    : "No applications in the index"}
+                ? "TinyDash, one shortcut away."
+                : mode() === "calculator"
+                  ? "Calculate and convert"
+                  : mode() === "emoji"
+                    ? "No emoji found"
+                    : indexing()
+                      ? "Finding your applications"
+                      : query()
+                        ? "No results found"
+                        : "No applications in the index"}
             </h1>
             <p>
               {!desktop
                 ? "Start the TinyDash desktop app to search this computer."
-                : indexing()
-                  ? "You can start typing while the list loads."
-                  : query()
-                    ? "Try a shorter name, an abbreviation, or part of a path."
-                    : "Refresh the list after you install an application."}
+                : mode() === "calculator"
+                  ? "Try 12 * 8, sqrt(144), or 5 ft to cm."
+                  : mode() === "emoji"
+                    ? "Try a name, shortcode, or category, such as coffee or food."
+                    : indexing()
+                      ? "You can start typing while the list loads."
+                      : query()
+                        ? "Try an app name, an emoji name, or a calculation."
+                        : "Refresh the list after you install an application."}
             </p>
-            <Show when={desktop && !indexing()}>
+            <Show
+              when={
+                desktop &&
+                !indexing() &&
+                (query() || mode() === "all" || mode() === "apps")
+              }
+            >
               <button
                 class="text-button"
                 onClick={() => {
@@ -396,10 +473,14 @@ export default function App() {
               </span>
               <span>TinyDash</span>
               <span class="status-separator">/</span>
-              <span>
+              <span class="query-hint">
                 {query()
                   ? `${results().length} ${results().length === 1 ? "result" : results().length === 30 ? "shown" : "results"}`
-                  : "Type a name. Press enter."}
+                  : mode() === "calculator"
+                    ? "Enter copies the result."
+                    : mode() === "emoji"
+                      ? "Enter copies the emoji."
+                      : "Type a name, : for emoji, or = to calculate."}
               </span>
             </>
           }
@@ -421,9 +502,13 @@ export default function App() {
           <button
             class="open-button"
             disabled={!canOpen()}
-            onClick={() => void run("launch")}
+            onClick={runPrimary}
           >
-            {busy() ? "Opening..." : "Open"}
+            {busy()
+              ? current()?.primaryAction === "copy"
+                ? "Copying..."
+                : "Opening..."
+              : primaryLabel()}
             <Icon name="return" size={17} />
           </button>
           <span class="footer-divider" />
@@ -449,19 +534,28 @@ export default function App() {
                 <button
                   role="menuitem"
                   disabled={!canOpen()}
-                  onClick={() => void run("launch")}
+                  onClick={runPrimary}
                 >
-                  <Icon name="return" />
-                  Open application<kbd>↵</kbd>
+                  <Icon
+                    name={
+                      current()?.primaryAction === "copy" ? "copy" : "return"
+                    }
+                  />
+                  {primaryLabel() === "Open"
+                    ? "Open application"
+                    : primaryLabel()}
+                  <kbd>↵</kbd>
                 </button>
-                <button
-                  role="menuitem"
-                  disabled={!canOpen()}
-                  onClick={() => void run("reveal")}
-                >
-                  <Icon name="folder" />
-                  Show in folder<kbd>{modifier()} ↵</kbd>
-                </button>
+                <Show when={current()?.secondaryActions.includes("reveal")}>
+                  <button
+                    role="menuitem"
+                    disabled={!canOpen()}
+                    onClick={() => void run("reveal")}
+                  >
+                    <Icon name="folder" />
+                    Show in folder<kbd>{modifier()} ↵</kbd>
+                  </button>
+                </Show>
                 <div class="menu-divider" />
                 <button
                   role="menuitem"

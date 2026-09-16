@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import {
+  execFileSync,
+  spawn,
+  spawnSync,
+  type ChildProcess,
+} from "node:child_process";
 import { closeSync, openSync } from "node:fs";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -117,6 +122,58 @@ async function saveScreen(name: string) {
   await writeFile(resolve(output, name), Buffer.from(screenshot, "base64"));
 }
 
+function clipboardText(): string {
+  if (process.platform === "win32") {
+    return execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); Get-Clipboard -Raw",
+      ],
+      { encoding: "utf8", timeout: 5_000 },
+    ).trimEnd();
+  }
+  return execFileSync("xclip", ["-selection", "clipboard", "-o"], {
+    encoding: "utf8",
+    timeout: 5_000,
+  });
+}
+
+async function reopen() {
+  // Start the executable as a desktop shortcut would. Its single-instance
+  // handler must show the resident window and reset the search field.
+  const child = spawn(binary, [], { env: fixtures.env, stdio: "ignore" });
+  try {
+    await new Promise<void>((resolveExit, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("The second instance did not exit")),
+        10_000,
+      );
+      child.once("error", (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+      child.once("exit", (code) => {
+        clearTimeout(timeout);
+        if (code === 0) resolveExit();
+        else reject(new Error(`The second instance exited with code ${code}`));
+      });
+    });
+  } finally {
+    if (child.exitCode === null) child.kill();
+  }
+  await until("the existing window reopens with an empty query", () =>
+    observe<boolean>(
+      `return document.querySelector('input[role=combobox]')?.value === ''
+      && document.activeElement?.getAttribute('role') === 'combobox'
+      && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
+      && document.querySelectorAll('[role=option]').length > 0`,
+    ),
+  );
+}
+
 try {
   log = openSync(resolve(output, "driver.log"), "w");
   const driverArgs = [
@@ -224,6 +281,53 @@ try {
     observe<string[]>(
       "return [...document.querySelectorAll('[role=option] .result-title')].map(el => el.textContent)",
     );
+  await keys(inputId, "12 * 8");
+  await until(
+    "arithmetic returns 96",
+    async () => (await titles())[0] === "96",
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, "5 ft to cm");
+  await until(
+    "units convert to 152.4 cm",
+    async () =>
+      (await titles())[0] === "152.4 cm" &&
+      (await observe<boolean>(
+        "return document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+      )),
+  );
+  await saveScreen("calculator.png");
+  await keys(inputId, "\uE007");
+  await until(
+    "the calculation reaches the OS clipboard",
+    async () => clipboardText() === "152.4 cm",
+  );
+  pass(
+    "Arithmetic and unit conversion run in Rust, and Enter copies the result to the OS clipboard",
+  );
+
+  await reopen();
+  await keys(inputId, ":rocket");
+  await until(
+    "the local emoji provider finds rocket",
+    async () =>
+      (await titles())[0] === "rocket" &&
+      (await observe<boolean>(
+        "return document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+      )),
+  );
+  await saveScreen("emoji.png");
+  await keys(inputId, "\uE007");
+  await until(
+    "the emoji reaches the OS clipboard",
+    async () => clipboardText() === "🚀",
+  );
+  pass(
+    "Emoji search uses local Rust data, and Enter copies the complete emoji to the OS clipboard",
+  );
+  await reopen();
+  pass("Starting TinyDash again reopens its existing window after copying");
+
   await keys(inputId, fixtures.prefix);
   await until("OS discovery finds both fixture applications", async () => {
     const names = await titles();

@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub enum ResultKind {
     App,
+    Calculation,
+    Emoji,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -11,6 +13,7 @@ pub enum ResultKind {
 pub enum Action {
     Launch,
     Reveal,
+    Copy,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -21,6 +24,7 @@ pub struct SearchResult {
     pub title: String,
     pub subtitle: String,
     pub score: u32,
+    pub icon: Option<String>,
     pub primary_action: Action,
     pub secondary_actions: Vec<Action>,
 }
@@ -32,4 +36,5 @@ pub struct SearchResponse {
     pub total: usize,
     pub indexing: bool,
     pub index_error: Option<String>,
+    pub notice: Option<String>,
 }

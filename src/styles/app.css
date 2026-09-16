@@ -24,7 +24,8 @@ body {
   user-select: none;
 }
 button,
-input {
+input,
+select {
   font: inherit;
   color: inherit;
 }
@@ -36,7 +37,8 @@ button:disabled {
   cursor: default;
   opacity: 0.4;
 }
-button:focus-visible {
+button:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
@@ -87,7 +89,11 @@ kbd {
 .search-field > svg {
   color: var(--color-ink);
 }
-.mode-label {
+.mode-select {
+  color-scheme: dark;
+  max-width: 100px;
+  flex-shrink: 0;
+  cursor: pointer;
   background: var(--color-raised);
   color: var(--color-muted);
   border: 1px solid var(--color-rule);
@@ -206,6 +212,32 @@ kbd {
 }
 .selected .app-avatar {
   color: var(--color-accent);
+}
+.emoji-icon,
+.calculation-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  color: var(--color-accent);
+}
+.emoji-icon {
+  font-size: 28px;
+  font-family:
+    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+.calculation-row {
+  min-height: 90px;
+}
+.calculation-row .result-title {
+  font-size: 32px;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+.query-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .result-copy {
   min-width: 0;
@@ -450,9 +482,6 @@ kbd {
   }
   .search-field input {
     font-size: var(--text-title);
-  }
-  .mode-label {
-    display: none;
   }
   .result-row {
     gap: var(--space-sm);

@@ -116,6 +116,7 @@ impl AppProvider {
                 title: app.entry.name.clone(),
                 subtitle: app.entry.path.to_string_lossy().into_owned(),
                 score,
+                icon: None,
                 primary_action: Action::Launch,
                 secondary_actions: vec![Action::Reveal],
             })

@@ -1,17 +1,19 @@
 pub mod actions;
+pub mod query;
 pub mod result;
 pub mod search;
 pub mod window;
 
 use std::sync::{
     Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::{error::Error, platform, providers::apps::AppProvider, settings::Settings};
+use query::SearchMode;
 use result::SearchResponse;
 use search::SearchManager;
 
@@ -22,6 +24,7 @@ pub struct LauncherState {
     pub settings: Settings,
     pub warnings: Vec<String>,
     pub index_error: Mutex<Option<String>>,
+    search_version: AtomicU64,
 }
 
 impl LauncherState {
@@ -33,6 +36,7 @@ impl LauncherState {
             settings,
             warnings,
             index_error: Mutex::new(None),
+            search_version: AtomicU64::new(0),
         }
     }
 }
@@ -61,16 +65,32 @@ pub fn launcher_ready(
 }
 
 #[tauri::command]
-pub async fn search_apps(query: String, app: AppHandle) -> Result<SearchResponse, String> {
+pub async fn search(
+    query: String,
+    mode: SearchMode,
+    app: AppHandle,
+) -> Result<SearchResponse, String> {
+    let version = app
+        .state::<LauncherState>()
+        .search_version
+        .fetch_add(1, Ordering::Relaxed)
+        .wrapping_add(1);
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<LauncherState>();
         let mut search = state
             .search
             .lock()
             .map_err(|_| Error::IndexUnavailable.to_string())?;
-        let results = search.search(&query).map_err(|error| error.to_string())?;
+        // Do not evaluate obsolete queries queued behind a calculation.
+        if state.search_version.load(Ordering::Relaxed) != version {
+            return Err("A newer search replaced this query.".into());
+        }
+        let outcome = search
+            .search(&query, mode)
+            .map_err(|error| error.to_string())?;
         Ok(SearchResponse {
-            results,
+            results: outcome.results,
+            notice: outcome.notice,
             total: search.app_count(),
             indexing: state.scanning.load(Ordering::Acquire),
             index_error: state

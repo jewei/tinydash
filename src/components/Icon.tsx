@@ -1,7 +1,15 @@
 import { Switch, Match } from "solid-js";
 
 type IconName =
-  "search" | "return" | "folder" | "refresh" | "quit" | "apps" | "close";
+  | "search"
+  | "return"
+  | "folder"
+  | "refresh"
+  | "quit"
+  | "apps"
+  | "close"
+  | "calculator"
+  | "copy";
 
 export default function Icon(props: { name: IconName; size?: number }) {
   return (
@@ -17,6 +25,14 @@ export default function Icon(props: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <Switch>
+        <Match when={props.name === "calculator"}>
+          <rect x="5" y="2" width="14" height="20" rx="2" />
+          <path d="M8 6h8M8 11h1m3 0h1m3 0h.1M8 15h1m3 0h1m3 0h.1M8 19h1m3 0h1m3 0h.1" />
+        </Match>
+        <Match when={props.name === "copy"}>
+          <rect x="8" y="7" width="12" height="14" rx="2" />
+          <path d="M16 7V3H4v14h4" />
+        </Match>
         <Match when={props.name === "search"}>
           <circle cx="10.5" cy="10.5" r="6.8" />
           <path d="m16 16 4.5 4.5" />

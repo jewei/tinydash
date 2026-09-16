@@ -3,10 +3,18 @@ use nucleo_matcher::{
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
 
-use super::result::SearchResult;
+use super::{
+    actions::ResolvedAction,
+    query::{Query, SearchMode},
+    result::{Action, SearchResult},
+};
 use crate::{
     error::{Error, Result},
-    providers::apps::{AppEntry, AppProvider},
+    providers::{
+        apps::{AppEntry, AppProvider},
+        calculator::CalculatorProvider,
+        emoji::EmojiProvider,
+    },
     ranking,
 };
 
@@ -15,6 +23,13 @@ pub const RESULT_LIMIT: usize = 30;
 pub struct SearchManager {
     apps: AppProvider,
     matcher: Matcher,
+    emoji: Option<EmojiProvider>,
+    calculator: CalculatorProvider,
+}
+
+pub struct SearchOutcome {
+    pub results: Vec<SearchResult>,
+    pub notice: Option<String>,
 }
 
 impl Default for SearchManager {
@@ -22,6 +37,8 @@ impl Default for SearchManager {
         Self {
             apps: AppProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
+            emoji: None,
+            calculator: CalculatorProvider::default(),
         }
     }
 }
@@ -39,20 +56,64 @@ impl SearchManager {
         self.apps.get(id).cloned().ok_or(Error::AppNotFound)
     }
 
-    pub fn search(&mut self, query: &str) -> Result<Vec<SearchResult>> {
-        if query.chars().count() > 256 {
-            return Err(Error::QueryTooLong);
+    pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
+        match action {
+            Action::Launch if id.starts_with("app:") => Ok(ResolvedAction::Launch(self.app(id)?)),
+            Action::Reveal if id.starts_with("app:") => {
+                Ok(ResolvedAction::Reveal(self.app(id)?.path))
+            }
+            Action::Copy if id.starts_with("emoji:") => EmojiProvider::copy_value(id)
+                .map(|value| ResolvedAction::Copy(value.to_owned()))
+                .ok_or(Error::ResultExpired),
+            Action::Copy if id.starts_with("calculation:") => self
+                .calculator
+                .copy_value(id)
+                .map(|value| ResolvedAction::Copy(value.to_owned()))
+                .ok_or(Error::ResultExpired),
+            _ => Err(Error::InvalidAction),
         }
-        let query = ranking::normalize(query);
-        // Literal fuzzy words: punctuation is part of an app name, never query syntax.
-        let pattern = Pattern::new(
-            &query,
-            CaseMatching::Ignore,
-            Normalization::Smart,
-            AtomKind::Fuzzy,
-        );
-        let results = self.apps.search(&query, &pattern, &mut self.matcher);
-        Ok(ranking::top_results(results, RESULT_LIMIT))
+    }
+
+    pub fn search(&mut self, input: &str, mode: SearchMode) -> Result<SearchOutcome> {
+        let query = Query::parse(input, mode)?;
+        let mut results = Vec::new();
+        let mut notice = None;
+        if matches!(query.mode, SearchMode::All | SearchMode::Apps) {
+            let normalized = ranking::normalize(query.text);
+            // App punctuation remains literal. Calculator input retains its case.
+            let pattern = Pattern::new(
+                &normalized,
+                CaseMatching::Ignore,
+                Normalization::Smart,
+                AtomKind::Fuzzy,
+            );
+            results.extend(self.apps.search(&normalized, &pattern, &mut self.matcher));
+        }
+        if query.mode == SearchMode::Emoji
+            || (query.mode == SearchMode::All && !query.text.is_empty())
+        {
+            results.extend(
+                self.emoji
+                    .get_or_insert_with(EmojiProvider::default)
+                    .search(query.text, &mut self.matcher),
+            );
+        }
+        if !query.text.is_empty()
+            && (query.mode == SearchMode::Calculator
+                || (query.mode == SearchMode::All && CalculatorProvider::is_candidate(query.text)))
+        {
+            match self.calculator.search(query.text) {
+                Ok(result) => results.push(result),
+                Err(error) if query.mode == SearchMode::Calculator => {
+                    notice = Some(error.to_string())
+                }
+                Err(_) => {} // Ordinary app names and partial input are not calculator errors.
+            }
+        }
+        Ok(SearchOutcome {
+            results: ranking::top_results(results, RESULT_LIMIT),
+            notice,
+        })
     }
 }
 
@@ -78,7 +139,10 @@ mod tests {
 
     #[test]
     fn exact_name_beats_alias_and_substring() {
-        let results = manager().search("CODE").expect("search");
+        let results = manager()
+            .search("CODE", SearchMode::All)
+            .expect("search")
+            .results;
         assert_eq!(results[0].title, "Code");
         assert_eq!(results[1].title, "Visual Studio Code");
     }
@@ -87,16 +151,35 @@ mod tests {
     fn supports_fuzzy_words_aliases_accents_and_paths() {
         let mut manager = manager();
         assert_eq!(
-            manager.search("vsc").expect("search")[0].title,
+            manager
+                .search("vsc", SearchMode::All)
+                .expect("search")
+                .results[0]
+                .title,
             "Visual Studio Code"
         );
         assert_eq!(
-            manager.search(" studio   visual ").expect("search")[0].title,
+            manager
+                .search(" studio   visual ", SearchMode::All)
+                .expect("search")
+                .results[0]
+                .title,
             "Visual Studio Code"
         );
-        assert_eq!(manager.search("cafe").expect("search")[0].title, "Café");
         assert_eq!(
-            manager.search("/apps/vscode").expect("search")[0].title,
+            manager
+                .search("cafe", SearchMode::All)
+                .expect("search")
+                .results[0]
+                .title,
+            "Café"
+        );
+        assert_eq!(
+            manager
+                .search("/apps/vscode", SearchMode::All)
+                .expect("search")
+                .results[0]
+                .title,
             "Visual Studio Code"
         );
     }
@@ -104,22 +187,49 @@ mod tests {
     #[test]
     fn punctuation_is_literal_and_unknown_apps_do_not_match() {
         let mut manager = manager();
-        assert_eq!(manager.search("!").expect("search")[0].title, "Notes!");
-        assert!(manager.search("zzzzzz").expect("search").is_empty());
+        assert_eq!(
+            manager
+                .search("!", SearchMode::All)
+                .expect("search")
+                .results[0]
+                .title,
+            "Notes!"
+        );
+        assert!(
+            manager
+                .search("zzzzzz", SearchMode::All)
+                .expect("search")
+                .results
+                .is_empty()
+        );
         assert!(manager.app("/tmp/arbitrary-executable").is_err());
     }
 
     #[test]
     fn empty_query_is_deterministic_and_results_are_bounded() {
         let mut manager = manager();
-        assert_eq!(manager.search(" \t ").expect("search")[0].title, "Café");
+        assert_eq!(
+            manager
+                .search(" \t ", SearchMode::All)
+                .expect("search")
+                .results[0]
+                .title,
+            "Café"
+        );
         manager.replace_apps(AppProvider::new(
             (0..100)
                 .map(|i| AppEntry::new(format!("App {i:03}"), format!("/app/{i}").into(), vec![]))
                 .collect(),
         ));
-        assert_eq!(manager.search("").expect("search").len(), RESULT_LIMIT);
-        assert!(manager.search(&"a".repeat(257)).is_err());
+        assert_eq!(
+            manager
+                .search("", SearchMode::All)
+                .expect("search")
+                .results
+                .len(),
+            RESULT_LIMIT
+        );
+        assert!(manager.search(&"a".repeat(257), SearchMode::All).is_err());
     }
 
     #[test]
@@ -128,6 +238,117 @@ mod tests {
         let entry = AppEntry::new("Only app".into(), "/only".into(), vec![]);
         manager.replace_apps(AppProvider::new(vec![entry.clone(), entry]));
         assert_eq!(manager.app_count(), 1);
-        assert!(manager.search("Code").expect("search").is_empty());
+        assert!(
+            manager
+                .search("Code", SearchMode::Apps)
+                .expect("search")
+                .results
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn combines_providers_and_respects_explicit_modes() {
+        let mut manager = manager();
+        assert!(manager.emoji.is_none());
+        manager.search("", SearchMode::All).expect("search");
+        assert!(manager.emoji.is_none(), "empty startup does not load emoji");
+        let calculation = manager.search("12 * 8", SearchMode::All).expect("search");
+        assert_eq!(calculation.results[0].title, "96");
+        assert_eq!(calculation.results[0].primary_action, Action::Copy);
+        assert!(
+            manager
+                .search("12 * 8", SearchMode::Apps)
+                .expect("search")
+                .results
+                .is_empty()
+        );
+        for mode in [SearchMode::All, SearchMode::Emoji] {
+            assert_eq!(
+                manager.search(":rocket:", mode).expect("search").results[0]
+                    .icon
+                    .as_deref(),
+                Some("🚀")
+            );
+        }
+        assert!(
+            manager
+                .search("Code", SearchMode::Calculator)
+                .expect("search")
+                .results
+                .is_empty()
+        );
+        assert_eq!(
+            manager
+                .search("", SearchMode::Emoji)
+                .expect("search")
+                .results
+                .len(),
+            RESULT_LIMIT
+        );
+    }
+
+    #[test]
+    fn reports_calculator_errors_only_in_explicit_calculator_searches() {
+        let mut manager = manager();
+        assert!(
+            manager
+                .search("12 +", SearchMode::All)
+                .expect("search")
+                .notice
+                .is_none()
+        );
+        assert!(
+            manager
+                .search("=12 +", SearchMode::All)
+                .expect("search")
+                .notice
+                .is_some()
+        );
+        assert!(
+            manager
+                .search("12 +", SearchMode::Calculator)
+                .expect("search")
+                .notice
+                .is_some()
+        );
+        assert!(
+            manager
+                .search("", SearchMode::Calculator)
+                .expect("search")
+                .notice
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn actions_validate_kind_and_copy_the_issued_value() {
+        let mut manager = manager();
+        let result = manager
+            .search("12 * 8", SearchMode::All)
+            .expect("search")
+            .results
+            .remove(0);
+        manager
+            .search("1 + 1", SearchMode::All)
+            .expect("new search");
+        assert!(
+            matches!(manager.resolve_action(&result.id, Action::Copy), Ok(ResolvedAction::Copy(value)) if value == "96")
+        );
+        assert!(manager.resolve_action(&result.id, Action::Launch).is_err());
+        assert!(
+            manager
+                .resolve_action("calculation:forged", Action::Copy)
+                .is_err()
+        );
+        assert!(
+            manager
+                .resolve_action("app:/apps/Code.app", Action::Copy)
+                .is_err()
+        );
+        assert!(manager.resolve_action("emoji:🚀", Action::Reveal).is_err());
+        assert!(
+            matches!(manager.resolve_action("emoji:🚀", Action::Copy), Ok(ResolvedAction::Copy(value)) if value == "🚀")
+        );
     }
 }
