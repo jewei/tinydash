@@ -185,9 +185,9 @@ async function click(selector: string) {
   );
 }
 
-async function selectMode(mode: "clipboard" | "files") {
-  // All mode also matches paths. Windows Start Menu paths can match words
-  // such as "second", so clipboard checks must select the intended provider.
+async function selectMode(mode: "apps" | "clipboard" | "files") {
+  // All mode also matches paths. Isolate the intended provider so temporary
+  // file paths do not affect app or clipboard result assertions.
   // WebKitWebDriver can change the option without delivering its change
   // event. Select as browser test drivers do, through the normal DOM events.
   // This still runs the frontend handler and real Rust IPC; no results are mocked.
@@ -198,10 +198,11 @@ async function selectMode(mode: "clipboard" | "files") {
       select.dispatchEvent(new Event('change', { bubbles: true }));`,
     args: [mode],
   });
-  const placeholder =
-    mode === "clipboard"
-      ? "Search clipboard history..."
-      : "Search filenames and paths...";
+  const placeholder = {
+    apps: "Search applications...",
+    clipboard: "Search clipboard history...",
+    files: "Search filenames and paths...",
+  }[mode];
   await until(`${mode} mode is ready`, () =>
     observe<boolean>(
       `return document.querySelector('input')?.placeholder === ${JSON.stringify(placeholder)} && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
@@ -404,6 +405,7 @@ try {
   pass("Copying an emoji moves it to the top of the emoji list");
   await keys(inputId, "\uE009a\uE000\uE003");
 
+  await selectMode("apps");
   await keys(inputId, fixtures.prefix);
   await until("OS discovery finds both fixture applications", async () => {
     const names = await titles();
