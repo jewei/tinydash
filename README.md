@@ -146,15 +146,19 @@ cargo test --manifest-path src-tauri/Cargo.toml installed_apps_smoke -- --ignore
 
 The [Checks workflow](.github/workflows/check.yml) builds on macOS, Windows, and Ubuntu 24.04. Each successful build produces a downloadable `TinyDash-<OS>-<architecture>` artifact with the app, commit information, and [desktop check instructions](docs/desktop-checks.md). Artifacts remain available for 14 days. They are unsigned development builds.
 
-Windows and Linux jobs also run the actual release application through `tauri-driver`. The Bun test script installs two temporary application entries, searches through the real Rust backend, checks initial input focus and arrow-key selection, then launches a harmless executable that records which entry was selected. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its driver processes when it finishes. CI retains screenshots and failure logs in `test-results-<OS>-<architecture>` artifacts.
+After the build jobs pass, the [native check workflow](.github/workflows/native.yml) downloads and tests the Windows and Linux artifacts through `tauri-driver`. The Bun test script installs two temporary application entries, searches through the real Rust backend, checks initial input focus and arrow-key selection, then launches a harmless executable that records which entry was selected. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its app and driver processes when it finishes. CI retains screenshots and failure logs in `native-results-<OS>-<architecture>` artifacts.
 
-To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime. Linux requires `WebKitWebDriver` and an active X11 session. Then run:
+The native workflow can also test an existing build without compiling it again. Select **Native app checks**, choose **Run workflow**, and enter the Checks run ID that contains the build artifacts. The diagnostics record both the build commit and the test-code commit. This makes native failures faster to reproduce.
+
+To run the native check locally, quit TinyDash first. Install `tauri-driver` 2.0.6 and the platform driver. Windows requires Edge WebDriver matching its WebView2 Runtime; use a terminal without administrator privileges. Linux requires `WebKitWebDriver` and an active X11 session. Then run:
 
 ```sh
 cargo install tauri-driver --version 2.0.6 --locked
 bun run tauri build --no-bundle
 bun run test:native
 ```
+
+On Windows, the test starts TinyDash with a temporary WebView2 profile and a local debug port, then attaches Edge WebDriver. See Microsoft's [WebView2 attach procedure](https://learn.microsoft.com/en-us/microsoft-edge/webview2/how-to/webdriver#approach-2-attaching-microsoft-edge-webdriver-to-a-running-webview2-app). The hosted Windows runner has administrator privileges, and [elevated WebView2 hosts ignore environment-based browser flags](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags). The CI wrapper therefore sets a temporary machine policy for `tinydash.exe` and restores it after the test. This wrapper refuses to run outside a disposable GitHub-hosted runner. Local tests use process environment variables. The application build contains no test flags.
 
 The direct Tauri WebDriver supports Windows and Linux. macOS receives build and Rust test checks in CI; its desktop checks remain manual. See the [Tauri WebDriver setup](https://v2.tauri.app/develop/tests/webdriver/).
 
