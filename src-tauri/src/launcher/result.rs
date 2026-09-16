@@ -37,4 +37,5 @@ pub struct SearchResponse {
     pub indexing: bool,
     pub index_error: Option<String>,
     pub notice: Option<String>,
+    pub storage_error: Option<String>,
 }

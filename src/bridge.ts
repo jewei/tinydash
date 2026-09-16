@@ -20,6 +20,7 @@ export interface SearchResponse {
   indexing: boolean;
   indexError: string | null;
   notice: string | null;
+  storageError: string | null;
 }
 
 export interface LauncherInfo {

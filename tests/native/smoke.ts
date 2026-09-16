@@ -328,6 +328,14 @@ try {
   await reopen();
   pass("Starting TinyDash again reopens its existing window after copying");
 
+  await keys(inputId, ":");
+  await until(
+    "the copied emoji ranks first without a search term",
+    async () => (await titles())[0] === "rocket",
+  );
+  pass("Copying an emoji moves it to the top of the emoji list");
+  await keys(inputId, "\uE009a\uE000\uE003");
+
   await keys(inputId, fixtures.prefix);
   await until("OS discovery finds both fixture applications", async () => {
     const names = await titles();
@@ -383,6 +391,16 @@ try {
     }
   });
   pass("Enter launches the selected fixture through the OS");
+
+  await reopen();
+  await until(
+    "the launched app ranks first in the complete index",
+    async () => (await titles())[0] === orderedNames[1],
+  );
+  await saveScreen("usage-ranking.png");
+  pass(
+    "A successful launch moves the app to the top before the result limit is applied",
+  );
   await writeFile(
     resolve(output, "result.json"),
     JSON.stringify({ passed }, null, 2),

@@ -31,6 +31,7 @@ export default function App() {
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
   const [indexError, setIndexError] = createSignal<string>();
+  const [storageError, setStorageError] = createSignal<string>();
   const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
   let input!: HTMLInputElement;
@@ -44,7 +45,11 @@ export default function App() {
   const current = () => results()[selected()];
   const canOpen = () => desktop && !!current() && !busy() && !pending();
   const message = () =>
-    error() ?? notice() ?? indexError() ?? info()?.warnings[0];
+    error() ??
+    notice() ??
+    indexError() ??
+    storageError() ??
+    info()?.warnings[0];
   const primaryLabel = () =>
     current()?.kind === "emoji" || mode() === "emoji"
       ? "Copy emoji"
@@ -74,6 +79,7 @@ export default function App() {
       setTotal(response.total);
       setIndexing(response.indexing);
       setIndexError(response.indexError ?? undefined);
+      setStorageError(response.storageError ?? undefined);
       setNotice(response.notice ?? undefined);
     } catch (reason) {
       if (disposed || request !== sequence) return;
@@ -258,6 +264,9 @@ export default function App() {
           register("apps-changed", () => {
             void search();
           }),
+          register("usage-changed", () => {
+            void search();
+          }),
           register("launcher-opened", (clear) => {
             setMenuOpen(false);
             setError(undefined);
@@ -266,7 +275,10 @@ export default function App() {
               changeQuery("");
             }
             focusInput();
-            if (clear !== true) input.select();
+            if (clear !== true) {
+              void search();
+              input.select();
+            }
           }),
         ]);
         if (disposed) return;

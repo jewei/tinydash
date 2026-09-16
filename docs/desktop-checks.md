@@ -8,6 +8,8 @@ Open the GitHub Actions **Checks** run for the commit under test. Download the `
 
 These are unsigned development builds. Windows needs the WebView2 Runtime. The Linux binary is built on Ubuntu 24.04 and needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, and libxdo libraries. Bun and Rust are not needed to run the build.
 
+Quit any older TinyDash process through its tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
+
 On macOS, extract the inner ZIP and open `TinyDash.app`. On Windows, run the `.exe`. On Linux, extract the inner archive and run `./tinydash` from a terminal.
 
 ## Check the launcher
@@ -35,6 +37,16 @@ Use Ctrl on Windows and Linux. Use Command on macOS. If a shortcut conflicts wit
 6. Change between Apps, Emoji, and Calculator modes while a query is present. Confirm that results follow the selected mode. Reopen TinyDash after each copy and confirm that the input accepts text.
 
 Currency rates and automatic paste are not implemented in this phase. Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details.
+
+## Check usage ranking
+
+1. Launch an app from a lower position in the list. Reopen TinyDash and clear the query. Confirm that the app moves higher in the list.
+2. Copy an emoji. Reopen TinyDash and enter `:`. Confirm that the copied emoji moves higher in the emoji list.
+3. Quit TinyDash fully, then start it again. Confirm that both ranking changes remain. Reopening a hidden window is not a process restart.
+4. Search for an exact app name after using another app several times. Confirm that the exact match remains above weak matches.
+5. Set `clearQueryOnOpen` to `false`, restart, and launch an app from a query with several matches. Reopen the launcher. Confirm that it keeps the query and refreshes the order. Restore the setting after the check.
+
+The existing usage history can affect the order. Use a separate test profile for repeatable checks. Usage records do not contain queries or calculation text.
 
 ## Linux session differences
 

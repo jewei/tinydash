@@ -21,6 +21,50 @@ async function actions(page: Page) {
   );
 }
 
+test("shows a storage warning while search and launch remain available", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.storageError =
+      "Usage history could not be saved. Ranking changes will be lost when TinyDash quits.";
+    return window.__launcherTest.emit("usage-changed", null);
+  });
+  await expect(page.getByRole("alert")).toContainText(
+    "Usage history could not be saved",
+  );
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("sa");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await input.press("Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      { command: "execute_action", payload: { id: "app-1", action: "launch" } },
+    ]);
+});
+
+test("refreshes Rust ranking when the launcher preserves the query", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("app");
+  await expect(
+    page.getByRole("listbox").getByRole("option").first(),
+  ).toContainText("Finder");
+  await page.evaluate(() => {
+    window.__launcherTest.usedAppFirst = true;
+    return window.__launcherTest.emit("launcher-opened", false);
+  });
+  await expect(input).toHaveValue("app");
+  await expect(
+    page.getByRole("listbox").getByRole("option").first(),
+  ).toContainText("Safari");
+  await expect(input).toBeFocused();
+});
+
 test("focuses the query, wraps selection, and launches the selected app", async ({
   page,
 }) => {
