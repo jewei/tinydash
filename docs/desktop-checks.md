@@ -17,7 +17,7 @@ On macOS, extract the inner ZIP and open `TinyDash.app`. On Windows, run the `.e
 1. Start TinyDash. Confirm that the window appears and typing immediately enters text in the search field.
 2. Search for an installed app by name. Search again with an abbreviation and part of its path. Confirm that the expected app appears.
 3. Use the arrow keys. Confirm that selection moves and wraps at both ends. Press Enter and confirm that the selected app starts.
-4. Press Command/Ctrl + Shift + Space while another app has focus. Confirm that TinyDash appears and immediately accepts text. Repeat ten times.
+4. Press Control + Shift + Space while another app has focus. Confirm that TinyDash appears and immediately accepts text. Confirm that Siri, Spotlight, or another system panel does not open. Repeat ten times.
 5. Press Escape. Confirm that the window hides and can reopen through the shortcut.
 6. Click another app. Confirm that TinyDash hides with the default `hideOnBlur` setting.
 7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash.
@@ -25,7 +25,7 @@ On macOS, extract the inner ZIP and open `TinyDash.app`. On Windows, run the `.e
 9. Use Command/Ctrl + Enter on an app result. Confirm that the OS file manager shows its location.
 10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and returns to All mode.
 
-Use Ctrl on Windows and Linux. Use Command on macOS. If a shortcut conflicts with another application, change it in `settings.json` and repeat the check.
+The global shortcut uses Control on all platforms. For shortcuts shown as Command/Ctrl, use Ctrl on Windows and Linux, and Command on macOS. If a shortcut conflicts with another application, change it in `settings.json` and repeat the check. On macOS 27, Command + Shift + Space opens Siri Visual Intelligence and must not be used as TinyDash's default.
 
 ## Check calculations and emoji
 
