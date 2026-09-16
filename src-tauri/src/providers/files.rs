@@ -7,6 +7,7 @@ use nucleo_matcher::{
     Matcher, Utf32String,
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
+use unicode_normalization::UnicodeNormalization;
 use walkdir::WalkDir;
 
 use crate::{
@@ -75,12 +76,22 @@ impl FileProvider {
     fn new(entries: Vec<FileEntry>) -> Self {
         let mut files: Vec<_> = entries
             .into_iter()
-            .map(|entry| IndexedFile {
-                name: entry.name.as_str().into(),
-                normalized_name: ranking::normalize(&entry.name),
-                // Accept forward slashes in Windows path queries as well.
-                path: entry.path.replace('\\', "/").into(),
-                entry,
+            .map(|entry| {
+                // macOS can return decomposed accents. Canonicalize matching
+                // text only; keep the exact OS path for IDs and file actions.
+                let name: String = entry.name.nfc().collect();
+                IndexedFile {
+                    name: name.as_str().into(),
+                    normalized_name: ranking::normalize(&name),
+                    // Accept forward slashes in Windows path queries as well.
+                    path: entry
+                        .path
+                        .replace('\\', "/")
+                        .nfc()
+                        .collect::<String>()
+                        .into(),
+                    entry,
+                }
             })
             .collect();
         files.sort_unstable_by(|a, b| {
@@ -110,7 +121,7 @@ impl FileProvider {
         now: i64,
         limit: usize,
     ) -> Vec<SearchResult> {
-        let normalized = ranking::normalize(query);
+        let normalized: String = ranking::normalize(query).nfc().collect();
         let pattern = Pattern::new(
             &normalized,
             CaseMatching::Ignore,
@@ -311,6 +322,24 @@ mod tests {
     use super::*;
     use crate::launcher::{query::SearchMode, search::SearchManager};
     use std::fs;
+
+    #[test]
+    fn matches_composed_and_decomposed_unicode_without_changing_file_paths() {
+        let path = Path::new("/Documents/cafe\u{301}.txt");
+        let entry = FileEntry::new(path).expect("entry");
+        let id = entry.id.clone();
+        let provider = FileProvider::new(vec![entry]);
+        let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+        for query in ["café.txt", "cafe\u{301}.txt", "Documents/café.txt"] {
+            let results = provider.search(query, &mut matcher, &HashMap::new(), 0, 30);
+            assert_eq!(results.len(), 1, "Query: {query}");
+            assert_eq!(results[0].id, id);
+            assert_eq!(results[0].subtitle, path.to_str().expect("path"));
+        }
+        assert!(
+            provider.search("café.txt", &mut matcher, &HashMap::new(), 0, 30)[0].score >= 10_000
+        );
+    }
 
     fn write(root: &Path, relative: &str, text: &str) -> PathBuf {
         let path = root.join(relative);

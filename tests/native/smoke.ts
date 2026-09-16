@@ -6,7 +6,14 @@ import {
   type ChildProcess,
 } from "node:child_process";
 import { closeSync, openSync } from "node:fs";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -645,6 +652,18 @@ try {
   );
 } catch (error) {
   console.error(error);
+  await writeFile(
+    resolve(output, "file-fixture.json"),
+    JSON.stringify(
+      {
+        expected: fixtures.filePath,
+        marker: await readFile(fixtures.fileMarker, "utf8").catch(() => null),
+        files: await readdir(fixtures.fileRoot).catch(() => []),
+      },
+      null,
+      2,
+    ),
+  );
   if (process.platform === "win32") {
     const diagnostic = spawnSync(
       "powershell.exe",
