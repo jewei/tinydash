@@ -48,6 +48,15 @@ export default function App() {
   let list!: HTMLUListElement;
   let sequence = 0;
   let disposed = false;
+  let searchTask: Promise<void> | undefined;
+  let queuedSearch:
+    | {
+        value: string;
+        mode: SearchMode;
+        selectedId: string | undefined;
+        request: number;
+      }
+    | undefined;
   const unlisteners: UnlistenFn[] = [];
 
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
@@ -83,34 +92,51 @@ export default function App() {
               : "Search apps, files, emoji...";
   const focusInput = () => input.focus({ preventScroll: true });
 
-  async function search(value = query(), preserveSelection = false) {
-    if (!desktop) return;
-    const selectedId = preserveSelection ? current()?.id : undefined;
-    const request = ++sequence;
+  function search(value = query(), preserveSelection = false) {
+    if (!desktop || disposed) return Promise.resolve();
+    queuedSearch = {
+      value,
+      mode: mode(),
+      selectedId: preserveSelection ? current()?.id : undefined,
+      request: ++sequence,
+    };
     setPending(true);
     setNotice(undefined);
+    // Native IPC calls can arrive out of order. Keep one call in flight and
+    // replace waiting input with the newest query, without a debounce timer.
+    return (searchTask ??= drainSearch());
+  }
+
+  async function drainSearch() {
     try {
-      const response = await backend.search(value, mode());
-      if (disposed || request !== sequence) return;
-      setResults(response.results);
-      setSelected(
-        Math.max(
-          0,
-          response.results.findIndex((result) => result.id === selectedId),
-        ),
-      );
-      setTotal(response.total);
-      setIndexing(response.indexing);
-      setFiles(response.files);
-      setIndexError(response.indexError ?? undefined);
-      setStorageError(response.storageError ?? undefined);
-      setNotice(response.notice ?? undefined);
-    } catch (reason) {
-      if (disposed || request !== sequence) return;
-      setResults([]);
-      setError(String(reason));
+      while (queuedSearch && !disposed) {
+        const { value, mode: searchMode, selectedId, request } = queuedSearch;
+        queuedSearch = undefined;
+        try {
+          const response = await backend.search(value, searchMode);
+          if (disposed || request !== sequence) continue;
+          setResults(response.results);
+          setSelected(
+            Math.max(
+              0,
+              response.results.findIndex((result) => result.id === selectedId),
+            ),
+          );
+          setTotal(response.total);
+          setIndexing(response.indexing);
+          setFiles(response.files);
+          setIndexError(response.indexError ?? undefined);
+          setStorageError(response.storageError ?? undefined);
+          setNotice(response.notice ?? undefined);
+        } catch (reason) {
+          if (disposed || request !== sequence) continue;
+          setResults([]);
+          setError(String(reason));
+        }
+      }
     } finally {
-      if (!disposed && request === sequence) setPending(false);
+      searchTask = undefined;
+      if (!disposed) setPending(false);
     }
   }
 
