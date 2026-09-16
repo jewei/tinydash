@@ -1,0 +1,15 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+.DS_Store
+*.log
+test-results/
+playwright-report/
+artifacts/
+/.local/
+/designs/
+/.hallmark/
+/site/
+/docs/benchmarks/
+/scripts/perf/memory/
