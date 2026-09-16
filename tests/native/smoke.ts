@@ -181,10 +181,19 @@ async function click(selector: string) {
 async function clipboardMode() {
   // All mode also matches paths. Windows Start Menu paths can match words
   // such as "second", so clipboard checks must select the intended provider.
-  await click('select option[value="clipboard"]');
+  // WebKitWebDriver can change the option without delivering its change
+  // event. Select as browser test drivers do, through the normal DOM events.
+  // This still runs the frontend handler and real Rust IPC; no results are mocked.
+  await request(`/session/${session}/execute/sync`, "POST", {
+    script: `const select = document.querySelector('select');
+      select.value = 'clipboard';
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));`,
+    args: [],
+  });
   await until("Clipboard mode is ready", () =>
     observe<boolean>(
-      "return document.querySelector('select')?.value === 'clipboard' && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+      "return document.querySelector('input')?.placeholder === 'Search clipboard history...' && !!document.querySelector('.clear-history') && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
     ),
   );
 }
