@@ -2,11 +2,21 @@ use rusqlite::{Connection, TransactionBehavior};
 
 use super::{Error, Result};
 
-const MIGRATIONS: &[&str] = &["CREATE TABLE usage_history (
+const MIGRATIONS: &[&str] = &[
+    "CREATE TABLE usage_history (
         result_id TEXT PRIMARY KEY NOT NULL,
         use_count INTEGER NOT NULL CHECK (use_count BETWEEN 1 AND 4294967295),
         last_used_at INTEGER NOT NULL CHECK (last_used_at >= 0)
-    ) STRICT;"];
+    ) STRICT;",
+    "CREATE TABLE clipboard_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        content TEXT NOT NULL UNIQUE CHECK (length(CAST(content AS BLOB)) BETWEEN 1 AND 16384),
+        created_at INTEGER NOT NULL CHECK (created_at >= 0),
+        last_used_at INTEGER CHECK (last_used_at >= 0),
+        pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)),
+        sort_order INTEGER NOT NULL
+    ) STRICT;",
+];
 
 pub fn apply(connection: &mut Connection) -> Result<()> {
     migrate(connection, MIGRATIONS)
@@ -61,6 +71,31 @@ mod tests {
             })
             .expect("row");
         assert_eq!(value, ("kept".into(), 1));
+    }
+
+    #[test]
+    fn adds_clipboard_to_the_usage_database_without_losing_usage() {
+        let mut connection = Connection::open_in_memory().expect("database");
+        migrate(&mut connection, &MIGRATIONS[..1]).expect("phase 4 schema");
+        connection
+            .execute("INSERT INTO usage_history VALUES ('emoji:🚀', 3, 100)", [])
+            .expect("usage");
+        apply(&mut connection).expect("phase 5 schema");
+        apply(&mut connection).expect("idempotent");
+        assert_eq!(
+            connection
+                .query_row("SELECT use_count FROM usage_history", [], |row| row
+                    .get::<_, u32>(0))
+                .expect("usage"),
+            3
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT count(*) FROM clipboard_history", [], |row| row
+                    .get::<_, u32>(0))
+                .expect("clipboard"),
+            0
+        );
     }
 
     #[test]

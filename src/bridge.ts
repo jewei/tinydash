@@ -1,11 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type Action = "launch" | "reveal" | "copy";
-export type SearchMode = "all" | "apps" | "emoji" | "calculator";
+export type Action = "launch" | "reveal" | "copy" | "delete";
+export type SearchMode = "all" | "apps" | "emoji" | "calculator" | "clipboard";
 
 export interface SearchResult {
   id: string;
-  kind: "app" | "emoji" | "calculation";
+  kind: "app" | "emoji" | "calculation" | "clipboard";
   title: string;
   subtitle: string;
   score: number;
@@ -28,9 +28,18 @@ export interface LauncherInfo {
     clearQueryOnOpen: boolean;
     hideOnBlur: boolean;
     shortcut: string;
+    clipboardHistoryEnabled: boolean;
+    clipboardHistoryLimit: number;
   };
   platform: "macos" | "windows" | "linux";
   warnings: string[];
+}
+
+export interface ClipboardEntry {
+  id: number;
+  content: string;
+  createdAt: number;
+  lastUsedAt: number | null;
 }
 
 export const backend = {
@@ -39,6 +48,9 @@ export const backend = {
     invoke<SearchResponse>("search", { query, mode }),
   execute: (id: string, action: Action) =>
     invoke<void>("execute_action", { id, action }),
+  clipboardPreview: (id: string) =>
+    invoke<ClipboardEntry>("clipboard_preview", { id }),
+  clearClipboard: () => invoke<void>("clear_clipboard_history"),
   hide: () => invoke<void>("hide_launcher"),
   refresh: () => invoke<void>("refresh_apps"),
   quit: () => invoke<void>("quit_app"),

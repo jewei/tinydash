@@ -48,6 +48,23 @@ Currency rates and automatic paste are not implemented in this phase. Clipboard 
 
 The existing usage history can affect the order. Use a separate test profile for repeatable checks. Usage records do not contain queries or calculation text.
 
+## Check clipboard history
+
+Use test text for these checks. History stores text without encryption. These checks delete saved history, so use a separate test profile.
+
+1. Copy a short text with several lines, spaces, and an emoji from a text editor. Open TinyDash and select Clipboard. Confirm that the entry appears within two seconds and the preview preserves its text.
+2. Copy the same text twice. Confirm that only one entry exists. Copy different text, then the first text again. Confirm that the first entry moves to the top.
+3. Search for a word from the second line. Confirm that both Clipboard mode and All mode find the entry. Confirm that Apps mode does not return clipboard text.
+4. Copy another value in the editor. Select the older entry in TinyDash and press Enter. Paste into the editor. Confirm that the full historical text is restored.
+5. Delete that entry with Command/Ctrl + Backspace. Confirm that the launcher stays open. Reopen it and confirm that the unchanged clipboard does not restore the deleted entry during this session.
+6. Select Clear history. Confirm that Cancel receives focus. Cancel first and confirm that entries remain. Then confirm the clear action and check that all entries disappear. Confirm that the current system clipboard is unchanged.
+7. Capture new test text, quit TinyDash fully, then start it again. Confirm that saved entries remain. Startup also captures the current system clipboard.
+8. Set `clipboardHistoryLimit` to 2 and restart. Copy three distinct values at least two seconds apart. Confirm that only the newest two remain. Restore the setting to 100.
+9. Set `clipboardHistoryEnabled` to `false` and restart. Copy new text and confirm that no new entry appears. Confirm that existing entries can still be copied and cleared. Restore the setting when finished.
+10. Copy an image, whitespace-only text, and text larger than 16 KiB. Confirm that none becomes an entry. Test clipboard capture while the launcher is hidden and after reopening it.
+
+macOS and Windows read their clipboard change counters once per second. Copies made within the same interval can be missed. Linux uses GTK clipboard events. On Wayland, the compositor can limit access while TinyDash lacks focus; record which changes appear only after opening the launcher.
+
 ## Linux session differences
 
 - On X11, test the registered global shortcut directly.

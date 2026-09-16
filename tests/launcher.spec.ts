@@ -21,6 +21,122 @@ async function actions(page: Page) {
   );
 }
 
+test("previews plain text, copies by ID, and deletes without hiding the launcher", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("clipboard");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await expect(input).toBeFocused();
+  await expect(page.getByLabel("Saved clipboard text")).toContainText(
+    "<script>literal text</script>",
+  );
+  await expect(page.getByLabel("Saved clipboard text")).toContainText(
+    "  Keep the original spacing. 🚀",
+  );
+  await page.screenshot({ path: "test-results/clipboard.png" });
+  await input.press("Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "clipboard:1", action: "copy" },
+      },
+    ]);
+  await input.press("Meta+Backspace");
+  await expect(page.locator(".result-title")).toHaveText("Project link");
+  await expect(page.getByLabel("Saved clipboard text")).toHaveText(
+    "https://example.com/project",
+  );
+  await expect
+    .poll(async () => (await actions(page)).at(-1))
+    .toEqual({
+      command: "execute_action",
+      payload: { id: "clipboard:1", action: "delete" },
+    });
+  await expect(input).toBeFocused();
+});
+
+test("ignores late clipboard previews and keeps the layout usable at narrow widths", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.slowPreview = true;
+  });
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("clipboard");
+  await expect(page.locator(".result-row")).toHaveCount(2);
+  await page
+    .getByRole("combobox", { name: "Search TinyDash" })
+    .press("ArrowDown");
+  await expect(page.getByLabel("Saved clipboard text")).toHaveText(
+    "https://example.com/project",
+  );
+  await page.waitForTimeout(300);
+  await expect(page.getByLabel("Saved clipboard text")).toHaveText(
+    "https://example.com/project",
+  );
+  for (const width of [320, 720]) {
+    await page.setViewportSize({ width, height: 550 });
+    await expect(page.getByLabel("Saved clipboard text")).toBeInViewport();
+    await expect(
+      page.getByRole("button", { name: "Copy text", exact: true }),
+    ).toBeInViewport();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  }
+});
+
+test("clear requires confirmation, keeps Cancel focused, and reports storage errors", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("clipboard");
+  const clear = page.getByRole("button", {
+    name: "Clear history",
+    exact: true,
+  });
+  await clear.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".result-row")).toHaveCount(2);
+  await clear.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await page.evaluate(() => {
+    window.__launcherTest.rejectClear = true;
+  });
+  await clear.click();
+  await dialog.getByRole("button", { name: "Clear history" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Error: Could not delete clipboard history.",
+  );
+  await expect(page.locator(".result-row")).toHaveCount(2);
+  await page.evaluate(() => {
+    window.__launcherTest.rejectClear = false;
+  });
+  await dialog.getByRole("button", { name: "Clear history" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "No saved clipboard text" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Search TinyDash" }),
+  ).toBeFocused();
+});
+
 test("shows a storage warning while search and launch remain available", async ({
   page,
 }) => {

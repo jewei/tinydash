@@ -14,6 +14,7 @@ pub fn show(app: &AppHandle) -> Result<()> {
         .try_state::<LauncherState>()
         .is_none_or(|state| state.settings.clear_query_on_open);
     window.emit("launcher-opened", clear)?;
+    super::clipboard::refresh(app);
     tracing::debug!("Launcher shown");
     Ok(())
 }

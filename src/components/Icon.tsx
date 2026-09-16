@@ -9,6 +9,8 @@ type IconName =
   | "apps"
   | "close"
   | "calculator"
+  | "clipboard"
+  | "delete"
   | "copy";
 
 export default function Icon(props: { name: IconName; size?: number }) {
@@ -25,6 +27,13 @@ export default function Icon(props: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <Switch>
+        <Match when={props.name === "clipboard"}>
+          <rect x="7" y="2" width="10" height="5" rx="2" />
+          <path d="M7 4H4v18h16V4h-3M8 12h8M8 16h6" />
+        </Match>
+        <Match when={props.name === "delete"}>
+          <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />
+        </Match>
         <Match when={props.name === "calculator"}>
           <rect x="5" y="2" width="14" height="20" rx="2" />
           <path d="M8 6h8M8 11h1m3 0h1m3 0h.1M8 15h1m3 0h1m3 0h.1M8 19h1m3 0h1m3 0h.1" />

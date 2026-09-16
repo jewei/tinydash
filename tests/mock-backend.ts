@@ -11,6 +11,10 @@ declare global {
       rejectActions: boolean;
       storageError: string | null;
       usedAppFirst: boolean;
+      clipboardDeleted: string[];
+      clipboardCleared: boolean;
+      rejectClear: boolean;
+      slowPreview: boolean;
       emit: typeof emit;
     };
   }
@@ -58,12 +62,29 @@ const emoji: SearchResult = {
   secondaryActions: [],
 };
 
+const clips: SearchResult[] = ["Meeting notes", "Project link"].map(
+  (title, index) => ({
+    id: `clipboard:${index + 1}`,
+    kind: "clipboard",
+    title,
+    subtitle: "Text · 64 characters",
+    score: 0,
+    icon: null,
+    primaryAction: "copy",
+    secondaryActions: ["delete"],
+  }),
+);
+
 window.isTauri = true;
 window.__launcherTest = {
   calls: [],
   rejectActions: false,
   storageError: null,
   usedAppFirst: false,
+  clipboardDeleted: [],
+  clipboardCleared: false,
+  rejectClear: false,
+  slowPreview: false,
   emit,
 };
 mockIPC(
@@ -77,6 +98,8 @@ mockIPC(
           clearQueryOnOpen: true,
           hideOnBlur: true,
           shortcut: "CommandOrControl+Shift+Space",
+          clipboardHistoryEnabled: true,
+          clipboardHistoryLimit: 100,
         },
         warnings: [],
       };
@@ -91,23 +114,29 @@ mockIPC(
         );
       // These fixed responses test rendering and IPC order, not TypeScript search.
       const results =
-        query === "=1 / 0" || (mode === "calculator" && !query)
-          ? []
-          : mode === "emoji" ||
-              query === ":rocket" ||
-              (query === "rocket" && mode !== "apps")
-            ? [emoji]
-            : query === "12 * 8" && mode !== "apps"
-              ? [calculation]
-              : query === "slow"
-                ? [apps[0]]
-                : query === "sa"
-                  ? [apps[1]]
-                  : query === "missing"
-                    ? []
-                    : state.usedAppFirst
-                      ? [apps[1], apps[0], ...apps.slice(2)]
-                      : apps;
+        mode === "clipboard"
+          ? state.clipboardCleared
+            ? []
+            : clips.filter(
+                (entry) => !state.clipboardDeleted.includes(entry.id),
+              )
+          : query === "=1 / 0" || (mode === "calculator" && !query)
+            ? []
+            : mode === "emoji" ||
+                query === ":rocket" ||
+                (query === "rocket" && mode !== "apps")
+              ? [emoji]
+              : query === "12 * 8" && mode !== "apps"
+                ? [calculation]
+                : query === "slow"
+                  ? [apps[0]]
+                  : query === "sa"
+                    ? [apps[1]]
+                    : query === "missing"
+                      ? []
+                      : state.usedAppFirst
+                        ? [apps[1], apps[0], ...apps.slice(2)]
+                        : apps;
       return {
         results,
         total: apps.length,
@@ -121,6 +150,31 @@ mockIPC(
       throw new Error(
         "Could not open the application. Refresh the application list.",
       );
+    }
+    if (
+      command === "execute_action" &&
+      (payload as { action: string }).action === "delete"
+    ) {
+      state.clipboardDeleted.push((payload as { id: string }).id);
+    }
+    if (command === "clipboard_preview") {
+      const { id } = payload as { id: string };
+      if (state.slowPreview && id === "clipboard:1")
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      return {
+        id: Number(id.split(":")[1]),
+        content:
+          id === "clipboard:1"
+            ? "Meeting notes\n  Review the launcher.\n  Keep the original spacing. 🚀\n<script>literal text</script>"
+            : "https://example.com/project",
+        createdAt: 1_789_571_700,
+        lastUsedAt: null,
+      };
+    }
+    if (command === "clear_clipboard_history") {
+      if (state.rejectClear)
+        throw new Error("Could not delete clipboard history.");
+      state.clipboardCleared = true;
     }
     return undefined;
   },
