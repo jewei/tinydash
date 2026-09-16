@@ -553,11 +553,13 @@ export default function App() {
                           : query()
                             ? "No files found"
                             : "No files in the index"
-                        : indexing()
-                          ? "Finding your applications"
-                          : query()
-                            ? "No results found"
-                            : "No applications in the index"}
+                        : mode() === "all" && files().indexing && query()
+                          ? "No results yet"
+                          : indexing()
+                            ? "Finding your applications"
+                            : query()
+                              ? "No results found"
+                              : "No applications in the index"}
             </h1>
             <p>
               {!desktop
@@ -580,11 +582,13 @@ export default function App() {
                             : info()?.settings.fileSearchRoots?.length === 0
                               ? "File search is off in settings.json."
                               : "Check your folders in settings.json, then refresh the file list."
-                        : indexing()
-                          ? "You can start typing while the list loads."
-                          : query()
-                            ? "Try a name, a file path, or a calculation."
-                            : "Refresh the list after you install an application."}
+                        : mode() === "all" && files().indexing && query()
+                          ? "The file scan is still running. You can search applications now."
+                          : indexing()
+                            ? "You can start typing while the list loads."
+                            : query()
+                              ? "Try a name, a file path, or a calculation."
+                              : "Refresh the list after you install an application."}
             </p>
             <Show
               when={
@@ -630,17 +634,19 @@ export default function App() {
               <span>TinyDash</span>
               <span class="status-separator">/</span>
               <span class="query-hint">
-                {query()
-                  ? `${results().length} ${results().length === 1 ? "result" : results().length === 30 ? "shown" : "results"}`
-                  : mode() === "calculator"
-                    ? "Enter copies the result."
-                    : mode() === "emoji"
-                      ? "Enter copies the emoji."
-                      : mode() === "clipboard"
-                        ? "Enter copies text. Paste it with your usual shortcut."
-                        : mode() === "files"
-                          ? "Enter opens the file. Refresh after files change."
-                          : "Type a name, : for emoji, or = to calculate."}
+                {mode() === "all" && files().indexing
+                  ? "Scanning files... You can search apps now."
+                  : query()
+                    ? `${results().length} ${results().length === 1 ? "result" : results().length === 30 ? "shown" : "results"}`
+                    : mode() === "calculator"
+                      ? "Enter copies the result."
+                      : mode() === "emoji"
+                        ? "Enter copies the emoji."
+                        : mode() === "clipboard"
+                          ? "Enter copies text. Paste it with your usual shortcut."
+                          : mode() === "files"
+                            ? "Enter opens the file. Refresh after files change."
+                            : "Type a name, : for emoji, or = to calculate."}
               </span>
             </>
           }

@@ -8,7 +8,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 // Install real, temporary OS app entries. The launcher uses its normal scanner.
@@ -140,6 +140,9 @@ export async function installFixtures() {
     } else {
       env.XDG_DATA_HOME = join(directory, "data");
       env.XDG_CONFIG_HOME = join(directory, "config");
+      // xdg-open's generic desktop parser cannot resolve a quoted Exec binary.
+      // Use a PATH command for this handler, as normal desktop entries do.
+      env.PATH = `${directory}${delimiter}${env.PATH ?? ""}`;
       const applications = join(env.XDG_DATA_HOME, "applications");
       await mkdir(applications, { recursive: true });
       const config = join(env.XDG_CONFIG_HOME, "dev.tinydash.launcher");
@@ -162,7 +165,7 @@ export async function installFixtures() {
       }
       await writeFile(
         join(applications, "tinydash-file.desktop"),
-        `[Desktop Entry]\nType=Application\nName=TinyDash test document handler\nExec=${quote(binary)} %f\nMimeType=text/plain;\nNoDisplay=true\nTerminal=false\n`,
+        `[Desktop Entry]\nType=Application\nName=TinyDash test document handler\nExec=fixture %f\nMimeType=text/plain;\nNoDisplay=true\nTerminal=false\n`,
       );
       await writeFile(
         join(env.XDG_CONFIG_HOME, "mimeapps.list"),
