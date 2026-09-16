@@ -19,6 +19,11 @@ export default function ResultIcon(props: { result: SearchResult }) {
           <Icon name="calculator" size={26} />
         </span>
       </Match>
+      <Match when={props.result.kind === "clipboard"}>
+        <span class="clipboard-icon" aria-hidden="true">
+          <Icon name="clipboard" size={24} />
+        </span>
+      </Match>
     </Switch>
   );
 }

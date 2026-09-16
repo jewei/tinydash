@@ -1,3 +1,4 @@
+mod clipboard;
 mod migrations;
 
 use std::{collections::HashMap, path::Path, time::Duration};
@@ -31,7 +32,15 @@ impl Database {
             std::fs::create_dir_all(parent)?;
         }
         let mut connection = Connection::open(path)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = std::fs::metadata(path)?.permissions();
+            permissions.set_mode(permissions.mode() & 0o600);
+            std::fs::set_permissions(path, permissions)?;
+        }
         connection.busy_timeout(Duration::from_millis(250))?;
+        connection.pragma_update(None, "secure_delete", true)?;
         // One connection and infrequent writes need no WAL or background checkpoint.
         // Keep SQLite's default durable transactions.
         migrations::apply(&mut connection)?;

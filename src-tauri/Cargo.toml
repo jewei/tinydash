@@ -34,13 +34,16 @@ walkdir = "2.5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1.8"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_System_Com"] }
+windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Memory"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Use the GIO version already required by Tauri's GTK backend.
 gio = "0.18"
+gtk = "0.18"
 
 [dev-dependencies]
 tempfile = "3"

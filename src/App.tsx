@@ -17,6 +17,8 @@ import {
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
+import ClipboardPreview from "./components/ClipboardPreview";
+import ClearHistoryDialog from "./components/ClearHistoryDialog";
 
 export default function App() {
   const desktop = isTauri();
@@ -34,6 +36,7 @@ export default function App() {
   const [storageError, setStorageError] = createSignal<string>();
   const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [clearOpen, setClearOpen] = createSignal(false);
   let input!: HTMLInputElement;
   let menu: HTMLDivElement | undefined;
   let list!: HTMLUListElement;
@@ -43,7 +46,8 @@ export default function App() {
 
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
   const current = () => results()[selected()];
-  const canOpen = () => desktop && !!current() && !busy() && !pending();
+  const canOpen = () =>
+    desktop && !!current() && !busy() && !pending() && !clearOpen();
   const message = () =>
     error() ??
     notice() ??
@@ -55,7 +59,9 @@ export default function App() {
       ? "Copy emoji"
       : current()?.kind === "calculation" || mode() === "calculator"
         ? "Copy result"
-        : "Open";
+        : current()?.kind === "clipboard" || mode() === "clipboard"
+          ? "Copy text"
+          : "Open";
   const placeholder = () =>
     mode() === "apps"
       ? "Search applications..."
@@ -63,11 +69,14 @@ export default function App() {
         ? "Search emoji..."
         : mode() === "calculator"
           ? "Calculate or convert..."
-          : "Search apps, emoji, or calculate...";
+          : mode() === "clipboard"
+            ? "Search clipboard history..."
+            : "Search apps, clipboard, emoji...";
   const focusInput = () => input.focus({ preventScroll: true });
 
-  async function search(value = query()) {
+  async function search(value = query(), preserveSelection = false) {
     if (!desktop) return;
+    const selectedId = preserveSelection ? current()?.id : undefined;
     const request = ++sequence;
     setPending(true);
     setNotice(undefined);
@@ -75,7 +84,12 @@ export default function App() {
       const response = await backend.search(value, mode());
       if (disposed || request !== sequence) return;
       setResults(response.results);
-      setSelected(0);
+      setSelected(
+        Math.max(
+          0,
+          response.results.findIndex((result) => result.id === selectedId),
+        ),
+      );
       setTotal(response.total);
       setIndexing(response.indexing);
       setIndexError(response.indexError ?? undefined);
@@ -116,9 +130,40 @@ export default function App() {
     setError(undefined);
     try {
       await backend.execute(result.id, action);
+      if (action === "delete") {
+        await search();
+        focusInput();
+      }
     } catch (reason) {
       setError(String(reason));
       focusInput();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function confirmClear() {
+    setMenuOpen(false);
+    setError(undefined);
+    setClearOpen(true);
+  }
+
+  function closeClear() {
+    setClearOpen(false);
+    setError(undefined);
+    focusInput();
+  }
+
+  async function clearHistory() {
+    if (busy()) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await backend.clearClipboard();
+      closeClear();
+      await search();
+    } catch (reason) {
+      setError(String(reason));
     } finally {
       setBusy(false);
     }
@@ -162,6 +207,13 @@ export default function App() {
 
   function onKey(event: KeyboardEvent) {
     if (event.isComposing || event.keyCode === 229) return;
+    if (clearOpen()) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (!busy()) closeClear();
+      }
+      return;
+    }
     const command =
       info()?.platform === "macos" ? event.metaKey : event.ctrlKey;
     if (event.key === "Escape") {
@@ -211,6 +263,15 @@ export default function App() {
       event.preventDefault();
       const result = results()[Number(event.key) - 1];
       if (result) void run(result.primaryAction, result);
+      return;
+    }
+    if (
+      command &&
+      event.key === "Backspace" &&
+      current()?.secondaryActions.includes("delete")
+    ) {
+      event.preventDefault();
+      void run("delete");
       return;
     }
     // Enter on a focused button must keep the button's native action.
@@ -267,8 +328,13 @@ export default function App() {
           register("usage-changed", () => {
             void search();
           }),
+          register("clipboard-changed", () => {
+            if (mode() === "clipboard" || (mode() === "all" && query().trim()))
+              void search(query(), true);
+          }),
           register("launcher-opened", (clear) => {
             setMenuOpen(false);
+            setClearOpen(false);
             setError(undefined);
             if (clear === true) {
               setMode("all");
@@ -315,6 +381,7 @@ export default function App() {
           >
             <option value="all">All</option>
             <option value="apps">Apps</option>
+            <option value="clipboard">Clipboard</option>
             <option value="emoji">Emoji</option>
             <option value="calculator">Calculator</option>
           </select>
@@ -356,12 +423,14 @@ export default function App() {
               ? "Emoji"
               : mode() === "calculator"
                 ? "Calculator"
-                : "Applications"}
+                : mode() === "clipboard"
+                  ? "Clipboard history"
+                  : "Applications"}
         </span>
         <span class="list-count" role="status" aria-live="polite">
           {mode() === "calculator"
             ? "Offline"
-            : mode() === "emoji"
+            : mode() === "emoji" || mode() === "clipboard"
               ? `${results().length} shown`
               : indexing()
                 ? "Finding applications..."
@@ -369,9 +438,22 @@ export default function App() {
                   ? "Searching..."
                   : `${total()} installed`}
         </span>
+        <Show when={mode() === "clipboard"}>
+          <button
+            class="text-button clear-history"
+            disabled={!desktop || busy()}
+            onClick={confirmClear}
+          >
+            Clear history
+          </button>
+        </Show>
       </div>
 
-      <section class="results-area" aria-label="Search results">
+      <section
+        class="results-area"
+        classList={{ "with-preview": current()?.kind === "clipboard" }}
+        aria-label="Search results"
+      >
         <ul
           id="search-results"
           ref={list}
@@ -417,6 +499,11 @@ export default function App() {
             )}
           </For>
         </ul>
+        <Show when={current()?.kind === "clipboard"}>
+          <Show when={!pending()}>
+            <ClipboardPreview id={current()!.id} />
+          </Show>
+        </Show>
 
         <Show when={results().length === 0}>
           <div class="empty-state">
@@ -430,11 +517,15 @@ export default function App() {
                   ? "Calculate and convert"
                   : mode() === "emoji"
                     ? "No emoji found"
-                    : indexing()
-                      ? "Finding your applications"
-                      : query()
-                        ? "No results found"
-                        : "No applications in the index"}
+                    : mode() === "clipboard"
+                      ? query()
+                        ? "No clipboard entries found"
+                        : "No saved clipboard text"
+                      : indexing()
+                        ? "Finding your applications"
+                        : query()
+                          ? "No results found"
+                          : "No applications in the index"}
             </h1>
             <p>
               {!desktop
@@ -443,11 +534,17 @@ export default function App() {
                   ? "Try 12 * 8, sqrt(144), or 5 ft to cm."
                   : mode() === "emoji"
                     ? "Try a name, shortcode, or category, such as coffee or food."
-                    : indexing()
-                      ? "You can start typing while the list loads."
-                      : query()
-                        ? "Try an app name, an emoji name, or a calculation."
-                        : "Refresh the list after you install an application."}
+                    : mode() === "clipboard"
+                      ? info()?.settings.clipboardHistoryEnabled === false
+                        ? "Clipboard capture is off in settings.json."
+                        : query()
+                          ? "Try a word from the text you copied."
+                          : "Copy text in any application. It will appear here."
+                      : indexing()
+                        ? "You can start typing while the list loads."
+                        : query()
+                          ? "Try an app name, an emoji name, or a calculation."
+                          : "Refresh the list after you install an application."}
             </p>
             <Show
               when={
@@ -492,7 +589,9 @@ export default function App() {
                     ? "Enter copies the result."
                     : mode() === "emoji"
                       ? "Enter copies the emoji."
-                      : "Type a name, : for emoji, or = to calculate."}
+                      : mode() === "clipboard"
+                        ? "Enter copies text. Paste it with your usual shortcut."
+                        : "Type a name, : for emoji, or = to calculate."}
               </span>
             </>
           }
@@ -568,6 +667,30 @@ export default function App() {
                     Show in folder<kbd>{modifier()} ↵</kbd>
                   </button>
                 </Show>
+                <Show when={current()?.secondaryActions.includes("delete")}>
+                  <button
+                    role="menuitem"
+                    disabled={!canOpen()}
+                    onClick={() => void run("delete")}
+                  >
+                    <Icon name="delete" />
+                    Delete entry<kbd>{modifier()} ⌫</kbd>
+                  </button>
+                </Show>
+                <Show
+                  when={
+                    mode() === "clipboard" || current()?.kind === "clipboard"
+                  }
+                >
+                  <button
+                    role="menuitem"
+                    disabled={!desktop || busy()}
+                    onClick={confirmClear}
+                  >
+                    <Icon name="delete" />
+                    Clear clipboard history
+                  </button>
+                </Show>
                 <div class="menu-divider" />
                 <button
                   role="menuitem"
@@ -594,6 +717,14 @@ export default function App() {
           </div>
         </div>
       </footer>
+      <Show when={clearOpen()}>
+        <ClearHistoryDialog
+          busy={busy()}
+          error={error()}
+          onClose={closeClear}
+          onClear={() => void clearHistory()}
+        />
+      </Show>
     </main>
   );
 }

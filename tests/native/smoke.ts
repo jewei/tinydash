@@ -141,6 +141,43 @@ function clipboardText(): string {
   });
 }
 
+function setClipboardText(text: string) {
+  if (process.platform === "win32") {
+    execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Set-Clipboard -Value $env:TINYDASH_TEST_CLIPBOARD",
+      ],
+      {
+        env: { ...process.env, TINYDASH_TEST_CLIPBOARD: text },
+        timeout: 5_000,
+      },
+    );
+  } else {
+    execFileSync("xclip", ["-selection", "clipboard", "-i"], {
+      input: text,
+      stdio: ["pipe", "ignore", "ignore"],
+      timeout: 5_000,
+    });
+  }
+}
+
+async function click(selector: string) {
+  const element = await request<Record<string, string>>(
+    `/session/${session}/element`,
+    "POST",
+    { using: "css selector", value: selector },
+  );
+  await request(
+    `/session/${session}/element/${element[elementKey]}/click`,
+    "POST",
+    {},
+  );
+}
+
 async function reopen() {
   // Start the executable as a desktop shortcut would. Its single-instance
   // handler must show the resident window and reset the search field.
@@ -401,6 +438,104 @@ try {
   pass(
     "A successful launch moves the app to the top before the result limit is applied",
   );
+
+  const firstClip = `TinyDash clipboard ${fixtures.nonce}\n  Preserve spaces and emoji 🚀`;
+  const secondClip = `TinyDash second ${fixtures.nonce}`;
+  setClipboardText(firstClip);
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, `clipboard ${fixtures.nonce}`);
+  await until("text copied by another process enters the history", async () =>
+    (await titles()).some((title) => title === firstClip.split("\n")[0]),
+  );
+  await until("the clipboard preview preserves the full text", () =>
+    observe<boolean>(
+      `return document.querySelector('.clipboard-preview pre')?.textContent === ${JSON.stringify(firstClip)}`,
+    ),
+  );
+  setClipboardText(firstClip);
+  await delay(1_200);
+  assert.equal(
+    (await titles()).filter((title) => title === firstClip.split("\n")[0])
+      .length,
+    1,
+  );
+  pass(
+    "External clipboard text is captured once and its full Unicode value appears in the preview",
+  );
+  setClipboardText(secondClip);
+  // Wait for the next capture so Enter must copy the older historical value.
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, `second ${fixtures.nonce}`);
+  await until(
+    "the second external value enters history",
+    async () => (await titles())[0] === secondClip,
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, `clipboard ${fixtures.nonce}`);
+  await until("the older entry remains searchable", () =>
+    observe<boolean>(
+      "return document.querySelector('.result-title')?.textContent.startsWith('TinyDash clipboard') && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+    ),
+  );
+  await saveScreen("clipboard.png");
+  await keys(inputId, "\uE007");
+  await until(
+    "Enter restores the historical text to the OS clipboard",
+    async () => clipboardText() === firstClip,
+  );
+  pass(
+    "Enter copies a stored clipboard entry through the native clipboard plugin",
+  );
+  await reopen();
+  await keys(inputId, `clipboard ${fixtures.nonce}`);
+  await until(
+    "the copied history entry remains available",
+    async () => (await titles())[0] === firstClip.split("\n")[0],
+  );
+  await keys(inputId, "\uE009\uE003\uE000");
+  await until(
+    "the delete shortcut removes the entry",
+    async () => (await titles()).length === 0,
+  );
+  await reopen();
+  await keys(inputId, `clipboard ${fixtures.nonce}`);
+  await delay(1_200);
+  assert.deepEqual(await titles(), []);
+  pass(
+    "Deleting an entry keeps the window open and does not recapture unchanged clipboard text",
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, `second ${fixtures.nonce}`);
+  await until(
+    "the other entry is still available",
+    async () => (await titles())[0] === secondClip,
+  );
+  await click(".actions-button");
+  await until("the history action is visible", () =>
+    observe<boolean>(
+      "return [...document.querySelectorAll('[role=menuitem]')].some(el => el.textContent.includes('Clear clipboard history'))",
+    ),
+  );
+  const clearItem = await observe<number>(
+    "return [...document.querySelectorAll('[role=menuitem]')].findIndex(el => el.textContent.includes('Clear clipboard history'))",
+  );
+  await click(`[role=menuitem]:nth-of-type(${clearItem + 1})`);
+  await until("clear asks for confirmation with Cancel selected", () =>
+    observe<boolean>(
+      "return !!document.querySelector('dialog[open]') && document.activeElement?.textContent === 'Cancel'",
+    ),
+  );
+  await click("dialog .cancel-button");
+  assert.equal((await titles())[0], secondClip);
+  await click(".actions-button");
+  await click(`[role=menuitem]:nth-of-type(${clearItem + 1})`);
+  await click("dialog .clear-button");
+  await until(
+    "confirmed clear removes remaining history",
+    async () => (await titles()).length === 0,
+  );
+  assert.equal(clipboardText(), firstClip);
+  pass("Clear history requires confirmation and preserves the OS clipboard");
   await writeFile(
     resolve(output, "result.json"),
     JSON.stringify({ passed }, null, 2),

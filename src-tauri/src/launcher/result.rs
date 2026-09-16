@@ -6,6 +6,7 @@ pub enum ResultKind {
     App,
     Calculation,
     Emoji,
+    Clipboard,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -14,6 +15,7 @@ pub enum Action {
     Launch,
     Reveal,
     Copy,
+    Delete,
 }
 
 #[derive(Clone, Debug, Serialize)]

@@ -15,6 +15,7 @@ use crate::{
     providers::{
         apps::{AppEntry, AppProvider},
         calculator::CalculatorProvider,
+        clipboard::{ClipboardEntry, ClipboardProvider},
         emoji::EmojiProvider,
     },
     ranking,
@@ -27,6 +28,7 @@ pub struct SearchManager {
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
     calculator: CalculatorProvider,
+    pub clipboard: ClipboardProvider,
     usage: HashMap<String, ranking::Usage>,
 }
 
@@ -42,6 +44,7 @@ impl Default for SearchManager {
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
             calculator: CalculatorProvider::default(),
+            clipboard: ClipboardProvider::default(),
             usage: HashMap::new(),
         }
     }
@@ -71,6 +74,10 @@ impl SearchManager {
         self.apps.get(id).cloned().ok_or(Error::AppNotFound)
     }
 
+    pub fn clipboard_entry(&self, id: &str) -> Result<ClipboardEntry> {
+        self.clipboard.get(id).cloned().ok_or(Error::ResultExpired)
+    }
+
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
         match action {
             Action::Launch if id.starts_with("app:") => Ok(ResolvedAction::Launch(self.app(id)?)),
@@ -85,6 +92,12 @@ impl SearchManager {
                 .copy_value(id)
                 .map(|value| ResolvedAction::Copy(value.to_owned()))
                 .ok_or(Error::ResultExpired),
+            Action::Copy if id.starts_with("clipboard:") => {
+                Ok(ResolvedAction::Copy(self.clipboard_entry(id)?.content))
+            }
+            Action::Delete if id.starts_with("clipboard:") => {
+                Ok(ResolvedAction::Delete(self.clipboard_entry(id)?.id))
+            }
             _ => Err(Error::InvalidAction),
         }
     }
@@ -93,6 +106,11 @@ impl SearchManager {
         let query = Query::parse(input, mode)?;
         let mut results = Vec::new();
         let mut notice = None;
+        if query.mode == SearchMode::Clipboard
+            || (query.mode == SearchMode::All && !query.text.is_empty())
+        {
+            results.extend(self.clipboard.search(query.text, &mut self.matcher));
+        }
         if matches!(query.mode, SearchMode::All | SearchMode::Apps) {
             let normalized = ranking::normalize(query.text);
             // App punctuation remains literal. Calculator input retains its case.
@@ -261,6 +279,62 @@ mod tests {
                 .results
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn clipboard_is_searchable_in_all_and_its_own_mode_and_validates_actions() {
+        let mut manager = manager();
+        manager.clipboard = ClipboardProvider::new(vec![ClipboardEntry {
+            id: 3,
+            content: "Meeting notes\nKeep these spaces.  🚀\n".into(),
+            created_at: 100,
+            last_used_at: None,
+        }]);
+        let history = manager
+            .search("", SearchMode::Clipboard)
+            .expect("history")
+            .results;
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].id, "clipboard:3");
+        assert_eq!(
+            manager
+                .search("meeting", SearchMode::All)
+                .expect("all")
+                .results[0]
+                .id,
+            "clipboard:3"
+        );
+        assert!(
+            manager
+                .search("meeting", SearchMode::Apps)
+                .expect("apps")
+                .results
+                .is_empty()
+        );
+        assert!(
+            !manager
+                .search("", SearchMode::All)
+                .expect("home")
+                .results
+                .iter()
+                .any(|result| result.id.starts_with("clipboard:"))
+        );
+        assert!(
+            matches!(manager.resolve_action("clipboard:3", Action::Copy), Ok(ResolvedAction::Copy(text)) if text.ends_with("  🚀\n"))
+        );
+        assert!(matches!(
+            manager.resolve_action("clipboard:3", Action::Delete),
+            Ok(ResolvedAction::Delete(3))
+        ));
+        assert!(
+            manager
+                .resolve_action("clipboard:3", Action::Launch)
+                .is_err()
+        );
+        assert!(manager.resolve_action("emoji:🚀", Action::Delete).is_err());
+        manager.clipboard.remove(3);
+        assert!(manager.resolve_action("clipboard:3", Action::Copy).is_err());
+        assert!(manager.clipboard_entry("clipboard:3").is_err());
     }
 
     #[test]

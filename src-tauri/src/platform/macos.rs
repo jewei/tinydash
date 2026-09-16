@@ -109,6 +109,29 @@ pub fn launch(entry: &AppEntry) -> Result<()> {
         .map_err(|error| Error::Launch(error.to_string()))
 }
 
+// Called on the clipboard worker. The counter check does not fetch text.
+pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, Option<String>)>> {
+    use crate::providers::clipboard::{MAX_TEXT_BYTES, valid_text};
+    use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
+    objc2::rc::autoreleasepool(|_| {
+        let clipboard = NSPasteboard::generalPasteboard();
+        let counter = clipboard.changeCount() as u64;
+        if previous == Some(counter) {
+            return Ok(None);
+        }
+        // NSPasteboardTypeString is an immutable AppKit constant.
+        let text = clipboard
+            .stringForType(unsafe { NSPasteboardTypeString })
+            .filter(|value| value.length() <= MAX_TEXT_BYTES)
+            .map(|value| value.to_string())
+            .filter(|value| valid_text(value));
+        if clipboard.changeCount() as u64 != counter {
+            anyhow::bail!("Clipboard changed during read");
+        }
+        Ok(Some((counter, text)))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

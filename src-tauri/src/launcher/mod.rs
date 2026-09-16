@@ -1,8 +1,9 @@
 pub mod actions;
-mod history;
+pub mod clipboard;
 pub mod query;
 pub mod result;
 pub mod search;
+mod storage;
 pub mod window;
 
 use std::sync::{
@@ -25,7 +26,8 @@ pub struct LauncherState {
     pub settings: Settings,
     pub warnings: Vec<String>,
     pub index_error: Mutex<Option<String>>,
-    pub history: history::History,
+    pub storage: storage::Storage,
+    pub clipboard: clipboard::Monitor,
     search_version: AtomicU64,
 }
 
@@ -38,7 +40,8 @@ impl LauncherState {
             settings,
             warnings,
             index_error: Mutex::new(None),
-            history: history::History::default(),
+            storage: storage::Storage::default(),
+            clipboard: clipboard::Monitor::default(),
             search_version: AtomicU64::new(0),
         }
     }
@@ -57,12 +60,13 @@ pub async fn launcher_ready(app: AppHandle) -> Result<LauncherInfo, String> {
     let worker_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let state = worker_app.state::<LauncherState>();
-        state.history.initialize(&worker_app, &state.search);
+        state.storage.initialize(&worker_app, &state.search);
     })
     .await
     .map_err(|error| error.to_string())?;
     let state = app.state::<LauncherState>();
     if !state.ready.swap(true, Ordering::AcqRel) {
+        clipboard::start(&app);
         window::show(&app).map_err(|error| error.to_string())?;
     }
     Ok(LauncherInfo {
@@ -99,7 +103,10 @@ pub async fn search(
         Ok(SearchResponse {
             results: outcome.results,
             notice: outcome.notice,
-            storage_error: state.history.warning(),
+            storage_error: state
+                .storage
+                .warning()
+                .or_else(|| state.clipboard.warning()),
             total: search.app_count(),
             indexing: state.scanning.load(Ordering::Acquire),
             index_error: state

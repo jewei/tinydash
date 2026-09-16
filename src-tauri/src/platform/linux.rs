@@ -45,3 +45,25 @@ pub fn launch(entry: &AppEntry) -> Result<()> {
     app.launch(&[], None::<&gio::AppLaunchContext>)
         .map_err(|error| Error::Launch(error.to_string()))
 }
+
+// GTK owns the selection protocol on its main thread. Requesting text is
+// asynchronous, including when another application supplies the selection.
+pub fn watch_clipboard(changed: impl Fn() + 'static) {
+    use gtk::prelude::*;
+    let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
+    // gtk-rs 0.18 does not generate the typed owner-change signal binding.
+    clipboard.connect_local("owner-change", false, move |_| {
+        changed();
+        None
+    });
+}
+
+pub fn read_clipboard(received: impl FnOnce(Option<String>) + 'static) {
+    let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
+    clipboard.request_text(move |_, text| {
+        received(
+            text.filter(|text| crate::providers::clipboard::valid_text(text))
+                .map(str::to_owned),
+        );
+    });
+}

@@ -8,6 +8,8 @@ pub struct Settings {
     pub clear_query_on_open: bool,
     pub hide_on_blur: bool,
     pub shortcut: String,
+    pub clipboard_history_enabled: bool,
+    pub clipboard_history_limit: u16,
 }
 
 impl Default for Settings {
@@ -16,7 +18,15 @@ impl Default for Settings {
             clear_query_on_open: true,
             hide_on_blur: true,
             shortcut: "CommandOrControl+Shift+Space".into(),
+            clipboard_history_enabled: true,
+            clipboard_history_limit: 100,
         }
+    }
+}
+
+impl Settings {
+    pub fn clipboard_limit(&self) -> usize {
+        usize::from(self.clipboard_history_limit.clamp(1, 500))
     }
 }
 
@@ -53,6 +63,23 @@ mod tests {
         let settings = load(dir.path()).expect("settings");
         assert!(!settings.clear_query_on_open);
         assert!(settings.hide_on_blur);
+    }
+
+    #[test]
+    fn clipboard_settings_have_bounded_defaults_and_can_disable_capture() {
+        let settings = Settings::default();
+        assert!(settings.clipboard_history_enabled);
+        assert_eq!(settings.clipboard_limit(), 100);
+        let settings: Settings =
+            serde_json::from_str(r#"{"clipboardHistoryEnabled":false,"clipboardHistoryLimit":0}"#)
+                .expect("settings");
+        assert!(!settings.clipboard_history_enabled);
+        assert_eq!(settings.clipboard_limit(), 1);
+        let settings = Settings {
+            clipboard_history_limit: 1000,
+            ..settings
+        };
+        assert_eq!(settings.clipboard_limit(), 500);
     }
 
     #[test]

@@ -10,6 +10,7 @@ pub enum SearchMode {
     Apps,
     Emoji,
     Calculator,
+    Clipboard,
 }
 
 pub struct Query<'a> {

@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_opener::OpenerExt;
 
 use super::{LauncherState, result::Action, window};
@@ -10,6 +9,7 @@ pub enum ResolvedAction {
     Launch(AppEntry),
     Reveal(PathBuf),
     Copy(String),
+    Delete(i64),
 }
 
 impl ResolvedAction {
@@ -25,6 +25,7 @@ impl ResolvedAction {
 
 #[tauri::command]
 pub async fn execute_action(id: String, action: Action, app: AppHandle) -> Result<(), String> {
+    let keep_open = action == Action::Delete;
     let worker_app = app.clone();
     let usage_id = tauri::async_runtime::spawn_blocking(move || {
         // Resolve backend-owned IDs. The webview supplies neither executable
@@ -45,22 +46,32 @@ pub async fn execute_action(id: String, action: Action, app: AppHandle) -> Resul
                 .opener()
                 .reveal_item_in_dir(path)
                 .map_err(|error| error.to_string()),
-            ResolvedAction::Copy(value) => worker_app
-                .clipboard()
-                .write_text(value)
-                .map_err(|error| format!("Could not copy to the clipboard: {error}")),
+            ResolvedAction::Copy(value) => {
+                worker_app
+                    .state::<LauncherState>()
+                    .storage
+                    .copy(&worker_app, &id, value)
+            }
+            ResolvedAction::Delete(id) => worker_app
+                .state::<LauncherState>()
+                .storage
+                .delete_clipboard(&worker_app, Some(id)),
         }?;
         Ok::<_, String>(usage_id)
     })
     .await
     .map_err(|error| error.to_string())??;
     // Hide after the OS action succeeds, before waiting for disk writes.
-    let hidden = window::hide_launcher(app.clone());
+    let hidden = if keep_open {
+        Ok(())
+    } else {
+        window::hide_launcher(app.clone())
+    };
     if let Some(id) = usage_id {
         let worker_app = app.clone();
         if let Err(error) = tauri::async_runtime::spawn_blocking(move || {
             let state = worker_app.state::<LauncherState>();
-            state.history.record(&worker_app, &state.search, &id);
+            state.storage.record(&worker_app, &state.search, &id);
         })
         .await
         {

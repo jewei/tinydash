@@ -96,6 +96,9 @@ pub fn run() -> anyhow::Result<()> {
 
             if platform::is_wayland() {
                 warnings.push("Global shortcuts need X11. On Wayland, assign a desktop shortcut to start TinyDash.".into());
+                if settings.clipboard_history_enabled {
+                    warnings.push("Wayland can limit background clipboard access. Open TinyDash after copying text if an entry is missing.".into());
+                }
             } else {
                 let shortcut_result = app.handle().plugin(
                     tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| {
@@ -141,11 +144,16 @@ pub fn run() -> anyhow::Result<()> {
             launcher::refresh_apps,
             launcher::quit_app,
             launcher::actions::execute_action,
+            launcher::clipboard::clipboard_preview,
+            launcher::clipboard::clear_clipboard_history,
             window::hide_launcher,
         ])
         .build(tauri::generate_context!())
         .context("Build the desktop launcher")?;
     app.run(|_app, _event| {
+        if matches!(_event, tauri::RunEvent::Exit) {
+            _app.state::<LauncherState>().clipboard.stop();
+        }
         // Launch Services sends Reopen when an existing .app is opened again.
         // This is separate from starting a second executable process.
         #[cfg(target_os = "macos")]
