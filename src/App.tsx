@@ -467,20 +467,23 @@ export default function App() {
               void search(query(), true);
           }),
           register("launcher-opened", (clear) => {
-            setVisible(true);
-            setMenuOpen(false);
-            setClearOpen(false);
-            setPendingAction(undefined);
-            setError(undefined);
-            if (clear === true) {
-              setMode("all");
-              changeQuery("");
-            }
+            // Show the preview only after the new search settles. Publishing
+            // visibility first would briefly request the previous preview.
+            batch(() => {
+              setVisible(true);
+              setMenuOpen(false);
+              setClearOpen(false);
+              setPendingAction(undefined);
+              setError(undefined);
+              if (clear === true) {
+                setMode("all");
+                changeQuery("");
+              } else {
+                void search();
+              }
+            });
             focusInput();
-            if (clear !== true) {
-              void search();
-              input.select();
-            }
+            if (clear !== true) input.select();
           }),
           register("launcher-hidden", () => {
             setVisible(false);

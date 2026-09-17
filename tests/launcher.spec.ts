@@ -370,6 +370,40 @@ test("hidden windows skip background searches and refresh when reopened", async 
   await expect(page.locator(".result-title").first()).toHaveText("Safari");
 });
 
+test("reopening requests the selected clipboard preview only once", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("clipboard");
+  await expect(page.getByLabel("Saved clipboard text")).toContainText(
+    "Meeting notes",
+  );
+  await page.getByRole("combobox", { name: "Search TinyDash" }).press("Escape");
+  await expect(page.getByLabel("Clipboard preview")).toHaveCount(0);
+  const before = await page.evaluate(
+    () =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "clipboard_preview",
+      ).length,
+  );
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-opened", false),
+  );
+  await expect(page.getByLabel("Saved clipboard text")).toContainText(
+    "Meeting notes",
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.filter(
+          (call) => call.command === "clipboard_preview",
+        ).length,
+    ),
+  ).toBe(before + 1);
+});
+
 test("hiding cancels waiting input and ignores an in-flight search result", async ({
   page,
 }) => {
