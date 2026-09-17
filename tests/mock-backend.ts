@@ -17,6 +17,10 @@ declare global {
       slowPreview: boolean;
       fileIndexing: boolean;
       fileWarning: string | null;
+      currencyDate: string | null;
+      currencyRefreshing: boolean;
+      currencyWarning: string | null;
+      currencyMissing: boolean;
       holdSearch: boolean;
       reverseSystem: boolean;
       holdAction: boolean;
@@ -128,6 +132,10 @@ window.__launcherTest = {
   slowPreview: false,
   fileIndexing: false,
   fileWarning: null,
+  currencyDate: null,
+  currencyRefreshing: false,
+  currencyWarning: null,
+  currencyMissing: false,
   holdSearch: false,
   reverseSystem: false,
   holdAction: false,
@@ -150,6 +158,8 @@ mockIPC(
           fileSearchRoots: null,
           fileSearchLimit: 50000,
           fileSearchExcludedDirs: ["node_modules", "target"],
+          fileWatchEnabled: true,
+          currencyRatesEnabled: true,
         },
         warnings: [],
       };
@@ -193,22 +203,44 @@ mockIPC(
                   ? [emoji]
                   : query === "12 * 8" && mode !== "apps"
                     ? [calculation]
-                    : query === "slow"
-                      ? [apps[0]]
-                      : query === "sa"
-                        ? [apps[1]]
-                        : query === "missing"
-                          ? []
-                          : state.usedAppFirst
-                            ? [apps[1], apps[0], ...apps.slice(2)]
-                            : apps;
+                    : query === "100 USD to MYR" && mode !== "apps"
+                      ? state.currencyMissing
+                        ? []
+                        : [
+                            {
+                              ...calculation,
+                              id: "calculation:currency",
+                              title: "400 MYR",
+                              subtitle:
+                                "100 USD to MYR · ECB 2026-09-16 · cached rates",
+                            },
+                          ]
+                      : query === "slow"
+                        ? [apps[0]]
+                        : query === "sa"
+                          ? [apps[1]]
+                          : query === "missing"
+                            ? []
+                            : state.usedAppFirst
+                              ? [apps[1], apps[0], ...apps.slice(2)]
+                              : apps;
       return {
         results,
         total: apps.length,
         indexing: false,
         indexError: null,
-        notice: query === "=1 / 0" ? "Division by zero is not allowed." : null,
+        notice:
+          query === "100 USD to MYR" && state.currencyMissing
+            ? "Currency rates are unavailable. Connect to the internet, then open Actions and choose Refresh currency rates."
+            : query === "=1 / 0"
+              ? "Division by zero is not allowed."
+              : null,
         storageError: state.storageError,
+        currency: {
+          asOf: state.currencyDate,
+          refreshing: state.currencyRefreshing,
+          warning: state.currencyWarning,
+        },
         files: {
           total: 1,
           indexing: state.fileIndexing,

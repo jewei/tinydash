@@ -55,4 +55,5 @@ pub struct SearchResponse {
     pub notice: Option<String>,
     pub storage_error: Option<String>,
     pub files: super::files::FileStatus,
+    pub currency: super::currency::CurrencyStatus,
 }

@@ -1,3 +1,4 @@
+mod currency;
 mod db;
 mod error;
 mod launcher;
@@ -145,6 +146,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::search,
             launcher::refresh_apps,
             launcher::files::refresh_files,
+            launcher::currency::refresh_currency,
             launcher::quit_app,
             launcher::actions::execute_action,
             launcher::clipboard::clipboard_preview,
@@ -156,6 +158,7 @@ pub fn run() -> anyhow::Result<()> {
     app.run(|_app, _event| {
         if matches!(_event, tauri::RunEvent::Exit) {
             _app.state::<LauncherState>().clipboard.stop();
+            _app.state::<LauncherState>().files.stop();
         }
         // Launch Services sends Reopen when an existing .app is opened again.
         // This is separate from starting a second executable process.

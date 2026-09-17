@@ -1,5 +1,7 @@
 pub mod actions;
 pub mod clipboard;
+pub mod currency;
+mod file_watch;
 pub mod files;
 pub mod query;
 pub mod result;
@@ -30,6 +32,7 @@ pub struct LauncherState {
     pub storage: storage::Storage,
     pub clipboard: clipboard::Monitor,
     pub files: files::FileScan,
+    pub currency: currency::Currency,
 }
 
 impl LauncherState {
@@ -44,6 +47,7 @@ impl LauncherState {
             storage: storage::Storage::default(),
             clipboard: clipboard::Monitor::default(),
             files: files::FileScan::default(),
+            currency: currency::Currency::default(),
         }
     }
 }
@@ -102,6 +106,7 @@ pub async fn search(
                 .or_else(|| state.clipboard.warning()),
             total: search.app_count(),
             files: state.files.status(search.file_count()),
+            currency: state.currency.status(search.rates()),
             indexing: state.scanning.load(Ordering::Acquire),
             index_error: state
                 .index_error

@@ -1,6 +1,6 @@
 # TinyDash
 
-A small desktop launcher. This version implements Phases 1 through 7.
+A small desktop launcher. This version implements Phases 1 through 8.
 
 Search installed applications and local filenames or paths. Find saved clipboard text, calculate values, convert units, search local emoji data, and run system commands. The app stays running after the window hides.
 
@@ -43,7 +43,11 @@ The **All** mode combines application, file, clipboard, emoji, calculation, and 
 | `20 km/h to mph` | Approximately `12.427 mph`     |
 | `=32 C to F`     | `89.6 °F`                      |
 
-Arithmetic and unit conversion work offline. Unit case is preserved. Calculator mode shows errors for invalid expressions. Each query is independent; variables and scripts are not supported. Currency conversion needs exchange rates and remains scheduled for Phase 8.
+Arithmetic and unit conversion work offline. Unit case is preserved. Calculator mode shows errors for invalid expressions. Each query is independent; variables and scripts are not supported.
+
+Currency queries such as `100 USD to MYR` use daily ECB rates from [Frankfurter](https://frankfurter.dev/). The result shows the rate date. SQLite saves the complete rate table so conversions keep working offline after the first successful refresh. Old rates remain usable and show a cached-rates label. Unsupported currencies produce an error.
+
+Opening the launcher starts a background refresh when rates are missing or the last download is at least 24 hours old. Failed automatic requests wait at least one hour before another open can retry. There is no refresh timer. Choose **Actions → Refresh currency rates** in any mode to request a refresh. Command/Ctrl + R also refreshes rates in Calculator mode. Requests have a 10-second limit and a 64 KiB response limit. Only the rate-table request goes to the service; queries, amounts, clipboard text, and file paths stay local. Set `currencyRatesEnabled` to `false` to stop network requests and keep using saved rates.
 
 Enter copies the selected emoji or calculation result and hides the launcher. Paste the value in another application with its normal paste command. TinyDash does not paste automatically. Emoji search uses names, shortcodes, and categories from the local dataset. The list uses the default skin tones; glyph appearance depends on the operating system fonts.
 
@@ -73,7 +77,9 @@ The default limit is 50,000 files. A scan also stops after visiting 500,000 entr
 
 File matching uses Unicode NFC so composed and decomposed accents match. The small [unicode-normalization crate](https://docs.rs/unicode-normalization/0.1.25/unicode_normalization/) supplies canonical normalization. This fixes accented filenames returned by macOS. Display text, file IDs, and open actions keep the original path.
 
-Use Refresh files in the actions or tray menu after adding, moving, or deleting files. Command/Ctrl + R refreshes files in Files mode. A full process restart also scans again. This phase has no filesystem watcher, periodic scan, file content index, or persisted file metadata. Only usage records for opened files are saved in SQLite.
+Operating system notifications update the file index after creation, renaming, moving, and deletion. A single worker combines a burst of changes, waits for 300 ms of quiet, and starts a scan within two seconds of continuous changes. It keeps one pending request during a scan. There is no folder polling timer. Content-write and access events do not require filename indexing.
+
+The [notify](https://docs.rs/notify/8.2.0/notify/) watcher uses FSEvents on macOS, ReadDirectoryChangesW on Windows, and inotify on Linux. Linux watches only folders accepted by the scanner, up to 8192 folders, so excluded trees do not consume recursive watches. Parent watches detect a removed or recreated search root. Registration limits or failures produce a warning. Network filesystems and restricted folders can omit events. **Refresh files** in the actions or tray menu remains available; Command/Ctrl + R refreshes files in Files mode. Set `fileWatchEnabled` to `false` for manual updates. File contents and file metadata are not stored in SQLite.
 
 ## Clipboard history
 
@@ -89,17 +95,17 @@ macOS checks the [pasteboard change counter](https://developer.apple.com/documen
 
 ## Keys
 
-| Key                          | Action                                                        |
-| ---------------------------- | ------------------------------------------------------------- |
-| Up / Down                    | Select a result; wrap at either end                           |
-| Enter                        | Run the primary action; power commands ask first              |
-| Escape                       | Cancel a dialog, close the actions menu, or hide the launcher |
-| Command / Ctrl + 1 through 9 | Run the corresponding result's primary action                 |
-| Command / Ctrl + Enter       | Show the selected app or file in its folder                   |
-| Command / Ctrl + Backspace   | Delete the selected clipboard entry                           |
-| Command / Ctrl + K           | Open the actions menu                                         |
-| Command / Ctrl + R           | Refresh files in Files mode; otherwise refresh apps           |
-| Command / Ctrl + Q           | Quit TinyDash                                                 |
+| Key                          | Action                                                              |
+| ---------------------------- | ------------------------------------------------------------------- |
+| Up / Down                    | Select a result; wrap at either end                                 |
+| Enter                        | Run the primary action; power commands ask first                    |
+| Escape                       | Cancel a dialog, close the actions menu, or hide the launcher       |
+| Command / Ctrl + 1 through 9 | Run the corresponding result's primary action                       |
+| Command / Ctrl + Enter       | Show the selected app or file in its folder                         |
+| Command / Ctrl + Backspace   | Delete the selected clipboard entry                                 |
+| Command / Ctrl + K           | Open the actions menu                                               |
+| Command / Ctrl + R           | Refresh rates in Calculator, files in Files, or apps in other modes |
+| Command / Ctrl + Q           | Quit TinyDash                                                       |
 
 ## Settings
 
@@ -120,7 +126,9 @@ TinyDash writes `settings.json` in its application configuration directory on fi
   "clipboardHistoryLimit": 100,
   "fileSearchRoots": null,
   "fileSearchLimit": 50000,
-  "fileSearchExcludedDirs": ["node_modules", "target"]
+  "fileSearchExcludedDirs": ["node_modules", "target"],
+  "fileWatchEnabled": true,
+  "currencyRatesEnabled": true
 }
 ```
 
@@ -175,7 +183,8 @@ The path is `query → SearchManager → providers → ranking → top 30 result
 - One Rust crate owns discovery, matching, ranking, usage persistence, indexed app IDs, launch actions, window lifecycle, settings, and shortcuts.
 - `SearchManager` reuses a `nucleo-matcher` instance. Names, aliases, and paths are prepared when the app index changes. Matching ignores case and supports Unicode normalization. Match and usage bonuses are applied in `ranking/mod.rs` before selecting the top 30. Unused apps keep a stable alphabetical order when the query is empty.
 - `AppProvider`, `FileProvider`, `ClipboardProvider`, `EmojiProvider`, `CalculatorProvider`, and `SystemCommandProvider` return the same result model. Rust parses search modes and prefixes. The emoji index and small system command catalog load on their first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit.
-- Discovery builds a new index off the UI thread. The old index remains available during refresh. Tauri's existing async runtime runs blocking scan, search, and launch work. A dedicated clipboard worker handles observations and database writes. Only macOS and Windows use the one-second clipboard counter timer.
+- Discovery builds a new index off the UI thread. The old index remains available during refresh. Tauri's existing async runtime runs application scans, searches, launch work, and currency requests. A file worker owns the scanner and watcher. A clipboard worker handles observations and database writes. Only macOS and Windows use the one-second clipboard counter timer.
+- Currency lookup reads a shared, immutable rate table in memory. Network requests and SQLite writes run outside the search lock. `currency.rs` contains the source request and parser; the calculator does not depend on the HTTP response format. The HTTP client reuses the reqwest version already required by Tauri and uses the OS TLS stack.
 - Clipboard capture, copy, delete, and clear use the same storage lock. A generation number rejects reads already in progress when an entry is removed. Search never waits for disk access. Linux coalesces pending clipboard observations in a bounded queue. Results include short text summaries; a separate request fetches the selected entry's preview.
 - SolidJS keeps UI state and sends queries without a debounce timer. It sends one search request at a time and retains only the newest waiting query. This prevents IPC arrival order from cancelling the current query when startup events overlap. Request numbers prevent late replies from replacing newer results. Enter cannot execute an old result while a new query is pending.
 - The frontend sends a result ID and an action. Rust resolves app paths, indexed file paths, emoji values, and calculation values. It checks that a file still exists before opening it. A bounded cache holds the last 32 calculation results so copying an issued result does not evaluate it again. The webview has no general shell, opener, filesystem, clipboard, or global-shortcut permissions.
@@ -195,6 +204,7 @@ tokens.css                Colors, fonts, and spacing
 src-tauri/src/
   lib.rs                  Tauri setup, tray, and shortcut
   main.rs                 Process entry and startup error handling
+  currency.rs             Rate validation and exchange-rate source request
   launcher/               SearchManager, file scan worker, actions, storage, clipboard monitor, window commands
   providers/              App, file, clipboard, emoji, calculator, and system providers
   platform/               OS app discovery, launch, clipboard, file flags, and system commands
@@ -216,7 +226,7 @@ docs/desktop-checks.md    Interactive checks for each desktop
 | Windows  | User and shared Start menu program folders and desktops, through known-folder APIs | Finds `.lnk`, `.exe`, and `.appref-ms` entries. Does not enumerate packaged apps without shortcuts or scan all of Program Files. Shortcut targets and their aliases are not extracted. |
 | Linux    | GIO's installed desktop entries                                                    | GIO handles desktop visibility, localization, aliases, XDG precedence, launch arguments, and D-Bus activation. AppImages without desktop entries are not discovered.                   |
 
-New applications appear after a refresh or restart. There is no filesystem watcher yet. Inaccessible directories are skipped and counted in logs. The UI retains the old index if a refresh fails.
+New applications appear after a refresh or restart. The file watcher applies only to file-search roots. Inaccessible application directories are skipped and counted in logs. The UI retains the old app index if a refresh fails.
 
 The global shortcut backend supports Linux X11, not native Wayland. On Wayland, assign a compositor or desktop shortcut to run the TinyDash binary. The single-instance handler then requests focus for the existing window. Window placement and focus remain subject to compositor policy. This limit comes from the [global-hotkey platform support](https://docs.rs/global-hotkey/latest/global_hotkey/).
 
@@ -242,7 +252,10 @@ Run the optional host discovery check and search timing sample:
 
 ```sh
 cargo test --manifest-path src-tauri/Cargo.toml installed_apps_smoke -- --ignored --nocapture
+cargo test --release --manifest-path src-tauri/Cargo.toml profile_search_50k_files -- --ignored --nocapture
 ```
+
+See the [performance check results](docs/performance.md) for the measured search times, idle host memory, and measurement limits.
 
 The [Checks workflow](.github/workflows/check.yml) builds on macOS, Windows, and Ubuntu 24.04. Each successful build produces a downloadable `TinyDash-<OS>-<architecture>` artifact with the app, commit information, and [desktop check instructions](docs/desktop-checks.md). Artifacts remain available for 14 days. They are unsigned development builds.
 
@@ -252,7 +265,9 @@ The native workflow can also test an existing build without compiling it again. 
 
 The native checks also copy test text from a separate process, verify capture and duplicate filtering, copy an older entry, delete it, and clear history with confirmation. They verify that deletion leaves the system clipboard unchanged.
 
-File checks scan a temporary folder, test filename and path matching, open a document through a temporary OS file association, report a deleted file, and refresh after file changes. Windows uses a unique test extension and restores the settings file after the check. Linux uses an isolated MIME association and configuration directory. Rust tests also cover overlapping roots, scan limits, hidden files, symbolic links, inaccessible folders, path validation, and file usage ranking before result limits.
+File checks scan a temporary folder, test filename and path matching, and open a document through a temporary OS file association. They verify automatic updates after file creation, renaming, and deletion, including a new subfolder and a recreated search root. They also check manual refresh. Windows uses a unique test extension and restores the settings file after the check. Linux uses an isolated MIME association and configuration directory. Rust tests also cover overlapping roots, scan limits, hidden files, symbolic links, inaccessible folders, path validation, watcher event filtering, and file usage ranking before result limits.
+
+Currency tests check source parsing, validation, cache persistence, offline conversion, refresh limits, and copy values across rate changes. UI tests check refresh status, retained results after network failure, and readable help text. Native CI disables live currency requests so a network outage cannot fail the desktop checks.
 
 System command checks search the native catalog, cancel the restart dialog, and verify that Rust rejects power requests without confirmation. Rust tests construct Mac Apple events without sending them and check the Windows flags and Linux method mapping. Browser tests cover explicit confirmation, cancellation, extra Enter presses, results changing behind the dialog, duplicate submission, and action errors. CI does not execute lock, sleep, restart, or shutdown. Test those transitions only in a disposable desktop session after saving work; use the desktop check guide.
 
@@ -274,4 +289,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
 
 ## Next step
 
-Implement Phase 8: filesystem watching, cached currency rates with background refresh, and performance measurements. Start with file watcher behavior and scan limits before adding network work.
+Prepare release builds. Complete desktop checks on physical Windows and Linux systems, including Wayland, then add signing and installer validation before distribution. Keep the MVP feature set fixed.

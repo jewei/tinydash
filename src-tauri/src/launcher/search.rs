@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use nucleo_matcher::{
     Config, Matcher,
@@ -11,6 +11,7 @@ use super::{
     result::{Action, SearchResult},
 };
 use crate::{
+    currency::Rates,
     error::{Error, Result},
     providers::{
         apps::{AppEntry, AppProvider},
@@ -57,6 +58,21 @@ impl Default for SearchManager {
 }
 
 impl SearchManager {
+    pub fn rates(&self) -> Option<&Rates> {
+        self.calculator.rates.as_deref()
+    }
+
+    pub fn set_rates(&mut self, rates: Rates) -> bool {
+        if self
+            .rates()
+            .is_some_and(|previous| previous.date > rates.date)
+        {
+            return false;
+        }
+        self.calculator.rates = Some(Arc::new(rates));
+        true
+    }
+
     pub fn set_usage(&mut self, usage: HashMap<String, ranking::Usage>) {
         self.usage = usage;
     }
@@ -164,7 +180,13 @@ impl SearchManager {
         {
             match self.calculator.search(query.text) {
                 Ok(result) => results.push(result),
-                Err(error) if query.mode == SearchMode::Calculator => {
+                Err(error)
+                    if query.mode == SearchMode::Calculator
+                        || matches!(
+                            error,
+                            crate::providers::calculator::CalculationError::Currency(_)
+                        ) =>
+                {
                     notice = Some(error.to_string())
                 }
                 Err(_) => {} // Ordinary app names and partial input are not calculator errors.
@@ -491,6 +513,40 @@ mod tests {
                 .results
                 .len(),
             RESULT_LIMIT
+        );
+    }
+
+    #[test]
+    fn currency_errors_are_visible_in_all_mode_and_older_rates_cannot_replace_the_cache() {
+        let mut manager = manager();
+        let query = "100 USD to MYR";
+        assert_eq!(
+            manager
+                .search(query, SearchMode::All)
+                .expect("missing rates")
+                .notice,
+            Some(crate::currency::Error::Unavailable.to_string())
+        );
+        let mut rates = crate::currency::fixture();
+        assert!(manager.set_rates(rates.clone()));
+        assert_eq!(
+            manager
+                .search(query, SearchMode::All)
+                .expect("cached conversion")
+                .results[0]
+                .title,
+            "400 MYR"
+        );
+        rates.date = "2026-09-15".into();
+        rates.values.insert("MYR".into(), 6.0);
+        assert!(!manager.set_rates(rates));
+        assert_eq!(
+            manager
+                .search(query, SearchMode::Calculator)
+                .expect("retained rates")
+                .results[0]
+                .title,
+            "400 MYR"
         );
     }
 

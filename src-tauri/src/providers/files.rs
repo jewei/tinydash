@@ -17,6 +17,7 @@ use crate::{
 };
 
 const VISIT_LIMIT: usize = 500_000;
+pub const WATCH_LIMIT: usize = 8192;
 
 #[derive(Clone, Debug)]
 pub struct FileEntry {
@@ -190,9 +191,19 @@ pub struct ScanReport {
     pub issue_count: usize,
     pub first_issue: Option<String>,
     pub limited: bool,
+    pub directories: Vec<PathBuf>,
+    pub watches_limited: bool,
 }
 
 impl ScanReport {
+    fn directory(&mut self, path: &Path) {
+        if self.directories.len() < WATCH_LIMIT {
+            self.directories.push(path.to_owned());
+        } else {
+            self.watches_limited = true;
+        }
+    }
+
     pub fn issue(&mut self, path: &Path, error: impl std::fmt::Display) {
         self.issue_count += 1;
         if self.first_issue.is_none() {
@@ -262,6 +273,9 @@ pub fn scan(
     }
     let mut entries = Vec::new();
     let mut visited = 0;
+    for root in &unique {
+        report.directory(root);
+    }
     'roots: for root in unique {
         let mut walk = WalkDir::new(&root)
             .follow_links(false)
@@ -312,6 +326,8 @@ pub fn scan(
                 } else {
                     report.issue(entry.path(), "Path is not valid UTF-8.");
                 }
+            } else if directory {
+                report.directory(entry.path());
             }
         }
     }
@@ -323,6 +339,38 @@ mod tests {
     use super::*;
     use crate::launcher::{query::SearchMode, search::SearchManager};
     use std::fs;
+
+    #[test]
+    #[ignore = "Measures search on 50,000 synthetic paths. Run in release mode with --ignored --nocapture."]
+    fn profile_search_50k_files() {
+        let files = (0..50_000)
+            .map(|index| {
+                FileEntry::new(Path::new(&format!(
+                    "/benchmark/Project-{}/Document-{index}.txt",
+                    index % 100
+                )))
+                .expect("entry")
+            })
+            .collect();
+        let mut manager = SearchManager::default();
+        let started = std::time::Instant::now();
+        manager.replace_files(FileProvider::new(files));
+        let indexing_ms = started.elapsed().as_millis();
+        let mut elapsed = Vec::new();
+        for _ in 0..25 {
+            for query in ["doc", "dcm123", "Project-72", "no-such-filename"] {
+                let started = std::time::Instant::now();
+                let results = manager.search(query, SearchMode::Files).expect("search");
+                std::hint::black_box(results);
+                elapsed.push(started.elapsed().as_micros());
+            }
+        }
+        elapsed.sort_unstable();
+        eprintln!(
+            "50,000 files: index={indexing_ms}ms; search p50={}µs p95={}µs max={}µs",
+            elapsed[50], elapsed[95], elapsed[99]
+        );
+    }
 
     #[test]
     fn matches_composed_and_decomposed_unicode_without_changing_file_paths() {

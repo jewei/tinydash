@@ -1,4 +1,5 @@
 mod clipboard;
+mod currency;
 mod migrations;
 
 use std::{collections::HashMap, path::Path, time::Duration};
@@ -13,6 +14,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("SQLite operation failed: {0}")]
     Sqlite(#[from] rusqlite::Error),
+    #[error("Stored currency rates are invalid: {0}")]
+    Currency(String),
     #[error("Database version {found} is newer than supported version {supported}")]
     NewerSchema { found: u32, supported: usize },
 }

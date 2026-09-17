@@ -16,6 +16,10 @@ const MIGRATIONS: &[&str] = &[
         pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)),
         sort_order INTEGER NOT NULL
     ) STRICT;",
+    "CREATE TABLE currency_rates (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        snapshot TEXT NOT NULL CHECK (length(snapshot) BETWEEN 1 AND 65536)
+    ) STRICT;",
 ];
 
 pub fn apply(connection: &mut Connection) -> Result<()> {

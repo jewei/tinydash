@@ -38,7 +38,11 @@ The global shortcut uses Control on all platforms. For shortcuts shown as Comman
 5. Search for `coffee`, `laugh`, and `heart` in Emoji mode. Check the results and the copy action. Use Command/Ctrl + K to confirm that the actions menu offers Copy and no app-location action.
 6. Change between Apps, Emoji, and Calculator modes while a query is present. Confirm that results follow the selected mode. Reopen TinyDash after each copy and confirm that the input accepts text.
 
-Currency rates and automatic paste are not implemented in this phase. Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details.
+7. While online, enter `100 USD to MYR` in Calculator mode. Confirm that the result includes the ECB rate date. Use Command/Ctrl + R to refresh and confirm that typing remains responsive.
+8. After a successful refresh, disconnect the network and restart TinyDash. Confirm that currency conversion still works from SQLite. Refresh again and confirm that the error does not remove the saved result. Arithmetic and units must also work without any saved rates.
+9. Set `currencyRatesEnabled` to `false` and restart. Confirm that saved rates remain usable and a manual refresh reports the disabled setting. Restore the setting after the check.
+
+Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. Automatic paste is not implemented.
 
 ## Check usage ranking
 
@@ -73,10 +77,11 @@ macOS and Windows read their clipboard change counters once per second. Copies m
 2. Search by filename, abbreviation, and part of the full path. Confirm that All mode also finds the file. Confirm that Apps mode does not return it.
 3. Search for text that occurs only inside the file. Confirm that the file does not appear.
 4. Press Enter on the file. Confirm that its default application opens it. Reopen TinyDash and use Command/Ctrl + Enter to show it in the file manager.
-5. Add a second file. Use Refresh files or Command/Ctrl + R in Files mode. Confirm that the new file appears and the existing results remain usable during the scan.
-6. Delete the first file outside TinyDash. Before refreshing, try to open its old result. Confirm that an error appears. Refresh and confirm that the deleted file disappears.
-7. Configure a temporary folder in `fileSearchRoots`. Add hidden files, an excluded `node_modules` folder, and symbolic links. Restart and confirm that the scanner excludes them. Test a folder without read permission and confirm that the app stays usable and shows a warning.
-8. Set `fileSearchLimit` to 2 in a folder with three files. Restart and confirm that the UI reports an incomplete scan. Set `fileSearchRoots` to `[]`, restart, and confirm that Files mode is empty. Restore the settings when finished.
+5. Add and rename a second file. Confirm that the results update without a manual refresh. Create a new subfolder and immediately add a file inside it. Confirm that the file appears.
+6. Delete the first file outside TinyDash. Confirm that its result disappears automatically. If an old result is opened before the scan finishes, confirm that the app reports that the file is unavailable.
+7. Rename a configured root folder, then recreate it and add a file. Confirm that the replacement root updates. Use Refresh files to confirm that manual recovery remains available. Set `fileWatchEnabled` to `false` and restart to check manual-only operation, then restore the setting.
+8. Configure a temporary folder in `fileSearchRoots`. Add hidden files, an excluded `node_modules` folder, and symbolic links. Restart and confirm that the scanner excludes them. Test a folder without read permission and confirm that the app stays usable and shows a warning.
+9. Set `fileSearchLimit` to 2 in a folder with three files. Restart and confirm that the UI reports an incomplete scan. Set `fileSearchRoots` to `[]`, restart, and confirm that Files mode is empty. Restore the settings when finished.
 
 File access depends on OS permissions. On macOS, record any Files and Folders permission prompt or denial. Test Windows redirected Known Folders and Linux XDG user directories if available. Files open through their OS association; a missing or broken association can prevent the target application from opening.
 

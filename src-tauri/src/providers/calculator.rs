@@ -1,11 +1,16 @@
 use std::{
     collections::VecDeque,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
 use fend_core::{Context, Interrupt, SpanKind};
 
 use crate::{
+    currency::Rates,
     launcher::result::{Action, ResultKind, SearchResult},
     ranking,
 };
@@ -23,6 +28,8 @@ pub enum CalculationError {
     TooLong,
     #[error("{0}")]
     Evaluation(String),
+    #[error("{0}")]
+    Currency(String),
 }
 
 struct Deadline(Instant);
@@ -39,6 +46,7 @@ pub struct CalculatorProvider {
     // of a displayed result. Copy never re-evaluates or accepts frontend text.
     copies: VecDeque<(String, String)>,
     next_id: u64,
+    pub rates: Option<Arc<Rates>>,
 }
 
 impl CalculatorProvider {
@@ -50,7 +58,12 @@ impl CalculatorProvider {
     }
 
     pub fn search(&mut self, query: &str) -> Result<SearchResult, CalculationError> {
-        let value = calculate(query, &Deadline(Instant::now() + TIME_LIMIT))?;
+        let calculation = calculate(
+            query,
+            &Deadline(Instant::now() + TIME_LIMIT),
+            self.rates.clone(),
+        )?;
+        let value = calculation.value;
         self.next_id = self.next_id.wrapping_add(1);
         let id = format!("calculation:{}", self.next_id);
         self.copies.push_back((id.clone(), value.clone()));
@@ -61,7 +74,9 @@ impl CalculatorProvider {
             id,
             kind: ResultKind::Calculation,
             title: value,
-            subtitle: query.to_owned(),
+            subtitle: calculation
+                .rate_label
+                .map_or_else(|| query.to_owned(), |label| format!("{query} · {label}")),
             score: ranking::CALCULATION_SCORE,
             icon: None,
             primary_action: Action::Copy,
@@ -78,7 +93,36 @@ impl CalculatorProvider {
     }
 }
 
-fn calculate(query: &str, interrupt: &impl Interrupt) -> Result<String, CalculationError> {
+struct Calculation {
+    value: String,
+    rate_label: Option<String>,
+}
+
+struct RateLookup {
+    rates: Option<Arc<Rates>>,
+    used: Arc<AtomicBool>,
+}
+
+impl fend_core::ExchangeRateFnV2 for RateLookup {
+    fn relative_to_base_currency(
+        &self,
+        currency: &str,
+        _: &fend_core::ExchangeRateFnV2Options,
+    ) -> Result<f64, Box<dyn std::error::Error + Send + Sync>> {
+        self.used.store(true, Ordering::Relaxed);
+        let rates = self
+            .rates
+            .as_ref()
+            .ok_or(crate::currency::Error::Unavailable)?;
+        Ok(rates.rate(currency)?)
+    }
+}
+
+fn calculate(
+    query: &str,
+    interrupt: &impl Interrupt,
+    rates: Option<Arc<Rates>>,
+) -> Result<Calculation, CalculationError> {
     if interrupt.should_interrupt() {
         return Err(CalculationError::Timeout);
     }
@@ -88,10 +132,21 @@ fn calculate(query: &str, interrupt: &impl Interrupt) -> Result<String, Calculat
     }
     let mut context = Context::new();
     context.disable_rng();
+    let used_rates = Arc::new(AtomicBool::new(false));
+    context.set_exchange_rate_handler_v2(RateLookup {
+        rates: rates.clone(),
+        used: Arc::clone(&used_rates),
+    });
     let result =
         fend_core::evaluate_with_interrupt(query, &mut context, interrupt).map_err(|error| {
             if interrupt.should_interrupt() {
                 CalculationError::Timeout
+            } else if used_rates.load(Ordering::Relaxed) {
+                CalculationError::Currency(if rates.is_none() {
+                    crate::currency::Error::Unavailable.to_string()
+                } else {
+                    error
+                })
             } else {
                 CalculationError::Evaluation(error)
             }
@@ -106,7 +161,12 @@ fn calculate(query: &str, interrupt: &impl Interrupt) -> Result<String, Calculat
     if value.len() > 512 || value.chars().any(char::is_control) {
         return Err(CalculationError::TooLong);
     }
-    Ok(value.to_owned())
+    Ok(Calculation {
+        value: value.to_owned(),
+        rate_label: rates
+            .filter(|_| used_rates.load(Ordering::Relaxed))
+            .map(|rates| rates.label(ranking::now())),
+    })
 }
 
 #[cfg(test)]
@@ -119,6 +179,29 @@ mod tests {
         fn should_interrupt(&self) -> bool {
             false
         }
+    }
+
+    fn calculate(query: &str, interrupt: &impl Interrupt) -> Result<String, CalculationError> {
+        super::calculate(query, interrupt, None).map(|calculation| calculation.value)
+    }
+
+    #[test]
+    fn currency_uses_only_cached_rates_and_preserves_issued_copy_values() {
+        let mut provider = CalculatorProvider {
+            rates: Some(Arc::new(crate::currency::fixture())),
+            ..CalculatorProvider::default()
+        };
+        let result = provider.search("100 USD to MYR").expect("conversion");
+        assert_eq!(result.title, "400 MYR");
+        assert!(result.subtitle.contains("ECB 2026-09-16"));
+        let mut changed = crate::currency::fixture();
+        changed.values.insert("MYR".into(), 6.0);
+        provider.rates = Some(Arc::new(changed));
+        let updated = provider.search("100 USD to MYR").expect("new conversion");
+        assert_eq!(updated.title, "480 MYR");
+        assert_eq!(provider.copy_value(&result.id), Some(result.title.as_str()));
+        let plain = provider.search("12 * 8").expect("arithmetic");
+        assert_eq!(plain.subtitle, "12 * 8");
     }
 
     #[test]
@@ -155,6 +238,11 @@ mod tests {
         ] {
             assert!(calculate(query, &NoInterrupt).is_err(), "{query}");
         }
+        let error = calculate("100 USD to MYR", &NoInterrupt).expect_err("missing rates");
+        assert_eq!(
+            error.to_string(),
+            crate::currency::Error::Unavailable.to_string()
+        );
     }
 
     #[test]

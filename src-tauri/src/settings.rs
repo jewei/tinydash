@@ -15,6 +15,8 @@ pub struct Settings {
     pub file_search_roots: Option<Vec<PathBuf>>,
     pub file_search_limit: u32,
     pub file_search_excluded_dirs: Vec<String>,
+    pub file_watch_enabled: bool,
+    pub currency_rates_enabled: bool,
 }
 
 impl Default for Settings {
@@ -28,6 +30,8 @@ impl Default for Settings {
             file_search_roots: None,
             file_search_limit: 50_000,
             file_search_excluded_dirs: vec!["node_modules".into(), "target".into()],
+            file_watch_enabled: true,
+            currency_rates_enabled: true,
         }
     }
 }
@@ -148,6 +152,13 @@ mod tests {
     fn file_defaults_allow_explicit_roots_disable_and_bounded_limits() {
         let defaults: Settings = serde_json::from_str("{}").expect("settings");
         assert!(defaults.file_search_roots.is_none());
+        assert!(defaults.file_watch_enabled);
+        assert!(defaults.currency_rates_enabled);
+        let offline: Settings =
+            serde_json::from_str(r#"{"fileWatchEnabled":false,"currencyRatesEnabled":false}"#)
+                .expect("offline settings");
+        assert!(!offline.file_watch_enabled);
+        assert!(!offline.currency_rates_enabled);
         assert_eq!(defaults.file_limit(), 50_000);
         let disabled: Settings =
             serde_json::from_str(r#"{"fileSearchRoots":[],"fileSearchLimit":0}"#)

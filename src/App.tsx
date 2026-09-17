@@ -16,6 +16,7 @@ import {
   type SearchResult,
   type SearchMode,
   type FileStatus,
+  type CurrencyStatus,
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
@@ -37,6 +38,11 @@ export default function App() {
     warning: null,
   });
   const [pending, setPending] = createSignal(false);
+  const [currency, setCurrency] = createSignal<CurrencyStatus>({
+    asOf: null,
+    refreshing: false,
+    warning: null,
+  });
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
   const [indexError, setIndexError] = createSignal<string>();
@@ -76,6 +82,7 @@ export default function App() {
     indexError() ??
     storageError() ??
     (mode() === "all" || mode() === "files" ? files().warning : undefined) ??
+    (mode() === "calculator" ? currency().warning : undefined) ??
     info()?.warnings[0];
   const primaryLabel = () =>
     current()?.kind === "systemCommand" || mode() === "system"
@@ -144,6 +151,7 @@ export default function App() {
           setTotal(response.total);
           setIndexing(response.indexing);
           setFiles(response.files);
+          setCurrency(response.currency);
           setIndexError(response.indexError ?? undefined);
           setStorageError(response.storageError ?? undefined);
           setNotice(response.notice ?? undefined);
@@ -262,21 +270,26 @@ export default function App() {
   }
 
   async function refresh(
-    target: "apps" | "files" = mode() === "files" ? "files" : "apps",
+    target: "apps" | "files" | "currency" = mode() === "calculator"
+      ? "currency"
+      : mode() === "files"
+        ? "files"
+        : "apps",
   ) {
     setMenuOpen(false);
     setError(undefined);
     if (target === "files") setFiles((state) => ({ ...state, indexing: true }));
-    else setIndexing(true);
+    else if (target === "apps") setIndexing(true);
     focusInput();
     try {
       if (target === "files") await backend.refreshFiles();
+      else if (target === "currency") await backend.refreshCurrency();
       else await backend.refresh();
       await search();
     } catch (reason) {
       if (target === "files")
         setFiles((state) => ({ ...state, indexing: false }));
-      else setIndexing(false);
+      else if (target === "apps") setIndexing(false);
       setError(String(reason));
     }
   }
@@ -420,6 +433,10 @@ export default function App() {
           register("files-changed", () => {
             void search(query(), true);
           }),
+          register("currency-changed", () => {
+            if (mode() === "calculator" || (mode() === "all" && query().trim()))
+              void search(query(), true);
+          }),
           register("usage-changed", () => {
             void search();
           }),
@@ -537,7 +554,11 @@ export default function App() {
         </span>
         <span class="list-count" role="status" aria-live="polite">
           {mode() === "calculator"
-            ? "Offline"
+            ? currency().refreshing
+              ? "Updating rates..."
+              : currency().asOf
+                ? `Rates ${currency().asOf}`
+                : "Arithmetic and units offline"
             : mode() === "files"
               ? files().indexing
                 ? "Scanning files..."
@@ -657,7 +678,7 @@ export default function App() {
                 : mode() === "system"
                   ? "Try sleep, restart, or settings."
                   : mode() === "calculator"
-                    ? "Try 12 * 8, sqrt(144), or 5 ft to cm."
+                    ? "Try 12 * 8, 5 ft to cm, or 100 USD to MYR."
                     : mode() === "emoji"
                       ? "Try a name, shortcode, or category, such as coffee or food."
                       : mode() === "clipboard"
@@ -739,7 +760,9 @@ export default function App() {
                           : mode() === "clipboard"
                             ? "Enter copies text. Paste it with your usual shortcut."
                             : mode() === "files"
-                              ? "Enter opens the file. Refresh after files change."
+                              ? info()?.settings.fileWatchEnabled === false
+                                ? "Enter opens the file. Refresh after files change."
+                                : "Enter opens the file. Changes update automatically."
                               : "Type a name, : for emoji, or = to calculate."}
               </span>
             </>
@@ -847,12 +870,23 @@ export default function App() {
                 <div class="menu-divider" />
                 <button
                   role="menuitem"
+                  disabled={!desktop || currency().refreshing}
+                  onClick={() => void refresh("currency")}
+                >
+                  <Icon name="refresh" />
+                  Refresh currency rates
+                  <Show when={mode() === "calculator"}>
+                    <kbd>{modifier()} R</kbd>
+                  </Show>
+                </button>
+                <button
+                  role="menuitem"
                   disabled={!desktop || indexing()}
                   onClick={() => void refresh("apps")}
                 >
                   <Icon name="refresh" />
                   Refresh applications
-                  <Show when={mode() !== "files"}>
+                  <Show when={mode() !== "files" && mode() !== "calculator"}>
                     <kbd>{modifier()} R</kbd>
                   </Show>
                 </button>
