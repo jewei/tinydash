@@ -6,6 +6,7 @@ use super::LauncherState;
 use crate::error::{Error, Result};
 
 pub fn show(app: &AppHandle) -> Result<()> {
+    let started = std::time::Instant::now();
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
@@ -22,7 +23,8 @@ pub fn show(app: &AppHandle) -> Result<()> {
         .is_none_or(|state| state.settings.clear_query_on_open);
     window.emit("launcher-opened", clear)?;
     super::clipboard::refresh(app);
-    tracing::debug!("Launcher shown");
+    super::currency::refresh(app, false);
+    tracing::debug!(elapsed_us = started.elapsed().as_micros(), "Launcher shown");
     Ok(())
 }
 

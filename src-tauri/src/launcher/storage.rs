@@ -49,9 +49,21 @@ impl Storage {
                 database
                     .prune_clipboard(app.state::<LauncherState>().settings.clipboard_limit())?;
                 let clipboard = ClipboardProvider::new(database.load_clipboard()?);
+                let rates = match database.load_rates() {
+                    Ok(rates) => rates,
+                    Err(error) => {
+                        tracing::warn!(%error, "Could not load cached currency rates");
+                        app.state::<LauncherState>().currency.warning(Some("Could not load saved currency rates. Refresh rates in Calculator mode.".into()));
+                        None
+                    }
+                };
                 let mut search = search.lock().map_err(|_| Error::IndexUnavailable)?;
                 search.set_usage(usage);
                 search.clipboard = clipboard;
+                if let Some(rates) = rates {
+                    app.state::<LauncherState>().currency.loaded(&rates);
+                    search.set_rates(rates);
+                }
                 Ok(database)
             })();
             Mutex::new(Session {
@@ -69,6 +81,25 @@ impl Storage {
 
     pub fn initialize(&self, app: &AppHandle, search: &Mutex<SearchManager>) {
         self.session(app, search);
+    }
+
+    pub fn save_rates(
+        &self,
+        app: &AppHandle,
+        rates: &crate::currency::Rates,
+    ) -> Result<(), String> {
+        let state = app.state::<LauncherState>();
+        let session = self
+            .session(app, &state.search)
+            .lock()
+            .map_err(|error| error.to_string())?;
+        let database = session
+            .database
+            .as_ref()
+            .ok_or("Currency rates are available for this session, but could not be saved.")?;
+        database
+            .save_rates(rates)
+            .map_err(|error| error.to_string())
     }
 
     pub fn record(&self, app: &AppHandle, search: &Mutex<SearchManager>, id: &str) {

@@ -25,6 +25,93 @@ async function actions(page: Page) {
   );
 }
 
+test("currency refresh keeps cached results usable and shows rate dates and failures", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("calculator");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("100 USD to MYR");
+  await page.evaluate(() => {
+    window.__launcherTest.currencyDate = "2026-09-16";
+    window.__launcherTest.currencyRefreshing = true;
+    return window.__launcherTest.emit("currency-changed", null);
+  });
+  await expect(page.locator(".list-count")).toHaveText("Updating rates...");
+  await expect(page.locator(".result-title")).toHaveText("400 MYR");
+  await expect(page.locator(".result-subtitle")).toContainText(
+    "ECB 2026-09-16 · cached rates",
+  );
+  await page.keyboard.press("Meta+r");
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.some(
+        (call) => call.command === "refresh_currency",
+      ),
+    ),
+  ).toBe(true);
+  await page.evaluate(() => {
+    window.__launcherTest.currencyRefreshing = false;
+    window.__launcherTest.currencyWarning =
+      "Could not refresh currency rates. Saved rates remain available offline.";
+    return window.__launcherTest.emit("currency-changed", null);
+  });
+  await expect(page.locator(".list-count")).toHaveText("Rates 2026-09-16");
+  await expect(page.getByRole("alert")).toContainText(
+    "Saved rates remain available offline",
+  );
+  await input.press("Enter");
+  expect(await actions(page)).toContainEqual({
+    command: "execute_action",
+    payload: { id: "calculation:currency", action: "copy" },
+  });
+  await page.setViewportSize({ width: 360, height: 460 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    360,
+  );
+});
+
+test("missing currency help is readable and its refresh action is available in All mode", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.currencyMissing = true;
+  });
+  await page
+    .getByRole("combobox", { name: "Search TinyDash" })
+    .fill("100 USD to MYR");
+  const alert = page.getByRole("alert");
+  await expect(alert).toHaveText(
+    "Currency rates are unavailable. Connect to the internet, then open Actions and choose Refresh currency rates.",
+  );
+  for (const width of [720, 360]) {
+    await page.setViewportSize({ width, height: 460 });
+    const size = await alert.evaluate((element) => ({
+      width: element.clientWidth,
+      contentWidth: element.scrollWidth,
+      height: element.clientHeight,
+      contentHeight: element.scrollHeight,
+    }));
+    expect(size.contentWidth).toBeLessThanOrEqual(size.width);
+    expect(size.contentHeight).toBeLessThanOrEqual(size.height);
+    await expect(
+      page.getByRole("button", { name: "Actions", exact: false }),
+    ).toBeInViewport();
+  }
+  await page.getByRole("button", { name: "Actions", exact: false }).click();
+  await page.getByRole("menuitem", { name: "Refresh currency rates" }).click();
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.some(
+        (call) => call.command === "refresh_currency",
+      ),
+    ),
+  ).toBe(true);
+});
+
 test("the drag handle moves the window without taking input focus", async ({
   page,
 }) => {

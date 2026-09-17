@@ -135,7 +135,12 @@ export async function installFixtures() {
       settingsPath = path;
       await writeFile(
         path,
-        JSON.stringify({ ...settings, fileSearchRoots: [fileRoot] }),
+        JSON.stringify({
+          ...settings,
+          fileSearchRoots: [fileRoot],
+          fileWatchEnabled: true,
+          currencyRatesEnabled: false,
+        }),
       );
     } else {
       env.XDG_DATA_HOME = join(directory, "data");
@@ -149,7 +154,11 @@ export async function installFixtures() {
       await mkdir(config, { recursive: true });
       await writeFile(
         join(config, "settings.json"),
-        JSON.stringify({ fileSearchRoots: [fileRoot] }),
+        JSON.stringify({
+          fileSearchRoots: [fileRoot],
+          fileWatchEnabled: true,
+          currencyRatesEnabled: false,
+        }),
       );
       // Desktop Exec quoting has two escape layers and treats % as a field code.
       const quote = (value: string) =>

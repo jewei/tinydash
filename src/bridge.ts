@@ -10,6 +10,12 @@ export interface FileStatus {
   warning: string | null;
 }
 
+export interface CurrencyStatus {
+  asOf: string | null;
+  refreshing: boolean;
+  warning: string | null;
+}
+
 export interface SearchResult {
   id: string;
   kind:
@@ -35,6 +41,7 @@ export interface SearchResponse {
   notice: string | null;
   storageError: string | null;
   files: FileStatus;
+  currency: CurrencyStatus;
 }
 
 export interface LauncherInfo {
@@ -47,6 +54,8 @@ export interface LauncherInfo {
     fileSearchRoots: string[] | null;
     fileSearchLimit: number;
     fileSearchExcludedDirs: string[];
+    fileWatchEnabled: boolean;
+    currencyRatesEnabled: boolean;
   };
   platform: "macos" | "windows" | "linux";
   warnings: string[];
@@ -75,5 +84,6 @@ export const backend = {
   hide: () => invoke<void>("hide_launcher"),
   refresh: () => invoke<void>("refresh_apps"),
   refreshFiles: () => invoke<void>("refresh_files"),
+  refreshCurrency: () => invoke<void>("refresh_currency"),
   quit: () => invoke<void>("quit_app"),
 };

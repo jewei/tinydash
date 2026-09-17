@@ -11,6 +11,7 @@ import {
   mkdir,
   readFile,
   readdir,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -632,32 +633,74 @@ try {
   );
   await rm(fixtures.filePath);
   await rm(fixtures.fileMarker);
-  await keys(inputId, "\uE007");
-  await until("a deleted file produces an action error", () =>
-    observe<boolean>(
-      "return document.querySelector('[role=alert]')?.textContent.includes('This file is no longer available')",
-    ),
+  await until(
+    "the watcher removes the deleted file",
+    async () => (await titles()).length === 0,
   );
-  pass(
-    "Opening a deleted file reports an error and keeps the launcher available",
-  );
+  pass("Deleted files leave the results without a manual refresh");
   const replacement = `Replacement ${fixtures.nonce}.txt`;
   await writeFile(
     resolve(fixtures.fileRoot, replacement),
     "New file after the initial scan\n",
   );
-  await keys(inputId, "\uE009r\uE000");
-  await until(
-    "refresh removes the deleted path",
-    async () => (await titles()).length === 0,
-  );
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, replacement);
   await until(
-    "refresh finds the new document",
+    "the watcher finds the new document",
     async () => (await titles())[0] === replacement,
   );
-  pass("The Files refresh shortcut replaces the index after file changes");
+  const renamed = `Renamed ${fixtures.nonce}.txt`;
+  await rename(
+    resolve(fixtures.fileRoot, replacement),
+    resolve(fixtures.fileRoot, renamed),
+  );
+  await until(
+    "the old filename leaves the results",
+    async () => (await titles()).length === 0,
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, renamed);
+  await until(
+    "the renamed file is indexed",
+    async () => (await titles())[0] === renamed,
+  );
+  const nested = `Nested ${fixtures.nonce}.txt`;
+  await mkdir(resolve(fixtures.fileRoot, "new-folder"));
+  await writeFile(
+    resolve(fixtures.fileRoot, "new-folder", nested),
+    "Created before the new directory watch\n",
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, nested);
+  await until(
+    "new subdirectories are scanned and watched",
+    async () => (await titles())[0] === nested,
+  );
+  await rename(fixtures.fileRoot, `${fixtures.fileRoot}-old`);
+  await mkdir(fixtures.fileRoot);
+  const recreated = `Recreated ${fixtures.nonce}.txt`;
+  await writeFile(
+    resolve(fixtures.fileRoot, recreated),
+    "A replacement search root\n",
+  );
+  await until(
+    "the old root leaves the results",
+    async () => (await titles()).length === 0,
+  );
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, recreated);
+  await until(
+    "a recreated root is watched",
+    async () => (await titles())[0] === recreated,
+  );
+  await keys(inputId, "\uE009r\uE000");
+  await until(
+    "manual refresh remains available",
+    async () => (await titles())[0] === recreated,
+  );
+  pass(
+    "File watching detects creation, renaming, new folders, and replacement roots; manual refresh still works",
+  );
 
   await reopen();
   await selectMode("system");
