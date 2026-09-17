@@ -287,7 +287,7 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
             anyhow::bail!("Clipboard text is unavailable");
         }
         let bytes = GlobalSize(handle);
-        if bytes == 0 || bytes > (MAX_TEXT_BYTES + 1) * 2 || bytes % 2 != 0 {
+        if bytes == 0 || bytes > (MAX_TEXT_BYTES + 1) * 2 || !bytes.is_multiple_of(2) {
             return Ok(Some((counter, None)));
         }
         let pointer = GlobalLock(handle);

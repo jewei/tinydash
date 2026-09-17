@@ -47,10 +47,10 @@ impl FileScan {
 
     pub fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
-        if let Ok(sender) = self.sender.lock() {
-            if let Some(sender) = sender.as_ref() {
-                let _ = sender.try_send(Request::Stop);
-            }
+        if let Ok(sender) = self.sender.lock()
+            && let Some(sender) = sender.as_ref()
+        {
+            let _ = sender.try_send(Request::Stop);
         }
     }
 

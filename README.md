@@ -6,9 +6,15 @@ Search installed applications and local filenames or paths. Find saved clipboard
 
 ## Run
 
-Install [Bun](https://bun.sh/docs/installation) 1.4.2, stable Rust, and the [Tauri 2 platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs Xcode command line tools. Windows needs the C++ build tools and WebView2. Linux needs the GTK and WebKitGTK development packages.
+Install [Bun](https://bun.sh/docs/installation) 1.4.2, Rust 1.98.1 or later, and the [Tauri 2 platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs Xcode command line tools. Windows needs the C++ build tools and WebView2. Linux needs the GTK and WebKitGTK development packages.
 
 Bun manages dependencies and runs all JavaScript development tools. `bunfig.toml` selects Bun's runtime for project commands and their child processes. Node.js is not required. The Bun version is set in `package.json`; CI uses the same version and installs from `bun.lock`.
+
+Dependencies were checked against the stable registry releases on 17 September 2026. `bun.lock` and `Cargo.lock` include the latest versions allowed by each dependency's requirements. GitHub Actions use explicit release tags. Tauri, SolidJS, the direct frontend packages, Bun, and `tauri-driver` were already current.
+
+On Linux, GTK stays at 0.18.2 because Tauri 2.11 requires the 0.18 series. GTK 0.19 cannot resolve alongside it because both link `gtk-3`. Application discovery and system commands use GIO 0.22.9 independently. The new GIO API puts `DesktopAppInfo` in `gio-unix` 0.22.8. Tauri and GTK retain their internal GIO/GLib 0.18 dependencies. Recheck this constraint when upgrading Tauri. See [Cargo's native-library constraint](https://doc.rust-lang.org/cargo/reference/resolver.html#links).
+
+This dependency update does not change the SQLite schema. Startup still applies the existing migrations. No manual data migration is required.
 
 `@types/node` provides TypeScript declarations for the tooling APIs that Bun supports. It does not install the Node.js runtime.
 

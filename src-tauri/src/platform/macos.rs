@@ -47,10 +47,10 @@ fn scan_roots(roots: &[PathBuf]) -> Vec<AppEntry> {
                 if entry.file_type().is_dir() {
                     walker.skip_current_dir();
                 }
-                if path.is_dir() {
-                    if let Some(app) = read_bundle(path) {
-                        apps.push(app);
-                    }
+                if path.is_dir()
+                    && let Some(app) = read_bundle(path)
+                {
+                    apps.push(app);
                 }
             }
         }

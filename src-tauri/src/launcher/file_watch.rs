@@ -226,10 +226,10 @@ pub fn resolve_root(path: &Path) -> PathBuf {
         return path.to_owned();
     }
     for parent in path.ancestors() {
-        if let Ok(resolved) = parent.canonicalize() {
-            if let Ok(suffix) = path.strip_prefix(parent) {
-                return resolved.join(suffix);
-            }
+        if let Ok(resolved) = parent.canonicalize()
+            && let Ok(suffix) = path.strip_prefix(parent)
+        {
+            return resolved.join(suffix);
         }
     }
     path.to_owned()

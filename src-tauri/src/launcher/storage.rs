@@ -115,12 +115,12 @@ impl Storage {
                 return;
             }
         };
-        if let Some(store) = database.database.as_ref() {
-            if let Err(error) = store.save_usage(id, usage) {
-                self.failed(&error);
-                // Continue with session-only ranking. Do not retry or flood logs.
-                database.database = None;
-            }
+        if let Some(store) = database.database.as_ref()
+            && let Err(error) = store.save_usage(id, usage)
+        {
+            self.failed(&error);
+            // Continue with session-only ranking. Do not retry or flood logs.
+            database.database = None;
         }
     }
 

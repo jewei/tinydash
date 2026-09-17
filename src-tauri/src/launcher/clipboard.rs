@@ -41,11 +41,14 @@ impl Monitor {
         self.warning.lock().ok().and_then(|warning| warning.clone())
     }
     fn failed(&self) {
-        if let Ok(mut warning) = self.warning.lock() {
-            if warning.is_none() {
-                tracing::warn!("Could not read clipboard changes");
-                *warning = Some("Clipboard capture is unavailable. TinyDash will try again after the next change.".into());
-            }
+        if let Ok(mut warning) = self.warning.lock()
+            && warning.is_none()
+        {
+            tracing::warn!("Could not read clipboard changes");
+            *warning = Some(
+                "Clipboard capture is unavailable. TinyDash will try again after the next change."
+                    .into(),
+            );
         }
     }
 }

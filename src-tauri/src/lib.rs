@@ -60,10 +60,9 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                     button_state: MouseButtonState::Up,
                     ..
                 }
-            ) {
-                if let Err(error) = window::show(tray.app_handle()) {
-                    tracing::warn!(%error, "Could not show launcher");
-                }
+            ) && let Err(error) = window::show(tray.app_handle())
+            {
+                tracing::warn!(%error, "Could not show launcher");
             }
         })
         .build(app)?;
@@ -105,8 +104,10 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 let shortcut_result = app.handle().plugin(
                     tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| {
-                        if event.state() == ShortcutState::Pressed {
-                            if let Err(error) = window::toggle(app) { tracing::warn!(%error, "Could not toggle launcher"); }
+                        if event.state() == ShortcutState::Pressed
+                            && let Err(error) = window::toggle(app)
+                        {
+                            tracing::warn!(%error, "Could not toggle launcher");
                         }
                     }).build()
                 ).and_then(|()| app.global_shortcut().register(settings.shortcut.as_str()).map_err(|error| tauri::Error::Anyhow(error.into())));
@@ -163,10 +164,10 @@ pub fn run() -> anyhow::Result<()> {
         // Launch Services sends Reopen when an existing .app is opened again.
         // This is separate from starting a second executable process.
         #[cfg(target_os = "macos")]
-        if let tauri::RunEvent::Reopen { .. } = _event {
-            if let Err(error) = window::show(_app) {
-                tracing::warn!(%error, "Could not reopen launcher");
-            }
+        if let tauri::RunEvent::Reopen { .. } = _event
+            && let Err(error) = window::show(_app)
+        {
+            tracing::warn!(%error, "Could not reopen launcher");
         }
     });
     Ok(())
