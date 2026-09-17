@@ -59,7 +59,7 @@ if ($Action -eq 'Install') {
     Run-Installer $installers[0].FullName '/S'
     Check-Data
     "TINYDASH_NATIVE_BINARY=$binary" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
-    Write-Host 'PASS: per-user installation, executable, shortcut, uninstall entry, and reinstall'
+    Write-Output 'PASS: per-user installation, executable, shortcut, uninstall entry, and reinstall'
 } else {
     # _?= prevents NSIS from detaching a temporary child process. Keep the path
     # last and unquoted, as required by NSIS, even when it contains spaces.
@@ -70,5 +70,5 @@ if ($Action -eq 'Install') {
         if (Test-Path $path) { throw "Removal left an installed item: $path" }
     }
     Check-Data
-    Write-Host 'PASS: removal deleted the app and shortcut and preserved user data'
+    Write-Output 'PASS: removal deleted the app and shortcut and preserved user data'
 }
