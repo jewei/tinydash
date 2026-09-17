@@ -656,7 +656,7 @@ try {
   );
   await until(
     "the old filename leaves the results",
-    async () => (await titles()).length === 0,
+    async () => !(await titles()).includes(replacement),
   );
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, renamed);
@@ -685,7 +685,9 @@ try {
   );
   await until(
     "the old root leaves the results",
-    async () => (await titles()).length === 0,
+    // Fuzzy path matching can return the recreated file for the old query.
+    // Only the stale file must disappear; unrelated matches remain valid.
+    async () => !(await titles()).includes(nested),
   );
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, recreated);
