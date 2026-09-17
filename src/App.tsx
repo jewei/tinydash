@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   backend,
   type Action,
@@ -101,6 +102,14 @@ export default function App() {
                 ? "Search clipboard history..."
                 : "Search apps, files, emoji...";
   const focusInput = () => input.focus({ preventScroll: true });
+
+  function startDragging(event: MouseEvent) {
+    if (!desktop || event.button !== 0) return;
+    event.preventDefault();
+    void getCurrentWindow()
+      .startDragging()
+      .catch((reason: unknown) => setError(String(reason)));
+  }
 
   function search(value = query(), preserveSelection = false) {
     if (!desktop || disposed) return Promise.resolve();
@@ -455,6 +464,12 @@ export default function App() {
 
   return (
     <main class="launcher" aria-label="TinyDash launcher">
+      <div
+        class="window-drag-handle"
+        title="Drag to move window"
+        aria-hidden="true"
+        onMouseDown={startDragging}
+      />
       <header class="search-header">
         <div class="search-field">
           <Icon name="search" size={23} />

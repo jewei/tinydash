@@ -1,5 +1,5 @@
 // Loaded only by the browser tests. Production always calls the Rust backend.
-import { mockIPC } from "@tauri-apps/api/mocks";
+import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { SearchResult, SearchMode } from "../src/bridge";
 
@@ -133,6 +133,7 @@ window.__launcherTest = {
   holdAction: false,
   emit,
 };
+mockWindows("main");
 mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;

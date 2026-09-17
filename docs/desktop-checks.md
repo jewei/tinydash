@@ -24,6 +24,8 @@ On macOS, extract the inner ZIP and open `TinyDash.app`. On Windows, run the `.e
 8. Start TinyDash again while it is running. Confirm that the existing window appears and a second launcher process does not remain running.
 9. Use Command/Ctrl + Enter on an app result. Confirm that the OS file manager shows its location.
 10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and returns to All mode.
+11. Drag the handle above the search field. Confirm that the window moves and typing still enters text in the search field. Select text with the mouse and change the search mode. Confirm that these controls do not move the window. Hide and reopen the launcher. Confirm that it keeps a position that fits on the screen.
+12. Move the launcher to another display, then disconnect that display or reduce its resolution. Reopen the launcher. Confirm that it moves inside the remaining screen's work area. Check displays with different scale factors. On Wayland, check placement through the compositor because TinyDash cannot set absolute positions there.
 
 The global shortcut uses Control on all platforms. For shortcuts shown as Command/Ctrl, use Ctrl on Windows and Linux, and Command on macOS. If a shortcut conflicts with another application, change it in `settings.json` and repeat the check. On macOS 27, Command + Shift + Space opens Siri Visual Intelligence and must not be used as TinyDash's default.
 
