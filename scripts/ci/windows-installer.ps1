@@ -38,8 +38,15 @@ if ($Action -eq 'Install') {
     if ($installers.Count -ne 1) { throw 'Expected one NSIS installer.' }
     Run-Installer $installers[0].FullName '/S'
     if (-not (Test-Path $binary)) { throw 'The installed executable is missing.' }
-    $expected = (Get-FileHash 'native-build/TinyDash-windows-X64.exe' -Algorithm SHA256).Hash
-    if ((Get-FileHash $binary -Algorithm SHA256).Hash -ne $expected) { throw 'The installed executable differs from the build.' }
+    # Tauri changes its bundle-type marker during packaging. Compare with the
+    # NSIS payload, not the standalone executable. Hosted Windows includes 7-Zip.
+    $payloadDir = Join-Path $env:RUNNER_TEMP 'TinyDash-package'
+    & 7z x $installers[0].FullName "-o$payloadDir" -y tinydash.exe -r | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Could not extract the NSIS payload.' }
+    $payload = @(Get-ChildItem $payloadDir -Filter 'tinydash.exe' -Recurse)
+    if ($payload.Count -ne 1) { throw 'Expected one packaged executable.' }
+    $expected = (Get-FileHash $payload[0].FullName -Algorithm SHA256).Hash
+    if ((Get-FileHash $binary -Algorithm SHA256).Hash -ne $expected) { throw 'The installed executable differs from the package.' }
     $shell = New-Object -ComObject WScript.Shell
     if (-not (Test-Path $shortcut)) { throw 'The Start menu shortcut is missing.' }
     if ($shell.CreateShortcut($shortcut).TargetPath -ne $binary) { throw 'The Start menu shortcut has the wrong target.' }
