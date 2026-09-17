@@ -76,19 +76,25 @@ pub fn toggle(app: &AppHandle) -> Result<()> {
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
     if window.is_visible()? && window.is_focused()? {
-        window.hide()?;
-        Ok(())
+        hide(app)
     } else {
         show(app)
     }
 }
 
-#[tauri::command]
-pub fn hide_launcher(app: AppHandle) -> std::result::Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
-        window.hide().map_err(|error| error.to_string())?;
+pub fn hide(app: &AppHandle) -> Result<()> {
+    if let Some(window) = app.get_webview_window("main")
+        && window.is_visible()?
+    {
+        window.hide()?;
+        window.emit("launcher-hidden", ())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn hide_launcher(app: AppHandle) -> std::result::Result<(), String> {
+    hide(&app).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

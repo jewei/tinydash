@@ -328,6 +328,131 @@ test("keeps only the latest waiting query when input and index events overlap", 
     ]);
 });
 
+test("hidden windows skip background searches and refresh when reopened", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("any");
+  await expect(page.getByRole("listbox")).toHaveAttribute("aria-busy", "false");
+  await input.press("Escape");
+  const before = await page.evaluate(
+    () =>
+      window.__launcherTest.calls.filter((call) => call.command === "search")
+        .length,
+  );
+  await page.evaluate(async () => {
+    window.__launcherTest.usedAppFirst = true;
+    for (const event of [
+      "apps-changed",
+      "files-changed",
+      "currency-changed",
+      "usage-changed",
+      "clipboard-changed",
+    ]) {
+      await window.__launcherTest.emit(event);
+    }
+  });
+  await expect(page.getByRole("listbox")).toHaveAttribute("aria-busy", "false");
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.filter((call) => call.command === "search")
+          .length,
+    ),
+  ).toBe(before);
+  await expect(page.locator(".result-title").first()).toHaveText("Finder");
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-opened", false),
+  );
+  await expect(input).toHaveValue("any");
+  await expect(input).toBeFocused();
+  await expect(page.locator(".result-title").first()).toHaveText("Safari");
+});
+
+test("hiding cancels waiting input and ignores an in-flight search result", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await page.evaluate(() => {
+    window.__launcherTest.holdSearch = true;
+  });
+  await input.fill("slow");
+  await page.waitForFunction(() => !!window.__launcherTest.releaseSearch);
+  await input.fill("sa");
+  await input.press("Escape");
+  await page.evaluate(() => window.__launcherTest.releaseSearch?.());
+  await expect(page.getByRole("listbox")).toHaveAttribute("aria-busy", "false");
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls
+        .filter((call) => call.command === "search")
+        .map((call) => (call.payload as { query: string }).query)
+        .filter(Boolean),
+    ),
+  ).toEqual(["slow"]);
+  await expect(page.locator(".result-title")).toHaveCount(8);
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-opened", false),
+  );
+  await expect(page.locator(".result-title")).toHaveText("Safari");
+});
+
+test("background refresh keeps the latest keyboard selection", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.press("ArrowDown");
+  await expect(
+    page.getByRole("listbox").getByRole("option", { selected: true }),
+  ).toContainText("Safari");
+  await page.evaluate(async () => {
+    window.__launcherTest.holdNextSearch = true;
+    await window.__launcherTest.emit("files-changed");
+  });
+  await page.waitForFunction(() => !!window.__launcherTest.releaseSearch);
+  await input.press("ArrowDown");
+  await expect(
+    page.getByRole("listbox").getByRole("option", { selected: true }),
+  ).toContainText("Visual Studio Code");
+  await page.evaluate(() => window.__launcherTest.releaseSearch?.());
+  await expect(page.getByRole("listbox")).toHaveAttribute("aria-busy", "false");
+  await expect(
+    page.getByRole("listbox").getByRole("option", { selected: true }),
+  ).toContainText("Visual Studio Code");
+  for (const event of ["apps-changed", "usage-changed"]) {
+    await page.evaluate((event) => window.__launcherTest.emit(event), event);
+    await expect(page.getByRole("listbox")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+    await expect(
+      page.getByRole("listbox").getByRole("option", { selected: true }),
+    ).toContainText("Visual Studio Code");
+  }
+});
+
+test("a background event does not preserve selection from a different query", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.press("ArrowDown");
+  await page.evaluate(() => {
+    window.__launcherTest.holdNextSearch = true;
+  });
+  await input.fill("new query");
+  await page.waitForFunction(() => !!window.__launcherTest.releaseSearch);
+  await page.evaluate(() => window.__launcherTest.emit("files-changed"));
+  await page.evaluate(() => window.__launcherTest.releaseSearch?.());
+  await expect(page.getByRole("listbox")).toHaveAttribute("aria-busy", "false");
+  await expect(
+    page.getByRole("listbox").getByRole("option", { selected: true }),
+  ).toContainText("Finder");
+});
+
 test("opens and reveals files by ID, and refreshes files with the mode shortcut", async ({
   page,
 }) => {
