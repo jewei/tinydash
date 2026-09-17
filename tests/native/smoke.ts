@@ -42,6 +42,7 @@ let applicationError: Error | undefined;
 let log: number | undefined;
 let appLog: number | undefined;
 const passed: string[] = [];
+const reopenCheckMs: number[] = [];
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -222,6 +223,7 @@ async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
 }
 
 async function reopen() {
+  const started = performance.now();
   // Start the executable as a desktop shortcut would. Its single-instance
   // handler must show the resident window and reset the search field.
   const child = spawn(binary, [], { env: fixtures.env, stdio: "ignore" });
@@ -252,6 +254,7 @@ async function reopen() {
       && document.querySelectorAll('[role=option]').length > 0`,
     ),
   );
+  reopenCheckMs.push(performance.now() - started);
 }
 
 try {
@@ -280,6 +283,7 @@ try {
   let capabilities: Record<string, unknown> = {
     "tauri:options": { application: binary },
   };
+  let startupStarted: number | undefined;
   if (process.platform === "win32") {
     // WebView2's launch mode relies on finding a DevToolsActivePort file.
     // Attach to an explicit loopback port so app startup remains observable.
@@ -288,6 +292,7 @@ try {
       : await freePort();
     assert(Number.isInteger(debugPort) && debugPort > 0 && debugPort <= 65535);
     appLog = openSync(resolve(output, "application.log"), "w");
+    startupStarted = performance.now();
     application = spawn(binary, [], {
       env: {
         ...fixtures.env,
@@ -320,6 +325,7 @@ try {
       "ms:edgeOptions": { debuggerAddress: `127.0.0.1:${debugPort}` },
     };
   }
+  startupStarted ??= performance.now();
   const created = await request<{ sessionId: string }>(
     "/session",
     "POST",
@@ -345,6 +351,7 @@ try {
         && document.querySelectorAll('[role=option]').length > 0`,
     ),
   );
+  const startupCheckMs = performance.now() - startupStarted;
   pass(
     "The application loads its index and selects the search field for input",
   );
@@ -704,6 +711,47 @@ try {
     "File watching detects creation, renaming, new folders, and replacement roots; manual refresh still works",
   );
 
+  await keys(inputId, "\uE00C");
+  await until("Escape pauses the hidden launcher", () =>
+    observe<boolean>(
+      "return document.querySelector('.open-button')?.disabled === true",
+    ),
+  );
+  await rm(resolve(fixtures.fileRoot, recreated));
+  const hiddenFile = `Hidden ${fixtures.nonce}.txt`;
+  await writeFile(
+    resolve(fixtures.fileRoot, hiddenFile),
+    "Created while TinyDash is hidden\n",
+  );
+  await until("the file index updates while the window is hidden", async () => {
+    // Inspect the real Rust index without asking the hidden UI to render it.
+    const found = await request<string[]>(
+      `/session/${session}/execute/async`,
+      "POST",
+      {
+        script: `const done = arguments[arguments.length - 1];
+        window.__TAURI_INTERNALS__.invoke('search', { query: arguments[0], mode: 'files' })
+          .then(response => done(response.results.map(result => result.title)), () => done([]));`,
+        args: [hiddenFile],
+      },
+    );
+    return found.includes(hiddenFile);
+  });
+  assert(
+    (await titles()).includes(recreated),
+    "Hidden results stay unchanged after index events",
+  );
+  await reopen();
+  await selectMode("files");
+  await keys(inputId, hiddenFile);
+  await until(
+    "reopening searches the current file index",
+    async () => (await titles())[0] === hiddenFile,
+  );
+  pass(
+    "Hidden windows pause result updates; the file index stays current and reopening shows new files",
+  );
+
   await reopen();
   await selectMode("system");
   assert.equal((await titles()).length, 5);
@@ -746,6 +794,68 @@ try {
   }
   pass(
     "Rust rejects sleep, restart, and shutdown IPC requests without explicit confirmation",
+  );
+  await reopen();
+  const queryTimings: { query: string; elapsedMs: number }[] = [];
+  for (let sample = 0; sample < 5; sample += 1) {
+    for (const [query, expected] of [
+      [expectedNames[0], expectedNames[0]],
+      ["12 * 8", "96"],
+      ["5 ft to cm", "152.4 cm"],
+      [":rocket", "rocket"],
+    ]) {
+      const result: {
+        elapsedMs: number;
+        title: string;
+        error?: string;
+      } = await request(`/session/${session}/execute/async`, "POST", {
+        // Measure inside the webview. This includes IPC, Rust search, and
+        // Solid's DOM update, but not WebDriver transport or a screen paint.
+        script: `const done = arguments[arguments.length - 1];
+            const input = document.querySelector('input[role=combobox]');
+            const list = document.querySelector('[role=listbox]');
+            if (!input || !list || list.getAttribute('aria-busy') !== 'false') {
+              done({ error: 'Search was not ready for the timing sample' }); return;
+            }
+            const started = performance.now();
+            const observer = new MutationObserver(() => {
+              if (list.getAttribute('aria-busy') !== 'false') return;
+              observer.disconnect();
+              clearTimeout(timer);
+              done({ elapsedMs: performance.now() - started,
+                title: list.querySelector('.result-title')?.textContent ?? '' });
+            });
+            const timer = setTimeout(() => {
+              observer.disconnect(); done({ error: 'Search timing timed out' });
+            }, 4000);
+            observer.observe(list, { attributes: true, attributeFilter: ['aria-busy'] });
+            input.value = arguments[0];
+            input.dispatchEvent(new Event('input', { bubbles: true }));`,
+        args: [query],
+      });
+      assert(!result.error, result.error);
+      assert.equal(result.title, expected);
+      assert(Number.isFinite(result.elapsedMs) && result.elapsedMs >= 0);
+      queryTimings.push({ query, elapsedMs: result.elapsedMs });
+    }
+  }
+  await writeFile(
+    resolve(output, "performance.json"),
+    JSON.stringify(
+      {
+        platform: process.platform,
+        startupCheckMs,
+        reopenCheckMs,
+        queryTimings,
+        method:
+          "Startup and reopen include WebDriver and readiness polling. Query samples measure input-event dispatch through IPC and Rust search to settled DOM. None measures screen paint or physical shortcut latency. CI timings have no pass/fail threshold.",
+      },
+      null,
+      2,
+    ),
+  );
+  pass(
+    "Native query timing samples return the expected app, calculation, unit conversion, and emoji",
   );
   await writeFile(
     resolve(output, "result.json"),

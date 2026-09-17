@@ -1,4 +1,5 @@
 import {
+  batch,
   createEffect,
   createSignal,
   For,
@@ -25,6 +26,7 @@ import ConfirmDialog from "./components/ConfirmDialog";
 
 export default function App() {
   const desktop = isTauri();
+  const [visible, setVisible] = createSignal(true);
   const [query, setQuery] = createSignal("");
   const [mode, setMode] = createSignal<SearchMode>("all");
   const [results, setResults] = createSignal<SearchResult[]>([]);
@@ -57,11 +59,12 @@ export default function App() {
   let sequence = 0;
   let disposed = false;
   let searchTask: Promise<void> | undefined;
+  let displayedQuery: { value: string; mode: SearchMode } | undefined;
   let queuedSearch:
     | {
         value: string;
         mode: SearchMode;
-        selectedId: string | undefined;
+        preserveSelection: boolean;
         request: number;
       }
     | undefined;
@@ -71,6 +74,7 @@ export default function App() {
   const current = () => results()[selected()];
   const canOpen = () =>
     desktop &&
+    visible() &&
     !!current() &&
     !busy() &&
     !pending() &&
@@ -119,11 +123,11 @@ export default function App() {
   }
 
   function search(value = query(), preserveSelection = false) {
-    if (!desktop || disposed) return Promise.resolve();
+    if (!desktop || !visible() || disposed) return Promise.resolve();
     queuedSearch = {
       value,
       mode: mode(),
-      selectedId: preserveSelection ? current()?.id : undefined,
+      preserveSelection,
       request: ++sequence,
     };
     setPending(true);
@@ -136,25 +140,43 @@ export default function App() {
   async function drainSearch() {
     try {
       while (queuedSearch && !disposed) {
-        const { value, mode: searchMode, selectedId, request } = queuedSearch;
+        const {
+          value,
+          mode: searchMode,
+          preserveSelection,
+          request,
+        } = queuedSearch;
         queuedSearch = undefined;
         try {
           const response = await backend.search(value, searchMode);
           if (disposed || request !== sequence) continue;
-          setResults(response.results);
-          setSelected(
-            Math.max(
-              0,
-              response.results.findIndex((result) => result.id === selectedId),
-            ),
-          );
-          setTotal(response.total);
-          setIndexing(response.indexing);
-          setFiles(response.files);
-          setCurrency(response.currency);
-          setIndexError(response.indexError ?? undefined);
-          setStorageError(response.storageError ?? undefined);
-          setNotice(response.notice ?? undefined);
+          // Read selection after the response. The user can navigate while a
+          // refresh runs, but a different query must select its first result.
+          const selectedId =
+            preserveSelection &&
+            displayedQuery?.value === value &&
+            displayedQuery.mode === searchMode
+              ? current()?.id
+              : undefined;
+          displayedQuery = { value, mode: searchMode };
+          batch(() => {
+            setResults(response.results);
+            setSelected(
+              Math.max(
+                0,
+                response.results.findIndex(
+                  (result) => result.id === selectedId,
+                ),
+              ),
+            );
+            setTotal(response.total);
+            setIndexing(response.indexing);
+            setFiles(response.files);
+            setCurrency(response.currency);
+            setIndexError(response.indexError ?? undefined);
+            setStorageError(response.storageError ?? undefined);
+            setNotice(response.notice ?? undefined);
+          });
         } catch (reason) {
           if (disposed || request !== sequence) continue;
           setResults([]);
@@ -428,7 +450,7 @@ export default function App() {
         };
         await Promise.all([
           register("apps-changed", () => {
-            void search();
+            void search(query(), true);
           }),
           register("files-changed", () => {
             void search(query(), true);
@@ -438,13 +460,14 @@ export default function App() {
               void search(query(), true);
           }),
           register("usage-changed", () => {
-            void search();
+            void search(query(), true);
           }),
           register("clipboard-changed", () => {
             if (mode() === "clipboard" || (mode() === "all" && query().trim()))
               void search(query(), true);
           }),
           register("launcher-opened", (clear) => {
+            setVisible(true);
             setMenuOpen(false);
             setClearOpen(false);
             setPendingAction(undefined);
@@ -458,6 +481,14 @@ export default function App() {
               void search();
               input.select();
             }
+          }),
+          register("launcher-hidden", () => {
+            setVisible(false);
+            // One running Rust search may finish. Ignore its reply and drop
+            // waiting input. Opening the window always requests current data.
+            queuedSearch = undefined;
+            sequence += 1;
+            setPending(false);
           }),
         ]);
         if (disposed) return;
@@ -635,7 +666,7 @@ export default function App() {
           </For>
         </ul>
         <Show when={current()?.kind === "clipboard"}>
-          <Show when={!pending()}>
+          <Show when={visible() && !pending()}>
             <ClipboardPreview id={current()!.id} />
           </Show>
         </Show>

@@ -134,11 +134,11 @@ pub fn run() -> anyhow::Result<()> {
         .on_window_event(|window, event| match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
-                if let Err(error) = window.hide() { tracing::warn!(%error, "Could not hide launcher"); }
+                if let Err(error) = window::hide(window.app_handle()) { tracing::warn!(%error, "Could not hide launcher"); }
             }
             tauri::WindowEvent::Focused(false)
                 if window.app_handle().try_state::<LauncherState>().is_some_and(|state| state.settings.hide_on_blur) => {
-                if let Err(error) = window.hide() { tracing::warn!(%error, "Could not hide launcher"); }
+                if let Err(error) = window::hide(window.app_handle()) { tracing::warn!(%error, "Could not hide launcher"); }
             }
             _ => {}
         })

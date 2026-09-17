@@ -22,6 +22,7 @@ declare global {
       currencyWarning: string | null;
       currencyMissing: boolean;
       holdSearch: boolean;
+      holdNextSearch: boolean;
       reverseSystem: boolean;
       holdAction: boolean;
       releaseAction?: () => void;
@@ -137,6 +138,7 @@ window.__launcherTest = {
   currencyWarning: null,
   currencyMissing: false,
   holdSearch: false,
+  holdNextSearch: false,
   reverseSystem: false,
   holdAction: false,
   emit,
@@ -146,6 +148,10 @@ mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
+    if (command === "hide_launcher") {
+      await emit("launcher-hidden");
+      return;
+    }
     if (command === "launcher_ready") {
       return {
         platform: "macos",
@@ -166,6 +172,12 @@ mockIPC(
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
+      if (state.holdNextSearch) {
+        state.holdNextSearch = false;
+        await new Promise<void>((resolve) => {
+          state.releaseSearch = resolve;
+        });
+      }
       if (query === "slow" && mode !== "emoji") {
         if (state.holdSearch)
           await new Promise<void>((resolve) => {
