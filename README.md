@@ -19,6 +19,8 @@ bun run tauri dev
 
 The launcher opens on startup. The default global shortcut is `Control+Shift+Space` on macOS, Windows, and X11 Linux. The shortcut shows or hides the existing window. The tray menu also opens the launcher, refreshes applications, and quits the app.
 
+Drag the handle above the search field to move the window. TinyDash keeps that position until it exits. Each time the window opens, it moves back inside the current screen's work area if needed. On Wayland, the compositor controls placement.
+
 On macOS, use Control, not Command, for this global shortcut. macOS 27 uses `Command+Shift+Space` for [Siri Visual Intelligence](https://support.apple.com/en-my/102650). The previous TinyDash default can open Siri and cause a "Siri Unavailable" alert.
 
 After building a new version, quit the running TinyDash process through the tray menu before opening the new build. Hiding or reopening its window keeps the existing code running.

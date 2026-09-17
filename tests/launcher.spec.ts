@@ -25,6 +25,48 @@ async function actions(page: Page) {
   );
 }
 
+test("the drag handle moves the window without taking input focus", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  const handle = page.getByTitle("Drag to move window");
+  await expect(input).toBeFocused();
+  await handle.click();
+  await expect(input).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__launcherTest.calls.filter(
+          (call) => call.command === "plugin:window|start_dragging",
+        ),
+      ),
+    )
+    .toEqual([
+      { command: "plugin:window|start_dragging", payload: { label: "main" } },
+    ]);
+  await handle.click({ button: "right" });
+  await input.fill("Safari");
+  await input.dblclick();
+  expect(
+    await input.evaluate((element: HTMLInputElement) =>
+      element.value.slice(
+        element.selectionStart ?? 0,
+        element.selectionEnd ?? 0,
+      ),
+    ),
+  ).toBe("Safari");
+  await page
+    .getByRole("combobox", { name: "Search mode" })
+    .selectOption("apps");
+  await page.getByRole("button", { name: "Hide launcher" }).click();
+  const calls = await page.evaluate(() => window.__launcherTest.calls);
+  expect(
+    calls.filter((call) => call.command === "plugin:window|start_dragging"),
+  ).toHaveLength(1);
+  expect(calls.some((call) => call.command === "hide_launcher")).toBe(true);
+});
+
 test("system commands ask before running and extra Enter cancels", async ({
   page,
 }) => {
