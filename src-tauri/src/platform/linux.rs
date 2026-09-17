@@ -1,4 +1,5 @@
 use gio::prelude::*;
+use gio_unix::DesktopAppInfo;
 
 use crate::{
     error::{Error, Result},
@@ -12,7 +13,7 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
         .into_iter()
         .filter(|app| app.should_show())
         .filter_map(|app| {
-            let desktop = app.downcast::<gio::DesktopAppInfo>().ok()?;
+            let desktop = app.downcast::<DesktopAppInfo>().ok()?;
             let path = desktop.filename()?;
             if desktop
                 .id()
@@ -39,7 +40,7 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
 }
 
 pub fn launch(entry: &AppEntry) -> Result<()> {
-    let app = gio::DesktopAppInfo::from_filename(&entry.path).ok_or(Error::AppNotFound)?;
+    let app = DesktopAppInfo::from_filename(&entry.path).ok_or(Error::AppNotFound)?;
     // Native desktop activation respects field codes, terminal apps, and D-Bus.
     // Never interpret desktop-file contents through a shell.
     app.launch(&[], None::<&gio::AppLaunchContext>)
@@ -58,7 +59,7 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
             let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
             let app = settings_desktop_ids(&desktop)
                 .iter()
-                .find_map(|id| gio::DesktopAppInfo::new(id))
+                .find_map(|id| DesktopAppInfo::new(id))
                 .ok_or_else(|| {
                     Error::SystemCommand(
                         "No supported settings application is installed for this desktop.".into(),
