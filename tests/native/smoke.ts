@@ -424,6 +424,24 @@ try {
   await keys(inputId, "\uE009a\uE000\uE003");
 
   await selectMode("apps");
+  if (process.platform === "linux") {
+    await keys(inputId, "TinyDash");
+    await until(
+      "the installed desktop entry is excluded from app search",
+      async () => {
+        const names = await titles();
+        return (
+          expectedNames.every((name) => names.includes(name)) &&
+          !names.includes("TinyDash") &&
+          (await observe<boolean>(
+            "return document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+          ))
+        );
+      },
+    );
+    pass("Application search excludes TinyDash's installed desktop entry");
+    await keys(inputId, "\uE009a\uE000\uE003");
+  }
   await keys(inputId, fixtures.prefix);
   await until("OS discovery finds both fixture applications", async () => {
     const names = await titles();

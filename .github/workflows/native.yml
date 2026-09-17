@@ -26,13 +26,9 @@ jobs:
         include:
           - os: windows-latest
             artifact: TinyDash-Windows-X64
-            binary: tinydash.exe
           - os: ubuntu-24.04
             artifact: TinyDash-Linux-X64
-            binary: tinydash
     runs-on: ${{ matrix.os }}
-    env:
-      TINYDASH_NATIVE_BINARY: ${{ github.workspace }}/native-build/${{ matrix.binary }}
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: oven-sh/setup-bun@v2.2.0
@@ -50,14 +46,11 @@ jobs:
           path: native-build/
           run-id: ${{ inputs.build_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Prepare native binary
+      - name: Verify downloaded build
+        run: bun scripts/ci/artifacts.ts verify native-build
+      - name: Record tested build
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = Windows ]; then
-            mv native-build/TinyDash-windows-X64.exe native-build/tinydash.exe
-          else
-            tar -xzf native-build/TinyDash-linux-X64.tar.gz -C native-build
-          fi
           mkdir -p test-results/native
           cp native-build/build.txt test-results/native/tested-build.txt
           printf '%s\n' "Test code: $GITHUB_SHA" > test-results/native/test-code.txt
@@ -66,6 +59,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y webkit2gtk-driver libayatana-appindicator3-1 libxdo3 xvfb openbox dbus-x11 xclip xdg-utils desktop-file-utils scrot
+      - name: Install and check Windows package
+        if: runner.os == 'Windows'
+        id: windows-install
+        shell: pwsh
+        run: ./scripts/ci/windows-installer.ps1 Install | Tee-Object test-results/native/installer.txt
+      - name: Install and check Linux package
+        if: runner.os == 'Linux'
+        id: linux-install
+        shell: bash
+        run: bash scripts/ci/linux-installer.sh install | tee test-results/native/installer.txt
       - name: Install native test driver
         run: cargo install tauri-driver --version 2.0.6 --locked
       - name: Install matching WebView2 driver
@@ -84,6 +87,14 @@ jobs:
           GDK_BACKEND: x11
           XDG_SESSION_TYPE: x11
         run: xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash -c 'openbox & exec bun run test:native'
+      - name: Remove and check Windows package
+        if: always() && steps.windows-install.outcome == 'success'
+        shell: pwsh
+        run: ./scripts/ci/windows-installer.ps1 Remove | Tee-Object -Append test-results/native/installer.txt
+      - name: Remove and check Linux package
+        if: always() && steps.linux-install.outcome == 'success'
+        shell: bash
+        run: bash scripts/ci/linux-installer.sh remove | tee -a test-results/native/installer.txt
       - name: Upload native diagnostics
         if: always()
         uses: actions/upload-artifact@v7.0.1

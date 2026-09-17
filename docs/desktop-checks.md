@@ -6,11 +6,13 @@ Use a Windows or Linux desktop session in a virtual machine or on a physical com
 
 Open the GitHub Actions **Checks** run for the commit under test. Download the `TinyDash-<OS>-<architecture>` artifact. Check `build.txt` to confirm the commit and CPU architecture. Extract the artifact before starting the app.
 
-These are unsigned development builds. Windows needs the WebView2 Runtime. The Linux binary is built on Ubuntu 24.04 and needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, and libxdo libraries. Bun and Rust are not needed to run the build.
+Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. These are unsigned development builds. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
 
 Quit any older TinyDash process through its tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
 
-On macOS, extract the inner ZIP and open `TinyDash.app`. On Windows, run the `.exe`. On Linux, extract the inner archive and run `./tinydash` from a terminal.
+Start the installed app from Applications on macOS, the Start menu on Windows, or the application menu on Linux. For standalone checks, use the inner Mac ZIP, the Windows executable without `-setup` in its name, or the Linux tar archive.
+
+CI checks installation, same-version replacement, and removal. On a physical desktop, also check replacement while the app is running, the Windows WebView2 download on a clean system, and the OS response to an unsigned build. Confirm that removal preserves saved settings and history unless you explicitly request their deletion.
 
 ## Check the launcher
 

@@ -172,13 +172,13 @@ If the database cannot load or save, TinyDash shows a warning, pauses clipboard 
 bun run tauri build
 ```
 
-Build on each target operating system. Output is in `src-tauri/target/release/bundle/`. For an unsigned local macOS application without a DMG:
+Build on each target operating system. Tauri uses the platform configuration to produce a macOS DMG and app, a Windows NSIS installer, or a Linux Debian package. Output is in `src-tauri/target/release/bundle/`. See the [installation guide](docs/install.md) for downloads, checksums, system requirements, and removal. For a local macOS application without a DMG:
 
 ```sh
 bun run tauri build --bundles app
 ```
 
-Signing, notarization, installers on other operating systems, and distribution need separate release checks.
+CI produces unsigned test packages for Apple silicon Macs, Windows x64, and Ubuntu 24.04 x64. Public distribution still needs signing, Mac notarization, and physical desktop checks.
 
 The release profile preserves symbols in build tools to avoid a [Rust linker issue on macOS 27](https://github.com/rust-lang/rust/issues/157750). The shipped application remains stripped.
 
@@ -220,7 +220,8 @@ src-tauri/src/
   settings.rs             Small startup configuration file
   error.rs                Internal errors
 tests/                    Browser tests and native WebDriver checks
-scripts/ci/               Platform test setup
+scripts/ci/               Installer checks, checksums, and native test setup
+docs/install.md           Install, replace, and remove test builds
 docs/desktop-checks.md    Interactive checks for each desktop
 .github/workflows/        Checks for macOS, Windows, and Linux
 ```
@@ -264,11 +265,11 @@ cargo test --release --manifest-path src-tauri/Cargo.toml profile_search_50k_fil
 
 See the [performance check results](docs/performance.md) for the measured search times, idle host memory, and measurement limits.
 
-The [Checks workflow](.github/workflows/check.yml) builds on macOS, Windows, and Ubuntu 24.04. Each successful build produces a downloadable `TinyDash-<OS>-<architecture>` artifact with the app, commit information, and [desktop check instructions](docs/desktop-checks.md). Artifacts remain available for 14 days. They are unsigned development builds.
+The [Checks workflow](.github/workflows/check.yml) builds on macOS, Windows, and Ubuntu 24.04. Each successful build produces a downloadable `TinyDash-<OS>-<architecture>` artifact with the installer, standalone app, commit information, SHA-256 checksums, and [installation instructions](docs/install.md). Artifacts remain available for 14 days. They are unsigned development builds. Mac CI mounts the DMG, copies its app to a temporary directory, and checks the copy.
 
-After the build jobs pass, the [native check workflow](.github/workflows/native.yml) downloads and tests the Windows and Linux artifacts through `tauri-driver`. The Bun test script checks arithmetic, unit conversion, and emoji search through the real Rust backend. It copies results, reads the OS clipboard to verify their values, and reopens the resident app. It also installs two temporary application entries, checks initial input selection and arrow-key selection, then launches a harmless executable that records which entry was selected. It verifies that a copied emoji and a launched app move up the result list. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its app and driver processes when it finishes. CI retains screenshots and failure logs in `native-results-<OS>-<architecture>` artifacts.
+After the build jobs pass, the [native check workflow](.github/workflows/native.yml) verifies checksums and installs the Windows and Linux packages. It checks the installed executable, Start menu shortcut or desktop entry, and same-version reinstallation. It runs the installed app through `tauri-driver`, then checks removal and retained test data. The Bun test script checks arithmetic, unit conversion, and emoji search through the real Rust backend. It copies results, reads the OS clipboard to verify their values, and reopens the resident app. It also installs two temporary application entries, checks initial input selection and arrow-key selection, then launches a harmless executable that records which entry was selected. It verifies that a copied emoji and a launched app move up the result list. It uses no mocked IPC and adds no application dependencies. The test removes its entries and stops its app and driver processes when it finishes. CI retains screenshots and failure logs in `native-results-<OS>-<architecture>` artifacts.
 
-The native workflow can also test an existing build without compiling it again. Select **Native app checks**, choose **Run workflow**, and enter the Checks run ID that contains the build artifacts. The diagnostics record both the build commit and the test-code commit. This makes native failures faster to reproduce.
+The native workflow can also test an existing installer build without compiling it again. Select **Native app checks**, choose **Run workflow**, and enter the Checks run ID that contains the build artifacts. The diagnostics record both the build commit and the test-code commit. This makes native failures faster to reproduce.
 
 The native checks also copy test text from a separate process, verify capture and duplicate filtering, copy an older entry, delete it, and clear history with confirmation. They verify that deletion leaves the system clipboard unchanged.
 
@@ -296,4 +297,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
 
 ## Next step
 
-Prepare release builds. Complete desktop checks on physical Windows and Linux systems, including Wayland, then add signing and installer validation before distribution. Keep the MVP feature set fixed.
+Complete desktop checks on physical Windows and Linux systems, including Wayland. Then configure Mac signing and notarization and Windows signing before public distribution. Keep the MVP feature set fixed.
