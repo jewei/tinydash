@@ -26,8 +26,11 @@ case "${1:-}" in
     dpkg-deb -I "$package"
     sudo apt-get install -y "$package"
     test -x /usr/bin/tinydash
-    tar -xzf native-build/TinyDash-linux-X64.tar.gz -C native-build
-    cmp native-build/tinydash /usr/bin/tinydash
+    # Tauri patches its bundle-type marker when making the package. Compare
+    # with the packaged executable, not the standalone build's different marker.
+    expected="$RUNNER_TEMP/tinydash-package"
+    dpkg-deb --extract "$package" "$expected"
+    cmp "$expected/usr/bin/tinydash" /usr/bin/tinydash
     desktop-file-validate "$desktop"
     grep -Fx 'Exec=tinydash' "$desktop"
     grep -Fx 'Icon=tinydash' "$desktop"
