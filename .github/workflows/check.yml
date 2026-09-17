@@ -44,34 +44,23 @@ jobs:
       - run: bun run build
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
-      - name: Build macOS application
+      - name: Build application and installer
+        run: bun run tauri build
+      - name: Check macOS disk image
         if: runner.os == 'macOS'
-        run: bun run tauri build --bundles app
-      - name: Build Windows or Linux binary
-        if: runner.os != 'macOS'
-        run: bun run tauri build --no-bundle
-      - name: Prepare downloadable build
         shell: bash
         run: |
-          mkdir -p artifacts
-          case "$RUNNER_OS" in
-            macOS)
-              ditto -c -k --keepParent src-tauri/target/release/bundle/macos/TinyDash.app "artifacts/TinyDash-macos-$RUNNER_ARCH.zip"
-              ;;
-            Windows)
-              cp src-tauri/target/release/tinydash.exe "artifacts/TinyDash-windows-$RUNNER_ARCH.exe"
-              ;;
-            Linux)
-              tar -C src-tauri/target/release -czf "artifacts/TinyDash-linux-$RUNNER_ARCH.tar.gz" tinydash
-              ;;
-          esac
-          cp docs/desktop-checks.md artifacts/
-          printf '%s\n' "Commit: $GITHUB_SHA" "OS: $RUNNER_OS" "Architecture: $RUNNER_ARCH" > artifacts/build.txt
+          mkdir -p test-results
+          bash scripts/ci/check-dmg.sh | tee test-results/dmg-check.txt
+      - name: Prepare downloadable build
+        run: bun scripts/ci/artifacts.ts prepare artifacts/packages
+      - name: Verify build checksums
+        run: bun scripts/ci/artifacts.ts verify artifacts/packages
       - name: Upload native build
         uses: actions/upload-artifact@v7.0.1
         with:
           name: TinyDash-${{ runner.os }}-${{ runner.arch }}
-          path: artifacts/
+          path: artifacts/packages/
           if-no-files-found: error
           retention-days: 14
       - name: Install browser for UI tests

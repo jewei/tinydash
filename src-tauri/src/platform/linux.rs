@@ -15,10 +15,13 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
         .filter_map(|app| {
             let desktop = app.downcast::<DesktopAppInfo>().ok()?;
             let path = desktop.filename()?;
-            if desktop
-                .id()
-                .is_some_and(|id| id == "dev.tinydash.launcher.desktop")
-            {
+            if desktop.id().is_some_and(|id| {
+                // Tauri's Debian bundler names the entry after productName.
+                matches!(
+                    id.as_str(),
+                    "TinyDash.desktop" | "dev.tinydash.launcher.desktop"
+                )
+            }) {
                 return None;
             }
             let mut aliases = desktop
