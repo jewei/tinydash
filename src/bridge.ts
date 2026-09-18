@@ -42,6 +42,7 @@ export interface SearchResult {
     | "webSearch";
   title: string;
   subtitle: string;
+  path?: string;
   score: number;
   icon: string | null;
   primaryAction: Action;

@@ -68,7 +68,7 @@ export default function ResultPreview(props: {
     }
   };
   const pathParts = () => {
-    const path = props.result?.subtitle ?? "";
+    const path = props.result?.path ?? props.result?.subtitle ?? "";
     const separator = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
     return {
       directory: separator >= 0 ? path.slice(0, separator) || "/" : "—",

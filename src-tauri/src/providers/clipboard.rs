@@ -118,6 +118,7 @@ impl ClipboardProvider {
                 Some(SearchResult {
                     id: format!("clipboard:{}", entry.entry.id),
                     kind: ResultKind::Clipboard,
+                    path: None,
                     title: entry.title.clone(),
                     subtitle: entry.subtitle.clone(),
                     score,

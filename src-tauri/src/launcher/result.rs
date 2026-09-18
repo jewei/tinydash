@@ -71,6 +71,8 @@ pub struct SearchResult {
     pub kind: ResultKind,
     pub title: String,
     pub subtitle: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     pub score: u32,
     pub icon: Option<String>,
     pub primary_action: Action,

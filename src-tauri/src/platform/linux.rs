@@ -33,11 +33,16 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
             if let Some(generic) = desktop.generic_name() {
                 aliases.push(generic.to_string());
             }
-            Some(AppEntry::new(
-                desktop.display_name().to_string(),
-                path,
-                aliases,
-            ))
+            let mut entry = AppEntry::new(desktop.display_name().to_string(), path, aliases);
+            if let Some(description) = desktop
+                .generic_name()
+                .filter(|value| !value.trim().is_empty())
+                .or_else(|| desktop.description())
+                .filter(|value| !value.trim().is_empty())
+            {
+                entry.description = description.trim().to_owned();
+            }
+            Some(entry)
         })
         .collect())
 }

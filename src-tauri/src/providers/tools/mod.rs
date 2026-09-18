@@ -77,6 +77,7 @@ impl ToolProvider {
             title,
             subtitle,
             score: 100_000,
+            path: None,
             icon: None,
             primary_action,
             secondary_actions: if password.is_some() {

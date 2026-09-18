@@ -101,6 +101,16 @@ test("Canvas detail actions follow the selection and keep system confirmation", 
   await page.setViewportSize({ width: 980, height: 620 });
   await openLauncher(page);
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await expect(input).toHaveAttribute(
+    "placeholder",
+    "What are you looking for?",
+  );
+  await expect(page.locator(".result-subtitle").first()).toHaveText(
+    "Files and folders",
+  );
+  await expect(page.locator(".result-subtitle").nth(1)).toHaveText(
+    "Web browser",
+  );
   await input.press("ArrowDown");
   const details = page.getByRole("complementary", {
     name: "Selected item details",

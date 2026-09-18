@@ -188,7 +188,7 @@ export default function App(
                       ? "Calculate or convert..."
                       : mode() === "clipboard"
                         ? "Search clipboard history..."
-                        : "Search apps, files, emoji...";
+                        : "What are you looking for?";
   const focusInput = () => input.focus({ preventScroll: true });
 
   createEffect(() => {

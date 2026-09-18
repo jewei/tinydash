@@ -107,6 +107,7 @@ impl EmojiProvider {
                 Some(SearchResult {
                     id: format!("emoji:{}", entry.emoji.as_str()),
                     kind: ResultKind::Emoji,
+                    path: None,
                     title: entry.emoji.name().to_owned(),
                     subtitle: format!("{shortcode}{}", entry.category),
                     score,
