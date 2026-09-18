@@ -1,13 +1,33 @@
-export default function AppAvatar(props: { name: string }) {
-  const initials = () => {
-    const words = props.name.trim().split(/\s+/);
-    return words.length > 1
-      ? `${Array.from(words[0])[0] ?? ""}${Array.from(words[1])[0] ?? ""}`.toUpperCase()
-      : Array.from(props.name).slice(0, 2).join("").toUpperCase();
-  };
+import { createSignal, Show } from "solid-js";
+import Icon from "./Icon";
+
+export default function AppAvatar(props: { icon: string | null }) {
+  const [failedSource, setFailedSource] = createSignal<string>();
+  const source = () =>
+    props.icon?.startsWith("data:image/png;base64,") &&
+    props.icon !== failedSource()
+      ? props.icon
+      : undefined;
   return (
-    <span class="app-avatar" aria-hidden="true">
-      {initials()}
+    <span
+      class="app-avatar"
+      classList={{ "has-app-icon": !!source() }}
+      aria-hidden="true"
+    >
+      <Show when={source()} fallback={<Icon name="window" size={20} />}>
+        {(url) => (
+          <img
+            src={url()}
+            alt=""
+            draggable={false}
+            onError={(event) =>
+              setFailedSource(
+                event.currentTarget.getAttribute("src") ?? undefined,
+              )
+            }
+          />
+        )}
+      </Show>
     </span>
   );
 }

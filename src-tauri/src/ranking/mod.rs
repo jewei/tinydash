@@ -130,6 +130,7 @@ mod tests {
             primary_action: Action::Launch,
             secondary_actions: vec![],
             confirmation: None,
+            detail: None,
         };
         let usage = HashMap::from([(
             "frequent".into(),

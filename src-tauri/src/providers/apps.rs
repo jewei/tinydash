@@ -13,6 +13,7 @@ pub struct AppEntry {
     pub name: String,
     pub path: PathBuf,
     pub aliases: Vec<String>,
+    pub icon: Option<String>,
 }
 
 impl AppEntry {
@@ -22,6 +23,7 @@ impl AppEntry {
             name,
             path,
             aliases,
+            icon: None,
         }
     }
 }
@@ -116,10 +118,11 @@ impl AppProvider {
                 title: app.entry.name.clone(),
                 subtitle: app.entry.path.to_string_lossy().into_owned(),
                 score,
-                icon: None,
+                icon: app.entry.icon.clone(),
                 primary_action: Action::Launch,
                 secondary_actions: vec![Action::Reveal],
                 confirmation: None,
+                detail: None,
             })
             .collect()
     }

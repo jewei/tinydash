@@ -3,6 +3,7 @@ pub mod clipboard;
 pub mod currency;
 mod file_watch;
 pub mod files;
+pub mod preferences;
 pub mod query;
 pub mod result;
 pub mod search;
@@ -10,14 +11,19 @@ mod storage;
 pub mod window;
 
 use std::sync::{
-    Mutex,
+    Mutex, RwLock,
     atomic::{AtomicBool, Ordering},
 };
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{error::Error, platform, providers::apps::AppProvider, settings::Settings};
+use crate::{
+    error::Error,
+    platform,
+    providers::{apps::AppProvider, files::FileProvider},
+    settings::Settings,
+};
 use query::SearchMode;
 use result::SearchResponse;
 use search::SearchManager;
@@ -26,7 +32,9 @@ pub struct LauncherState {
     pub search: Mutex<SearchManager>,
     pub scanning: AtomicBool,
     pub ready: AtomicBool,
-    pub settings: Settings,
+    settings: RwLock<Settings>,
+    pub settings_update: Mutex<()>,
+    pub shortcut_recording: AtomicBool,
     pub warnings: Vec<String>,
     pub index_error: Mutex<Option<String>>,
     pub storage: storage::Storage,
@@ -41,7 +49,9 @@ impl LauncherState {
             search: Mutex::new(SearchManager::default()),
             scanning: AtomicBool::new(false),
             ready: AtomicBool::new(false),
-            settings,
+            settings: RwLock::new(settings),
+            settings_update: Mutex::new(()),
+            shortcut_recording: AtomicBool::new(false),
             warnings,
             index_error: Mutex::new(None),
             storage: storage::Storage::default(),
@@ -49,6 +59,55 @@ impl LauncherState {
             files: files::FileScan::default(),
             currency: currency::Currency::default(),
         }
+    }
+
+    pub fn settings(&self) -> Settings {
+        self.settings
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone()
+    }
+
+    pub fn replace_settings(&self, settings: Settings) {
+        // Use the same lock order as scan publication. A scan for the old roots
+        // must not restore removed files after the new settings are accepted.
+        let mut current = self
+            .settings
+            .write()
+            .unwrap_or_else(|error| error.into_inner());
+        let previous_files = if !current.same_file_settings(&settings) {
+            self.search
+                .lock()
+                .ok()
+                .map(|mut search| search.replace_files(FileProvider::default()))
+        } else {
+            None
+        };
+        *current = settings;
+        drop(current);
+        drop(previous_files);
+    }
+
+    pub fn accept_file_scan(
+        &self,
+        settings: &Settings,
+        files: FileProvider,
+    ) -> Result<bool, String> {
+        let current = self
+            .settings
+            .read()
+            .unwrap_or_else(|error| error.into_inner());
+        if !current.same_file_settings(settings) {
+            return Ok(false);
+        }
+        let previous = self
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?
+            .replace_files(files);
+        drop(current);
+        drop(previous);
+        Ok(true)
     }
 }
 
@@ -72,11 +131,15 @@ pub async fn launcher_ready(app: AppHandle) -> Result<LauncherInfo, String> {
     let state = app.state::<LauncherState>();
     if !state.ready.swap(true, Ordering::AcqRel) {
         clipboard::start(&app);
-        window::show(&app).map_err(|error| error.to_string())?;
+        if std::env::args().any(|arg| arg == "--settings") {
+            preferences::open_settings(app.clone()).await?;
+        } else {
+            window::show(&app).map_err(|error| error.to_string())?;
+        }
         files::scan_files(&app);
     }
     Ok(LauncherInfo {
-        settings: state.settings.clone(),
+        settings: state.settings(),
         platform: std::env::consts::OS,
         warnings: state.warnings.clone(),
     })
@@ -99,6 +162,7 @@ pub async fn search(
             .map_err(|error| error.to_string())?;
         Ok(SearchResponse {
             results: outcome.results,
+            pinned_ids: search.pinned_ids(),
             notice: outcome.notice,
             storage_error: state
                 .storage
@@ -124,6 +188,23 @@ pub fn refresh_apps(app: AppHandle) {
     scan_apps(&app);
 }
 
+#[tauri::command]
+pub async fn set_app_pinned(app: AppHandle, id: String, pinned: bool) -> Result<(), String> {
+    let worker_app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        worker_app
+            .state::<LauncherState>()
+            .storage
+            .set_pinned(&worker_app, &id, pinned)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    if let Err(error) = app.emit("pins-changed", ()) {
+        tracing::debug!(%error, "No app pin listener");
+    }
+    Ok(())
+}
+
 pub fn scan_apps(app: &AppHandle) {
     let state = app.state::<LauncherState>();
     if state.scanning.swap(true, Ordering::AcqRel) {
@@ -135,8 +216,26 @@ pub fn scan_apps(app: &AppHandle) {
             tracing::debug!(%error, "No index listener");
         }
         let started = std::time::Instant::now();
-        let scanned = tauri::async_runtime::spawn_blocking(|| {
-            platform::discover_apps().map(AppProvider::new)
+        let worker_app = app.clone();
+        let scanned = tauri::async_runtime::spawn_blocking(move || {
+            let entries = platform::discover_apps()?;
+            // Native icon resolution can take longer than app discovery. Publish
+            // searchable names first and never hold the search lock while loading images.
+            #[cfg(target_os = "macos")]
+            {
+                let state = worker_app.state::<LauncherState>();
+                state
+                    .search
+                    .lock()
+                    .map_err(|_| Error::IndexUnavailable)?
+                    .replace_apps(AppProvider::new(entries.clone()));
+                if let Err(error) = worker_app.emit("apps-changed", ()) {
+                    tracing::debug!(%error, "No index listener");
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = worker_app;
+            Ok::<_, Error>(AppProvider::new(platform::load_app_icons(entries)))
         })
         .await;
         let state = app.state::<LauncherState>();

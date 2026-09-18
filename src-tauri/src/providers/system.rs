@@ -176,6 +176,7 @@ impl SystemCommandProvider {
                     primary_action: Action::Run,
                     secondary_actions: vec![],
                     confirmation: command.confirmation(),
+                    detail: None,
                 })
             })
             .collect()

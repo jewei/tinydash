@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+mod icons;
+
 use crate::{
     error::{Error, Result},
     providers::apps::AppEntry,
@@ -81,7 +83,10 @@ fn read_bundle(path: &Path) -> Option<AppEntry> {
                     .as_string()
                     .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
         });
-    if background || string("CFBundlePackageType").is_some_and(|kind| kind != "APPL") {
+    // Finder is a launchable application with Apple's special FNDR package type.
+    let finder = string("CFBundleIdentifier") == Some("com.apple.finder")
+        && string("CFBundlePackageType") == Some("FNDR");
+    if background || string("CFBundlePackageType").is_some_and(|kind| kind != "APPL" && !finder) {
         return None;
     }
     let name = string("CFBundleDisplayName")
@@ -102,6 +107,13 @@ fn read_bundle(path: &Path) -> Option<AppEntry> {
     // Canonical paths deduplicate symlinked bundles without walking through symlink trees.
     let path = path.canonicalize().unwrap_or_else(|_| path.to_owned());
     Some(AppEntry::new(name, path, aliases))
+}
+
+pub fn load_app_icons(mut apps: Vec<AppEntry>) -> Vec<AppEntry> {
+    for entry in &mut apps {
+        entry.icon = icons::application_icon(&entry.path);
+    }
+    apps
 }
 
 pub fn launch(entry: &AppEntry) -> Result<()> {
@@ -325,6 +337,38 @@ mod tests {
         assert_eq!(apps.len(), 1);
         assert_eq!(apps[0].name, "Editor Display");
         assert!(apps[0].aliases.contains(&"Editor".to_owned()));
+    }
+
+    #[test]
+    fn finds_finder_with_its_special_bundle_type() {
+        let directory = tempfile::tempdir().unwrap();
+        let finder = bundle(
+            &directory.path().join("CoreServices"),
+            "Finder",
+            "<key>CFBundleIdentifier</key><string>com.apple.finder</string>\
+             <key>CFBundlePackageType</key><string>FNDR</string>",
+        );
+        let applications = directory.path().join("Applications");
+        bundle(
+            &applications,
+            "NotFinder",
+            "<key>CFBundleIdentifier</key><string>example.other</string>\
+             <key>CFBundlePackageType</key><string>FNDR</string>",
+        );
+        let apps = scan_roots(&[applications, finder.clone()]);
+        assert_eq!(apps.len(), 1, "Finder must be searchable");
+        assert_eq!(apps[0].path, finder.canonicalize().unwrap());
+        let mut search = crate::launcher::search::SearchManager::default();
+        search.replace_apps(crate::providers::apps::AppProvider::new(apps));
+        let result = search
+            .search("finder", crate::launcher::query::SearchMode::Apps)
+            .unwrap()
+            .results;
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].primary_action,
+            crate::launcher::result::Action::Launch
+        );
     }
 
     #[test]

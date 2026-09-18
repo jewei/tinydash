@@ -8,6 +8,7 @@ type IconName =
   | "refresh"
   | "quit"
   | "apps"
+  | "window"
   | "close"
   | "calculator"
   | "clipboard"
@@ -15,7 +16,13 @@ type IconName =
   | "system"
   | "lock"
   | "sleep"
-  | "copy";
+  | "copy"
+  | "clock"
+  | "globe"
+  | "link"
+  | "pin"
+  | "arrow"
+  | "chevron";
 
 export default function Icon(props: { name: IconName; size?: number }) {
   return (
@@ -31,6 +38,30 @@ export default function Icon(props: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <Switch>
+        <Match when={props.name === "arrow"}>
+          <path d="M4 12h15m-5-5 5 5-5 5" />
+        </Match>
+        <Match when={props.name === "pin"}>
+          <path d="m16 3 5 5-3 1-4 4v4l-3-3-5 5m5-5-4-3h4l4-4 1-4Z" />
+        </Match>
+        <Match when={props.name === "chevron"}>
+          <path d="m8 10 4 4 4-4" />
+        </Match>
+        <Match when={props.name === "clock"}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 6v6l4 2" />
+        </Match>
+        <Match when={props.name === "globe"}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z" />
+        </Match>
+        <Match when={props.name === "link"}>
+          <path d="m10 13 4-4m-5 6-2 2a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 2 2-2a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" />
+        </Match>
+        <Match when={props.name === "window"}>
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <path d="M3 8h18M7 5.5h.01" />
+        </Match>
         <Match when={props.name === "system"}>
           <path d="M3 6h9m4 0h5M3 12h3m4 0h11M3 18h11m4 0h3" />
           <circle cx="14" cy="6" r="2" />

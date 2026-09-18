@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { inflateSync } from "node:zlib";
 import type {} from "./mock-backend";
 
 async function openLauncher(page: Page) {
@@ -26,12 +27,208 @@ async function actions(page: Page) {
 }
 
 async function selectCategory(page: Page, name: string) {
-  await page.getByRole("button", { name: /^Search category:/ }).click();
   await page
-    .getByRole("listbox", { name: "Search categories" })
-    .getByRole("option", { name, exact: true })
+    .getByRole("navigation", { name: "Search categories" })
+    .getByRole("button", { name, exact: true })
     .click();
 }
+
+test("installed app icons appear in the result list and detail panel", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Apps");
+  const rowIcon = page
+    .getByRole("listbox")
+    .getByRole("option")
+    .first()
+    .locator("img");
+  await expect(rowIcon).toBeVisible();
+  await expect
+    .poll(() =>
+      rowIcon.evaluate((image: HTMLImageElement) => image.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  await expect(page.locator(".preview-icon img")).toHaveAttribute(
+    "src",
+    (await rowIcon.getAttribute("src")) as string,
+  );
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.press("ArrowDown");
+  await expect(page.locator(".preview-icon img")).toHaveCount(0);
+  await expect(page.locator(".preview-icon svg")).toBeVisible();
+  await input.press("ArrowUp");
+  await expect(page.locator(".preview-icon img")).toBeVisible();
+});
+
+test("rounded window corners remain transparent behind menus and dialogs", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  async function expectClearCorner() {
+    const png = await page.screenshot({ omitBackground: true });
+    expect(png[24]).toBe(8); // Eight bits per channel.
+    expect(png[25]).toBe(6); // RGBA, rather than an opaque RGB screenshot.
+    const chunks: Buffer[] = [];
+    for (let offset = 8; offset < png.length;) {
+      const length = png.readUInt32BE(offset);
+      if (png.toString("ascii", offset + 4, offset + 8) === "IDAT") {
+        chunks.push(png.subarray(offset + 8, offset + 8 + length));
+      }
+      offset += length + 12;
+    }
+    // All PNG row filters leave the first pixel of the first row unchanged.
+    // The first byte is the filter, followed by red, green, blue, and alpha.
+    expect(inflateSync(Buffer.concat(chunks))[4]).toBe(0);
+  }
+  for (const appearance of ["Dark", "Compact", "Light"]) {
+    await page.keyboard.press("Meta+k");
+    await expectClearCorner();
+    await page
+      .getByRole("menuitemradio", { name: appearance, exact: true })
+      .click();
+    await expectClearCorner();
+  }
+  await selectCategory(page, "System");
+  await page.getByRole("listbox").getByRole("option").first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expectClearCorner();
+});
+
+test("Canvas detail actions follow the selection and keep system confirmation", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 980, height: 620 });
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.press("ArrowDown");
+  const details = page.getByRole("complementary", {
+    name: "Selected item details",
+  });
+  await expect(
+    details.getByRole("heading", { name: "Safari", exact: true }),
+  ).toBeVisible();
+  await expect(
+    details.getByText("/Applications", { exact: true }),
+  ).toBeVisible();
+  await expect(details.getByText("Safari.app", { exact: true })).toBeVisible();
+  await details.getByRole("button", { name: "Launch application" }).click();
+  await details
+    .getByRole("button", { name: "Show in enclosing folder" })
+    .click();
+  expect(await actions(page)).toEqual([
+    { command: "execute_action", payload: { id: "app-1", action: "launch" } },
+    { command: "execute_action", payload: { id: "app-1", action: "reveal" } },
+  ]);
+  await selectCategory(page, "System");
+  await details.getByRole("button", { name: "Run selected command" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByRole("button", { name: "Cancel" }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  expect(await actions(page)).toHaveLength(2);
+  await expect(input).toBeFocused();
+});
+
+test("appearance choices persist and Compact keeps clipboard text available", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  for (const [label, value] of [
+    ["Dark", "dark"],
+    ["Compact", "compact"],
+    ["Light", "light"],
+  ]) {
+    await page.keyboard.press("Meta+k");
+    await page.getByRole("menuitemradio", { name: label, exact: true }).click();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-appearance",
+      value,
+    );
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-appearance",
+      value,
+    );
+    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+    if (value === "compact") {
+      await expect(
+        page.getByRole("complementary", { name: "Selected item details" }),
+      ).toBeHidden();
+      await selectCategory(page, "Clipboard");
+      await expect(page.getByLabel("Saved clipboard text")).toContainText(
+        "Meeting notes",
+      );
+      await page.setViewportSize({ width: 360, height: 550 });
+      await expect(page.getByLabel("Saved clipboard text")).toBeVisible();
+      await page.setViewportSize({ width: 720, height: 550 });
+    }
+  }
+});
+
+test("previous appearance names migrate to the Canvas choices", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  for (const [previous, current] of [
+    ["mint", "dark"],
+    ["paper", "light"],
+    ["graphite", "compact"],
+  ]) {
+    await page.evaluate(
+      (value) => localStorage.setItem("tinydash.appearance", value),
+      previous,
+    );
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-appearance",
+      current,
+    );
+  }
+});
+
+test("emoji arrows follow grid columns and wrap incomplete rows after resize", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await selectCategory(page, "Emoji");
+  await input.fill("grid");
+  const options = page.getByRole("listbox").getByRole("option");
+  await expect(options).toHaveCount(20);
+  for (const width of [980, 360]) {
+    await page.setViewportSize({ width, height: 620 });
+    const columns = await options.evaluateAll((elements) => {
+      const top = elements[0].getBoundingClientRect().top;
+      return elements.filter(
+        (element) => element.getBoundingClientRect().top === top,
+      ).length;
+    });
+    const last = Math.floor(19 / columns) * columns;
+    await input.press("ArrowUp");
+    await expect(input).toHaveAttribute(
+      "aria-activedescendant",
+      `result-${last}`,
+    );
+    await input.press("ArrowDown");
+    await expect(input).toHaveAttribute("aria-activedescendant", "result-0");
+    await input.press("ArrowDown");
+    await expect(input).toHaveAttribute(
+      "aria-activedescendant",
+      `result-${columns}`,
+    );
+    await input.press("ArrowUp");
+    await input.press("ArrowLeft");
+    await expect(input).toHaveAttribute("aria-activedescendant", "result-19");
+    await input.press("ArrowRight");
+    await expect(input).toHaveAttribute("aria-activedescendant", "result-0");
+  }
+  await input.press("Enter");
+  expect(await actions(page)).toEqual([
+    { command: "execute_action", payload: { id: "emoji:0", action: "copy" } },
+  ]);
+});
 
 test("currency refresh keeps cached results usable and shows rate dates and failures", async ({
   page,
@@ -260,8 +457,10 @@ test("system failures remain in the dialog and reopening discards pending confir
     page.getByRole("combobox", { name: "Search TinyDash" }),
   ).toBeFocused();
   await expect(
-    page.getByRole("button", { name: /^Search category:/ }),
-  ).toHaveText("All");
+    page
+      .getByRole("navigation", { name: "Search categories" })
+      .locator("[aria-pressed=true]"),
+  ).toHaveAccessibleName("All");
   await expect(page.getByRole("alert")).toHaveCount(0);
   expect(await actions(page)).toHaveLength(1);
 });
@@ -947,14 +1146,18 @@ test("changes search mode during a pending query and copies an emoji", async ({
     window.__launcherTest.emit("launcher-opened", false),
   );
   await expect(
-    page.getByRole("button", { name: /^Search category:/ }),
-  ).toHaveText("Emoji");
+    page
+      .getByRole("navigation", { name: "Search categories" })
+      .locator("[aria-pressed=true]"),
+  ).toHaveAccessibleName("Emoji");
   await page.evaluate(() =>
     window.__launcherTest.emit("launcher-opened", true),
   );
   await expect(
-    page.getByRole("button", { name: /^Search category:/ }),
-  ).toHaveText("All");
+    page
+      .getByRole("navigation", { name: "Search categories" })
+      .locator("[aria-pressed=true]"),
+  ).toHaveAccessibleName("All");
 });
 
 test("shows calculator errors and fits both new result types in a narrow window", async ({
@@ -972,7 +1175,9 @@ test("shows calculator errors and fits both new result types in a narrow window"
     await expect(page.getByRole("alert")).toHaveCount(0);
     await page.setViewportSize({ width: 320, height: 550 });
     await expect(
-      page.getByRole("button", { name: /^Search category:/ }),
+      page
+        .getByRole("navigation", { name: "Search categories" })
+        .locator("[aria-pressed=true]"),
     ).toBeInViewport();
     await expect(
       page.getByRole("button", { name: "Actions" }),

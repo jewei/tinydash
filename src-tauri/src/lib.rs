@@ -21,8 +21,9 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Open TinyDash", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh applications", true, None::<&str>)?;
     let files = MenuItem::with_id(app, "files", "Refresh files", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit TinyDash", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show, &refresh, &files, &quit])?;
+    let menu = Menu::with_items(app, &[&show, &settings, &refresh, &files, &quit])?;
     // Two small dashes form a legible monochrome menu-bar icon.
     let mut rgba = vec![0_u8; 22 * 22 * 4];
     for y in 0..22 {
@@ -49,6 +50,14 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             }
             "refresh" => launcher::scan_apps(app),
             "files" => launcher::files::scan_files(app),
+            "settings" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = launcher::preferences::open_settings(app).await {
+                        tracing::warn!(%error, "Could not open settings");
+                    }
+                });
+            }
             "quit" => app.exit(0),
             _ => {}
         })
@@ -76,10 +85,14 @@ pub fn run() -> anyhow::Result<()> {
                 .unwrap_or_else(|_| "tinydash_lib=info".into()),
         )
         .try_init();
-
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Err(error) = window::show(app) { tracing::warn!(%error, "Could not activate existing launcher"); }
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if args.iter().any(|arg| arg == "--settings") {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(error) = launcher::preferences::open_settings(app).await { tracing::warn!(%error, "Could not open settings"); }
+                });
+            } else if let Err(error) = window::show(app) { tracing::warn!(%error, "Could not activate existing launcher"); }
         }))
         .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -103,8 +116,12 @@ pub fn run() -> anyhow::Result<()> {
                 }
             } else {
                 let shortcut_result = app.handle().plugin(
-                    tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| {
+                    tauri_plugin_global_shortcut::Builder::new().with_handler(|app, shortcut, event| {
                         if event.state() == ShortcutState::Pressed
+                            && app.try_state::<LauncherState>().is_some_and(|state| {
+                                !state.shortcut_recording.load(std::sync::atomic::Ordering::Acquire)
+                                    && state.settings().shortcut.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|active| active.id() == shortcut.id())
+                            })
                             && let Err(error) = window::toggle(app)
                         {
                             tracing::warn!(%error, "Could not toggle launcher");
@@ -131,20 +148,40 @@ pub fn run() -> anyhow::Result<()> {
             launcher::scan_apps(app.handle());
             Ok(())
         })
-        .on_window_event(|window, event| match event {
+        .on_window_event(|window, event| {
+            if window.label() == "settings" {
+                match event {
+                    tauri::WindowEvent::CloseRequested { api, .. } => {
+                        // Keep an unfinished settings form when its window closes.
+                        api.prevent_close();
+                        launcher::preferences::restore_shortcut_in_background(window.app_handle());
+                        if let Err(error) = window.hide() { tracing::warn!(%error, "Could not hide settings"); }
+                    }
+                    tauri::WindowEvent::Focused(false) => launcher::preferences::restore_shortcut_in_background(window.app_handle()),
+                    _ => {}
+                }
+                return;
+            }
+            match event {
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
                 if let Err(error) = window::hide(window.app_handle()) { tracing::warn!(%error, "Could not hide launcher"); }
             }
             tauri::WindowEvent::Focused(false)
-                if window.app_handle().try_state::<LauncherState>().is_some_and(|state| state.settings.hide_on_blur) => {
+                if window.app_handle().try_state::<LauncherState>().is_some_and(|state| state.settings().hide_on_blur) => {
                 if let Err(error) = window::hide(window.app_handle()) { tracing::warn!(%error, "Could not hide launcher"); }
             }
             _ => {}
-        })
+        }})
         .invoke_handler(tauri::generate_handler![
             launcher::launcher_ready,
+            launcher::preferences::get_settings,
+            launcher::preferences::save_settings,
+            launcher::preferences::open_settings,
+            launcher::preferences::set_shortcut_recording,
+            launcher::preferences::reveal_settings_path,
             launcher::search,
+            launcher::set_app_pinned,
             launcher::refresh_apps,
             launcher::files::refresh_files,
             launcher::currency::refresh_currency,

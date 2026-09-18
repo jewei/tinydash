@@ -1,13 +1,19 @@
 // Loaded only by the browser tests. Production always calls the Rust backend.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { SearchResult, SearchMode } from "../src/bridge";
+import type { SearchResult, SearchMode, SettingsValues } from "../src/bridge";
+import { defaultCategories } from "../src/categories";
 
 declare global {
   interface Window {
     isTauri: boolean;
     __launcherTest: {
       calls: { command: string; payload: unknown }[];
+      settings: SettingsValues;
+      rejectSettings: string | null;
+      pinnedIds: string[];
+      rejectPin: boolean;
+      toolRevision: number;
       rejectActions: boolean;
       storageError: string | null;
       usedAppFirst: boolean;
@@ -48,7 +54,12 @@ const apps: SearchResult[] = names.map((title, index) => ({
   title,
   subtitle: `/Applications/${title}.app`,
   score: 100 - index,
-  icon: null,
+  icon:
+    index === 0
+      ? "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1sAAAAASUVORK5CYII="
+      : index === 1
+        ? "data:image/png;base64,broken"
+        : null,
   primaryAction: "launch",
   secondaryActions: ["reveal"],
 }));
@@ -124,6 +135,25 @@ const clips: SearchResult[] = ["Meeting notes", "Project link"].map(
 window.isTauri = true;
 window.__launcherTest = {
   calls: [],
+  settings: JSON.parse(
+    localStorage.getItem("tinydash.test.settings") ?? "null",
+  ) ?? {
+    clearQueryOnOpen: true,
+    hideOnBlur: true,
+    shortcut: "Control+Shift+Space",
+    clipboardHistoryEnabled: true,
+    clipboardHistoryLimit: 100,
+    fileSearchRoots: null,
+    fileSearchLimit: 50000,
+    fileSearchExcludedDirs: ["node_modules", "target"],
+    fileWatchEnabled: true,
+    currencyRatesEnabled: true,
+    visibleCategories: [...defaultCategories],
+  },
+  rejectSettings: null,
+  pinnedIds: JSON.parse(localStorage.getItem("tinydash.test.pins") ?? "[]"),
+  rejectPin: false,
+  toolRevision: 0,
   rejectActions: false,
   storageError: null,
   usedAppFirst: false,
@@ -155,20 +185,32 @@ mockIPC(
     if (command === "launcher_ready") {
       return {
         platform: "macos",
-        settings: {
-          clearQueryOnOpen: true,
-          hideOnBlur: true,
-          shortcut: "Control+Shift+Space",
-          clipboardHistoryEnabled: true,
-          clipboardHistoryLimit: 100,
-          fileSearchRoots: null,
-          fileSearchLimit: 50000,
-          fileSearchExcludedDirs: ["node_modules", "target"],
-          fileWatchEnabled: true,
-          currencyRatesEnabled: true,
-        },
+        settings: state.settings,
         warnings: [],
       };
+    }
+    if (command === "get_settings") {
+      return {
+        settings: state.settings,
+        defaults: { ...state.settings, shortcut: "Control+Shift+Space" },
+        platform: "macos",
+        version: "0.1.0",
+        configPath:
+          "/Users/test/Library/Application Support/dev.tinydash.launcher/settings.json",
+        dataPath:
+          "/Users/test/Library/Application Support/dev.tinydash.launcher/tinydash.sqlite3",
+        shortcutsAvailable: true,
+      };
+    }
+    if (command === "save_settings") {
+      if (state.rejectSettings) throw new Error(state.rejectSettings);
+      state.settings = (payload as { settings: SettingsValues }).settings;
+      localStorage.setItem(
+        "tinydash.test.settings",
+        JSON.stringify(state.settings),
+      );
+      await emit("settings-changed", state.settings);
+      return state.settings;
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
@@ -191,7 +233,8 @@ mockIPC(
         );
       // These fixed responses test rendering and IPC order, not TypeScript search.
       const results =
-        mode === "system" || query === "reboot"
+        toolResults(query, mode) ??
+        (mode === "system" || query === "reboot"
           ? query === "missing"
             ? []
             : state.reverseSystem
@@ -212,7 +255,13 @@ mockIPC(
                 : mode === "emoji" ||
                     query === ":rocket" ||
                     (query === "rocket" && mode !== "apps")
-                  ? [emoji]
+                  ? query === "grid"
+                    ? Array.from({ length: 20 }, (_, index) => ({
+                        ...emoji,
+                        id: `emoji:${index}`,
+                        title: `Emoji ${index + 1}`,
+                      }))
+                    : [emoji]
                   : query === "12 * 8" && mode !== "apps"
                     ? [calculation]
                     : query === "100 USD to MYR" && mode !== "apps"
@@ -235,9 +284,17 @@ mockIPC(
                             ? []
                             : state.usedAppFirst
                               ? [apps[1], apps[0], ...apps.slice(2)]
-                              : apps;
+                              : apps);
       return {
-        results,
+        results:
+          !query.trim() && (mode === "all" || mode === "apps")
+            ? [...results].sort(
+                (a, b) =>
+                  Number(state.pinnedIds.includes(b.id)) -
+                  Number(state.pinnedIds.includes(a.id)),
+              )
+            : results,
+        pinnedIds: state.pinnedIds,
         total: apps.length,
         indexing: false,
         indexError: null,
@@ -260,6 +317,25 @@ mockIPC(
         },
       };
     }
+    if (command === "set_app_pinned") {
+      if (state.rejectPin) throw new Error("Could not save the app pin.");
+      const { id, pinned } = payload as { id: string; pinned: boolean };
+      state.pinnedIds = [
+        ...state.pinnedIds.filter((value) => value !== id),
+        ...(pinned ? [id] : []),
+      ];
+      localStorage.setItem(
+        "tinydash.test.pins",
+        JSON.stringify(state.pinnedIds),
+      );
+      await emit("pins-changed");
+      return;
+    }
+    if (
+      command === "execute_action" &&
+      (payload as { action: string }).action === "regenerate"
+    )
+      state.toolRevision += 1;
     if (command === "execute_action" && state.holdAction) {
       await new Promise<void>((resolve) => {
         state.releaseAction = resolve;
@@ -301,3 +377,90 @@ mockIPC(
   },
   { shouldMockEvents: true },
 );
+
+// Fixed tool values verify UI behavior. Rust tests verify generation and parsing.
+function toolResults(
+  query: string,
+  mode: SearchMode,
+): SearchResult[] | undefined {
+  const base = {
+    score: 100000,
+    icon: null,
+    primaryAction: "copy" as const,
+    secondaryActions: [] as SearchResult["secondaryActions"],
+  };
+  if (mode === "password" || /^(password|passphrase|pin)\b/.test(query)) {
+    return ["Symbols", "Letters and digits", "Word passphrase", "PIN"].map(
+      (variant, index) => ({
+        ...base,
+        id: `password:${index}-${window.__launcherTest.toolRevision}`,
+        kind: "password",
+        title:
+          index === 3
+            ? "491027"
+            : index === 2
+              ? "sample words for a test only"
+              : `SamplePassword${index}!Revision${window.__launcherTest.toolRevision}`,
+        subtitle: `${variant} · Strength estimate`,
+        secondaryActions: ["regenerate"],
+        detail: {
+          type: "password",
+          variant,
+          entropyBits: index === 3 ? 19 : 99,
+          strength: index === 3 ? "Low" : "Strong",
+        },
+      }),
+    );
+  }
+  if (mode === "timezone" || /^(time |tomorrow )/.test(query)) {
+    return ["Asia/Tokyo", "Europe/London"].map((sourceZone, index) => ({
+      ...base,
+      id: `tool:time-${index}-${Date.now()}`,
+      kind: "timezone",
+      title: index === 0 ? "21:00 · Tokyo" : "13:00 · London",
+      subtitle: "Thursday, 17 September 2026",
+      detail: {
+        type: "timezone",
+        sourceZone,
+        source: "Thu, 17 Sep 2026 · 21:00 · UTC+09:00",
+        local: "Thu, 17 Sep 2026 · 20:00 · UTC+08:00",
+        ambiguous: query.includes("ambiguous"),
+      },
+    }));
+  }
+  if (mode === "url" || query.startsWith("https://")) {
+    if (!query) return [];
+    return [
+      {
+        ...base,
+        id: "tool:url",
+        kind: "cleanedUrl",
+        title: "https://www.youtube.com/watch?v=demo&t=30",
+        subtitle: "2 tracking fields removed",
+        secondaryActions: ["open"],
+        detail: { type: "cleanedUrl", original: query, removed: 2 },
+      },
+    ];
+  }
+  if (mode === "web" || query.startsWith("web ")) {
+    if (!query) return [];
+    return ["Google", "DuckDuckGo", "Bing", "Brave", "YouTube", "GitHub"].map(
+      (engine, index) => ({
+        ...base,
+        id: `tool:web-${index}`,
+        kind: "webSearch",
+        title: `Search ${engine}`,
+        subtitle: query,
+        primaryAction: "open",
+        secondaryActions: ["copy"],
+        detail: {
+          type: "webSearch",
+          engine,
+          query,
+          url: "https://example.com/search?q=sample",
+        },
+      }),
+    );
+  }
+  return undefined;
+}

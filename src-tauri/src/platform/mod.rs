@@ -12,7 +12,15 @@ pub use linux::{read_clipboard, watch_clipboard};
 #[cfg(target_os = "macos")]
 pub use macos::clipboard_snapshot;
 #[cfg(target_os = "macos")]
+pub use macos::load_app_icons;
+#[cfg(target_os = "macos")]
 pub use macos::{discover_apps, launch, run_system_command, system_commands};
+#[cfg(not(target_os = "macos"))]
+pub fn load_app_icons(
+    apps: Vec<crate::providers::apps::AppEntry>,
+) -> Vec<crate::providers::apps::AppEntry> {
+    apps
+}
 #[cfg(target_os = "windows")]
 pub use windows::clipboard_snapshot;
 #[cfg(target_os = "windows")]
@@ -48,6 +56,48 @@ pub fn file_is_hidden(entry: &walkdir::DirEntry) -> std::io::Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "Uses installed macOS applications and WindowServer. Run with --ignored."]
+    fn installed_app_results_have_native_icons() {
+        use crate::launcher::{query::SearchMode, search::SearchManager};
+        use crate::providers::apps::AppProvider;
+
+        let apps =
+            super::load_app_icons(super::discover_apps().expect("discover installed applications"));
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(apps));
+        let results = manager
+            .search("Activity Monitor", SearchMode::Apps)
+            .unwrap()
+            .results;
+        let activity = results
+            .iter()
+            .find(|result| result.title == "Activity Monitor")
+            .expect("Activity Monitor is installed on macOS");
+        assert!(
+            activity
+                .icon
+                .as_deref()
+                .is_some_and(|icon| icon.starts_with("data:image/png;base64,")),
+            "The native search response must include Activity Monitor's image"
+        );
+        let activity_icon = activity.icon.clone();
+        let store = manager
+            .search("App Store", SearchMode::Apps)
+            .unwrap()
+            .results;
+        let store = store
+            .iter()
+            .find(|result| result.title == "App Store")
+            .expect("App Store is installed");
+        assert!(store.icon.is_some());
+        assert_ne!(
+            activity_icon, store.icon,
+            "Installed apps must have distinct native icons"
+        );
+    }
+
     #[test]
     #[ignore = "Scans the host's installed apps. Run with --ignored --nocapture."]
     fn installed_apps_smoke() {

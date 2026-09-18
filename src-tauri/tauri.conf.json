@@ -10,12 +10,13 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
         "title": "TinyDash",
-        "width": 720,
-        "height": 550,
+        "width": 980,
+        "height": 620,
         "center": true,
         "visible": false,
         "resizable": false,
@@ -23,7 +24,8 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "shadow": true,
-        "backgroundColor": "#1b2120"
+        "transparent": true,
+        "backgroundColor": "#00000000"
       }
     ],
     "security": {

@@ -20,7 +20,7 @@ pub fn show(app: &AppHandle) -> Result<()> {
     window.set_focus()?;
     let clear = app
         .try_state::<LauncherState>()
-        .is_none_or(|state| state.settings.clear_query_on_open);
+        .is_none_or(|state| state.settings().clear_query_on_open);
     window.emit("launcher-opened", clear)?;
     super::clipboard::refresh(app);
     super::currency::refresh(app, false);

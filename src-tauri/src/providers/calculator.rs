@@ -82,6 +82,7 @@ impl CalculatorProvider {
             primary_action: Action::Copy,
             secondary_actions: vec![],
             confirmation: None,
+            detail: None,
         })
     }
 

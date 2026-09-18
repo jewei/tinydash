@@ -1,0 +1,263 @@
+mod password;
+mod timezones;
+pub mod url_cleaner;
+mod web;
+
+use std::collections::VecDeque;
+use zeroize::Zeroize;
+
+use crate::{
+    error::Error,
+    launcher::{
+        actions::ResolvedAction,
+        query::{Query, SearchMode},
+        result::{Action, ResultKind, SearchResult, ToolDetail},
+    },
+};
+
+struct Output {
+    kind: ResultKind,
+    title: String,
+    subtitle: String,
+    value: String,
+    detail: ToolDetail,
+    open: Option<String>,
+    password: Option<password::Spec>,
+}
+
+struct Issued {
+    result: SearchResult,
+    value: String,
+    open: Option<String>,
+    password: Option<password::Spec>,
+}
+impl Drop for Issued {
+    fn drop(&mut self) {
+        if self.password.is_some() {
+            self.value.zeroize();
+            self.result.title.zeroize();
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ToolProvider {
+    issued: VecDeque<Issued>,
+    next_id: u64,
+    password_specs: Vec<password::Spec>,
+    password_ids: Vec<String>,
+}
+
+impl ToolProvider {
+    fn issue(&mut self, output: Output) -> SearchResult {
+        let Output {
+            kind,
+            title,
+            subtitle,
+            value,
+            detail,
+            open,
+            password,
+        } = output;
+        self.next_id = self.next_id.wrapping_add(1);
+        let prefix = if password.is_some() {
+            "password"
+        } else {
+            "tool"
+        };
+        let primary_action = if kind == ResultKind::WebSearch {
+            Action::Open
+        } else {
+            Action::Copy
+        };
+        let result = SearchResult {
+            id: format!("{prefix}:{}", self.next_id),
+            kind,
+            title,
+            subtitle,
+            score: 100_000,
+            icon: None,
+            primary_action,
+            secondary_actions: if password.is_some() {
+                vec![Action::Regenerate]
+            } else if primary_action == Action::Open {
+                vec![Action::Copy]
+            } else if open.is_some() {
+                vec![Action::Open]
+            } else {
+                vec![]
+            },
+            confirmation: None,
+            detail: Some(detail),
+        };
+        self.issued.push_back(Issued {
+            result: result.clone(),
+            value,
+            open,
+            password,
+        });
+        while self.issued.len() > 64 {
+            self.issued.pop_front();
+        }
+        result
+    }
+
+    fn password(&mut self, spec: password::Spec) -> Result<SearchResult, String> {
+        let (value, subtitle, detail) = password::generate(spec)?;
+        Ok(self.issue(Output {
+            kind: ResultKind::Password,
+            title: value.clone(),
+            subtitle,
+            value,
+            detail,
+            open: None,
+            password: Some(spec),
+        }))
+    }
+
+    pub fn regenerate(&mut self, id: &str) -> Result<(), String> {
+        let spec = self
+            .issued
+            .iter()
+            .find(|entry| entry.result.id == id)
+            .and_then(|entry| entry.password)
+            .ok_or_else(|| Error::ResultExpired.to_string())?;
+        let result = self.password(spec)?;
+        if let Some(index) = self.password_ids.iter().position(|old| old == id) {
+            self.password_ids[index] = result.id;
+        }
+        Ok(())
+    }
+
+    pub fn resolve(&self, id: &str, action: Action) -> crate::error::Result<ResolvedAction> {
+        let entry = self
+            .issued
+            .iter()
+            .find(|entry| entry.result.id == id)
+            .ok_or(Error::ResultExpired)?;
+        match action {
+            Action::Copy => Ok(ResolvedAction::Copy(entry.value.clone())),
+            Action::Open => entry
+                .open
+                .clone()
+                .map(ResolvedAction::OpenUrl)
+                .ok_or(Error::InvalidAction),
+            Action::Regenerate if entry.password.is_some() => {
+                Ok(ResolvedAction::RegeneratePassword(id.into()))
+            }
+            _ => Err(Error::InvalidAction),
+        }
+    }
+
+    pub fn search(&mut self, query: &Query<'_>) -> Option<Result<Vec<SearchResult>, String>> {
+        let text = query.text;
+        let mode = query.mode;
+        if mode == SearchMode::Password || (mode == SearchMode::All && password::is_candidate(text))
+        {
+            return Some((|| {
+                let specs = password::parse(text)?;
+                if self.password_specs == specs {
+                    let cached: Option<Vec<_>> = self
+                        .password_ids
+                        .iter()
+                        .map(|id| {
+                            self.issued
+                                .iter()
+                                .find(|entry| &entry.result.id == id)
+                                .map(|entry| entry.result.clone())
+                        })
+                        .collect();
+                    if let Some(cached) = cached
+                        && cached.len() == specs.len()
+                    {
+                        return Ok(cached);
+                    }
+                }
+                let results: Vec<_> = specs
+                    .iter()
+                    .map(|&spec| self.password(spec))
+                    .collect::<Result<_, _>>()?;
+                self.password_specs = specs;
+                self.password_ids = results.iter().map(|result| result.id.clone()).collect();
+                Ok(results)
+            })());
+        }
+        // Keep a value stable during refreshes, but start fresh after leaving
+        // password search. Previously issued IDs remain valid for queued actions.
+        self.password_specs.clear();
+        self.password_ids.clear();
+        if mode == SearchMode::Url || (mode == SearchMode::All && url_cleaner::is_candidate(text)) {
+            return Some(url_cleaner::clean(text).map(|cleaned| {
+                let subtitle = format!(
+                    "{} tracking {} removed",
+                    cleaned.removed,
+                    if cleaned.removed == 1 {
+                        "field"
+                    } else {
+                        "fields"
+                    }
+                );
+                vec![self.issue(Output {
+                    kind: ResultKind::CleanedUrl,
+                    title: cleaned.value.clone(),
+                    subtitle,
+                    value: cleaned.value.clone(),
+                    detail: ToolDetail::CleanedUrl {
+                        original: cleaned.original,
+                        removed: cleaned.removed,
+                    },
+                    open: Some(cleaned.value),
+                    password: None,
+                })]
+            }));
+        }
+        if mode == SearchMode::Timezone
+            || (mode == SearchMode::All && timezones::is_candidate(text))
+        {
+            return Some(
+                timezones::calculate(text, chrono::Utc::now(), |time| {
+                    time.with_timezone(&chrono::Local).fixed_offset()
+                })
+                .map(|results| {
+                    results
+                        .into_iter()
+                        .map(|result| {
+                            self.issue(Output {
+                                kind: ResultKind::Timezone,
+                                title: result.title,
+                                subtitle: result.subtitle,
+                                value: result.copy,
+                                detail: result.detail,
+                                open: None,
+                                password: None,
+                            })
+                        })
+                        .collect()
+                }),
+            );
+        }
+        if mode == SearchMode::Web || (mode == SearchMode::All && web::is_candidate(text)) {
+            return Some(web::searches(text).map(|results| {
+                results
+                    .into_iter()
+                    .map(|(engine, query, url)| {
+                        self.issue(Output {
+                            kind: ResultKind::WebSearch,
+                            title: format!("Search {engine}"),
+                            subtitle: query.clone(),
+                            value: url.clone(),
+                            detail: ToolDetail::WebSearch {
+                                engine: engine.into(),
+                                query,
+                                url: url.clone(),
+                            },
+                            open: Some(url),
+                            password: None,
+                        })
+                    })
+                    .collect()
+            }));
+        }
+        None
+    }
+}

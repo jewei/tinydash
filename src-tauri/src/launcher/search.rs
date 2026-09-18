@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use nucleo_matcher::{
     Config, Matcher,
@@ -20,6 +23,7 @@ use crate::{
         emoji::EmojiProvider,
         files::{FileEntry, FileProvider},
         system::SystemCommandProvider,
+        tools::ToolProvider,
     },
     ranking,
 };
@@ -34,7 +38,9 @@ pub struct SearchManager {
     system: Option<SystemCommandProvider>,
     calculator: CalculatorProvider,
     pub clipboard: ClipboardProvider,
+    pub tools: ToolProvider,
     usage: HashMap<String, ranking::Usage>,
+    pins: HashSet<String>,
 }
 
 pub struct SearchOutcome {
@@ -52,12 +58,32 @@ impl Default for SearchManager {
             system: None,
             calculator: CalculatorProvider::default(),
             clipboard: ClipboardProvider::default(),
+            tools: ToolProvider::default(),
             usage: HashMap::new(),
+            pins: HashSet::new(),
         }
     }
 }
 
 impl SearchManager {
+    pub fn set_pins(&mut self, pins: HashSet<String>) {
+        self.pins = pins;
+    }
+
+    pub fn set_pinned(&mut self, id: &str, pinned: bool) {
+        if pinned {
+            self.pins.insert(id.to_owned());
+        } else {
+            self.pins.remove(id);
+        }
+    }
+
+    pub fn pinned_ids(&self) -> Vec<String> {
+        let mut ids: Vec<_> = self.pins.iter().cloned().collect();
+        ids.sort();
+        ids
+    }
+
     pub fn rates(&self) -> Option<&Rates> {
         self.calculator.rates.as_deref()
     }
@@ -113,6 +139,9 @@ impl SearchManager {
     }
 
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
+        if id.starts_with("password:") || id.starts_with("tool:") {
+            return self.tools.resolve(id, action);
+        }
         match action {
             Action::Run => self
                 .system
@@ -147,6 +176,18 @@ impl SearchManager {
 
     pub fn search(&mut self, input: &str, mode: SearchMode) -> Result<SearchOutcome> {
         let query = Query::parse(input, mode)?;
+        if let Some(outcome) = self.tools.search(&query) {
+            return Ok(match outcome {
+                Ok(results) => SearchOutcome {
+                    results: results.into_iter().take(RESULT_LIMIT).collect(),
+                    notice: None,
+                },
+                Err(notice) => SearchOutcome {
+                    results: vec![],
+                    notice: Some(notice),
+                },
+            });
+        }
         let mut results = Vec::new();
         let mut notice = None;
         if query.mode == SearchMode::Clipboard
@@ -216,16 +257,233 @@ impl SearchManager {
                 RESULT_LIMIT,
             ));
         }
-        Ok(SearchOutcome {
-            results: ranking::top_results(results, RESULT_LIMIT),
-            notice,
-        })
+        // Pin only the empty app list. Typed queries retain their match ranking.
+        // Partition before truncation so an app outside the top 30 can be pinned.
+        let show_pins =
+            query.text.is_empty() && matches!(query.mode, SearchMode::All | SearchMode::Apps);
+        let mut results =
+            ranking::top_results(results, if show_pins { usize::MAX } else { RESULT_LIMIT });
+        if show_pins {
+            results.sort_by_key(|result| !self.pins.contains(&result.id));
+            results.truncate(RESULT_LIMIT);
+        }
+        Ok(SearchOutcome { results, notice })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pins_precede_the_result_limit_but_do_not_change_typed_search() {
+        let mut manager = SearchManager::default();
+        let apps = || {
+            AppProvider::new(
+                (0..100)
+                    .map(|i| {
+                        AppEntry::new(format!("App {i:03}"), format!("/app/{i}").into(), vec![])
+                    })
+                    .collect(),
+            )
+        };
+        manager.replace_apps(apps());
+        manager.set_pinned("app:/app/99", true);
+        manager.set_pinned("app:/missing", true);
+        for mode in [SearchMode::All, SearchMode::Apps] {
+            let results = manager.search("  ", mode).unwrap().results;
+            assert_eq!(results.len(), RESULT_LIMIT);
+            assert_eq!(results[0].title, "App 099");
+            assert!(!results.iter().any(|result| result.id == "app:/missing"));
+            assert_eq!(
+                manager.search("App 000", mode).unwrap().results[0].title,
+                "App 000"
+            );
+        }
+        manager.replace_apps(apps());
+        assert_eq!(
+            manager.search("", SearchMode::Apps).unwrap().results[0].title,
+            "App 099"
+        );
+        manager.set_pinned("app:/app/99", false);
+        assert_eq!(
+            manager.search("", SearchMode::Apps).unwrap().results[0].title,
+            "App 000"
+        );
+    }
+
+    #[test]
+    fn bare_web_aliases_find_apps_and_search_text_selects_the_engine() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(vec![
+            AppEntry::new("Ghostty".into(), "/apps/Ghostty.app".into(), vec![]),
+            AppEntry::new("Brave Browser".into(), "/apps/Brave.app".into(), vec![]),
+            AppEntry::new("Google Chrome".into(), "/apps/Chrome.app".into(), vec![]),
+            AppEntry::new("GitHub Desktop".into(), "/apps/GitHub.app".into(), vec![]),
+        ]));
+
+        for (input, app) in [
+            ("gh", "Ghostty"),
+            ("g", "Ghostty"),
+            ("gh   ", "Ghostty"),
+            (" GH ", "Ghostty"),
+            ("brave", "Brave Browser"),
+            ("google", "Google Chrome"),
+            ("github", "GitHub Desktop"),
+        ] {
+            for mode in [SearchMode::Apps, SearchMode::All] {
+                let outcome = manager.search(input, mode).unwrap();
+                assert!(
+                    outcome.results.iter().any(|result| result.title == app),
+                    "{input:?} must find {app} in {mode:?}; notice: {:?}",
+                    outcome.notice
+                );
+                assert!(outcome.notice.is_none());
+            }
+        }
+
+        for input in ["gh rust", " GH  rust ", "gh\trust"] {
+            let outcome = manager.search(input, SearchMode::All).unwrap();
+            assert!(outcome.notice.is_none());
+            assert_eq!(outcome.results.len(), 1);
+            assert!(matches!(
+                manager.resolve_action(&outcome.results[0].id, Action::Open).unwrap(),
+                ResolvedAction::OpenUrl(url) if url == "https://github.com/search?q=rust"
+            ));
+        }
+
+        let explicit_web = manager.search("gh", SearchMode::Web).unwrap();
+        assert!(explicit_web.results.is_empty());
+        assert!(explicit_web.notice.is_some());
+    }
+
+    #[test]
+    fn tools_are_scoped_and_actions_copy_issued_values() {
+        let mut manager = manager();
+        for input in [
+            "password 32",
+            "time in tokyo",
+            "https://example.com/?utm_source=test",
+            "web rust",
+        ] {
+            assert!(
+                !manager
+                    .search(input, SearchMode::All)
+                    .unwrap()
+                    .results
+                    .is_empty(),
+                "{input}"
+            );
+            assert!(
+                manager
+                    .search(input, SearchMode::Apps)
+                    .unwrap()
+                    .results
+                    .is_empty(),
+                "{input}"
+            );
+        }
+        let passwords = manager
+            .search("password 32", SearchMode::All)
+            .unwrap()
+            .results;
+        assert_eq!(passwords.len(), 4);
+        let password = &passwords[1];
+        assert!(
+            matches!(manager.resolve_action(&password.id, Action::Copy).unwrap(), ResolvedAction::Copy(value) if value == password.title)
+        );
+        let refreshed = manager
+            .search("password 32", SearchMode::All)
+            .unwrap()
+            .results;
+        assert_eq!(refreshed[1].id, password.id);
+        manager.tools.regenerate(&password.id).unwrap();
+        let regenerated = manager
+            .search("password 32", SearchMode::All)
+            .unwrap()
+            .results;
+        assert_ne!(regenerated[1].id, password.id);
+        assert!(
+            matches!(manager.resolve_action(&password.id, Action::Copy).unwrap(), ResolvedAction::Copy(value) if value == password.title)
+        );
+        assert!(manager.resolve_action(&password.id, Action::Open).is_err());
+        let cleaned = &manager
+            .search(
+                "https://example.com/?q=keep&utm_source=test",
+                SearchMode::All,
+            )
+            .unwrap()
+            .results[0];
+        assert!(
+            matches!(manager.resolve_action(&cleaned.id, Action::Open).unwrap(), ResolvedAction::OpenUrl(value) if value == "https://example.com/?q=keep")
+        );
+        assert!(
+            manager
+                .resolve_action(&cleaned.id, Action::Regenerate)
+                .is_err()
+        );
+        assert!(manager.resolve_action("tool:forged", Action::Open).is_err());
+    }
+
+    #[test]
+    fn returning_to_password_search_generates_new_values_without_changing_issued_actions() {
+        let mut manager = manager();
+        let first = manager
+            .search("password 32", SearchMode::All)
+            .unwrap()
+            .results;
+        manager.search("", SearchMode::All).unwrap();
+        let next = manager
+            .search("password 32", SearchMode::All)
+            .unwrap()
+            .results;
+        assert_eq!(first.len(), next.len());
+        for (previous, current) in first.iter().zip(&next) {
+            assert_ne!(previous.id, current.id);
+            assert!(matches!(
+                manager.resolve_action(&previous.id, Action::Copy).unwrap(),
+                ResolvedAction::Copy(value) if value == previous.title
+            ));
+        }
+    }
+
+    #[test]
+    fn tool_cache_is_bounded_and_long_urls_do_not_raise_the_app_query_limit() {
+        let mut manager = manager();
+        let first = manager
+            .search("web original", SearchMode::All)
+            .unwrap()
+            .results[0]
+            .id
+            .clone();
+        for index in 0..20 {
+            manager
+                .search(&format!("web query {index}"), SearchMode::All)
+                .unwrap();
+        }
+        assert!(manager.resolve_action(&first, Action::Open).is_err());
+        let long_url = format!(
+            "https://example.com/?token={}&utm_source=test",
+            "a".repeat(2000)
+        );
+        assert_eq!(
+            manager
+                .search(&long_url, SearchMode::All)
+                .unwrap()
+                .results
+                .len(),
+            1
+        );
+        assert!(manager.search(&"a".repeat(257), SearchMode::All).is_err());
+        assert!(
+            manager
+                .search(
+                    &format!("https://example.com/{}", "a".repeat(9000)),
+                    SearchMode::All
+                )
+                .is_err()
+        );
+    }
 
     fn manager() -> SearchManager {
         let mut manager = SearchManager::default();

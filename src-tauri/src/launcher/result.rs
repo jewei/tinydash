@@ -9,6 +9,10 @@ pub enum ResultKind {
     Emoji,
     Clipboard,
     SystemCommand,
+    Password,
+    Timezone,
+    CleanedUrl,
+    WebSearch,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -20,6 +24,7 @@ pub enum Action {
     Copy,
     Delete,
     Run,
+    Regenerate,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -43,12 +48,44 @@ pub struct SearchResult {
     pub secondary_actions: Vec<Action>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub confirmation: Option<ActionConfirmation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<ToolDetail>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum ToolDetail {
+    Password {
+        variant: String,
+        entropy_bits: u32,
+        strength: String,
+    },
+    Timezone {
+        source: String,
+        local: String,
+        source_zone: String,
+        ambiguous: bool,
+    },
+    CleanedUrl {
+        original: String,
+        removed: usize,
+    },
+    WebSearch {
+        engine: String,
+        query: String,
+        url: String,
+    },
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResponse {
     pub results: Vec<SearchResult>,
+    pub pinned_ids: Vec<String>,
     pub total: usize,
     pub indexing: bool,
     pub index_error: Option<String>,

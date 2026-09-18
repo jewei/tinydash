@@ -125,6 +125,7 @@ impl ClipboardProvider {
                     primary_action: Action::Copy,
                     secondary_actions: vec![Action::Delete],
                     confirmation: None,
+                    detail: None,
                 })
             })
             .collect()

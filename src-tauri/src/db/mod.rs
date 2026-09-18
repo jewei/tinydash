@@ -1,6 +1,7 @@
 mod clipboard;
 mod currency;
 mod migrations;
+mod pins;
 
 use std::{collections::HashMap, path::Path, time::Duration};
 

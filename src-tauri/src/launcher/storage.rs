@@ -21,6 +21,11 @@ struct Session {
 struct Observation(Option<String>);
 
 impl Observation {
+    fn copied(&mut self, text: String, sensitive: bool) -> bool {
+        let changed = self.changed(Some(text)).is_some();
+        // Remember the OS value so the monitor also skips our password copy.
+        changed && !sensitive
+    }
     fn changed(&mut self, text: Option<String>) -> Option<String> {
         let text = text.filter(|text| valid_text(text));
         if self.0 == text {
@@ -46,8 +51,9 @@ impl Storage {
                 let path = app.path().app_data_dir()?.join("tinydash.sqlite3");
                 let database = Database::open(&path)?;
                 let usage = database.load_usage()?;
+                let pins = database.load_pins()?;
                 database
-                    .prune_clipboard(app.state::<LauncherState>().settings.clipboard_limit())?;
+                    .prune_clipboard(app.state::<LauncherState>().settings().clipboard_limit())?;
                 let clipboard = ClipboardProvider::new(database.load_clipboard()?);
                 let rates = match database.load_rates() {
                     Ok(rates) => rates,
@@ -59,6 +65,7 @@ impl Storage {
                 };
                 let mut search = search.lock().map_err(|_| Error::IndexUnavailable)?;
                 search.set_usage(usage);
+                search.set_pins(pins);
                 search.clipboard = clipboard;
                 if let Some(rates) = rates {
                     app.state::<LauncherState>().currency.loaded(&rates);
@@ -81,6 +88,60 @@ impl Storage {
 
     pub fn initialize(&self, app: &AppHandle, search: &Mutex<SearchManager>) {
         self.session(app, search);
+    }
+
+    pub fn set_pinned(&self, app: &AppHandle, id: &str, pinned: bool) -> Result<(), String> {
+        let state = app.state::<LauncherState>();
+        let session = self
+            .session(app, &state.search)
+            .lock()
+            .map_err(|_| "App pin storage is unavailable.")?;
+        state
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?
+            .app(id)
+            .map_err(|error| error.to_string())?;
+        let database = session
+            .database
+            .as_ref()
+            .ok_or("Could not save the app pin. Local storage is unavailable.")?;
+        database
+            .set_pinned(id, pinned)
+            .map_err(|error| format!("Could not save the app pin: {error}"))?;
+        // Publish only after a successful write. Searches do not wait for disk.
+        state
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?
+            .set_pinned(id, pinned);
+        Ok(())
+    }
+
+    pub fn apply_clipboard_limit(&self, app: &AppHandle) {
+        let state = app.state::<LauncherState>();
+        let Ok(mut session) = self.session(app, &state.search).lock() else {
+            return;
+        };
+        let outcome = (|| -> anyhow::Result<()> {
+            let database = session
+                .database
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Clipboard storage is unavailable"))?;
+            database.prune_clipboard(state.settings().clipboard_limit())?;
+            let entries = database.load_clipboard()?;
+            state
+                .search
+                .lock()
+                .map_err(|_| Error::IndexUnavailable)?
+                .clipboard = ClipboardProvider::new(entries);
+            Ok(())
+        })();
+        if let Err(error) = outcome {
+            self.failed(&error);
+            session.database = None;
+        }
+        super::clipboard::changed(app);
     }
 
     pub fn save_rates(
@@ -130,7 +191,8 @@ impl Storage {
             return;
         };
         // A delete, clear, or copy invalidates reads that were already in flight.
-        if generation != state.clipboard.generation() {
+        if generation != state.clipboard.generation() || !state.settings().clipboard_history_enabled
+        {
             return;
         }
         let Some(text) = session.observed.changed(text) else {
@@ -141,13 +203,13 @@ impl Storage {
 
     fn save_clipboard(&self, app: &AppHandle, session: &mut Session, text: &str) {
         let state = app.state::<LauncherState>();
-        if !state.settings.clipboard_history_enabled || !valid_text(text) {
+        if !state.settings().clipboard_history_enabled || !valid_text(text) {
             return;
         }
         let Some(database) = session.database.as_mut() else {
             return;
         };
-        match database.capture_clipboard(text, ranking::now(), state.settings.clipboard_limit()) {
+        match database.capture_clipboard(text, ranking::now(), state.settings().clipboard_limit()) {
             Ok((entry, removed)) => {
                 let indexed = entry.into();
                 if let Ok(mut search) = state.search.lock() {
@@ -191,7 +253,9 @@ impl Storage {
             .write_text(text.clone())
             .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;
         state.clipboard.invalidate();
-        let changed = session.observed.changed(Some(text.clone())).is_some();
+        let changed = session
+            .observed
+            .copied(text.clone(), id.starts_with("password:"));
         if let Some(id) = clipboard_id {
             if let Some(database) = session.database.as_mut() {
                 match database.touch_clipboard(id, ranking::now()) {
@@ -266,6 +330,19 @@ impl Storage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn password_copy_is_not_captured_by_the_copy_action_or_monitor() {
+        let mut observed = Observation::default();
+        assert!(!observed.copied("a-generated-secret".into(), true));
+        assert_eq!(observed.changed(Some("a-generated-secret".into())), None);
+        assert_eq!(observed.changed(Some("a-generated-secret".into())), None);
+        assert_eq!(
+            observed.changed(Some("ordinary text".into())),
+            Some("ordinary text".into())
+        );
+        assert!(observed.copied("https://example.com".into(), false));
+    }
 
     #[test]
     fn ignores_consecutive_values_but_accepts_returning_text() {
