@@ -1,4 +1,5 @@
 node_modules/
+.hallmark/
 dist/
 src-tauri/target/
 src-tauri/gen/
