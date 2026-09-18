@@ -148,6 +148,7 @@ const system: SearchResult[] = [
 
 const calculations = new Map([
   ["12*8", "96"],
+  ["128*1.08", "138.24"],
   ["5fttocm", "152.4 cm"],
   ["sqrt(144)", "12"],
   ["32ctof", "89.6 °F"],
@@ -187,7 +188,7 @@ function sampleSearch(query: string, mode: SearchMode): SearchResult[] {
                 ? []
                 : normalized
                   ? [...apps, ...files, ...clips, ...emoji, ...system]
-                  : apps;
+                  : [];
   const value = normalized.replace(/^:/, "");
   return source.filter((item) =>
     `${item.title} ${item.subtitle} ${item.path ?? ""}`
@@ -253,7 +254,7 @@ mockIPC(
         storageError: null,
         notice:
           mode === "calculator" && query && !sampleSearch(query, mode).length
-            ? "The preview supports 12 * 8, 5 ft to cm, sqrt(144), and 32 C to F."
+            ? "The preview supports 12 * 8, 128 * 1.08, 5 ft to cm, sqrt(144), and 32 C to F."
             : null,
         files: { total: files.length, indexing: false, warning: null },
         currency: { asOf: null, refreshing: false, warning: null },

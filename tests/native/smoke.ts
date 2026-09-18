@@ -347,13 +347,13 @@ try {
     observe<boolean>(
       `return document.activeElement?.getAttribute('role') === 'combobox'
         && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
-        && /\\d+ installed/.test(document.querySelector('.list-count')?.textContent ?? '')
-        && document.querySelectorAll('[role=option]').length > 0`,
+        && document.querySelector('.welcome-suggestions') !== null
+        && document.querySelectorAll('[role=option]').length === 0`,
     ),
   );
   const startupCheckMs = performance.now() - startupStarted;
   pass(
-    "The application loads its index and selects the search field for input",
+    "The application shows its welcome screen and selects the search field for input",
   );
 
   const input = await request<Record<string, string>>(

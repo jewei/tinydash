@@ -8,6 +8,7 @@ type IconName =
   | "refresh"
   | "quit"
   | "apps"
+  | "emoji"
   | "window"
   | "close"
   | "calculator"
@@ -38,6 +39,10 @@ export default function Icon(props: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <Switch>
+        <Match when={props.name === "emoji"}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8 14a4 4 0 0 0 8 0M8 9h.01M16 9h.01" />
+        </Match>
         <Match when={props.name === "arrow"}>
           <path d="M4 12h15m-5-5 5 5-5 5" />
         </Match>

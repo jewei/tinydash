@@ -87,13 +87,10 @@ export default function ResultPreview(props: {
         fallback={
           <div class="welcome-panel">
             <span class="welcome-mark">
-              <Icon name="search" size={30} />
+              <Icon name="search" size={19} />
             </span>
-            <p class="eyebrow">A LITTLE LESS SEARCHING</p>
             <h1>Start typing.</h1>
-            <p>
-              Your apps, files, and small everyday tasks. All a few keys away.
-            </p>
+            <p>Find an app, a file, or the answer to a quick calculation.</p>
             <dl class="welcome-shortcuts">
               <div>
                 <dt>Move through results</dt>
@@ -121,10 +118,6 @@ export default function ResultPreview(props: {
                 </dd>
               </div>
             </dl>
-            <p class="welcome-examples">
-              Try an app name, <strong>:coffee</strong>, or{" "}
-              <strong>12 * 8</strong>.
-            </p>
           </div>
         }
       >

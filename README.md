@@ -57,7 +57,7 @@ Tool pins save their input and output choice. When you open a category, TinyDash
 
 ## Search
 
-The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Datetime, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows its pinned items, then applications.
+The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Datetime, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows a welcome screen with search examples and keyboard hints. If you have pinned items to All, it shows those items instead. Select Apps to browse installed applications. The welcome examples work on macOS, Windows, and Linux.
 
 | Query            | Result                         |
 | ---------------- | ------------------------------ |
