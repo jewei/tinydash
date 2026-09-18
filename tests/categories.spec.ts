@@ -13,9 +13,10 @@ async function openLauncher(page: Page) {
     },
   );
   await page.goto("/");
-  await expect(page.locator("#search-results").getByRole("option")).toHaveCount(
-    8,
-  );
+  await expect(page.locator(".list-count")).toHaveText("0 results");
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
 }
 
 const bar = (page: Page) =>

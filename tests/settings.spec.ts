@@ -193,7 +193,9 @@ test("launcher provides settings through its menu and keyboard shortcut", async 
 }) => {
   await openSettings(page);
   await page.goto("/");
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
   await page.keyboard.press("Meta+Comma");
   await page
     .getByRole("button", { name: /Actions/ })

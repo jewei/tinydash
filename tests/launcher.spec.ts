@@ -15,7 +15,10 @@ async function openLauncher(page: Page) {
     },
   );
   await page.goto("/");
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+  await expect(page.locator(".list-count")).toHaveText("0 results");
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
 }
 
 async function actions(page: Page) {
@@ -105,6 +108,7 @@ test("Canvas detail actions follow the selection and keep system confirmation", 
     "placeholder",
     "What are you looking for?",
   );
+  await selectCategory(page, "Apps");
   await expect(page.locator(".result-subtitle").first()).toHaveText(
     "Files and folders",
   );
@@ -161,7 +165,9 @@ test("appearance choices persist and Compact keeps clipboard text available", as
       "data-appearance",
       value,
     );
-    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+    await expect(
+      page.getByRole("heading", { name: "What will you do next?" }),
+    ).toBeVisible();
     if (value === "compact") {
       await expect(
         page.getByRole("complementary", { name: "Selected item details" }),
@@ -613,6 +619,7 @@ test("hiding cancels waiting input and ignores an in-flight search result", asyn
   page,
 }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await page.evaluate(() => {
     window.__launcherTest.holdSearch = true;
@@ -642,6 +649,7 @@ test("background refresh keeps the latest keyboard selection", async ({
   page,
 }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.press("ArrowDown");
   await expect(
@@ -677,6 +685,7 @@ test("a background event does not preserve selection from a different query", as
   page,
 }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.press("ArrowDown");
   await page.evaluate(() => {
@@ -746,6 +755,7 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
   page,
 }) => {
   await openLauncher(page);
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("any");
   await page.evaluate(() => {
     window.__launcherTest.fileIndexing = true;
     return window.__launcherTest.emit("files-changed", null);
@@ -893,6 +903,7 @@ test("shows a storage warning while search and launch remain available", async (
   page,
 }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   await page.evaluate(() => {
     window.__launcherTest.storageError =
       "Usage history could not be saved. Ranking changes will be lost when TinyDash quits.";
@@ -937,6 +948,7 @@ test("focuses the query, wraps selection, and launches the selected app", async 
   page,
 }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await expect(input).toBeFocused();
   await input.press("ArrowUp");
@@ -955,6 +967,7 @@ test("focuses the query, wraps selection, and launches the selected app", async 
 
 test("uses result shortcuts and the reveal action", async ({ page }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   await page.keyboard.press("Meta+3");
   await expect.poll(async () => (await actions(page)).length).toBe(1);
   await page
@@ -972,6 +985,7 @@ test("the actions menu keeps native button keyboard behavior and closes with Esc
   page,
 }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   const button = page.getByRole("button", { name: "Actions" });
   await button.focus();
   await button.press("Enter");
@@ -1028,6 +1042,7 @@ test("shows action errors, handles empty results, and ignores IME confirmation",
   page,
 }) => {
   await openLauncher(page);
+  await selectCategory(page, "Apps");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.dispatchEvent("keydown", {
     key: "Enter",
@@ -1074,7 +1089,10 @@ test("reopening clears or selects the prior query as configured", async ({
     window.__launcherTest.emit("launcher-opened", true),
   );
   await expect(input).toHaveValue("");
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
+  await expect(page.getByRole("option")).toHaveCount(0);
 });
 
 test("the layout fits narrow windows and the desktop window", async ({

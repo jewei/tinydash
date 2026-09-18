@@ -14,7 +14,10 @@ async function openLauncher(page: Page) {
   );
   await page.setViewportSize({ width: 980, height: 620 });
   await page.goto("/");
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+  await expect(page.locator(".list-count")).toHaveText("0 results");
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
 }
 const input = (page: Page) =>
   page.getByRole("combobox", { name: "Search TinyDash" });

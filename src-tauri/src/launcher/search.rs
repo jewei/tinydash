@@ -343,7 +343,9 @@ impl SearchManager {
         {
             results.extend(self.clipboard.search(query.text, &mut self.matcher));
         }
-        if matches!(query.mode, SearchMode::All | SearchMode::Apps) {
+        if query.mode == SearchMode::Apps
+            || (query.mode == SearchMode::All && !query.text.is_empty())
+        {
             let normalized = ranking::normalize(query.text);
             // App punctuation remains literal. Calculator input retains its case.
             let pattern = Pattern::new(
@@ -435,7 +437,14 @@ mod tests {
         }
         for mode in [SearchMode::All, SearchMode::Apps] {
             let results = manager.search("  ", mode).unwrap().results;
-            assert_eq!(results.len(), RESULT_LIMIT);
+            assert_eq!(
+                results.len(),
+                if mode == SearchMode::All {
+                    1
+                } else {
+                    RESULT_LIMIT
+                }
+            );
             assert_eq!(results[0].title, "App 099");
             assert!(!results.iter().any(|result| result.id == "app:/missing"));
             assert_eq!(
@@ -779,11 +788,39 @@ mod tests {
     }
 
     #[test]
+    fn empty_all_query_shows_no_unpinned_apps() {
+        let mut manager = manager();
+        for input in ["", " \t "] {
+            assert!(
+                manager
+                    .search(input, SearchMode::All)
+                    .unwrap()
+                    .results
+                    .is_empty()
+            );
+        }
+        assert!(
+            !manager
+                .search("code", SearchMode::All)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+        assert!(
+            !manager
+                .search("", SearchMode::Apps)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn empty_query_is_deterministic_and_results_are_bounded() {
         let mut manager = manager();
         assert_eq!(
             manager
-                .search(" \t ", SearchMode::All)
+                .search(" \t ", SearchMode::Apps)
                 .expect("search")
                 .results[0]
                 .title,
@@ -796,7 +833,7 @@ mod tests {
         ));
         assert_eq!(
             manager
-                .search("", SearchMode::All)
+                .search("", SearchMode::Apps)
                 .expect("search")
                 .results
                 .len(),

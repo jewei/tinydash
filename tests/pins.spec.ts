@@ -13,9 +13,10 @@ async function openLauncher(page: Page) {
     },
   );
   await page.goto("/");
+  await expect(page.locator(".list-count")).toHaveText("0 results");
   await expect(
-    page.getByRole("listbox", { name: "Search results" }).getByRole("option"),
-  ).toHaveCount(8);
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
 }
 
 test("app pins persist, preserve selection, and can be removed in compact mode", async ({
@@ -26,8 +27,9 @@ test("app pins persist, preserve selection, and can be removed in compact mode",
   const rows = page
     .getByRole("listbox", { name: "Search results" })
     .getByRole("option");
-  await input.press("ArrowDown");
+  await input.fill("sa");
   await page.getByRole("button", { name: "Pin to All", exact: true }).click();
+  await input.fill("");
   await expect(rows.first()).toContainText("Safari");
   await expect(rows.first()).toHaveAttribute("aria-selected", "true");
   await expect(
@@ -40,7 +42,7 @@ test("app pins persist, preserve selection, and can be removed in compact mode",
   await expect(rows).toHaveCount(1);
   await expect(page.locator(".result-group")).toHaveText("Applications1");
   await page.getByRole("button", { name: "Clear search", exact: true }).click();
-  await expect(rows).toHaveCount(8);
+  await expect(rows).toHaveCount(1);
   await input.press("Meta+k");
   await page
     .getByRole("menuitemradio", { name: "Compact", exact: true })
@@ -49,11 +51,15 @@ test("app pins persist, preserve selection, and can be removed in compact mode",
   await page
     .getByRole("menuitem", { name: "Unpin from All", exact: true })
     .click();
-  await expect(rows.first()).toContainText("Finder");
-  await expect(rows.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(rows).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
   await expect(input).toBeFocused();
   await page.reload();
-  await expect(rows.first()).toContainText("Finder");
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
 });
 
 test("a failed pin write leaves the list unchanged and permits retry", async ({
@@ -61,7 +67,7 @@ test("a failed pin write leaves the list unchanged and permits retry", async ({
 }) => {
   await openLauncher(page);
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
-  await input.press("ArrowDown");
+  await input.fill("sa");
   await page.evaluate(() => {
     window.__launcherTest.rejectPin = true;
   });
@@ -75,11 +81,12 @@ test("a failed pin write leaves the list unchanged and permits retry", async ({
   await expect(pin).toHaveAttribute("aria-pressed", "false");
   await expect(
     page.getByRole("listbox").getByRole("option").first(),
-  ).toContainText("Finder");
+  ).toContainText("Safari");
   await page.evaluate(() => {
     window.__launcherTest.rejectPin = false;
   });
   await pin.click();
+  await input.fill("");
   await expect(
     page.getByRole("listbox").getByRole("option").first(),
   ).toContainText("Safari");
@@ -93,13 +100,17 @@ test("All and Apps have independent pins, including after restart", async ({
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   const rows = page.getByRole("listbox").getByRole("option");
   const tabs = page.getByRole("navigation", { name: "Search categories" });
-  await input.press("ArrowDown");
+  await input.fill("sa");
   await page.getByRole("button", { name: "Pin to Apps", exact: true }).click();
-  await expect(rows.first()).toContainText("Finder");
-  await expect(rows.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(rows.first()).toContainText("Safari");
+  await expect(rows.first()).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".result-group").first()).toHaveText(
-    "Applications8",
+    "Applications1",
   );
+  await input.fill("");
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
   await tabs.getByRole("button", { name: "Apps", exact: true }).click();
   await expect(rows.first()).toContainText("Safari");
   await expect(page.locator(".result-group").first()).toHaveText("Pinned1");
@@ -109,13 +120,18 @@ test("All and Apps have independent pins, including after restart", async ({
   await page
     .getByRole("button", { name: "Unpin from All", exact: true })
     .click();
-  await expect(rows.first()).toContainText("Finder");
+  await expect(rows).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "What will you do next?" }),
+  ).toBeVisible();
+  await tabs.getByRole("button", { name: "Apps", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Unpin from Apps", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.reload();
-  await expect(rows.first()).toContainText("Finder");
-  await tabs.getByRole("button", { name: "Apps", exact: true }).click();
   await expect(rows.first()).toContainText("Safari");
   await expect(rows).toHaveCount(8);
 });
@@ -216,7 +232,7 @@ test("pin controls fit the detail panel and the compact menu", async ({
   await page.setViewportSize({ width: 980, height: 620 });
   await openLauncher(page);
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
-  await input.press("ArrowDown");
+  await input.fill("sa");
   await page.getByRole("button", { name: "Pin to Apps", exact: true }).click();
   await page.getByRole("button", { name: "Pin to All", exact: true }).click();
   await expect(page.getByRole("group", { name: "Pin item" })).toBeVisible();

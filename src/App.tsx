@@ -24,6 +24,7 @@ import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
 import ResultPreview from "./components/ResultPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
+import WelcomeSuggestions from "./components/WelcomeSuggestions";
 import {
   appearances,
   readAppearance,
@@ -115,6 +116,8 @@ export default function App(
     categories.filter(({ id }) => enabledCategories().includes(id)),
   );
   const current = () => results()[selected()];
+  const welcome = () =>
+    mode() === "all" && !query().trim() && results().length === 0;
   const resultKey = (result?: SearchResult) => result?.pin?.key ?? result?.id;
   const isPinned = (result?: SearchResult, category = mode()) =>
     result?.pin?.categories.includes(category) ?? false;
@@ -230,6 +233,13 @@ export default function App(
       request: ++sequence,
     };
     setPending(true);
+    if (
+      mode() === "all" &&
+      !value.trim() &&
+      (displayedQuery?.mode !== "all" || displayedQuery.value.trim())
+    ) {
+      setResults([]);
+    }
     setNotice(undefined);
     // Native IPC calls can arrive out of order. Keep one call in flight and
     // replace waiting input with the newest query, without a debounce timer.
@@ -549,6 +559,33 @@ export default function App(
       return;
     }
     // Enter on a focused button must keep the button's native action.
+    if (
+      welcome() &&
+      !command &&
+      !event.altKey &&
+      !event.shiftKey &&
+      (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+      (event.target === input ||
+        (event.target instanceof Element &&
+          event.target.closest(".suggestion-button")))
+    ) {
+      event.preventDefault();
+      const buttons = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(".suggestion-button"),
+      );
+      const index = buttons.indexOf(
+        document.activeElement as HTMLButtonElement,
+      );
+      const next =
+        index < 0
+          ? event.key === "ArrowDown"
+            ? 0
+            : buttons.length - 1
+          : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) %
+            buttons.length;
+      buttons[next]?.focus();
+      return;
+    }
     if (event.target !== input) return;
     if (
       event.altKey &&
@@ -835,7 +872,9 @@ export default function App(
           </span>
         </nav>
       </header>
-      <Show when={!message() && mode() === "all" && files().indexing}>
+      <Show
+        when={!message() && !welcome() && mode() === "all" && files().indexing}
+      >
         <div class="status-line indexing-status">
           <span class="query-hint" role="status">
             Scanning files... You can search apps now.
@@ -862,12 +901,23 @@ export default function App(
       <section
         class="results-area"
         classList={{
+          "welcome-results": welcome(),
           "emoji-results": mode() === "emoji",
           "clipboard-results": current()?.kind === "clipboard",
         }}
         aria-label="Search results"
       >
         <div class="result-column">
+          <Show when={welcome()}>
+            <WelcomeSuggestions
+              appsAvailable={enabledCategories().includes("apps")}
+              onBrowseApps={() => changeMode("apps")}
+              onQuery={(value) => {
+                changeQuery(value);
+                focusInput();
+              }}
+            />
+          </Show>
           <Show when={mode() === "clipboard"}>
             <div class="list-tools">
               <span>Saved on this device</span>
@@ -956,7 +1006,7 @@ export default function App(
               )}
             </For>
           </ul>
-          <Show when={results().length === 0}>
+          <Show when={results().length === 0 && !welcome()}>
             <div class="empty-state">
               <div class="empty-icon">
                 <Icon name={query() ? "search" : "apps"} size={28} />
@@ -1089,50 +1139,59 @@ export default function App(
 
       <footer class="footer">
         <div class="footer-actions">
-          <button
-            class="open-button"
-            disabled={!canOpen()}
-            onClick={runPrimary}
+          <Show
+            when={!welcome()}
+            fallback={<span class="footer-prompt">Type to search</span>}
           >
-            {busy()
-              ? current()?.primaryAction === "run"
-                ? "Running..."
-                : current()?.primaryAction === "copy"
-                  ? "Copying..."
-                  : "Opening..."
-              : primaryLabel()}
-            <Icon name="return" size={17} />
-          </button>
-          <span class="footer-selection" title={current()?.title}>
-            {current()?.title ?? "TinyDash"}
-          </span>
+            <button
+              class="open-button"
+              disabled={!canOpen()}
+              onClick={runPrimary}
+            >
+              {busy()
+                ? current()?.primaryAction === "run"
+                  ? "Running..."
+                  : current()?.primaryAction === "copy"
+                    ? "Copying..."
+                    : "Opening..."
+                : primaryLabel()}
+              <Icon name="return" size={17} />
+            </button>
+            <span class="footer-selection" title={current()?.title}>
+              {current()?.title ?? "TinyDash"}
+            </span>
+          </Show>
           <span class="navigation-hint">
             <kbd>↑</kbd>
             <kbd>↓</kbd> navigate
           </span>
           <span class="list-count" role="status" aria-live="polite">
-            {mode() === "calculator"
-              ? currency().refreshing
-                ? "Updating rates..."
-                : currency().asOf
-                  ? `Rates ${currency().asOf}`
-                  : "Arithmetic and units offline"
-              : mode() === "files"
-                ? files().indexing
-                  ? "Scanning files..."
-                  : `${files().total} ${files().total === 1 ? "file" : "files"} indexed`
-                : mode() === "emoji" ||
-                    mode() === "clipboard" ||
-                    mode() === "system" ||
-                    ["password", "timezone", "url", "web"].includes(mode())
-                  ? `${results().length} shown`
-                  : indexing()
-                    ? "Finding applications..."
-                    : pending()
-                      ? "Searching..."
-                      : query().trim()
-                        ? `${results().length} ${results().length === 1 ? "result" : "results"}`
-                        : `${total()} installed`}
+            {welcome()
+              ? "0 results"
+              : mode() === "calculator"
+                ? currency().refreshing
+                  ? "Updating rates..."
+                  : currency().asOf
+                    ? `Rates ${currency().asOf}`
+                    : "Arithmetic and units offline"
+                : mode() === "files"
+                  ? files().indexing
+                    ? "Scanning files..."
+                    : `${files().total} ${files().total === 1 ? "file" : "files"} indexed`
+                  : mode() === "emoji" ||
+                      mode() === "clipboard" ||
+                      mode() === "system" ||
+                      ["password", "timezone", "url", "web"].includes(mode())
+                    ? `${results().length} shown`
+                    : indexing()
+                      ? "Finding applications..."
+                      : pending()
+                        ? "Searching..."
+                        : query().trim()
+                          ? `${results().length} ${results().length === 1 ? "result" : "results"}`
+                          : mode() === "all"
+                            ? `${results().length} pinned`
+                            : `${total()} installed`}
           </span>
 
           <div class="actions-area">

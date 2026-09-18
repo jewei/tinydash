@@ -10,6 +10,7 @@ declare global {
     __launcherTest: {
       calls: { command: string; payload: unknown }[];
       settings: SettingsValues;
+      platform: "macos" | "windows" | "linux";
       rejectSettings: string | null;
       pins: Partial<Record<SearchMode, string[]>>;
       rejectPin: boolean;
@@ -200,6 +201,9 @@ function restorePin(key: string): SearchResult | undefined {
 window.isTauri = true;
 window.__launcherTest = {
   calls: [],
+  platform:
+    (localStorage.getItem("tinydash.test.platform") as
+      "macos" | "windows" | "linux") ?? "macos",
   settings: JSON.parse(
     localStorage.getItem("tinydash.test.settings") ?? "null",
   ) ?? {
@@ -252,7 +256,7 @@ mockIPC(
     }
     if (command === "launcher_ready") {
       return {
-        platform: "macos",
+        platform: state.platform,
         settings: state.settings,
         warnings: [],
       };
@@ -261,7 +265,7 @@ mockIPC(
       return {
         settings: state.settings,
         defaults: { ...state.settings, shortcut: "Control+Shift+Space" },
-        platform: "macos",
+        platform: state.platform,
         version: "0.1.0",
         configPath:
           "/Users/test/Library/Application Support/dev.tinydash.launcher/settings.json",
@@ -322,12 +326,19 @@ mockIPC(
                 ? []
                 : mode === "emoji" ||
                     query === ":rocket" ||
+                    query === ":smile" ||
                     (query === "rocket" && mode !== "apps")
                   ? query === "grid" || (!query && state.emojiGrid)
                     ? gridEmoji
                     : [emoji]
-                  : query === "12 * 8" && mode !== "apps"
-                    ? [calculation]
+                  : ["12 * 8", "128 * 1.08"].includes(query) && mode !== "apps"
+                    ? [
+                        {
+                          ...calculation,
+                          title: query === "128 * 1.08" ? "138.24" : "96",
+                          subtitle: query,
+                        },
+                      ]
                     : query === "100 USD to MYR" && mode !== "apps"
                       ? state.currencyMissing
                         ? []
@@ -349,7 +360,10 @@ mockIPC(
                             : state.usedAppFirst
                               ? [apps[1], apps[0], ...apps.slice(2)]
                               : apps);
-      const described = describePins(results, query);
+      const described = describePins(
+        mode === "all" && !query.trim() ? [] : results,
+        query,
+      );
       if (!query.trim()) {
         for (const key of state.pins[mode] ?? []) {
           if (described.some((result) => result.pin?.key === key)) continue;
