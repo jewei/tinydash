@@ -61,7 +61,7 @@ pub fn changed(app: &AppHandle) {
 
 pub fn start(app: &AppHandle) {
     let state = app.state::<LauncherState>();
-    if !state.settings.clipboard_history_enabled {
+    if !state.settings().clipboard_history_enabled {
         return;
     }
     let (sender, receiver) = mpsc::sync_channel(1);
@@ -81,16 +81,20 @@ pub fn start(app: &AppHandle) {
                         break;
                     }
                     let generation = state.clipboard.generation();
-                    match crate::platform::clipboard_snapshot(previous) {
-                        Ok(Some((counter, text))) => {
-                            previous = Some(counter);
-                            if let Ok(mut warning) = state.clipboard.warning.lock() {
-                                *warning = None;
+                    if state.settings().clipboard_history_enabled {
+                        match crate::platform::clipboard_snapshot(previous) {
+                            Ok(Some((counter, text))) => {
+                                previous = Some(counter);
+                                if let Ok(mut warning) = state.clipboard.warning.lock() {
+                                    *warning = None;
+                                }
+                                state.storage.capture(&worker_app, text, generation);
                             }
-                            state.storage.capture(&worker_app, text, generation);
+                            Ok(None) => {}
+                            Err(_) => state.clipboard.failed(), // Never log clipboard contents.
                         }
-                        Ok(None) => {}
-                        Err(_) => state.clipboard.failed(), // Never log clipboard contents.
+                    } else {
+                        previous = None;
                     }
                     if matches!(
                         receiver.recv_timeout(std::time::Duration::from_secs(1)),
@@ -137,7 +141,7 @@ pub fn start(app: &AppHandle) {
 
 pub fn refresh(app: &AppHandle) {
     let state = app.state::<LauncherState>();
-    if !state.settings.clipboard_history_enabled || state.clipboard.sender.get().is_none() {
+    if !state.settings().clipboard_history_enabled || state.clipboard.sender.get().is_none() {
         return;
     }
     #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -157,7 +161,9 @@ pub fn refresh(app: &AppHandle) {
 #[cfg(target_os = "linux")]
 fn request_linux(app: &AppHandle) {
     let state = app.state::<LauncherState>();
-    if state.clipboard.stopped.load(Ordering::Acquire) {
+    if state.clipboard.stopped.load(Ordering::Acquire)
+        || !state.settings().clipboard_history_enabled
+    {
         return;
     }
     let generation = state.clipboard.generation();

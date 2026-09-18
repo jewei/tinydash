@@ -1,18 +1,62 @@
+/* User-supplied TinyDash Canvas design: Organic palette, Figtree + Caprasimo.
+ * Pre-emit critique: P5 H5 E5 S5 R5 V4. Light / Dark / Compact.
+ */
+@font-face {
+  font-family: "Caprasimo";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/caprasimo-latin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/figtree-latin.woff2") format("woff2");
+}
 :root {
-  /* sRGB fallbacks keep older system webviews readable. */
-  --color-paper: #1b211f;
-  --color-field: #212724;
-  --color-raised: #252a28;
-  --color-selected: #25342f;
-  --color-ink: #ebf0ee;
-  --color-muted: #a4adaa;
-  --color-subtle: #919b97;
-  --color-rule: #373f3c;
-  --color-border: #515b57;
-  --color-accent: #9feacf;
-  --color-error: #f2bb8a;
-  --color-shadow: #04060566;
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: light;
+  --color-paper: #fcf8f2;
+  --color-field: #ebe5da;
+  --color-raised: #fcf8f2;
+  --color-preview: #f3eee5;
+  --color-selected: #fbe4d4;
+  --color-selection-border: #e8bda0;
+  --color-selection-ink: #763f21;
+  --color-ink: #302a24;
+  --color-muted: #6f6458;
+  --color-subtle: #75695b;
+  --color-rule: #e4dbce;
+  --color-border: #d7ccbc;
+  --color-accent: #9c4e28;
+  --color-accent-hover: #824020;
+  --color-hover: #efe8dd;
+  --color-focus: #a25731;
+  --color-accent-ink: #fff8f1;
+  --color-olive: #e9ecdf;
+  --color-olive-ink: #536046;
+  --color-code: #fcf8f2;
+  --color-error: #a33b2c;
+  --color-warning: #fff2eb;
+  --color-shadow: #302a2422;
+  --color-backdrop: #302a2466;
+  --color-grip: #c3b8a8;
+  --color-transparent: transparent;
+  --swatch-light: #fbe4d4;
+  --swatch-dark: #403b32;
+  --swatch-compact: #8fa073;
+  --preview-light-paper: #fcf8f2;
+  --preview-light-field: #ebe5da;
+  --preview-dark-paper: #302d27;
+  --preview-dark-field: #403b32;
+  --preview-dark-selection: #763f21;
+  --font-heading: "Caprasimo", Georgia, serif;
+  --font-body:
+    "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-emoji:
+    "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   --space-2xs: 4px;
   --space-xs: 8px;
   --space-sm: 12px;
@@ -22,26 +66,45 @@
   --text-xs: 11px;
   --text-sm: 12px;
   --text-body: 14px;
-  --text-title: 15px;
-  --text-search: 19px;
-  --radius-sm: 5px;
-  --radius-md: 9px;
-  --radius-lg: 13px;
+  --text-title: 14px;
+  --text-search: 23px;
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --row-height: 54px;
+  --icon-size: 36px;
+  --z-menu: 10;
 }
-
-@supports (color: oklch(50% 0.01 170)) {
-  :root {
-    --color-paper: oklch(24% 0.009 170);
-    --color-field: oklch(26.5% 0.01 170);
-    --color-raised: oklch(28% 0.009 170);
-    --color-selected: oklch(31% 0.022 170);
-    --color-ink: oklch(95% 0.005 170);
-    --color-muted: oklch(74% 0.012 170);
-    --color-subtle: oklch(68% 0.012 170);
-    --color-rule: oklch(36% 0.012 170);
-    --color-border: oklch(46% 0.014 170);
-    --color-accent: oklch(88% 0.083 170);
-    --color-error: oklch(83% 0.09 63);
-    --color-shadow: oklch(12% 0.005 170 / 0.4);
-  }
+:root[data-appearance="dark"] {
+  color-scheme: dark;
+  --color-paper: #302d27;
+  --color-field: #403b32;
+  --color-raised: #403b32;
+  --color-preview: #35362c;
+  --color-selected: #563b29;
+  --color-selection-border: #8d6444;
+  --color-selection-ink: #ffdabc;
+  --color-ink: #f4eddf;
+  --color-muted: #c3b8a8;
+  --color-subtle: #b0a392;
+  --color-rule: #494236;
+  --color-border: #5f5545;
+  --color-accent: #efb181;
+  --color-accent-hover: #ffd0aa;
+  --color-hover: #413b32;
+  --color-focus: #efb181;
+  --color-accent-ink: #382819;
+  --color-olive: #424936;
+  --color-olive-ink: #d2dfb5;
+  --color-code: #1a1815;
+  --color-error: #ffc7b4;
+  --color-warning: #402310;
+  --color-shadow: #0c0b0a55;
+  --color-backdrop: #0c0b0a9e;
+  --color-grip: #6f6458;
+}
+:root[data-appearance="compact"] {
+  --text-search: 23px;
+  --row-height: 46px;
+  --icon-size: 32px;
 }

@@ -1,5 +1,117 @@
 [
   {
+    "date": "2026-09-18",
+    "macrostructure": "Existing Canvas launcher",
+    "theme": "Approved warm refinement: cream, terracotta, and olive",
+    "brief": "Apply the approved HTML design to the production launcher",
+    "scope": "SolidJS launcher, shared tokens, native SQLite app pins, and browser and Rust checks",
+    "refinements": [
+      "Category buttons with a full category menu",
+      "Smaller result corners and a selection edge marker",
+      "Separate location and filename details with path separator wrapping",
+      "Fixed primary actions below scrolling details",
+      "Native app pins saved across restarts",
+      "Light, Dark, and Compact layouts"
+    ],
+    "validation": {
+      "desktopBuild": "macOS debug app bundle passed",
+      "rustTests": "102 passed; 3 existing opt-in tests ignored",
+      "uiTests": "54 Chromium and 54 WebKit tests passed; final path and pin changes rechecked in WebKit",
+      "layoutChecks": 594,
+      "responsiveWidths": [320, 375, 414, 600, 601, 640, 720, 768, 980],
+      "contrast": "Tested text pairs: minimum 4.99:1 in Light and 5.55:1 in Dark",
+      "nativeChecks": "macOS search, app icons, pin, restart persistence, and unpin passed; test pin removed",
+      "screenshots": "artifacts/design-implementation/",
+      "format": "Prettier and git diff --check passed"
+    }
+  },
+  {
+    "date": "2026-09-18",
+    "macrostructure": "Workbench with existing Canvas launcher",
+    "theme": "User-supplied Organic, refined",
+    "enrichment": "Interactive HTML launcher with embedded local fonts and app icons",
+    "brief": "Refine the supplied launcher design while preserving its warm style",
+    "scope": "Standalone designs/polished.html and separate preview token export",
+    "files": ["designs/polished.html", "designs/polished.tokens.css"],
+    "refinements": [
+      "Consistent result spacing and distinct application icons",
+      "Peach selection with an edge marker and matched text",
+      "Smaller primary actions and readable file details",
+      "Light, dark, and compact views",
+      "Keyboard controls, focus restoration, clipboard states, empty and welcome views"
+    ],
+    "validation": {
+      "engines": ["chromium", "webkit"],
+      "layoutChecks": 210,
+      "responsiveWidths": [320, 375, 414, 768, 1440],
+      "interactions": "Search, category controls, arrow navigation, numbered actions, pinning, clipboard success and failure, dialogs, and focus restoration passed",
+      "contrast": "All tested text pairs meet WCAG 4.5:1 in both themes",
+      "standalone": "Direct file opening works with zero network requests",
+      "visualReview": "Desktop, compact, dark, all four required mobile widths, file previews, and calculator inspected",
+      "slopTest": "Applicable visual, accessibility, token, and responsive checks passed; retained source structure at user request"
+    }
+  },
+  {
+    "date": "2026-09-17",
+    "macrostructure": "Canvas launcher and separate Settings window",
+    "theme": "User-supplied Organic / Light / Dark / Compact",
+    "brief": "Implement Settings and four launcher tools",
+    "scope": "SolidJS UI, native settings persistence, global shortcut recording, and Rust tool providers",
+    "variation": [
+      "Light: cream and peach Canvas",
+      "Dark: charcoal and olive Canvas",
+      "Compact: single-column result list"
+    ],
+    "fonts": "Existing locally bundled Figtree + Caprasimo",
+    "validation": {
+      "uiTests": "48 passed in Chromium; six Settings and five tool tests passed in WebKit",
+      "rustTests": "93 passed; three existing opt-in checks ignored",
+      "responsiveWidths": [320, 375, 414, 768, 980],
+      "nativeChecks": "macOS password copy and history exclusion, all password types, relative time conversion, URL cleaning, six search engine URLs, shortcut recording, persistence, and global activation passed",
+      "visuals": "Native Settings and tool captures; Light web and Dark time previews inspected at 980 x 620",
+      "slopTest": "Uses the supplied design and functional settings only; no placeholder controls"
+    }
+  },
+  {
+    "date": "2026-09-17",
+    "macrostructure": "Canvas: result list and selected-item detail panel",
+    "theme": "User-supplied Organic / Light / Dark / Compact",
+    "brief": "Implement the supplied TinyDash App Launcher Design package",
+    "source": "Tinydash App Launcher Design.zip",
+    "scope": "Production SolidJS launcher and separate local preview",
+    "variation": [
+      "Light: cream and peach Canvas",
+      "Dark: charcoal and olive Canvas",
+      "Compact: single-column result list"
+    ],
+    "fonts": "Figtree + Caprasimo, bundled locally",
+    "validation": {
+      "desktopBuild": "macOS debug build passed",
+      "layout": "182 checks in Chromium and WebKit",
+      "responsiveWidths": [320, 375, 414, 680, 768, 980],
+      "slopTest": "pass for supplied design; no invented data or remote runtime",
+      "uiTests": "35 passed in Chromium; 35 WebKit checks passed including corrected reruns",
+      "format": "Prettier and git diff --check passed",
+      "contrast": "Light primary text 4.66:1"
+    }
+  },
+  {
+    "date": "2026-09-17",
+    "macrostructure": "Workbench",
+    "theme": "Mint / Paper / Graphite",
+    "enrichment": "Live launcher with labelled sample data, development entry only",
+    "nav": "N9 Edge-aligned",
+    "footer": "Ft2 Inline",
+    "brief": "Polish TinyDash and compare a light, dark, and compact variant",
+    "scope": "Existing launcher with separate review page",
+    "preservedStructure": "Index-First launcher",
+    "variation": [
+      "Mint: framed search, 61 px rows, soft corners",
+      "Paper: open search, 65 px ruled rows, warm light palette",
+      "Graphite: inline filter, 47 px rows, monospace details"
+    ]
+  },
+  {
     "date": "2026-09-16",
     "macrostructure": "Index-First",
     "theme": "User reference: charcoal and mint",

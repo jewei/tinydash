@@ -3,7 +3,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc::{Receiver, SyncSender, sync_channel},
+        mpsc::{Receiver, SyncSender, TrySendError, sync_channel},
     },
     time::{Duration, Instant},
 };
@@ -16,8 +16,8 @@ use super::{
     file_watch::{self, FileWatcher, Request},
 };
 use crate::{
-    error::Error,
     providers::files::{self, ScanReport},
+    settings::Settings,
 };
 
 #[derive(Default)]
@@ -59,6 +59,40 @@ impl FileScan {
             *stored = warning;
         }
     }
+
+    fn request(
+        &self,
+        spawn: impl FnOnce(Receiver<Request>, SyncSender<Request>) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
+        let mut sender = self
+            .sender
+            .lock()
+            .map_err(|_| std::io::Error::other("File scanner is unavailable"))?;
+        if self.stopped.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        if let Some(active) = sender.as_ref() {
+            match active.try_send(Request::Refresh) {
+                Ok(()) | Err(TrySendError::Full(_)) => return Ok(()),
+                // An exited worker drops its receiver. Discard the dead sender
+                // so settings changes and manual refresh can start a new worker.
+                Err(TrySendError::Disconnected(_)) => *sender = None,
+            }
+        }
+        if sender.is_none() {
+            let (tx, rx) = sync_channel(1);
+            self.running.store(true, Ordering::Release);
+            if let Err(error) = spawn(rx, tx.clone()) {
+                self.running.store(false, Ordering::Release);
+                return Err(error);
+            }
+            *sender = Some(tx);
+        }
+        if let Some(sender) = sender.as_ref() {
+            let _ = sender.try_send(Request::Refresh);
+        }
+        Ok(())
+    }
 }
 
 #[tauri::command]
@@ -68,38 +102,24 @@ pub fn refresh_files(app: AppHandle) {
 
 pub fn scan_files(app: &AppHandle) {
     let state = app.state::<LauncherState>();
-    let Ok(mut sender) = state.files.sender.lock() else {
-        return;
-    };
-    if sender.is_none() {
-        let (tx, rx) = sync_channel(1);
+    if let Err(error) = state.files.request(|rx, callback_sender| {
         let worker = app.clone();
-        let callback_sender = tx.clone();
         let stop = Arc::clone(&state.files.stopped);
-        state.files.running.store(true, Ordering::Release);
-        match std::thread::Builder::new()
+        std::thread::Builder::new()
             .name("file-index".into())
             .spawn(move || run_worker(worker, rx, callback_sender, stop))
-        {
-            Ok(_) => *sender = Some(tx),
-            Err(error) => {
-                state.files.running.store(false, Ordering::Release);
-                state
-                    .files
-                    .warning(Some(format!("Cannot start the file scanner: {error}")));
-                let _ = app.emit("files-changed", ());
-            }
-        }
-    }
-    if let Some(sender) = sender.as_ref() {
-        let _ = sender.try_send(Request::Refresh);
+            .map(|_| ())
+    }) {
+        state
+            .files
+            .warning(Some(format!("Cannot start the file scanner: {error}")));
+        let _ = app.emit("files-changed", ());
     }
 }
 
-fn roots(app: &AppHandle) -> (Vec<PathBuf>, Option<String>) {
-    let state = app.state::<LauncherState>();
+fn roots(app: &AppHandle, settings: &Settings) -> (Vec<PathBuf>, Option<String>) {
     let mut report = ScanReport::default();
-    let roots = match &state.settings.file_search_roots {
+    let roots = match &settings.file_search_roots {
         Some(roots) => {
             let home = app.path().home_dir().ok();
             roots
@@ -132,28 +152,9 @@ fn run_worker(
     stop: Arc<AtomicBool>,
 ) {
     let state = worker.state::<LauncherState>();
-    let (roots, root_warning) = roots(&worker);
     let mut watch_warning = None;
-    let mut watcher = if state.settings.file_watch_enabled && !roots.is_empty() {
-        match FileWatcher::new(
-            roots
-                .iter()
-                .map(|path| file_watch::resolve_root(path))
-                .collect(),
-            state.settings.file_search_excluded_dirs.clone(),
-            callback_sender.clone(),
-        ) {
-            Ok(watcher) => Some(watcher),
-            Err(error) => {
-                watch_warning = Some(format!(
-                    "Automatic file updates are unavailable: {error}. Use Refresh files."
-                ));
-                None
-            }
-        }
-    } else {
-        None
-    };
+    let mut watcher: Option<FileWatcher> = None;
+    let mut active_settings: Option<Settings> = None;
     while let Ok(request) = rx.recv() {
         if stop.load(Ordering::Acquire) || matches!(request, Request::Stop) {
             break;
@@ -166,6 +167,34 @@ fn run_worker(
         if stop.load(Ordering::Acquire) {
             break;
         }
+        let settings = state.settings();
+        let (roots, root_warning) = roots(&worker, &settings);
+        if active_settings
+            .as_ref()
+            .is_none_or(|active| !active.same_file_settings(&settings))
+        {
+            // Drop watches for removed roots before installing the new configuration.
+            drop(watcher.take());
+            watch_warning = None;
+            if settings.file_watch_enabled && !roots.is_empty() {
+                match FileWatcher::new(
+                    roots
+                        .iter()
+                        .map(|path| file_watch::resolve_root(path))
+                        .collect(),
+                    settings.file_search_excluded_dirs.clone(),
+                    callback_sender.clone(),
+                ) {
+                    Ok(value) => watcher = Some(value),
+                    Err(error) => {
+                        watch_warning = Some(format!(
+                            "Automatic file updates are unavailable: {error}. Use Refresh files."
+                        ))
+                    }
+                }
+            }
+            active_settings = Some(settings.clone());
+        }
         state.files.running.store(true, Ordering::Release);
         let _ = worker.emit("files-changed", ());
         let started = Instant::now();
@@ -173,23 +202,23 @@ fn run_worker(
         let scan_roots = roots
             .iter()
             .filter(|path| {
-                state.settings.file_search_roots.is_some() || path.try_exists().unwrap_or(true)
+                settings.file_search_roots.is_some() || path.try_exists().unwrap_or(true)
             })
             .cloned()
             .collect();
         let provider = files::scan(
             scan_roots,
-            &state.settings.file_search_excluded_dirs,
-            state.settings.file_limit(),
+            &settings.file_search_excluded_dirs,
+            settings.file_limit(),
             &mut report,
         );
         let count = provider.len();
-        let outcome = state
-            .search
-            .lock()
-            .map(|mut search| search.replace_files(provider))
-            .map_err(|_| Error::IndexUnavailable.to_string());
-        // Drop the previous index outside the search lock.
+        let outcome = state.accept_file_scan(&settings, provider);
+        if matches!(outcome, Ok(false)) {
+            // The queued refresh will scan the current folders. Do not publish
+            // stale warnings or rearm watches from this obsolete scan.
+            continue;
+        }
         let mut warnings: Vec<_> = [
             root_warning.clone(),
             report.warning(),
@@ -198,7 +227,6 @@ fn run_worker(
         .into_iter()
         .flatten()
         .collect();
-        drop(outcome);
         if let Some(watcher) = watcher.as_mut() {
             let (changed, warning) = watcher.update(&report);
             watch_warning = warning;
@@ -220,5 +248,125 @@ fn run_worker(
             elapsed_ms = started.elapsed().as_millis(),
             "File index ready"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::launcher::query::SearchMode;
+
+    #[test]
+    fn changing_roots_removes_old_results_and_rejects_an_unfinished_old_scan() {
+        let directory = tempfile::tempdir().unwrap();
+        let documents = directory.path().join("Documents");
+        let downloads = directory.path().join("Downloads");
+        for root in [&documents, &downloads] {
+            std::fs::create_dir(root).unwrap();
+            std::fs::write(root.join("example.txt"), "").unwrap();
+        }
+        let previous = Settings {
+            file_search_roots: Some(vec![documents.clone()]),
+            ..Settings::default()
+        };
+        let next = Settings {
+            file_search_roots: Some(vec![downloads.clone()]),
+            ..previous.clone()
+        };
+        let scan =
+            |root: &PathBuf| files::scan(vec![root.clone()], &[], 100, &mut ScanReport::default());
+        let state = LauncherState::new(previous.clone(), vec![]);
+        assert!(state.accept_file_scan(&previous, scan(&documents)).unwrap());
+        state.replace_settings(next.clone());
+        assert!(
+            state
+                .search
+                .lock()
+                .unwrap()
+                .search("example", SearchMode::Files)
+                .unwrap()
+                .results
+                .is_empty(),
+            "Documents must disappear when the saved folder changes"
+        );
+        assert!(
+            !state.accept_file_scan(&previous, scan(&documents)).unwrap(),
+            "A scan for removed folders must not replace current results"
+        );
+        assert!(state.accept_file_scan(&next, scan(&downloads)).unwrap());
+        let mut search = state.search.lock().unwrap();
+        let results = search.search("example", SearchMode::Files).unwrap().results;
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            PathBuf::from(&results[0].subtitle),
+            downloads.canonicalize().unwrap().join("example.txt")
+        );
+        drop(search);
+        state.replace_settings(Settings {
+            file_search_roots: Some(vec![]),
+            ..next.clone()
+        });
+        assert!(!state.accept_file_scan(&next, scan(&downloads)).unwrap());
+        assert_eq!(state.search.lock().unwrap().file_count(), 0);
+    }
+
+    #[test]
+    fn refresh_restarts_a_worker_that_stopped() {
+        let files = FileScan::default();
+        let mut receiver = None;
+        files
+            .request(|rx, _| {
+                receiver = Some(rx);
+                Ok(())
+            })
+            .unwrap();
+        assert!(matches!(
+            receiver.as_ref().unwrap().try_recv(),
+            Ok(Request::Refresh)
+        ));
+        drop(receiver.take());
+        files
+            .request(|rx, _| {
+                receiver = Some(rx);
+                Ok(())
+            })
+            .unwrap();
+        assert!(
+            receiver.is_some(),
+            "A disconnected scanner must be replaced"
+        );
+        assert!(matches!(receiver.unwrap().try_recv(), Ok(Request::Refresh)));
+    }
+
+    #[test]
+    fn queued_refresh_keeps_one_worker_and_shutdown_prevents_restart() {
+        let files = FileScan::default();
+        let mut receiver = None;
+        files
+            .request(|rx, _| {
+                receiver = Some(rx);
+                Ok(())
+            })
+            .unwrap();
+        files
+            .request(|_, _| panic!("A queued refresh must reuse the worker"))
+            .unwrap();
+        assert!(matches!(
+            receiver.as_ref().unwrap().try_recv(),
+            Ok(Request::Refresh)
+        ));
+        assert!(receiver.as_ref().unwrap().try_recv().is_err());
+        files
+            .request(|_, _| panic!("An idle worker must receive the refresh"))
+            .unwrap();
+        assert!(matches!(
+            receiver.as_ref().unwrap().try_recv(),
+            Ok(Request::Refresh)
+        ));
+        files.stop();
+        drop(receiver);
+        files
+            .request(|_, _| panic!("Shutdown must not start a worker"))
+            .unwrap();
     }
 }

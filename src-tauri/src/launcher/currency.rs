@@ -83,11 +83,11 @@ pub fn refresh(app: &AppHandle, force: bool) {
     if !state.ready.load(Ordering::Acquire) {
         return;
     }
-    if !state.settings.currency_rates_enabled {
+    if !state.settings().currency_rates_enabled {
         if force {
-            state.currency.warning(Some(
-                "Currency refresh is disabled in settings.json.".into(),
-            ));
+            state
+                .currency
+                .warning(Some("Currency refresh is disabled in Settings.".into()));
             let _ = app.emit("currency-changed", ());
         }
         return;

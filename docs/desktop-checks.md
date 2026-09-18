@@ -25,14 +25,39 @@ CI checks installation, same-version replacement, and removal. On a physical des
 7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash.
 8. Start TinyDash again while it is running. Confirm that the existing window appears and a second launcher process does not remain running.
 9. Use Command/Ctrl + Enter on an app result. Confirm that the OS file manager shows its location.
-10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and returns to All mode.
+10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and selects the first visible category (All by default).
 11. Drag the handle above the search field. Confirm that the window moves and typing still enters text in the search field. Select text with the mouse and change the search mode. Confirm that these controls do not move the window. Hide and reopen the launcher. Confirm that it keeps a position that fits on the screen.
 12. Move the launcher to another display, then disconnect that display or reduce its resolution. Reopen the launcher. Confirm that it moves inside the remaining screen's work area. Check displays with different scale factors. On Wayland, check placement through the compositor because TinyDash cannot set absolute positions there.
 13. Move the selection with the arrow keys while refreshing the file or application index. Confirm that the refresh keeps the latest selection if that result still exists. Enter a new query and confirm that it selects the first result.
 14. Type a query, then immediately press Escape. Add a file in a configured folder while TinyDash is hidden. Reopen TinyDash and confirm that the new file is searchable. Repeat after hiding through the global shortcut and after opening a result.
-15. Press Tab in the search field. Confirm that the full category list opens and All stays selected. Press Tab again to select Apps. Type a query and confirm that the list closes, typing stays in the search field, and Apps stays selected. Press Tab again and confirm that Files is selected. Use Shift + Tab to move back. Check that selection wraps between the first and last categories. Press Escape once to close the list and again to hide the launcher.
+15. With the default categories shown, press Tab in the search field. Confirm that Apps is selected immediately. Type a query, then press Tab again. Confirm that Files is selected, the query stays unchanged, and the search field keeps focus. Use Shift + Tab to move back. Check that selection wraps between the first and last visible categories. Make the window narrow and confirm that the bar scrolls to show the selected category. Press Escape once to hide the launcher.
 
-The global shortcut uses Control on all platforms. For shortcuts shown as Command/Ctrl, use Ctrl on Windows and Linux, and Command on macOS. If a shortcut conflicts with another application, change it in `settings.json` and repeat the check. On macOS 27, Command + Shift + Space opens Siri Visual Intelligence and must not be used as TinyDash's default.
+The default global shortcut uses Control on all platforms. For shortcuts shown as Command/Ctrl, use Ctrl on Windows and Linux, and Command on macOS. If a shortcut conflicts with another application, change it in Settings and repeat the check. On macOS 27, Command + Shift + Space opens Siri Visual Intelligence and must not be used as TinyDash's default.
+
+## Check Settings
+
+1. Open Settings with Command/Ctrl + comma. Close it, then open it from the Actions menu and the tray menu. Confirm that there is one Settings window.
+2. Select **Record new**. Press a key combination, then **Save changes**. Use that combination while another app has focus. Confirm that TinyDash opens without a restart. Restore the original shortcut after this check.
+3. Cancel a recording with Escape. Confirm that the saved shortcut still works. Try a shortcut already used by another app. If the OS rejects it, confirm that the error appears and the previous shortcut still works.
+4. Change **Hide when focus is lost** and **Clear search when opened**. Save, then check each behaviour. Confirm that Settings stays open when another app has focus.
+5. Choose Light, Dark, and Compact in Appearance. Confirm that the launcher changes immediately and keeps the choice after a restart.
+6. In a separate test profile, change the clipboard limit and file folders. Save and confirm that the history limit and file index update without a restart. Turn currency updates off and confirm that saved rates remain usable.
+7. Change a field without saving, close Settings, and reopen it. Confirm that the edit remains. Select **Discard** and confirm that the saved value returns.
+8. Open **Categories**. Clear some checkboxes, including the active category, then select **Save changes**. Confirm that the bar shows only the selected categories and selects the first visible one. Check that Tab and Shift + Tab skip hidden categories. Keep only one checkbox selected and confirm that you cannot clear it. Restart TinyDash and confirm that the choices remain saved. Restore the original category choices after this check.
+
+## Check passwords, time zones, URLs, and web search
+
+Use generated test values for these checks. Restore the original clipboard when finished.
+
+1. Enter `password 32`. Confirm that the results include symbols, letters and digits, a word passphrase, and a PIN. Check the strength estimate. Copy the first result and confirm that it matches the displayed 32 characters. Confirm that this copy does not appear in TinyDash's clipboard history.
+2. Check `password letters 64`, `passphrase 6`, and `pin 6`. Confirm the character, word, or digit count. Check that `password 5` and `password 65` show an error. Select **Generate another** and confirm that the selected type stays selected. Clear the query, enter it again, and confirm that new passwords appear.
+3. Enter `time in tokyo` and `time in us`. Check the named zones, dates, and UTC offsets. Leave the current time visible across a minute change and confirm that it updates.
+4. Enter `tomorrow 3pm london`. Confirm that the source date is tomorrow in London and the local result has the correct date and offset. Check `2026-03-29 1:30 london` for a missing-time error and `2026-10-25 1:30 london` for two possible results.
+5. Paste `https://www.youtube.com/watch?v=demo&t=90&si=test&utm_source=share`. Confirm that two fields are removed and `v` and `t` remain. Copy the result and check the exact URL. Repeat with an Amazon product URL containing `tag` and a Spotify URL containing `si`.
+6. Use **Open cleaned URL** with a known public page. Confirm that the default browser opens the cleaned address.
+7. Enter `web rust & c++`. Confirm that Google, DuckDuckGo, Bing, Brave, YouTube, and GitHub appear. Copy each search URL and confirm that the complete query is one parameter. Open a search and confirm that the chosen engine receives that text. Check `ddg rust`, `yt rust`, and `gh rust` for one-engine searches. In All mode, enter `gh`, `brave`, or `google` without search text. Confirm that matching installed apps appear without an empty web search warning. With Ghostty installed, check that `gh` finds it and `gh rust` still searches GitHub.
+
+Password generation, time conversion, and URL cleaning must also work with the network disconnected. Web searches need a connection only after opening them in the browser.
 
 ## Check calculations and emoji
 
@@ -50,6 +75,8 @@ The global shortcut uses Control on all platforms. For shortcuts shown as Comman
 Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. Automatic paste is not implemented.
 
 ## Check usage ranking
+
+Select an app and pin it from its detail panel. Clear the query in All or Apps and confirm that the app appears in the Pinned group. Restart TinyDash and confirm that the pin remains. Search for another app by its exact name and confirm that the pin does not change the match order. Switch to Compact, unpin the app through Actions, and confirm that the Pinned group disappears when no pins remain. Restore the original pins after this check.
 
 1. Launch an app from a lower position in the list. Reopen TinyDash and clear the query. Confirm that the app moves higher in the list.
 2. Copy an emoji. Reopen TinyDash and enter `:`. Confirm that the copied emoji moves higher in the emoji list.
@@ -87,6 +114,7 @@ macOS and Windows read their clipboard change counters once per second. Copies m
 7. Rename a configured root folder, then recreate it and add a file. Confirm that the replacement root updates. Use Refresh files to confirm that manual recovery remains available. Set `fileWatchEnabled` to `false` and restart to check manual-only operation, then restore the setting.
 8. Configure a temporary folder in `fileSearchRoots`. Add hidden files, an excluded `node_modules` folder, and symbolic links. Restart and confirm that the scanner excludes them. Test a folder without read permission and confirm that the app stays usable and shows a warning.
 9. Set `fileSearchLimit` to 2 in a folder with three files. Restart and confirm that the UI reports an incomplete scan. Set `fileSearchRoots` to `[]`, restart, and confirm that Files mode is empty. Restore the settings when finished.
+10. In Settings, select only `~/Documents` and save. Confirm that a known Documents file appears. Change the folder to `~/Downloads` and save without restarting. Confirm that the Documents result disappears immediately and only Downloads files appear after the scan. Repeat while a scan is in progress, then turn file search off and confirm that the results stay empty.
 
 File access depends on OS permissions. On macOS, record any Files and Folders permission prompt or denial. Test Windows redirected Known Folders and Linux XDG user directories if available. Files open through their OS association; a missing or broken association can prevent the target application from opening.
 

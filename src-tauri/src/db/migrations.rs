@@ -20,6 +20,9 @@ const MIGRATIONS: &[&str] = &[
         id INTEGER PRIMARY KEY CHECK (id = 1),
         snapshot TEXT NOT NULL CHECK (length(snapshot) BETWEEN 1 AND 65536)
     ) STRICT;",
+    "CREATE TABLE pinned_apps (
+        result_id TEXT PRIMARY KEY NOT NULL
+    ) STRICT;",
 ];
 
 pub fn apply(connection: &mut Connection) -> Result<()> {

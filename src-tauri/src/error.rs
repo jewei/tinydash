@@ -14,7 +14,7 @@ pub enum Error {
     SystemCommand(String),
     #[error("This result has expired. Search again to copy it.")]
     ResultExpired,
-    #[error("Search queries must contain at most 256 characters.")]
+    #[error("Use at most 256 characters for a search, or 8,192 for a URL.")]
     QueryTooLong,
     #[error("Could not open the application: {0}")]
     Launch(String),

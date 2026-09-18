@@ -13,6 +13,10 @@ pub enum SearchMode {
     Calculator,
     Clipboard,
     System,
+    Password,
+    Timezone,
+    Url,
+    Web,
 }
 
 pub struct Query<'a> {
@@ -22,7 +26,9 @@ pub struct Query<'a> {
 
 impl<'a> Query<'a> {
     pub fn parse(input: &'a str, mut mode: SearchMode) -> Result<Self> {
-        if input.chars().count() > 256 {
+        let url_input = mode == SearchMode::Url
+            || crate::providers::tools::url_cleaner::is_candidate(input.trim());
+        if input.chars().count() > if url_input { 8192 } else { 256 } {
             return Err(Error::QueryTooLong);
         }
         let mut text = input.trim();

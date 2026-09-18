@@ -1,6 +1,6 @@
 # TinyDash
 
-A small desktop launcher. This version implements Phases 1 through 8.
+A small desktop launcher with local tools and a separate settings window.
 
 Search installed applications and local filenames or paths. Find saved clipboard text, calculate values, convert units, search local emoji data, and run system commands. The app stays running after the window hides.
 
@@ -33,11 +33,27 @@ After building a new version, quit the running TinyDash process through the tray
 
 `bun run dev` runs only the frontend in a browser. It displays an empty state because app discovery requires the desktop backend. It does not load test data.
 
+## Appearance
+
+Open **Actions → Appearance** to choose **Light**, **Dark**, or **Compact**. The Canvas layout uses a result list and a detail panel. Light has cream surfaces and peach highlights. Dark has charcoal and olive surfaces. Compact uses a single column with shorter rows. The app saves your choice on this device. Previous Mint, Paper, and Graphite choices map to Dark, Light, and Compact.
+
+The design follows the approved warm refinement in `designs/polished.html`. It uses smaller row corners, a peach selection marker, and separate location and filename details. The main action stays visible when details scroll. Figtree and Caprasimo are bundled locally with their SIL Open Font License files in `public/fonts/`; no font service is required. The desktop window is 980 × 620. At small widths, the list takes the full width and clipboard previews appear below it.
+
+On macOS, TinyDash loads application icons through NSWorkspace and converts them to bounded PNG images during the background scan. Application names become searchable before the icons finish loading. The list and detail panel use the same image, with a fallback if an icon is unavailable.
+
+Rounded corners require a transparent native window and a transparent page background. The macOS build enables Tauri's `macos-private-api` feature for transparency. This requires a separate approach for Mac App Store distribution, as described in the [Tauri transparency configuration](https://v2.tauri.app/reference/config/#transparent).
+
+Press **Tab** from the search field to select the next visible category. **Shift + Tab** selects the previous category. Selection wraps at both ends. The search field keeps focus and the query stays unchanged. You can also click a category in the bar. Use the arrow keys to select results, **Enter** to open the selected result, and **Escape** to hide the launcher. Emoji mode uses a grid with arrow-key navigation. The detail panel provides the selected result's supported actions; app paths and clipboard content come from the existing backend.
+
+To compare the designs, run `bun run dev` and open [the design preview](http://127.0.0.1:1420/designs/). Each preview uses the real launcher components with labelled sample data. Search for `Safari`, `:coffee`, or `12 * 8`, or change the search mode. Preview actions do not open applications, change the system clipboard, or run system commands. The separate preview entry and its sample backend are excluded from the desktop build.
+
+All categories are visible by default. Open **Settings > Categories**, select the checkboxes for the categories you want to show, then select **Save changes**. Keep at least one category selected. Hiding a category does not remove its results from All. In small windows, the category bar scrolls to keep the selected category visible. **Option/Alt + Left/Right** also changes the category from the search field.
+
+Select an app and use **Pin** in the detail panel, or **Actions → Pin application**. Pinned apps appear first when All or Apps has an empty query. Typed searches keep their match order. Pins stay saved after a restart. Use **Unpin application** to remove a pin. Pins use the local SQLite database.
+
 ## Search
 
-Press **Tab** from the search field to show all search categories. Each later **Tab** selects the next category, including after typing closes the list. **Shift + Tab** selects the previous category. Typing stays in the search field and keeps the selected category. **Enter** or **Escape** closes the category list. You can also click the category button and select a category directly.
-
-The **All** mode combines application, file, clipboard, emoji, calculation, and system command results. Select **Apps**, **Files**, **Clipboard**, **Emoji**, **Calculator**, or **System** to limit the search. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows applications only.
+The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Time zones, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows applications only.
 
 | Query            | Result                         |
 | ---------------- | ------------------------------ |
@@ -95,9 +111,9 @@ TinyDash captures text while it is running, including the current clipboard at s
 
 The default limit is 100 entries. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, images, and larger values are skipped. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
 
-Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. Clear history asks for confirmation before deleting all entries. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again. The schema includes a pin flag for later use; this version has no pin controls.
+Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. Clear history asks for confirmation before deleting all entries. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again. Clipboard entries cannot be pinned in this version.
 
-History is local plain text in the same SQLite database as usage. It can contain sensitive text that you copy; there is no password detection or encryption. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Set `clipboardHistoryEnabled` to `false` and restart to stop capture. Existing history remains searchable and can be cleared.
+History is local plain text in the same SQLite database as usage. It can contain sensitive text that you copy; there is no general password detection or encryption. Copies from TinyDash's password generator skip capture during that session. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
 
 macOS checks the [pasteboard change counter](https://developer.apple.com/documentation/appkit/nspasteboard/changecount). Windows checks the [clipboard sequence number](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber). Each check runs once per second and when the launcher opens. Text is read only when the counter changes. Rapid copies within one interval can be missed. Linux uses GTK [owner-change events](https://docs.gtk.org/gtk3/signal.Clipboard.owner-change.html) and asynchronous text requests, with no polling timer. Wayland can restrict background access; opening TinyDash requests the current clipboard again. Desktop session checks remain necessary for Wayland.
 
@@ -111,13 +127,44 @@ macOS checks the [pasteboard change counter](https://developer.apple.com/documen
 | Command / Ctrl + 1 through 9 | Run the corresponding result's primary action                       |
 | Command / Ctrl + Enter       | Show the selected app or file in its folder                         |
 | Command / Ctrl + Backspace   | Delete the selected clipboard entry                                 |
+| Command / Ctrl + ,           | Open TinyDash Settings                                              |
 | Command / Ctrl + K           | Open the actions menu                                               |
 | Command / Ctrl + R           | Refresh rates in Calculator, files in Files, or apps in other modes |
 | Command / Ctrl + Q           | Quit TinyDash                                                       |
 
+## Passwords, time zones, URLs, and web search
+
+| Input                                                                      | Result                                                                                  |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `password` or `password 32`                                                | Passwords with symbols, passwords with letters and digits, a word passphrase, and a PIN |
+| `password letters 24`                                                      | A password with letters and digits                                                      |
+| `passphrase 6`                                                             | Six random words                                                                        |
+| `pin 6`                                                                    | A six-digit PIN                                                                         |
+| `time in tokyo`                                                            | The current time in Tokyo, with your local time                                         |
+| `tomorrow 3pm london`                                                      | Tomorrow at 15:00 in London, converted to your local time                               |
+| `in 2 days 11pm new york`                                                  | A relative date conversion                                                              |
+| `2026-10-25 1:30 london`                                                   | Both possible times during the daylight saving change                                   |
+| `https://youtu.be/example?si=tracking&t=90`                                | A cleaned URL that keeps the video time                                                 |
+| `web rust programming`                                                     | Search choices for six engines                                                          |
+| `google rust`, `ddg rust`, `bing rust`, `brave rust`, `yt rust`, `gh rust` | A search with one engine                                                                |
+
+Character passwords support 6 to 64 characters and default to 20. Passphrases support 3 to 12 words and default to six. PINs support 4 to 12 digits and default to six. Generation uses the operating system's [secure random source](https://docs.rs/getrandom/0.3.4/getrandom/fn.fill.html) with unbiased selection. Passphrases use the bundled [EFF Large Wordlist](https://www.eff.org/dice), with attribution in Settings → About and the source data directory. Strength estimates use the number of possible generated values, in bits. They do not predict a cracking time. **Generate another** replaces the selected result. Copy uses the exact displayed value and skips TinyDash's clipboard history for that copy.
+
+Time zones use the bundled [IANA database through chrono-tz](https://docs.rs/chrono-tz/0.10.4/chrono_tz/). City names, aliases, regions such as US and Australia, and full names such as `America/New_York` work offline. Relative dates use the date in the source city. Today, tomorrow, yesterday, weekdays, next week, and `in N days` are supported. The output shows explicit dates and UTC offsets. Missing times during a clock change produce an error; repeated times produce two results. Current times refresh each minute while visible. An app update is needed for new time zone rules.
+
+The URL cleaner removes common tracking fields, including `utm_*`, `fbclid`, `gclid`, and `msclkid`. It has additional Amazon, YouTube, and Spotify rules. It keeps unrelated query values, duplicate keys, encoded values, and fragments. Video IDs, timestamps, playlist IDs, and product options remain in place. It shows the removal count and provides **Copy cleaned URL** and **Open cleaned URL**. Cleaning works offline, supports URLs up to 8,192 characters, and does not follow shortened links.
+
+Web search supports Google, DuckDuckGo, Bing, Brave, YouTube, and GitHub. Enter opens the selected search in your default browser. **Copy search URL** copies its URL. TinyDash does not send the search until you open it. Other queries are limited to 256 characters.
+
+In All mode, an engine name or shortcut starts a web search only when search text follows it. For example, `gh` can find Ghostty, while `gh rust` searches GitHub. The same rule lets `brave` find Brave Browser and `google` find Google Chrome.
+
 ## Settings
 
-TinyDash writes `settings.json` in its application configuration directory on first launch. Edit the file, then restart TinyDash.
+Open **Actions → Settings**, press **Command+,** on macOS or **Ctrl+,** on Windows and Linux, or select **Settings** from the tray menu. The separate window opens on Shortcut. Click **Record new**, press a key combination, then click **Save changes**. Shortcut changes apply at once. If registration or saving fails, TinyDash keeps the previous shortcut.
+
+Settings includes Shortcut, Appearance, Categories, Clipboard history, File search, Currency, Privacy, and About. Save changes to apply visible categories, window behaviour, clipboard limits, file folders, file watching, and currency updates while TinyDash runs. Appearance applies immediately and stays in sync between windows. Closing Settings keeps an unfinished form. Use Discard to restore saved values.
+
+You can also open Settings directly with `tinydash --settings`. TinyDash writes `settings.json` in its application configuration directory on first launch. Manual file edits still require a restart. The settings screen preserves unknown JSON fields and refuses to overwrite a damaged file.
 
 | Platform | Default location                                                                                           |
 | -------- | ---------------------------------------------------------------------------------------------------------- |
@@ -140,13 +187,13 @@ TinyDash writes `settings.json` in its application configuration directory on fi
 }
 ```
 
-Set `clearQueryOnOpen` to `false` to keep the previous query and search mode. TinyDash selects that text when the window opens. With the default setting, it clears the query and returns to All mode. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Shortcut changes take effect after restart. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
+Set `clearQueryOnOpen` to `false` to keep the previous query and search mode. TinyDash selects that text when the window opens. With the default setting, it clears the query and selects the first visible category, which is All by default. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Use the settings screen to apply shortcut changes at once. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
 
 On macOS, a saved `CommandOrControl+Shift+Space` value from earlier TinyDash versions now uses `Control+Shift+Space`. This compatibility rule keeps the settings file intact, including other user settings. Other custom shortcuts remain unchanged. New settings files contain `Control+Shift+Space`.
 
-Set `clipboardHistoryLimit` to a value between 1 and 500. TinyDash applies the limit on restart and after each capture. Missing settings use their defaults. The settings file remains the editable startup configuration. Usage and clipboard data are stored separately in SQLite.
+Set `clipboardHistoryLimit` to a value between 1 and 500. TinyDash applies the limit when saved in Settings, on restart, and after each capture. Missing settings use their defaults. The settings file remains the editable startup configuration. Usage and clipboard data are stored separately in SQLite.
 
-Set `fileSearchRoots` to `null` for the default folders, `[]` to disable file scanning, or an array of absolute paths. A leading `~` refers to your home folder on all three platforms. For example, `["~/Documents", "~/Projects"]` scans those two folders; `["~"]` scans your home folder. Windows paths in JSON need escaped backslashes, such as `"C:\\Users\\Alex\\Documents"`. `fileSearchLimit` is restricted to 1 through 100,000. `fileSearchExcludedDirs` contains exact folder names, not patterns. These settings take effect after a process restart.
+Set `fileSearchRoots` to `null` for the default folders, `[]` to disable file scanning, or an array of absolute paths. A leading `~` refers to your home folder on all three platforms. For example, `["~/Documents", "~/Projects"]` scans those two folders; `["~"]` scans your home folder. Windows paths in JSON need escaped backslashes, such as `"C:\\Users\\Alex\\Documents"`. `fileSearchLimit` is restricted to 1 through 100,000. `fileSearchExcludedDirs` contains exact folder names, not patterns. Changes saved in Settings start a new scan and update the file watcher. Manual JSON edits take effect after a process restart.
 
 ## Usage and ranking
 
@@ -190,7 +237,7 @@ The path is `query → SearchManager → providers → ranking → top 30 result
 
 - One Rust crate owns discovery, matching, ranking, usage persistence, indexed app IDs, launch actions, window lifecycle, settings, and shortcuts.
 - `SearchManager` reuses a `nucleo-matcher` instance. Names, aliases, and paths are prepared when the app index changes. Matching ignores case and supports Unicode normalization. Match and usage bonuses are applied in `ranking/mod.rs` before selecting the top 30. Unused apps keep a stable alphabetical order when the query is empty.
-- `AppProvider`, `FileProvider`, `ClipboardProvider`, `EmojiProvider`, `CalculatorProvider`, and `SystemCommandProvider` return the same result model. Rust parses search modes and prefixes. The emoji index and small system command catalog load on their first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit.
+- `AppProvider`, `FileProvider`, `ClipboardProvider`, `EmojiProvider`, `CalculatorProvider`, `SystemCommandProvider`, and `ToolProvider` return the same result model. Rust parses search modes and prefixes. The emoji index and small system command catalog load on their first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit. Tool results use a bounded cache of 64 issued IDs. Password refreshes keep the displayed value; a new password search or **Generate another** produces new values.
 - Discovery builds a new index off the UI thread. The old index remains available during refresh. Tauri's existing async runtime runs application scans, searches, launch work, and currency requests. A file worker owns the scanner and watcher. A clipboard worker handles observations and database writes. Only macOS and Windows use the one-second clipboard counter timer.
 - Currency lookup reads a shared, immutable rate table in memory. Network requests and SQLite writes run outside the search lock. `currency.rs` contains the source request and parser; the calculator does not depend on the HTTP response format. The HTTP client reuses the reqwest version already required by Tauri and uses the OS TLS stack.
 - Clipboard capture, copy, delete, and clear use the same storage lock. A generation number rejects reads already in progress when an entry is removed. Search never waits for disk access. Linux coalesces pending clipboard observations in a bounded queue. Results include short text summaries; a separate request fetches the selected entry's preview.
@@ -199,7 +246,7 @@ The path is `query → SearchManager → providers → ranking → top 30 result
 - The frontend sends a result ID and an action. Rust resolves app paths, indexed file paths, emoji values, and calculation values. It checks that a file still exists before opening it. A bounded cache holds the last 32 calculation results so copying an issued result does not evaluate it again. The webview has no general shell, opener, filesystem, clipboard, or global-shortcut permissions.
 - System command IDs resolve against the Rust catalog. Rust owns command aliases, confirmation text, and the confirmation rule. The frontend supplies explicit consent after the dialog. Platform modules contain the native API calls; no shell command text comes from the webview.
 - The official global shortcut, opener, and clipboard manager plugins supply desktop integration through Rust. The official single-instance plugin brings the existing process forward when the user starts TinyDash again.
-- App icons use initials in this version. The UI uses system fonts and local CSS. It makes no network requests.
+- macOS app icons come from NSWorkspace. Unavailable icons use initials. The UI uses bundled fonts and local CSS. It makes no network requests.
 
 The providers use direct methods. No provider trait is needed. The shared result and action enums contain only implemented variants. Future providers can join `SearchManager` without moving logic into TypeScript.
 

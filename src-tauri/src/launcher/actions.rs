@@ -16,6 +16,8 @@ pub enum ResolvedAction {
     Copy(String),
     Delete(i64),
     System(SystemCommand),
+    OpenUrl(String),
+    RegeneratePassword(String),
 }
 
 impl ResolvedAction {
@@ -45,7 +47,7 @@ pub async fn execute_action(
     confirmed: Option<bool>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let keep_open = action == Action::Delete;
+    let keep_open = matches!(action, Action::Delete | Action::Regenerate);
     let worker_app = app.clone();
     let usage_id = tauri::async_runtime::spawn_blocking(move || {
         // Resolve backend-owned IDs. The webview supplies neither executable
@@ -89,6 +91,17 @@ pub async fn execute_action(
                     .storage
                     .copy(&worker_app, &id, value)
             }
+            ResolvedAction::OpenUrl(url) => worker_app
+                .opener()
+                .open_url(url, None::<&str>)
+                .map_err(|error| error.to_string()),
+            ResolvedAction::RegeneratePassword(id) => worker_app
+                .state::<LauncherState>()
+                .search
+                .lock()
+                .map_err(|_| Error::IndexUnavailable.to_string())?
+                .tools
+                .regenerate(&id),
             ResolvedAction::Delete(id) => worker_app
                 .state::<LauncherState>()
                 .storage

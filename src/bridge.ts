@@ -1,8 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type Action = "launch" | "open" | "reveal" | "copy" | "delete" | "run";
+export type Action =
+  "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
 export type SearchMode =
-  "all" | "apps" | "files" | "emoji" | "calculator" | "clipboard" | "system";
+  | "all"
+  | "apps"
+  | "files"
+  | "emoji"
+  | "calculator"
+  | "clipboard"
+  | "system"
+  | "password"
+  | "timezone"
+  | "url"
+  | "web";
 
 export interface FileStatus {
   total: number;
@@ -19,13 +30,38 @@ export interface CurrencyStatus {
 export interface SearchResult {
   id: string;
   kind:
-    "app" | "file" | "emoji" | "calculation" | "clipboard" | "systemCommand";
+    | "app"
+    | "file"
+    | "emoji"
+    | "calculation"
+    | "clipboard"
+    | "systemCommand"
+    | "password"
+    | "timezone"
+    | "cleanedUrl"
+    | "webSearch";
   title: string;
   subtitle: string;
   score: number;
   icon: string | null;
   primaryAction: Action;
   secondaryActions: Action[];
+  detail?:
+    | {
+        type: "password";
+        variant: string;
+        entropyBits: number;
+        strength: string;
+      }
+    | {
+        type: "timezone";
+        source: string;
+        local: string;
+        sourceZone: string;
+        ambiguous: boolean;
+      }
+    | { type: "cleanedUrl"; original: string; removed: number }
+    | { type: "webSearch"; engine: string; query: string; url: string };
   confirmation?: {
     title: string;
     description: string;
@@ -35,6 +71,7 @@ export interface SearchResult {
 
 export interface SearchResponse {
   results: SearchResult[];
+  pinnedIds: string[];
   total: number;
   indexing: boolean;
   indexError: string | null;
@@ -44,21 +81,34 @@ export interface SearchResponse {
   currency: CurrencyStatus;
 }
 
+export interface SettingsValues {
+  clearQueryOnOpen: boolean;
+  hideOnBlur: boolean;
+  shortcut: string;
+  clipboardHistoryEnabled: boolean;
+  clipboardHistoryLimit: number;
+  fileSearchRoots: string[] | null;
+  fileSearchLimit: number;
+  fileSearchExcludedDirs: string[];
+  fileWatchEnabled: boolean;
+  currencyRatesEnabled: boolean;
+  visibleCategories: SearchMode[];
+}
+
 export interface LauncherInfo {
-  settings: {
-    clearQueryOnOpen: boolean;
-    hideOnBlur: boolean;
-    shortcut: string;
-    clipboardHistoryEnabled: boolean;
-    clipboardHistoryLimit: number;
-    fileSearchRoots: string[] | null;
-    fileSearchLimit: number;
-    fileSearchExcludedDirs: string[];
-    fileWatchEnabled: boolean;
-    currencyRatesEnabled: boolean;
-  };
+  settings: SettingsValues;
   platform: "macos" | "windows" | "linux";
   warnings: string[];
+}
+
+export interface SettingsInfo {
+  settings: SettingsValues;
+  defaults: SettingsValues;
+  platform: LauncherInfo["platform"];
+  version: string;
+  configPath: string;
+  dataPath: string;
+  shortcutsAvailable: boolean;
 }
 
 export interface ClipboardEntry {
@@ -70,8 +120,18 @@ export interface ClipboardEntry {
 
 export const backend = {
   ready: () => invoke<LauncherInfo>("launcher_ready"),
+  openSettings: () => invoke<void>("open_settings"),
+  settings: () => invoke<SettingsInfo>("get_settings"),
+  saveSettings: (settings: SettingsValues) =>
+    invoke<SettingsValues>("save_settings", { settings }),
+  recordShortcut: (recording: boolean) =>
+    invoke<void>("set_shortcut_recording", { recording }),
+  revealSettings: (data = false) =>
+    invoke<void>("reveal_settings_path", { data }),
   search: (query: string, mode: SearchMode) =>
     invoke<SearchResponse>("search", { query, mode }),
+  setAppPinned: (id: string, pinned: boolean) =>
+    invoke<void>("set_app_pinned", { id, pinned }),
   execute: (id: string, action: Action, confirmed = false) =>
     invoke<void>("execute_action", {
       id,
