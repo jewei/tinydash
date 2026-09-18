@@ -7,7 +7,7 @@ const UPPER: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const DIGITS: &[u8] = b"0123456789";
 const SYMBOLS: &[u8] = b"!@#$%^&*()-_=+[]{};:,.?";
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Style {
     Symbols,
     Alphanumeric,
@@ -15,7 +15,7 @@ pub enum Style {
     Pin,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Spec {
     pub style: Style,
     pub length: usize,

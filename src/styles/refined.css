@@ -250,6 +250,12 @@ body {
   width: 30px;
   height: 30px;
 }
+.pin-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
 .pin-button {
   display: inline-flex;
   align-items: center;
@@ -378,6 +384,10 @@ body {
   font-size: clamp(30px, 5vw, 48px);
 }
 .clipboard-results .preview-topline {
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+.clipboard-results .preview-topline .preview-icon {
   display: none;
 }
 .clipboard-results .preview-title {
@@ -409,7 +419,18 @@ body {
   grid-template-columns: minmax(0, 1fr);
 }
 .emoji-results .result-pin {
-  display: none;
+  display: flex;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.emoji-results .result-entry {
+  display: contents;
+}
+.emoji-results .result-group {
+  display: flex;
+  grid-column: 1 / -1;
+  padding: 4px 0;
 }
 .emoji-results .result-row.selected::before {
   display: none;

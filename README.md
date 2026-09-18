@@ -49,11 +49,13 @@ To compare the designs, run `bun run dev` and open [the design preview](http://1
 
 All categories are visible by default. Open **Settings > Categories**, select the checkboxes for the categories you want to show, then select **Save changes**. Keep at least one category selected. Hiding a category does not remove its results from All. In small windows, the category bar scrolls to keep the selected category visible. **Option/Alt + Left/Right** also changes the category from the search field.
 
-Select an app and use **Pin** in the detail panel, or **Actions → Pin application**. Pinned apps appear first when All or Apps has an empty query. Typed searches keep their match order. Pins stay saved after a restart. Use **Unpin application** to remove a pin. Pins use the local SQLite database.
+Select an item and use **Pin to All** or **Pin to Apps**, or the item's category, in the detail panel or Actions menu. Each category has its own pin list. You can pin the same item to both All and its category. Removing one pin keeps the other pin. Pinned items appear in a Pinned section when that category has an empty query. Typed searches keep their match order. Pins stay saved in the local SQLite database after a restart. Existing app pins move to both Apps and All when the database updates.
+
+Tool pins save their input and output choice. When you open a category, TinyDash uses this input to show current tool results. Password pins save the generator type and length. They generate a new value after a restart. Generated passwords are not stored as pins.
 
 ## Search
 
-The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Time zones, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows applications only.
+The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Time zones, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows its pinned items, then applications.
 
 | Query            | Result                         |
 | ---------------- | ------------------------------ |
@@ -109,9 +111,9 @@ The [notify](https://docs.rs/notify/8.2.0/notify/) watcher uses FSEvents on macO
 
 TinyDash captures text while it is running, including the current clipboard at startup. Select Clipboard mode to see recent entries. Search any word in the saved text, use the arrow keys to inspect its full preview, and press Enter to copy it. Paste it in the target application with Command/Ctrl + V.
 
-The default limit is 100 entries. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, images, and larger values are skipped. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
+The default limit is 100 unpinned entries. Pins in Clipboard or All keep an entry outside this limit. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, images, and larger values are skipped. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
 
-Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. Clear history asks for confirmation before deleting all entries. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again. Clipboard entries cannot be pinned in this version.
+Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. Clear history asks for confirmation before deleting all entries, including pinned entries. Deleting an entry removes its pins from both categories. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again.
 
 History is local plain text in the same SQLite database as usage. It can contain sensitive text that you copy; there is no general password detection or encryption. Copies from TinyDash's password generator skip capture during that session. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
 
@@ -209,7 +211,7 @@ TinyDash stores `result_id`, `use_count`, and `last_used_at` in `tinydash.sqlite
 | Windows  | `%APPDATA%\dev.tinydash.launcher\tinydash.sqlite3`                                                                  |
 | Linux    | `$XDG_DATA_HOME/dev.tinydash.launcher/tinydash.sqlite3`, or `~/.local/share/dev.tinydash.launcher/tinydash.sqlite3` |
 
-Opening a location, failed actions, and calculation copies do not change usage counts. Calculation IDs are temporary. Search queries are not stored. Copied calculation results can enter clipboard history while capture is enabled. App and file usage is tied to the indexed path; moving an item gives it a new ID. File usage IDs contain the full path.
+Opening a location, failed actions, and calculation copies do not change usage counts. Calculation IDs are temporary. Tool pins store the input needed to run that tool again. Other search queries are not stored. Copied calculation results can enter clipboard history while capture is enabled. App and file usage is tied to the indexed path; moving an item gives it a new ID. File usage IDs contain the full path.
 
 The database loads once on a background worker. Search uses an in-memory copy and performs no database reads while typing. SQLite writes use one connection, a short lock timeout, and explicit transactions for schema migrations and clipboard capture with pruning. There are no database polling timers. SQLite is bundled through [rusqlite](https://docs.rs/rusqlite/0.40.2/rusqlite/), so users do not need a separate SQLite installation.
 

@@ -3,6 +3,7 @@ pub mod clipboard;
 pub mod currency;
 mod file_watch;
 pub mod files;
+pub mod pins;
 pub mod preferences;
 pub mod query;
 pub mod result;
@@ -162,7 +163,6 @@ pub async fn search(
             .map_err(|error| error.to_string())?;
         Ok(SearchResponse {
             results: outcome.results,
-            pinned_ids: search.pinned_ids(),
             notice: outcome.notice,
             storage_error: state
                 .storage
@@ -189,18 +189,23 @@ pub fn refresh_apps(app: AppHandle) {
 }
 
 #[tauri::command]
-pub async fn set_app_pinned(app: AppHandle, id: String, pinned: bool) -> Result<(), String> {
+pub async fn set_pinned(
+    app: AppHandle,
+    id: String,
+    category: SearchMode,
+    pinned: bool,
+) -> Result<(), String> {
     let worker_app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         worker_app
             .state::<LauncherState>()
             .storage
-            .set_pinned(&worker_app, &id, pinned)
+            .set_pinned(&worker_app, &id, category, pinned)
     })
     .await
     .map_err(|error| error.to_string())??;
     if let Err(error) = app.emit("pins-changed", ()) {
-        tracing::debug!(%error, "No app pin listener");
+        tracing::debug!(%error, "No pin listener");
     }
     Ok(())
 }

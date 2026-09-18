@@ -113,6 +113,7 @@ impl EmojiProvider {
                     icon: Some(entry.emoji.as_str().to_owned()),
                     primary_action: Action::Copy,
                     secondary_actions: vec![],
+                    pin: None,
                     confirmation: None,
                     detail: None,
                 })

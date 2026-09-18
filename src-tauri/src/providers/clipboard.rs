@@ -124,6 +124,7 @@ impl ClipboardProvider {
                     icon: None,
                     primary_action: Action::Copy,
                     secondary_actions: vec![Action::Delete],
+                    pin: None,
                     confirmation: None,
                     detail: None,
                 })

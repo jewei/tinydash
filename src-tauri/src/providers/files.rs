@@ -45,6 +45,22 @@ impl FileEntry {
         })
     }
 
+    pub fn result(&self, score: u32) -> SearchResult {
+        SearchResult {
+            id: self.id.clone(),
+            kind: ResultKind::File,
+            title: self.name.clone(),
+            subtitle: self.path.clone(),
+            score,
+            icon: None,
+            primary_action: Action::Open,
+            secondary_actions: vec![Action::Reveal],
+            pin: None,
+            confirmation: None,
+            detail: None,
+        }
+    }
+
     pub fn validate(&self) -> Result<()> {
         let metadata = std::fs::symlink_metadata(&self.path).map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
@@ -168,21 +184,7 @@ impl FileProvider {
         matches.sort_unstable_by(compare);
         matches
             .into_iter()
-            .map(|(index, score)| {
-                let file = &self.files[index].entry;
-                SearchResult {
-                    id: file.id.clone(),
-                    kind: ResultKind::File,
-                    title: file.name.clone(),
-                    subtitle: file.path.clone(),
-                    score,
-                    icon: None,
-                    primary_action: Action::Open,
-                    secondary_actions: vec![Action::Reveal],
-                    confirmation: None,
-                    detail: None,
-                }
-            })
+            .map(|(index, score)| self.files[index].entry.result(score))
             .collect()
     }
 }

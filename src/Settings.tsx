@@ -655,7 +655,7 @@ export default function Settings() {
                   <span>
                     <strong>History limit</strong>
                     <span class="settings-hint">
-                      Keep 1 to 500 entries. Older entries are removed.
+                      Keep 1 to 500 unpinned entries. Pinned entries stay saved.
                     </span>
                   </span>
                   <input
@@ -819,8 +819,9 @@ export default function Settings() {
                 <div class="settings-group">
                   <h2>Stored on this computer</h2>
                   <p>
-                    TinyDash stores your settings, app usage counts, and saved
-                    clipboard text locally. It searches file names and paths.
+                    TinyDash stores your settings, app usage counts, pins, and
+                    saved clipboard text locally. Tool pins save their input.
+                    TinyDash searches file names and paths.
                   </p>
                   <p>
                     Generated passwords stay in memory. TinyDash does not add
@@ -977,7 +978,7 @@ export default function Settings() {
       <Show when={clearOpen()}>
         <ConfirmDialog
           title="Clear clipboard history?"
-          description="This deletes all saved text entries. The current system clipboard stays available."
+          description="This deletes all saved text entries, including pinned entries. The current system clipboard stays available."
           confirmLabel="Clear history"
           busyLabel="Clearing..."
           busy={clearing()}

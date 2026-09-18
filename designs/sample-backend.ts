@@ -1,11 +1,35 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { LauncherInfo, SearchMode, SearchResult } from "../src/bridge";
-import { defaultCategories } from "../src/categories";
+import { defaultCategories, resultCategories } from "../src/categories";
 
-let pinnedIds: string[] = JSON.parse(
-  localStorage.getItem("tinydash.preview.pins") ?? "[]",
+const savedPins = JSON.parse(
+  localStorage.getItem("tinydash.preview.pins") ?? "{}",
 );
+const pins: Partial<Record<SearchMode, string[]>> = Array.isArray(savedPins)
+  ? { all: savedPins, apps: savedPins }
+  : savedPins;
+const issued = new Map<string, SearchResult>();
+
+function describePins(results: SearchResult[]): SearchResult[] {
+  return results.map((result) => {
+    const key =
+      result.kind === "calculation"
+        ? `calculation:${result.subtitle}`
+        : result.id;
+    const described = {
+      ...result,
+      pin: {
+        key,
+        categories: defaultCategories.filter((category) =>
+          pins[category]?.includes(key),
+        ),
+      },
+    };
+    issued.set(result.id, described);
+    return described;
+  });
+}
 
 const apps: SearchResult[] = [
   "Safari",
@@ -200,16 +224,25 @@ mockIPC(
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
-      const results = sampleSearch(query, mode);
-      if (!query.trim() && (mode === "all" || mode === "apps")) {
+      const results = describePins(sampleSearch(query, mode));
+      if (!query.trim()) {
+        for (const key of pins[mode] ?? []) {
+          if (results.some((result) => result.pin?.key === key)) continue;
+          const result = key.startsWith("calculation:")
+            ? sampleSearch(key.slice(12), "calculator")[0]
+            : [...apps, ...files, ...clips, ...emoji, ...system].find(
+                (result) => result.id === key,
+              );
+          if (result) results.push(...describePins([result]));
+        }
         results.sort(
           (a, b) =>
-            Number(pinnedIds.includes(b.id)) - Number(pinnedIds.includes(a.id)),
+            Number(b.pin?.categories.includes(mode)) -
+            Number(a.pin?.categories.includes(mode)),
         );
       }
       return {
         results,
-        pinnedIds,
         total: apps.length,
         indexing: false,
         indexError: null,
@@ -222,13 +255,24 @@ mockIPC(
         currency: { asOf: null, refreshing: false, warning: null },
       };
     }
-    if (command === "set_app_pinned") {
-      const { id, pinned } = payload as { id: string; pinned: boolean };
-      pinnedIds = [
-        ...pinnedIds.filter((value) => value !== id),
-        ...(pinned ? [id] : []),
+    if (command === "set_pinned") {
+      const { id, category, pinned } = payload as {
+        id: string;
+        category: SearchMode;
+        pinned: boolean;
+      };
+      const result = issued.get(id);
+      if (
+        !result?.pin ||
+        (category !== "all" && category !== resultCategories[result.kind])
+      )
+        throw new Error("This pin is not available.");
+      const key = result.pin.key;
+      pins[category] = [
+        ...(pins[category] ?? []).filter((value) => value !== key),
+        ...(pinned ? [key] : []),
       ];
-      localStorage.setItem("tinydash.preview.pins", JSON.stringify(pinnedIds));
+      localStorage.setItem("tinydash.preview.pins", JSON.stringify(pins));
       await emit("pins-changed");
       return;
     }

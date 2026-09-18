@@ -23,6 +23,29 @@ const MIGRATIONS: &[&str] = &[
     "CREATE TABLE pinned_apps (
         result_id TEXT PRIMARY KEY NOT NULL
     ) STRICT;",
+    "CREATE TABLE pinned_items (
+        category TEXT NOT NULL,
+        result_id TEXT NOT NULL,
+        PRIMARY KEY (category, result_id)
+    ) STRICT;
+    INSERT INTO pinned_items SELECT 'all', result_id FROM pinned_apps;
+    INSERT INTO pinned_items SELECT 'apps', result_id FROM pinned_apps;
+    DROP TABLE pinned_apps;
+    CREATE TRIGGER pin_clipboard AFTER INSERT ON pinned_items
+    BEGIN
+        UPDATE clipboard_history SET pinned = 1
+        WHERE 'clipboard:' || id = NEW.result_id;
+    END;
+    CREATE TRIGGER unpin_clipboard AFTER DELETE ON pinned_items
+    BEGIN
+        UPDATE clipboard_history SET pinned = EXISTS (
+            SELECT 1 FROM pinned_items WHERE result_id = OLD.result_id
+        ) WHERE 'clipboard:' || id = OLD.result_id;
+    END;
+    CREATE TRIGGER delete_clipboard_pins AFTER DELETE ON clipboard_history
+    BEGIN
+        DELETE FROM pinned_items WHERE result_id = 'clipboard:' || OLD.id;
+    END;",
 ];
 
 pub fn apply(connection: &mut Connection) -> Result<()> {
@@ -119,5 +142,36 @@ mod tests {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .expect("version");
         assert_eq!(version, 99);
+    }
+
+    #[test]
+    fn migrates_shared_app_pins_into_two_independent_lists() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        migrate(&mut connection, &MIGRATIONS[..4]).unwrap();
+        connection
+            .execute("INSERT INTO pinned_apps VALUES (?1)", ["app:kept"])
+            .unwrap();
+        apply(&mut connection).unwrap();
+        apply(&mut connection).unwrap();
+        let categories: Vec<String> = connection
+            .prepare(
+                "SELECT category FROM pinned_items WHERE result_id = 'app:kept' ORDER BY category",
+            )
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(categories, ["all", "apps"]);
+        connection
+            .execute("DELETE FROM pinned_items WHERE category = 'all'", [])
+            .unwrap();
+        assert_eq!(
+            connection
+                .query_row("SELECT category FROM pinned_items", [], |row| row
+                    .get::<_, String>(0))
+                .unwrap(),
+            "apps"
+        );
     }
 }

@@ -175,6 +175,7 @@ impl SystemCommandProvider {
                     icon: None,
                     primary_action: Action::Run,
                     secondary_actions: vec![],
+                    pin: None,
                     confirmation: command.confirmation(),
                     detail: None,
                 })

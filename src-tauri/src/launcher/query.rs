@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 pub enum SearchMode {
     #[default]
@@ -17,6 +17,24 @@ pub enum SearchMode {
     Timezone,
     Url,
     Web,
+}
+
+impl SearchMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::Apps => "apps",
+            Self::Files => "files",
+            Self::Emoji => "emoji",
+            Self::Calculator => "calculator",
+            Self::Clipboard => "clipboard",
+            Self::System => "system",
+            Self::Password => "password",
+            Self::Timezone => "timezone",
+            Self::Url => "url",
+            Self::Web => "web",
+        }
+    }
 }
 
 pub struct Query<'a> {

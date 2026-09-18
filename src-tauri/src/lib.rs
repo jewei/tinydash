@@ -181,7 +181,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::preferences::set_shortcut_recording,
             launcher::preferences::reveal_settings_path,
             launcher::search,
-            launcher::set_app_pinned,
+            launcher::set_pinned,
             launcher::refresh_apps,
             launcher::files::refresh_files,
             launcher::currency::refresh_currency,
