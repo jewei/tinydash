@@ -35,6 +35,8 @@ After building a new version, quit the running TinyDash process through the tray
 
 ## Search
 
+Press **Tab** from the search field to show all search categories. Each later **Tab** selects the next category, including after typing closes the list. **Shift + Tab** selects the previous category. Typing stays in the search field and keeps the selected category. **Enter** or **Escape** closes the category list. You can also click the category button and select a category directly.
+
 The **All** mode combines application, file, clipboard, emoji, calculation, and system command results. Select **Apps**, **Files**, **Clipboard**, **Emoji**, **Calculator**, or **System** to limit the search. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows applications only.
 
 | Query            | Result                         |

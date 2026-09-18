@@ -91,6 +91,7 @@ kbd {
   cursor: grabbing;
 }
 .search-header {
+  position: relative;
   padding: 0 var(--space-md) var(--space-xs);
   flex-shrink: 0;
 }
@@ -110,21 +111,117 @@ kbd {
 .search-field > svg {
   color: var(--color-ink);
 }
-.mode-select {
-  color-scheme: dark;
-  max-width: 100px;
+.scope-chip {
+  order: 0;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
-  cursor: pointer;
-  background: var(--color-raised);
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  background: var(--color-selected);
+  color: var(--color-selection-ink, var(--color-ink));
+  font-size: 13px;
+  font-weight: 700;
+}
+.scope-chip:focus-visible,
+.scope-chip[aria-expanded="true"] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.scope-chip:hover {
+  border-color: var(--color-selection-border, var(--color-accent));
+}
+.scope-chip > svg {
+  stroke-width: 2.25;
+}
+.scope-popover {
+  position: absolute;
+  z-index: var(--z-menu, 10);
+  top: calc(100% - 8px);
+  left: 26px;
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-width: calc(100% - 28px);
+  max-height: calc(100dvh - 110px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  box-shadow: 0 8px 24px var(--color-shadow);
+}
+.scope-title {
+  margin: 0;
+  padding: 12px 16px 8px;
   color: var(--color-muted);
-  border: 1px solid var(--color-rule);
+  font-size: 12px;
+  font-weight: 600;
+}
+.scope-options {
+  min-height: 0;
+  margin: 0;
+  padding: 0 6px 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+.scope-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  padding: 5px 10px;
   border-radius: var(--radius-sm);
-  padding: var(--space-2xs) var(--space-xs);
-  font-size: var(--text-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+.scope-option:hover {
+  background: var(--color-field);
+}
+.scope-option[aria-selected="true"] {
+  background: var(--color-selected);
+  color: var(--color-selection-ink, var(--color-ink));
+  font-weight: 700;
+}
+.scope-check {
+  width: 16px;
+  text-align: center;
+}
+.scope-help {
+  display: flex;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-rule);
+  color: var(--color-muted);
+  font-size: 11px;
+}
+.scope-help > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.scope-help kbd {
+  min-height: 22px;
+  padding: 1px 6px;
+}
+.scope-hint {
+  order: 2;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 .search-field input {
+  order: 1;
+  flex: 1;
   min-width: 0;
-  width: 100%;
+  width: 0;
   border: 0;
   outline: none;
   background: transparent;
@@ -137,6 +234,7 @@ kbd {
   color: var(--color-subtle);
 }
 .escape-key {
+  order: 3;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius-sm);
   background: var(--color-raised);
@@ -639,5 +737,35 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   button:active:not(:disabled) {
     transform: none;
+  }
+}
+
+.scope-hint kbd,
+.scope-help kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+  background: var(--color-field);
+}
+@media (max-width: 800px) {
+  .scope-hint {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .scope-chip {
+    gap: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  .scope-chip > svg {
+    display: none;
+  }
+  .scope-popover {
+    left: 14px;
   }
 }

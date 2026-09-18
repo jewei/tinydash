@@ -25,13 +25,19 @@ async function actions(page: Page) {
   );
 }
 
+async function selectCategory(page: Page, name: string) {
+  await page.getByRole("button", { name: /^Search category:/ }).click();
+  await page
+    .getByRole("listbox", { name: "Search categories" })
+    .getByRole("option", { name, exact: true })
+    .click();
+}
+
 test("currency refresh keeps cached results usable and shows rate dates and failures", async ({
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("calculator");
+  await selectCategory(page, "Calculator");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.fill("100 USD to MYR");
   await page.evaluate(() => {
@@ -143,9 +149,7 @@ test("the drag handle moves the window without taking input focus", async ({
       ),
     ),
   ).toBe("Safari");
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("apps");
+  await selectCategory(page, "Apps");
   await page.getByRole("button", { name: "Hide launcher" }).click();
   const calls = await page.evaluate(() => window.__launcherTest.calls);
   expect(
@@ -158,9 +162,7 @@ test("system commands ask before running and extra Enter cancels", async ({
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("system");
+  await selectCategory(page, "System");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await expect(input).toHaveAttribute(
     "placeholder",
@@ -234,9 +236,7 @@ test("system failures remain in the dialog and reopening discards pending confir
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("system");
+  await selectCategory(page, "System");
   await expect(page.locator(".result-title")).toHaveCount(4);
   await page.keyboard.press("Meta+3");
   const dialog = page.getByRole("dialog", {
@@ -259,9 +259,9 @@ test("system failures remain in the dialog and reopening discards pending confir
   await expect(
     page.getByRole("combobox", { name: "Search TinyDash" }),
   ).toBeFocused();
-  await expect(page.getByRole("combobox", { name: "Search mode" })).toHaveValue(
-    "all",
-  );
+  await expect(
+    page.getByRole("button", { name: /^Search category:/ }),
+  ).toHaveText("All");
   await expect(page.getByRole("alert")).toHaveCount(0);
   expect(await actions(page)).toHaveLength(1);
 });
@@ -270,9 +270,7 @@ test("settings runs directly and System mode has its own empty state", async ({
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("system");
+  await selectCategory(page, "System");
   await expect(page.locator(".result-title")).toHaveCount(4);
   await page.keyboard.press("Meta+4");
   await expect
@@ -374,9 +372,7 @@ test("reopening requests the selected clipboard preview only once", async ({
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("clipboard");
+  await selectCategory(page, "Clipboard");
   await expect(page.getByLabel("Saved clipboard text")).toContainText(
     "Meeting notes",
   );
@@ -491,9 +487,7 @@ test("opens and reveals files by ID, and refreshes files with the mode shortcut"
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("files");
+  await selectCategory(page, "Files");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await expect(input).toBeFocused();
   await expect(input).toHaveAttribute(
@@ -553,9 +547,7 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
     page.getByRole("heading", { name: "No results yet" }),
   ).toBeVisible();
   await page.getByRole("combobox", { name: "Search TinyDash" }).fill("");
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("files");
+  await selectCategory(page, "Files");
   await expect(page.locator(".list-count")).toHaveText("Scanning files...");
   await expect(
     page.getByRole("button", { name: "Open", exact: true }),
@@ -574,9 +566,7 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
   await expect(
     page.getByRole("button", { name: "Open", exact: true }),
   ).toBeDisabled();
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("apps");
+  await selectCategory(page, "Apps");
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
@@ -584,9 +574,7 @@ test("previews plain text, copies by ID, and deletes without hiding the launcher
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("clipboard");
+  await selectCategory(page, "Clipboard");
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await expect(input).toBeFocused();
   await expect(page.getByLabel("Saved clipboard text")).toContainText(
@@ -626,9 +614,7 @@ test("ignores late clipboard previews and keeps the layout usable at narrow widt
   await page.evaluate(() => {
     window.__launcherTest.slowPreview = true;
   });
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("clipboard");
+  await selectCategory(page, "Clipboard");
   await expect(page.locator(".result-row")).toHaveCount(2);
   await page
     .getByRole("combobox", { name: "Search TinyDash" })
@@ -658,9 +644,7 @@ test("clear requires confirmation, keeps Cancel focused, and reports storage err
   page,
 }) => {
   await openLauncher(page);
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("clipboard");
+  await selectCategory(page, "Clipboard");
   const clear = page.getByRole("button", {
     name: "Clear history",
     exact: true,
@@ -942,9 +926,7 @@ test("changes search mode during a pending query and copies an emoji", async ({
   await openLauncher(page);
   const input = page.getByRole("combobox", { name: "Search TinyDash" });
   await input.fill("slow");
-  await page
-    .getByRole("combobox", { name: "Search mode" })
-    .selectOption("emoji");
+  await selectCategory(page, "Emoji");
   await expect(input).toBeFocused();
   await expect(
     page.getByRole("listbox").getByRole("option").filter({ hasText: "rocket" }),
@@ -964,15 +946,15 @@ test("changes search mode during a pending query and copies an emoji", async ({
   await page.evaluate(() =>
     window.__launcherTest.emit("launcher-opened", false),
   );
-  await expect(page.getByRole("combobox", { name: "Search mode" })).toHaveValue(
-    "emoji",
-  );
+  await expect(
+    page.getByRole("button", { name: /^Search category:/ }),
+  ).toHaveText("Emoji");
   await page.evaluate(() =>
     window.__launcherTest.emit("launcher-opened", true),
   );
-  await expect(page.getByRole("combobox", { name: "Search mode" })).toHaveValue(
-    "all",
-  );
+  await expect(
+    page.getByRole("button", { name: /^Search category:/ }),
+  ).toHaveText("All");
 });
 
 test("shows calculator errors and fits both new result types in a narrow window", async ({
@@ -990,7 +972,7 @@ test("shows calculator errors and fits both new result types in a narrow window"
     await expect(page.getByRole("alert")).toHaveCount(0);
     await page.setViewportSize({ width: 320, height: 550 });
     await expect(
-      page.getByRole("combobox", { name: "Search mode" }),
+      page.getByRole("button", { name: /^Search category:/ }),
     ).toBeInViewport();
     await expect(
       page.getByRole("button", { name: "Actions" }),
