@@ -41,6 +41,8 @@ The design follows the approved warm refinement in `designs/polished.html`. It u
 
 On macOS, TinyDash loads application icons through NSWorkspace and converts them to bounded PNG images during the background scan. Application names become searchable before the icons finish loading. The list and detail panel use the same image, with a fallback if an icon is unavailable.
 
+App rows show short descriptions. On macOS, TinyDash uses built-in descriptions for known bundle identifiers, then the app's category, then "Application" if neither is available. Linux uses the desktop entry's generic name or description. Apps without this data show "Application". Full paths remain in the detail panel and can still be searched.
+
 Rounded corners require a transparent native window and a transparent page background. The macOS build enables Tauri's `macos-private-api` feature for transparency. This requires a separate approach for Mac App Store distribution, as described in the [Tauri transparency configuration](https://v2.tauri.app/reference/config/#transparent).
 
 Press **Tab** from the search field to select the next visible category. **Shift + Tab** selects the previous category. Selection wraps at both ends. The search field keeps focus and the query stays unchanged. You can also click a category in the bar. Use the arrow keys to select results, **Enter** to open the selected result, and **Escape** to hide the launcher. Emoji mode uses a grid with arrow-key navigation. The detail panel provides the selected result's supported actions; app paths and clipboard content come from the existing backend.

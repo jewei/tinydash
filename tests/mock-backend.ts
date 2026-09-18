@@ -40,20 +40,21 @@ declare global {
 }
 
 const names = [
-  "Finder",
-  "Safari",
-  "Visual Studio Code",
-  "Activity Monitor",
-  "Calendar",
-  "Ghostty",
-  "Notes",
-  "System Settings",
+  ["Finder", "Files and folders"],
+  ["Safari", "Web browser"],
+  ["Visual Studio Code", "Code editor"],
+  ["Activity Monitor", "System activity"],
+  ["Calendar", "Events and reminders"],
+  ["Ghostty", "Terminal emulator"],
+  ["Notes", "Notes and checklists"],
+  ["System Settings", "System preferences"],
 ];
-const apps: SearchResult[] = names.map((title, index) => ({
+const apps: SearchResult[] = names.map(([title, subtitle], index) => ({
   id: `app-${index}`,
   kind: "app",
   title,
-  subtitle: `/Applications/${title}.app`,
+  subtitle,
+  path: `/Applications/${title}.app`,
   score: 100 - index,
   icon:
     index === 0
@@ -104,6 +105,7 @@ const file: SearchResult = {
   kind: "file",
   title: "Launch notes.md",
   subtitle: "/Documents/Launch notes.md",
+  path: "/Documents/Launch notes.md",
   score: 2000,
   icon: null,
   primaryAction: "open",

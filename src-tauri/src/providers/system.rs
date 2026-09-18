@@ -169,6 +169,7 @@ impl SystemCommandProvider {
                 Some(SearchResult {
                     id: command.id().into(),
                     kind: ResultKind::SystemCommand,
+                    path: None,
                     title: command.title().into(),
                     subtitle: command.subtitle().into(),
                     score,

@@ -11,6 +11,7 @@ use crate::{
 pub struct AppEntry {
     pub id: String,
     pub name: String,
+    pub description: String,
     pub path: PathBuf,
     pub aliases: Vec<String>,
     pub icon: Option<String>,
@@ -21,6 +22,7 @@ impl AppEntry {
         Self {
             id: format!("app:{}", path.to_string_lossy()),
             name,
+            description: "Application".to_owned(),
             path,
             aliases,
             icon: None,
@@ -32,7 +34,8 @@ impl AppEntry {
             id: self.id.clone(),
             kind: ResultKind::App,
             title: self.name.clone(),
-            subtitle: self.path.to_string_lossy().into_owned(),
+            subtitle: self.description.clone(),
+            path: Some(self.path.to_string_lossy().into_owned()),
             score,
             icon: self.icon.clone(),
             primary_action: Action::Launch,

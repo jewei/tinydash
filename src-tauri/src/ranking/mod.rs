@@ -121,6 +121,7 @@ mod tests {
     #[test]
     fn usage_ranks_before_truncation_without_overriding_strong_matches() {
         let result = |id: &str, score: u32| SearchResult {
+            path: None,
             id: id.into(),
             kind: ResultKind::App,
             title: id.into(),

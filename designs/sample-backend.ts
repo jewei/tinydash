@@ -32,19 +32,20 @@ function describePins(results: SearchResult[]): SearchResult[] {
 }
 
 const apps: SearchResult[] = [
-  "Safari",
-  "Finder",
-  "Notes",
-  "Calendar",
-  "Ghostty",
-  "Visual Studio Code",
-  "Activity Monitor",
-  "System Settings",
-].map((title, index) => ({
+  ["Safari", "Web browser"],
+  ["Finder", "Files and folders"],
+  ["Notes", "Notes and checklists"],
+  ["Calendar", "Events and reminders"],
+  ["Ghostty", "Terminal emulator"],
+  ["Visual Studio Code", "Code editor"],
+  ["Activity Monitor", "System activity"],
+  ["System Settings", "System preferences"],
+].map(([title, subtitle], index) => ({
   id: `sample-app-${index}`,
   kind: "app",
   title,
-  subtitle: `/Applications/${title}.app`,
+  subtitle,
+  path: `/Applications/${title}.app`,
   score: 100 - index,
   icon: null,
   primaryAction: "launch",
@@ -60,6 +61,7 @@ const files: SearchResult[] = [
   kind: "file",
   title,
   subtitle: `~/${path}`,
+  path: `~/${path}`,
   score: 80 - index,
   icon: null,
   primaryAction: "open",
@@ -188,7 +190,9 @@ function sampleSearch(query: string, mode: SearchMode): SearchResult[] {
                   : apps;
   const value = normalized.replace(/^:/, "");
   return source.filter((item) =>
-    `${item.title} ${item.subtitle}`.toLowerCase().includes(value),
+    `${item.title} ${item.subtitle} ${item.path ?? ""}`
+      .toLowerCase()
+      .includes(value),
   );
 }
 

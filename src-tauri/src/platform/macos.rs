@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+mod descriptions;
 mod icons;
 
 use crate::{
@@ -106,7 +107,13 @@ fn read_bundle(path: &Path) -> Option<AppEntry> {
     .collect();
     // Canonical paths deduplicate symlinked bundles without walking through symlink trees.
     let path = path.canonicalize().unwrap_or_else(|_| path.to_owned());
-    Some(AppEntry::new(name, path, aliases))
+    let mut app = AppEntry::new(name, path, aliases);
+    app.description = descriptions::app_description(
+        string("CFBundleIdentifier"),
+        string("LSApplicationCategoryType"),
+    )
+    .to_owned();
+    Some(app)
 }
 
 pub fn load_app_icons(mut apps: Vec<AppEntry>) -> Vec<AppEntry> {
@@ -372,6 +379,54 @@ mod tests {
     }
 
     #[test]
+    fn descriptions_use_bundle_identity_then_category_and_keep_paths_searchable() {
+        use crate::{
+            launcher::{query::SearchMode, search::SearchManager},
+            providers::apps::AppProvider,
+        };
+
+        let directory = tempfile::tempdir().unwrap();
+        let browser = bundle(
+            directory.path(),
+            "Renamed browser",
+            "<key>CFBundleIdentifier</key><string>com.apple.Safari</string>\
+             <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>",
+        );
+        let other = bundle(
+            directory.path(),
+            "Safari",
+            "<key>CFBundleIdentifier</key><string>example.other</string>\
+             <key>LSApplicationCategoryType</key><string>public.app-category.business</string>",
+        );
+        let unknown = bundle(
+            directory.path(),
+            "Unknown",
+            "<key>LSApplicationCategoryType</key><string>example.unknown</string>",
+        );
+        let apps = scan_roots(&[directory.path().to_owned()]);
+        for (path, expected) in [
+            (browser, "Web browser"),
+            (other, "Business"),
+            (unknown, "Application"),
+        ] {
+            let path = path.canonicalize().unwrap();
+            let app = apps.iter().find(|app| app.path == path).unwrap();
+            assert_eq!(app.description, expected);
+            let result = app.result(0);
+            assert_eq!(result.subtitle, expected);
+            assert_eq!(result.path.as_deref(), path.to_str());
+        }
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(apps));
+        let results = manager
+            .search("Renamed browser.app", SearchMode::Apps)
+            .unwrap()
+            .results;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].subtitle, "Web browser");
+    }
+
+    #[test]
     fn handles_broken_metadata_and_symlink_loops() {
         let dir = tempfile::tempdir().expect("tempdir");
         std::fs::create_dir(dir.path().join("Broken.app")).expect("create bundle");
@@ -379,6 +434,7 @@ mod tests {
         let apps = scan_roots(&[dir.path().to_owned()]);
         assert_eq!(apps.len(), 1);
         assert_eq!(apps[0].name, "Broken");
+        assert_eq!(apps[0].description, "Application");
     }
 
     #[test]

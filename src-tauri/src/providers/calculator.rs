@@ -73,6 +73,7 @@ impl CalculatorProvider {
         Ok(SearchResult {
             id,
             kind: ResultKind::Calculation,
+            path: None,
             title: value,
             subtitle: calculation
                 .rate_label

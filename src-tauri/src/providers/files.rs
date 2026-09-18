@@ -51,6 +51,7 @@ impl FileEntry {
             kind: ResultKind::File,
             title: self.name.clone(),
             subtitle: self.path.clone(),
+            path: Some(self.path.clone()),
             score,
             icon: None,
             primary_action: Action::Open,
