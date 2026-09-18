@@ -2,7 +2,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type { SearchResult, SearchMode, SettingsValues } from "../src/bridge";
-import { defaultCategories } from "../src/categories";
+import { defaultCategories, resultCategories } from "../src/categories";
 
 declare global {
   interface Window {
@@ -11,8 +11,9 @@ declare global {
       calls: { command: string; payload: unknown }[];
       settings: SettingsValues;
       rejectSettings: string | null;
-      pinnedIds: string[];
+      pins: Partial<Record<SearchMode, string[]>>;
       rejectPin: boolean;
+      emojiGrid: boolean;
       toolRevision: number;
       rejectActions: boolean;
       storageError: string | null;
@@ -118,6 +119,11 @@ const emoji: SearchResult = {
   primaryAction: "copy",
   secondaryActions: [],
 };
+const gridEmoji = Array.from({ length: 20 }, (_, index) => ({
+  ...emoji,
+  id: `emoji:${index}`,
+  title: `Emoji ${index + 1}`,
+}));
 
 const clips: SearchResult[] = ["Meeting notes", "Project link"].map(
   (title, index) => ({
@@ -131,6 +137,63 @@ const clips: SearchResult[] = ["Meeting notes", "Project link"].map(
     secondaryActions: ["delete"],
   }),
 );
+
+const issued = new Map<string, SearchResult>();
+const savedPins = JSON.parse(
+  localStorage.getItem("tinydash.test.pins") ?? "{}",
+);
+
+function describePins(results: SearchResult[], query: string): SearchResult[] {
+  const indices = new Map<SearchMode, number>();
+  return results.map((result) => {
+    const category = resultCategories[result.kind];
+    const index = indices.get(category) ?? 0;
+    indices.set(category, index + 1);
+    const key = ["calculator", "password", "timezone", "url", "web"].includes(
+      category,
+    )
+      ? `query:${JSON.stringify([category, query.trim().replace(/^=/, "").trim(), index])}`
+      : result.id;
+    const value = {
+      ...result,
+      pin: {
+        key,
+        categories: defaultCategories.filter((mode) =>
+          window.__launcherTest.pins[mode]?.includes(key),
+        ),
+      },
+    };
+    issued.set(result.id, value);
+    return value;
+  });
+}
+
+function restorePin(key: string): SearchResult | undefined {
+  if (key.startsWith("query:")) {
+    const [mode, query, index] = JSON.parse(key.slice(6)) as [
+      SearchMode,
+      string,
+      number,
+    ];
+    const results =
+      toolResults(query, mode) ?? (mode === "calculator" ? [calculation] : []);
+    return describePins(results, query)[index];
+  }
+  const state = window.__launcherTest;
+  const available = [
+    ...apps,
+    file,
+    emoji,
+    ...gridEmoji,
+    ...systemCommands,
+    ...clips.filter(
+      (clip) =>
+        !state.clipboardCleared && !state.clipboardDeleted.includes(clip.id),
+    ),
+  ];
+  const result = available.find((result) => result.id === key);
+  return result ? describePins([result], "")[0] : undefined;
+}
 
 window.isTauri = true;
 window.__launcherTest = {
@@ -151,8 +214,11 @@ window.__launcherTest = {
     visibleCategories: [...defaultCategories],
   },
   rejectSettings: null,
-  pinnedIds: JSON.parse(localStorage.getItem("tinydash.test.pins") ?? "[]"),
+  pins: Array.isArray(savedPins)
+    ? { all: savedPins, apps: savedPins }
+    : savedPins,
   rejectPin: false,
+  emojiGrid: false,
   toolRevision: 0,
   rejectActions: false,
   storageError: null,
@@ -255,12 +321,8 @@ mockIPC(
                 : mode === "emoji" ||
                     query === ":rocket" ||
                     (query === "rocket" && mode !== "apps")
-                  ? query === "grid"
-                    ? Array.from({ length: 20 }, (_, index) => ({
-                        ...emoji,
-                        id: `emoji:${index}`,
-                        title: `Emoji ${index + 1}`,
-                      }))
+                  ? query === "grid" || (!query && state.emojiGrid)
+                    ? gridEmoji
                     : [emoji]
                   : query === "12 * 8" && mode !== "apps"
                     ? [calculation]
@@ -285,16 +347,21 @@ mockIPC(
                             : state.usedAppFirst
                               ? [apps[1], apps[0], ...apps.slice(2)]
                               : apps);
+      const described = describePins(results, query);
+      if (!query.trim()) {
+        for (const key of state.pins[mode] ?? []) {
+          if (described.some((result) => result.pin?.key === key)) continue;
+          const result = restorePin(key);
+          if (result) described.push(result);
+        }
+        described.sort(
+          (a, b) =>
+            Number(b.pin?.categories.includes(mode)) -
+            Number(a.pin?.categories.includes(mode)),
+        );
+      }
       return {
-        results:
-          !query.trim() && (mode === "all" || mode === "apps")
-            ? [...results].sort(
-                (a, b) =>
-                  Number(state.pinnedIds.includes(b.id)) -
-                  Number(state.pinnedIds.includes(a.id)),
-              )
-            : results,
-        pinnedIds: state.pinnedIds,
+        results: described,
         total: apps.length,
         indexing: false,
         indexError: null,
@@ -317,17 +384,20 @@ mockIPC(
         },
       };
     }
-    if (command === "set_app_pinned") {
-      if (state.rejectPin) throw new Error("Could not save the app pin.");
-      const { id, pinned } = payload as { id: string; pinned: boolean };
-      state.pinnedIds = [
-        ...state.pinnedIds.filter((value) => value !== id),
-        ...(pinned ? [id] : []),
+    if (command === "set_pinned") {
+      if (state.rejectPin) throw new Error("Could not save the pin.");
+      const { id, category, pinned } = payload as {
+        id: string;
+        category: SearchMode;
+        pinned: boolean;
+      };
+      const result = issued.get(id)!;
+      const key = result.pin!.key;
+      state.pins[category] = [
+        ...(state.pins[category] ?? []).filter((value) => value !== key),
+        ...(pinned ? [key] : []),
       ];
-      localStorage.setItem(
-        "tinydash.test.pins",
-        JSON.stringify(state.pinnedIds),
-      );
+      localStorage.setItem("tinydash.test.pins", JSON.stringify(state.pins));
       await emit("pins-changed");
       return;
     }

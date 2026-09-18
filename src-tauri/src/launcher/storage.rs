@@ -3,6 +3,7 @@ use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Manager};
 
 use super::LauncherState;
+use super::query::SearchMode;
 use super::search::SearchManager;
 use crate::{
     db::Database,
@@ -90,31 +91,37 @@ impl Storage {
         self.session(app, search);
     }
 
-    pub fn set_pinned(&self, app: &AppHandle, id: &str, pinned: bool) -> Result<(), String> {
+    pub fn set_pinned(
+        &self,
+        app: &AppHandle,
+        id: &str,
+        category: SearchMode,
+        pinned: bool,
+    ) -> Result<(), String> {
         let state = app.state::<LauncherState>();
         let session = self
             .session(app, &state.search)
             .lock()
-            .map_err(|_| "App pin storage is unavailable.")?;
-        state
+            .map_err(|_| "Pin storage is unavailable.")?;
+        let key = state
             .search
             .lock()
             .map_err(|_| Error::IndexUnavailable.to_string())?
-            .app(id)
+            .pin_key(id, category)
             .map_err(|error| error.to_string())?;
         let database = session
             .database
             .as_ref()
-            .ok_or("Could not save the app pin. Local storage is unavailable.")?;
+            .ok_or("Could not save the pin. Local storage is unavailable.")?;
         database
-            .set_pinned(id, pinned)
-            .map_err(|error| format!("Could not save the app pin: {error}"))?;
+            .set_pinned(&key, category, pinned)
+            .map_err(|error| format!("Could not save the pin: {error}"))?;
         // Publish only after a successful write. Searches do not wait for disk.
         state
             .search
             .lock()
             .map_err(|_| Error::IndexUnavailable.to_string())?
-            .set_pinned(id, pinned);
+            .set_pinned(&key, category, pinned);
         Ok(())
     }
 
@@ -310,6 +317,7 @@ impl Storage {
             Some(id) => search.clipboard.remove(id),
             None => search.clipboard = ClipboardProvider::default(),
         }
+        search.forget_clipboard_pins(id);
         drop(search);
         super::clipboard::changed(app);
         Ok(())

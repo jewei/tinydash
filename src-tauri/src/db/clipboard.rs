@@ -24,7 +24,7 @@ impl Database {
     pub fn prune_clipboard(&self, limit: usize) -> Result<Vec<i64>> {
         let mut statement = self.connection.prepare(
             "DELETE FROM clipboard_history WHERE id IN (
-                SELECT id FROM clipboard_history ORDER BY sort_order DESC LIMIT -1 OFFSET ?1
+                SELECT id FROM clipboard_history WHERE pinned = 0 ORDER BY sort_order DESC LIMIT -1 OFFSET ?1
              ) RETURNING id",
         )?;
         Ok(statement
@@ -50,7 +50,7 @@ impl Database {
         let removed = {
             let mut statement = transaction.prepare(
                 "DELETE FROM clipboard_history WHERE id IN (
-                    SELECT id FROM clipboard_history ORDER BY sort_order DESC LIMIT -1 OFFSET ?1
+                    SELECT id FROM clipboard_history WHERE pinned = 0 ORDER BY sort_order DESC LIMIT -1 OFFSET ?1
                  ) RETURNING id",
             )?;
             statement

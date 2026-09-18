@@ -1,4 +1,23 @@
-import type { SearchMode } from "./bridge";
+import type { SearchMode, SearchResult } from "./bridge";
+
+export const resultCategories: Record<SearchResult["kind"], SearchMode> = {
+  app: "apps",
+  file: "files",
+  clipboard: "clipboard",
+  emoji: "emoji",
+  calculation: "calculator",
+  systemCommand: "system",
+  password: "password",
+  timezone: "timezone",
+  cleanedUrl: "url",
+  webSearch: "web",
+};
+
+export interface PinOption {
+  category: SearchMode;
+  label: string;
+  pinned: boolean;
+}
 
 export const categories = [
   { id: "all", label: "All" },

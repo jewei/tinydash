@@ -15,6 +15,35 @@ pub enum ResultKind {
     WebSearch,
 }
 
+impl ResultKind {
+    pub fn category(self) -> super::query::SearchMode {
+        use super::query::SearchMode;
+        match self {
+            Self::App => SearchMode::Apps,
+            Self::File => SearchMode::Files,
+            Self::Calculation => SearchMode::Calculator,
+            Self::Emoji => SearchMode::Emoji,
+            Self::Clipboard => SearchMode::Clipboard,
+            Self::SystemCommand => SearchMode::System,
+            Self::Password => SearchMode::Password,
+            Self::Timezone => SearchMode::Timezone,
+            Self::CleanedUrl => SearchMode::Url,
+            Self::WebSearch => SearchMode::Web,
+        }
+    }
+
+    pub fn has_query_pin(self) -> bool {
+        matches!(
+            self,
+            Self::Calculation
+                | Self::Password
+                | Self::Timezone
+                | Self::CleanedUrl
+                | Self::WebSearch
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Action {
@@ -46,6 +75,8 @@ pub struct SearchResult {
     pub icon: Option<String>,
     pub primary_action: Action,
     pub secondary_actions: Vec<Action>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pin: Option<super::pins::ResultPin>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub confirmation: Option<ActionConfirmation>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -85,7 +116,6 @@ pub enum ToolDetail {
 #[serde(rename_all = "camelCase")]
 pub struct SearchResponse {
     pub results: Vec<SearchResult>,
-    pub pinned_ids: Vec<String>,
     pub total: usize,
     pub indexing: bool,
     pub index_error: Option<String>,

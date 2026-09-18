@@ -32,7 +32,11 @@ import {
   type Appearance,
 } from "./appearance";
 
-import { categories, normalizeCategories } from "./categories";
+import {
+  categories,
+  normalizeCategories,
+  resultCategories,
+} from "./categories";
 
 const groupLabels: Record<SearchResult["kind"], string> = {
   app: "Applications",
@@ -62,7 +66,6 @@ export default function App(
   const [mode, setMode] = createSignal<SearchMode>("all");
   const [results, setResults] = createSignal<SearchResult[]>([]);
   const [selected, setSelected] = createSignal(0);
-  const [pinnedIds, setPinnedIds] = createSignal<string[]>([]);
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
   const [total, setTotal] = createSignal(0);
@@ -112,14 +115,22 @@ export default function App(
     categories.filter(({ id }) => enabledCategories().includes(id)),
   );
   const current = () => results()[selected()];
-  const isPinned = (result?: SearchResult) =>
-    !!result && pinnedIds().includes(result.id);
+  const resultKey = (result?: SearchResult) => result?.pin?.key ?? result?.id;
+  const isPinned = (result?: SearchResult, category = mode()) =>
+    result?.pin?.categories.includes(category) ?? false;
+  const pinOptions = createMemo(() => {
+    const result = current();
+    if (!result?.pin) return [];
+    return categories
+      .filter(({ id }) => id === "all" || id === resultCategories[result.kind])
+      .map(({ id, label }) => ({
+        category: id,
+        label: isPinned(result, id) ? `Unpin from ${label}` : `Pin to ${label}`,
+        pinned: isPinned(result, id),
+      }));
+  });
   const groupLabel = (result: SearchResult) =>
-    !query().trim() &&
-    (mode() === "all" || mode() === "apps") &&
-    isPinned(result)
-      ? "Pinned"
-      : groupLabels[result.kind];
+    !query().trim() && isPinned(result) ? "Pinned" : groupLabels[result.kind];
   const canOpen = () =>
     desktop &&
     visible() &&
@@ -242,7 +253,7 @@ export default function App(
             preserveSelection &&
             displayedQuery?.value === value &&
             displayedQuery.mode === searchMode
-              ? current()?.id
+              ? resultKey(current())
               : undefined;
           const stableToolIndex =
             selectedId &&
@@ -250,12 +261,11 @@ export default function App(
               ? Math.min(selected(), response.results.length - 1)
               : 0;
           const matchedIndex = response.results.findIndex(
-            (result) => result.id === selectedId,
+            (result) => resultKey(result) === selectedId,
           );
           displayedQuery = { value, mode: searchMode };
           batch(() => {
             setResults(response.results);
-            setPinnedIds(response.pinnedIds ?? []);
             setSelected(
               Math.max(0, matchedIndex >= 0 ? matchedIndex : stableToolIndex),
             );
@@ -285,16 +295,16 @@ export default function App(
     void search(value);
   }
 
-  async function togglePin() {
+  async function togglePin(category: SearchMode) {
     const result = current();
-    if (!canOpen() || pinBusy() || result?.kind !== "app") return;
-    const pinned = !isPinned(result);
+    if (!canOpen() || pinBusy() || !result?.pin) return;
+    const pinned = !isPinned(result, category);
     setPinBusy(true);
     setMenuOpen(false);
     focusInput();
     setError(undefined);
     try {
-      await backend.setAppPinned(result.id, pinned);
+      await backend.setPinned(result.id, category, pinned);
       if (!disposed) await search(query(), true);
     } catch (reason) {
       if (!disposed) setError(String(reason));
@@ -566,23 +576,32 @@ export default function App(
     ) {
       event.preventDefault();
       if (results().length) {
-        const columns = emojiGrid
-          ? getComputedStyle(list).gridTemplateColumns.split(" ").length
-          : 1;
         const count = results().length;
         setSelected((index) => {
-          if (event.key === "ArrowDown") {
-            return index + columns < count ? index + columns : index % columns;
+          if (
+            emojiGrid &&
+            (event.key === "ArrowDown" || event.key === "ArrowUp")
+          ) {
+            const cells = Array.from(
+              list.querySelectorAll<HTMLElement>('[role="option"]'),
+            );
+            const left = cells[index].getBoundingClientRect().left;
+            const column = cells
+              .map((cell, position) => ({
+                position,
+                left: cell.getBoundingClientRect().left,
+              }))
+              .filter((cell) => Math.abs(cell.left - left) < 1);
+            const position = column.findIndex(
+              (cell) => cell.position === index,
+            );
+            const step = event.key === "ArrowDown" ? 1 : -1;
+            return column[(position + step + column.length) % column.length]
+              .position;
           }
-          if (event.key === "ArrowUp") {
-            if (index >= columns) return index - columns;
-            const lastInColumn =
-              Math.floor((count - 1) / columns) * columns + index;
-            return lastInColumn < count ? lastInColumn : lastInColumn - columns;
-          }
-          return (
-            (index + (event.key === "ArrowRight" ? 1 : -1) + count) % count
-          );
+          const step =
+            event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+          return (index + step + count) % count;
         });
       }
     } else if (event.key === "Enter") {
@@ -608,7 +627,9 @@ export default function App(
     results();
     appearance();
     queueMicrotask(() =>
-      list?.children[index]?.scrollIntoView({ block: "nearest" }),
+      list
+        ?.querySelector(`#result-${index}`)
+        ?.scrollIntoView({ block: "nearest" }),
     );
   });
 
@@ -677,14 +698,14 @@ export default function App(
             void search(query(), true);
           }),
           register("currency-changed", () => {
-            if (mode() === "calculator" || (mode() === "all" && query().trim()))
+            if (mode() === "calculator" || mode() === "all")
               void search(query(), true);
           }),
           register("usage-changed", () => {
             void search(query(), true);
           }),
           register("clipboard-changed", () => {
-            if (mode() === "clipboard" || (mode() === "all" && query().trim()))
+            if (mode() === "clipboard" || mode() === "all")
               void search(query(), true);
           }),
           register("launcher-opened", (clear) => {
@@ -916,8 +937,8 @@ export default function App(
                     <Show when={isPinned(result)}>
                       <span
                         class="result-pin"
-                        title="Pinned"
-                        aria-label="Pinned"
+                        title={`Pinned to ${categories.find(({ id }) => id === mode())?.label}`}
+                        aria-label={`Pinned to ${categories.find(({ id }) => id === mode())?.label}`}
                       >
                         <Icon name="pin" size={13} />
                       </span>
@@ -1056,9 +1077,9 @@ export default function App(
             previewReady={visible() && !pending()}
             enabled={canOpen()}
             modifier={modifier()}
-            pinned={isPinned(current())}
+            pinOptions={pinOptions()}
             pinBusy={pinBusy()}
-            onPin={() => void togglePin()}
+            onPin={(category) => void togglePin(category)}
             onAction={(action) => void run(action)}
           />
         </Show>
@@ -1166,18 +1187,18 @@ export default function App(
                       Show in folder<kbd>{modifier()} ↵</kbd>
                     </button>
                   </Show>
-                  <Show when={current()?.kind === "app"}>
-                    <button
-                      role="menuitem"
-                      disabled={!canOpen() || pinBusy()}
-                      onClick={() => void togglePin()}
-                    >
-                      <Icon name="pin" />
-                      {isPinned(current())
-                        ? "Unpin application"
-                        : "Pin application"}
-                    </button>
-                  </Show>
+                  <For each={pinOptions()}>
+                    {(option) => (
+                      <button
+                        role="menuitem"
+                        disabled={!canOpen() || pinBusy()}
+                        onClick={() => void togglePin(option.category)}
+                      >
+                        <Icon name="pin" />
+                        {option.label}
+                      </button>
+                    )}
+                  </For>
                   <Show when={current()?.secondaryActions.includes("delete")}>
                     <button
                       role="menuitem"
@@ -1324,7 +1345,7 @@ export default function App(
       <Show when={clearOpen()}>
         <ConfirmDialog
           title="Clear clipboard history?"
-          description="This deletes all saved text entries. The current system clipboard stays available."
+          description="This deletes all saved text entries, including pinned entries. The current system clipboard stays available."
           confirmLabel="Clear history"
           busyLabel="Clearing..."
           busy={busy()}

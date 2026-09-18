@@ -3,7 +3,7 @@ mod timezones;
 pub mod url_cleaner;
 mod web;
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use zeroize::Zeroize;
 
 use crate::{
@@ -46,6 +46,7 @@ pub struct ToolProvider {
     next_id: u64,
     password_specs: Vec<password::Spec>,
     password_ids: Vec<String>,
+    pinned_password_ids: HashMap<password::Spec, String>,
 }
 
 impl ToolProvider {
@@ -87,6 +88,7 @@ impl ToolProvider {
             } else {
                 vec![]
             },
+            pin: None,
             confirmation: None,
             detail: Some(detail),
         };
@@ -97,14 +99,19 @@ impl ToolProvider {
             password,
         });
         while self.issued.len() > 64 {
-            self.issued.pop_front();
+            if let Some(expired) = self.issued.pop_front()
+                && let Some(spec) = expired.password
+                && self.pinned_password_ids.get(&spec) == Some(&expired.result.id)
+            {
+                self.pinned_password_ids.remove(&spec);
+            }
         }
         result
     }
 
     fn password(&mut self, spec: password::Spec) -> Result<SearchResult, String> {
         let (value, subtitle, detail) = password::generate(spec)?;
-        Ok(self.issue(Output {
+        let result = self.issue(Output {
             kind: ResultKind::Password,
             title: value.clone(),
             subtitle,
@@ -112,7 +119,9 @@ impl ToolProvider {
             detail,
             open: None,
             password: Some(spec),
-        }))
+        });
+        self.pinned_password_ids.insert(spec, result.id.clone());
+        Ok(result)
     }
 
     pub fn regenerate(&mut self, id: &str) -> Result<(), String> {
@@ -149,13 +158,54 @@ impl ToolProvider {
         }
     }
 
+    pub fn password_pin_query(&self, id: &str) -> Option<String> {
+        let spec = self
+            .issued
+            .iter()
+            .find(|entry| entry.result.id == id)?
+            .password?;
+        let command = match spec.style {
+            password::Style::Symbols => "password symbols",
+            password::Style::Alphanumeric => "password letters",
+            password::Style::Words => "passphrase",
+            password::Style::Pin => "pin",
+        };
+        Some(format!("{command} {}", spec.length))
+    }
+
     pub fn search(&mut self, query: &Query<'_>) -> Option<Result<Vec<SearchResult>, String>> {
+        self.search_selected(query, None)
+    }
+
+    pub fn search_pinned(&mut self, query: &Query<'_>, index: usize) -> Option<SearchResult> {
+        self.search_selected(query, Some(index))?
+            .ok()?
+            .into_iter()
+            .next()
+    }
+
+    fn search_selected(
+        &mut self,
+        query: &Query<'_>,
+        selected: Option<usize>,
+    ) -> Option<Result<Vec<SearchResult>, String>> {
         let text = query.text;
         let mode = query.mode;
         if mode == SearchMode::Password || (mode == SearchMode::All && password::is_candidate(text))
         {
             return Some((|| {
                 let specs = password::parse(text)?;
+                if let Some(index) = selected {
+                    let spec = *specs
+                        .get(index)
+                        .ok_or_else(|| Error::ResultExpired.to_string())?;
+                    if let Some(id) = self.pinned_password_ids.get(&spec)
+                        && let Some(entry) = self.issued.iter().find(|entry| &entry.result.id == id)
+                    {
+                        return Ok(vec![entry.result.clone()]);
+                    }
+                    return self.password(spec).map(|result| vec![result]);
+                }
                 if self.password_specs == specs {
                     let cached: Option<Vec<_>> = self
                         .password_ids
@@ -184,8 +234,10 @@ impl ToolProvider {
         }
         // Keep a value stable during refreshes, but start fresh after leaving
         // password search. Previously issued IDs remain valid for queued actions.
-        self.password_specs.clear();
-        self.password_ids.clear();
+        if selected.is_none() {
+            self.password_specs.clear();
+            self.password_ids.clear();
+        }
         if mode == SearchMode::Url || (mode == SearchMode::All && url_cleaner::is_candidate(text)) {
             return Some(url_cleaner::clean(text).map(|cleaned| {
                 let subtitle = format!(
@@ -219,8 +271,7 @@ impl ToolProvider {
                     time.with_timezone(&chrono::Local).fixed_offset()
                 })
                 .map(|results| {
-                    results
-                        .into_iter()
+                    select(results, selected)
                         .map(|result| {
                             self.issue(Output {
                                 kind: ResultKind::Timezone,
@@ -238,8 +289,7 @@ impl ToolProvider {
         }
         if mode == SearchMode::Web || (mode == SearchMode::All && web::is_candidate(text)) {
             return Some(web::searches(text).map(|results| {
-                results
-                    .into_iter()
+                select(results, selected)
                     .map(|(engine, query, url)| {
                         self.issue(Output {
                             kind: ResultKind::WebSearch,
@@ -260,4 +310,12 @@ impl ToolProvider {
         }
         None
     }
+}
+
+fn select<T>(results: Vec<T>, selected: Option<usize>) -> impl Iterator<Item = T> {
+    results
+        .into_iter()
+        .enumerate()
+        .filter(move |(index, _)| selected.is_none_or(|selected| selected == *index))
+        .map(|(_, result)| result)
 }

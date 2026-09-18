@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     sync::Arc,
 };
 
@@ -10,6 +10,7 @@ use nucleo_matcher::{
 
 use super::{
     actions::ResolvedAction,
+    pins::{Pins, QueryPin, ResultPin},
     query::{Query, SearchMode},
     result::{Action, SearchResult},
 };
@@ -40,7 +41,8 @@ pub struct SearchManager {
     pub clipboard: ClipboardProvider,
     pub tools: ToolProvider,
     usage: HashMap<String, ranking::Usage>,
-    pins: HashSet<String>,
+    pins: Pins,
+    issued_pins: VecDeque<(String, String, SearchMode)>,
 }
 
 pub struct SearchOutcome {
@@ -60,28 +62,119 @@ impl Default for SearchManager {
             clipboard: ClipboardProvider::default(),
             tools: ToolProvider::default(),
             usage: HashMap::new(),
-            pins: HashSet::new(),
+            pins: Pins::new(),
+            issued_pins: VecDeque::new(),
         }
     }
 }
 
 impl SearchManager {
-    pub fn set_pins(&mut self, pins: HashSet<String>) {
+    pub fn set_pins(&mut self, pins: Pins) {
         self.pins = pins;
     }
 
-    pub fn set_pinned(&mut self, id: &str, pinned: bool) {
+    pub fn set_pinned(&mut self, key: &str, category: SearchMode, pinned: bool) {
+        let pins = self.pins.entry(category).or_default();
         if pinned {
-            self.pins.insert(id.to_owned());
+            pins.insert(key.to_owned());
         } else {
-            self.pins.remove(id);
+            pins.remove(key);
         }
     }
 
-    pub fn pinned_ids(&self) -> Vec<String> {
-        let mut ids: Vec<_> = self.pins.iter().cloned().collect();
-        ids.sort();
-        ids
+    pub fn pin_key(&self, id: &str, category: SearchMode) -> Result<String> {
+        let (_, key, own_category) = self
+            .issued_pins
+            .iter()
+            .rev()
+            .find(|(issued, _, _)| issued == id)
+            .ok_or(Error::ResultExpired)?;
+        if category != SearchMode::All && category != *own_category {
+            return Err(Error::InvalidAction);
+        }
+        Ok(key.clone())
+    }
+
+    pub fn forget_clipboard_pins(&mut self, id: Option<i64>) {
+        let removed = id.map(|id| format!("clipboard:{id}"));
+        let keep = |key: &str| match &removed {
+            Some(removed) => key != removed,
+            None => !key.starts_with("clipboard:"),
+        };
+        for pins in self.pins.values_mut() {
+            pins.retain(|key| keep(key));
+        }
+        self.issued_pins.retain(|(_, key, _)| keep(key));
+    }
+
+    fn describe_pin(&self, key: String) -> ResultPin {
+        let mut categories: Vec<_> = self
+            .pins
+            .iter()
+            .filter(|(_, keys)| keys.contains(&key))
+            .map(|(mode, _)| *mode)
+            .collect();
+        categories.sort_by_key(|mode| mode.as_str());
+        ResultPin { key, categories }
+    }
+
+    fn describe_results(&self, results: &mut [SearchResult], query: &Query<'_>) {
+        let mut indices = HashMap::<SearchMode, usize>::new();
+        for result in results {
+            let mode = result.kind.category();
+            let index = indices.entry(mode).or_default();
+            let key = if result.kind.has_query_pin() {
+                let password_query = self.tools.password_pin_query(&result.id);
+                QueryPin {
+                    mode,
+                    index: if password_query.is_some() { 0 } else { *index },
+                    text: password_query.unwrap_or_else(|| query.text.to_owned()),
+                }
+                .key()
+            } else {
+                result.id.clone()
+            };
+            *index += 1;
+            result.pin = Some(self.describe_pin(key));
+        }
+    }
+
+    fn pinned_result(&mut self, key: &str) -> Option<SearchResult> {
+        let result = if let Some(saved) = QueryPin::from_key(key) {
+            let query = Query::parse(&saved.text, saved.mode).ok()?;
+            if query.mode == SearchMode::Calculator {
+                self.calculator.search(query.text).ok()
+            } else {
+                self.tools.search_pinned(&query, saved.index)
+            }
+        } else if key.starts_with("app:") {
+            self.apps.get(key).map(|app| app.result(0))
+        } else if key.starts_with("file:") {
+            self.files.get(key).map(|file| file.result(0))
+        } else if key.starts_with("emoji:") {
+            self.emoji
+                .get_or_insert_with(EmojiProvider::default)
+                .search(EmojiProvider::copy_value(key)?, &mut self.matcher)
+                .into_iter()
+                .find(|result| result.id == key)
+        } else if key.starts_with("clipboard:") {
+            self.clipboard
+                .search("", &mut self.matcher)
+                .into_iter()
+                .find(|result| result.id == key)
+        } else if key.starts_with("system:") {
+            self.system
+                .get_or_insert_with(SystemCommandProvider::default)
+                .search("", &mut self.matcher)
+                .into_iter()
+                .find(|result| result.id == key)
+        } else {
+            None
+        };
+        result.map(|mut result| {
+            result.pin = Some(self.describe_pin(key.to_owned()));
+            result
+        })
     }
 
     pub fn rates(&self) -> Option<&Rates> {
@@ -176,8 +269,63 @@ impl SearchManager {
 
     pub fn search(&mut self, input: &str, mode: SearchMode) -> Result<SearchOutcome> {
         let query = Query::parse(input, mode)?;
-        if let Some(outcome) = self.tools.search(&query) {
-            return Ok(match outcome {
+        let mut outcome = self.search_unpinned(&query);
+        self.describe_results(&mut outcome.results, &query);
+        if input.trim().is_empty() {
+            let mut keys: Vec<_> = self
+                .pins
+                .get(&mode)
+                .into_iter()
+                .flatten()
+                .cloned()
+                .collect();
+            keys.sort();
+            let present: HashSet<_> = outcome
+                .results
+                .iter()
+                .filter_map(|result| result.pin.as_ref().map(|pin| pin.key.clone()))
+                .collect();
+            // Resolve missing pins directly so file/provider limits cannot hide them.
+            // Keep issued tool values bounded, even when a category has many pins.
+            let mut added = 0;
+            for key in keys.iter().filter(|key| !present.contains(*key)) {
+                if added == RESULT_LIMIT {
+                    break;
+                }
+                if let Some(result) = self.pinned_result(key) {
+                    outcome.results.push(result);
+                    added += 1;
+                }
+            }
+            outcome.results.sort_by_key(|result| {
+                !result
+                    .pin
+                    .as_ref()
+                    .is_some_and(|pin| pin.categories.contains(&mode))
+            });
+            if !outcome.results.is_empty() {
+                outcome.notice = None;
+            }
+        }
+        outcome.results.truncate(RESULT_LIMIT);
+        for result in &outcome.results {
+            if let Some(pin) = &result.pin {
+                self.issued_pins.push_back((
+                    result.id.clone(),
+                    pin.key.clone(),
+                    result.kind.category(),
+                ));
+            }
+        }
+        while self.issued_pins.len() > RESULT_LIMIT * 4 {
+            self.issued_pins.pop_front();
+        }
+        Ok(outcome)
+    }
+
+    fn search_unpinned(&mut self, query: &Query<'_>) -> SearchOutcome {
+        if let Some(outcome) = self.tools.search(query) {
+            return match outcome {
                 Ok(results) => SearchOutcome {
                     results: results.into_iter().take(RESULT_LIMIT).collect(),
                     notice: None,
@@ -186,7 +334,7 @@ impl SearchManager {
                     results: vec![],
                     notice: Some(notice),
                 },
-            });
+            };
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -257,17 +405,10 @@ impl SearchManager {
                 RESULT_LIMIT,
             ));
         }
-        // Pin only the empty app list. Typed queries retain their match ranking.
-        // Partition before truncation so an app outside the top 30 can be pinned.
-        let show_pins =
-            query.text.is_empty() && matches!(query.mode, SearchMode::All | SearchMode::Apps);
-        let mut results =
-            ranking::top_results(results, if show_pins { usize::MAX } else { RESULT_LIMIT });
-        if show_pins {
-            results.sort_by_key(|result| !self.pins.contains(&result.id));
-            results.truncate(RESULT_LIMIT);
+        SearchOutcome {
+            results: ranking::top_results(results, RESULT_LIMIT),
+            notice,
         }
-        Ok(SearchOutcome { results, notice })
     }
 }
 
@@ -288,8 +429,10 @@ mod tests {
             )
         };
         manager.replace_apps(apps());
-        manager.set_pinned("app:/app/99", true);
-        manager.set_pinned("app:/missing", true);
+        for mode in [SearchMode::All, SearchMode::Apps] {
+            manager.set_pinned("app:/app/99", mode, true);
+            manager.set_pinned("app:/missing", mode, true);
+        }
         for mode in [SearchMode::All, SearchMode::Apps] {
             let results = manager.search("  ", mode).unwrap().results;
             assert_eq!(results.len(), RESULT_LIMIT);
@@ -305,7 +448,7 @@ mod tests {
             manager.search("", SearchMode::Apps).unwrap().results[0].title,
             "App 099"
         );
-        manager.set_pinned("app:/app/99", false);
+        manager.set_pinned("app:/app/99", SearchMode::Apps, false);
         assert_eq!(
             manager.search("", SearchMode::Apps).unwrap().results[0].title,
             "App 000"

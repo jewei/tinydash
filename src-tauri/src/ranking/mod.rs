@@ -129,6 +129,7 @@ mod tests {
             icon: None,
             primary_action: Action::Launch,
             secondary_actions: vec![],
+            pin: None,
             confirmation: None,
             detail: None,
         };

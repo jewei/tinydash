@@ -26,6 +26,22 @@ impl AppEntry {
             icon: None,
         }
     }
+
+    pub fn result(&self, score: u32) -> SearchResult {
+        SearchResult {
+            id: self.id.clone(),
+            kind: ResultKind::App,
+            title: self.name.clone(),
+            subtitle: self.path.to_string_lossy().into_owned(),
+            score,
+            icon: self.icon.clone(),
+            primary_action: Action::Launch,
+            secondary_actions: vec![Action::Reveal],
+            pin: None,
+            confirmation: None,
+            detail: None,
+        }
+    }
 }
 
 struct IndexedApp {
@@ -112,18 +128,7 @@ impl AppProvider {
             .collect();
         matches
             .into_iter()
-            .map(|(app, score)| SearchResult {
-                id: app.entry.id.clone(),
-                kind: ResultKind::App,
-                title: app.entry.name.clone(),
-                subtitle: app.entry.path.to_string_lossy().into_owned(),
-                score,
-                icon: app.entry.icon.clone(),
-                primary_action: Action::Launch,
-                secondary_actions: vec![Action::Reveal],
-                confirmation: None,
-                detail: None,
-            })
+            .map(|(app, score)| app.entry.result(score))
             .collect()
     }
 }

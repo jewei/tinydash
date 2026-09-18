@@ -46,6 +46,10 @@ export interface SearchResult {
   icon: string | null;
   primaryAction: Action;
   secondaryActions: Action[];
+  pin?: {
+    key: string;
+    categories: SearchMode[];
+  };
   detail?:
     | {
         type: "password";
@@ -71,7 +75,6 @@ export interface SearchResult {
 
 export interface SearchResponse {
   results: SearchResult[];
-  pinnedIds: string[];
   total: number;
   indexing: boolean;
   indexError: string | null;
@@ -130,8 +133,8 @@ export const backend = {
     invoke<void>("reveal_settings_path", { data }),
   search: (query: string, mode: SearchMode) =>
     invoke<SearchResponse>("search", { query, mode }),
-  setAppPinned: (id: string, pinned: boolean) =>
-    invoke<void>("set_app_pinned", { id, pinned }),
+  setPinned: (id: string, category: SearchMode, pinned: boolean) =>
+    invoke<void>("set_pinned", { id, category, pinned }),
   execute: (id: string, action: Action, confirmed = false) =>
     invoke<void>("execute_action", {
       id,

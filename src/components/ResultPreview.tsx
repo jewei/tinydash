@@ -1,5 +1,6 @@
 import { For, Show } from "solid-js";
-import type { Action, SearchResult } from "../bridge";
+import type { Action, SearchMode, SearchResult } from "../bridge";
+import type { PinOption } from "../categories";
 import ClipboardPreview from "./ClipboardPreview";
 import Icon from "./Icon";
 import ResultIcon from "./ResultIcon";
@@ -11,9 +12,9 @@ export default function ResultPreview(props: {
   previewReady: boolean;
   enabled: boolean;
   modifier: string;
-  pinned: boolean;
+  pinOptions: PinOption[];
   pinBusy: boolean;
-  onPin: () => void;
+  onPin: (category: SearchMode) => void;
   onAction: (action: Action) => void;
 }) {
   const kindLabel = () => {
@@ -138,26 +139,24 @@ export default function ResultPreview(props: {
               <div class="preview-icon">
                 <ResultIcon result={props.result!} />
               </div>
-              <Show when={props.result?.kind === "app"}>
-                <button
-                  class="pin-button"
-                  aria-label={
-                    props.pinned ? "Unpin application" : "Pin application"
-                  }
-                  aria-pressed={props.pinned}
-                  aria-busy={props.pinBusy}
-                  disabled={!props.enabled || props.pinBusy}
-                  onClick={props.onPin}
-                  title={
-                    props.pinned
-                      ? "Remove from pinned apps"
-                      : "Keep at the top of an empty search"
-                  }
-                >
-                  <Icon name="pin" size={14} />
-                  {props.pinBusy ? "Saving…" : props.pinned ? "Pinned" : "Pin"}
-                </button>
-              </Show>
+              <div class="pin-controls" role="group" aria-label="Pin item">
+                <For each={props.pinOptions}>
+                  {(option) => (
+                    <button
+                      class="pin-button"
+                      aria-label={option.label}
+                      aria-pressed={option.pinned}
+                      aria-busy={props.pinBusy}
+                      disabled={!props.enabled || props.pinBusy}
+                      onClick={() => props.onPin(option.category)}
+                      title={option.label}
+                    >
+                      <Icon name="pin" size={14} />
+                      {option.label}
+                    </button>
+                  )}
+                </For>
+              </div>
             </div>
             <p class="eyebrow">{kindLabel()}</p>
             <h1 class="preview-title">
