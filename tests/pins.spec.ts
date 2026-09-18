@@ -127,7 +127,7 @@ for (const [category, query, title] of [
   ["Calculator", "12 * 8", "96"],
   ["System", "", "Restart"],
   ["Passwords", "password 24", "SamplePassword0"],
-  ["Time zones", "time in Tokyo", "Tokyo"],
+  ["Datetime", "time in Tokyo", "Tokyo"],
   ["URLs", "https://example.com/?utm_source=test", "youtube.com"],
   ["Web", "web rust", "Search Google"],
 ]) {

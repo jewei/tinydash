@@ -30,6 +30,9 @@ const ALIASES: &[(&str, &str)] = &[
     ("et", "America/New_York"),
     ("us eastern", "America/New_York"),
     ("pacific", "America/Los_Angeles"),
+    ("pacific time", "America/Los_Angeles"),
+    ("pacific standard time", "Etc/GMT+8"),
+    ("pacific daylight time", "Etc/GMT+7"),
     ("pt", "America/Los_Angeles"),
     ("us pacific", "America/Los_Angeles"),
     ("central", "America/Chicago"),
@@ -157,23 +160,112 @@ fn clock(value: &str) -> Option<NaiveTime> {
     NaiveTime::from_hms_opt(hour, minute, 0)
 }
 
+fn input_text(query: &str) -> String {
+    query
+        .trim()
+        .to_ascii_lowercase()
+        .replace("a.m.", "am")
+        .replace("p.m.", "pm")
+        .replace("a.m", "am")
+        .replace("p.m", "pm")
+}
+
+fn explicit_clock(value: &str) -> bool {
+    clock(value).is_some()
+        && (value.contains(':')
+            || value.ends_with("am")
+            || value.ends_with("pm")
+            || matches!(value, "noon" | "midnight"))
+}
+
+fn date_unit(value: &str) -> Option<u64> {
+    match value {
+        "day" | "days" => Some(1),
+        "week" | "weeks" => Some(7),
+        _ => None,
+    }
+}
+
+fn weekday(value: &str) -> Option<Weekday> {
+    match value {
+        "monday" | "mon" => Some(Weekday::Mon),
+        "tuesday" | "tue" => Some(Weekday::Tue),
+        "wednesday" | "wed" => Some(Weekday::Wed),
+        "thursday" | "thu" => Some(Weekday::Thu),
+        "friday" | "fri" => Some(Weekday::Fri),
+        "saturday" | "sat" => Some(Weekday::Sat),
+        "sunday" | "sun" => Some(Weekday::Sun),
+        _ => None,
+    }
+}
+
+fn starts_with_date(value: &str) -> bool {
+    let parts: Vec<_> = value.split_whitespace().collect();
+    let Some(first) = parts.first().copied() else {
+        return false;
+    };
+    matches!(first, "today" | "tomorrow" | "yesterday")
+        || weekday(first).is_some()
+        || (first == "next"
+            && parts
+                .get(1)
+                .is_some_and(|part| *part == "week" || weekday(part).is_some()))
+        || (first == "in" && parts.get(2).is_some_and(|part| date_unit(part).is_some()))
+        || (first.len() == 10
+            && first.bytes().enumerate().all(|(index, byte)| {
+                if matches!(index, 4 | 7) {
+                    byte == b'-'
+                } else {
+                    byte.is_ascii_digit()
+                }
+            }))
+}
+
 pub fn is_candidate(query: &str) -> bool {
-    let lower = query.to_ascii_lowercase();
-    if lower == "time" || lower.starts_with("time ") {
+    let lower = input_text(query);
+    if ["time", "date", "datetime"]
+        .iter()
+        .any(|prefix| lower == *prefix || lower.starts_with(&format!("{prefix} ")))
+        || (starts_with_date(&lower)
+            && date(&lower, NaiveDate::from_ymd_opt(2000, 1, 1).unwrap()).is_ok())
+    {
         return true;
     }
     let parts: Vec<_> = lower.split_whitespace().collect();
-    let has_clock = parts.iter().any(|part| {
-        clock(part).is_some()
-            && (part.contains(':')
-                || part.ends_with("am")
-                || part.ends_with("pm")
-                || matches!(*part, "noon" | "midnight"))
-    });
+    let has_clock = parts.iter().any(|part| explicit_clock(part));
     has_clock && (parts.len() > 1)
 }
 
 fn date(value: &str, today: NaiveDate) -> Result<NaiveDate, String> {
+    let value = value.trim().trim_end_matches(" at").replace('+', " + ");
+    let parts: Vec<_> = value.split_whitespace().collect();
+    let first_offset = parts
+        .iter()
+        .position(|part| matches!(*part, "+" | "-"))
+        .unwrap_or(parts.len());
+    let mut result = base_date(&parts[..first_offset].join(" "), today)?;
+    for offset in parts[first_offset..].chunks(3) {
+        let [sign, count, unit] = offset else {
+            return Err("Use a date followed by + or - and a number of days or weeks.".into());
+        };
+        let count = count
+            .parse::<u64>()
+            .ok()
+            .zip(date_unit(unit))
+            .and_then(|(count, unit)| count.checked_mul(unit))
+            .filter(|days| *days <= 36_600)
+            .ok_or("Use a whole number of days or weeks, up to 36,600 days per step.")?;
+        result = match *sign {
+            "+" => result.checked_add_days(Days::new(count)),
+            "-" => result.checked_sub_days(Days::new(count)),
+            _ => return Err("Use + to add days or weeks, or - to subtract them.".into()),
+        }
+        .ok_or("This date is outside the supported range.")?;
+    }
+    Ok(result)
+}
+
+fn base_date(value: &str, today: NaiveDate) -> Result<NaiveDate, String> {
     let value = value.trim().trim_end_matches(" at").to_ascii_lowercase();
     let days = match value.as_str() {
         "" | "today" | "at" => Some(0),
@@ -188,28 +280,18 @@ fn date(value: &str, today: NaiveDate) -> Result<NaiveDate, String> {
             .ok_or_else(|| "This date is outside the supported range.".into());
     }
     let parts: Vec<_> = value.split_whitespace().collect();
-    if parts.len() == 3 && parts[0] == "in" && matches!(parts[2], "day" | "days") {
+    if parts.len() == 3 && parts[0] == "in" && date_unit(parts[2]).is_some() {
         let count: u64 = parts[1]
             .parse()
-            .map_err(|_| "Use a number of days, such as in 2 days 3pm London.")?;
-        if count <= 36_600
+            .map_err(|_| "Use a whole number of days or weeks, such as in 2 weeks.")?;
+        if let Some(count) = count.checked_mul(date_unit(parts[2]).unwrap())
+            && count <= 36_600
             && let Some(date) = today.checked_add_days(Days::new(count))
         {
             return Ok(date);
         }
     }
-    let weekday = value.strip_prefix("next ").unwrap_or(&value);
-    let weekday = match weekday {
-        "monday" | "mon" => Some(Weekday::Mon),
-        "tuesday" | "tue" => Some(Weekday::Tue),
-        "wednesday" | "wed" => Some(Weekday::Wed),
-        "thursday" | "thu" => Some(Weekday::Thu),
-        "friday" | "fri" => Some(Weekday::Fri),
-        "saturday" | "sat" => Some(Weekday::Sat),
-        "sunday" | "sun" => Some(Weekday::Sun),
-        _ => None,
-    };
-    if let Some(day) = weekday {
+    if let Some(day) = weekday(value.strip_prefix("next ").unwrap_or(&value)) {
         let mut delta =
             (7 + day.num_days_from_monday() - today.weekday().num_days_from_monday()) % 7;
         if delta == 0 && value.starts_with("next ") {
@@ -220,8 +302,7 @@ fn date(value: &str, today: NaiveDate) -> Result<NaiveDate, String> {
             .ok_or_else(|| "This date is outside the supported range.".into());
     }
     NaiveDate::parse_from_str(&value, "%Y-%m-%d").map_err(|_| {
-        "Use today, tomorrow, yesterday, a weekday, in 2 days, or YYYY-MM-DD before the time."
-            .into()
+        "Use today, tomorrow, a weekday, in 2 weeks, or YYYY-MM-DD. You can add or subtract days or weeks.".into()
     })
 }
 
@@ -238,23 +319,23 @@ pub fn calculate(
     now: DateTime<Utc>,
     local: impl Fn(DateTime<Utc>) -> DateTime<FixedOffset>,
 ) -> Result<Vec<TimeResult>, String> {
-    let lower = query.trim().to_ascii_lowercase();
-    let text = lower
-        .strip_prefix("time ")
-        .map(|text| text.trim().strip_prefix("in ").unwrap_or(text.trim()))
-        .unwrap_or(&lower);
-    if text.is_empty() || text == "time" {
-        return Err("Try time in Tokyo or tomorrow 3pm London.".into());
+    let lower = input_text(query);
+    let text = ["datetime ", "date ", "time "]
+        .iter()
+        .find_map(|prefix| lower.strip_prefix(prefix))
+        .unwrap_or(&lower)
+        .trim();
+    let text = if starts_with_date(text) {
+        text
+    } else {
+        text.strip_prefix("in ").unwrap_or(text)
+    };
+    if text.is_empty() || matches!(text, "time" | "date" | "datetime") {
+        return Err("Try next Friday + 2 weeks, time in Tokyo, or 10am Pacific Time.".into());
     }
     let parts: Vec<_> = text.split_whitespace().collect();
     // A date's day count is not a clock. Prefer explicit clock tokens before bare hours.
-    let explicit = parts.iter().position(|part| {
-        clock(part).is_some()
-            && (part.contains(':')
-                || part.ends_with("am")
-                || part.ends_with("pm")
-                || matches!(*part, "noon" | "midnight"))
-    });
+    let explicit = parts.iter().position(|part| explicit_clock(part));
     let clock_index = explicit.or_else(|| {
         parts
             .iter()
@@ -263,10 +344,26 @@ pub fn calculate(
                 clock(part).is_some()
                     && parts
                         .get(index + 1)
-                        .is_none_or(|next| !matches!(*next, "day" | "days"))
+                        .is_none_or(|next| date_unit(next).is_none())
             })
             .map(|(index, _)| index)
     });
+    if clock_index.is_none() && starts_with_date(text) {
+        let today = local(now).date_naive();
+        let answer = date(text, today)?;
+        let result = answer.format("%a, %d %b %Y").to_string();
+        let based_on = today.format("%a, %d %b %Y").to_string();
+        return Ok(vec![TimeResult {
+            title: result.clone(),
+            subtitle: format!("{} · based on your local date, {}", query.trim(), based_on),
+            copy: answer.format("%Y-%m-%d").to_string(),
+            detail: ToolDetail::DateCalculation {
+                expression: query.trim().into(),
+                based_on,
+                result,
+            },
+        }]);
+    }
     let (location, selected_time, selected_date) = if let Some(index) = clock_index {
         let mut consumed = index + 1;
         let mut token = parts[index].to_owned();
@@ -412,6 +509,144 @@ mod tests {
                 .copy
                 .contains("16 Sep 2026")
         );
+    }
+    #[test]
+    fn date_arithmetic_uses_the_local_calendar_and_copies_an_iso_date() {
+        let result = calculate("next friday + 2 week", now(), local).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "Fri, 02 Oct 2026");
+        assert_eq!(result[0].copy, "2026-10-02");
+        assert!(matches!(
+            &result[0].detail,
+            ToolDetail::DateCalculation { expression, based_on, result }
+                if expression == "next friday + 2 week"
+                    && based_on == "Thu, 17 Sep 2026"
+                    && result == "Fri, 02 Oct 2026"
+        ));
+        let friday_locally = Utc.with_ymd_and_hms(2026, 9, 17, 23, 30, 0).unwrap();
+        assert_eq!(
+            calculate("next Friday + 2 weeks", friday_locally, local).unwrap()[0].copy,
+            "2026-10-09",
+            "Next Friday must be after today, using the local date"
+        );
+        assert_eq!(
+            calculate("date today + 1 day", friday_locally, local).unwrap()[0].copy,
+            "2026-09-19"
+        );
+        assert_eq!(
+            calculate("datetime in 2 weeks", now(), local).unwrap()[0].copy,
+            "2026-10-01"
+        );
+    }
+
+    #[test]
+    fn date_arithmetic_handles_leap_days_subtraction_and_invalid_offsets() {
+        for (query, expected) in [
+            ("2028-02-28 + 1 day", "2028-02-29"),
+            ("2028-02-28 + 1 week - 2 days", "2028-03-04"),
+            ("2026-01-01 - 1 day", "2025-12-31"),
+            ("today +2 weeks", "2026-10-01"),
+        ] {
+            assert_eq!(
+                calculate(query, now(), local).unwrap()[0].copy,
+                expected,
+                "{query}"
+            );
+        }
+        for query in [
+            "2026-02-30 + 1 day",
+            "today + 2 months",
+            "today + 1.5 weeks",
+            "today + -1 week",
+            "today + 2 weeks +",
+            "today + 50000 days",
+            "today + 18446744073709551615 weeks",
+        ] {
+            assert!(calculate(query, now(), local).is_err(), "{query}");
+        }
+    }
+
+    #[test]
+    fn pacific_time_accepts_meridiem_punctuation_and_uses_the_selected_date() {
+        let results = calculate("10:00 a.m. Pacific Time", now(), local).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].title.starts_with("01:00"));
+        assert!(results[0].copy.contains("18 Sep 2026"));
+        assert!(matches!(
+            &results[0].detail,
+            ToolDetail::Timezone { source, source_zone, .. }
+                if source.contains("UTC-07:00") && source_zone == "America/Los_Angeles"
+        ));
+        let winter = calculate("2026-12-15 10:00 a.m. Pacific Time", now(), local).unwrap();
+        assert!(winter[0].title.starts_with("02:00"));
+        assert!(winter[0].copy.contains("16 Dec 2026"));
+        assert!(winter[0].subtitle.contains("UTC-08:00"));
+        for query in [
+            "10:00a.m. Pacific Time",
+            "10 a.m. Pacific Time",
+            "10am Pacific",
+        ] {
+            assert_eq!(
+                calculate(query, now(), local).unwrap()[0].copy,
+                results[0].copy
+            );
+        }
+        assert!(
+            calculate("2026-10-25 + 2 weeks 10:00 a.m. Pacific Time", now(), local).unwrap()[0]
+                .copy
+                .contains("09 Nov 2026 · 02:00")
+        );
+        assert!(
+            calculate("10:00 a.m. Pacific Standard Time", now(), local).unwrap()[0]
+                .title
+                .starts_with("02:00")
+        );
+        assert!(
+            calculate("10:00 p.m. Pacific Time", now(), local).unwrap()[0]
+                .title
+                .starts_with("13:00")
+        );
+    }
+
+    #[test]
+    fn pacific_clock_changes_keep_missing_and_repeated_times_explicit() {
+        assert!(
+            calculate("2026-03-08 2:30 a.m. Pacific Time", now(), local)
+                .unwrap_err()
+                .contains("clocks move forward")
+        );
+        let results = calculate("2026-11-01 1:30 a.m. Pacific Time", now(), local).unwrap();
+        assert_eq!(results.len(), 2);
+        assert_ne!(results[0].copy, results[1].copy);
+        assert!(results.iter().all(|result| matches!(
+            result.detail,
+            ToolDetail::Timezone {
+                ambiguous: true,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn all_mode_recognizes_dates_without_taking_ordinary_file_searches() {
+        for query in [
+            "next friday + 2 week",
+            "today",
+            "2028-02-28 + 1 day",
+            "10:00 a.m. Pacific Time",
+            "date tomorrow",
+        ] {
+            assert!(is_candidate(query), "{query}");
+        }
+        for query in [
+            "Friday notes",
+            "tomorrow report",
+            "timezones.rs",
+            "12 + 8",
+            "Finder",
+        ] {
+            assert!(!is_candidate(query), "{query}");
+        }
     }
     #[test]
     fn daylight_saving_gaps_are_rejected_and_both_repeated_times_are_explicit() {

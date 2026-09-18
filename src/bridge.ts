@@ -64,6 +64,12 @@ export interface SearchResult {
         sourceZone: string;
         ambiguous: boolean;
       }
+    | {
+        type: "dateCalculation";
+        expression: string;
+        basedOn: string;
+        result: string;
+      }
     | { type: "cleanedUrl"; original: string; removed: number }
     | { type: "webSearch"; engine: string; query: string; url: string };
   confirmation?: {

@@ -30,6 +30,28 @@ export default function ToolDetails(props: {
           </div>
         )}
       </Show>
+      <Show
+        when={
+          props.detail?.type === "dateCalculation" ? props.detail : undefined
+        }
+      >
+        {(detail) => (
+          <dl class="time-details">
+            <div>
+              <dt>Expression</dt>
+              <dd>{detail().expression}</dd>
+            </div>
+            <div>
+              <dt>Based on your local date</dt>
+              <dd>{detail().basedOn}</dd>
+            </div>
+            <div>
+              <dt>Result</dt>
+              <dd>{detail().result}</dd>
+            </div>
+          </dl>
+        )}
+      </Show>
       <Show when={props.detail?.type === "timezone" ? props.detail : undefined}>
         {(detail) => (
           <>

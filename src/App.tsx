@@ -46,7 +46,7 @@ const groupLabels: Record<SearchResult["kind"], string> = {
   calculation: "Calculator",
   systemCommand: "System commands",
   password: "Password generator",
-  timezone: "Time zones",
+  timezone: "Datetime",
   cleanedUrl: "URL cleaner",
   webSearch: "Web search",
 };
@@ -151,7 +151,9 @@ export default function App(
     current()?.kind === "password"
       ? "Copy password"
       : current()?.kind === "timezone"
-        ? "Copy time"
+        ? current()?.detail?.type === "dateCalculation"
+          ? "Copy date"
+          : "Copy time"
         : current()?.kind === "cleanedUrl"
           ? "Copy URL"
           : current()?.kind === "webSearch"
@@ -169,7 +171,7 @@ export default function App(
     mode() === "password"
       ? "password 32, passphrase 6, pin 6..."
       : mode() === "timezone"
-        ? "time in Tokyo, tomorrow 3pm London..."
+        ? "next Friday + 2 weeks, 10am Pacific Time..."
         : mode() === "url"
           ? "Paste a URL to remove tracking..."
           : mode() === "web"
@@ -965,7 +967,7 @@ export default function App(
                   : mode() === "password"
                     ? "Generate a password"
                     : mode() === "timezone"
-                      ? "Find a time"
+                      ? "Calculate a date or time"
                       : mode() === "url"
                         ? "Clean a URL"
                         : mode() === "web"
@@ -1002,7 +1004,7 @@ export default function App(
                   : mode() === "password"
                     ? "Try password 32, passphrase 6, or pin 6."
                     : mode() === "timezone"
-                      ? "Try time in Tokyo or tomorrow 3pm London."
+                      ? "Try next Friday + 2 weeks, time in Tokyo, or 10am Pacific Time."
                       : mode() === "url"
                         ? "Paste a full http:// or https:// URL."
                         : mode() === "web"

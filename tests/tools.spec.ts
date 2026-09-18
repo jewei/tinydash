@@ -80,6 +80,50 @@ test("time results show both dates and preserve selection through a clock refres
   ).toBeInViewport({ ratio: 1 });
 });
 
+test("Datetime shows date arithmetic and Pacific conversion with the correct copy action", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page
+    .getByRole("navigation", { name: "Search categories" })
+    .getByRole("button", { name: "Datetime", exact: true })
+    .click();
+  await input(page).fill("next friday + 2 week");
+  await expect(
+    page.getByText("Based on your local date", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".time-details")).toContainText("Thu, 17 Sep 2026");
+  await expect(page.locator(".preview-title")).toHaveText("Fri, 02 Oct 2026");
+  const copyDate = page.getByRole("button", { name: /^Copy this date/ });
+  await expect(copyDate).toBeInViewport({ ratio: 1 });
+  await copyDate.click();
+  expect((await calls(page)).at(-1)).toMatchObject({
+    id: "tool:date-calculation",
+    action: "copy",
+  });
+  await input(page).fill("10:00 a.m. Pacific Time");
+  await expect(page.locator(".preview-title")).toHaveText(
+    "01:00 · your local time",
+  );
+  await expect(page.locator(".time-details")).toContainText("UTC-07:00");
+  await expect(page.locator(".time-details")).toContainText(
+    "Fri, 18 Sep 2026 · 01:00 · UTC+08:00",
+  );
+  await page.getByRole("button", { name: /^Copy this time/ }).click();
+  expect((await calls(page)).at(-1)).toMatchObject({
+    id: "tool:pacific-conversion",
+    action: "copy",
+  });
+  await page.goto("/?view=settings");
+  await page.getByRole("button", { name: "Categories", exact: true }).click();
+  await expect(
+    page.getByRole("checkbox", { name: "Datetime", exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("checkbox", { name: "Time zones", exact: true }),
+  ).toHaveCount(0);
+});
+
 test("cleaned URLs offer separate copy and open actions and accept long input", async ({
   page,
 }) => {
