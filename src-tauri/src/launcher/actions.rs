@@ -49,7 +49,7 @@ pub async fn execute_action(
 ) -> Result<(), String> {
     let keep_open = matches!(action, Action::Delete | Action::Regenerate);
     let worker_app = app.clone();
-    let usage_id = tauri::async_runtime::spawn_blocking(move || {
+    let (usage_id, restore_focus) = tauri::async_runtime::spawn_blocking(move || {
         // Resolve backend-owned IDs. The webview supplies neither executable
         // paths nor clipboard content. Release the search lock before OS work.
         let action = worker_app
@@ -60,6 +60,7 @@ pub async fn execute_action(
             .resolve_action(&id, action)
             .map_err(|error| error.to_string())?;
         let usage_id = action.usage_id(&id);
+        let restore_focus = matches!(action, ResolvedAction::Copy(_));
         // Enforce this in Rust as well as in the dialog. Missing IPC fields
         // never count as consent, including on older frontend builds.
         action
@@ -107,15 +108,17 @@ pub async fn execute_action(
                 .storage
                 .delete_clipboard(&worker_app, Some(id)),
         }?;
-        Ok::<_, String>(usage_id)
+        Ok::<_, String>((usage_id, restore_focus))
     })
     .await
     .map_err(|error| error.to_string())??;
     // Hide after the OS action succeeds, before waiting for disk writes.
     let hidden = if keep_open {
         Ok(())
+    } else if restore_focus {
+        window::dismiss(&app).map_err(|error| error.to_string())
     } else {
-        window::hide_launcher(app.clone())
+        window::hide(&app).map_err(|error| error.to_string())
     };
     if let Some(id) = usage_id {
         let worker_app = app.clone();

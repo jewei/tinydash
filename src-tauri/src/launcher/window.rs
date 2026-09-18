@@ -10,6 +10,10 @@ pub fn show(app: &AppHandle) -> Result<()> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
+    #[cfg(target_os = "macos")]
+    if let Some(state) = app.try_state::<LauncherState>() {
+        state.focus.remember();
+    }
     window.unminimize()?;
     // A resident window can retain coordinates from a disconnected or resized display.
     // Placement failure must not prevent the launcher from opening.
@@ -76,17 +80,36 @@ pub fn toggle(app: &AppHandle) -> Result<()> {
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
     if window.is_visible()? && window.is_focused()? {
-        hide(app)
+        dismiss(app)
     } else {
         show(app)
     }
 }
 
 pub fn hide(app: &AppHandle) -> Result<()> {
+    hide_window(app, false)
+}
+
+pub fn dismiss(app: &AppHandle) -> Result<()> {
+    hide_window(app, true)
+}
+
+fn hide_window(app: &AppHandle, _restore_focus: bool) -> Result<()> {
+    // Take the saved app before hiding. The resulting blur event can call hide again.
+    #[cfg(target_os = "macos")]
+    let previous = app
+        .try_state::<LauncherState>()
+        .and_then(|state| state.focus.take());
     if let Some(window) = app.get_webview_window("main")
         && window.is_visible()?
     {
+        #[cfg(target_os = "macos")]
+        let restore_focus = _restore_focus && window.is_focused()?;
         window.hide()?;
+        #[cfg(target_os = "macos")]
+        if restore_focus && let Some(previous) = previous {
+            previous.restore();
+        }
         window.emit("launcher-hidden", ())?;
     }
     Ok(())
@@ -94,7 +117,7 @@ pub fn hide(app: &AppHandle) -> Result<()> {
 
 #[tauri::command]
 pub fn hide_launcher(app: AppHandle) -> std::result::Result<(), String> {
-    hide(&app).map_err(|error| error.to_string())
+    dismiss(&app).map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

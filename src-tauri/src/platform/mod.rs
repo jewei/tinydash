@@ -10,6 +10,8 @@ pub use linux::{discover_apps, launch, run_system_command, system_commands};
 #[cfg(target_os = "linux")]
 pub use linux::{read_clipboard, watch_clipboard};
 #[cfg(target_os = "macos")]
+pub use macos::LauncherFocus;
+#[cfg(target_os = "macos")]
 pub use macos::clipboard_snapshot;
 #[cfg(target_os = "macos")]
 pub use macos::load_app_icons;

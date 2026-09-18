@@ -20,7 +20,7 @@ CI checks installation, same-version replacement, and removal. On a physical des
 2. Search for an installed app by name. Search again with an abbreviation and part of its path. Confirm that the expected app appears.
 3. Use the arrow keys. Confirm that selection moves and wraps at both ends. Press Enter and confirm that the selected app starts.
 4. Press Control + Shift + Space while another app has focus. Confirm that TinyDash appears and immediately accepts text. Confirm that Siri, Spotlight, or another system panel does not open. Repeat ten times.
-5. Press Escape. Confirm that the window hides and can reopen through the shortcut.
+5. Type in a browser or terminal, then open TinyDash with the shortcut. Press Escape without entering a query. Confirm that the palette hides and you can continue typing in the same window without a click. Repeat after copying a calculation result and after closing the palette with the shortcut. Alternate between two apps to check that each opening remembers the current app.
 6. Click another app. Confirm that TinyDash hides with the default `hideOnBlur` setting.
 7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash.
 8. Start TinyDash again while it is running. Confirm that the existing window appears and a second launcher process does not remain running.
@@ -33,6 +33,8 @@ CI checks installation, same-version replacement, and removal. On a physical des
 15. With the default categories shown, press Tab in the search field. Confirm that Apps is selected immediately. Type a query, then press Tab again. Confirm that Files is selected, the query stays unchanged, and the search field keeps focus. Use Shift + Tab to move back. Check that selection wraps between the first and last visible categories. Make the window narrow and confirm that the bar scrolls to show the selected category. Press Escape once to hide the launcher.
 
 The default global shortcut uses Control on all platforms. For shortcuts shown as Command/Ctrl, use Ctrl on Windows and Linux, and Command on macOS. If a shortcut conflicts with another application, change it in Settings and repeat the check. On macOS 27, Command + Shift + Space opens Siri Visual Intelligence and must not be used as TinyDash's default.
+
+On macOS, run `swift tests/native/focus-macos.swift` with the built app open and Accessibility access enabled for the test process. The check opens two test windows and verifies that typing resumes in the correct window after Escape, the global shortcut, a second launch, and copying a calculation. It restores the clipboard when finished. If your shortcut uses different modifiers with Space, set `TINYDASH_TEST_SHORTCUT`, for example `TINYDASH_TEST_SHORTCUT=Super+Space swift tests/native/focus-macos.swift`.
 
 ## Check Settings
 

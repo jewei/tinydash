@@ -33,6 +33,8 @@ pub struct LauncherState {
     pub search: Mutex<SearchManager>,
     pub scanning: AtomicBool,
     pub ready: AtomicBool,
+    #[cfg(target_os = "macos")]
+    pub focus: platform::LauncherFocus,
     settings: RwLock<Settings>,
     pub settings_update: Mutex<()>,
     pub shortcut_recording: AtomicBool,
@@ -50,6 +52,8 @@ impl LauncherState {
             search: Mutex::new(SearchManager::default()),
             scanning: AtomicBool::new(false),
             ready: AtomicBool::new(false),
+            #[cfg(target_os = "macos")]
+            focus: platform::LauncherFocus::default(),
             settings: RwLock::new(settings),
             settings_update: Mutex::new(()),
             shortcut_recording: AtomicBool::new(false),

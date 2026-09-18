@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 
 mod descriptions;
+mod focus;
 mod icons;
+
+pub use focus::LauncherFocus;
 
 use crate::{
     error::{Error, Result},
