@@ -1,4 +1,5 @@
 node_modules/
+/designs/
 .hallmark/
 dist/
 src-tauri/target/
