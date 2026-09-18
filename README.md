@@ -55,7 +55,7 @@ Tool pins save their input and output choice. When you open a category, TinyDash
 
 ## Search
 
-The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Time zones, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows its pinned items, then applications.
+The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Datetime, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows its pinned items, then applications.
 
 | Query            | Result                         |
 | ---------------- | ------------------------------ |
@@ -134,7 +134,7 @@ macOS checks the [pasteboard change counter](https://developer.apple.com/documen
 | Command / Ctrl + R           | Refresh rates in Calculator, files in Files, or apps in other modes |
 | Command / Ctrl + Q           | Quit TinyDash                                                       |
 
-## Passwords, time zones, URLs, and web search
+## Passwords, Datetime, URLs, and web search
 
 | Input                                                                      | Result                                                                                  |
 | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -143,6 +143,9 @@ macOS checks the [pasteboard change counter](https://developer.apple.com/documen
 | `passphrase 6`                                                             | Six random words                                                                        |
 | `pin 6`                                                                    | A six-digit PIN                                                                         |
 | `time in tokyo`                                                            | The current time in Tokyo, with your local time                                         |
+| `next friday + 2 week`                                                     | Two weeks after the next Friday, using your local date                                  |
+| `2028-02-28 + 1 day`                                                       | 29 February 2028                                                                        |
+| `10:00 a.m. Pacific Time`                                                  | 10:00 in Los Angeles on its current date, converted to your local time                  |
 | `tomorrow 3pm london`                                                      | Tomorrow at 15:00 in London, converted to your local time                               |
 | `in 2 days 11pm new york`                                                  | A relative date conversion                                                              |
 | `2026-10-25 1:30 london`                                                   | Both possible times during the daylight saving change                                   |
@@ -152,7 +155,9 @@ macOS checks the [pasteboard change counter](https://developer.apple.com/documen
 
 Character passwords support 6 to 64 characters and default to 20. Passphrases support 3 to 12 words and default to six. PINs support 4 to 12 digits and default to six. Generation uses the operating system's [secure random source](https://docs.rs/getrandom/0.3.4/getrandom/fn.fill.html) with unbiased selection. Passphrases use the bundled [EFF Large Wordlist](https://www.eff.org/dice), with attribution in Settings → About and the source data directory. Strength estimates use the number of possible generated values, in bits. They do not predict a cracking time. **Generate another** replaces the selected result. Copy uses the exact displayed value and skips TinyDash's clipboard history for that copy.
 
-Time zones use the bundled [IANA database through chrono-tz](https://docs.rs/chrono-tz/0.10.4/chrono_tz/). City names, aliases, regions such as US and Australia, and full names such as `America/New_York` work offline. Relative dates use the date in the source city. Today, tomorrow, yesterday, weekdays, next week, and `in N days` are supported. The output shows explicit dates and UTC offsets. Missing times during a clock change produce an error; repeated times produce two results. Current times refresh each minute while visible. An app update is needed for new time zone rules.
+**Datetime** calculates dates and converts times offline. Enter `next friday + 2 week`, `today + 3 days`, `in 2 weeks`, or `2028-02-28 + 1 week - 2 days`. Date calculations use your local date. "Next Friday" means the next Friday after today. Day and week offsets accept whole numbers, with up to 36,600 days per step. The result shows the date used for the calculation. **Copy this date** copies `YYYY-MM-DD`.
+
+Time conversion uses the bundled [IANA database through chrono-tz](https://docs.rs/chrono-tz/0.10.4/chrono_tz/). City names, aliases, regions such as US and Australia, and full names such as `America/New_York` work offline. `10:00 a.m. Pacific Time` uses the current date in Los Angeles and applies its daylight saving rule. Add a date for another day, such as `2026-12-15 10:00 a.m. Pacific Time`. `PST` and `Pacific Standard Time` mean a fixed UTC−08:00 offset; `PDT` and `Pacific Daylight Time` mean UTC−07:00. Relative dates in a conversion use the source city's date. Today, tomorrow, yesterday, weekdays, next week, and `in N days/weeks` are supported. The output shows explicit dates and UTC offsets. Missing times during a clock change produce an error; repeated times produce two results. Current times refresh each minute while visible. An app update is needed for new time zone rules.
 
 The URL cleaner removes common tracking fields, including `utm_*`, `fbclid`, `gclid`, and `msclkid`. It has additional Amazon, YouTube, and Spotify rules. It keeps unrelated query values, duplicate keys, encoded values, and fragments. Video IDs, timestamps, playlist IDs, and product options remain in place. It shows the removal count and provides **Copy cleaned URL** and **Open cleaned URL**. Cleaning works offline, supports URLs up to 8,192 characters, and does not follow shortened links.
 

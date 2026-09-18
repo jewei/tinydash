@@ -482,6 +482,43 @@ function toolResults(
       }),
     );
   }
+  if (/^next friday \+ 2 weeks?$/i.test(query)) {
+    return [
+      {
+        ...base,
+        id: "tool:date-calculation",
+        kind: "timezone",
+        title: "Fri, 02 Oct 2026",
+        subtitle:
+          "next friday + 2 week · based on your local date, Thu, 17 Sep 2026",
+        detail: {
+          type: "dateCalculation",
+          expression: query,
+          basedOn: "Thu, 17 Sep 2026",
+          result: "Fri, 02 Oct 2026",
+        },
+      },
+    ];
+  }
+  if (query === "10:00 a.m. Pacific Time") {
+    return [
+      {
+        ...base,
+        id: "tool:pacific-conversion",
+        kind: "timezone",
+        title: "01:00 · your local time",
+        subtitle:
+          "Thu, 17 Sep 2026 · 10:00 · Los Angeles · UTC-07:00 · 18 Sep locally",
+        detail: {
+          type: "timezone",
+          sourceZone: "America/Los_Angeles",
+          source: "Thu, 17 Sep 2026 · 10:00 · Los Angeles · UTC-07:00",
+          local: "Fri, 18 Sep 2026 · 01:00 · UTC+08:00",
+          ambiguous: false,
+        },
+      },
+    ];
+  }
   if (mode === "timezone" || /^(time |tomorrow )/.test(query)) {
     return ["Asia/Tokyo", "Europe/London"].map((sourceZone, index) => ({
       ...base,

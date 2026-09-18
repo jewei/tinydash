@@ -28,7 +28,7 @@ export const categories = [
   { id: "calculator", label: "Calculator" },
   { id: "system", label: "System" },
   { id: "password", label: "Passwords" },
-  { id: "timezone", label: "Time zones" },
+  { id: "timezone", label: "Datetime" },
   { id: "url", label: "URLs" },
   { id: "web", label: "Web" },
 ] as const satisfies readonly { id: SearchMode; label: string }[];

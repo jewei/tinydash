@@ -101,6 +101,11 @@ pub enum ToolDetail {
         source_zone: String,
         ambiguous: bool,
     },
+    DateCalculation {
+        expression: String,
+        based_on: String,
+        result: String,
+    },
     CleanedUrl {
         original: String,
         removed: usize,

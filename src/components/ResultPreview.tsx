@@ -32,7 +32,7 @@ export default function ResultPreview(props: {
       case "password":
         return "Password generator";
       case "timezone":
-        return "Time zones";
+        return "Datetime";
       case "cleanedUrl":
         return "Cleaned URL";
       case "webSearch":
@@ -56,7 +56,9 @@ export default function ResultPreview(props: {
       case "password":
         return "Copy generated password";
       case "timezone":
-        return "Copy this time";
+        return props.result?.detail?.type === "dateCalculation"
+          ? "Copy this date"
+          : "Copy this time";
       case "cleanedUrl":
         return "Copy cleaned URL";
       case "webSearch":
