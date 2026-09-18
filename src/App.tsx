@@ -24,6 +24,17 @@ import ResultIcon from "./components/ResultIcon";
 import ClipboardPreview from "./components/ClipboardPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
 
+const scopeLabels: Record<SearchMode, string> = {
+  all: "All",
+  apps: "Apps",
+  files: "Files",
+  clipboard: "Clipboard",
+  emoji: "Emoji",
+  calculator: "Calculator",
+  system: "System",
+};
+const scopes = Object.keys(scopeLabels) as SearchMode[];
+
 export default function App() {
   const desktop = isTauri();
   const [visible, setVisible] = createSignal(true);
@@ -50,12 +61,15 @@ export default function App() {
   const [indexError, setIndexError] = createSignal<string>();
   const [storageError, setStorageError] = createSignal<string>();
   const [notice, setNotice] = createSignal<string>();
+  const [scopeOpen, setScopeOpen] = createSignal(false);
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [clearOpen, setClearOpen] = createSignal(false);
   const [pendingAction, setPendingAction] = createSignal<SearchResult>();
   let input!: HTMLInputElement;
   let menu: HTMLDivElement | undefined;
   let list!: HTMLUListElement;
+  let scopeList: HTMLUListElement | undefined;
+  let scopeCycleStarted = false;
   let sequence = 0;
   let disposed = false;
   let searchTask: Promise<void> | undefined;
@@ -190,6 +204,7 @@ export default function App() {
   }
 
   function changeQuery(value: string) {
+    setScopeOpen(false);
     setQuery(value);
     setError(undefined);
     void search(value);
@@ -203,6 +218,19 @@ export default function App() {
     focusInput();
   }
 
+  function cycleScope(step: number) {
+    changeMode(
+      scopes[(scopes.indexOf(mode()) + step + scopes.length) % scopes.length],
+    );
+  }
+
+  function toggleScope() {
+    scopeCycleStarted = true;
+    setScopeOpen(!scopeOpen());
+    setMenuOpen(false);
+    focusInput();
+  }
+
   function runPrimary() {
     const result = current();
     if (result) void run(result.primaryAction, result);
@@ -210,6 +238,7 @@ export default function App() {
 
   async function run(action: Action, result = current()) {
     if (!result || !canOpen()) return;
+    setScopeOpen(false);
     setMenuOpen(false);
     setError(undefined);
     if (result.confirmation && action === result.primaryAction) {
@@ -256,6 +285,7 @@ export default function App() {
   }
 
   function confirmClear() {
+    setScopeOpen(false);
     setMenuOpen(false);
     setError(undefined);
     setClearOpen(true);
@@ -283,6 +313,7 @@ export default function App() {
   }
 
   async function hide() {
+    setScopeOpen(false);
     if (!desktop) return;
     try {
       await backend.hide();
@@ -317,6 +348,7 @@ export default function App() {
   }
 
   function toggleMenu() {
+    setScopeOpen(false);
     setMenuOpen(!menuOpen());
     if (menuOpen()) {
       queueMicrotask(() =>
@@ -345,7 +377,10 @@ export default function App() {
       info()?.platform === "macos" ? event.metaKey : event.ctrlKey;
     if (event.key === "Escape") {
       event.preventDefault();
-      if (menuOpen()) {
+      if (scopeOpen()) {
+        setScopeOpen(false);
+        focusInput();
+      } else if (menuOpen()) {
         setMenuOpen(false);
         focusInput();
       } else void hide();
@@ -403,6 +438,29 @@ export default function App() {
     }
     // Enter on a focused button must keep the button's native action.
     if (event.target !== input) return;
+    const plainKey = !event.metaKey && !event.ctrlKey && !event.altKey;
+    if (event.key === "Tab" && plainKey) {
+      event.preventDefault();
+      // The first Tab shows the current category. Later presses keep cycling,
+      // including after typing has closed the list.
+      if (scopeCycleStarted || event.shiftKey)
+        cycleScope(event.shiftKey ? -1 : 1);
+      scopeCycleStarted = true;
+      setScopeOpen(true);
+      return;
+    }
+    if (scopeOpen() && plainKey && !event.shiftKey) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        cycleScope(event.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        setScopeOpen(false);
+        return;
+      }
+    }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       if (results().length) {
@@ -420,6 +478,16 @@ export default function App() {
   }
 
   createEffect(() => {
+    mode();
+    if (!scopeOpen()) return;
+    queueMicrotask(() =>
+      scopeList
+        ?.querySelector('[aria-selected="true"]')
+        ?.scrollIntoView({ block: "nearest" }),
+    );
+  });
+
+  createEffect(() => {
     const index = selected();
     results();
     queueMicrotask(() =>
@@ -428,6 +496,12 @@ export default function App() {
   });
 
   function outsideClick(event: PointerEvent) {
+    if (
+      scopeOpen() &&
+      !(event.target as Element).closest(".scope-chip, .scope-popover")
+    ) {
+      setScopeOpen(false);
+    }
     if (menuOpen() && !(event.target as Element).closest(".actions-area")) {
       setMenuOpen(false);
     }
@@ -470,6 +544,8 @@ export default function App() {
             // Show the preview only after the new search settles. Publishing
             // visibility first would briefly request the previous preview.
             batch(() => {
+              scopeCycleStarted = false;
+              setScopeOpen(false);
               setVisible(true);
               setMenuOpen(false);
               setClearOpen(false);
@@ -486,6 +562,7 @@ export default function App() {
             if (clear !== true) input.select();
           }),
           register("launcher-hidden", () => {
+            setScopeOpen(false);
             setVisible(false);
             // One running Rust search may finish. Ignore its reply and drop
             // waiting input. Opening the window always requests current data.
@@ -523,33 +600,20 @@ export default function App() {
       />
       <header class="search-header">
         <div class="search-field">
-          <Icon name="search" size={23} />
-          <select
-            class="mode-select"
-            aria-label="Search mode"
-            value={mode()}
-            onChange={(event) =>
-              changeMode(event.currentTarget.value as SearchMode)
-            }
-          >
-            <option value="all">All</option>
-            <option value="apps">Apps</option>
-            <option value="files">Files</option>
-            <option value="clipboard">Clipboard</option>
-            <option value="emoji">Emoji</option>
-            <option value="calculator">Calculator</option>
-            <option value="system">System</option>
-          </select>
           <input
             ref={input}
             type="text"
             role="combobox"
             aria-label="Search TinyDash"
             aria-autocomplete="list"
-            aria-expanded={results().length > 0}
-            aria-controls="search-results"
+            aria-expanded={scopeOpen() || results().length > 0}
+            aria-controls={scopeOpen() ? "search-categories" : "search-results"}
             aria-activedescendant={
-              current() ? `result-${selected()}` : undefined
+              scopeOpen()
+                ? `category-${mode()}`
+                : current()
+                  ? `result-${selected()}`
+                  : undefined
             }
             placeholder={placeholder()}
             autocomplete="off"
@@ -558,16 +622,75 @@ export default function App() {
             maxLength={256}
             value={query()}
             onInput={(event) => changeQuery(event.currentTarget.value)}
+            onBlur={() => setScopeOpen(false)}
           />
+          <button
+            class="scope-chip"
+            aria-label={`Search category: ${scopeLabels[mode()]}`}
+            aria-haspopup="listbox"
+            aria-expanded={scopeOpen()}
+            aria-controls={scopeOpen() ? "search-categories" : undefined}
+            title="Press Tab to show categories, then Tab to select the next category"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={toggleScope}
+          >
+            <Icon name="search" size={15} />
+            <span>{scopeLabels[mode()]}</span>
+          </button>
+          <span class="scope-hint">
+            <kbd aria-label="Tab">⇥</kbd> to scope
+          </span>
           <button
             class="escape-key"
             aria-label="Hide launcher"
+            title="Hide launcher (Esc)"
             onClick={() => void hide()}
             disabled={!desktop}
           >
             <kbd>esc</kbd>
           </button>
         </div>
+        <Show when={scopeOpen()}>
+          <div class="scope-popover">
+            <p class="scope-title">Search category</p>
+            <ul
+              ref={scopeList}
+              id="search-categories"
+              class="scope-options"
+              role="listbox"
+              aria-label="Search categories"
+            >
+              <For each={scopes}>
+                {(value) => (
+                  <li
+                    id={`category-${value}`}
+                    class="scope-option"
+                    role="option"
+                    aria-selected={mode() === value}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      changeMode(value);
+                      setScopeOpen(false);
+                    }}
+                  >
+                    <span>{scopeLabels[value]}</span>
+                    <span class="scope-check" aria-hidden="true">
+                      {mode() === value ? "✓" : ""}
+                    </span>
+                  </li>
+                )}
+              </For>
+            </ul>
+            <p class="scope-help">
+              <span>
+                <kbd>Tab</kbd> next
+              </span>
+              <span>
+                <kbd>Shift Tab</kbd> previous
+              </span>
+            </p>
+          </div>
+        </Show>
       </header>
 
       <div class="list-heading">
