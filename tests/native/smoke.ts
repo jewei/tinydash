@@ -415,7 +415,9 @@ try {
       "return !!document.querySelector('.first-use[aria-label=\"Clipboard history choice\"]')",
     ),
   );
-  const beforeChoice = `TinyDash before clipboard choice ${fixtures.nonce}`;
+  // This value can be captured after consent. Keep it distinct from the
+  // clipboard search fixture used below so it cannot change that selection.
+  const beforeChoice = `TinyDash consent probe ${fixtures.nonce}`;
   setClipboardText(beforeChoice);
   await delay(1_000);
   const beforeChoiceEntries = await request<string[]>(
