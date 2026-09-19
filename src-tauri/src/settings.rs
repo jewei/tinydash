@@ -1,9 +1,90 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use crate::launcher::query::SearchMode;
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_SHORTCUT: &str = "Control+Shift+Space";
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct AppPreference {
+    pub aliases: Vec<String>,
+    pub hidden: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CategoryShortcut {
+    pub mode: SearchMode,
+    pub shortcut: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WebSearch {
+    pub name: String,
+    pub keyword: String,
+    pub template: String,
+    pub enabled: bool,
+}
+
+impl WebSearch {
+    pub fn url(&self, query: &str) -> anyhow::Result<String> {
+        use anyhow::ensure;
+        ensure!(
+            self.template.matches("{query}").count() == 1,
+            "Use {query} exactly once in the URL."
+        );
+        ensure!(
+            !self.template.chars().any(char::is_control),
+            "The URL must fit on one line."
+        );
+        let probe = self
+            .template
+            .replace("{query}", "tinydash-query-placeholder");
+        ensure!(
+            !probe.contains(['{', '}']),
+            "Only the {query} placeholder is supported."
+        );
+        let base = url::Url::parse(&probe)?;
+        ensure!(
+            matches!(base.scheme(), "http" | "https") && base.host_str().is_some(),
+            "Use an HTTP or HTTPS URL."
+        );
+        ensure!(
+            base.username().is_empty() && base.password().is_none(),
+            "Do not include a username or password in the URL."
+        );
+        ensure!(
+            !base
+                .host_str()
+                .unwrap_or_default()
+                .contains("tinydash-query-placeholder"),
+            "Put {query} in the path or search part, not the hostname."
+        );
+        // Encode the input as one URL component, including spaces and slashes.
+        let encoded: String = query
+            .as_bytes()
+            .iter()
+            .map(|&byte| {
+                if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+                    (byte as char).to_string()
+                } else {
+                    format!("%{byte:02X}")
+                }
+            })
+            .collect();
+        let target = url::Url::parse(&self.template.replace("{query}", &encoded))?;
+        ensure!(
+            target.origin() == base.origin(),
+            "Search text must not change the website."
+        );
+        Ok(target.into())
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -11,7 +92,12 @@ pub struct Settings {
     pub clear_query_on_open: bool,
     pub hide_on_blur: bool,
     pub shortcut: String,
+    pub category_shortcuts: Vec<CategoryShortcut>,
+    pub start_at_login: bool,
+    pub app_preferences: BTreeMap<String, AppPreference>,
+    pub web_searches: Vec<WebSearch>,
     pub clipboard_history_enabled: bool,
+    pub clipboard_history_decided: bool,
     pub clipboard_history_limit: u16,
     pub file_search_roots: Option<Vec<PathBuf>>,
     pub file_search_limit: u32,
@@ -27,7 +113,12 @@ impl Default for Settings {
             clear_query_on_open: true,
             hide_on_blur: true,
             shortcut: DEFAULT_SHORTCUT.into(),
+            category_shortcuts: Vec::new(),
+            start_at_login: false,
+            app_preferences: BTreeMap::new(),
+            web_searches: Vec::new(),
             clipboard_history_enabled: true,
+            clipboard_history_decided: true,
             clipboard_history_limit: 100,
             file_search_roots: None,
             file_search_limit: 50_000,
@@ -52,6 +143,24 @@ impl Default for Settings {
 }
 
 impl Settings {
+    pub fn fresh_install() -> Self {
+        Self {
+            clipboard_history_enabled: false,
+            clipboard_history_decided: false,
+            ..Self::default()
+        }
+    }
+
+    pub fn shortcuts(&self) -> Vec<&str> {
+        std::iter::once(self.shortcut.as_str())
+            .chain(
+                self.category_shortcuts
+                    .iter()
+                    .map(|binding| binding.shortcut.as_str()),
+            )
+            .collect()
+    }
+
     pub fn validate(&self) -> anyhow::Result<()> {
         use anyhow::ensure;
         use tauri_plugin_global_shortcut::{Modifiers, Shortcut};
@@ -76,6 +185,86 @@ impl Settings {
                 .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER),
             "Include Control, Option / Alt, or Command / Windows in the shortcut."
         );
+        ensure!(
+            self.category_shortcuts.len() <= 11,
+            "Use no more than one shortcut per category."
+        );
+        let mut keys = std::collections::HashSet::from([shortcut.id()]);
+        let mut modes = std::collections::HashSet::new();
+        for binding in &self.category_shortcuts {
+            let key: Shortcut = binding.shortcut.parse().map_err(|_| {
+                anyhow::anyhow!("Use a modifier and one key for each category shortcut.")
+            })?;
+            ensure!(
+                key.mods
+                    .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER),
+                "Category shortcuts need Control, Option / Alt, or Command / Windows."
+            );
+            ensure!(keys.insert(key.id()), "Each shortcut must be different.");
+            ensure!(modes.insert(binding.mode), "Use one shortcut per category.");
+            ensure!(
+                self.visible_categories.contains(&binding.mode),
+                "Show a category before assigning its shortcut."
+            );
+        }
+        ensure!(
+            self.clipboard_history_decided || !self.clipboard_history_enabled,
+            "Choose whether to save clipboard history first."
+        );
+        ensure!(
+            self.app_preferences.len() <= 512,
+            "Use preferences for no more than 512 apps."
+        );
+        for (id, preference) in &self.app_preferences {
+            ensure!(
+                id.starts_with("app:") && id.len() <= 4100 && !id.contains('\0'),
+                "An app preference has an invalid app ID."
+            );
+            ensure!(
+                preference.aliases.len() <= 16,
+                "Use no more than 16 aliases per app."
+            );
+            for alias in &preference.aliases {
+                ensure!(
+                    !alias.trim().is_empty()
+                        && alias.len() <= 160
+                        && !alias.chars().any(char::is_control),
+                    "App aliases must be 1 to 160 bytes on one line."
+                );
+            }
+        }
+        ensure!(
+            self.web_searches.len() <= 24,
+            "Use no more than 24 custom web searches."
+        );
+        let mut keywords = std::collections::HashSet::new();
+        for search in &self.web_searches {
+            ensure!(
+                !search.name.trim().is_empty()
+                    && search.name.len() <= 80
+                    && !search.name.chars().any(char::is_control),
+                "Search names must be 1 to 80 bytes on one line."
+            );
+            ensure!(
+                !search.keyword.is_empty()
+                    && search.keyword.len() <= 24
+                    && search
+                        .keyword
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'),
+                "Use 1 to 24 lowercase letters, digits, or hyphens for a search keyword."
+            );
+            ensure!(
+                keywords.insert(&search.keyword)
+                    && !crate::providers::tools::web::reserved_keyword(&search.keyword),
+                "Use a unique search keyword that is not a built-in command."
+            );
+            ensure!(
+                search.template.len() <= 2048,
+                "Search URLs must be no more than 2,048 bytes."
+            );
+            search.url("example")?;
+        }
         ensure!(
             (1..=500).contains(&self.clipboard_history_limit),
             "Clipboard history must contain 1 to 500 entries."
@@ -181,10 +370,13 @@ pub fn load(directory: &Path) -> anyhow::Result<Settings> {
                 settings.shortcut = DEFAULT_SHORTCUT.into();
                 tracing::info!("Replaced the old macOS shortcut with Control+Shift+Space");
             }
+            settings.validate().context(
+                "The saved settings contain invalid values. The file was kept unchanged.",
+            )?;
             Ok(settings)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            let settings = Settings::default();
+            let settings = Settings::fresh_install();
             std::fs::create_dir_all(directory).context("Create the settings directory")?;
             std::fs::write(&path, serde_json::to_vec_pretty(&settings)?)
                 .context("Write default settings")?;
@@ -356,12 +548,165 @@ mod tests {
     }
 
     #[test]
+    fn fresh_install_requires_an_explicit_clipboard_choice_but_legacy_defaults_do_not() {
+        let fresh = Settings::fresh_install();
+        assert!(!fresh.clipboard_history_enabled);
+        assert!(!fresh.clipboard_history_decided);
+        assert!(fresh.validate().is_ok());
+
+        let legacy: Settings = serde_json::from_str("{}").expect("legacy settings");
+        assert!(legacy.clipboard_history_enabled);
+        assert!(legacy.clipboard_history_decided);
+        assert!(legacy.validate().is_ok());
+
+        let undecided_enabled = Settings {
+            clipboard_history_enabled: true,
+            clipboard_history_decided: false,
+            ..Settings::default()
+        };
+        assert!(undecided_enabled.validate().is_err());
+
+        let undecided_disabled = Settings {
+            clipboard_history_enabled: false,
+            clipboard_history_decided: false,
+            ..Settings::default()
+        };
+        assert!(undecided_disabled.validate().is_ok());
+    }
+
+    #[test]
+    fn saves_and_loads_the_clipboard_choice() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let mut app_preferences = BTreeMap::new();
+        app_preferences.insert(
+            "app:/apps/editor".into(),
+            AppPreference {
+                aliases: vec!["write".into()],
+                hidden: true,
+            },
+        );
+        let settings = Settings {
+            category_shortcuts: vec![CategoryShortcut {
+                mode: SearchMode::Apps,
+                shortcut: "Alt+KeyE".into(),
+            }],
+            app_preferences,
+            web_searches: vec![WebSearch {
+                name: "Docs".into(),
+                keyword: "docs".into(),
+                template: "https://example.test/?q={query}".into(),
+                enabled: true,
+            }],
+            clipboard_history_enabled: false,
+            clipboard_history_decided: false,
+            ..Settings::default()
+        };
+        save(directory.path(), &settings).expect("save settings");
+        let loaded = load(directory.path()).expect("load settings");
+        assert_eq!(loaded, settings);
+        let document: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(directory.path().join("settings.json")).expect("read settings"),
+        )
+        .expect("settings JSON");
+        assert_eq!(document["clipboardHistoryDecided"], false);
+    }
+
+    #[test]
+    fn rejects_duplicate_normalized_shortcuts_and_missing_modifiers() {
+        let mut settings = Settings {
+            shortcut: "Control+Shift+KeyA".into(),
+            category_shortcuts: vec![CategoryShortcut {
+                mode: SearchMode::Apps,
+                shortcut: "Shift+Control+KeyA".into(),
+            }],
+            ..Settings::default()
+        };
+        assert!(settings.validate().is_err());
+
+        settings.shortcut = "KeyA".into();
+        settings.category_shortcuts.clear();
+        assert!(settings.validate().is_err());
+
+        settings.shortcut = DEFAULT_SHORTCUT.into();
+        settings.category_shortcuts = vec![CategoryShortcut {
+            mode: SearchMode::Apps,
+            shortcut: "KeyB".into(),
+        }];
+        assert!(settings.validate().is_err());
+    }
+
+    #[test]
+    fn validates_custom_search_templates_and_encodes_reserved_input() {
+        let search = WebSearch {
+            name: "Docs".into(),
+            keyword: "docs".into(),
+            template: "https://example.test/search?q={query}".into(),
+            enabled: true,
+        };
+        assert_eq!(
+            search.url("rust lang/東京 & more").unwrap(),
+            "https://example.test/search?q=rust%20lang%2F%E6%9D%B1%E4%BA%AC%20%26%20more"
+        );
+        let origin_safe = WebSearch {
+            template: "https://example.test/{query}".into(),
+            ..search.clone()
+        };
+        let target = origin_safe.url("//evil.example/path?x=1#part").unwrap();
+        assert!(target.starts_with("https://example.test/"));
+        assert!(!target.contains("evil.example/path"));
+
+        let http = WebSearch {
+            template: "http://example.test/{query}".into(),
+            ..search.clone()
+        };
+        assert!(http.url("ok").is_ok());
+
+        for template in [
+            "ftp://example.test/{query}",
+            "https://user:pass@example.test/{query}",
+            "https://{query}.example.test/",
+            "https://example.test/{query}/{query}",
+            "https://example.test/search",
+            "https://example.test/{query}/{extra}",
+            "https://example.test/{query}\n",
+        ] {
+            let invalid = WebSearch {
+                template: template.into(),
+                ..search.clone()
+            };
+            assert!(invalid.url("value").is_err(), "{template}");
+        }
+
+        for keyword in ["search", "google", "date", "datetime", "clean", "url"] {
+            let invalid = Settings {
+                web_searches: vec![WebSearch {
+                    keyword: keyword.into(),
+                    ..search.clone()
+                }],
+                ..Settings::default()
+            };
+            assert!(invalid.validate().is_err(), "{keyword}");
+        }
+    }
+
+    #[test]
     fn does_not_overwrite_invalid_settings() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("settings.json");
         std::fs::write(&path, "bad json").expect("write");
         assert!(load(dir.path()).is_err());
         assert_eq!(std::fs::read_to_string(path).expect("read"), "bad json");
+    }
+
+    #[test]
+    fn startup_rejects_undecided_capture_and_keeps_the_original_settings_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("settings.json");
+        let bytes = br#"{"clipboardHistoryEnabled":true,"clipboardHistoryDecided":false}"#;
+        std::fs::write(&path, bytes).unwrap();
+        assert!(load(directory.path()).is_err());
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
+        assert!(!Settings::fresh_install().clipboard_history_enabled);
     }
 
     #[test]

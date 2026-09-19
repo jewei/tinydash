@@ -382,6 +382,57 @@ mod tests {
     }
 
     #[test]
+    fn discovers_browser_pwa_bundles_with_localized_metadata() {
+        let directory = tempfile::tempdir().unwrap();
+        let pwa = bundle(
+            directory.path(),
+            "新闻 PWA",
+            "<key>CFBundleIdentifier</key><string>com.google.Chrome.app.news</string>\
+             <key>CFBundleName</key><string>新闻</string>\
+             <key>CFBundlePackageType</key><string>APPL</string>",
+        );
+
+        let apps = scan_roots(&[directory.path().to_owned()]);
+        let app = apps
+            .iter()
+            .find(|app| app.path == pwa.canonicalize().unwrap())
+            .expect("Chrome PWA bundle should be discovered");
+        assert_eq!(app.name, "新闻 PWA Display");
+        assert!(app.aliases.contains(&"新闻".to_owned()));
+    }
+
+    #[test]
+    fn keeps_apps_with_the_same_bundle_id_at_distinct_paths() {
+        let directory = tempfile::tempdir().unwrap();
+        let first = bundle(
+            directory.path(),
+            "First copy",
+            "<key>CFBundleIdentifier</key><string>com.example.shared</string>",
+        );
+        let second = bundle(
+            directory.path(),
+            "Second copy",
+            "<key>CFBundleIdentifier</key><string>com.example.shared</string>",
+        );
+
+        let apps = scan_roots(&[directory.path().to_owned()]);
+        assert_eq!(apps.len(), 2);
+        assert_ne!(apps[0].id, apps[1].id);
+        let provider = crate::providers::apps::AppProvider::new(apps);
+        assert_eq!(provider.len(), 2);
+        assert!(
+            provider
+                .get(&format!("app:{}", first.canonicalize().unwrap().display()))
+                .is_some()
+        );
+        assert!(
+            provider
+                .get(&format!("app:{}", second.canonicalize().unwrap().display()))
+                .is_some()
+        );
+    }
+
+    #[test]
     fn descriptions_use_bundle_identity_then_category_and_keep_paths_searchable() {
         use crate::{
             launcher::{query::SearchMode, search::SearchManager},

@@ -48,6 +48,8 @@ const MIGRATIONS: &[&str] = &[
     END;",
 ];
 
+pub const VERSION: usize = MIGRATIONS.len();
+
 pub fn apply(connection: &mut Connection) -> Result<()> {
     migrate(connection, MIGRATIONS)
 }

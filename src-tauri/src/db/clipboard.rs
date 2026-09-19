@@ -85,11 +85,21 @@ impl Database {
             .execute("DELETE FROM clipboard_history", [])?;
         Ok(())
     }
+
+    pub fn clear_unpinned_clipboard(&self) -> Result<Vec<i64>> {
+        let mut statement = self
+            .connection
+            .prepare("DELETE FROM clipboard_history WHERE pinned = 0 RETURNING id")?;
+        Ok(statement
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::launcher::query::SearchMode;
     use crate::ranking::Usage;
 
     #[test]
@@ -189,5 +199,49 @@ mod tests {
                 .is_err()
         );
         assert_eq!(database.load_clipboard().expect("load").len(), 1);
+    }
+
+    #[test]
+    fn clear_unpinned_preserves_pins_in_all_and_clipboard() {
+        let directory = tempfile::tempdir().expect("directory");
+        let mut database = Database::open(&directory.path().join("state.sqlite3")).expect("open");
+        let all = database.capture_clipboard("all", 1, 100).expect("all").0;
+        let clipboard = database
+            .capture_clipboard("clipboard", 2, 100)
+            .expect("clipboard")
+            .0;
+        let removed = database
+            .capture_clipboard("removed", 3, 100)
+            .expect("removed")
+            .0;
+        database
+            .set_pinned(&format!("clipboard:{}", all.id), SearchMode::All, true)
+            .expect("all pin");
+        database
+            .set_pinned(
+                &format!("clipboard:{}", clipboard.id),
+                SearchMode::Clipboard,
+                true,
+            )
+            .expect("clipboard pin");
+
+        assert_eq!(
+            database.clear_unpinned_clipboard().expect("clear"),
+            [removed.id]
+        );
+        assert_eq!(
+            database
+                .load_clipboard()
+                .expect("load")
+                .into_iter()
+                .map(|entry| entry.id)
+                .collect::<Vec<_>>(),
+            [clipboard.id, all.id]
+        );
+        assert_eq!(
+            database.load_pins().expect("pins").len(),
+            2,
+            "clear must keep both pin categories"
+        );
     }
 }

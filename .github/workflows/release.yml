@@ -1,0 +1,265 @@
+name: Release candidate
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to build (for example v0.1.0)
+        required: true
+        type: string
+      stage_draft:
+        description: Stage a draft GitHub Release after all builds pass
+        required: true
+        default: false
+        type: boolean
+      release_mode:
+        description: Require signing and updater secrets for a release candidate
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos
+            runner: macos-latest
+            platform: darwin
+            architecture: ARM64
+          - name: windows
+            runner: windows-latest
+            platform: win32
+            architecture: X64
+          - name: linux
+            runner: ubuntu-24.04
+            platform: linux
+            architecture: X64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev
+      - name: Install Rust tools
+        run: |
+          rustup update stable --no-self-update
+          rustup component add rustfmt clippy
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          workspaces: src-tauri
+      - run: bun install --frozen-lockfile
+      - name: Verify selected tag and runner architecture
+        shell: bash
+        run: |
+          test "$RUNNER_ARCH" = "${{ matrix.architecture }}" || { echo "Expected ${{ matrix.architecture }}, got $RUNNER_ARCH"; exit 1; }
+          bun scripts/release/verify-tag.ts "$RELEASE_TAG"
+      - name: Run selected-tag checks
+        shell: bash
+        run: |
+          bun run format:check
+          bun run typecheck
+          bun run build
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+          if [[ "$RUNNER_OS" == 'Linux' ]]; then
+            bunx --bun --no-install playwright install --with-deps chromium
+            bun run test:ui
+          fi
+      - name: Require release configuration
+        if: ${{ inputs.release_mode == true }}
+        shell: bash
+        env:
+          RELEASE_MODE: "true"
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          TINYDASH_UPDATE_ENDPOINT: ${{ vars.TINYDASH_UPDATE_ENDPOINT }}
+        run: bash scripts/release/require-config.sh
+      - name: Import Windows signing certificate
+        if: ${{ inputs.release_mode == true && runner.os == 'Windows' }}
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $path = Join-Path $env:RUNNER_TEMP 'tinydash-signing.pfx'
+          "WINDOWS_CERTIFICATE_PATH=$path" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $certificates = @(Import-PfxCertificate -FilePath $path -CertStoreLocation Cert:\CurrentUser\My -Password $password)
+          $certificate = $certificates | Where-Object HasPrivateKey | Select-Object -First 1
+          if (-not $certificate) { throw 'The Windows signing certificate could not be imported.' }
+          $thumbprint = $certificate.Thumbprint.Replace(' ', '').ToUpperInvariant()
+          "WINDOWS_CERTIFICATE_THUMBPRINT=$thumbprint" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Build application
+        shell: bash
+        env:
+          RELEASE_MODE: ${{ inputs.release_mode == true && 'true' || 'false' }}
+          APPLE_CERTIFICATE: ${{ inputs.release_mode == true && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ inputs.release_mode == true && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ inputs.release_mode == true && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ inputs.release_mode == true && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ inputs.release_mode == true && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.release_mode == true && secrets.APPLE_TEAM_ID || '' }}
+          WINDOWS_CERTIFICATE: ${{ inputs.release_mode == true && secrets.WINDOWS_CERTIFICATE || '' }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ inputs.release_mode == true && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.release_mode == true && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.release_mode == true && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ inputs.release_mode == true && secrets.TAURI_UPDATER_PUBLIC_KEY || '' }}
+          TINYDASH_UPDATE_ENDPOINT: ${{ inputs.release_mode == true && vars.TINYDASH_UPDATE_ENDPOINT || '' }}
+        run: |
+          if [[ "$RELEASE_MODE" == "true" ]]; then
+            if [[ "$RUNNER_OS" == 'macOS' ]]; then
+              config=$(bun scripts/release/tauri-build-config.ts macos)
+              bun run tauri build --config "$config"
+            elif [[ "$RUNNER_OS" == 'Windows' ]]; then
+              config=$(bun scripts/release/tauri-build-config.ts windows)
+              bun run tauri build --config "$config"
+            else
+              bun run tauri build
+            fi
+          else
+            bun run tauri build
+          fi
+      - name: Notarize and staple macOS DMG
+        if: ${{ inputs.release_mode == true && runner.os == 'macOS' }}
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash scripts/release/notarize-macos-dmg.sh
+      - name: Verify macOS signed output
+        if: ${{ inputs.release_mode == true && runner.os == 'macOS' }}
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: bash scripts/release/verify-macos-signing.sh
+      - name: Verify Windows signed output
+        if: ${{ inputs.release_mode == true && runner.os == 'Windows' }}
+        shell: pwsh
+        run: ./scripts/release/verify-windows-signing.ps1 -ExpectedThumbprint $env:WINDOWS_CERTIFICATE_THUMBPRINT
+      - name: Collect updater artifact
+        if: ${{ inputs.release_mode == true && runner.os != 'Linux' }}
+        shell: bash
+        run: |
+          rm -rf artifacts/updater
+          bash scripts/release/collect-updater.sh artifacts/updater
+      - name: Check macOS disk image
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash scripts/ci/check-dmg.sh
+      - name: Prepare and verify packages
+        shell: bash
+        env:
+          RELEASE_MODE: ${{ inputs.release_mode == true && 'true' || 'false' }}
+          UPDATER_ARTIFACTS: ${{ inputs.release_mode == true && runner.os != 'Linux' && 'true' || 'false' }}
+        run: |
+          rm -rf artifacts/packages
+          bun scripts/ci/artifacts.ts prepare artifacts/packages
+          if [[ "${UPDATER_ARTIFACTS}" == "true" ]]; then
+            cp artifacts/updater/* artifacts/packages/
+            bun scripts/ci/artifacts.ts checksums artifacts/packages
+          fi
+          bun scripts/ci/artifacts.ts verify artifacts/packages
+          bun scripts/release/verify-artifacts.ts artifacts/packages "${{ matrix.platform }}" "${{ matrix.architecture }}"
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: release-${{ matrix.name }}
+          path: artifacts/packages/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove Windows signing certificate
+        if: ${{ always() && inputs.release_mode == true && runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          if ($env:WINDOWS_CERTIFICATE_THUMBPRINT) {
+            Remove-Item "Cert:\CurrentUser\My\$env:WINDOWS_CERTIFICATE_THUMBPRINT" -ErrorAction SilentlyContinue
+          }
+          if ($env:WINDOWS_CERTIFICATE_PATH) {
+            Remove-Item $env:WINDOWS_CERTIFICATE_PATH -Force -ErrorAction SilentlyContinue
+          }
+
+  stage-draft:
+    needs: build
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.stage_draft == true }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Refuse an unsigned draft
+        if: ${{ inputs.release_mode != true }}
+        run: |
+          echo 'stage_draft requires release_mode=true. Unsigned builds stay in Actions artifacts.' >&2
+          exit 1
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: release-macos
+          path: staged/macos
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: release-windows
+          path: staged/windows
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: release-linux
+          path: staged/linux
+      - name: Stage and verify release assets
+        run: bash scripts/release/stage-assets.sh staged/release staged/macos staged/windows staged/linux
+      - name: Generate updater manifest from matching signatures
+        env:
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          bun scripts/release/generate-latest.ts staged/release "$RELEASE_TAG" "$RELEASE_REPOSITORY"
+          bun scripts/ci/artifacts.ts checksums staged/release
+          bun scripts/ci/artifacts.ts verify staged/release
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" staged/release/* \
+            --draft \
+            --title "TinyDash ${RELEASE_TAG}" \
+            --notes "Internal release candidate. Verify publisher signatures, updater signatures, desktop checks, and user checks before publication."
