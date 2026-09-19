@@ -33,8 +33,9 @@ Add the repository secrets below. Do not put private values in chat, source
 files, or command arguments.
 
 All six Apple secret names are present in GitHub as of 19 September 2026.
-The maintainer supplied the certificate, passwords, and account. CI must still
-verify that the values work. The instructions below remain for future recovery.
+The [internal release build](https://github.com/jewei/tinydash/actions/runs/35430862006)
+used these credentials successfully for app and DMG signing and notarization.
+The instructions below remain for future recovery.
 
 | Secret                       | Value                                              |
 | ---------------------------- | -------------------------------------------------- |
@@ -65,8 +66,10 @@ that the account can notarize an app.
 
 ## Configure the free updater key
 
-The maintainer added all three updater secrets on 19 September 2026. CI must
-still verify signing. Keep an offline backup of this key before publication.
+The maintainer added all three updater secrets on 19 September 2026. The
+internal release build signed the Mac and Windows update files. Both downloaded
+files verify with the local public key; changed files are rejected. Installed
+version upgrades and offline key recovery still need checks before publication.
 
 Use one updater key for Mac and Windows. If a key already exists, restore that
 key. Do not generate a replacement for an existing public release.
@@ -128,6 +131,7 @@ For a release candidate, use **Run workflow** with an existing version tag:
 
 - `release_mode=true` applies the signing policy in the table above.
 - `stage_draft=true` stages a draft after all three builds pass.
+- `stage_draft=false` keeps packages in Actions artifacts for internal checks.
 
 The Mac job requires Apple and updater secrets. The Windows job requires only
 updater secrets. Linux requires neither. Apple credentials go only to the Mac
@@ -140,6 +144,12 @@ and staples the DMG. It checks Developer ID signatures, tickets, and Gatekeeper.
 The Windows check requires `NotSigned` for the NSIS installer and its extracted
 `tinydash.exe`. It checks that the matching updater signature file is present.
 `build.txt` records publisher signing separately from updater signing.
+
+After a successful build, run **Native app checks** with its run ID and
+`release_artifacts=true`. This installs, tests, reinstalls, and removes the
+exact Windows and Ubuntu packages from that run. The default value, `false`,
+keeps the existing development-build tests. Keep the tested build and test-code
+commits in the verification record. Complete Mac and Wayland checks separately.
 
 The workflow stages these updater pairs:
 

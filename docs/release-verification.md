@@ -9,7 +9,7 @@ its workflow exists.
 
 Use this record with the [release plan](release-plan.md). Both the public prerelease and stable launch include macOS, Windows, and Linux together.
 
-Current release decision: **Not ready for public release.** Credential validation in CI, actual package signing, installed updates, public downloads, and desktop checks remain incomplete.
+Current release decision: **Not ready for public release.** Installed version upgrades, key backup and recovery, public downloads, and desktop checks remain incomplete. License and price still need a decision.
 
 ## Status rules
 
@@ -63,28 +63,61 @@ MIT, a free first release, and the public credit "TinyDash by Jewei" remain reco
 
 The maintainer resumed this task and assigned it the release workflow and
 scripts. No paid service is required. The [setup guide](release-setup.md) lists
-the remaining Mac and updater configuration.
+the configuration and remaining key-recovery checks.
 
-| Check                              | Result                      | Evidence and limit                                                                                                                                                                                                                                                                                                                 |
-| ---------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local Mac identity                 | PASS for identity discovery | `security find-identity -v -p codesigning` lists `Developer ID Application: Jewei Mak (4L4SS26L9J)`. Its public certificate expires on 1 February 2027 at 22:12:15 UTC. No private key was exported. This is not package or notarization evidence.                                                                                 |
-| Repository signing configuration   | PENDING                     | The maintainer added all nine requested secrets. `gh secret list --json name` confirms the expected names. The stable-feed variable has the expected GitHub Releases URL. This verifies configuration names only; certificate import, passwords, notarization, and update signing still need a CI run. No secret values were read. |
-| Release configuration and metadata | PASS locally                | 26 tests passed in `tests/release-config.spec.ts` and `tests/release-artifacts.spec.ts`. They cover per-system requirements, missing updater keys, HTTPS, Developer ID, publisher labels, and empty or mismatched updater signatures. Artifact tests use temporary fixtures, not real installers.                                  |
-| Type and shell checks              | PASS locally                | App and site TypeScript checks passed. `bash -n` passed for the changed preflight/staging scripts and the Mac verification/notarization scripts.                                                                                                                                                                                   |
-| Workflow validation                | PASS locally                | Actionlint v1.7.12 accepted `.github/workflows/release.yml`. ShellCheck and Pyflakes were disabled because they are not installed. This does not execute the workflow.                                                                                                                                                             |
-| Download page                      | PASS locally                | All 25 site tests passed after adding the Windows preview warning. The Windows main download button has the warning beside it. The static site build passed and still contains no public installer links.                                                                                                                          |
-| Actual signing and trust           | PENDING                     | Mac notarization, the Windows PowerShell check, and clean desktop installation have not run on a candidate. Linux package checks and installed update-signature verification also remain pending.                                                                                                                                  |
+| Check                              | Result                      | Evidence and limit                                                                                                                                                                                                                                                                                         |
+| ---------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local Mac identity                 | PASS for identity discovery | `security find-identity -v -p codesigning` lists `Developer ID Application: Jewei Mak (4L4SS26L9J)`. Its public certificate expires on 1 February 2027 at 22:12:15 UTC. No private key was exported. This is not package or notarization evidence.                                                         |
+| Repository signing configuration   | PASS for CI use             | [Release run 35430862006](https://github.com/jewei/tinydash/actions/runs/35430862006) used the Apple credentials and updater key successfully. The downloaded Mac and Windows update files verify with the local public key. No private keys or passwords were displayed or copied into this record.       |
+| Release configuration and metadata | PASS locally                | 26 tests passed in `tests/release-config.spec.ts` and `tests/release-artifacts.spec.ts`. They cover per-system requirements, missing updater keys, HTTPS, Developer ID, publisher labels, and empty or mismatched updater signatures. Artifact tests use temporary fixtures, not real installers.          |
+| Type and shell checks              | PASS locally                | App and site TypeScript checks passed. `bash -n` passed for the changed preflight/staging scripts and the Mac verification/notarization scripts.                                                                                                                                                           |
+| Workflow validation                | PASS locally                | Actionlint v1.7.12 accepted `.github/workflows/release.yml`. ShellCheck and Pyflakes were disabled because they are not installed. This does not execute the workflow.                                                                                                                                     |
+| Download page                      | PASS locally                | All 25 site tests passed after adding the Windows preview warning. The Windows main download button has the warning beside it. The static site build passed and still contains no public installer links.                                                                                                  |
+| Actual signing and trust           | PASS for CI package checks  | The Mac app and DMG passed Developer ID, notarization-ticket, and Gatekeeper checks. The Windows installer and extracted app passed the unsigned-preview checks. All three package sets passed metadata and checksum checks. Physical desktop trust prompts and installed version upgrades remain pending. |
 
 The workflow no longer imports a Windows PFX. It checks that the installer and
 its extracted TinyDash executable are unsigned. It also requires a matching,
-nonempty updater signature file. This source change does not pass B4. The
-Windows desktop still needs an installation and launch result.
+nonempty updater signature file. The package and signature checks are recorded
+below. B4 still needs a Windows 11 desktop report with the actual trust prompt
+and installation result.
 
-## Open CI issue
+## CI checks, 19 September 2026
 
-The Windows test `launcher::files::tests::changing_roots_removes_old_results_and_rejects_an_unfinished_old_scan` failed at line 300 of [the file-index tests](../src-tauri/src/launcher/files.rs).
+The release setup was merged in [PR 1](https://github.com/jewei/tinydash/pull/1).
+Tag `v0.1.0` selects `9cdbf9e484541d85b4ef8fef0e3b46e5dd522456`.
+The three version files agree with this tag. No GitHub Release was published.
 
-The assertion compared a regular Windows path with a path that included the `\\?\` prefix. The failure also occurred in the [Windows job for `bccaa245`](https://github.com/jewei/tinydash/actions/runs/35324561816/job/105534607159). Both Windows jobs reported 106 passed tests, one failed test, and two ignored tests. The assertion now compares resolved paths and passed locally on Mac. Obtain a passing Windows run for the release commit.
+| Check                              | Result | Evidence and limit                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Three desktop builds               | PASS   | The Mac, Windows, and Ubuntu build jobs in [run 35428796476](https://github.com/jewei/tinydash/actions/runs/35428796476) passed for `4c445b1490b7336517bf355a1ac71d8df5c75507`. The Windows path regression, Rust checks, package checks, and Linux UI tests passed. These are development packages.                                                                                                                                       |
+| Native installation and app tests  | PASS   | [Run 35430680136](https://github.com/jewei/tinydash/actions/runs/35430680136) passed 25 Windows and 26 Ubuntu app checks, plus installation, same-version reinstallation, and removal. Test code `a3ead830cc8256e01cf18ce0b90ac96b811af570` used unchanged installers from `4c445b1`. These hosted-runner checks do not cover Windows security warnings, Wayland, or a version upgrade.                                                    |
+| Download site                      | PASS   | [Run 35428796397](https://github.com/jewei/tinydash/actions/runs/35428796397) passed all 25 site tests and the static build. Public installer links remain disabled.                                                                                                                                                                                                                                                                       |
+| Internal signing build             | PASS   | [Run 35430862006](https://github.com/jewei/tinydash/actions/runs/35430862006) built all three systems from `v0.1.0`, with `release_mode=true` and `stage_draft=false`. It passed source, package, Mac signing/notarization, and Windows unsigned-preview checks. No release was staged or published.                                                                                                                                       |
+| Release package installation tests | PASS   | [Run 35431612597](https://github.com/jewei/tinydash/actions/runs/35431612597) passed 25 Windows and 26 Ubuntu app checks, plus installation, same-version reinstallation, and removal. Test code `3ca70823ae2fe853db71aca3e7e680015b47bb2e` used the exact release packages from `35430862006`, built from `9cdbf9e`. It verified retained settings and the test data marker. Version upgrades and physical desktop checks remain pending. |
+
+The earlier native failures exposed old test selectors, an asynchronous
+first-use check, overlapping clipboard samples, and a query-clear keyboard
+sequence. The test now uses category buttons, the welcome screen, bounded
+readiness waits, distinct samples, and the visible clear control. It retains
+the clipboard consent and deletion checks. No application changes were needed
+for these test corrections. The earlier Windows path assertion is resolved.
+
+Downloaded Mac and Windows update files passed cryptographic verification with
+`minisign-verify` 0.2.5, the library in the Tauri updater. Changing one byte in
+memory caused rejection for each file. The generated public-key file SHA-256 is
+`a159a8a49018cd9d848551ca10b34374cb3fdd4ba7e20c458344651acba6c207`.
+The extracted Mac update app contains this public key and the stable update URL.
+Its code signature and stapled notarization ticket also passed local checks.
+These checks do not replace an installed version-upgrade or key-restoration test.
+
+The downloaded installers have these SHA-256 values. Keep these files unchanged
+when performing the remaining checks.
+
+| Package                        | SHA-256                                                            |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `TinyDash_0.1.0_aarch64.dmg`   | `660a85cdbd1fa8f98d17120927d6e752362be270829a23d8da1e368345da7ee7` |
+| `TinyDash_0.1.0_x64-setup.exe` | `4b5f0e90e72a98c9a1996ce9493e735b2f9c090d2863ac0c6fa78cc7d0d9510d` |
+| `TinyDash_0.1.0_amd64.deb`     | `1f72d0b31f327fddafcaa9277ed78a135672e96999b509798202dc31fff79682` |
 
 ## Required release checks
 
