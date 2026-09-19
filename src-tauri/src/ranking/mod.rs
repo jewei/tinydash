@@ -43,10 +43,26 @@ pub fn score_with_usage(score: u32, id: &str, usage: &HashMap<String, Usage>, no
     score.saturating_add(usage.get(id).map_or(0, |stats| usage_bonus(*stats, now)))
 }
 
-/// Rank after provider collection and before limiting the response.
+/// Group by category, then rank matches before limiting the response.
 pub fn top_results(mut results: Vec<SearchResult>, limit: usize) -> Vec<SearchResult> {
-    // Stable sorting preserves the alphabetical provider order for ties.
-    results.sort_by_key(|result| std::cmp::Reverse(result.score));
+    // An exact emoji shortcode must not displace an app prefix such as "sa".
+    // Explicit tools return separately; calculations can mix with text matches.
+    // Stable sorting keeps provider order for equal scores within a category.
+    results.sort_by_key(|result| {
+        let priority = match result.kind {
+            ResultKind::Calculation
+            | ResultKind::Password
+            | ResultKind::Timezone
+            | ResultKind::CleanedUrl
+            | ResultKind::WebSearch => 0,
+            ResultKind::App => 1,
+            ResultKind::File => 2,
+            ResultKind::Clipboard => 3,
+            ResultKind::SystemCommand => 4,
+            ResultKind::Emoji => 5,
+        };
+        (priority, std::cmp::Reverse(result.score))
+    });
     results.truncate(limit);
     results
 }
