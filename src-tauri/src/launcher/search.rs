@@ -453,7 +453,7 @@ impl SearchManager {
             || (query.mode == SearchMode::All && !query.text.is_empty())
         {
             // File results include usage before their own top-N limit. This
-            // preserves global ranking without allocating a result per file.
+            // preserves file ranking without allocating a result per file.
             results.extend(self.files.search(
                 query.text,
                 &mut self.matcher,
@@ -472,6 +472,119 @@ impl SearchManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        launcher::result::ResultKind,
+        providers::{
+            files::{ScanReport, scan},
+            system::SystemCommand,
+        },
+    };
+
+    #[test]
+    fn app_prefix_precedes_exact_emoji_shortcode_in_all() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(vec![AppEntry::new(
+            "Safari".into(),
+            "/apps/Safari.app".into(),
+            vec![],
+        )]));
+        let emoji = manager.search(":sa:", SearchMode::All).unwrap().results[0].clone();
+        assert!(emoji.subtitle.starts_with(":sa:"));
+        for _ in 0..20 {
+            manager.record_usage(&emoji.id, ranking::now());
+        }
+
+        for input in ["sa", " SA "] {
+            let results = manager.search(input, SearchMode::All).unwrap().results;
+            assert_eq!(results[0].title, "Safari");
+            assert_eq!(results[0].primary_action, Action::Launch);
+            let emoji = results.iter().find(|result| result.id == emoji.id).unwrap();
+            assert!(emoji.score > results[0].score);
+        }
+
+        for (input, mode) in [("sa", SearchMode::Emoji), (":sa:", SearchMode::All)] {
+            let results = manager.search(input, mode).unwrap().results;
+            assert_eq!(results[0].id, emoji.id);
+            assert!(
+                results
+                    .iter()
+                    .all(|result| result.kind == ResultKind::Emoji)
+            );
+        }
+    }
+
+    #[test]
+    fn all_search_keeps_categories_together_in_launcher_order() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(vec![
+            AppEntry::new("Clock".into(), "/apps/Clock.app".into(), vec![]),
+            AppEntry::new("Logseq".into(), "/apps/Logseq.app".into(), vec![]),
+        ]));
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("lo"), "").unwrap();
+        manager.replace_files(scan(
+            vec![directory.path().to_owned()],
+            &[],
+            10,
+            &mut ScanReport::default(),
+        ));
+        manager.clipboard = ClipboardProvider::new(vec![ClipboardEntry {
+            id: 1,
+            content: "lo".into(),
+            created_at: 100,
+            last_used_at: None,
+        }]);
+        manager.system = Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec()));
+
+        let results = manager.search("lo", SearchMode::All).unwrap().results;
+        assert_eq!(results[0].title, "Logseq");
+        assert_eq!(results[1].title, "Clock");
+        let mut groups: Vec<_> = results.iter().map(|result| result.kind).collect();
+        groups.dedup();
+        assert_eq!(
+            groups,
+            [
+                ResultKind::App,
+                ResultKind::File,
+                ResultKind::Clipboard,
+                ResultKind::SystemCommand,
+                ResultKind::Emoji,
+            ]
+        );
+    }
+
+    #[test]
+    fn application_priority_applies_before_the_result_limit() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(
+            (0..40)
+                .map(|i| {
+                    AppEntry::new(format!("Safari {i:02}"), format!("/app/{i}").into(), vec![])
+                })
+                .collect(),
+        ));
+        manager.record_usage("app:/app/39", ranking::now());
+
+        let results = manager.search("sa", SearchMode::All).unwrap().results;
+        assert_eq!(results.len(), RESULT_LIMIT);
+        assert!(results.iter().all(|result| result.kind == ResultKind::App));
+        assert_eq!(results[0].title, "Safari 39");
+    }
+
+    #[test]
+    fn valid_calculation_precedes_an_app_with_the_same_name() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(vec![AppEntry::new(
+            "12 * 8".into(),
+            "/apps/calculator.app".into(),
+            vec![],
+        )]));
+
+        let results = manager.search("12 * 8", SearchMode::All).unwrap().results;
+        assert_eq!(results[0].kind, ResultKind::Calculation);
+        assert_eq!(results[0].title, "96");
+        assert_eq!(results[1].kind, ResultKind::App);
+    }
 
     #[test]
     fn pins_precede_the_result_limit_but_do_not_change_typed_search() {
@@ -710,7 +823,6 @@ mod tests {
 
     #[test]
     fn system_search_is_lazy_scoped_and_uses_durable_ranking() {
-        use crate::providers::system::SystemCommand;
         let mut manager = manager();
         manager.search("", SearchMode::All).expect("home");
         assert!(manager.system.is_none());

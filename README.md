@@ -57,7 +57,7 @@ Tool pins save their input and output choice. When you open a category, TinyDash
 
 ## Search
 
-The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Datetime, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows a welcome screen with search examples and keyboard hints. If you have pinned items to All, it shows those items instead. Select Apps to browse installed applications. The welcome examples work on macOS, Windows, and Linux.
+The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Calculator, System, Emoji, Passwords, Datetime, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows a welcome screen with search examples and keyboard hints. If you have pinned items to All, it shows those items instead. Select Apps to browse installed applications. The welcome examples work on macOS, Windows, and Linux.
 
 | Query            | Result                         |
 | ---------------- | ------------------------------ |
@@ -210,9 +210,11 @@ Set `fileSearchRoots` to `null` for the default folders, `[]` to disable file sc
 
 ## Usage and ranking
 
-Successful app launches, file opens, emoji copies, and accepted system commands update a use count and last-used time. Frequently used and recently used results move higher in the list. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches. A usage bonus cannot add an item that does not match the query.
+The **All** mode keeps text results together by category, in this order: Apps, Files, Clipboard, System, then Emoji. Matching apps appear first, so `sa` puts Safari above the exact emoji shortcode `:sa:`. Valid calculations appear before these groups. Explicit tool commands and the `:` and `=` prefixes keep their own search scope. Category priority applies before the 30-result limit.
 
-The frequency bonus is 25 points per use, up to 500 points. The recency bonus starts at 500 points and decreases with the number of days since the last use. Their combined limit is 1,000 points, compared with 10,000 for an exact match and 2,000 for a prefix match. Results with equal scores retain their existing order. Calculator results remain first for valid calculations.
+Successful app launches, file opens, emoji copies, and accepted system commands update a use count and last-used time. Frequently used and recently used results move higher within their category. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches within each category. A usage bonus cannot add an item that does not match the query.
+
+The frequency bonus is 25 points per use, up to 500 points. The recency bonus starts at 500 points and decreases with the number of days since the last use. Their combined limit is 1,000 points, compared with 10,000 for an exact match and 2,000 for a prefix match. Results with equal scores in the same category retain their existing order.
 
 TinyDash stores `result_id`, `use_count`, and `last_used_at` in `tinydash.sqlite3`:
 
