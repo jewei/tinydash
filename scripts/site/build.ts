@@ -52,6 +52,7 @@ await Promise.all([
     resolve(root, "src-tauri/icons/32x32.png"),
     resolve(output, "assets/icon.png"),
   ),
+  cp(resolve(root, "app-icon.svg"), resolve(output, "assets/app-icon.svg")),
   writeFile(
     resolve(output, "release.json"),
     `${JSON.stringify(manifest, null, 2)}\n`,
