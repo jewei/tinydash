@@ -111,11 +111,13 @@ The [notify](https://docs.rs/notify/8.2.0/notify/) watcher uses FSEvents on macO
 
 ## Clipboard history
 
-TinyDash captures text while it is running, including the current clipboard at startup. Select Clipboard mode to see recent entries. Search any word in the saved text, use the arrow keys to inspect its full preview, and press Enter to copy it. Paste it in the target application with Command/Ctrl + V.
+On a fresh installation, TinyDash asks before it saves clipboard text. Existing installations keep their saved capture choice. When capture is enabled, TinyDash captures text while it runs, including the current clipboard at startup. Select Clipboard mode to see recent entries. Pins stay at the top, and a fresh empty search selects the latest entry. Search saved text, use the arrow keys to inspect its full preview, and press Enter to copy it. Paste it in the target application with Command/Ctrl + V.
 
 The default limit is 100 unpinned entries. Pins in Clipboard or All keep an entry outside this limit. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, images, and larger values are skipped. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
 
-Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. Clear history asks for confirmation before deleting all entries, including pinned entries. Deleting an entry removes its pins from both categories. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again.
+Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. **Clear unpinned** keeps entries pinned in All or Clipboard. The separate **Clear all clipboard history** action includes pins. Both ask for confirmation. Deleting an entry removes its pins from both categories. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again when capture is enabled.
+
+The actions menu can edit a copy, combine selected entries in a chosen order with a separator, or save the full text as a file. Edited and combined copies leave history unchanged. See the [search and control guide](docs/search-controls.md) for limits and examples.
 
 History is local plain text in the same SQLite database as usage. It can contain sensitive text that you copy; there is no general password detection or encryption. Copies from TinyDash's password generator skip capture during that session. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
 
@@ -171,7 +173,9 @@ In All mode, an engine name or shortcut starts a web search only when search tex
 
 Open **Actions → Settings**, press **Command+,** on macOS or **Ctrl+,** on Windows and Linux, or select **Settings** from the tray menu. The separate window opens on Shortcut. Click **Record new**, press a key combination, then click **Save changes**. Shortcut changes apply at once. If registration or saving fails, TinyDash keeps the previous shortcut.
 
-Settings includes Shortcut, Appearance, Categories, Clipboard history, File search, Currency, Privacy, and About. Save changes to apply visible categories, window behaviour, clipboard limits, file folders, file watching, and currency updates while TinyDash runs. Appearance applies immediately and stays in sync between windows. Closing Settings keeps an unfinished form. Use Discard to restore saved values.
+Settings includes Shortcut, Appearance, Categories, Search, Clipboard history, File search, Currency, Privacy, and About. Save changes to apply visible categories, window behaviour, clipboard limits, file folders, file watching, and currency updates while TinyDash runs. Appearance applies immediately and stays in sync between windows. Closing Settings keeps an unfinished form. Use Discard to restore saved values.
+
+The Search section adds app aliases, hidden apps, and custom web search templates with a URL preview. Shortcut settings include direct category keys and start at login. Category shortcuts and `tinydash --mode clipboard` open an empty category search. Start at login uses `--background` and keeps the window hidden. Privacy settings can export saved settings, preview an import before saving, and show the recovery archive. About includes an explicit update check. Release builds need an updater key and HTTPS feed; Ubuntu updates use a new `.deb` package. See [search controls](docs/search-controls.md), [data recovery](docs/data-recovery.md), and [release setup](docs/release-setup.md).
 
 You can also open Settings directly with `tinydash --settings`. TinyDash writes `settings.json` in its application configuration directory on first launch. Manual file edits still require a restart. The settings screen preserves unknown JSON fields and refuses to overwrite a damaged file.
 
@@ -236,7 +240,7 @@ Build on each target operating system. Tauri uses the platform configuration to 
 bun run tauri build --bundles app
 ```
 
-CI produces unsigned test packages for Apple silicon Macs, Windows x64, and Ubuntu 24.04 x64. Public distribution still needs signing, Mac notarization, and physical desktop checks.
+CI produces development packages for Apple silicon Macs, Windows x64, and Ubuntu 24.04 x64. The release policy uses a signed and notarized Mac app, an unsigned Windows preview, and an Ubuntu package with SHA-256 checksums. Mac and Windows updates use separate Tauri signatures. Actual release packages still need verification. See [release setup](docs/release-setup.md).
 
 The release profile preserves symbols in build tools to avoid a [Rust linker issue on macOS 27](https://github.com/rust-lang/rust/issues/157750). The shipped application remains stripped.
 
@@ -355,4 +359,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
 
 ## Next step
 
-Complete desktop checks on physical Windows and Linux systems, including Wayland. Then configure Mac signing and notarization and Windows signing before public distribution. Keep the MVP feature set fixed.
+Follow the [public release plan](docs/release-plan.md) for a combined macOS, Windows, and Linux release. Record evidence in [release verification](docs/release-verification.md). The plan covers signing, installation, updates, the download page, and user checks. Keep the MVP tool set fixed while completing this work.

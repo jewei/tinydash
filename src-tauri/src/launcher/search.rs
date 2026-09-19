@@ -32,6 +32,7 @@ use crate::{
 pub const RESULT_LIMIT: usize = 30;
 
 pub struct SearchManager {
+    app_preferences: std::collections::BTreeMap<String, crate::settings::AppPreference>,
     apps: AppProvider,
     files: FileProvider,
     matcher: Matcher,
@@ -53,6 +54,7 @@ pub struct SearchOutcome {
 impl Default for SearchManager {
     fn default() -> Self {
         Self {
+            app_preferences: Default::default(),
             apps: AppProvider::default(),
             files: FileProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
@@ -69,6 +71,15 @@ impl Default for SearchManager {
 }
 
 impl SearchManager {
+    pub fn apply_settings(&mut self, settings: &crate::settings::Settings) {
+        self.app_preferences = settings.app_preferences.clone();
+        self.apps.apply_preferences(&self.app_preferences);
+        self.tools.set_web_searches(&settings.web_searches);
+    }
+
+    pub fn app_catalog(&self) -> Vec<SearchResult> {
+        self.apps.catalog()
+    }
     pub fn set_pins(&mut self, pins: Pins) {
         self.pins = pins;
     }
@@ -125,10 +136,20 @@ impl SearchManager {
             let index = indices.entry(mode).or_default();
             let key = if result.kind.has_query_pin() {
                 let password_query = self.tools.password_pin_query(&result.id);
+                let web_pin = self.tools.web_pin(&result.id);
                 QueryPin {
                     mode,
-                    index: if password_query.is_some() { 0 } else { *index },
-                    text: password_query.unwrap_or_else(|| query.text.to_owned()),
+                    index: if password_query.is_some() || web_pin.is_some() {
+                        0
+                    } else {
+                        *index
+                    },
+                    text: web_pin
+                        .as_ref()
+                        .map(|(_, text)| text.clone())
+                        .or(password_query)
+                        .unwrap_or_else(|| query.text.to_owned()),
+                    web_keyword: web_pin.map(|(keyword, _)| keyword),
                 }
                 .key()
             } else {
@@ -141,11 +162,18 @@ impl SearchManager {
 
     fn pinned_result(&mut self, key: &str) -> Option<SearchResult> {
         let result = if let Some(saved) = QueryPin::from_key(key) {
-            let query = Query::parse(&saved.text, saved.mode).ok()?;
-            if query.mode == SearchMode::Calculator {
-                self.calculator.search(query.text).ok()
+            if let Some(keyword) = &saved.web_keyword {
+                if saved.mode != SearchMode::Web {
+                    return None;
+                }
+                self.tools.search_web_pin(keyword, &saved.text)
             } else {
-                self.tools.search_pinned(&query, saved.index)
+                let query = Query::parse(&saved.text, saved.mode).ok()?;
+                if query.mode == SearchMode::Calculator {
+                    self.calculator.search(query.text).ok()
+                } else {
+                    self.tools.search_pinned(&query, saved.index)
+                }
             }
         } else if key.starts_with("app:") {
             self.apps.get(key).map(|app| app.result(0))
@@ -203,7 +231,8 @@ impl SearchManager {
         *usage
     }
 
-    pub fn replace_apps(&mut self, apps: AppProvider) {
+    pub fn replace_apps(&mut self, mut apps: AppProvider) {
+        apps.apply_preferences(&self.app_preferences);
         self.apps = apps;
     }
 
@@ -307,6 +336,21 @@ impl SearchManager {
                 outcome.notice = None;
             }
         }
+        // Pins remain first, but leave a place for the most recent clipboard
+        // item even when pinned items fill the result limit.
+        if mode == SearchMode::Clipboard
+            && input.trim().is_empty()
+            && let Some(newest) = self.clipboard.newest_id()
+            && let Some(index) = outcome
+                .results
+                .iter()
+                .position(|result| result.id == newest)
+            && index >= RESULT_LIMIT
+        {
+            let latest = outcome.results.remove(index);
+            outcome.results.truncate(RESULT_LIMIT - 1);
+            outcome.results.push(latest);
+        }
         outcome.results.truncate(RESULT_LIMIT);
         for result in &outcome.results {
             if let Some(pin) = &result.pin {
@@ -324,6 +368,17 @@ impl SearchManager {
     }
 
     fn search_unpinned(&mut self, query: &Query<'_>) -> SearchOutcome {
+        if query.mode == SearchMode::Clipboard && query.text.is_empty() {
+            return SearchOutcome {
+                results: self
+                    .clipboard
+                    .search("", &mut self.matcher)
+                    .into_iter()
+                    .take(RESULT_LIMIT)
+                    .collect(),
+                notice: None,
+            };
+        }
         if let Some(outcome) = self.tools.search(query) {
             return match outcome {
                 Ok(results) => SearchOutcome {
@@ -1136,5 +1191,118 @@ mod tests {
             "emoji:🚀"
         );
         assert_eq!(search.record_usage(app_id, now).count, 4);
+    }
+
+    #[test]
+    fn newest_clipboard_entry_survives_a_full_page_of_older_pins_and_usage() {
+        let mut search = SearchManager {
+            clipboard: ClipboardProvider::new(
+                (1..=500)
+                    .rev()
+                    .map(|id| ClipboardEntry {
+                        id,
+                        content: format!("Saved text {id}"),
+                        created_at: id,
+                        last_used_at: None,
+                    })
+                    .collect(),
+            ),
+            ..SearchManager::default()
+        };
+        for id in 1..=40 {
+            let key = format!("clipboard:{id}");
+            search.set_pinned(&key, SearchMode::Clipboard, true);
+            search.record_usage(&key, ranking::now());
+        }
+        let results = search.search("", SearchMode::Clipboard).unwrap().results;
+        assert_eq!(results.len(), RESULT_LIMIT);
+        assert_eq!(results.last().unwrap().id, "clipboard:500");
+        assert!(results[..RESULT_LIMIT - 1].iter().all(|result| {
+            result
+                .pin
+                .as_ref()
+                .unwrap()
+                .categories
+                .contains(&SearchMode::Clipboard)
+        }));
+        assert_eq!(
+            search
+                .search("Saved text 499", SearchMode::Clipboard)
+                .unwrap()
+                .results[0]
+                .id,
+            "clipboard:499"
+        );
+        assert_eq!(
+            search.clipboard.newest_id().as_deref(),
+            Some("clipboard:500")
+        );
+    }
+
+    #[test]
+    fn custom_web_pins_keep_their_engine_when_searches_are_reordered_or_disabled() {
+        use crate::settings::{Settings, WebSearch};
+        let custom = |keyword: &str| WebSearch {
+            name: "Same name".into(),
+            keyword: keyword.into(),
+            enabled: true,
+            template: format!("https://{keyword}.example/search?q={{query}}"),
+        };
+        let mut settings = Settings {
+            web_searches: vec![custom("first"), custom("second")],
+            ..Settings::default()
+        };
+        let mut search = SearchManager::default();
+        search.apply_settings(&settings);
+        let results = search
+            .search("web coffee & 東京", SearchMode::Web)
+            .unwrap()
+            .results;
+        assert_eq!(results.len(), 8);
+        let chosen = &results[7];
+        let key = search.pin_key(&chosen.id, SearchMode::All).unwrap();
+        search.set_pinned(&key, SearchMode::All, true);
+        settings.web_searches.reverse();
+        search.apply_settings(&settings);
+        assert!(search.resolve_action(&chosen.id, Action::Open).is_err());
+        let pinned = search
+            .search("", SearchMode::All)
+            .unwrap()
+            .results
+            .remove(0);
+        assert_eq!(pinned.pin.as_ref().unwrap().key, key);
+        let ResolvedAction::OpenUrl(url) = search.resolve_action(&pinned.id, Action::Open).unwrap()
+        else {
+            panic!("web action");
+        };
+        let target = url::Url::parse(&url).unwrap();
+        assert_eq!(target.host_str(), Some("second.example"));
+        assert_eq!(target.query_pairs().next().unwrap().1, "coffee & 東京");
+        settings.web_searches[0].enabled = false;
+        search.apply_settings(&settings);
+        assert!(
+            search
+                .search("", SearchMode::All)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+        settings.web_searches[0].enabled = true;
+        let mut restored = SearchManager::default();
+        restored.apply_settings(&settings);
+        restored.set_pinned(&key, SearchMode::All, true);
+        assert_eq!(
+            restored.search("", SearchMode::All).unwrap().results.len(),
+            1
+        );
+        settings.web_searches.clear();
+        restored.apply_settings(&settings);
+        assert!(
+            restored
+                .search("", SearchMode::All)
+                .unwrap()
+                .results
+                .is_empty()
+        );
     }
 }

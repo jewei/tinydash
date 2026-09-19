@@ -1,0 +1,53 @@
+name: Download site checks
+
+on:
+  push:
+    paths:
+      - "site/**"
+      - "scripts/site/**"
+      - "docs/assets/**"
+      - "public/fonts/**"
+      - "src-tauri/icons/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - ".github/workflows/site-checks.yml"
+  pull_request:
+    paths:
+      - "site/**"
+      - "scripts/site/**"
+      - "docs/assets/**"
+      - "public/fonts/**"
+      - "src-tauri/icons/**"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - ".github/workflows/site-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  site:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bunx --no-install prettier --check site scripts/site .github/workflows/site-checks.yml
+      - run: bunx --no-install tsc --project site/tsconfig.json
+      - run: bunx --no-install playwright install --with-deps chromium
+      - run: bunx --no-install playwright test --config site/playwright.config.ts
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: download-site-preview
+          path: |
+            site-dist/
+            artifacts/site-tests/
+          if-no-files-found: error
+          retention-days: 14

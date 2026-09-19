@@ -1,4 +1,36 @@
-# Install TinyDash test builds
+# Install TinyDash candidates and test builds
+
+Use the prepared release path only when the maintainer gives you a specific
+release candidate or public release. Use the existing Checks path for unsigned
+development builds. These paths use different trust and update expectations.
+
+## Prepared release candidate
+
+The release workflow can build a candidate from one version tag and stage it as
+a draft GitHub Release. A draft can require GitHub access and is not an
+anonymous tester download. Do not treat a draft as a public release.
+
+Before installing a prepared candidate, confirm the version, tag, source
+commit, package type, processor, and release verification record supplied by
+the maintainer. The signing policy differs by system:
+
+- macOS: Developer ID signing and Apple notarization.
+- Windows: an unsigned preview. Windows can warn or block installation.
+- Ubuntu: a `.deb` with SHA-256 checksums and no publisher signature.
+
+Download the package for your system and
+verify its `SHA256SUMS` file. Follow the package steps below. Keep the old
+installation until the update and removal checks are complete.
+
+The repository does not currently provide a verified public candidate. Manual
+update checks and installs are available only in release builds with the
+compiled updater endpoint and public key. Development builds report that updates
+are not configured. The Windows preview has separate Tauri update signatures;
+these do not establish a trusted Windows publisher. Do not invent a download URL or bypass an operating system
+trust warning. See [release setup](release-setup.md) for signing and updater
+requirements.
+
+## Existing unsigned test builds
 
 Open the [Checks runs](https://github.com/jewei/tinydash/actions/workflows/check.yml) and select a successful run. Download the artifact for your operating system and CPU, then extract it. Read `build.txt` to confirm the commit and version.
 
@@ -43,9 +75,14 @@ Get-Content SHA256SUMS | ForEach-Object {
 
 Quit the running TinyDash process through its tray menu before installation. Hiding the window does not stop the process. The bundle identifier remains `dev.tinydash.launcher`, so installed builds use the existing settings and database. The package version is currently `0.1.0`. Use the commit in `build.txt` to distinguish test builds of this version.
 
-On macOS, open the DMG and drag `TinyDash.app` to Applications. Replace the previous copy if needed. Eject the disk image, then open TinyDash from Applications. The inner ZIP contains the same app for checks that do not need the disk image. The disk image check mounts it read-only and verifies the copied app. It does not test Gatekeeper approval or notarization.
+On macOS, open the DMG and drag `TinyDash.app` to Applications. Replace the previous copy if needed. Eject the disk image, then open TinyDash from Applications. The disk image check mounts it read-only and verifies the copied app. It does not test Gatekeeper approval or notarization.
 
-On Windows, run the file that ends in `-setup.exe`. The installer adds TinyDash to the current user's Start menu and installs to `%LOCALAPPDATA%\TinyDash`. It does not need an administrator account. If WebView2 is missing, the installer downloads Microsoft's runtime. This step needs an internet connection. CI already has WebView2; installation without WebView2 still needs a separate desktop check. The other `.exe` in the artifact is a standalone file for diagnosis, not an installer.
+On Windows, run the file that ends in `-setup.exe`. The installer adds TinyDash to the current user's Start menu and installs to `%LOCALAPPDATA%\TinyDash`. It does not need an administrator account. If WebView2 is missing, the installer downloads Microsoft's runtime. This step needs an internet connection. CI already has WebView2; installation without WebView2 still needs a separate desktop check.
+
+The Windows preview has no Authenticode signature. An unknown-publisher or
+SmartScreen warning is possible. Smart App Control or organization policy can
+block it. Such systems are not supported by this preview. Do not disable
+security controls or install a custom root certificate to run TinyDash.
 
 On Ubuntu 24.04 x64, run this command in the extracted directory:
 
@@ -54,7 +91,13 @@ sudo apt install ./TinyDash_0.1.0_amd64.deb
 tinydash
 ```
 
-APT installs the declared libraries. The package adds `/usr/bin/tinydash`, a desktop entry, and icons. It uses the system GTK 3 and WebKitGTK 4.1 libraries. Do not assume this package works on older Ubuntu versions or every Debian-based distribution. The inner tar archive contains the standalone binary for diagnosis and needs the same system libraries.
+APT installs the declared libraries. The package adds `/usr/bin/tinydash`, a desktop entry, and icons. It uses the system GTK 3 and WebKitGTK 4.1 libraries. Do not assume this package works on older Ubuntu versions or every Debian-based distribution. The release artifact contains the installer and its checksum.
+
+To update Ubuntu v1, quit TinyDash, download the new `.deb`, check its SHA-256
+hash, and repeat the APT install command with the new filename. This preserves
+settings and data. There is no TinyDash APT repository or automatic Linux
+updater in v1. SHA-256 checksums detect changed bytes; they do not authenticate
+the publisher.
 
 Press Control + Shift + Space to show or hide TinyDash. On native Wayland, assign a desktop or compositor shortcut to `tinydash`. Focus and placement depend on the compositor. See [desktop-checks.md](desktop-checks.md) before using a build for daily work.
 
@@ -76,4 +119,8 @@ CI verifies each artifact's checksums. Mac CI mounts the DMG and checks the copi
 
 Installation logs are in `native-results-<OS>-<architecture>/installer.txt`. Mac disk image results are in `test-results-macOS-<architecture>/dmg-check.txt`. The native workflow can test an existing Checks run that contains these installer artifacts. Runs from before installer support contain only standalone builds.
 
-Public distribution still needs Mac signing and notarization, Windows signing, and physical desktop checks. No automatic updater is included. Use the standard [Tauri distribution tools](https://v2.tauri.app/distribute/), [Mac signing configuration](https://v2.tauri.app/distribute/sign/macos/), and [Windows installer settings](https://v2.tauri.app/distribute/windows-installer/) when adding signing. Replace the Mac test signing identity `-` with a Developer ID identity for distribution.
+Public distribution still needs a verified Mac signature and notarization,
+update tests, and desktop checks on all three systems. Windows publisher
+signing is deferred. See [release setup](release-setup.md) for the current
+signing and update policy. Mac and Windows release builds let the user check
+for an update and choose when to install it.

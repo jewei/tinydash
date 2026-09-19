@@ -16,6 +16,86 @@ async function openSettings(page: Page) {
   await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
 }
 
+for (const editBeforeUpdate of [false, true]) {
+  test(`keeps external settings changes with a ${editBeforeUpdate ? "dirty" : "clean"} draft`, async ({
+    page,
+  }) => {
+    await openSettings(page);
+    const clearSearch = page.getByRole("switch", {
+      name: "Clear the search each time",
+    });
+    if (editBeforeUpdate) await clearSearch.uncheck();
+    await page.evaluate(async () => {
+      const state = window.__launcherTest;
+      state.settings = {
+        ...state.settings,
+        appPreferences: {
+          "app:/Applications/Safari.app": { aliases: [], hidden: true },
+        },
+        clipboardHistoryEnabled: false,
+        clipboardHistoryDecided: true,
+      };
+      await state.emit("settings-changed", state.settings);
+    });
+    if (!editBeforeUpdate) {
+      await expect(
+        page.getByRole("button", { name: "Save changes" }),
+      ).toBeDisabled();
+      await clearSearch.uncheck();
+    }
+    await expect(clearSearch).not.toBeChecked();
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(
+      page.getByText("Changes saved.", { exact: true }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(() => window.__launcherTest.settings),
+    ).toMatchObject({
+      clearQueryOnOpen: false,
+      appPreferences: {
+        "app:/Applications/Safari.app": { aliases: [], hidden: true },
+      },
+      clipboardHistoryEnabled: false,
+      clipboardHistoryDecided: true,
+    });
+  });
+}
+
+test("keeps an edited alias when another window hides apps", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.locator('select[size="6"]').selectOption("app-0");
+  await page.getByLabel("Aliases, one per line").fill("work files");
+  await page.getByLabel("Aliases, one per line").blur();
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = {
+      ...state.settings,
+      appPreferences: {
+        "app-0": { aliases: [], hidden: true },
+        "app-1": { aliases: [], hidden: true },
+      },
+    };
+    await state.emit("settings-changed", state.settings);
+  });
+  await expect(page.getByLabel("Aliases, one per line")).toHaveValue(
+    "work files",
+  );
+  await expect(
+    page.getByRole("checkbox", { name: "Hide this app from search" }),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.appPreferences),
+  ).toEqual({
+    "app-0": { aliases: ["work files"], hidden: true },
+    "app-1": { aliases: [], hidden: true },
+  });
+});
+
 test("records, saves, and reloads the launch shortcut and window preferences", async ({
   page,
 }) => {
@@ -285,4 +365,213 @@ test("category choices support discard, failed saves, retry, and restoring all",
       () => window.__launcherTest.settings.visibleCategories.length,
     ),
   ).toBe(11);
+});
+
+test("saves app preferences, custom web searches, category shortcuts, and login setting", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "test-results/settings-search-320.png" });
+  await page.setViewportSize({ width: 768, height: 640 });
+  await page.locator('select[size="6"]').selectOption("app-0");
+  await page.getByLabel("Aliases, one per line").fill("files\nwork files");
+  await page
+    .getByRole("checkbox", { name: "Hide this app from search" })
+    .check();
+  await page
+    .getByRole("button", { name: "Add web search", exact: true })
+    .click();
+  await page.getByLabel("Search name").last().fill("Project docs");
+  await page.getByLabel("Keyword").last().fill("docs");
+  await page
+    .getByLabel("Search URL")
+    .last()
+    .fill("https://example.com/search?q={query}");
+  await page.getByRole("button", { name: "Shortcut", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Record", exact: true })
+    .first()
+    .click();
+  await page.keyboard.press("Control+Alt+KeyA");
+  await page
+    .getByRole("switch", { name: "Start TinyDash when you sign in" })
+    .check();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings),
+  ).toMatchObject({
+    startAtLogin: true,
+    appPreferences: {
+      "app-0": { aliases: ["files", "work files"], hidden: true },
+    },
+    webSearches: [
+      {
+        name: "Project docs",
+        keyword: "docs",
+        template: "https://example.com/search?q={query}",
+        enabled: true,
+      },
+    ],
+  });
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.categoryShortcuts),
+  ).toEqual([{ mode: "apps", shortcut: "Control+Alt+KeyA" }]);
+});
+
+test("previews imports without replacing saved settings and preserves failed imports", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.evaluate(() => {
+    window.__launcherTest.importPreview = {
+      settings: { ...window.__launcherTest.settings, hideOnBlur: false },
+      ignoredKeys: ["futureField"],
+      appearance: "dark",
+    };
+  });
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Import settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Import preview" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({ path: "test-results/settings-import-320.png" });
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.hideOnBlur),
+  ).toBe(true);
+  await page
+    .getByRole("button", { name: "Import settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Import preview" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Apply import", exact: true }).click();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.hideOnBlur),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.hideOnBlur),
+  ).toBe(false);
+
+  await page.evaluate(() => {
+    window.__launcherTest.rejectImport = "Import file is invalid.";
+  });
+  await page
+    .getByRole("button", { name: "Import settings", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("Import file is invalid");
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.hideOnBlur),
+  ).toBe(false);
+});
+
+test("removing a category shortcut stays in the draft until Save", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "tinydash.test.settings",
+      JSON.stringify({
+        categoryShortcuts: [{ mode: "apps", shortcut: "Control+Alt+KeyR" }],
+      }),
+    );
+  });
+  await openSettings(page);
+  await page.getByRole("button", { name: "Shortcut", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Change", exact: true })
+    .first()
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Remove Apps shortcut", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Remove Apps shortcut", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Remove Apps shortcut", exact: true }),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.categoryShortcuts),
+  ).toEqual([{ mode: "apps", shortcut: "Control+Alt+KeyR" }]);
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.categoryShortcuts),
+  ).toEqual([]);
+});
+
+test("export is disabled for a dirty draft and works after discard", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  const exportButton = page.getByRole("button", {
+    name: "Export settings",
+    exact: true,
+  });
+  await expect(exportButton).toBeEnabled();
+  await page
+    .getByRole("button", { name: "Clipboard history", exact: true })
+    .click();
+  await page.getByRole("switch", { name: "Save clipboard history" }).uncheck();
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  await expect(exportButton).toBeDisabled();
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.filter(
+          (call) => call.command === "export_settings",
+        ).length,
+    ),
+  ).toBe(0);
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(exportButton).toBeEnabled();
+  await exportButton.click();
+  await expect(
+    page.getByText("Saved settings exported.", { exact: true }),
+  ).toBeVisible();
+});
+
+test("clears unpinned clipboard entries separately and keeps pinned entries", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page
+    .getByRole("button", { name: "Clipboard history", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Clear unpinned entries", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Clear unpinned entries?" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Clear unpinned", exact: true })
+    .click();
+  expect(
+    await page.evaluate(() => window.__launcherTest.clipboardClearKeepPinned),
+  ).toBe(true);
+  expect(
+    await page.evaluate(() => window.__launcherTest.calls.at(-1)?.payload),
+  ).toEqual({ keepPinned: true });
 });

@@ -32,6 +32,7 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-src 'none'"
     }
   },
+  "plugins": { "updater": { "pubkey": "" } },
   "bundle": {
     "active": true,
     "category": "Utility",
