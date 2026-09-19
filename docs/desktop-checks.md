@@ -6,7 +6,7 @@ Use a Windows or Linux desktop session in a virtual machine or on a physical com
 
 Open the GitHub Actions **Checks** run for the commit under test. Download the `TinyDash-<OS>-<architecture>` artifact. Check `build.txt` to confirm the commit and CPU architecture. Extract the artifact before starting the app.
 
-Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. The Checks workflow supplies unsigned development builds. For a signed candidate, use the Release workflow artifacts and confirm the distribution in `build.txt`. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
+Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. The Checks workflow supplies unsigned development builds. For a release candidate, use the Release workflow artifacts. Confirm the distribution and publisher-signing fields in `build.txt`. Mac candidates require Developer ID signing and notarization. Windows candidates are unsigned previews with separate updater signatures. Ubuntu uses checksums and manual updates. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
 
 Quit any older TinyDash process through its tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
 
@@ -53,7 +53,7 @@ On macOS, run `swift tests/native/focus-macos.swift` with the built app open and
 11. Record a category shortcut. Save and use it while another app has focus. Confirm that it opens an empty search in that category. Remove the binding, save, and confirm that it stops working. Test a conflict without losing the previous binding. On Wayland, use a desktop shortcut for `tinydash --mode clipboard`. Test the command with both a stopped and a running TinyDash process.
 12. Turn on **Start at login**, save, and sign out and in. Confirm that one TinyDash process starts and the launcher stays hidden. Turn it off, save, and repeat. Confirm that TinyDash does not start.
 13. Export saved settings through **Privacy**. Preview the file through import. Cancel and confirm that nothing changes. Import again, apply the preview, and confirm that settings stay unchanged until **Save changes**. Check invalid JSON, unsupported versions, unknown keys, and file paths from another operating system. An invalid import must leave saved settings unchanged.
-14. In **About**, check for updates in an unsigned build. Confirm that it gives package instructions. Use signed candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in [release verification](release-verification.md). Preserve the source files before manual recovery.
+14. In **About**, check for updates in a development build. Confirm that it gives package instructions. Use release candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in [release verification](release-verification.md). Windows previews have updater signatures but no publisher signature. Preserve the source files before manual recovery.
 
 ## Check passwords, time zones, URLs, and web search
 

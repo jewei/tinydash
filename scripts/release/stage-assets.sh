@@ -40,7 +40,7 @@ for directory in "$@"; do
   RELEASE_MODE=true UPDATER_ARTIFACTS="$updater_artifacts" \
     bun scripts/release/verify-artifacts.ts "$directory" "$platform" "$architecture"
   if grep -Fxq 'Distribution: unsigned test build' "$directory/build.txt"; then
-    echo "Refusing unsigned build in a staged release: $directory" >&2
+    echo "Refusing development build in a staged release: $directory" >&2
     exit 1
   fi
   while IFS= read -r -d '' file; do

@@ -130,9 +130,16 @@ if (command === "verify") {
   const modified = execFileSync("git", ["status", "--porcelain"], {
     encoding: "utf8",
   }).trim();
+  const publisherSigning = releaseMode
+    ? process.platform === "darwin"
+      ? "Developer ID"
+      : process.platform === "win32"
+        ? "none (unsigned preview)"
+        : "none"
+    : "none";
   await writeFile(
     join(output, "build.txt"),
-    `Commit: ${commit}\nSource: ${modified ? "modified worktree" : "clean worktree"}\nVersion: ${config.version}\nOS: ${process.platform}\nArchitecture: ${arch}\nDistribution: ${process.env.RELEASE_MODE === "true" ? (process.env.UPDATER_ARTIFACTS === "true" ? "release candidate with updater signatures" : "release candidate") : "unsigned test build"}\n`,
+    `Commit: ${commit}\nSource: ${modified ? "modified worktree" : "clean worktree"}\nVersion: ${config.version}\nOS: ${process.platform}\nArchitecture: ${arch}\nDistribution: ${releaseMode ? (process.env.UPDATER_ARTIFACTS === "true" ? "release candidate with updater signatures" : "release candidate") : "unsigned test build"}\nPublisher signing: ${publisherSigning}\n`,
   );
   files.push("build.txt");
   await writeChecksums(files);
