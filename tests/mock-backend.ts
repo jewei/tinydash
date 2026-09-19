@@ -1,7 +1,13 @@
 // Loaded only by the browser tests. Production always calls the Rust backend.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import type { SearchResult, SearchMode, SettingsValues } from "../src/bridge";
+import type {
+  SearchResult,
+  SearchMode,
+  SettingsImport,
+  SettingsValues,
+  UpdateStatus,
+} from "../src/bridge";
 import { defaultCategories, resultCategories } from "../src/categories";
 
 declare global {
@@ -29,6 +35,19 @@ declare global {
       currencyRefreshing: boolean;
       currencyWarning: string | null;
       currencyMissing: boolean;
+      importPreview: SettingsImport | null;
+      rejectImport: string | null;
+      backupRevealed: boolean;
+      rejectBackup: string | null;
+      updateStatus: UpdateStatus;
+      updateInstalled: boolean;
+      rejectUpdate: string | null;
+      clipboardClearKeepPinned: boolean;
+      editedClipboard: { id: string; text: string } | null;
+      copiedSelection: { ids: string[]; separator: string } | null;
+      rejectClipboardCopy: string | null;
+      initialVisible?: boolean;
+      initialMode?: SearchMode | null;
       holdSearch: boolean;
       holdNextSearch: boolean;
       reverseSystem: boolean;
@@ -189,36 +208,49 @@ function restorePin(key: string): SearchResult | undefined {
     emoji,
     ...gridEmoji,
     ...systemCommands,
-    ...clips.filter(
-      (clip) =>
-        !state.clipboardCleared && !state.clipboardDeleted.includes(clip.id),
-    ),
+    ...clips.filter((clip) => {
+      const pinned = Object.values(state.pins).some((keys) =>
+        keys?.includes(clip.id),
+      );
+      return (
+        (!state.clipboardCleared ||
+          (state.clipboardClearKeepPinned && pinned)) &&
+        !state.clipboardDeleted.includes(clip.id)
+      );
+    }),
   ];
   const result = available.find((result) => result.id === key);
   return result ? describePins([result], "")[0] : undefined;
 }
 
 window.isTauri = true;
+const defaultSettings: SettingsValues = {
+  clearQueryOnOpen: true,
+  hideOnBlur: true,
+  shortcut: "Control+Shift+Space",
+  categoryShortcuts: [],
+  startAtLogin: false,
+  appPreferences: {},
+  webSearches: [],
+  clipboardHistoryEnabled: true,
+  clipboardHistoryDecided: true,
+  clipboardHistoryLimit: 100,
+  fileSearchRoots: null,
+  fileSearchLimit: 50000,
+  fileSearchExcludedDirs: ["node_modules", "target"],
+  fileWatchEnabled: true,
+  currencyRatesEnabled: true,
+  visibleCategories: [...defaultCategories],
+};
+const savedSettings = JSON.parse(
+  localStorage.getItem("tinydash.test.settings") ?? "null",
+) as Partial<SettingsValues> | null;
 window.__launcherTest = {
   calls: [],
   platform:
     (localStorage.getItem("tinydash.test.platform") as
       "macos" | "windows" | "linux") ?? "macos",
-  settings: JSON.parse(
-    localStorage.getItem("tinydash.test.settings") ?? "null",
-  ) ?? {
-    clearQueryOnOpen: true,
-    hideOnBlur: true,
-    shortcut: "Control+Shift+Space",
-    clipboardHistoryEnabled: true,
-    clipboardHistoryLimit: 100,
-    fileSearchRoots: null,
-    fileSearchLimit: 50000,
-    fileSearchExcludedDirs: ["node_modules", "target"],
-    fileWatchEnabled: true,
-    currencyRatesEnabled: true,
-    visibleCategories: [...defaultCategories],
-  },
+  settings: { ...defaultSettings, ...savedSettings },
   rejectSettings: null,
   pins: Array.isArray(savedPins)
     ? { all: savedPins, apps: savedPins }
@@ -239,6 +271,29 @@ window.__launcherTest = {
   currencyRefreshing: false,
   currencyWarning: null,
   currencyMissing: false,
+  importPreview: null,
+  rejectImport: null,
+  backupRevealed: false,
+  rejectBackup: null,
+  updateStatus: {
+    available: false,
+    version: null,
+    notes: null,
+    message: "TinyDash is up to date.",
+  },
+  updateInstalled: false,
+  rejectUpdate: null,
+  clipboardClearKeepPinned: false,
+  editedClipboard: null,
+  copiedSelection: null,
+  rejectClipboardCopy: null,
+  initialVisible:
+    localStorage.getItem("tinydash.test.initialVisible") === "false"
+      ? false
+      : undefined,
+  initialMode:
+    (localStorage.getItem("tinydash.test.initialMode") as SearchMode | null) ??
+    null,
   holdSearch: false,
   holdNextSearch: false,
   reverseSystem: false,
@@ -259,6 +314,8 @@ mockIPC(
         platform: state.platform,
         settings: state.settings,
         warnings: [],
+        visible: state.initialVisible,
+        initialMode: state.initialMode,
       };
     }
     if (command === "get_settings") {
@@ -283,6 +340,70 @@ mockIPC(
       );
       await emit("settings-changed", state.settings);
       return state.settings;
+    }
+    if (command === "choose_clipboard_history") {
+      const { enabled } = payload as { enabled: boolean };
+      state.settings = {
+        ...state.settings,
+        clipboardHistoryEnabled: enabled,
+        clipboardHistoryDecided: true,
+      };
+      localStorage.setItem(
+        "tinydash.test.settings",
+        JSON.stringify(state.settings),
+      );
+      return state.settings;
+    }
+    if (command === "app_catalog") return apps;
+    if (command === "set_app_preference") {
+      const { id, aliases, hidden } = payload as {
+        id: string;
+        aliases: string[];
+        hidden: boolean;
+      };
+      const appPreferences = { ...state.settings.appPreferences };
+      if (aliases.length || hidden) appPreferences[id] = { aliases, hidden };
+      else delete appPreferences[id];
+      state.settings = { ...state.settings, appPreferences };
+      return state.settings;
+    }
+    if (command === "preview_web_search") {
+      const { search, query } = payload as {
+        search: { template: string };
+        query: string;
+      };
+      if ((search.template.match(/\{query\}/g) ?? []).length !== 1)
+        throw new Error("Use {query} exactly once in the URL.");
+      return search.template.replace("{query}", encodeURIComponent(query));
+    }
+    if (command === "export_settings") return true;
+    if (command === "preview_settings_import") {
+      if (state.rejectImport) throw new Error(state.rejectImport);
+      return state.importPreview;
+    }
+    if (command === "reveal_backup") {
+      if (state.rejectBackup) throw new Error(state.rejectBackup);
+      state.backupRevealed = true;
+      return;
+    }
+    if (command === "check_update") {
+      if (state.rejectUpdate) throw new Error(state.rejectUpdate);
+      return state.updateStatus;
+    }
+    if (command === "install_update") {
+      if (state.rejectUpdate) throw new Error(state.rejectUpdate);
+      state.updateInstalled = true;
+      return;
+    }
+    if (command === "edit_clipboard_history") {
+      if (state.rejectClipboardCopy) throw new Error(state.rejectClipboardCopy);
+      state.editedClipboard = payload as { id: string; text: string };
+      return;
+    }
+    if (command === "copy_clipboard_selection") {
+      if (state.rejectClipboardCopy) throw new Error(state.rejectClipboardCopy);
+      state.copiedSelection = payload as { ids: string[]; separator: string };
+      return;
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
@@ -317,11 +438,19 @@ mockIPC(
               ? []
               : [file]
             : mode === "clipboard"
-              ? state.clipboardCleared
-                ? []
-                : clips.filter(
-                    (entry) => !state.clipboardDeleted.includes(entry.id),
-                  )
+              ? clips.filter((entry) => {
+                  const pinned = Object.values(state.pins).some((keys) =>
+                    keys?.includes(entry.id),
+                  );
+                  return (
+                    (!state.clipboardCleared ||
+                      (state.clipboardClearKeepPinned && pinned)) &&
+                    !state.clipboardDeleted.includes(entry.id) &&
+                    `${entry.title} ${entry.subtitle}`
+                      .toLocaleLowerCase()
+                      .includes(query.trim().toLocaleLowerCase())
+                  );
+                })
               : query === "=1 / 0" || (mode === "calculator" && !query)
                 ? []
                 : mode === "emoji" ||
@@ -376,7 +505,21 @@ mockIPC(
             Number(a.pin?.categories.includes(mode)),
         );
       }
+      const preferredSelectionId =
+        !query.trim() && (mode === "clipboard" || mode === "all")
+          ? (clips.find((entry) => {
+              const pinned = Object.values(state.pins).some((keys) =>
+                keys?.includes(entry.id),
+              );
+              return (
+                (!state.clipboardCleared ||
+                  (state.clipboardClearKeepPinned && pinned)) &&
+                !state.clipboardDeleted.includes(entry.id)
+              );
+            })?.id ?? null)
+          : null;
       return {
+        preferredSelectionId,
         results: described,
         total: apps.length,
         indexing: false,
@@ -458,6 +601,9 @@ mockIPC(
       if (state.rejectClear)
         throw new Error("Could not delete clipboard history.");
       state.clipboardCleared = true;
+      state.clipboardClearKeepPinned = Boolean(
+        (payload as { keepPinned?: boolean }).keepPinned,
+      );
     }
     return undefined;
   },

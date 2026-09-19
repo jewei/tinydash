@@ -10,6 +10,15 @@ const ALIASES: &[(&str, &str)] = &[
     ("japan", "Asia/Tokyo"),
     ("malaysia", "Asia/Kuala_Lumpur"),
     ("kl", "Asia/Kuala_Lumpur"),
+    ("singapore", "Asia/Singapore"),
+    ("sgt", "Asia/Singapore"),
+    ("argentina", "America/Argentina/Buenos_Aires"),
+    ("arg", "America/Argentina/Buenos_Aires"),
+    ("art", "America/Argentina/Buenos_Aires"),
+    ("gambia", "Africa/Banjul"),
+    ("the gambia", "Africa/Banjul"),
+    ("bahamas", "America/Nassau"),
+    ("the bahamas", "America/Nassau"),
     ("uk", "Europe/London"),
     ("britain", "Europe/London"),
     ("england", "Europe/London"),
@@ -72,10 +81,11 @@ fn city(zone: Tz) -> String {
 
 fn zones(location: &str) -> Vec<Tz> {
     let name = normalized(location.trim());
+    let name = name.strip_prefix("the ").unwrap_or(&name);
     if let Some((_, zone)) = ALIASES.iter().find(|(alias, _)| *alias == name) {
         return vec![zone.parse().expect("known timezone")];
     }
-    let region: &[&str] = match name.as_str() {
+    let region: &[&str] = match name {
         "us" | "usa" | "united states" => &[
             "America/New_York",
             "America/Chicago",
@@ -127,7 +137,7 @@ fn zones(location: &str) -> Vec<Tz> {
         .copied()
         .filter(|zone| {
             normalized(zone.name()).starts_with(&format!("{name}/"))
-                || normalized(&city(*zone)).starts_with(&name)
+                || normalized(&city(*zone)).starts_with(name)
         })
         .take(30)
         .collect()
@@ -170,6 +180,19 @@ fn input_text(query: &str) -> String {
         .replace("p.m", "pm")
 }
 
+fn query_without_time_qualifier(query: &str) -> String {
+    for prefix in ["the current ", "current ", "the "] {
+        if let Some(rest) = query.strip_prefix(prefix)
+            && ["time", "date", "datetime"]
+                .iter()
+                .any(|kind| rest == *kind || rest.starts_with(&format!("{kind} ")))
+        {
+            return rest.to_owned();
+        }
+    }
+    query.to_owned()
+}
+
 fn explicit_clock(value: &str) -> bool {
     clock(value).is_some()
         && (value.contains(':')
@@ -199,6 +222,58 @@ fn weekday(value: &str) -> Option<Weekday> {
     }
 }
 
+fn month(value: &str) -> Option<u32> {
+    match value.trim_end_matches('.') {
+        "january" | "jan" => Some(1),
+        "february" | "feb" => Some(2),
+        "march" | "mar" => Some(3),
+        "april" | "apr" => Some(4),
+        "may" => Some(5),
+        "june" | "jun" => Some(6),
+        "july" | "jul" => Some(7),
+        "august" | "aug" => Some(8),
+        "september" | "sep" | "sept" => Some(9),
+        "october" | "oct" => Some(10),
+        "november" | "nov" => Some(11),
+        "december" | "dec" => Some(12),
+        _ => None,
+    }
+}
+
+fn day_number(value: &str) -> Option<u32> {
+    let value = value
+        .strip_suffix("st")
+        .or_else(|| value.strip_suffix("nd"))
+        .or_else(|| value.strip_suffix("rd"))
+        .or_else(|| value.strip_suffix("th"))
+        .unwrap_or(value);
+    value.parse().ok().filter(|day| (1..=31).contains(day))
+}
+
+fn natural_date(value: &str, today: NaiveDate) -> Option<NaiveDate> {
+    let cleaned = value.replace(',', " ");
+    let parts: Vec<_> = cleaned.split_whitespace().collect();
+    let (year, month, day) = match parts.as_slice() {
+        [first, second] => {
+            if let Some(month) = month(first) {
+                (today.year(), month, day_number(second)?)
+            } else {
+                (today.year(), month(second)?, day_number(first)?)
+            }
+        }
+        [first, second, year] => {
+            let year = year.parse().ok()?;
+            if let Some(month) = month(first) {
+                (year, month, day_number(second)?)
+            } else {
+                (year, month(second)?, day_number(first)?)
+            }
+        }
+        _ => return None,
+    };
+    NaiveDate::from_ymd_opt(year, month, day)
+}
+
 fn starts_with_date(value: &str) -> bool {
     let parts: Vec<_> = value.split_whitespace().collect();
     let Some(first) = parts.first().copied() else {
@@ -206,6 +281,8 @@ fn starts_with_date(value: &str) -> bool {
     };
     matches!(first, "today" | "tomorrow" | "yesterday")
         || weekday(first).is_some()
+        || month(first).is_some()
+        || (parts.get(1).is_some_and(|part| month(part).is_some()) && day_number(first).is_some())
         || (first == "next"
             && parts
                 .get(1)
@@ -222,7 +299,7 @@ fn starts_with_date(value: &str) -> bool {
 }
 
 pub fn is_candidate(query: &str) -> bool {
-    let lower = input_text(query);
+    let lower = query_without_time_qualifier(&input_text(query));
     if ["time", "date", "datetime"]
         .iter()
         .any(|prefix| lower == *prefix || lower.starts_with(&format!("{prefix} ")))
@@ -301,9 +378,26 @@ fn base_date(value: &str, today: NaiveDate) -> Result<NaiveDate, String> {
             .checked_add_days(Days::new(delta.into()))
             .ok_or_else(|| "This date is outside the supported range.".into());
     }
+    if let Some(date) = natural_date(&value, today) {
+        return Ok(date);
+    }
     NaiveDate::parse_from_str(&value, "%Y-%m-%d").map_err(|_| {
-        "Use today, tomorrow, a weekday, in 2 weeks, or YYYY-MM-DD. You can add or subtract days or weeks.".into()
+        "Use today, tomorrow, a weekday, a month name, in 2 weeks, or YYYY-MM-DD. You can add or subtract days or weeks.".into()
     })
+}
+
+fn split_target_location(location: &str) -> (String, Option<String>) {
+    for separator in [" to ", " in "] {
+        if let Some((source, target)) = location.rsplit_once(separator)
+            && !source.trim().is_empty()
+            && !target.trim().is_empty()
+            && !zones(source).is_empty()
+            && zones(target).len() == 1
+        {
+            return (source.trim().to_owned(), Some(target.trim().to_owned()));
+        }
+    }
+    (location.trim().to_owned(), None)
 }
 
 #[derive(Debug)]
@@ -319,7 +413,7 @@ pub fn calculate(
     now: DateTime<Utc>,
     local: impl Fn(DateTime<Utc>) -> DateTime<FixedOffset>,
 ) -> Result<Vec<TimeResult>, String> {
-    let lower = input_text(query);
+    let lower = query_without_time_qualifier(&input_text(query));
     let text = ["datetime ", "date ", "time "]
         .iter()
         .find_map(|prefix| lower.strip_prefix(prefix))
@@ -336,7 +430,16 @@ pub fn calculate(
     let parts: Vec<_> = text.split_whitespace().collect();
     // A date's day count is not a clock. Prefer explicit clock tokens before bare hours.
     let explicit = parts.iter().position(|part| explicit_clock(part));
+    let today = local(now).date_naive();
+    let date_answer = if explicit.is_none() && starts_with_date(text) {
+        date(text, today).ok()
+    } else {
+        None
+    };
     let clock_index = explicit.or_else(|| {
+        if date_answer.is_some() {
+            return None;
+        }
         parts
             .iter()
             .enumerate()
@@ -349,8 +452,10 @@ pub fn calculate(
             .map(|(index, _)| index)
     });
     if clock_index.is_none() && starts_with_date(text) {
-        let today = local(now).date_naive();
-        let answer = date(text, today)?;
+        let answer = match date_answer {
+            Some(answer) => answer,
+            None => date(text, today)?,
+        };
         let result = answer.format("%a, %d %b %Y").to_string();
         let based_on = today.format("%a, %d %b %Y").to_string();
         return Ok(vec![TimeResult {
@@ -384,6 +489,12 @@ pub fn calculate(
     } else {
         (text.to_owned(), None, String::new())
     };
+    let (location, target_location) = split_target_location(&location);
+    let target_zones = target_location.as_deref().map(zones).unwrap_or_default();
+    if target_location.is_some() && target_zones.len() != 1 {
+        return Err("Target zone not found. Try a city or an IANA name.".into());
+    }
+    let target_zone = target_zones.into_iter().next();
     let zones = zones(&location);
     if zones.is_empty() {
         return Err("City or region not found. Try Tokyo, London, US, or an IANA name such as America/New_York.".into());
@@ -408,29 +519,52 @@ pub fn calculate(
             (vec![now.with_timezone(&zone)], false)
         };
         for source in times {
-            let converted = local(source.with_timezone(&Utc));
+            let target_name = target_zone.map(city);
+            let converting = selected_time.is_some() || target_zone.is_some();
+            let converted = target_zone.map_or_else(
+                || local(source.with_timezone(&Utc)),
+                |target| source.with_timezone(&target).fixed_offset(),
+            );
             let source_text = format!(
                 "{} · {} · UTC{}",
                 source.format("%a, %d %b %Y · %H:%M"),
                 city(zone),
                 source.format("%:z")
             );
-            let local_text = format!(
-                "{} · UTC{}",
-                converted.format("%a, %d %b %Y · %H:%M"),
-                converted.format("%:z")
+            let local_text = target_name.as_deref().map_or_else(
+                || {
+                    format!(
+                        "{} · UTC{}",
+                        converted.format("%a, %d %b %Y · %H:%M"),
+                        converted.format("%:z")
+                    )
+                },
+                |target| {
+                    format!(
+                        "{} · {} · UTC{}",
+                        converted.format("%a, %d %b %Y · %H:%M"),
+                        target,
+                        converted.format("%:z")
+                    )
+                },
             );
             output.push(TimeResult {
-                title: if selected_time.is_some() {
-                    format!("{} · your local time", converted.format("%H:%M"))
+                title: if converting {
+                    target_name.as_deref().map_or_else(
+                        || format!("{} · your local time", converted.format("%H:%M")),
+                        |target| format!("{} · {} time", converted.format("%H:%M"), target),
+                    )
                 } else {
                     format!("{} · {}", source.format("%H:%M"), city(zone))
                 },
-                subtitle: if selected_time.is_some() {
+                subtitle: if converting {
                     format!(
                         "{} · {}{}",
                         source_text,
-                        converted.format("%d %b locally"),
+                        target_name.as_deref().map_or_else(
+                            || converted.format("%d %b locally").to_string(),
+                            |target| format!("{} {}", converted.format("%d %b"), target),
+                        ),
                         if ambiguous { " · occurs twice" } else { "" }
                     )
                 } else {
@@ -441,7 +575,7 @@ pub fn calculate(
                         source.format("%:z")
                     )
                 },
-                copy: if selected_time.is_some() {
+                copy: if converting {
                     local_text.clone()
                 } else {
                     source_text.clone()
@@ -450,6 +584,7 @@ pub fn calculate(
                     source: source_text,
                     local: local_text,
                     source_zone: zone.name().into(),
+                    target_zone: target_zone.map(|zone| zone.name().into()),
                     ambiguous,
                 },
             });
@@ -488,6 +623,66 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn accepts_unambiguous_abbreviations_and_qualified_place_queries() {
+        assert!(
+            calculate("time in SGT", now(), local).unwrap()[0]
+                .title
+                .starts_with("20:00")
+        );
+        assert!(
+            calculate("time in ART", now(), local).unwrap()[0]
+                .title
+                .starts_with("09:00")
+        );
+        assert!(is_candidate("the current time in the gambia"));
+        assert!(
+            calculate("the current time in the gambia", now(), local).unwrap()[0]
+                .title
+                .contains("Banjul")
+        );
+    }
+
+    #[test]
+    fn parses_month_name_dates_and_explicit_target_zones() {
+        let current = calculate("time in Tokyo to London", now(), local).unwrap();
+        assert!(current[0].title.starts_with("13:00"));
+        assert!(current[0].copy.contains("London"));
+        for query in [
+            "September 18",
+            "18 Sep",
+            "September 18 2026",
+            "18th September 2026",
+            "September 18, 2026",
+        ] {
+            assert!(is_candidate(query), "{query}");
+            let result = calculate(query, now(), local).unwrap();
+            assert_eq!(result[0].copy, "2026-09-18", "{query}");
+            assert!(matches!(
+                result[0].detail,
+                ToolDetail::DateCalculation { .. }
+            ));
+        }
+        assert_eq!(
+            calculate("September 18 + 2 days", now(), local).unwrap()[0].copy,
+            "2026-09-20"
+        );
+        assert!(calculate("September 31", now(), local).is_err());
+        let result = calculate("September 18, 2026 10am Tokyo", now(), local).unwrap();
+        assert!(result[0].copy.contains("18 Sep 2026"));
+
+        let result = calculate("18 Sep 2026 10am Tokyo to London", now(), local).unwrap();
+        assert!(result[0].title.starts_with("02:00"));
+        assert!(result[0].title.contains("London time"));
+        assert!(
+            matches!(&result[0].detail, ToolDetail::Timezone { target_zone: Some(zone), .. } if zone == "Europe/London")
+        );
+        assert!(result[0].copy.contains("18 Sep 2026"));
+
+        let result = calculate("2026-12-15 10am Tokyo to New York", now(), local).unwrap();
+        assert!(result[0].copy.contains("14 Dec 2026"));
     }
     #[test]
     fn relative_dates_are_dates_in_the_source_city_and_convert_across_midnight() {
@@ -668,5 +863,13 @@ mod tests {
         assert!(calculate("2026-02-30 3pm london", now(), local).is_err());
         assert!(calculate("time in imaginary", now(), local).is_err());
         assert!(calculate("tomorrow 25pm london", now(), local).is_err());
+        for query in [
+            "10am Atlantis",
+            "10am Tokyo to Atlantis",
+            "10am Atlantis to London",
+            "10am Tokyo to US",
+        ] {
+            assert!(calculate(query, now(), local).is_err(), "{query}");
+        }
     }
 }

@@ -1,3 +1,4 @@
+mod backup;
 mod clipboard;
 mod currency;
 mod migrations;
@@ -19,6 +20,8 @@ pub enum Error {
     Currency(String),
     #[error("Database version {found} is newer than supported version {supported}")]
     NewerSchema { found: u32, supported: usize },
+    #[error("Could not make a recovery backup. Your data was not migrated: {0}")]
+    Backup(String),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -28,7 +31,12 @@ pub struct Database {
 }
 
 impl Database {
+    #[cfg(test)]
     pub fn open(path: &Path) -> Result<Self> {
+        Self::open_with_settings(path, &path.with_file_name("settings.json"))
+    }
+
+    pub fn open_with_settings(path: &Path, settings: &Path) -> Result<Self> {
         if let Some(parent) = path
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
@@ -44,6 +52,16 @@ impl Database {
             std::fs::set_permissions(path, permissions)?;
         }
         connection.busy_timeout(Duration::from_millis(250))?;
+        let version: u32 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
+        if version as usize > migrations::VERSION {
+            return Err(Error::NewerSchema {
+                found: version,
+                supported: migrations::VERSION,
+            });
+        }
+        if version > 0 && (version as usize) < migrations::VERSION {
+            backup::create(&connection, path, settings)?;
+        }
         connection.pragma_update(None, "secure_delete", true)?;
         // One connection and infrequent writes need no WAL or background checkpoint.
         // Keep SQLite's default durable transactions.

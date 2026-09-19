@@ -1,7 +1,7 @@
 mod password;
 mod timezones;
 pub mod url_cleaner;
-mod web;
+pub(crate) mod web;
 
 use std::collections::{HashMap, VecDeque};
 use zeroize::Zeroize;
@@ -23,6 +23,7 @@ struct Output {
     detail: ToolDetail,
     open: Option<String>,
     password: Option<password::Spec>,
+    web_keyword: Option<String>,
 }
 
 struct Issued {
@@ -30,6 +31,7 @@ struct Issued {
     value: String,
     open: Option<String>,
     password: Option<password::Spec>,
+    web_keyword: Option<String>,
 }
 impl Drop for Issued {
     fn drop(&mut self) {
@@ -42,6 +44,7 @@ impl Drop for Issued {
 
 #[derive(Default)]
 pub struct ToolProvider {
+    custom_web_searches: Vec<crate::settings::WebSearch>,
     issued: VecDeque<Issued>,
     next_id: u64,
     password_specs: Vec<password::Spec>,
@@ -50,6 +53,13 @@ pub struct ToolProvider {
 }
 
 impl ToolProvider {
+    pub fn set_web_searches(&mut self, searches: &[crate::settings::WebSearch]) {
+        if self.custom_web_searches != searches {
+            self.custom_web_searches = searches.to_vec();
+            self.issued
+                .retain(|entry| entry.result.kind != ResultKind::WebSearch);
+        }
+    }
     fn issue(&mut self, output: Output) -> SearchResult {
         let Output {
             kind,
@@ -59,6 +69,7 @@ impl ToolProvider {
             detail,
             open,
             password,
+            web_keyword,
         } = output;
         self.next_id = self.next_id.wrapping_add(1);
         let prefix = if password.is_some() {
@@ -98,6 +109,7 @@ impl ToolProvider {
             value,
             open,
             password,
+            web_keyword,
         });
         while self.issued.len() > 64 {
             if let Some(expired) = self.issued.pop_front()
@@ -120,6 +132,7 @@ impl ToolProvider {
             detail,
             open: None,
             password: Some(spec),
+            web_keyword: None,
         });
         self.pinned_password_ids.insert(spec, result.id.clone());
         Ok(result)
@@ -172,6 +185,23 @@ impl ToolProvider {
             password::Style::Pin => "pin",
         };
         Some(format!("{command} {}", spec.length))
+    }
+
+    pub fn web_pin(&self, id: &str) -> Option<(String, String)> {
+        let entry = self.issued.iter().find(|entry| entry.result.id == id)?;
+        let ToolDetail::WebSearch { query, .. } = entry.result.detail.as_ref()? else {
+            return None;
+        };
+        Some((entry.web_keyword.clone()?, query.clone()))
+    }
+
+    pub fn search_web_pin(&mut self, keyword: &str, text: &str) -> Option<SearchResult> {
+        if !web::keyword_available(keyword, &self.custom_web_searches) {
+            return None;
+        }
+        let input = format!("{keyword} {text}");
+        let query = Query::parse(&input, SearchMode::Web).ok()?;
+        self.search_pinned(&query, 0)
     }
 
     pub fn search(&mut self, query: &Query<'_>) -> Option<Result<Vec<SearchResult>, String>> {
@@ -261,6 +291,7 @@ impl ToolProvider {
                     },
                     open: Some(cleaned.value),
                     password: None,
+                    web_keyword: None,
                 })]
             }));
         }
@@ -282,32 +313,47 @@ impl ToolProvider {
                                 detail: result.detail,
                                 open: None,
                                 password: None,
+                                web_keyword: None,
                             })
                         })
                         .collect()
                 }),
             );
         }
-        if mode == SearchMode::Web || (mode == SearchMode::All && web::is_candidate(text)) {
-            return Some(web::searches(text).map(|results| {
-                select(results, selected)
-                    .map(|(engine, query, url)| {
-                        self.issue(Output {
-                            kind: ResultKind::WebSearch,
-                            title: format!("Search {engine}"),
-                            subtitle: query.clone(),
-                            value: url.clone(),
-                            detail: ToolDetail::WebSearch {
-                                engine: engine.into(),
-                                query,
-                                url: url.clone(),
+        if mode == SearchMode::Web
+            || (mode == SearchMode::All
+                && (web::is_candidate(text)
+                    || web::custom_candidate(text, &self.custom_web_searches)))
+        {
+            return Some(
+                web::searches_with_custom(text, &self.custom_web_searches).map(|results| {
+                    select(results, selected)
+                        .map(
+                            |web::SearchTarget {
+                                 engine,
+                                 text: query,
+                                 url,
+                                 keyword: web_keyword,
+                             }| {
+                                self.issue(Output {
+                                    kind: ResultKind::WebSearch,
+                                    title: format!("Search {engine}"),
+                                    subtitle: query.clone(),
+                                    value: url.clone(),
+                                    detail: ToolDetail::WebSearch {
+                                        engine,
+                                        query,
+                                        url: url.clone(),
+                                    },
+                                    open: Some(url),
+                                    password: None,
+                                    web_keyword,
+                                })
                             },
-                            open: Some(url),
-                            password: None,
-                        })
-                    })
-                    .collect()
-            }));
+                        )
+                        .collect()
+                }),
+            );
         }
         None
     }

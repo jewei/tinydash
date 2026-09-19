@@ -19,6 +19,8 @@ pub struct QueryPin {
     pub mode: SearchMode,
     pub text: String,
     pub index: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web_keyword: Option<String>,
 }
 
 impl QueryPin {

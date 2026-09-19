@@ -4,11 +4,14 @@ pub mod currency;
 mod file_watch;
 pub mod files;
 pub mod pins;
+pub mod portability;
 pub mod preferences;
 pub mod query;
 pub mod result;
 pub mod search;
+pub mod startup;
 mod storage;
+pub mod updates;
 pub mod window;
 
 use std::sync::{
@@ -48,8 +51,10 @@ pub struct LauncherState {
 
 impl LauncherState {
     pub fn new(settings: Settings, warnings: Vec<String>) -> Self {
+        let mut search = SearchManager::default();
+        search.apply_settings(&settings);
         Self {
-            search: Mutex::new(SearchManager::default()),
+            search: Mutex::new(search),
             scanning: AtomicBool::new(false),
             ready: AtomicBool::new(false),
             #[cfg(target_os = "macos")]
@@ -80,14 +85,11 @@ impl LauncherState {
             .settings
             .write()
             .unwrap_or_else(|error| error.into_inner());
-        let previous_files = if !current.same_file_settings(&settings) {
-            self.search
-                .lock()
-                .ok()
-                .map(|mut search| search.replace_files(FileProvider::default()))
-        } else {
-            None
-        };
+        let previous_files = self.search.lock().ok().and_then(|mut search| {
+            search.apply_settings(&settings);
+            (!current.same_file_settings(&settings))
+                .then(|| search.replace_files(FileProvider::default()))
+        });
         *current = settings;
         drop(current);
         drop(previous_files);
@@ -122,6 +124,8 @@ pub struct LauncherInfo {
     settings: Settings,
     platform: &'static str,
     warnings: Vec<String>,
+    visible: bool,
+    initial_mode: Option<SearchMode>,
 }
 
 #[tauri::command]
@@ -134,19 +138,24 @@ pub async fn launcher_ready(app: AppHandle) -> Result<LauncherInfo, String> {
     .await
     .map_err(|error| error.to_string())?;
     let state = app.state::<LauncherState>();
+    let request = *app
+        .state::<startup::Startup>()
+        .0
+        .lock()
+        .map_err(|_| "Startup settings are unavailable.")?;
     if !state.ready.swap(true, Ordering::AcqRel) {
         clipboard::start(&app);
-        if std::env::args().any(|arg| arg == "--settings") {
-            preferences::open_settings(app.clone()).await?;
-        } else {
-            window::show(&app).map_err(|error| error.to_string())?;
-        }
+        request.open(app.clone()).await?;
         files::scan_files(&app);
     }
     Ok(LauncherInfo {
         settings: state.settings(),
         platform: std::env::consts::OS,
         warnings: state.warnings.clone(),
+        visible: app
+            .get_webview_window("main")
+            .is_some_and(|window| window.is_visible().unwrap_or(false)),
+        initial_mode: request.mode(),
     })
 }
 
@@ -166,6 +175,11 @@ pub async fn search(
             .search(&query, mode)
             .map_err(|error| error.to_string())?;
         Ok(SearchResponse {
+            preferred_selection_id: if mode == SearchMode::Clipboard && query.trim().is_empty() {
+                search.clipboard.newest_id()
+            } else {
+                None
+            },
             results: outcome.results,
             notice: outcome.notice,
             storage_error: state

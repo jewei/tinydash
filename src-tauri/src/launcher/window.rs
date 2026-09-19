@@ -6,6 +6,14 @@ use super::LauncherState;
 use crate::error::{Error, Result};
 
 pub fn show(app: &AppHandle) -> Result<()> {
+    show_in_category(app, None)
+}
+
+pub fn show_category(app: &AppHandle, mode: super::query::SearchMode) -> Result<()> {
+    show_in_category(app, Some(mode))
+}
+
+fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> Result<()> {
     let started = std::time::Instant::now();
     let window = app
         .get_webview_window("main")
@@ -25,7 +33,10 @@ pub fn show(app: &AppHandle) -> Result<()> {
     let clear = app
         .try_state::<LauncherState>()
         .is_none_or(|state| state.settings().clear_query_on_open);
-    window.emit("launcher-opened", clear)?;
+    window.emit("launcher-opened", clear || mode.is_some())?;
+    if let Some(mode) = mode {
+        window.emit("launcher-category", mode)?;
+    }
     super::clipboard::refresh(app);
     super::currency::refresh(app, false);
     tracing::debug!(elapsed_us = started.elapsed().as_micros(), "Launcher shown");

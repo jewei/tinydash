@@ -740,6 +740,10 @@ test("opens and reveals files by ID, and refreshes files with the mode shortcut"
     )
     .toBe(1);
   await page.keyboard.press("Meta+k");
+  await expect(
+    page.getByRole("searchbox", { name: "Search actions" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await expect(page.getByRole("menuitem", { name: "Open file" })).toBeFocused();
   await expect(
     page.getByRole("menuitem", { name: "Show in folder" }),
@@ -865,7 +869,7 @@ test("clear requires confirmation, keeps Cancel focused, and reports storage err
   await openLauncher(page);
   await selectCategory(page, "Clipboard");
   const clear = page.getByRole("button", {
-    name: "Clear history",
+    name: "Clear unpinned",
     exact: true,
   });
   await clear.click();
@@ -881,7 +885,7 @@ test("clear requires confirmation, keeps Cancel focused, and reports storage err
     window.__launcherTest.rejectClear = true;
   });
   await clear.click();
-  await dialog.getByRole("button", { name: "Clear history" }).click();
+  await dialog.getByRole("button", { name: "Clear unpinned" }).click();
   await expect(dialog.getByRole("alert")).toHaveText(
     "Error: Could not delete clipboard history.",
   );
@@ -889,7 +893,7 @@ test("clear requires confirmation, keeps Cancel focused, and reports storage err
   await page.evaluate(() => {
     window.__launcherTest.rejectClear = false;
   });
-  await dialog.getByRole("button", { name: "Clear history" }).click();
+  await dialog.getByRole("button", { name: "Clear unpinned" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "No saved clipboard text" }),
@@ -990,6 +994,10 @@ test("the actions menu keeps native button keyboard behavior and closes with Esc
   await button.focus();
   await button.press("Enter");
   await expect(page.getByRole("menu")).toBeVisible();
+  await expect(
+    page.getByRole("searchbox", { name: "Search actions" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await expect(
     page.getByRole("menuitem", { name: "Open application" }),
   ).toBeFocused();
@@ -1128,6 +1136,10 @@ test("copies calculation results and offers only their supported actions", async
     page.getByRole("button", { name: "Copy result", exact: true }),
   ).toBeEnabled();
   await page.keyboard.press("Meta+k");
+  await expect(
+    page.getByRole("searchbox", { name: "Search actions" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await expect(
     page.getByRole("menuitem", { name: "Copy result" }),
   ).toBeFocused();

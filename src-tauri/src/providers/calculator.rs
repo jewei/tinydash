@@ -18,6 +18,38 @@ use crate::{
 const TIME_LIMIT: Duration = Duration::from_millis(50);
 const COPY_CACHE_LIMIT: usize = 32;
 
+fn implicit_currency_pair(query: &str) -> Option<String> {
+    let [amount, source, target] = query
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .try_into()
+        .ok()?;
+    if !simple_number(amount) || !currency_code(source) || !currency_code(target) {
+        return None;
+    }
+    Some(format!("{amount} {source} to {target}"))
+}
+
+fn simple_number(value: &str) -> bool {
+    let value = value.strip_prefix(['+', '-']).unwrap_or(value);
+    let mut dots = 0;
+    let mut digits = 0;
+    for character in value.chars() {
+        if character == '.' {
+            dots += 1;
+        } else if character.is_ascii_digit() {
+            digits += 1;
+        } else {
+            return false;
+        }
+    }
+    digits > 0 && dots <= 1
+}
+
+fn currency_code(value: &str) -> bool {
+    value.len() == 3 && value.bytes().all(|byte| byte.is_ascii_uppercase())
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum CalculationError {
     #[error("This calculation took too long. Try a smaller expression.")]
@@ -140,8 +172,9 @@ fn calculate(
         rates: rates.clone(),
         used: Arc::clone(&used_rates),
     });
-    let result =
-        fend_core::evaluate_with_interrupt(query, &mut context, interrupt).map_err(|error| {
+    let evaluation = implicit_currency_pair(query).unwrap_or_else(|| query.to_owned());
+    let result = fend_core::evaluate_with_interrupt(&evaluation, &mut context, interrupt).map_err(
+        |error| {
             if interrupt.should_interrupt() {
                 CalculationError::Timeout
             } else if used_rates.load(Ordering::Relaxed) {
@@ -153,7 +186,8 @@ fn calculate(
             } else {
                 CalculationError::Evaluation(error)
             }
-        })?;
+        },
+    )?;
     if !result
         .get_main_result_spans()
         .any(|span| span.kind() == SpanKind::Number)
@@ -205,6 +239,19 @@ mod tests {
         assert_eq!(provider.copy_value(&result.id), Some(result.title.as_str()));
         let plain = provider.search("12 * 8").expect("arithmetic");
         assert_eq!(plain.subtitle, "12 * 8");
+    }
+
+    #[test]
+    fn accepts_one_anchored_implicit_iso_currency_pair() {
+        let rates = Some(Arc::new(crate::currency::fixture()));
+        assert_eq!(
+            super::calculate("10 USD EUR", &NoInterrupt, rates)
+                .expect("implicit currency pair")
+                .value,
+            "8 EUR"
+        );
+        assert!(super::calculate("10 usd eur", &NoInterrupt, None).is_err());
+        assert!(super::calculate("10 USD CAD extra", &NoInterrupt, None).is_err());
     }
 
     #[test]

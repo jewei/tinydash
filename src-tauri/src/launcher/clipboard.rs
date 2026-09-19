@@ -202,11 +202,47 @@ pub async fn clipboard_preview(id: String, app: AppHandle) -> Result<ClipboardEn
 }
 
 #[tauri::command]
-pub async fn clear_clipboard_history(app: AppHandle) -> Result<(), String> {
+pub async fn clear_clipboard_history(
+    keep_pinned: Option<bool>,
+    app: AppHandle,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let storage = &app.state::<LauncherState>().storage;
+        if keep_pinned.unwrap_or(false) {
+            storage.clear_unpinned_clipboard(&app)
+        } else {
+            storage.delete_clipboard(&app, None)
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn edit_clipboard_history(
+    id: String,
+    text: String,
+    app: AppHandle,
+) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         app.state::<LauncherState>()
             .storage
-            .delete_clipboard(&app, None)
+            .edit_clipboard(&app, &id, text)
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn copy_clipboard_selection(
+    ids: Vec<String>,
+    separator: String,
+    app: AppHandle,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<LauncherState>()
+            .storage
+            .copy_clipboard_selection(&app, &ids, &separator)
     })
     .await
     .map_err(|error| error.to_string())?
