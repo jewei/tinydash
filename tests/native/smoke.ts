@@ -232,14 +232,15 @@ async function clickButtonText(text: string) {
 }
 
 async function clickMenuItemText(text: string) {
-  const clicked = await observeArgs<boolean>(
-    `const item = [...document.querySelectorAll('[role=menuitem]')].find((element) => element.textContent?.trim() === arguments[0]);
-     if (!item || item.getAttribute('aria-disabled') === 'true') return false;
-     item.click();
-     return true;`,
-    [text],
+  await until(`menu item is available: ${text}`, () =>
+    observeArgs<boolean>(
+      `const item = [...document.querySelectorAll('[role=menuitem]')].find((element) => element.textContent?.trim() === arguments[0]);
+       if (!item || item.disabled || item.getAttribute('aria-disabled') === 'true') return false;
+       item.click();
+       return true;`,
+      [text],
+    ),
   );
-  assert(clicked, `Could not click menu item: ${text}`);
 }
 
 async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
@@ -661,9 +662,9 @@ try {
     "the other entry is still available",
     async () => (await titles())[0] === secondClip,
   );
-  await clickButtonText("Actions");
+  await click(".actions-button");
   await clickMenuItemText("Pin to Clipboard");
-  await clickButtonText("Actions");
+  await click(".actions-button");
   await clickMenuItemText("Pin to All");
   const thirdClip = `TinyDash third ${fixtures.nonce}`;
   setClipboardText(thirdClip);
@@ -703,7 +704,7 @@ try {
       (await titles()).length === 1 && (await titles())[0] === secondClip,
   );
   assert.equal(await selectedTitle(), secondClip);
-  await clickButtonText("Actions");
+  await click(".actions-button");
   await clickMenuItemText("Clear all clipboard history");
   await until("clear all asks for its separate confirmation", () =>
     observe<boolean>(
