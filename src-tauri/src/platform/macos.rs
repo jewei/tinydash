@@ -119,12 +119,7 @@ fn read_bundle(path: &Path) -> Option<AppEntry> {
     Some(app)
 }
 
-pub fn load_app_icons(mut apps: Vec<AppEntry>) -> Vec<AppEntry> {
-    for entry in &mut apps {
-        entry.icon = icons::application_icon(&entry.path);
-    }
-    apps
-}
+pub use icons::application_icon;
 
 pub fn launch(entry: &AppEntry) -> Result<()> {
     tauri_plugin_opener::open_path(&entry.path, None::<&str>)

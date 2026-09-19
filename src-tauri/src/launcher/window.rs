@@ -117,6 +117,9 @@ fn hide_window(app: &AppHandle, _restore_focus: bool) -> Result<()> {
         #[cfg(target_os = "macos")]
         let restore_focus = _restore_focus && window.is_focused()?;
         window.hide()?;
+        if let Some(state) = app.try_state::<LauncherState>() {
+            state.icons.cancel_window("main");
+        }
         #[cfg(target_os = "macos")]
         if restore_focus && let Some(previous) = previous {
             previous.restore();

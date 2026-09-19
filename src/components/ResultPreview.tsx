@@ -11,6 +11,7 @@ export default function ResultPreview(props: {
   welcome: boolean;
   previewReady: boolean;
   enabled: boolean;
+  active?: boolean;
   modifier: string;
   pinOptions: PinOption[];
   pinBusy: boolean;
@@ -132,7 +133,7 @@ export default function ResultPreview(props: {
           >
             <div class="preview-topline">
               <div class="preview-icon">
-                <ResultIcon result={props.result!} />
+                <ResultIcon result={props.result!} active={props.active} />
               </div>
               <div class="pin-controls" role="group" aria-label="Pin item">
                 <For each={props.pinOptions}>
