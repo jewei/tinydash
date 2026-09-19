@@ -38,6 +38,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2.9.2
         with:
           key: native-driver
+          workspaces: src-tauri
           cache-on-failure: true
       - run: bun install --frozen-lockfile
       - uses: actions/download-artifact@v8.0.1

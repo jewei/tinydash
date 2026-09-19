@@ -245,16 +245,13 @@ async function clickMenuItemText(text: string) {
 async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
   // All mode also matches paths. Isolate the intended provider so temporary
   // file paths do not affect app or clipboard result assertions.
-  // WebKitWebDriver can change the option without delivering its change
-  // event. Select as browser test drivers do, through the normal DOM events.
-  // This still runs the frontend handler and real Rust IPC; no results are mocked.
-  await request(`/session/${session}/execute/sync`, "POST", {
-    script: `const select = document.querySelector('select');
-      select.value = arguments[0];
-      select.dispatchEvent(new Event('input', { bubbles: true }));
-      select.dispatchEvent(new Event('change', { bubbles: true }));`,
-    args: [mode],
-  });
+  const label = {
+    apps: "Apps",
+    clipboard: "Clipboard",
+    files: "Files",
+    system: "System",
+  }[mode];
+  await clickButtonText(label);
   const placeholder = {
     apps: "Search applications...",
     clipboard: "Search clipboard history...",
@@ -263,7 +260,9 @@ async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
   }[mode];
   await until(`${mode} mode is ready`, () =>
     observe<boolean>(
-      `return document.querySelector('input')?.placeholder === ${JSON.stringify(placeholder)} && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
+      `return document.querySelector('.category-tab[aria-pressed=true]')?.textContent === ${JSON.stringify(label)}
+        && document.querySelector('input[role=combobox]')?.placeholder === ${JSON.stringify(placeholder)}
+        && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
     ),
   );
 }
@@ -292,12 +291,14 @@ async function reopen() {
   } finally {
     if (child.exitCode === null) child.kill();
   }
-  await until("the existing window reopens with an empty query", () =>
+  await until("the existing window reopens on the welcome screen", () =>
     observe<boolean>(
       `return document.querySelector('input[role=combobox]')?.value === ''
       && document.activeElement?.getAttribute('role') === 'combobox'
       && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
-      && document.querySelectorAll('[role=option]').length > 0`,
+      && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
+      && document.querySelector('.welcome-suggestions') !== null
+      && document.querySelectorAll('[role=option]').length === 0`,
     ),
   );
   reopenCheckMs.push(performance.now() - started);
@@ -409,11 +410,10 @@ try {
   );
   const inputId = input[elementKey];
   assert(inputId, "The search field has a WebDriver element ID");
-  assert(
-    await observe<boolean>(
+  await until("the first-use clipboard choice is visible", () =>
+    observe<boolean>(
       "return !!document.querySelector('.first-use[aria-label=\"Clipboard history choice\"]')",
     ),
-    "The first-use clipboard choice is visible",
   );
   const beforeChoice = `TinyDash before clipboard choice ${fixtures.nonce}`;
   setClipboardText(beforeChoice);
@@ -575,6 +575,7 @@ try {
   pass("Enter launches the selected fixture through the OS");
 
   await reopen();
+  await selectMode("apps");
   await until(
     "the launched app ranks first in the complete index",
     async () => (await titles())[0] === orderedNames[1],
