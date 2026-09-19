@@ -1,0 +1,441 @@
+{
+  "tinydash": {
+    "trials": [
+      {
+        "trial": 1,
+        "sample_seconds": 30.009526084002573,
+        "process_names": [
+          "tinydash",
+          "SetStoreUpdateService",
+          "com.apple.WebKit.GPU",
+          "com.apple.WebKit.WebContent",
+          "com.apple.WebKit.Networking",
+          "com.apple.audio.SandboxHelper",
+          "com.apple.SafariPlatformSupport.Helper"
+        ],
+        "idle_cpu_percent_one_core": 0.008696201974982767,
+        "idle_interrupt_wakeups_per_second": 15.728339017376651,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 163.06719207763672,
+          "p95": 166.86406707763672,
+          "min": 162.73906707763672,
+          "max": 166.86406707763672
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 218.859375,
+          "p95": 234.6875,
+          "min": 118.46875,
+          "max": 234.6875
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 174.67656707763672,
+          "p95": 192.06719207763672,
+          "min": 169.83281707763672,
+          "max": 192.06719207763672
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 36.501121520996094,
+          "p95": 37.032371520996094,
+          "min": 36.485496520996094,
+          "max": 37.032371520996094
+        }
+      },
+      {
+        "trial": 2,
+        "sample_seconds": 29.923297458008165,
+        "process_names": [
+          "tinydash",
+          "SetStoreUpdateService",
+          "com.apple.WebKit.GPU",
+          "com.apple.WebKit.WebContent",
+          "com.apple.WebKit.Networking",
+          "com.apple.audio.SandboxHelper",
+          "com.apple.SafariPlatformSupport.Helper"
+        ],
+        "idle_cpu_percent_one_core": 0.0029380485263488776,
+        "idle_interrupt_wakeups_per_second": 14.67084303179005,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 166.59844207763672,
+          "p95": 166.62969207763672,
+          "min": 166.50469207763672,
+          "max": 166.67656707763672
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 106.15625,
+          "p95": 107.921875,
+          "min": 104.328125,
+          "max": 107.921875
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 177.3015899658203,
+          "p95": 188.3797149658203,
+          "min": 176.0828399658203,
+          "max": 188.3797149658203
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 36.641700744628906,
+          "p95": 36.657325744628906,
+          "min": 36.641700744628906,
+          "max": 36.704200744628906
+        }
+      },
+      {
+        "trial": 3,
+        "sample_seconds": 30.003877959010424,
+        "process_names": [
+          "tinydash",
+          "SetStoreUpdateService",
+          "com.apple.WebKit.GPU",
+          "com.apple.WebKit.WebContent",
+          "com.apple.WebKit.Networking",
+          "com.apple.audio.SandboxHelper",
+          "com.apple.SafariPlatformSupport.Helper"
+        ],
+        "idle_cpu_percent_one_core": 0.0001131820361567689,
+        "idle_interrupt_wakeups_per_second": 0.6999095259849075,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 157.39511108398438,
+          "p95": 157.41073608398438,
+          "min": 157.39511108398438,
+          "max": 157.41073608398438
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 256.78125,
+          "p95": 256.796875,
+          "min": 256.78125,
+          "max": 256.796875
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 174.61397552490234,
+          "p95": 185.31710052490234,
+          "min": 173.83272552490234,
+          "max": 185.31710052490234
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 36.313621520996094,
+          "p95": 36.329246520996094,
+          "min": 36.313621520996094,
+          "max": 36.329246520996094
+        }
+      }
+    ],
+    "apps_ms": {
+      "n": 60,
+      "median": 31.14512498723343,
+      "p95": 50.596458313521,
+      "min": 13.413125008810312,
+      "max": 140.27683335007168
+    },
+    "arithmetic_ms": {
+      "n": 60,
+      "median": 21.700437515391968,
+      "p95": 47.21920832525939,
+      "min": 7.819874997949228,
+      "max": 75.59516665060073
+    },
+    "summon_ms": {
+      "n": 30,
+      "median": 35.26933332614135,
+      "p95": 52.71204165183008,
+      "min": 20.520166668575257,
+      "max": 62.52608331851661
+    },
+    "median_trial_idle_footprint_mib": 163.06719207763672,
+    "median_trial_visible_footprint_mib": 174.67656707763672,
+    "median_trial_idle_rss_mib": 218.859375,
+    "median_trial_idle_cpu_percent_one_core": 0.0029380485263488776
+  },
+  "bopop": {
+    "trials": [
+      {
+        "trial": 1,
+        "sample_seconds": 29.982632041996112,
+        "process_names": [
+          "Bopop",
+          "SetStoreUpdateService",
+          "com.apple.SafariPlatformSupport.Helper",
+          "SetStoreUpdateService"
+        ],
+        "idle_cpu_percent_one_core": 0.0008516563844106062,
+        "idle_interrupt_wakeups_per_second": 2.0678638190655763,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 52.92388916015625,
+          "p95": 52.98638916015625,
+          "min": 52.92388916015625,
+          "max": 52.98638916015625
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 130.453125,
+          "p95": 130.53125,
+          "min": 116.5625,
+          "max": 130.53125
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 53.50201416015625,
+          "p95": 53.84576416015625,
+          "min": 53.50201416015625,
+          "max": 53.84576416015625
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 32.500892639160156,
+          "p95": 32.516517639160156,
+          "min": 32.454017639160156,
+          "max": 32.516517639160156
+        }
+      },
+      {
+        "trial": 2,
+        "sample_seconds": 30.020580207987223,
+        "process_names": [
+          "Bopop",
+          "SetStoreUpdateService",
+          "com.apple.SafariPlatformSupport.Helper"
+        ],
+        "idle_cpu_percent_one_core": 0.0014347857270440112,
+        "idle_interrupt_wakeups_per_second": 2.1318708551466394,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 49.34544372558594,
+          "p95": 49.34544372558594,
+          "min": 49.25169372558594,
+          "max": 49.34544372558594
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 92.015625,
+          "p95": 92.21875,
+          "min": 89.96875,
+          "max": 92.21875
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 49.75169372558594,
+          "p95": 50.14231872558594,
+          "min": 49.70481872558594,
+          "max": 50.14231872558594
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 32.45404052734375,
+          "p95": 32.45404052734375,
+          "min": 32.40716552734375,
+          "max": 32.45404052734375
+        }
+      },
+      {
+        "trial": 3,
+        "sample_seconds": 30.039418458996806,
+        "process_names": [
+          "Bopop",
+          "SetStoreUpdateService",
+          "com.apple.SafariPlatformSupport.Helper"
+        ],
+        "idle_cpu_percent_one_core": 0.0018060635918785968,
+        "idle_interrupt_wakeups_per_second": 2.197113106237015,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 48.907920837402344,
+          "p95": 48.939170837402344,
+          "min": 48.829795837402344,
+          "max": 48.939170837402344
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 133.984375,
+          "p95": 134.15625,
+          "min": 133.96875,
+          "max": 134.15625
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 45.767295837402344,
+          "p95": 46.157920837402344,
+          "min": 45.751670837402344,
+          "max": 46.157920837402344
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 32.422767639160156,
+          "p95": 32.438392639160156,
+          "min": 32.391517639160156,
+          "max": 32.438392639160156
+        }
+      }
+    ],
+    "apps_ms": {
+      "n": 60,
+      "median": 42.5986458430998,
+      "p95": 58.02558333380148,
+      "min": 31.91670833621174,
+      "max": 114.15050001232885
+    },
+    "arithmetic_ms": {
+      "n": 60,
+      "median": 44.93604166782461,
+      "p95": 65.47904168837704,
+      "min": 29.220458323834464,
+      "max": 69.4591666397173
+    },
+    "summon_ms": {
+      "n": 30,
+      "median": 67.08479167718906,
+      "p95": 86.21775000938214,
+      "min": 40.811708342516795,
+      "max": 92.5334166677203
+    },
+    "median_trial_idle_footprint_mib": 49.34544372558594,
+    "median_trial_visible_footprint_mib": 49.75169372558594,
+    "median_trial_idle_rss_mib": 130.453125,
+    "median_trial_idle_cpu_percent_one_core": 0.0014347857270440112
+  },
+  "tinycast": {
+    "trials": [
+      {
+        "trial": 1,
+        "sample_seconds": 29.998411584005225,
+        "process_names": ["Tinycast", "SetStoreUpdateService"],
+        "idle_cpu_percent_one_core": 0.0007539965886747153,
+        "idle_interrupt_wakeups_per_second": 0.16667549166723003,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 51.04815673828125,
+          "p95": 51.04815673828125,
+          "min": 50.93878173828125,
+          "max": 51.04815673828125
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 45.1875,
+          "p95": 73.796875,
+          "min": 43.6875,
+          "max": 73.890625
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 51.67315673828125,
+          "p95": 52.37628173828125,
+          "min": 50.93878173828125,
+          "max": 52.37628173828125
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 48.188438415527344,
+          "p95": 48.188438415527344,
+          "min": 48.079063415527344,
+          "max": 48.188438415527344
+        }
+      },
+      {
+        "trial": 2,
+        "sample_seconds": 29.99289195900201,
+        "process_names": ["Tinycast", "SetStoreUpdateService"],
+        "idle_cpu_percent_one_core": 0.0003619057480298135,
+        "idle_interrupt_wakeups_per_second": 0.13336493211350522,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 51.03253173828125,
+          "p95": 51.07940673828125,
+          "min": 50.98565673828125,
+          "max": 51.07940673828125
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 115.828125,
+          "p95": 117.09375,
+          "min": 58.296875,
+          "max": 117.09375
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 52.095054626464844,
+          "p95": 52.626304626464844,
+          "min": 51.345054626464844,
+          "max": 52.626304626464844
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 48.172813415527344,
+          "p95": 48.219688415527344,
+          "min": 48.125938415527344,
+          "max": 48.219688415527344
+        }
+      },
+      {
+        "trial": 3,
+        "sample_seconds": 29.969633708999027,
+        "process_names": ["Tinycast", "SetStoreUpdateService"],
+        "idle_cpu_percent_one_core": 0.0005943682920172383,
+        "idle_interrupt_wakeups_per_second": 0.13346843137421843,
+        "idle_footprint_mib": {
+          "n": 31,
+          "median": 51.48565673828125,
+          "p95": 51.98565673828125,
+          "min": 51.39190673828125,
+          "max": 51.98565673828125
+        },
+        "idle_rss_mib": {
+          "n": 31,
+          "median": 107.046875,
+          "p95": 132.375,
+          "min": 97.453125,
+          "max": 132.375
+        },
+        "visible_footprint_mib": {
+          "n": 5,
+          "median": 50.18878173828125,
+          "p95": 51.62628173828125,
+          "min": 50.18878173828125,
+          "max": 51.62628173828125
+        },
+        "host_footprint_mib": {
+          "n": 31,
+          "median": 48.985313415527344,
+          "p95": 49.204063415527344,
+          "min": 48.657188415527344,
+          "max": 49.204063415527344
+        }
+      }
+    ],
+    "apps_ms": {
+      "n": 60,
+      "median": 37.17297916591633,
+      "p95": 99.84233335126191,
+      "min": 17.673166672466323,
+      "max": 122.73129168897867
+    },
+    "arithmetic_ms": {
+      "n": 60,
+      "median": 36.01077082566917,
+      "p95": 68.34729167167097,
+      "min": 21.22937500826083,
+      "max": 201.96733332704753
+    },
+    "summon_ms": {
+      "n": 30,
+      "median": 91.78489581972826,
+      "p95": 107.57187500712462,
+      "min": 71.28424997790717,
+      "max": 108.24570833938196
+    },
+    "median_trial_idle_footprint_mib": 51.04815673828125,
+    "median_trial_visible_footprint_mib": 51.67315673828125,
+    "median_trial_idle_rss_mib": 107.046875,
+    "median_trial_idle_cpu_percent_one_core": 0.0005943682920172383
+  }
+}

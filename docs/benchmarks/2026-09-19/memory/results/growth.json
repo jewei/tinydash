@@ -1,0 +1,5789 @@
+{
+  "mode": "growth",
+  "pid": 98049,
+  "stages": {
+    "baseline": {
+      "samples": [
+        {
+          "monotonic": 262631.514177583,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 73736218,
+              "system_ns": 20553264,
+              "idle_wakeups": 32,
+              "interrupt_wakeups": 2937,
+              "rss_bytes": 136544256,
+              "footprint_bytes": 38831184
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 593766,
+              "system_ns": 265666,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 3,
+              "rss_bytes": 9748480,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 11959108,
+              "system_ns": 6181784,
+              "idle_wakeups": 3,
+              "interrupt_wakeups": 458,
+              "rss_bytes": 40599552,
+              "footprint_bytes": 13484824
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 35887901,
+              "system_ns": 12753367,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 898,
+              "rss_bytes": 115458048,
+              "footprint_bytes": 84804664
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 686646,
+              "system_ns": 436738,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 140,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 5489144
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 2698377,
+              "system_ns": 855162,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 38,
+              "rss_bytes": 36044800,
+              "footprint_bytes": 10928584
+            }
+          ]
+        },
+        {
+          "monotonic": 262632.583161833,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 73741030,
+              "system_ns": 20571415,
+              "idle_wakeups": 32,
+              "interrupt_wakeups": 2947,
+              "rss_bytes": 136544256,
+              "footprint_bytes": 38831184
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 593766,
+              "system_ns": 265666,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 3,
+              "rss_bytes": 9748480,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 11969156,
+              "system_ns": 6186900,
+              "idle_wakeups": 3,
+              "interrupt_wakeups": 464,
+              "rss_bytes": 40599552,
+              "footprint_bytes": 13484824
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 35904536,
+              "system_ns": 12760630,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 907,
+              "rss_bytes": 115458048,
+              "footprint_bytes": 84804664
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 686646,
+              "system_ns": 436738,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 140,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 5489144
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 2698377,
+              "system_ns": 855162,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 38,
+              "rss_bytes": 36044800,
+              "footprint_bytes": 10928584
+            }
+          ]
+        },
+        {
+          "monotonic": 262633.650575,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 73765846,
+              "system_ns": 20598313,
+              "idle_wakeups": 32,
+              "interrupt_wakeups": 2957,
+              "rss_bytes": 136544256,
+              "footprint_bytes": 38831184
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 593766,
+              "system_ns": 265666,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 3,
+              "rss_bytes": 9748480,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 11979183,
+              "system_ns": 6192994,
+              "idle_wakeups": 3,
+              "interrupt_wakeups": 470,
+              "rss_bytes": 40599552,
+              "footprint_bytes": 13484824
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 35921878,
+              "system_ns": 12767825,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 917,
+              "rss_bytes": 115458048,
+              "footprint_bytes": 84804664
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 686646,
+              "system_ns": 436738,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 140,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 5489144
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 2698377,
+              "system_ns": 855162,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 38,
+              "rss_bytes": 36044800,
+              "footprint_bytes": 10928584
+            }
+          ]
+        },
+        {
+          "monotonic": 262634.717966666,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 73771272,
+              "system_ns": 20622820,
+              "idle_wakeups": 32,
+              "interrupt_wakeups": 2968,
+              "rss_bytes": 136544256,
+              "footprint_bytes": 38831184
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 593766,
+              "system_ns": 265666,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 3,
+              "rss_bytes": 9748480,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 11988897,
+              "system_ns": 6200240,
+              "idle_wakeups": 3,
+              "interrupt_wakeups": 476,
+              "rss_bytes": 40599552,
+              "footprint_bytes": 13484824
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 35939275,
+              "system_ns": 12776205,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 925,
+              "rss_bytes": 115458048,
+              "footprint_bytes": 84804664
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 686646,
+              "system_ns": 436738,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 140,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 5489144
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 2698377,
+              "system_ns": 855162,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 38,
+              "rss_bytes": 36044800,
+              "footprint_bytes": 10928584
+            }
+          ]
+        },
+        {
+          "monotonic": 262635.787681916,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 73776364,
+              "system_ns": 20641868,
+              "idle_wakeups": 33,
+              "interrupt_wakeups": 2978,
+              "rss_bytes": 136544256,
+              "footprint_bytes": 38831184
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 593766,
+              "system_ns": 265666,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 3,
+              "rss_bytes": 9748480,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 12002028,
+              "system_ns": 6207386,
+              "idle_wakeups": 3,
+              "interrupt_wakeups": 482,
+              "rss_bytes": 40599552,
+              "footprint_bytes": 13484824
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 35961362,
+              "system_ns": 12786491,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 935,
+              "rss_bytes": 115458048,
+              "footprint_bytes": 84804664
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 686646,
+              "system_ns": 436738,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 140,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 5489144
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 2698377,
+              "system_ns": 855162,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 38,
+              "rss_bytes": 36044800,
+              "footprint_bytes": 10928584
+            }
+          ]
+        }
+      ],
+      "status": {
+        "active": false,
+        "finished": true,
+        "input": false,
+        "onscreen": false
+      },
+      "median_footprint_mib": 154.64520263671875,
+      "settle_seconds": 30
+    },
+    "cycle_1": {
+      "samples": [
+        {
+          "monotonic": 262695.892806958,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 136710821,
+              "system_ns": 48974868,
+              "idle_wakeups": 73,
+              "interrupt_wakeups": 6584,
+              "rss_bytes": 137314304,
+              "footprint_bytes": 39289936
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 788791,
+              "system_ns": 580315,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 5,
+              "rss_bytes": 9814016,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 31647288,
+              "system_ns": 14833259,
+              "idle_wakeups": 8,
+              "interrupt_wakeups": 1029,
+              "rss_bytes": 41680896,
+              "footprint_bytes": 13501208
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 96276838,
+              "system_ns": 36511360,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 2004,
+              "rss_bytes": 123600896,
+              "footprint_bytes": 91620432
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 856125,
+              "system_ns": 596857,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 314,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 3503081,
+              "system_ns": 1230752,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 61,
+              "rss_bytes": 36044800,
+              "footprint_bytes": 10928584
+            }
+          ]
+        },
+        {
+          "monotonic": 262696.931723583,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 136715867,
+              "system_ns": 48988366,
+              "idle_wakeups": 73,
+              "interrupt_wakeups": 6594,
+              "rss_bytes": 137330688,
+              "footprint_bytes": 39306320
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 788791,
+              "system_ns": 580315,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 5,
+              "rss_bytes": 9814016,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 31658933,
+              "system_ns": 14849852,
+              "idle_wakeups": 8,
+              "interrupt_wakeups": 1037,
+              "rss_bytes": 41713664,
+              "footprint_bytes": 13533976
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 96291651,
+              "system_ns": 36518626,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 2013,
+              "rss_bytes": 123600896,
+              "footprint_bytes": 91620432
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 856125,
+              "system_ns": 596857,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 314,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 3505008,
+              "system_ns": 1232513,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 61,
+              "rss_bytes": 36061184,
+              "footprint_bytes": 10944968
+            }
+          ]
+        },
+        {
+          "monotonic": 262697.979947333,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 136733781,
+              "system_ns": 49009913,
+              "idle_wakeups": 73,
+              "interrupt_wakeups": 6606,
+              "rss_bytes": 137363456,
+              "footprint_bytes": 39339088
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 788791,
+              "system_ns": 580315,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 5,
+              "rss_bytes": 9814016,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 31669192,
+              "system_ns": 14860744,
+              "idle_wakeups": 9,
+              "interrupt_wakeups": 1043,
+              "rss_bytes": 41713664,
+              "footprint_bytes": 13533976
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 96306916,
+              "system_ns": 36525956,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 2022,
+              "rss_bytes": 123600896,
+              "footprint_bytes": 91620432
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 856125,
+              "system_ns": 596857,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 314,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 3510881,
+              "system_ns": 1236720,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 61,
+              "rss_bytes": 36093952,
+              "footprint_bytes": 10977736
+            }
+          ]
+        },
+        {
+          "monotonic": 262699.038845041,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 136765662,
+              "system_ns": 49035251,
+              "idle_wakeups": 73,
+              "interrupt_wakeups": 6622,
+              "rss_bytes": 137379840,
+              "footprint_bytes": 39355472
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 788791,
+              "system_ns": 580315,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 5,
+              "rss_bytes": 9814016,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 31679829,
+              "system_ns": 14867062,
+              "idle_wakeups": 9,
+              "interrupt_wakeups": 1049,
+              "rss_bytes": 41713664,
+              "footprint_bytes": 13533976
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 96328603,
+              "system_ns": 36542862,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 2032,
+              "rss_bytes": 123600896,
+              "footprint_bytes": 91620432
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 856125,
+              "system_ns": 596857,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 314,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 3510881,
+              "system_ns": 1236720,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 61,
+              "rss_bytes": 36093952,
+              "footprint_bytes": 10977736
+            }
+          ]
+        },
+        {
+          "monotonic": 262700.10367925,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 136776848,
+              "system_ns": 49055412,
+              "idle_wakeups": 73,
+              "interrupt_wakeups": 6634,
+              "rss_bytes": 137379840,
+              "footprint_bytes": 39355472
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 788791,
+              "system_ns": 580315,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 5,
+              "rss_bytes": 9814016,
+              "footprint_bytes": 2376040
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 31688687,
+              "system_ns": 14872562,
+              "idle_wakeups": 9,
+              "interrupt_wakeups": 1056,
+              "rss_bytes": 41713664,
+              "footprint_bytes": 13533976
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 96344814,
+              "system_ns": 36548776,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 2041,
+              "rss_bytes": 123600896,
+              "footprint_bytes": 91620432
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 856125,
+              "system_ns": 596857,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 314,
+              "rss_bytes": 14565376,
+              "footprint_bytes": 6242808
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 3510881,
+              "system_ns": 1236720,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 61,
+              "rss_bytes": 36093952,
+              "footprint_bytes": 10977736
+            }
+          ]
+        }
+      ],
+      "status": {
+        "active": false,
+        "finished": true,
+        "input": false,
+        "onscreen": false
+      },
+      "median_footprint_mib": 159.42647552490234,
+      "settle_seconds": 30
+    },
+    "cycle_2": {
+      "samples": [
+        {
+          "monotonic": 262759.492013083,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 208647036,
+              "system_ns": 81361937,
+              "idle_wakeups": 80,
+              "interrupt_wakeups": 10170,
+              "rss_bytes": 138739712,
+              "footprint_bytes": 39683152
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 976834,
+              "system_ns": 896649,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 7,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2425192
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 50930501,
+              "system_ns": 23055170,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 1647,
+              "rss_bytes": 42254336,
+              "footprint_bytes": 13501232
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 161430668,
+              "system_ns": 59688355,
+              "idle_wakeups": 15,
+              "interrupt_wakeups": 3116,
+              "rss_bytes": 132595712,
+              "footprint_bytes": 93586512
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1011346,
+              "system_ns": 762257,
+              "idle_wakeups": 4,
+              "interrupt_wakeups": 482,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 4273406,
+              "system_ns": 1621161,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 81,
+              "rss_bytes": 35962880,
+              "footprint_bytes": 10846664
+            }
+          ]
+        },
+        {
+          "monotonic": 262760.56041125,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 208652035,
+              "system_ns": 81380902,
+              "idle_wakeups": 80,
+              "interrupt_wakeups": 10180,
+              "rss_bytes": 138739712,
+              "footprint_bytes": 39683152
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 976834,
+              "system_ns": 896649,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 7,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2425192
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 50939568,
+              "system_ns": 23061286,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 1654,
+              "rss_bytes": 42254336,
+              "footprint_bytes": 13501232
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 161446983,
+              "system_ns": 59694892,
+              "idle_wakeups": 15,
+              "interrupt_wakeups": 3124,
+              "rss_bytes": 132595712,
+              "footprint_bytes": 93586512
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1011346,
+              "system_ns": 762257,
+              "idle_wakeups": 4,
+              "interrupt_wakeups": 482,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 4273406,
+              "system_ns": 1621161,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 81,
+              "rss_bytes": 35962880,
+              "footprint_bytes": 10846664
+            }
+          ]
+        },
+        {
+          "monotonic": 262761.629205375,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 208657375,
+              "system_ns": 81399718,
+              "idle_wakeups": 80,
+              "interrupt_wakeups": 10190,
+              "rss_bytes": 138739712,
+              "footprint_bytes": 39683152
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 976834,
+              "system_ns": 896649,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 7,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2425192
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 50953246,
+              "system_ns": 23069845,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 1659,
+              "rss_bytes": 42237952,
+              "footprint_bytes": 13484848
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 161469560,
+              "system_ns": 59704362,
+              "idle_wakeups": 16,
+              "interrupt_wakeups": 3134,
+              "rss_bytes": 132595712,
+              "footprint_bytes": 93586512
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1011346,
+              "system_ns": 762257,
+              "idle_wakeups": 4,
+              "interrupt_wakeups": 482,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 4273406,
+              "system_ns": 1621161,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 81,
+              "rss_bytes": 35962880,
+              "footprint_bytes": 10846664
+            }
+          ]
+        },
+        {
+          "monotonic": 262762.696574875,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 208663498,
+              "system_ns": 81420548,
+              "idle_wakeups": 80,
+              "interrupt_wakeups": 10201,
+              "rss_bytes": 138739712,
+              "footprint_bytes": 39683152
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 976834,
+              "system_ns": 896649,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 7,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2425192
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 50964491,
+              "system_ns": 23078297,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 1664,
+              "rss_bytes": 42237952,
+              "footprint_bytes": 13484848
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 161496250,
+              "system_ns": 59715510,
+              "idle_wakeups": 16,
+              "interrupt_wakeups": 3145,
+              "rss_bytes": 132595712,
+              "footprint_bytes": 93586512
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1011346,
+              "system_ns": 762257,
+              "idle_wakeups": 4,
+              "interrupt_wakeups": 482,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 4273406,
+              "system_ns": 1621161,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 81,
+              "rss_bytes": 35962880,
+              "footprint_bytes": 10846664
+            }
+          ]
+        },
+        {
+          "monotonic": 262763.765210708,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 208668857,
+              "system_ns": 81438220,
+              "idle_wakeups": 80,
+              "interrupt_wakeups": 10211,
+              "rss_bytes": 138739712,
+              "footprint_bytes": 39683152
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 976834,
+              "system_ns": 896649,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 7,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2425192
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 50976256,
+              "system_ns": 23086669,
+              "idle_wakeups": 10,
+              "interrupt_wakeups": 1671,
+              "rss_bytes": 42237952,
+              "footprint_bytes": 13484848
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 161516635,
+              "system_ns": 59725396,
+              "idle_wakeups": 16,
+              "interrupt_wakeups": 3153,
+              "rss_bytes": 132595712,
+              "footprint_bytes": 93586512
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1011346,
+              "system_ns": 762257,
+              "idle_wakeups": 4,
+              "interrupt_wakeups": 482,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 4273406,
+              "system_ns": 1621161,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 81,
+              "rss_bytes": 35962880,
+              "footprint_bytes": 10846664
+            }
+          ]
+        }
+      ],
+      "status": {
+        "active": false,
+        "finished": true,
+        "input": false,
+        "onscreen": false
+      },
+      "median_footprint_mib": 161.45772552490234,
+      "settle_seconds": 30
+    },
+    "cycle_3": {
+      "samples": [
+        {
+          "monotonic": 262822.520174083,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 270197626,
+              "system_ns": 109028144,
+              "idle_wakeups": 99,
+              "interrupt_wakeups": 13725,
+              "rss_bytes": 138887168,
+              "footprint_bytes": 39863376
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 1164663,
+              "system_ns": 1198680,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 9,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2408808
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 70019849,
+              "system_ns": 31580229,
+              "idle_wakeups": 14,
+              "interrupt_wakeups": 2212,
+              "rss_bytes": 42631168,
+              "footprint_bytes": 13550384
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 221694388,
+              "system_ns": 83351927,
+              "idle_wakeups": 22,
+              "interrupt_wakeups": 4193,
+              "rss_bytes": 133709824,
+              "footprint_bytes": 94258256
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1166658,
+              "system_ns": 906886,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 640,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 5033699,
+              "system_ns": 1978547,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 110,
+              "rss_bytes": 36012032,
+              "footprint_bytes": 10895816
+            }
+          ]
+        },
+        {
+          "monotonic": 262823.581537458,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 270202718,
+              "system_ns": 109051423,
+              "idle_wakeups": 99,
+              "interrupt_wakeups": 13735,
+              "rss_bytes": 138887168,
+              "footprint_bytes": 39863376
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 1164663,
+              "system_ns": 1198680,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 9,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2408808
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 70031047,
+              "system_ns": 31588889,
+              "idle_wakeups": 14,
+              "interrupt_wakeups": 2218,
+              "rss_bytes": 42631168,
+              "footprint_bytes": 13550384
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 221714598,
+              "system_ns": 83361028,
+              "idle_wakeups": 22,
+              "interrupt_wakeups": 4202,
+              "rss_bytes": 133709824,
+              "footprint_bytes": 94258256
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1166658,
+              "system_ns": 906886,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 640,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 5033699,
+              "system_ns": 1978547,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 110,
+              "rss_bytes": 36012032,
+              "footprint_bytes": 10895816
+            }
+          ]
+        },
+        {
+          "monotonic": 262824.640568916,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 270208111,
+              "system_ns": 109073330,
+              "idle_wakeups": 99,
+              "interrupt_wakeups": 13745,
+              "rss_bytes": 138887168,
+              "footprint_bytes": 39863376
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 1164663,
+              "system_ns": 1198680,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 9,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2408808
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 70042560,
+              "system_ns": 31596847,
+              "idle_wakeups": 14,
+              "interrupt_wakeups": 2224,
+              "rss_bytes": 42631168,
+              "footprint_bytes": 13550384
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 221738720,
+              "system_ns": 83371854,
+              "idle_wakeups": 22,
+              "interrupt_wakeups": 4212,
+              "rss_bytes": 133709824,
+              "footprint_bytes": 94258256
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1166658,
+              "system_ns": 906886,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 640,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 5033699,
+              "system_ns": 1978547,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 110,
+              "rss_bytes": 36012032,
+              "footprint_bytes": 10895816
+            }
+          ]
+        },
+        {
+          "monotonic": 262825.705424416,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 270214063,
+              "system_ns": 109096273,
+              "idle_wakeups": 99,
+              "interrupt_wakeups": 13756,
+              "rss_bytes": 138887168,
+              "footprint_bytes": 39863376
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 1164663,
+              "system_ns": 1198680,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 9,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2408808
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 70053124,
+              "system_ns": 31602721,
+              "idle_wakeups": 14,
+              "interrupt_wakeups": 2229,
+              "rss_bytes": 42631168,
+              "footprint_bytes": 13550384
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 221759370,
+              "system_ns": 83380465,
+              "idle_wakeups": 22,
+              "interrupt_wakeups": 4221,
+              "rss_bytes": 133709824,
+              "footprint_bytes": 94258256
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1166658,
+              "system_ns": 906886,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 640,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 5033699,
+              "system_ns": 1978547,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 110,
+              "rss_bytes": 36012032,
+              "footprint_bytes": 10895816
+            }
+          ]
+        },
+        {
+          "monotonic": 262826.770027958,
+          "processes": [
+            {
+              "pid": 98049,
+              "executable": "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-dae8btaw/source/src-tauri/target/release/bundle/macos/TinyDashMemoryProbe.app/Contents/MacOS/tinydash",
+              "user_ns": 270219571,
+              "system_ns": 109119300,
+              "idle_wakeups": 99,
+              "interrupt_wakeups": 13766,
+              "rss_bytes": 138887168,
+              "footprint_bytes": 39863376
+            },
+            {
+              "pid": 98051,
+              "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+              "user_ns": 1164663,
+              "system_ns": 1198680,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 9,
+              "rss_bytes": 9895936,
+              "footprint_bytes": 2408808
+            },
+            {
+              "pid": 98052,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+              "user_ns": 70063643,
+              "system_ns": 31609085,
+              "idle_wakeups": 14,
+              "interrupt_wakeups": 2236,
+              "rss_bytes": 42631168,
+              "footprint_bytes": 13550384
+            },
+            {
+              "pid": 98053,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+              "user_ns": 221782358,
+              "system_ns": 83387728,
+              "idle_wakeups": 22,
+              "interrupt_wakeups": 4231,
+              "rss_bytes": 133709824,
+              "footprint_bytes": 94258256
+            },
+            {
+              "pid": 98054,
+              "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+              "user_ns": 1166658,
+              "system_ns": 906886,
+              "idle_wakeups": 6,
+              "interrupt_wakeups": 640,
+              "rss_bytes": 14532608,
+              "footprint_bytes": 6193632
+            },
+            {
+              "pid": 98055,
+              "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+              "user_ns": 437411,
+              "system_ns": 94166,
+              "idle_wakeups": 1,
+              "interrupt_wakeups": 2,
+              "rss_bytes": 11698176,
+              "footprint_bytes": 3080696
+            },
+            {
+              "pid": 98056,
+              "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+              "user_ns": 5033699,
+              "system_ns": 1978547,
+              "idle_wakeups": 0,
+              "interrupt_wakeups": 110,
+              "rss_bytes": 36012032,
+              "footprint_bytes": 10895816
+            }
+          ]
+        }
+      ],
+      "status": {
+        "active": false,
+        "finished": true,
+        "input": false,
+        "onscreen": false
+      },
+      "median_footprint_mib": 162.36397552490234,
+      "settle_seconds": 30
+    }
+  },
+  "queries": {
+    "samples": [
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 40.8621666720137,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 52.90920834522694,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 14.416499994695187,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 43.60154166352004,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 61.81170837953687,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 53.37649997090921,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 14.79991665109992,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 58.05091664660722,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 24.01079167611897,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 29.193458321969956,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 15.668041654862463,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 25.939833314623684,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 24.085499986540526,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 30.916541640181094,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 15.243416652083397,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 26.44841664005071,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 31.78587497677654,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 31.787624990101904,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 33.739791659172624,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 26.877666707150638,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 34.768541692756116,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 31.553874956443906,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 22.8156250086613,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 25.85754165193066,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 27.469083317555487,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 31.591166683938354,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 43.805999972391874,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 48.72429167153314,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 35.75325000565499,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 59.32641663821414,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 42.84120834199712,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 19.190583319868892,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 21.70174999628216,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 29.799583309795707,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 28.48208334762603,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 27.483624988235533,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 26.876708318013698,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 28.07929168920964,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 14.646750001702458,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 45.433666673488915,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 19.53970832983032,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 62.495333375409245,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 14.551958302035928,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 22.5279166479595,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 24.385750002693385,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 29.096416663378477,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 15.967166691552848,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 28.102208336349577,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "summon": {
+    "samples": [
+      {
+        "iteration": -2,
+        "ms": 51.49083328433335,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": -1,
+        "ms": 30.997583293356,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": 0,
+        "ms": 39.441874949261546,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 1,
+        "ms": 28.09633337892592,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "ms": 26.02741663577035,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "ms": 27.41087501635775,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 4,
+        "ms": 42.80841670697555,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 5,
+        "ms": 37.475958350114524,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 6,
+        "ms": 39.44595833308995,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 7,
+        "ms": 26.95670834509656,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 8,
+        "ms": 26.08983329264447,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 9,
+        "ms": 26.871624984778464,
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "dom": {
+    "devicePixelRatio": 2,
+    "hidden": true,
+    "images": [],
+    "nodes": 99,
+    "resultRows": 0,
+    "scripts": [
+      "index-jzliY2aJ.js"
+    ]
+  },
+  "icons": {
+    "count": 125,
+    "encoded_bytes": 4615934,
+    "icons": 125
+  },
+  "cycle_queries_1": {
+    "samples": [
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 41.01250000530854,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 19.859541673213243,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 47.73570835823193,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 10.373958328273147,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 46.32670833962038,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 21.287333336658776,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 9.670333354733884,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 10.202875011600554,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 29.106499976478517,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 24.2297500371933,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 27.04895834904164,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 16.46508334670216,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 53.55229170527309,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 21.75300003727898,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 53.29783336492255,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 41.00949998246506,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 54.845625010784715,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 51.49591661756858,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 22.501333325635642,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 16.800791665446013,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 28.976916684769094,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 28.797375038266182,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 15.839458326809108,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 25.675916695035994,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 32.11345832096413,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 27.45945833157748,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 16.852916625794023,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 26.44937497097999,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 29.84616666799411,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 29.032458376605064,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 26.04445832548663,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 27.474875038024038,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 33.41295832069591,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 34.19020836008713,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 17.525208357255906,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 22.828458284493536,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 30.353999987710267,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 30.068541644141078,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 26.99070831295103,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 51.18495837086812,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 50.52987503586337,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 44.9571666540578,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 14.067666663322598,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 20.736208360176533,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 29.512166627682745,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 51.53129168320447,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 12.453708332031965,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 14.950625016354024,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 10,
+        "ms": 18.610041646752506,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 10,
+        "ms": 20.639499998651445,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 10,
+        "ms": 16.482541686855257,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 10,
+        "ms": 21.815499989315867,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 11,
+        "ms": 32.013166637625545,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 11,
+        "ms": 27.50416664639488,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 11,
+        "ms": 46.341000008396804,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 11,
+        "ms": 15.038250014185905,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 12,
+        "ms": 30.63724999083206,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 12,
+        "ms": 30.4998749634251,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 12,
+        "ms": 15.107708342839032,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 12,
+        "ms": 13.400291674770415,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 13,
+        "ms": 54.67616661917418,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 13,
+        "ms": 17.076749994885176,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 13,
+        "ms": 16.64975000312552,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 13,
+        "ms": 28.589041670784354,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 14,
+        "ms": 26.864416664466262,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 14,
+        "ms": 31.633083359338343,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 14,
+        "ms": 15.039958292618394,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 14,
+        "ms": 26.732333353720605,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 15,
+        "ms": 32.802208384964615,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 15,
+        "ms": 29.982166655827314,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 15,
+        "ms": 26.944666693452746,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 15,
+        "ms": 26.838416699320078,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 16,
+        "ms": 61.644833360332996,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 16,
+        "ms": 23.781333351507783,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 16,
+        "ms": 25.838708330411464,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 16,
+        "ms": 15.964208345394582,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 17,
+        "ms": 30.309041612781584,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 17,
+        "ms": 28.826874971855432,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 17,
+        "ms": 27.320124965626746,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 17,
+        "ms": 26.042125013191253,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 18,
+        "ms": 30.111208383459598,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 18,
+        "ms": 32.285124994814396,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 18,
+        "ms": 25.523875025101006,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 18,
+        "ms": 23.32479163305834,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 19,
+        "ms": 31.77900001173839,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 19,
+        "ms": 53.33800002699718,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 19,
+        "ms": 27.533583343029022,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 19,
+        "ms": 10.33441670006141,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 20,
+        "ms": 26.809333357959986,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 20,
+        "ms": 56.135166669264436,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 20,
+        "ms": 15.859125007409602,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 20,
+        "ms": 22.35858334461227,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 21,
+        "ms": 30.56250000372529,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 21,
+        "ms": 30.423374962992966,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 21,
+        "ms": 26.713999977800995,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 21,
+        "ms": 16.332291706930846,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 22,
+        "ms": 31.10683336853981,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 22,
+        "ms": 33.35837501799688,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 22,
+        "ms": 48.28858334803954,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 22,
+        "ms": 14.465583371929824,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 23,
+        "ms": 27.881833317223936,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 23,
+        "ms": 28.953750035725534,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 23,
+        "ms": 26.023166661616415,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 23,
+        "ms": 26.9602500484325,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 24,
+        "ms": 30.86649999022484,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 24,
+        "ms": 19.556416664272547,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 24,
+        "ms": 23.678749974351376,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 24,
+        "ms": 17.796166706830263,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "cycle_summon_1": {
+    "samples": [
+      {
+        "iteration": -2,
+        "ms": 61.43612501909956,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": -1,
+        "ms": 38.57704164693132,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": 0,
+        "ms": 41.57079162541777,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 1,
+        "ms": 25.407625013031065,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "ms": 24.688291654456407,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "ms": 24.18508328264579,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 4,
+        "ms": 37.70758333848789,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 5,
+        "ms": 38.50874997442588,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 6,
+        "ms": 40.30258330749348,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 7,
+        "ms": 42.73987497435883,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 8,
+        "ms": 41.256416705437005,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 9,
+        "ms": 37.741708278190345,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 10,
+        "ms": 41.81537503609434,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 11,
+        "ms": 41.95137502392754,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 12,
+        "ms": 26.357208320405334,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 13,
+        "ms": 41.707041673362255,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 14,
+        "ms": 38.31862501101568,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 15,
+        "ms": 40.629499999340624,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 16,
+        "ms": 29.46941670961678,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 17,
+        "ms": 37.96012501697987,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 18,
+        "ms": 38.77745836507529,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 19,
+        "ms": 35.10550002101809,
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "cycle_queries_2": {
+    "samples": [
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 12.03016669023782,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 50.76733330497518,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 9.305375046096742,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 44.257499976083636,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 52.4367083562538,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 36.480374983511865,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 49.54254167387262,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 10.47874998766929,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 60.06754166446626,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 17.258958308957517,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 44.87662500469014,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 9.169875003863126,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 50.76116666896269,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 18.85425002546981,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 45.93995836330578,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 12.296166678424925,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 58.634124987293035,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 18.79099995130673,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 45.06366665009409,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 47.98708332236856,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 21.862541674636304,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 23.49379169754684,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 46.07524996390566,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 12.869124999269843,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 62.640541640575975,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 36.96220833808184,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 46.5994167025201,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 11.666124977637082,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 31.196541676763445,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 63.73695831280202,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 9.692874969914556,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 17.16504170326516,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 57.73112497990951,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 52.978624997194856,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 11.547874950338155,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 19.47216666303575,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 50.01624999567866,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 22.324541641864926,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 11.83199998922646,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 49.599541642237455,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 19.01395828463137,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 53.970791632309556,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 20.686374977231026,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 47.251583309844136,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 51.84999998891726,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 33.90662500169128,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 45.35187495639548,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 47.68270836211741,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 10,
+        "ms": 53.93241666024551,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 10,
+        "ms": 47.144958341959864,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 10,
+        "ms": 9.677291673142463,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 10,
+        "ms": 51.84924998320639,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 11,
+        "ms": 19.544249982573092,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 11,
+        "ms": 23.758375027682632,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 11,
+        "ms": 23.994083341676742,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 11,
+        "ms": 15.21545834839344,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 12,
+        "ms": 52.31670831562951,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 12,
+        "ms": 16.926916665397584,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 12,
+        "ms": 46.36891669360921,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 12,
+        "ms": 47.02737496700138,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 13,
+        "ms": 22.79837499372661,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 13,
+        "ms": 63.31662501906976,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 13,
+        "ms": 10.600124951452017,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 13,
+        "ms": 11.20133331278339,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 14,
+        "ms": 24.27320834249258,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 14,
+        "ms": 19.03108332771808,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 14,
+        "ms": 13.373041700106114,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 14,
+        "ms": 15.04774997010827,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 15,
+        "ms": 24.32383334962651,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 15,
+        "ms": 26.84841671725735,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 15,
+        "ms": 14.921541616786271,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 15,
+        "ms": 34.451874962542206,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 16,
+        "ms": 34.12991663208231,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 16,
+        "ms": 49.44174998672679,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 16,
+        "ms": 25.613958307076246,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 16,
+        "ms": 11.13462500507012,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 17,
+        "ms": 27.581041678786278,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 17,
+        "ms": 50.44600000837818,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 17,
+        "ms": 12.366500042844564,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 17,
+        "ms": 24.641083320602775,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 18,
+        "ms": 27.973166666924953,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 18,
+        "ms": 17.799541645217687,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 18,
+        "ms": 11.662916687782854,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 18,
+        "ms": 16.18962496286258,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 19,
+        "ms": 24.835499993059784,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 19,
+        "ms": 54.50670834397897,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 19,
+        "ms": 11.18824997683987,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 19,
+        "ms": 11.699499969836324,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 20,
+        "ms": 59.43104164907709,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 20,
+        "ms": 16.573374974541366,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 20,
+        "ms": 14.811208355240524,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 20,
+        "ms": 46.306791715323925,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 21,
+        "ms": 22.99783332273364,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 21,
+        "ms": 17.720041680149734,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 21,
+        "ms": 54.51845831703395,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 21,
+        "ms": 13.731916667893529,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 22,
+        "ms": 54.96145831421018,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 22,
+        "ms": 17.220875015482306,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 22,
+        "ms": 44.36112497933209,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 22,
+        "ms": 49.4138749781996,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 23,
+        "ms": 16.534958383999765,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 23,
+        "ms": 50.81816669553518,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 23,
+        "ms": 21.466291684191674,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 23,
+        "ms": 51.42266664188355,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 24,
+        "ms": 19.210125028621405,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 24,
+        "ms": 52.810583321843296,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 24,
+        "ms": 20.968333294149488,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 24,
+        "ms": 11.315541691146791,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "cycle_summon_2": {
+    "samples": [
+      {
+        "iteration": -2,
+        "ms": 60.586624953430146,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": -1,
+        "ms": 30.17366665881127,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": 0,
+        "ms": 40.104916668497026,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 1,
+        "ms": 39.02100003324449,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "ms": 29.310749960131943,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "ms": 38.5817083879374,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 4,
+        "ms": 38.623958360403776,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 5,
+        "ms": 25.94320831121877,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 6,
+        "ms": 39.762708358466625,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 7,
+        "ms": 34.88966671284288,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 8,
+        "ms": 36.41820832854137,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 9,
+        "ms": 35.01637501176447,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 10,
+        "ms": 29.725125001277775,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 11,
+        "ms": 41.11908335471526,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 12,
+        "ms": 25.459333322942257,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 13,
+        "ms": 25.04745835904032,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 14,
+        "ms": 24.638500006403774,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 15,
+        "ms": 37.080791662447155,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 16,
+        "ms": 35.89029161958024,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 17,
+        "ms": 25.707249995321035,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 18,
+        "ms": 30.29462497215718,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 19,
+        "ms": 36.53783333720639,
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "cycle_queries_3": {
+    "samples": [
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 48.65612497087568,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 31.262500036973506,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 14.810333319474012,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 23.42987497104332,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 28.245666704606265,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 29.10654165316373,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 14.046875003259629,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 14.45708330720663,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 55.47433329047635,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 18.22454167995602,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 13.965291669592261,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 47.36883332952857,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 18.104583374224603,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 31.96783334715292,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 27.34266663901508,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 26.258333295118064,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 30.311291629914194,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 25.980375008657575,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 27.68358332104981,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 24.17787502054125,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 52.73295834194869,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 16.841541626490653,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 16.65299996966496,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 49.0168749820441,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 24.372583313379437,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 27.529749961104244,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 15.888624999206513,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 26.720541703980416,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 28.228375012986362,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 61.104583321139216,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 14.733874995727092,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 24.614166643004864,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 28.65012496476993,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 29.26041668979451,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 18.90391670167446,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 15.94445831142366,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 32.14412496890873,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 29.156999953556806,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 25.616416649427265,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 16.472333343699574,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 30.391541658900678,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 31.904416682664305,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 24.246583343483508,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 13.866125023923814,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 27.135999989695847,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 31.836083333473653,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 15.703624987509102,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 26.521583378780633,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 10,
+        "ms": 55.24083331692964,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 10,
+        "ms": 36.736875015776604,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 10,
+        "ms": 23.934375029057264,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 10,
+        "ms": 16.946791613008827,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 11,
+        "ms": 28.21004163706675,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 11,
+        "ms": 26.279916637577116,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 11,
+        "ms": 49.74595835665241,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 11,
+        "ms": 43.97162498207763,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 12,
+        "ms": 19.324791675899178,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 12,
+        "ms": 26.167500007431954,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 12,
+        "ms": 27.352625038474798,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 12,
+        "ms": 27.17487496556714,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 13,
+        "ms": 54.74529165076092,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 13,
+        "ms": 33.820666663814336,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 13,
+        "ms": 16.14329166477546,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 13,
+        "ms": 23.094375035725534,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 14,
+        "ms": 31.062166672199965,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 14,
+        "ms": 51.52741668280214,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 14,
+        "ms": 13.557291647884995,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 14,
+        "ms": 17.226666677743196,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 15,
+        "ms": 28.623374993912876,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 15,
+        "ms": 21.35291666490957,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 15,
+        "ms": 22.067708312533796,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 15,
+        "ms": 24.479999963659793,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 16,
+        "ms": 32.21512498566881,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 16,
+        "ms": 21.118958364240825,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 16,
+        "ms": 15.144666656851768,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 16,
+        "ms": 16.61879161838442,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 17,
+        "ms": 29.835374967660755,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 17,
+        "ms": 30.350124987307936,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 17,
+        "ms": 16.09608333092183,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 17,
+        "ms": 31.321874994318932,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 18,
+        "ms": 26.877291675191373,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 18,
+        "ms": 20.592500048223883,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 18,
+        "ms": 6.4257916528731585,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 18,
+        "ms": 28.194124985020608,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 19,
+        "ms": 55.69008336169645,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 19,
+        "ms": 19.14433331694454,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 19,
+        "ms": 15.634958341252059,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 19,
+        "ms": 27.295833337120712,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 20,
+        "ms": 28.942500008270144,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 20,
+        "ms": 30.503166664857417,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 20,
+        "ms": 15.939708333462477,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 20,
+        "ms": 15.98854165058583,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 21,
+        "ms": 30.230291711632162,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 21,
+        "ms": 31.48645831970498,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 21,
+        "ms": 23.955541662871838,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 21,
+        "ms": 23.455250018741935,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 22,
+        "ms": 29.1141250054352,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 22,
+        "ms": 29.567291669081897,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 22,
+        "ms": 26.97633334901184,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 22,
+        "ms": 30.737374967429787,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 23,
+        "ms": 31.542708340566605,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 23,
+        "ms": 27.29120838921517,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 23,
+        "ms": 14.220125041902065,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 23,
+        "ms": 24.181708344258368,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 24,
+        "ms": 30.370375025086105,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 24,
+        "ms": 20.524749998003244,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 24,
+        "ms": 15.32387500628829,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 24,
+        "ms": 48.338416672777385,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "cycle_summon_3": {
+    "samples": [
+      {
+        "iteration": -2,
+        "ms": 63.89837496681139,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": -1,
+        "ms": 23.914666671771556,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": 0,
+        "ms": 30.94500000588596,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 1,
+        "ms": 45.28216668404639,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "ms": 31.99733333894983,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "ms": 28.33816665224731,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 4,
+        "ms": 40.892458346206695,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 5,
+        "ms": 27.52112498274073,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 6,
+        "ms": 29.585000011138618,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 7,
+        "ms": 37.50445833429694,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 8,
+        "ms": 35.56237503653392,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 9,
+        "ms": 37.86162502365187,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 10,
+        "ms": 29.590333346277475,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 11,
+        "ms": 28.995916654821485,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 12,
+        "ms": 30.93395830364898,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 13,
+        "ms": 34.66050000861287,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 14,
+        "ms": 41.686458338517696,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 15,
+        "ms": 40.65983335021883,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 16,
+        "ms": 46.20187496766448,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 17,
+        "ms": 38.93595834961161,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 18,
+        "ms": 28.759999957401305,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 19,
+        "ms": 33.7578333565034,
+        "success": true,
+        "warmup": false
+      }
+    ]
+  }
+}

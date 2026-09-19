@@ -1,0 +1,1484 @@
+{
+  "app": "tinycast",
+  "trial": 3,
+  "pid": 47223,
+  "process_discovery_ms": 180.40033298893832,
+  "launch_timestamp": "2026-09-19T09:18:23+0800",
+  "initial_show": {
+    "ready": true
+  },
+  "queries": {
+    "samples": [
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 28.91212498070672,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 31.153083342360333,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 91.34783330955543,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 33.76695830957033,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 23.51245834142901,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 29.471625020960346,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 29.649333329871297,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 28.572416660608724,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 28.334916656604037,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 24.426958319963887,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 34.87354167737067,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 38.073708332376555,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 41.77629167679697,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 38.57916669221595,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 32.99658335163258,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 38.09445834485814,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 26.380499999504536,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 36.057541670743376,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 38.97691666497849,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 34.7290416539181,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 36.88183333724737,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 49.626666674157605,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 50.66304164938629,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 201.96733332704753,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 61.70762502006255,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 70.42708332301117,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 68.34729167167097,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 76.80649997200817,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 111.30633333232254,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 49.62637499556877,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 51.724458346143365,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 49.84304166282527,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 47.71208332385868,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 122.73129168897867,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 50.34733333741315,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 54.58050000015646,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 45.695958338910714,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 118.62079164711758,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 52.1805000025779,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 44.49183333781548,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 99.84233335126191,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 41.61333333468065,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 49.44095833343454,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 47.173708328045905,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 92.56662501138635,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 37.15012499014847,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 94.00129166897386,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 41.7404166655615,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "summon": {
+    "samples": [
+      {
+        "iteration": -2,
+        "ms": 125.07079166243784,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": -1,
+        "ms": 86.31995832547545,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": 0,
+        "ms": 84.36358332983218,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 1,
+        "ms": 93.89325001393445,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "ms": 96.06666667968966,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "ms": 96.32895831600763,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 4,
+        "ms": 91.91004166495986,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 5,
+        "ms": 91.70999997877516,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 6,
+        "ms": 100.5157083272934,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 7,
+        "ms": 93.96008335170336,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 8,
+        "ms": 107.57187500712462,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 9,
+        "ms": 102.30562498327345,
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "visible_samples": [
+    {
+      "monotonic": 246317.900593791,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 181757118,
+          "system_ns": 41829145,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 470,
+          "rss_bytes": 149323776,
+          "footprint_bytes": 51643352
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1437580,
+          "system_ns": 1002564,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 10305536,
+          "footprint_bytes": 2490728
+        }
+      ]
+    },
+    {
+      "monotonic": 246318.983193875,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 181899519,
+          "system_ns": 41868346,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 476,
+          "rss_bytes": 149323776,
+          "footprint_bytes": 50136024
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1443324,
+          "system_ns": 1013002,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 10305536,
+          "footprint_bytes": 2490728
+        }
+      ]
+    },
+    {
+      "monotonic": 246320.06477325,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 181902952,
+          "system_ns": 41870180,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 478,
+          "rss_bytes": 149323776,
+          "footprint_bytes": 50136024
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1443324,
+          "system_ns": 1013002,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 10305536,
+          "footprint_bytes": 2490728
+        }
+      ]
+    },
+    {
+      "monotonic": 246321.144405041,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 181902952,
+          "system_ns": 41870180,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 478,
+          "rss_bytes": 149323776,
+          "footprint_bytes": 50136024
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1443324,
+          "system_ns": 1013002,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 10305536,
+          "footprint_bytes": 2490728
+        }
+      ]
+    },
+    {
+      "monotonic": 246322.198801583,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 181902952,
+          "system_ns": 41870180,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 478,
+          "rss_bytes": 149323776,
+          "footprint_bytes": 50136024
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1443324,
+          "system_ns": 1013002,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 10305536,
+          "footprint_bytes": 2490728
+        }
+      ]
+    }
+  ],
+  "hidden_check": {
+    "hidden": true
+  },
+  "idle_samples": [
+    {
+      "monotonic": 246353.492144041,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183150672,
+          "system_ns": 42004767,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 502,
+          "rss_bytes": 129368064,
+          "footprint_bytes": 51364824
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 9437184,
+          "footprint_bytes": 2523496
+        }
+      ]
+    },
+    {
+      "monotonic": 246354.500306083,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183150672,
+          "system_ns": 42004767,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 502,
+          "rss_bytes": 129368064,
+          "footprint_bytes": 51364824
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 9437184,
+          "footprint_bytes": 2523496
+        }
+      ]
+    },
+    {
+      "monotonic": 246355.495883375,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183150672,
+          "system_ns": 42004767,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 502,
+          "rss_bytes": 129368064,
+          "footprint_bytes": 51364824
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 9437184,
+          "footprint_bytes": 2523496
+        }
+      ]
+    },
+    {
+      "monotonic": 246356.498442416,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183150672,
+          "system_ns": 42004767,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 502,
+          "rss_bytes": 129368064,
+          "footprint_bytes": 51364824
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 9437184,
+          "footprint_bytes": 2523496
+        }
+      ]
+    },
+    {
+      "monotonic": 246357.461541291,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183150672,
+          "system_ns": 42004767,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 502,
+          "rss_bytes": 116588544,
+          "footprint_bytes": 51561432
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246358.462551958,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246359.496862,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246360.499733958,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246361.497044333,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246362.4982805,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246363.492508208,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246364.495543833,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246365.492084416,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183151783,
+          "system_ns": 42012035,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 107462656,
+          "footprint_bytes": 51512280
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246366.489825541,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183165601,
+          "system_ns": 42037609,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 110395392,
+          "footprint_bytes": 51545048
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246367.497345583,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183165601,
+          "system_ns": 42037609,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 110395392,
+          "footprint_bytes": 51545048
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246368.5053935,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183198892,
+          "system_ns": 42049683,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 504,
+          "rss_bytes": 110657536,
+          "footprint_bytes": 51545048
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246369.460140291,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183204717,
+          "system_ns": 42059606,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 504,
+          "rss_bytes": 110870528,
+          "footprint_bytes": 51594200
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246370.610631083,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183212788,
+          "system_ns": 42066798,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 504,
+          "rss_bytes": 108003328,
+          "footprint_bytes": 51594200
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246371.6218305,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183214693,
+          "system_ns": 42073857,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 108314624,
+          "footprint_bytes": 51594200
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4784128,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246372.521841958,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183214693,
+          "system_ns": 42073857,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 97746944,
+          "footprint_bytes": 51069912
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246373.457620333,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183227065,
+          "system_ns": 42083154,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 98009088,
+          "footprint_bytes": 51069912
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246374.467836625,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183227065,
+          "system_ns": 42083154,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 98009088,
+          "footprint_bytes": 51069912
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246375.460927208,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183227065,
+          "system_ns": 42083154,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 98009088,
+          "footprint_bytes": 51069912
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246376.457533458,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183227065,
+          "system_ns": 42083154,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 98009088,
+          "footprint_bytes": 51069912
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246377.458929791,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183227065,
+          "system_ns": 42083154,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 98009088,
+          "footprint_bytes": 51069912
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246378.4645305,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183227921,
+          "system_ns": 42085389,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 506,
+          "rss_bytes": 98074624,
+          "footprint_bytes": 51020760
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246379.460890458,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183236043,
+          "system_ns": 42092023,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 506,
+          "rss_bytes": 98418688,
+          "footprint_bytes": 51037144
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246380.455915208,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183240170,
+          "system_ns": 42093399,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 506,
+          "rss_bytes": 98418688,
+          "footprint_bytes": 51037144
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246381.463703916,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183240170,
+          "system_ns": 42093399,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 506,
+          "rss_bytes": 97845248,
+          "footprint_bytes": 51037144
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246382.460459875,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183240170,
+          "system_ns": 42093399,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 506,
+          "rss_bytes": 97845248,
+          "footprint_bytes": 51037144
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    },
+    {
+      "monotonic": 246383.46177775,
+      "processes": [
+        {
+          "pid": 47223,
+          "executable": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast",
+          "user_ns": 183240170,
+          "system_ns": 42093399,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 506,
+          "rss_bytes": 97632256,
+          "footprint_bytes": 51037144
+        },
+        {
+          "pid": 47229,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1448255,
+          "system_ns": 1022347,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 5,
+          "rss_bytes": 4554752,
+          "footprint_bytes": 2916712
+        }
+      ]
+    }
+  ],
+  "final_hidden_status": {
+    "active": false,
+    "finished": true,
+    "input": false,
+    "onscreen": false
+  },
+  "remaining_responsible_processes_after_exit": {}
+}

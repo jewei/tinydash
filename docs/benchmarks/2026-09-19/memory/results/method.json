@@ -1,0 +1,25 @@
+{
+  "source_commit": "bccaa245284cc22a7bc0c96d3083dace3a1950ca",
+  "app_identifier": "dev.tinydash.memoryprobe.20260919",
+  "configuration": "arm64 Tauri release, ad hoc signed, isolated profile, temporary command-file instrumentation",
+  "executable_sha256": "906b420b1d3197b0800e29420c22f2e183d77ccc36c59dc3cf539b769fbadc87",
+  "build_command": "TINYDASH_PROBE_DIR=<absolute temporary directory> bun run tauri build --bundles app",
+  "profile": {
+    "fileSearchRoots": [],
+    "fileWatchEnabled": false,
+    "currencyRatesEnabled": false,
+    "clipboardHistoryEnabled": false,
+    "shortcut": "Control+Alt+Shift+Space"
+  },
+  "system": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A428\n",
+  "swap": "vm.swapusage: total = 9216.00M  used = 7485.00M  free = 1731.00M  (encrypted)",
+  "stage_sample_count": 5,
+  "stage_sample_interval_seconds": 1,
+  "stage_settle_seconds": 30,
+  "instrumentation": "One Rust thread polls a command file every 100 ms. A custom command records DOM counts. No developer tools are open. Do not use these results for idle CPU or wakeup comparisons.",
+  "limitations": [
+    "One run per intervention; process helpers and memory pressure can vary.",
+    "Original benchmark used 31 samples per idle stage; this diagnostic uses five.",
+    "Recreated main window failed the 3-second accessible-input readiness check."
+  ]
+}

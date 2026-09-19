@@ -1,0 +1,6 @@
+{
+  "src-tauri/src/providers/apps.rs": "44bd177c10bfc4702d0a532d4a2876b42c6c915e215b8b873c2b05daa03b1a18",
+  "src-tauri/src/launcher/search.rs": "ef9fa869e8729490949335c05c49cf58eaf689bd3141efba08663718e8137ecb",
+  "src-tauri/src/launcher/search_memory_tests.rs": "684f18ab8839e2867548f9cd7888d6049283a1a57265db3785681c133db31122",
+  "tests/fixtures/app-selection.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+}

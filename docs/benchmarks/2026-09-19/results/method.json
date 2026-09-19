@@ -1,0 +1,79 @@
+{
+  "date": "2026-09-19",
+  "configuration": "Release, arm64, ad hoc signed, separate bundle identifiers",
+  "builds": {
+    "tinydash": {
+      "commit": "bccaa245284cc22a7bc0c96d3083dace3a1950ca",
+      "command": "bun run tauri build --bundles app --config tauri-perf.json",
+      "config": {
+        "productName": "TinyDashPerf",
+        "identifier": "dev.tinydash.performance.20260919"
+      }
+    },
+    "bopop": {
+      "commit": "480d157255f3e65e6e45bf765d2c8804edfb7bfd",
+      "command": "swift build -c release --arch arm64",
+      "assembly": "Support/assemble-app.sh using swift build -c release --arch arm64 --show-bin-path",
+      "bundle_identifier": "com.oneone.bopop.performance.20260919.dev",
+      "source_patch": "Change only the dev data folder name in Storage.swift to Bopop Perf 20260919."
+    },
+    "tinycast": {
+      "commit": "0d7537bd1dc42ed60a5018090c1126983bbb4355",
+      "command": "xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release -derivedDataPath tinycast-build ARCHS=arm64 ONLY_ACTIVE_ARCH=YES PRODUCT_BUNDLE_IDENTIFIER=com.tinycast.app.performance.20260919 CODE_SIGNING_ALLOWED=NO build",
+      "bundle_identifier": "com.tinycast.app.performance.20260919"
+    }
+  },
+  "profiles": {
+    "all": "Fresh test settings and empty history; clipboard capture off; no extensions or custom scripts; shared hotkey Control+Option+Shift+Space.",
+    "tinydash": {
+      "fileSearchRoots": [],
+      "fileWatchEnabled": false,
+      "currencyRatesEnabled": false,
+      "clipboardHistoryEnabled": false,
+      "shortcut": "Control+Alt+Shift+Space"
+    },
+    "bopop": {
+      "clipboardRecordingEnabled": false,
+      "currencyConversionEnabled": false,
+      "SUEnableAutomaticChecks": false,
+      "hotkeyKeyCode": 49,
+      "hotkeyModifiers": 917504
+    },
+    "tinycast": {
+      "clipboardEnabled": false,
+      "supportReminders": false,
+      "onboarded_marker": true,
+      "optional_features": "Default off",
+      "hotkey.togglePalette": "{\"combo\":{\"_0\":{\"carbonKeyCode\":49,\"carbonModifiers\":6656}}}"
+    }
+  },
+  "toolchain": {
+    "rust": "1.98.1",
+    "bun": "1.4.2",
+    "swift": "6.4",
+    "xcode": "27.0 27A266a",
+    "python": "3.14.7"
+  },
+  "method": {
+    "rounds": 3,
+    "order": [
+      ["tinydash", "bopop", "tinycast"],
+      ["bopop", "tinycast", "tinydash"],
+      ["tinycast", "tinydash", "bopop"]
+    ],
+    "query_samples_per_group_per_trial": 20,
+    "summon_samples_per_trial": 10,
+    "query_warmup_per_group_per_trial": 4,
+    "summon_warmup_per_trial": 2,
+    "startup_settle_seconds": 10,
+    "hidden_settle_seconds": 30,
+    "idle_duration_seconds": 30,
+    "idle_sample_interval_seconds": 1,
+    "latency_poll_sleep_seconds": 0.002,
+    "query_timer": "One whole query Unicode keyboard event to expected non-input accessibility text; no-match query and absent-result check before each sample. Timer excludes select-all and preparation.",
+    "summon_timer": "Global hotkey posting to on-screen app window at least 200 by 60 pixels and an accessible input field. Does not verify first painted pixel or keyboard focus.",
+    "memory": "RUSAGE_INFO_V2 physical footprint and RSS, summed over the app and processes attributed to it by responsibility_get_pid_responsible_for_pid. Does not include WindowServer.",
+    "cpu": "Sum of user and system CPU-time deltas over the idle sample interval, divided by elapsed time. 100% means one CPU core.",
+    "statistics": "Median and nearest-rank p95 for pooled latency samples; median of three trial medians for memory; median of three CPU intervals."
+  }
+}

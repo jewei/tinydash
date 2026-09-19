@@ -1,0 +1,4926 @@
+{
+  "metric": "macOS physical footprint, host and every attributed helper",
+  "spread": "range of fresh-process run medians",
+  "excluded_runs": [],
+  "configurations": {
+    "baseline2/controlled": {
+      "binary_sha256": "4b8f9004157b63e7f30e24d9df35b3430a1603e630c0dd5a8ded3fb648944403",
+      "complete": true,
+      "runs": [
+        {
+          "file": "baseline2-controlled-real-1.json",
+          "trial": 1,
+          "peak_mib": 343.4109649658203,
+          "peak_before_settings_mib": 343.4109649658203,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 47647,
+                "name": "tinydash",
+                "mib": 30.688552856445312
+              },
+              {
+                "pid": 47649,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1565704345703125
+              },
+              {
+                "pid": 47650,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.78209686279297
+              },
+              {
+                "pid": 47651,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 57.2510986328125
+              },
+              {
+                "pid": 47652,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.031684875488281
+              },
+              {
+                "pid": 47653,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9536285400390625
+              },
+              {
+                "pid": 47654,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.375457763671875
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 47647,
+                "name": "tinydash",
+                "mib": 30.594802856445312
+              },
+              {
+                "pid": 47649,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1878204345703125
+              },
+              {
+                "pid": 47650,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.766471862792969
+              },
+              {
+                "pid": 47651,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 57.0323486328125
+              },
+              {
+                "pid": 47652,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.031684875488281
+              },
+              {
+                "pid": 47653,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9536285400390625
+              },
+              {
+                "pid": 47654,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.391082763671875
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 47647,
+                "name": "tinydash",
+                "mib": 42.70429229736328
+              },
+              {
+                "pid": 47649,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2815933227539062
+              },
+              {
+                "pid": 47650,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.423019409179688
+              },
+              {
+                "pid": 47651,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 57.8292236328125
+              },
+              {
+                "pid": 47652,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.000434875488281
+              },
+              {
+                "pid": 47653,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9536285400390625
+              },
+              {
+                "pid": 47654,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.437957763671875
+              },
+              {
+                "pid": 48422,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 45.20399475097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 30.688552856445312,
+              "web_content": 57.2510986328125,
+              "web_gpu": 20.78209686279297,
+              "web_network": 6.031684875488281,
+              "other_helpers": 15.48565673828125
+            },
+            "hidden": {
+              "host": 30.594802856445312,
+              "web_content": 57.0323486328125,
+              "web_gpu": 12.766471862792969,
+              "web_network": 6.031684875488281,
+              "other_helpers": 15.53253173828125
+            },
+            "after_settings": {
+              "host": 42.70429229736328,
+              "web_content": 103.03321838378906,
+              "web_gpu": 13.423019409179688,
+              "web_network": 6.000434875488281,
+              "other_helpers": 15.673179626464844
+            }
+          },
+          "visible_mib": 130.2390899658203,
+          "hidden_mib": 121.95783996582031,
+          "after_settings_mib": 180.83414459228516
+        },
+        {
+          "file": "baseline2-controlled-real-2.json",
+          "trial": 2,
+          "peak_mib": 322.89522552490234,
+          "peak_before_settings_mib": 322.89522552490234,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 51056,
+                "name": "tinydash",
+                "mib": 34.18855285644531
+              },
+              {
+                "pid": 51058,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2503433227539062
+              },
+              {
+                "pid": 51059,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.188323974609375
+              },
+              {
+                "pid": 51060,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 57.78227996826172
+              },
+              {
+                "pid": 51061,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.547309875488281
+              },
+              {
+                "pid": 51062,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.234855651855469
+              },
+              {
+                "pid": 51063,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.422309875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 51056,
+                "name": "tinydash",
+                "mib": 34.07917785644531
+              },
+              {
+                "pid": 51058,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2659683227539062
+              },
+              {
+                "pid": 51059,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.875823974609375
+              },
+              {
+                "pid": 51060,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 57.56352996826172
+              },
+              {
+                "pid": 51061,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.3597869873046875
+              },
+              {
+                "pid": 51062,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9379806518554688
+              },
+              {
+                "pid": 51063,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 51056,
+                "name": "tinydash",
+                "mib": 44.938621520996094
+              },
+              {
+                "pid": 51058,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3284683227539062
+              },
+              {
+                "pid": 51059,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.547950744628906
+              },
+              {
+                "pid": 51060,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 57.73540496826172
+              },
+              {
+                "pid": 51061,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.391059875488281
+              },
+              {
+                "pid": 51062,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9379806518554688
+              },
+              {
+                "pid": 51063,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.453559875488281
+              },
+              {
+                "pid": 51392,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 52.96961975097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 34.18855285644531,
+              "web_content": 57.78227996826172,
+              "web_gpu": 20.188323974609375,
+              "web_network": 6.547309875488281,
+              "other_helpers": 17.907508850097656
+            },
+            "hidden": {
+              "host": 34.07917785644531,
+              "web_content": 57.56352996826172,
+              "web_gpu": 12.875823974609375,
+              "web_network": 6.3597869873046875,
+              "other_helpers": 15.610633850097656
+            },
+            "after_settings": {
+              "host": 44.938621520996094,
+              "web_content": 110.72064971923828,
+              "web_gpu": 13.547950744628906,
+              "web_network": 6.391059875488281,
+              "other_helpers": 15.720008850097656
+            }
+          },
+          "visible_mib": 136.61397552490234,
+          "hidden_mib": 126.48895263671875,
+          "after_settings_mib": 191.30266571044922
+        },
+        {
+          "file": "baseline2-controlled-real-3.json",
+          "trial": 3,
+          "peak_mib": 358.9578170776367,
+          "peak_before_settings_mib": 358.9578170776367,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 52875,
+                "name": "tinydash",
+                "mib": 33.53230285644531
+              },
+              {
+                "pid": 52877,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2190933227539062
+              },
+              {
+                "pid": 52878,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.719573974609375
+              },
+              {
+                "pid": 52879,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 56.844825744628906
+              },
+              {
+                "pid": 52880,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.437934875488281
+              },
+              {
+                "pid": 52881,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.2817535400390625
+              },
+              {
+                "pid": 52882,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.484809875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 52875,
+                "name": "tinydash",
+                "mib": 33.40730285644531
+              },
+              {
+                "pid": 52877,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1722183227539062
+              },
+              {
+                "pid": 52878,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.625823974609375
+              },
+              {
+                "pid": 52879,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 56.657325744628906
+              },
+              {
+                "pid": 52880,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.437934875488281
+              },
+              {
+                "pid": 52881,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.2817535400390625
+              },
+              {
+                "pid": 52882,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.469184875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 52875,
+                "name": "tinydash",
+                "mib": 43.54804229736328
+              },
+              {
+                "pid": 52877,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3128433227539062
+              },
+              {
+                "pid": 52878,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.235427856445312
+              },
+              {
+                "pid": 52879,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 58.032325744628906
+              },
+              {
+                "pid": 52880,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.391059875488281
+              },
+              {
+                "pid": 52881,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 52882,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.531684875488281
+              },
+              {
+                "pid": 53646,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 50.89147186279297
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 33.53230285644531,
+              "web_content": 56.844825744628906,
+              "web_gpu": 20.719573974609375,
+              "web_network": 6.437934875488281,
+              "other_helpers": 17.98565673828125
+            },
+            "hidden": {
+              "host": 33.40730285644531,
+              "web_content": 56.657325744628906,
+              "web_gpu": 12.625823974609375,
+              "web_network": 6.437934875488281,
+              "other_helpers": 17.92315673828125
+            },
+            "after_settings": {
+              "host": 43.54804229736328,
+              "web_content": 108.92379760742188,
+              "web_gpu": 13.235427856445312,
+              "web_network": 6.391059875488281,
+              "other_helpers": 15.82940673828125
+            }
+          },
+          "visible_mib": 135.52029418945312,
+          "hidden_mib": 127.05154418945312,
+          "after_settings_mib": 187.927734375
+        },
+        {
+          "file": "baseline2-controlled-real-4.json",
+          "trial": 4,
+          "peak_mib": 325.61402130126953,
+          "peak_before_settings_mib": 325.61402130126953,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 56274,
+                "name": "tinydash",
+                "mib": 34.04790496826172
+              },
+              {
+                "pid": 56276,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1878204345703125
+              },
+              {
+                "pid": 56277,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.110198974609375
+              },
+              {
+                "pid": 56278,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 85.7667236328125
+              },
+              {
+                "pid": 56279,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.187934875488281
+              },
+              {
+                "pid": 56280,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.3130035400390625
+              },
+              {
+                "pid": 56281,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.469184875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 56274,
+                "name": "tinydash",
+                "mib": 33.93852996826172
+              },
+              {
+                "pid": 56276,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1565933227539062
+              },
+              {
+                "pid": 56277,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.750823974609375
+              },
+              {
+                "pid": 56278,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 85.5948486328125
+              },
+              {
+                "pid": 56279,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.187934875488281
+              },
+              {
+                "pid": 56280,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.3130035400390625
+              },
+              {
+                "pid": 56281,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.484809875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 56274,
+                "name": "tinydash",
+                "mib": 42.391746520996094
+              },
+              {
+                "pid": 56276,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3284683227539062
+              },
+              {
+                "pid": 56277,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.516746520996094
+              },
+              {
+                "pid": 56278,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 58.6104736328125
+              },
+              {
+                "pid": 56279,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.125434875488281
+              },
+              {
+                "pid": 56280,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0161285400390625
+              },
+              {
+                "pid": 56281,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.516059875488281
+              },
+              {
+                "pid": 56618,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 52.87586975097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 34.04790496826172,
+              "web_content": 85.7667236328125,
+              "web_gpu": 20.110198974609375,
+              "web_network": 6.187934875488281,
+              "other_helpers": 17.970008850097656
+            },
+            "hidden": {
+              "host": 33.93852996826172,
+              "web_content": 85.5948486328125,
+              "web_gpu": 12.750823974609375,
+              "web_network": 6.187934875488281,
+              "other_helpers": 17.95440673828125
+            },
+            "after_settings": {
+              "host": 42.391746520996094,
+              "web_content": 111.48634338378906,
+              "web_gpu": 13.516746520996094,
+              "web_network": 6.125434875488281,
+              "other_helpers": 15.86065673828125
+            }
+          },
+          "visible_mib": 164.08277130126953,
+          "hidden_mib": 156.42654418945312,
+          "after_settings_mib": 189.38092803955078
+        },
+        {
+          "file": "baseline2-controlled-real-5.json",
+          "trial": 5,
+          "peak_mib": 338.2859191894531,
+          "peak_before_settings_mib": 338.2859191894531,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 58103,
+                "name": "tinydash",
+                "mib": 34.37605285644531
+              },
+              {
+                "pid": 58106,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1878204345703125
+              },
+              {
+                "pid": 58107,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.438369750976562
+              },
+              {
+                "pid": 58108,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 84.39167785644531
+              },
+              {
+                "pid": 58109,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.125434875488281
+              },
+              {
+                "pid": 58110,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.266105651855469
+              },
+              {
+                "pid": 58111,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 58103,
+                "name": "tinydash",
+                "mib": 32.81355285644531
+              },
+              {
+                "pid": 58106,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1096954345703125
+              },
+              {
+                "pid": 58107,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.719619750976562
+              },
+              {
+                "pid": 58108,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 84.14167785644531
+              },
+              {
+                "pid": 58109,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.125434875488281
+              },
+              {
+                "pid": 58110,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.266105651855469
+              },
+              {
+                "pid": 58111,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.359809875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 58103,
+                "name": "tinydash",
+                "mib": 42.67301940917969
+              },
+              {
+                "pid": 58106,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3128433227539062
+              },
+              {
+                "pid": 58107,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 14.048042297363281
+              },
+              {
+                "pid": 58108,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 85.7667007446289
+              },
+              {
+                "pid": 58109,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.078559875488281
+              },
+              {
+                "pid": 58110,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9692306518554688
+              },
+              {
+                "pid": 58111,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              },
+              {
+                "pid": 58885,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 44.26647186279297
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 34.37605285644531,
+              "web_content": 84.39167785644531,
+              "web_gpu": 20.438369750976562,
+              "web_network": 6.125434875488281,
+              "other_helpers": 17.860610961914062
+            },
+            "hidden": {
+              "host": 32.81355285644531,
+              "web_content": 84.14167785644531,
+              "web_gpu": 12.719619750976562,
+              "web_network": 6.125434875488281,
+              "other_helpers": 17.735610961914062
+            },
+            "after_settings": {
+              "host": 42.67301940917969,
+              "web_content": 130.03317260742188,
+              "web_gpu": 14.048042297363281,
+              "web_network": 6.078559875488281,
+              "other_helpers": 15.688758850097656
+            }
+          },
+          "visible_mib": 163.19214630126953,
+          "hidden_mib": 153.53589630126953,
+          "after_settings_mib": 208.52155303955078
+        }
+      ],
+      "footprint": {
+        "visible": {
+          "values": [
+            130.2390899658203,
+            136.61397552490234,
+            135.52029418945312,
+            164.08277130126953,
+            163.19214630126953
+          ],
+          "median": 136.61397552490234,
+          "min": 130.2390899658203,
+          "max": 164.08277130126953
+        },
+        "hidden": {
+          "values": [
+            121.95783996582031,
+            126.48895263671875,
+            127.05154418945312,
+            156.42654418945312,
+            153.53589630126953
+          ],
+          "median": 127.05154418945312,
+          "min": 121.95783996582031,
+          "max": 156.42654418945312
+        },
+        "after_settings": {
+          "values": [
+            180.83414459228516,
+            191.30266571044922,
+            187.927734375,
+            189.38092803955078,
+            208.52155303955078
+          ],
+          "median": 189.38092803955078,
+          "min": 180.83414459228516,
+          "max": 208.52155303955078
+        },
+        "peak": {
+          "values": [
+            343.4109649658203,
+            322.89522552490234,
+            358.9578170776367,
+            325.61402130126953,
+            338.2859191894531
+          ],
+          "median": 338.2859191894531,
+          "min": 322.89522552490234,
+          "max": 358.9578170776367
+        },
+        "peak_before_settings": {
+          "values": [
+            343.4109649658203,
+            322.89522552490234,
+            358.9578170776367,
+            325.61402130126953,
+            338.2859191894531
+          ],
+          "median": 338.2859191894531,
+          "min": 322.89522552490234,
+          "max": 358.9578170776367
+        }
+      },
+      "components": {
+        "visible": {
+          "host": {
+            "values": [
+              30.688552856445312,
+              34.18855285644531,
+              33.53230285644531,
+              34.04790496826172,
+              34.37605285644531
+            ],
+            "median": 34.04790496826172,
+            "min": 30.688552856445312,
+            "max": 34.37605285644531
+          },
+          "web_content": {
+            "values": [
+              57.2510986328125,
+              57.78227996826172,
+              56.844825744628906,
+              85.7667236328125,
+              84.39167785644531
+            ],
+            "median": 57.78227996826172,
+            "min": 56.844825744628906,
+            "max": 85.7667236328125
+          },
+          "web_gpu": {
+            "values": [
+              20.78209686279297,
+              20.188323974609375,
+              20.719573974609375,
+              20.110198974609375,
+              20.438369750976562
+            ],
+            "median": 20.438369750976562,
+            "min": 20.110198974609375,
+            "max": 20.78209686279297
+          },
+          "web_network": {
+            "values": [
+              6.031684875488281,
+              6.547309875488281,
+              6.437934875488281,
+              6.187934875488281,
+              6.125434875488281
+            ],
+            "median": 6.187934875488281,
+            "min": 6.031684875488281,
+            "max": 6.547309875488281
+          },
+          "other_helpers": {
+            "values": [
+              15.48565673828125,
+              17.907508850097656,
+              17.98565673828125,
+              17.970008850097656,
+              17.860610961914062
+            ],
+            "median": 17.907508850097656,
+            "min": 15.48565673828125,
+            "max": 17.98565673828125
+          }
+        },
+        "hidden": {
+          "host": {
+            "values": [
+              30.594802856445312,
+              34.07917785644531,
+              33.40730285644531,
+              33.93852996826172,
+              32.81355285644531
+            ],
+            "median": 33.40730285644531,
+            "min": 30.594802856445312,
+            "max": 34.07917785644531
+          },
+          "web_content": {
+            "values": [
+              57.0323486328125,
+              57.56352996826172,
+              56.657325744628906,
+              85.5948486328125,
+              84.14167785644531
+            ],
+            "median": 57.56352996826172,
+            "min": 56.657325744628906,
+            "max": 85.5948486328125
+          },
+          "web_gpu": {
+            "values": [
+              12.766471862792969,
+              12.875823974609375,
+              12.625823974609375,
+              12.750823974609375,
+              12.719619750976562
+            ],
+            "median": 12.750823974609375,
+            "min": 12.625823974609375,
+            "max": 12.875823974609375
+          },
+          "web_network": {
+            "values": [
+              6.031684875488281,
+              6.3597869873046875,
+              6.437934875488281,
+              6.187934875488281,
+              6.125434875488281
+            ],
+            "median": 6.187934875488281,
+            "min": 6.031684875488281,
+            "max": 6.437934875488281
+          },
+          "other_helpers": {
+            "values": [
+              15.53253173828125,
+              15.610633850097656,
+              17.92315673828125,
+              17.95440673828125,
+              17.735610961914062
+            ],
+            "median": 17.735610961914062,
+            "min": 15.53253173828125,
+            "max": 17.95440673828125
+          }
+        },
+        "after_settings": {
+          "host": {
+            "values": [
+              42.70429229736328,
+              44.938621520996094,
+              43.54804229736328,
+              42.391746520996094,
+              42.67301940917969
+            ],
+            "median": 42.70429229736328,
+            "min": 42.391746520996094,
+            "max": 44.938621520996094
+          },
+          "web_content": {
+            "values": [
+              103.03321838378906,
+              110.72064971923828,
+              108.92379760742188,
+              111.48634338378906,
+              130.03317260742188
+            ],
+            "median": 110.72064971923828,
+            "min": 103.03321838378906,
+            "max": 130.03317260742188
+          },
+          "web_gpu": {
+            "values": [
+              13.423019409179688,
+              13.547950744628906,
+              13.235427856445312,
+              13.516746520996094,
+              14.048042297363281
+            ],
+            "median": 13.516746520996094,
+            "min": 13.235427856445312,
+            "max": 14.048042297363281
+          },
+          "web_network": {
+            "values": [
+              6.000434875488281,
+              6.391059875488281,
+              6.391059875488281,
+              6.125434875488281,
+              6.078559875488281
+            ],
+            "median": 6.125434875488281,
+            "min": 6.000434875488281,
+            "max": 6.391059875488281
+          },
+          "other_helpers": {
+            "values": [
+              15.673179626464844,
+              15.720008850097656,
+              15.82940673828125,
+              15.86065673828125,
+              15.688758850097656
+            ],
+            "median": 15.720008850097656,
+            "min": 15.673179626464844,
+            "max": 15.86065673828125
+          }
+        }
+      },
+      "latency": {
+        "apps": {
+          "n": 100,
+          "p50_ms": 29.50737500214018,
+          "p95_ms": 53.693875030148774,
+          "min_ms": 17.627083347178996,
+          "max_ms": 64.76554169785231,
+          "run_p50": {
+            "values": [
+              27.59668749058619,
+              30.683020828291774,
+              29.69156252220273,
+              29.571874998509884,
+              30.5629791400861
+            ],
+            "median": 29.69156252220273,
+            "min": 27.59668749058619,
+            "max": 30.683020828291774
+          },
+          "run_p95": {
+            "values": [
+              51.597583340480924,
+              50.51037500379607,
+              35.16545833554119,
+              34.72141665406525,
+              54.8656249884516
+            ],
+            "median": 50.51037500379607,
+            "min": 34.72141665406525,
+            "max": 54.8656249884516
+          }
+        },
+        "arithmetic": {
+          "n": 100,
+          "p50_ms": 16.874729160917923,
+          "p95_ms": 50.34712504129857,
+          "min_ms": 8.600083354394883,
+          "max_ms": 61.62674998631701,
+          "run_p50": {
+            "values": [
+              15.983395831426606,
+              18.87495833216235,
+              18.831666675396264,
+              15.494041668716818,
+              18.051833350909874
+            ],
+            "median": 18.051833350909874,
+            "min": 15.494041668716818,
+            "max": 18.87495833216235
+          },
+          "run_p95": {
+            "values": [
+              28.054874972440302,
+              39.261583297047764,
+              49.064458347857,
+              50.81504164263606,
+              50.34712504129857
+            ],
+            "median": 49.064458347857,
+            "min": 28.054874972440302,
+            "max": 50.81504164263606
+          }
+        },
+        "reopen": {
+          "n": 100,
+          "p50_ms": 39.11733330460265,
+          "p95_ms": 48.97008335683495,
+          "min_ms": 22.16975000919774,
+          "max_ms": 55.50775001756847,
+          "run_p50": {
+            "values": [
+              37.30685418122448,
+              32.739854155806825,
+              30.581062514102086,
+              41.18733335053548,
+              41.514604177791625
+            ],
+            "median": 37.30685418122448,
+            "min": 30.581062514102086,
+            "max": 41.514604177791625
+          },
+          "run_p95": {
+            "values": [
+              50.3361250157468,
+              44.433791656047106,
+              48.52795833721757,
+              47.05024999566376,
+              47.33195836888626
+            ],
+            "median": 47.33195836888626,
+            "min": 44.433791656047106,
+            "max": 50.3361250157468
+          }
+        },
+        "settings": {
+          "n": 100,
+          "p50_ms": 7.778229512041435,
+          "p95_ms": 44.552499952260405,
+          "min_ms": 2.485417004209012,
+          "max_ms": 283.76716701313853,
+          "run_p50": {
+            "values": [
+              7.041645993012935,
+              7.384270487818867,
+              3.668146033305675,
+              11.739395471522585,
+              10.647792019881308
+            ],
+            "median": 7.384270487818867,
+            "min": 3.668146033305675,
+            "max": 11.739395471522585
+          },
+          "run_p95": {
+            "values": [
+              37.633667001500726,
+              41.23958299169317,
+              7.924749981611967,
+              44.552499952260405,
+              43.071750027593225
+            ],
+            "median": 41.23958299169317,
+            "min": 7.924749981611967,
+            "max": 44.552499952260405
+          }
+        },
+        "settings_first": {
+          "n": 5,
+          "p50_ms": 276.90220798831433,
+          "p95_ms": 283.76716701313853,
+          "min_ms": 262.6594169996679,
+          "max_ms": 283.76716701313853,
+          "run_p50": {
+            "values": [
+              280.44449997833,
+              283.76716701313853,
+              276.90220798831433,
+              269.46829102234915,
+              262.6594169996679
+            ],
+            "median": 276.90220798831433,
+            "min": 262.6594169996679,
+            "max": 283.76716701313853
+          },
+          "run_p95": {
+            "values": [
+              280.44449997833,
+              283.76716701313853,
+              276.90220798831433,
+              269.46829102234915,
+              262.6594169996679
+            ],
+            "median": 276.90220798831433,
+            "min": 262.6594169996679,
+            "max": 283.76716701313853
+          }
+        },
+        "settings_reopen": {
+          "n": 95,
+          "p50_ms": 7.4819999863393605,
+          "p95_ms": 37.87654102779925,
+          "min_ms": 2.485417004209012,
+          "max_ms": 44.552499952260405,
+          "run_p50": {
+            "values": [
+              6.66633399669081,
+              6.384082953445613,
+              3.482417028862983,
+              10.758749966043979,
+              10.248000035062432
+            ],
+            "median": 6.66633399669081,
+            "min": 3.482417028862983,
+            "max": 10.758749966043979
+          },
+          "run_p95": {
+            "values": [
+              37.633667001500726,
+              41.23958299169317,
+              7.924749981611967,
+              44.552499952260405,
+              43.071750027593225
+            ],
+            "median": 41.23958299169317,
+            "min": 7.924749981611967,
+            "max": 44.552499952260405
+          }
+        }
+      }
+    },
+    "baseline2/daily": {
+      "binary_sha256": "4b8f9004157b63e7f30e24d9df35b3430a1603e630c0dd5a8ded3fb648944403",
+      "complete": true,
+      "runs": [
+        {
+          "file": "baseline2-daily-real-1.json",
+          "trial": 1,
+          "peak_mib": 545.4579086303711,
+          "peak_before_settings_mib": 545.4579086303711,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 49246,
+                "name": "tinydash",
+                "mib": 85.5010986328125
+              },
+              {
+                "pid": 49248,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1565933227539062
+              },
+              {
+                "pid": 49249,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.469573974609375
+              },
+              {
+                "pid": 49250,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 241.31366729736328
+              },
+              {
+                "pid": 49251,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.4222869873046875
+              },
+              {
+                "pid": 49252,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9536285400390625
+              },
+              {
+                "pid": 49253,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.500434875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 49246,
+                "name": "tinydash",
+                "mib": 77.3760986328125
+              },
+              {
+                "pid": 49248,
+                "name": "SetStoreUpdateService",
+                "mib": 2.6565933227539062
+              },
+              {
+                "pid": 49249,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 14.610198974609375
+              },
+              {
+                "pid": 49250,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 68.50116729736328
+              },
+              {
+                "pid": 49251,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 7.2816619873046875
+              },
+              {
+                "pid": 49252,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9536285400390625
+              },
+              {
+                "pid": 49253,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 12.750434875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 49246,
+                "name": "tinydash",
+                "mib": 89.32929229736328
+              },
+              {
+                "pid": 49248,
+                "name": "SetStoreUpdateService",
+                "mib": 2.9065933227539062
+              },
+              {
+                "pid": 49249,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 16.047950744628906
+              },
+              {
+                "pid": 49250,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 101.86054229736328
+              },
+              {
+                "pid": 49251,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 7.2191619873046875
+              },
+              {
+                "pid": 49252,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9536285400390625
+              },
+              {
+                "pid": 49253,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 12.859809875488281
+              },
+              {
+                "pid": 49580,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 45.016448974609375
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 85.4854736328125,
+              "web_content": 241.32929229736328,
+              "web_gpu": 20.469573974609375,
+              "web_network": 6.4222869873046875,
+              "other_helpers": 15.61065673828125
+            },
+            "hidden": {
+              "host": 77.3760986328125,
+              "web_content": 68.50116729736328,
+              "web_gpu": 14.610198974609375,
+              "web_network": 7.2816619873046875,
+              "other_helpers": 18.36065673828125
+            },
+            "after_settings": {
+              "host": 89.32929229736328,
+              "web_content": 146.87699127197266,
+              "web_gpu": 16.047950744628906,
+              "web_network": 7.2191619873046875,
+              "other_helpers": 18.72003173828125
+            }
+          },
+          "visible_mib": 369.3172836303711,
+          "hidden_mib": 186.1297836303711,
+          "after_settings_mib": 278.1934280395508
+        },
+        {
+          "file": "baseline2-daily-real-2.json",
+          "trial": 2,
+          "peak_mib": 561.7080001831055,
+          "peak_before_settings_mib": 561.7080001831055,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 52207,
+                "name": "tinydash",
+                "mib": 68.8292236328125
+              },
+              {
+                "pid": 52209,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2347183227539062
+              },
+              {
+                "pid": 52210,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.84459686279297
+              },
+              {
+                "pid": 52211,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 240.96996307373047
+              },
+              {
+                "pid": 52212,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.437934875488281
+              },
+              {
+                "pid": 52213,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0161285400390625
+              },
+              {
+                "pid": 52215,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.500434875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 52207,
+                "name": "tinydash",
+                "mib": 54.282325744628906
+              },
+              {
+                "pid": 52209,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1878433227539062
+              },
+              {
+                "pid": 52210,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.828971862792969
+              },
+              {
+                "pid": 52211,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 64.46996307373047
+              },
+              {
+                "pid": 52212,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.437934875488281
+              },
+              {
+                "pid": 52213,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0161285400390625
+              },
+              {
+                "pid": 52215,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.484809875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 52207,
+                "name": "tinydash",
+                "mib": 64.8604965209961
+              },
+              {
+                "pid": 52209,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3284683227539062
+              },
+              {
+                "pid": 52210,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.266769409179688
+              },
+              {
+                "pid": 52211,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 66.68871307373047
+              },
+              {
+                "pid": 52212,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.406684875488281
+              },
+              {
+                "pid": 52213,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0161285400390625
+              },
+              {
+                "pid": 52215,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.547309875488281
+              },
+              {
+                "pid": 52704,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 45.000892639160156
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 68.8292236328125,
+              "web_content": 240.96996307373047,
+              "web_gpu": 20.84459686279297,
+              "web_network": 6.437934875488281,
+              "other_helpers": 15.75128173828125
+            },
+            "hidden": {
+              "host": 54.282325744628906,
+              "web_content": 64.46996307373047,
+              "web_gpu": 12.828971862792969,
+              "web_network": 6.437934875488281,
+              "other_helpers": 15.68878173828125
+            },
+            "after_settings": {
+              "host": 64.8604965209961,
+              "web_content": 111.68960571289062,
+              "web_gpu": 13.266769409179688,
+              "web_network": 6.406684875488281,
+              "other_helpers": 15.89190673828125
+            }
+          },
+          "visible_mib": 352.83300018310547,
+          "hidden_mib": 153.70797729492188,
+          "after_settings_mib": 212.11546325683594
+        },
+        {
+          "file": "baseline2-daily-real-3.json",
+          "trial": 3,
+          "peak_mib": 515.9892501831055,
+          "peak_before_settings_mib": 515.9892501831055,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 54465,
+                "name": "tinydash",
+                "mib": 67.2667236328125
+              },
+              {
+                "pid": 54467,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2347183227539062
+              },
+              {
+                "pid": 54468,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 21.14147186279297
+              },
+              {
+                "pid": 54469,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 98.61056518554688
+              },
+              {
+                "pid": 54470,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.406684875488281
+              },
+              {
+                "pid": 54471,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9379806518554688
+              },
+              {
+                "pid": 54472,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.594184875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 54465,
+                "name": "tinydash",
+                "mib": 67.2198486328125
+              },
+              {
+                "pid": 54467,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2190933227539062
+              },
+              {
+                "pid": 54468,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.953971862792969
+              },
+              {
+                "pid": 54469,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 98.37619018554688
+              },
+              {
+                "pid": 54470,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.406684875488281
+              },
+              {
+                "pid": 54471,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9379806518554688
+              },
+              {
+                "pid": 54472,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.594184875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 54465,
+                "name": "tinydash",
+                "mib": 79.57929229736328
+              },
+              {
+                "pid": 54467,
+                "name": "SetStoreUpdateService",
+                "mib": 2.8440933227539062
+              },
+              {
+                "pid": 54468,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 16.329269409179688
+              },
+              {
+                "pid": 54469,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 64.42306518554688
+              },
+              {
+                "pid": 54470,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 7.234809875488281
+              },
+              {
+                "pid": 54471,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9379806518554688
+              },
+              {
+                "pid": 54472,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 12.797309875488281
+              },
+              {
+                "pid": 54798,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 53.07904052734375
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 67.2667236328125,
+              "web_content": 98.61056518554688,
+              "web_gpu": 21.12584686279297,
+              "web_network": 6.406684875488281,
+              "other_helpers": 15.766883850097656
+            },
+            "hidden": {
+              "host": 67.2198486328125,
+              "web_content": 98.37619018554688,
+              "web_gpu": 12.953971862792969,
+              "web_network": 6.406684875488281,
+              "other_helpers": 15.751258850097656
+            },
+            "after_settings": {
+              "host": 79.57929229736328,
+              "web_content": 117.50210571289062,
+              "web_gpu": 16.329269409179688,
+              "web_network": 7.234809875488281,
+              "other_helpers": 18.579383850097656
+            }
+          },
+          "visible_mib": 209.19232940673828,
+          "hidden_mib": 200.70795440673828,
+          "after_settings_mib": 239.22486114501953
+        },
+        {
+          "file": "baseline2-daily-real-4.json",
+          "trial": 4,
+          "peak_mib": 553.0985565185547,
+          "peak_before_settings_mib": 553.0985565185547,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 57440,
+                "name": "tinydash",
+                "mib": 88.8136215209961
+              },
+              {
+                "pid": 57443,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2034683227539062
+              },
+              {
+                "pid": 57444,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.438323974609375
+              },
+              {
+                "pid": 57445,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 241.03241729736328
+              },
+              {
+                "pid": 57446,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.4222869873046875
+              },
+              {
+                "pid": 57447,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0004806518554688
+              },
+              {
+                "pid": 57448,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.531684875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 57440,
+                "name": "tinydash",
+                "mib": 68.8448486328125
+              },
+              {
+                "pid": 57443,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1409683227539062
+              },
+              {
+                "pid": 57444,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.610198974609375
+              },
+              {
+                "pid": 57445,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 64.20429229736328
+              },
+              {
+                "pid": 57446,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.4222869873046875
+              },
+              {
+                "pid": 57447,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0004806518554688
+              },
+              {
+                "pid": 57448,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.469184875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 57440,
+                "name": "tinydash",
+                "mib": 66.28239440917969
+              },
+              {
+                "pid": 57443,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2972183227539062
+              },
+              {
+                "pid": 57444,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.251029968261719
+              },
+              {
+                "pid": 57445,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 66.36054229736328
+              },
+              {
+                "pid": 57446,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.3441619873046875
+              },
+              {
+                "pid": 57447,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0004806518554688
+              },
+              {
+                "pid": 57448,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.562934875488281
+              },
+              {
+                "pid": 57938,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 52.93834686279297
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 88.8136215209961,
+              "web_content": 241.03241729736328,
+              "web_gpu": 20.438323974609375,
+              "web_network": 6.4222869873046875,
+              "other_helpers": 15.735633850097656
+            },
+            "hidden": {
+              "host": 68.8448486328125,
+              "web_content": 64.20429229736328,
+              "web_gpu": 12.610198974609375,
+              "web_network": 6.4222869873046875,
+              "other_helpers": 15.610633850097656
+            },
+            "after_settings": {
+              "host": 66.28239440917969,
+              "web_content": 119.29888916015625,
+              "web_gpu": 13.251029968261719,
+              "web_network": 6.3441619873046875,
+              "other_helpers": 15.860633850097656
+            }
+          },
+          "visible_mib": 372.4422836303711,
+          "hidden_mib": 167.6922607421875,
+          "after_settings_mib": 221.037109375
+        },
+        {
+          "file": "baseline2-daily-real-5.json",
+          "trial": 5,
+          "peak_mib": 429.8953857421875,
+          "peak_before_settings_mib": 429.8953857421875,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 59721,
+                "name": "tinydash",
+                "mib": 71.1261215209961
+              },
+              {
+                "pid": 59723,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2190704345703125
+              },
+              {
+                "pid": 59724,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.53209686279297
+              },
+              {
+                "pid": 59725,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 137.6573486328125
+              },
+              {
+                "pid": 59726,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.062934875488281
+              },
+              {
+                "pid": 59728,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9692306518554688
+              },
+              {
+                "pid": 59729,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.484809875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 59721,
+                "name": "tinydash",
+                "mib": 54.1104736328125
+              },
+              {
+                "pid": 59723,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1409454345703125
+              },
+              {
+                "pid": 59724,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.594596862792969
+              },
+              {
+                "pid": 59725,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 137.4698486328125
+              },
+              {
+                "pid": 59726,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.016059875488281
+              },
+              {
+                "pid": 59728,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9692306518554688
+              },
+              {
+                "pid": 59729,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.437934875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 59721,
+                "name": "tinydash",
+                "mib": 64.95429229736328
+              },
+              {
+                "pid": 59723,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2972183227539062
+              },
+              {
+                "pid": 59724,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.376052856445312
+              },
+              {
+                "pid": 59725,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 139.6417236328125
+              },
+              {
+                "pid": 59726,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.047309875488281
+              },
+              {
+                "pid": 59728,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9692306518554688
+              },
+              {
+                "pid": 59729,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.484809875488281
+              },
+              {
+                "pid": 60057,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 44.32897186279297
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 71.1261215209961,
+              "web_content": 137.6573486328125,
+              "web_gpu": 20.53209686279297,
+              "web_network": 6.062934875488281,
+              "other_helpers": 15.673110961914062
+            },
+            "hidden": {
+              "host": 54.1104736328125,
+              "web_content": 137.4698486328125,
+              "web_gpu": 12.594596862792969,
+              "web_network": 6.016059875488281,
+              "other_helpers": 15.548110961914062
+            },
+            "after_settings": {
+              "host": 64.95429229736328,
+              "web_content": 183.97069549560547,
+              "web_gpu": 13.376052856445312,
+              "web_network": 6.047309875488281,
+              "other_helpers": 15.751258850097656
+            }
+          },
+          "visible_mib": 251.0516128540039,
+          "hidden_mib": 225.7390899658203,
+          "after_settings_mib": 284.099609375
+        }
+      ],
+      "footprint": {
+        "visible": {
+          "values": [
+            369.3172836303711,
+            352.83300018310547,
+            209.19232940673828,
+            372.4422836303711,
+            251.0516128540039
+          ],
+          "median": 352.83300018310547,
+          "min": 209.19232940673828,
+          "max": 372.4422836303711
+        },
+        "hidden": {
+          "values": [
+            186.1297836303711,
+            153.70797729492188,
+            200.70795440673828,
+            167.6922607421875,
+            225.7390899658203
+          ],
+          "median": 186.1297836303711,
+          "min": 153.70797729492188,
+          "max": 225.7390899658203
+        },
+        "after_settings": {
+          "values": [
+            278.1934280395508,
+            212.11546325683594,
+            239.22486114501953,
+            221.037109375,
+            284.099609375
+          ],
+          "median": 239.22486114501953,
+          "min": 212.11546325683594,
+          "max": 284.099609375
+        },
+        "peak": {
+          "values": [
+            545.4579086303711,
+            561.7080001831055,
+            515.9892501831055,
+            553.0985565185547,
+            429.8953857421875
+          ],
+          "median": 545.4579086303711,
+          "min": 429.8953857421875,
+          "max": 561.7080001831055
+        },
+        "peak_before_settings": {
+          "values": [
+            545.4579086303711,
+            561.7080001831055,
+            515.9892501831055,
+            553.0985565185547,
+            429.8953857421875
+          ],
+          "median": 545.4579086303711,
+          "min": 429.8953857421875,
+          "max": 561.7080001831055
+        }
+      },
+      "components": {
+        "visible": {
+          "host": {
+            "values": [
+              85.4854736328125,
+              68.8292236328125,
+              67.2667236328125,
+              88.8136215209961,
+              71.1261215209961
+            ],
+            "median": 71.1261215209961,
+            "min": 67.2667236328125,
+            "max": 88.8136215209961
+          },
+          "web_content": {
+            "values": [
+              241.32929229736328,
+              240.96996307373047,
+              98.61056518554688,
+              241.03241729736328,
+              137.6573486328125
+            ],
+            "median": 240.96996307373047,
+            "min": 98.61056518554688,
+            "max": 241.32929229736328
+          },
+          "web_gpu": {
+            "values": [
+              20.469573974609375,
+              20.84459686279297,
+              21.12584686279297,
+              20.438323974609375,
+              20.53209686279297
+            ],
+            "median": 20.53209686279297,
+            "min": 20.438323974609375,
+            "max": 21.12584686279297
+          },
+          "web_network": {
+            "values": [
+              6.4222869873046875,
+              6.437934875488281,
+              6.406684875488281,
+              6.4222869873046875,
+              6.062934875488281
+            ],
+            "median": 6.4222869873046875,
+            "min": 6.062934875488281,
+            "max": 6.437934875488281
+          },
+          "other_helpers": {
+            "values": [
+              15.61065673828125,
+              15.75128173828125,
+              15.766883850097656,
+              15.735633850097656,
+              15.673110961914062
+            ],
+            "median": 15.735633850097656,
+            "min": 15.61065673828125,
+            "max": 15.766883850097656
+          }
+        },
+        "hidden": {
+          "host": {
+            "values": [
+              77.3760986328125,
+              54.282325744628906,
+              67.2198486328125,
+              68.8448486328125,
+              54.1104736328125
+            ],
+            "median": 67.2198486328125,
+            "min": 54.1104736328125,
+            "max": 77.3760986328125
+          },
+          "web_content": {
+            "values": [
+              68.50116729736328,
+              64.46996307373047,
+              98.37619018554688,
+              64.20429229736328,
+              137.4698486328125
+            ],
+            "median": 68.50116729736328,
+            "min": 64.20429229736328,
+            "max": 137.4698486328125
+          },
+          "web_gpu": {
+            "values": [
+              14.610198974609375,
+              12.828971862792969,
+              12.953971862792969,
+              12.610198974609375,
+              12.594596862792969
+            ],
+            "median": 12.828971862792969,
+            "min": 12.594596862792969,
+            "max": 14.610198974609375
+          },
+          "web_network": {
+            "values": [
+              7.2816619873046875,
+              6.437934875488281,
+              6.406684875488281,
+              6.4222869873046875,
+              6.016059875488281
+            ],
+            "median": 6.4222869873046875,
+            "min": 6.016059875488281,
+            "max": 7.2816619873046875
+          },
+          "other_helpers": {
+            "values": [
+              18.36065673828125,
+              15.68878173828125,
+              15.751258850097656,
+              15.610633850097656,
+              15.548110961914062
+            ],
+            "median": 15.68878173828125,
+            "min": 15.548110961914062,
+            "max": 18.36065673828125
+          }
+        },
+        "after_settings": {
+          "host": {
+            "values": [
+              89.32929229736328,
+              64.8604965209961,
+              79.57929229736328,
+              66.28239440917969,
+              64.95429229736328
+            ],
+            "median": 66.28239440917969,
+            "min": 64.8604965209961,
+            "max": 89.32929229736328
+          },
+          "web_content": {
+            "values": [
+              146.87699127197266,
+              111.68960571289062,
+              117.50210571289062,
+              119.29888916015625,
+              183.97069549560547
+            ],
+            "median": 119.29888916015625,
+            "min": 111.68960571289062,
+            "max": 183.97069549560547
+          },
+          "web_gpu": {
+            "values": [
+              16.047950744628906,
+              13.266769409179688,
+              16.329269409179688,
+              13.251029968261719,
+              13.376052856445312
+            ],
+            "median": 13.376052856445312,
+            "min": 13.251029968261719,
+            "max": 16.329269409179688
+          },
+          "web_network": {
+            "values": [
+              7.2191619873046875,
+              6.406684875488281,
+              7.234809875488281,
+              6.3441619873046875,
+              6.047309875488281
+            ],
+            "median": 6.406684875488281,
+            "min": 6.047309875488281,
+            "max": 7.234809875488281
+          },
+          "other_helpers": {
+            "values": [
+              18.72003173828125,
+              15.89190673828125,
+              18.579383850097656,
+              15.860633850097656,
+              15.751258850097656
+            ],
+            "median": 15.89190673828125,
+            "min": 15.751258850097656,
+            "max": 18.72003173828125
+          }
+        }
+      },
+      "latency": {
+        "apps": {
+          "n": 100,
+          "p50_ms": 49.70229166792706,
+          "p95_ms": 64.09674999304116,
+          "min_ms": 18.20837502600625,
+          "max_ms": 65.70483330870047,
+          "run_p50": {
+            "values": [
+              39.36745837563649,
+              42.461791657842696,
+              45.87647915468551,
+              54.97118749190122,
+              52.50329166301526
+            ],
+            "median": 45.87647915468551,
+            "min": 39.36745837563649,
+            "max": 54.97118749190122
+          },
+          "run_p95": {
+            "values": [
+              62.4124999740161,
+              64.44624997675419,
+              59.8935000016354,
+              62.656624999362975,
+              65.44870836660266
+            ],
+            "median": 62.656624999362975,
+            "min": 59.8935000016354,
+            "max": 65.44870836660266
+          }
+        },
+        "arithmetic": {
+          "n": 100,
+          "p50_ms": 15.83283333457075,
+          "p95_ms": 48.82654169341549,
+          "min_ms": 9.424999996554106,
+          "max_ms": 62.8656666376628,
+          "run_p50": {
+            "values": [
+              16.96489582536742,
+              14.41014584270306,
+              17.329645837889984,
+              14.973999990615994,
+              19.269687501946464
+            ],
+            "median": 16.96489582536742,
+            "min": 14.41014584270306,
+            "max": 19.269687501946464
+          },
+          "run_p95": {
+            "values": [
+              48.51820832118392,
+              48.23058331385255,
+              48.38037496665493,
+              47.902166668791324,
+              50.43129168916494
+            ],
+            "median": 48.38037496665493,
+            "min": 47.902166668791324,
+            "max": 50.43129168916494
+          }
+        },
+        "reopen": {
+          "n": 100,
+          "p50_ms": 34.37995834974572,
+          "p95_ms": 47.34370834194124,
+          "min_ms": 22.00779167469591,
+          "max_ms": 57.44000000413507,
+          "run_p50": {
+            "values": [
+              36.526645824778825,
+              29.01327080326155,
+              34.87283331924118,
+              39.51135417446494,
+              29.040562512818724
+            ],
+            "median": 34.87283331924118,
+            "min": 29.01327080326155,
+            "max": 39.51135417446494
+          },
+          "run_p95": {
+            "values": [
+              53.34983329521492,
+              36.466750025283545,
+              49.89087500143796,
+              45.258958358317614,
+              46.20962496846914
+            ],
+            "median": 46.20962496846914,
+            "min": 36.466750025283545,
+            "max": 53.34983329521492
+          }
+        },
+        "settings": {
+          "n": 100,
+          "p50_ms": 9.929229505360126,
+          "p95_ms": 43.80433296319097,
+          "min_ms": 2.5889170356094837,
+          "max_ms": 284.71770795295015,
+          "run_p50": {
+            "values": [
+              9.335020498838276,
+              9.310437511885539,
+              12.815166497603059,
+              9.547666501021013,
+              7.791083480697125
+            ],
+            "median": 9.335020498838276,
+            "min": 7.791083480697125,
+            "max": 12.815166497603059
+          },
+          "run_p95": {
+            "values": [
+              39.771458017639816,
+              38.211833976674825,
+              43.80433296319097,
+              39.85195804852992,
+              38.32920896820724
+            ],
+            "median": 39.771458017639816,
+            "min": 38.211833976674825,
+            "max": 43.80433296319097
+          }
+        },
+        "settings_first": {
+          "n": 5,
+          "p50_ms": 276.7862500040792,
+          "p95_ms": 284.71770795295015,
+          "min_ms": 272.177874983754,
+          "max_ms": 284.71770795295015,
+          "run_p50": {
+            "values": [
+              277.7406250243075,
+              284.71770795295015,
+              276.7862500040792,
+              272.177874983754,
+              275.2482910291292
+            ],
+            "median": 276.7862500040792,
+            "min": 272.177874983754,
+            "max": 284.71770795295015
+          },
+          "run_p95": {
+            "values": [
+              277.7406250243075,
+              284.71770795295015,
+              276.7862500040792,
+              272.177874983754,
+              275.2482910291292
+            ],
+            "median": 276.7862500040792,
+            "min": 272.177874983754,
+            "max": 284.71770795295015
+          }
+        },
+        "settings_reopen": {
+          "n": 95,
+          "p50_ms": 9.461458015721291,
+          "p95_ms": 38.32920896820724,
+          "min_ms": 2.5889170356094837,
+          "max_ms": 43.80433296319097,
+          "run_p50": {
+            "values": [
+              9.20858298195526,
+              8.730207977350801,
+              12.71258300403133,
+              9.375417022965848,
+              7.20499997260049
+            ],
+            "median": 9.20858298195526,
+            "min": 7.20499997260049,
+            "max": 12.71258300403133
+          },
+          "run_p95": {
+            "values": [
+              39.771458017639816,
+              38.211833976674825,
+              43.80433296319097,
+              39.85195804852992,
+              38.32920896820724
+            ],
+            "median": 39.771458017639816,
+            "min": 38.211833976674825,
+            "max": 43.80433296319097
+          }
+        }
+      }
+    },
+    "icon-final/controlled": {
+      "binary_sha256": "852b0667c0e94249c3dda3b791bfd96f8809223888c6339d84b1ee70ff13983d",
+      "complete": true,
+      "runs": [
+        {
+          "file": "icon-final-controlled-real-1.json",
+          "trial": 1,
+          "peak_mib": 376.1152801513672,
+          "peak_before_settings_mib": 288.69210052490234,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 48582,
+                "name": "tinydash",
+                "mib": 27.53223419189453
+              },
+              {
+                "pid": 48584,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1721954345703125
+              },
+              {
+                "pid": 48585,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.657073974609375
+              },
+              {
+                "pid": 48586,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 88.2667007446289
+              },
+              {
+                "pid": 48587,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.484832763671875
+              },
+              {
+                "pid": 48589,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 48590,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.453559875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 48582,
+                "name": "tinydash",
+                "mib": 27.17285919189453
+              },
+              {
+                "pid": 48584,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1409683227539062
+              },
+              {
+                "pid": 48585,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.750823974609375
+              },
+              {
+                "pid": 48586,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 88.4229507446289
+              },
+              {
+                "pid": 48587,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.437957763671875
+              },
+              {
+                "pid": 48589,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 48590,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.437934875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 48582,
+                "name": "tinydash",
+                "mib": 37.92292785644531
+              },
+              {
+                "pid": 48584,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2347183227539062
+              },
+              {
+                "pid": 48585,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.501144409179688
+              },
+              {
+                "pid": 48586,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 58.735450744628906
+              },
+              {
+                "pid": 48587,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.406707763671875
+              },
+              {
+                "pid": 48589,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 48590,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.500434875488281
+              },
+              {
+                "pid": 48924,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 53.204017639160156
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 27.26660919189453,
+              "web_content": 88.4073257446289,
+              "web_gpu": 20.672698974609375,
+              "web_network": 6.484832763671875,
+              "other_helpers": 15.610633850097656
+            },
+            "hidden": {
+              "host": 27.17285919189453,
+              "web_content": 88.4229507446289,
+              "web_gpu": 12.750823974609375,
+              "web_network": 6.437957763671875,
+              "other_helpers": 15.56378173828125
+            },
+            "after_settings": {
+              "host": 37.92292785644531,
+              "web_content": 111.93946838378906,
+              "web_gpu": 13.501144409179688,
+              "web_network": 6.406707763671875,
+              "other_helpers": 15.72003173828125
+            }
+          },
+          "visible_mib": 158.55147552490234,
+          "hidden_mib": 150.34837341308594,
+          "after_settings_mib": 185.4902801513672
+        },
+        {
+          "file": "icon-final-controlled-real-2.json",
+          "trial": 2,
+          "peak_mib": 320.1610107421875,
+          "peak_before_settings_mib": 320.1610107421875,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 50403,
+                "name": "tinydash",
+                "mib": 28.016700744628906
+              },
+              {
+                "pid": 50405,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1878204345703125
+              },
+              {
+                "pid": 50406,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 18.875892639160156
+              },
+              {
+                "pid": 50407,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 94.0479736328125
+              },
+              {
+                "pid": 50408,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.391059875488281
+              },
+              {
+                "pid": 50409,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.3130035400390625
+              },
+              {
+                "pid": 50410,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.469184875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 50403,
+                "name": "tinydash",
+                "mib": 27.922950744628906
+              },
+              {
+                "pid": 50405,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1565933227539062
+              },
+              {
+                "pid": 50406,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.516517639160156
+              },
+              {
+                "pid": 50407,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 56.2667236328125
+              },
+              {
+                "pid": 50408,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.391059875488281
+              },
+              {
+                "pid": 50409,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.3130035400390625
+              },
+              {
+                "pid": 50410,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.422309875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 50403,
+                "name": "tinydash",
+                "mib": 37.704246520996094
+              },
+              {
+                "pid": 50405,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2972183227539062
+              },
+              {
+                "pid": 50406,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.2823486328125
+              },
+              {
+                "pid": 50407,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 59.157371520996094
+              },
+              {
+                "pid": 50408,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.344184875488281
+              },
+              {
+                "pid": 50409,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0161285400390625
+              },
+              {
+                "pid": 50410,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.500434875488281
+              },
+              {
+                "pid": 50890,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 44.719642639160156
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 28.016700744628906,
+              "web_content": 94.1104736328125,
+              "web_gpu": 18.875892639160156,
+              "web_network": 6.391059875488281,
+              "other_helpers": 17.970008850097656
+            },
+            "hidden": {
+              "host": 27.922950744628906,
+              "web_content": 56.2667236328125,
+              "web_gpu": 12.516517639160156,
+              "web_network": 6.391059875488281,
+              "other_helpers": 17.89190673828125
+            },
+            "after_settings": {
+              "host": 37.704246520996094,
+              "web_content": 103.87701416015625,
+              "web_gpu": 13.2823486328125,
+              "web_network": 6.344184875488281,
+              "other_helpers": 15.81378173828125
+            }
+          },
+          "visible_mib": 165.3016357421875,
+          "hidden_mib": 120.9891586303711,
+          "after_settings_mib": 177.02157592773438
+        },
+        {
+          "file": "icon-final-controlled-real-3.json",
+          "trial": 3,
+          "peak_mib": 399.4277572631836,
+          "peak_before_settings_mib": 303.06710052490234,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 53800,
+                "name": "tinydash",
+                "mib": 27.51665496826172
+              },
+              {
+                "pid": 53802,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2503433227539062
+              },
+              {
+                "pid": 53803,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 21.00080108642578
+              },
+              {
+                "pid": 53804,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 81.96977996826172
+              },
+              {
+                "pid": 53805,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.500457763671875
+              },
+              {
+                "pid": 53807,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.3286285400390625
+              },
+              {
+                "pid": 53808,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.422309875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 53800,
+                "name": "tinydash",
+                "mib": 27.48540496826172
+              },
+              {
+                "pid": 53802,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2034683227539062
+              },
+              {
+                "pid": 53803,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.860176086425781
+              },
+              {
+                "pid": 53804,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 81.93852996826172
+              },
+              {
+                "pid": 53805,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.453582763671875
+              },
+              {
+                "pid": 53807,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.3286285400390625
+              },
+              {
+                "pid": 53808,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.422309875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 53800,
+                "name": "tinydash",
+                "mib": 37.751121520996094
+              },
+              {
+                "pid": 53802,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3128433227539062
+              },
+              {
+                "pid": 53803,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.469825744628906
+              },
+              {
+                "pid": 53804,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 107.4542007446289
+              },
+              {
+                "pid": 53805,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.422332763671875
+              },
+              {
+                "pid": 53807,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 3.0317535400390625
+              },
+              {
+                "pid": 53808,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.469184875488281
+              },
+              {
+                "pid": 54137,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 45.25086975097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 27.51665496826172,
+              "web_content": 81.96977996826172,
+              "web_gpu": 21.00080108642578,
+              "web_network": 6.500457763671875,
+              "other_helpers": 18.00128173828125
+            },
+            "hidden": {
+              "host": 27.48540496826172,
+              "web_content": 81.93852996826172,
+              "web_gpu": 12.860176086425781,
+              "web_network": 6.453582763671875,
+              "other_helpers": 17.95440673828125
+            },
+            "after_settings": {
+              "host": 37.751121520996094,
+              "web_content": 152.70507049560547,
+              "web_gpu": 13.469825744628906,
+              "web_network": 6.422332763671875,
+              "other_helpers": 15.81378173828125
+            }
+          },
+          "visible_mib": 154.98897552490234,
+          "hidden_mib": 146.69210052490234,
+          "after_settings_mib": 226.1621322631836
+        },
+        {
+          "file": "icon-final-controlled-real-4.json",
+          "trial": 4,
+          "peak_mib": 350.78692626953125,
+          "peak_before_settings_mib": 280.14524841308594,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 55625,
+                "name": "tinydash",
+                "mib": 27.84477996826172
+              },
+              {
+                "pid": 55627,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2190933227539062
+              },
+              {
+                "pid": 55628,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.625755310058594
+              },
+              {
+                "pid": 55629,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 81.28230285644531
+              },
+              {
+                "pid": 55630,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.484809875488281
+              },
+              {
+                "pid": 55631,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.266105651855469
+              },
+              {
+                "pid": 55632,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.437934875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 55625,
+                "name": "tinydash",
+                "mib": 27.76665496826172
+              },
+              {
+                "pid": 55627,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2347183227539062
+              },
+              {
+                "pid": 55628,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.641380310058594
+              },
+              {
+                "pid": 55629,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 81.39167785644531
+              },
+              {
+                "pid": 55630,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.453559875488281
+              },
+              {
+                "pid": 55631,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.266105651855469
+              },
+              {
+                "pid": 55632,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.453559875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 55625,
+                "name": "tinydash",
+                "mib": 37.110450744628906
+              },
+              {
+                "pid": 55627,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2659683227539062
+              },
+              {
+                "pid": 55628,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.344757080078125
+              },
+              {
+                "pid": 55629,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 58.672950744628906
+              },
+              {
+                "pid": 55630,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.406684875488281
+              },
+              {
+                "pid": 55631,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.266105651855469
+              },
+              {
+                "pid": 55632,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.484809875488281
+              },
+              {
+                "pid": 56110,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 44.938323974609375
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 27.84477996826172,
+              "web_content": 81.28230285644531,
+              "web_gpu": 20.625755310058594,
+              "web_network": 6.484809875488281,
+              "other_helpers": 17.923133850097656
+            },
+            "hidden": {
+              "host": 27.76665496826172,
+              "web_content": 81.39167785644531,
+              "web_gpu": 12.641380310058594,
+              "web_network": 6.453559875488281,
+              "other_helpers": 17.954383850097656
+            },
+            "after_settings": {
+              "host": 37.110450744628906,
+              "web_content": 103.61127471923828,
+              "web_gpu": 13.344757080078125,
+              "web_network": 6.406684875488281,
+              "other_helpers": 18.016883850097656
+            }
+          },
+          "visible_mib": 154.16078186035156,
+          "hidden_mib": 146.20765686035156,
+          "after_settings_mib": 178.49005126953125
+        },
+        {
+          "file": "icon-final-controlled-real-5.json",
+          "trial": 5,
+          "peak_mib": 434.9266357421875,
+          "peak_before_settings_mib": 434.9266357421875,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 59064,
+                "name": "tinydash",
+                "mib": 27.626052856445312
+              },
+              {
+                "pid": 59066,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2347183227539062
+              },
+              {
+                "pid": 59067,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.453948974609375
+              },
+              {
+                "pid": 59068,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 213.3605194091797
+              },
+              {
+                "pid": 59070,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.172332763671875
+              },
+              {
+                "pid": 59071,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 59072,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 59064,
+                "name": "tinydash",
+                "mib": 27.532302856445312
+              },
+              {
+                "pid": 59066,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2190933227539062
+              },
+              {
+                "pid": 59067,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.719573974609375
+              },
+              {
+                "pid": 59068,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 66.20426940917969
+              },
+              {
+                "pid": 59070,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.172332763671875
+              },
+              {
+                "pid": 59071,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 59072,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 59064,
+                "name": "tinydash",
+                "mib": 39.266746520996094
+              },
+              {
+                "pid": 59066,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3128433227539062
+              },
+              {
+                "pid": 59067,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.735427856445312
+              },
+              {
+                "pid": 59068,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 68.56366729736328
+              },
+              {
+                "pid": 59070,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.109832763671875
+              },
+              {
+                "pid": 59071,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 59072,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.453559875488281
+              },
+              {
+                "pid": 59392,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 52.64147186279297
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 27.610427856445312,
+              "web_content": 213.3448944091797,
+              "web_gpu": 20.469573974609375,
+              "web_network": 6.172332763671875,
+              "other_helpers": 15.62628173828125
+            },
+            "hidden": {
+              "host": 27.532302856445312,
+              "web_content": 66.20426940917969,
+              "web_gpu": 12.719573974609375,
+              "web_network": 6.172332763671875,
+              "other_helpers": 15.61065673828125
+            },
+            "after_settings": {
+              "host": 39.266746520996094,
+              "web_content": 121.20513916015625,
+              "web_gpu": 13.735427856445312,
+              "web_network": 6.109832763671875,
+              "other_helpers": 15.75128173828125
+            }
+          },
+          "visible_mib": 283.2391357421875,
+          "hidden_mib": 128.2391357421875,
+          "after_settings_mib": 196.06842803955078
+        }
+      ],
+      "footprint": {
+        "visible": {
+          "values": [
+            158.55147552490234,
+            165.3016357421875,
+            154.98897552490234,
+            154.16078186035156,
+            283.2391357421875
+          ],
+          "median": 158.55147552490234,
+          "min": 154.16078186035156,
+          "max": 283.2391357421875
+        },
+        "hidden": {
+          "values": [
+            150.34837341308594,
+            120.9891586303711,
+            146.69210052490234,
+            146.20765686035156,
+            128.2391357421875
+          ],
+          "median": 146.20765686035156,
+          "min": 120.9891586303711,
+          "max": 150.34837341308594
+        },
+        "after_settings": {
+          "values": [
+            185.4902801513672,
+            177.02157592773438,
+            226.1621322631836,
+            178.49005126953125,
+            196.06842803955078
+          ],
+          "median": 185.4902801513672,
+          "min": 177.02157592773438,
+          "max": 226.1621322631836
+        },
+        "peak": {
+          "values": [
+            376.1152801513672,
+            320.1610107421875,
+            399.4277572631836,
+            350.78692626953125,
+            434.9266357421875
+          ],
+          "median": 376.1152801513672,
+          "min": 320.1610107421875,
+          "max": 434.9266357421875
+        },
+        "peak_before_settings": {
+          "values": [
+            288.69210052490234,
+            320.1610107421875,
+            303.06710052490234,
+            280.14524841308594,
+            434.9266357421875
+          ],
+          "median": 303.06710052490234,
+          "min": 280.14524841308594,
+          "max": 434.9266357421875
+        }
+      },
+      "components": {
+        "visible": {
+          "host": {
+            "values": [
+              27.26660919189453,
+              28.016700744628906,
+              27.51665496826172,
+              27.84477996826172,
+              27.610427856445312
+            ],
+            "median": 27.610427856445312,
+            "min": 27.26660919189453,
+            "max": 28.016700744628906
+          },
+          "web_content": {
+            "values": [
+              88.4073257446289,
+              94.1104736328125,
+              81.96977996826172,
+              81.28230285644531,
+              213.3448944091797
+            ],
+            "median": 88.4073257446289,
+            "min": 81.28230285644531,
+            "max": 213.3448944091797
+          },
+          "web_gpu": {
+            "values": [
+              20.672698974609375,
+              18.875892639160156,
+              21.00080108642578,
+              20.625755310058594,
+              20.469573974609375
+            ],
+            "median": 20.625755310058594,
+            "min": 18.875892639160156,
+            "max": 21.00080108642578
+          },
+          "web_network": {
+            "values": [
+              6.484832763671875,
+              6.391059875488281,
+              6.500457763671875,
+              6.484809875488281,
+              6.172332763671875
+            ],
+            "median": 6.484809875488281,
+            "min": 6.172332763671875,
+            "max": 6.500457763671875
+          },
+          "other_helpers": {
+            "values": [
+              15.610633850097656,
+              17.970008850097656,
+              18.00128173828125,
+              17.923133850097656,
+              15.62628173828125
+            ],
+            "median": 17.923133850097656,
+            "min": 15.610633850097656,
+            "max": 18.00128173828125
+          }
+        },
+        "hidden": {
+          "host": {
+            "values": [
+              27.17285919189453,
+              27.922950744628906,
+              27.48540496826172,
+              27.76665496826172,
+              27.532302856445312
+            ],
+            "median": 27.532302856445312,
+            "min": 27.17285919189453,
+            "max": 27.922950744628906
+          },
+          "web_content": {
+            "values": [
+              88.4229507446289,
+              56.2667236328125,
+              81.93852996826172,
+              81.39167785644531,
+              66.20426940917969
+            ],
+            "median": 81.39167785644531,
+            "min": 56.2667236328125,
+            "max": 88.4229507446289
+          },
+          "web_gpu": {
+            "values": [
+              12.750823974609375,
+              12.516517639160156,
+              12.860176086425781,
+              12.641380310058594,
+              12.719573974609375
+            ],
+            "median": 12.719573974609375,
+            "min": 12.516517639160156,
+            "max": 12.860176086425781
+          },
+          "web_network": {
+            "values": [
+              6.437957763671875,
+              6.391059875488281,
+              6.453582763671875,
+              6.453559875488281,
+              6.172332763671875
+            ],
+            "median": 6.437957763671875,
+            "min": 6.172332763671875,
+            "max": 6.453582763671875
+          },
+          "other_helpers": {
+            "values": [
+              15.56378173828125,
+              17.89190673828125,
+              17.95440673828125,
+              17.954383850097656,
+              15.61065673828125
+            ],
+            "median": 17.89190673828125,
+            "min": 15.56378173828125,
+            "max": 17.95440673828125
+          }
+        },
+        "after_settings": {
+          "host": {
+            "values": [
+              37.92292785644531,
+              37.704246520996094,
+              37.751121520996094,
+              37.110450744628906,
+              39.266746520996094
+            ],
+            "median": 37.751121520996094,
+            "min": 37.110450744628906,
+            "max": 39.266746520996094
+          },
+          "web_content": {
+            "values": [
+              111.93946838378906,
+              103.87701416015625,
+              152.70507049560547,
+              103.61127471923828,
+              121.20513916015625
+            ],
+            "median": 111.93946838378906,
+            "min": 103.61127471923828,
+            "max": 152.70507049560547
+          },
+          "web_gpu": {
+            "values": [
+              13.501144409179688,
+              13.2823486328125,
+              13.469825744628906,
+              13.344757080078125,
+              13.735427856445312
+            ],
+            "median": 13.469825744628906,
+            "min": 13.2823486328125,
+            "max": 13.735427856445312
+          },
+          "web_network": {
+            "values": [
+              6.406707763671875,
+              6.344184875488281,
+              6.422332763671875,
+              6.406684875488281,
+              6.109832763671875
+            ],
+            "median": 6.406684875488281,
+            "min": 6.109832763671875,
+            "max": 6.422332763671875
+          },
+          "other_helpers": {
+            "values": [
+              15.72003173828125,
+              15.81378173828125,
+              15.81378173828125,
+              18.016883850097656,
+              15.75128173828125
+            ],
+            "median": 15.81378173828125,
+            "min": 15.72003173828125,
+            "max": 18.016883850097656
+          }
+        }
+      },
+      "latency": {
+        "apps": {
+          "n": 100,
+          "p50_ms": 30.524375004461035,
+          "p95_ms": 57.09833331638947,
+          "min_ms": 17.964041675440967,
+          "max_ms": 68.79737501731142,
+          "run_p50": {
+            "values": [
+              29.303395829629153,
+              30.358437506947666,
+              30.38185418699868,
+              30.174333340255544,
+              35.67193751223385
+            ],
+            "median": 30.358437506947666,
+            "min": 29.303395829629153,
+            "max": 35.67193751223385
+          },
+          "run_p95": {
+            "values": [
+              54.5735833584331,
+              64.15658333571628,
+              57.09833331638947,
+              54.036083340179175,
+              56.20708334026858
+            ],
+            "median": 56.20708334026858,
+            "min": 54.036083340179175,
+            "max": 64.15658333571628
+          }
+        },
+        "arithmetic": {
+          "n": 100,
+          "p50_ms": 16.305583354551345,
+          "p95_ms": 50.13341666199267,
+          "min_ms": 9.057916642632335,
+          "max_ms": 61.17166666081175,
+          "run_p50": {
+            "values": [
+              13.74983330606483,
+              14.461229176959023,
+              18.161479150876403,
+              15.393500012578443,
+              23.531791637651622
+            ],
+            "median": 15.393500012578443,
+            "min": 13.74983330606483,
+            "max": 23.531791637651622
+          },
+          "run_p95": {
+            "values": [
+              47.732833365444094,
+              46.428833331447095,
+              49.52504165703431,
+              61.16887502139434,
+              50.123708380851895
+            ],
+            "median": 49.52504165703431,
+            "min": 46.428833331447095,
+            "max": 61.16887502139434
+          }
+        },
+        "reopen": {
+          "n": 100,
+          "p50_ms": 36.94029164034873,
+          "p95_ms": 47.76024998864159,
+          "min_ms": 18.32641666987911,
+          "max_ms": 51.435666682664305,
+          "run_p50": {
+            "values": [
+              41.00737499538809,
+              37.91529167210683,
+              34.713354194536805,
+              41.49766665068455,
+              27.188291656784713
+            ],
+            "median": 37.91529167210683,
+            "min": 27.188291656784713,
+            "max": 41.49766665068455
+          },
+          "run_p95": {
+            "values": [
+              51.271374977659434,
+              47.959125018678606,
+              42.98266663681716,
+              46.69516667490825,
+              45.65262497635558
+            ],
+            "median": 46.69516667490825,
+            "min": 42.98266663681716,
+            "max": 51.271374977659434
+          }
+        },
+        "settings": {
+          "n": 100,
+          "p50_ms": 9.563875006278977,
+          "p95_ms": 44.511625019367784,
+          "min_ms": 2.5822080206125975,
+          "max_ms": 289.2283329856582,
+          "run_p50": {
+            "values": [
+              8.014624996576458,
+              8.644624991575256,
+              12.430125003447756,
+              9.615771006792784,
+              8.98158352356404
+            ],
+            "median": 8.98158352356404,
+            "min": 8.014624996576458,
+            "max": 12.430125003447756
+          },
+          "run_p95": {
+            "values": [
+              43.45987498527393,
+              42.12224995717406,
+              39.293167006690055,
+              39.894332992844284,
+              44.511625019367784
+            ],
+            "median": 42.12224995717406,
+            "min": 39.293167006690055,
+            "max": 44.511625019367784
+          }
+        },
+        "settings_first": {
+          "n": 5,
+          "p50_ms": 277.77633402729407,
+          "p95_ms": 289.2283329856582,
+          "min_ms": 274.27579200593755,
+          "max_ms": 289.2283329856582,
+          "run_p50": {
+            "values": [
+              289.2283329856582,
+              277.22649998031557,
+              277.77633402729407,
+              282.6094159972854,
+              274.27579200593755
+            ],
+            "median": 277.77633402729407,
+            "min": 274.27579200593755,
+            "max": 289.2283329856582
+          },
+          "run_p95": {
+            "values": [
+              289.2283329856582,
+              277.22649998031557,
+              277.77633402729407,
+              282.6094159972854,
+              274.27579200593755
+            ],
+            "median": 277.77633402729407,
+            "min": 274.27579200593755,
+            "max": 289.2283329856582
+          }
+        },
+        "settings_reopen": {
+          "n": 95,
+          "p50_ms": 9.29308304330334,
+          "p95_ms": 39.894332992844284,
+          "min_ms": 2.5822080206125975,
+          "max_ms": 44.511625019367784,
+          "run_p50": {
+            "values": [
+              8.008875011000782,
+              8.448334003333002,
+              12.308750010561198,
+              9.109375008847564,
+              8.806292025838047
+            ],
+            "median": 8.806292025838047,
+            "min": 8.008875011000782,
+            "max": 12.308750010561198
+          },
+          "run_p95": {
+            "values": [
+              43.45987498527393,
+              42.12224995717406,
+              39.293167006690055,
+              39.894332992844284,
+              44.511625019367784
+            ],
+            "median": 42.12224995717406,
+            "min": 39.293167006690055,
+            "max": 44.511625019367784
+          }
+        }
+      }
+    },
+    "icon-final/daily": {
+      "binary_sha256": "852b0667c0e94249c3dda3b791bfd96f8809223888c6339d84b1ee70ff13983d",
+      "complete": true,
+      "runs": [
+        {
+          "file": "icon-final-daily-real-1.json",
+          "trial": 1,
+          "peak_mib": 601.8330459594727,
+          "peak_before_settings_mib": 601.8330459594727,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 49747,
+                "name": "tinydash",
+                "mib": 90.3604965209961
+              },
+              {
+                "pid": 49749,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2034454345703125
+              },
+              {
+                "pid": 49750,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 18.96966552734375
+              },
+              {
+                "pid": 49751,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 298.09496307373047
+              },
+              {
+                "pid": 49752,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.422309875488281
+              },
+              {
+                "pid": 49753,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.266105651855469
+              },
+              {
+                "pid": 49755,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.453559875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 49747,
+                "name": "tinydash",
+                "mib": 70.3761215209961
+              },
+              {
+                "pid": 49749,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1722183227539062
+              },
+              {
+                "pid": 49750,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.68841552734375
+              },
+              {
+                "pid": 49751,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 77.12621307373047
+              },
+              {
+                "pid": 49752,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.422309875488281
+              },
+              {
+                "pid": 49753,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9692306518554688
+              },
+              {
+                "pid": 49755,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 49747,
+                "name": "tinydash",
+                "mib": 71.39181518554688
+              },
+              {
+                "pid": 49749,
+                "name": "SetStoreUpdateService",
+                "mib": 2.8440933227539062
+              },
+              {
+                "pid": 49750,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 16.282440185546875
+              },
+              {
+                "pid": 49751,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 83.53246307373047
+              },
+              {
+                "pid": 49752,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 7.328559875488281
+              },
+              {
+                "pid": 49753,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9692306518554688
+              },
+              {
+                "pid": 49755,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 12.609809875488281
+              },
+              {
+                "pid": 50239,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 44.81336975097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 90.3604965209961,
+              "web_content": 298.09496307373047,
+              "web_gpu": 19.18841552734375,
+              "web_network": 6.422309875488281,
+              "other_helpers": 17.923110961914062
+            },
+            "hidden": {
+              "host": 70.3761215209961,
+              "web_content": 77.12621307373047,
+              "web_gpu": 12.68841552734375,
+              "web_network": 6.422309875488281,
+              "other_helpers": 15.548133850097656
+            },
+            "after_settings": {
+              "host": 71.37619018554688,
+              "web_content": 128.36145782470703,
+              "web_gpu": 16.282440185546875,
+              "web_network": 7.328559875488281,
+              "other_helpers": 18.423133850097656
+            }
+          },
+          "visible_mib": 431.77054595947266,
+          "hidden_mib": 182.16119384765625,
+          "after_settings_mib": 241.77178192138672
+        },
+        {
+          "file": "icon-final-daily-real-2.json",
+          "trial": 2,
+          "peak_mib": 466.39669036865234,
+          "peak_before_settings_mib": 463.1142272949219,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 51710,
+                "name": "tinydash",
+                "mib": 90.1261215209961
+              },
+              {
+                "pid": 51712,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2347183227539062
+              },
+              {
+                "pid": 51713,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.625869750976562
+              },
+              {
+                "pid": 51714,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 159.0948944091797
+              },
+              {
+                "pid": 51715,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.500434875488281
+              },
+              {
+                "pid": 51716,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.2817535400390625
+              },
+              {
+                "pid": 51718,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.469184875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 51710,
+                "name": "tinydash",
+                "mib": 82.8292465209961
+              },
+              {
+                "pid": 51712,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2503433227539062
+              },
+              {
+                "pid": 51713,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.375869750976562
+              },
+              {
+                "pid": 51714,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 158.8761444091797
+              },
+              {
+                "pid": 51715,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.500434875488281
+              },
+              {
+                "pid": 51716,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 51718,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.453559875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 51710,
+                "name": "tinydash",
+                "mib": 77.20433807373047
+              },
+              {
+                "pid": 51712,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2972183227539062
+              },
+              {
+                "pid": 51713,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 14.579246520996094
+              },
+              {
+                "pid": 51714,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 163.82929229736328
+              },
+              {
+                "pid": 51715,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.469184875488281
+              },
+              {
+                "pid": 51716,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 51718,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 12.812934875488281
+              },
+              {
+                "pid": 52043,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 53.36024475097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 90.1261215209961,
+              "web_content": 159.0948944091797,
+              "web_gpu": 20.610244750976562,
+              "web_network": 6.500434875488281,
+              "other_helpers": 17.98565673828125
+            },
+            "hidden": {
+              "host": 82.8292465209961,
+              "web_content": 158.8761444091797,
+              "web_gpu": 12.375869750976562,
+              "web_network": 6.500434875488281,
+              "other_helpers": 15.68878173828125
+            },
+            "after_settings": {
+              "host": 77.20433807373047,
+              "web_content": 217.18953704833984,
+              "web_gpu": 14.579246520996094,
+              "web_network": 6.469184875488281,
+              "other_helpers": 18.09503173828125
+            }
+          },
+          "visible_mib": 294.3329772949219,
+          "hidden_mib": 276.2704772949219,
+          "after_settings_mib": 333.53733825683594
+        },
+        {
+          "file": "icon-final-daily-real-3.json",
+          "trial": 3,
+          "peak_mib": 497.1922149658203,
+          "peak_before_settings_mib": 497.1922149658203,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 54960,
+                "name": "tinydash",
+                "mib": 80.18855285644531
+              },
+              {
+                "pid": 54962,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1878433227539062
+              },
+              {
+                "pid": 54963,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 19.95397186279297
+              },
+              {
+                "pid": 54964,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 194.7042465209961
+              },
+              {
+                "pid": 54965,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.0160369873046875
+              },
+              {
+                "pid": 54966,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 5.2817535400390625
+              },
+              {
+                "pid": 54968,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 54960,
+                "name": "tinydash",
+                "mib": 61.87605285644531
+              },
+              {
+                "pid": 54962,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1878433227539062
+              },
+              {
+                "pid": 54963,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.828971862792969
+              },
+              {
+                "pid": 54964,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 189.9542465209961
+              },
+              {
+                "pid": 54965,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.0160369873046875
+              },
+              {
+                "pid": 54966,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 54968,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.375434875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 54960,
+                "name": "tinydash",
+                "mib": 59.688575744628906
+              },
+              {
+                "pid": 54962,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2972183227539062
+              },
+              {
+                "pid": 54963,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.641769409179688
+              },
+              {
+                "pid": 54964,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 191.7823944091797
+              },
+              {
+                "pid": 54965,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 5.9535369873046875
+              },
+              {
+                "pid": 54966,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 54968,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.422309875488281
+              },
+              {
+                "pid": 55452,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 53.59461975097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 80.18855285644531,
+              "web_content": 194.6886215209961,
+              "web_gpu": 19.95397186279297,
+              "web_network": 6.0160369873046875,
+              "other_helpers": 17.87628173828125
+            },
+            "hidden": {
+              "host": 61.87605285644531,
+              "web_content": 189.9542465209961,
+              "web_gpu": 12.828971862792969,
+              "web_network": 6.0160369873046875,
+              "other_helpers": 15.54815673828125
+            },
+            "after_settings": {
+              "host": 59.688575744628906,
+              "web_content": 245.39263916015625,
+              "web_gpu": 13.641769409179688,
+              "web_network": 5.9535369873046875,
+              "other_helpers": 15.70440673828125
+            }
+          },
+          "visible_mib": 318.7390899658203,
+          "hidden_mib": 286.2234649658203,
+          "after_settings_mib": 340.3653030395508
+        },
+        {
+          "file": "icon-final-daily-real-4.json",
+          "trial": 4,
+          "peak_mib": 507.2704086303711,
+          "peak_before_settings_mib": 507.2704086303711,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 56943,
+                "name": "tinydash",
+                "mib": 79.3136215209961
+              },
+              {
+                "pid": 56945,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2503433227539062
+              },
+              {
+                "pid": 56946,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.875869750976562
+              },
+              {
+                "pid": 56947,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 164.2198486328125
+              },
+              {
+                "pid": 56948,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.1410369873046875
+              },
+              {
+                "pid": 56950,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 56951,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 56943,
+                "name": "tinydash",
+                "mib": 79.2198715209961
+              },
+              {
+                "pid": 56945,
+                "name": "SetStoreUpdateService",
+                "mib": 2.2034683227539062
+              },
+              {
+                "pid": 56946,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.719619750976562
+              },
+              {
+                "pid": 56947,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 164.0635986328125
+              },
+              {
+                "pid": 56948,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.1410369873046875
+              },
+              {
+                "pid": 56950,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 56951,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 56943,
+                "name": "tinydash",
+                "mib": 70.00116729736328
+              },
+              {
+                "pid": 56945,
+                "name": "SetStoreUpdateService",
+                "mib": 2.3597183227539062
+              },
+              {
+                "pid": 56946,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.532325744628906
+              },
+              {
+                "pid": 56947,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 145.7511215209961
+              },
+              {
+                "pid": 56948,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.0785369873046875
+              },
+              {
+                "pid": 56950,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 56951,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.453559875488281
+              },
+              {
+                "pid": 57275,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 45.250892639160156
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 79.3136215209961,
+              "web_content": 164.2198486328125,
+              "web_gpu": 20.875869750976562,
+              "web_network": 6.1410369873046875,
+              "other_helpers": 15.64190673828125
+            },
+            "hidden": {
+              "host": 79.2198715209961,
+              "web_content": 164.0635986328125,
+              "web_gpu": 12.719619750976562,
+              "web_network": 6.1410369873046875,
+              "other_helpers": 15.59503173828125
+            },
+            "after_settings": {
+              "host": 70.00116729736328,
+              "web_content": 191.00201416015625,
+              "web_gpu": 13.532325744628906,
+              "web_network": 6.0785369873046875,
+              "other_helpers": 15.79815673828125
+            }
+          },
+          "visible_mib": 286.1922836303711,
+          "hidden_mib": 277.7391586303711,
+          "after_settings_mib": 296.4122009277344
+        },
+        {
+          "file": "icon-final-daily-real-5.json",
+          "trial": 5,
+          "peak_mib": 559.5830230712891,
+          "peak_before_settings_mib": 559.5830230712891,
+          "representative_processes": {
+            "visible": [
+              {
+                "pid": 60221,
+                "name": "tinydash",
+                "mib": 79.3292465209961
+              },
+              {
+                "pid": 60224,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1409683227539062
+              },
+              {
+                "pid": 60225,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 20.53205108642578
+              },
+              {
+                "pid": 60226,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 270.6261901855469
+              },
+              {
+                "pid": 60227,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.156730651855469
+              },
+              {
+                "pid": 60228,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 60229,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.391059875488281
+              }
+            ],
+            "hidden": [
+              {
+                "pid": 60221,
+                "name": "tinydash",
+                "mib": 65.6417465209961
+              },
+              {
+                "pid": 60224,
+                "name": "SetStoreUpdateService",
+                "mib": 2.1565933227539062
+              },
+              {
+                "pid": 60225,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 12.860176086425781
+              },
+              {
+                "pid": 60226,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 76.23556518554688
+              },
+              {
+                "pid": 60227,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.156730651855469
+              },
+              {
+                "pid": 60228,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 60229,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.359809875488281
+              }
+            ],
+            "after_settings": [
+              {
+                "pid": 60221,
+                "name": "tinydash",
+                "mib": 76.81366729736328
+              },
+              {
+                "pid": 60224,
+                "name": "SetStoreUpdateService",
+                "mib": 2.5784683227539062
+              },
+              {
+                "pid": 60225,
+                "name": "com.apple.WebKit.GPU",
+                "mib": 13.907302856445312
+              },
+              {
+                "pid": 60226,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 77.25119018554688
+              },
+              {
+                "pid": 60227,
+                "name": "com.apple.WebKit.Networking",
+                "mib": 6.422355651855469
+              },
+              {
+                "pid": 60228,
+                "name": "com.apple.audio.SandboxHelper",
+                "mib": 2.9848785400390625
+              },
+              {
+                "pid": 60229,
+                "name": "com.apple.SafariPlatformSupport.Helper",
+                "mib": 10.406684875488281
+              },
+              {
+                "pid": 60714,
+                "name": "com.apple.WebKit.WebContent",
+                "mib": 52.61024475097656
+              }
+            ]
+          },
+          "components": {
+            "visible": {
+              "host": 79.3292465209961,
+              "web_content": 270.6574401855469,
+              "web_gpu": 20.53205108642578,
+              "web_network": 6.156730651855469,
+              "other_helpers": 15.51690673828125
+            },
+            "hidden": {
+              "host": 65.6417465209961,
+              "web_content": 76.23556518554688,
+              "web_gpu": 12.860176086425781,
+              "web_network": 6.156730651855469,
+              "other_helpers": 15.50128173828125
+            },
+            "after_settings": {
+              "host": 76.82929229736328,
+              "web_content": 129.86143493652344,
+              "web_gpu": 13.907302856445312,
+              "web_network": 6.422355651855469,
+              "other_helpers": 15.97003173828125
+            }
+          },
+          "visible_mib": 392.16112518310547,
+          "hidden_mib": 176.39550018310547,
+          "after_settings_mib": 242.97479248046875
+        }
+      ],
+      "footprint": {
+        "visible": {
+          "values": [
+            431.77054595947266,
+            294.3329772949219,
+            318.7390899658203,
+            286.1922836303711,
+            392.16112518310547
+          ],
+          "median": 318.7390899658203,
+          "min": 286.1922836303711,
+          "max": 431.77054595947266
+        },
+        "hidden": {
+          "values": [
+            182.16119384765625,
+            276.2704772949219,
+            286.2234649658203,
+            277.7391586303711,
+            176.39550018310547
+          ],
+          "median": 276.2704772949219,
+          "min": 176.39550018310547,
+          "max": 286.2234649658203
+        },
+        "after_settings": {
+          "values": [
+            241.77178192138672,
+            333.53733825683594,
+            340.3653030395508,
+            296.4122009277344,
+            242.97479248046875
+          ],
+          "median": 296.4122009277344,
+          "min": 241.77178192138672,
+          "max": 340.3653030395508
+        },
+        "peak": {
+          "values": [
+            601.8330459594727,
+            466.39669036865234,
+            497.1922149658203,
+            507.2704086303711,
+            559.5830230712891
+          ],
+          "median": 507.2704086303711,
+          "min": 466.39669036865234,
+          "max": 601.8330459594727
+        },
+        "peak_before_settings": {
+          "values": [
+            601.8330459594727,
+            463.1142272949219,
+            497.1922149658203,
+            507.2704086303711,
+            559.5830230712891
+          ],
+          "median": 507.2704086303711,
+          "min": 463.1142272949219,
+          "max": 601.8330459594727
+        }
+      },
+      "components": {
+        "visible": {
+          "host": {
+            "values": [
+              90.3604965209961,
+              90.1261215209961,
+              80.18855285644531,
+              79.3136215209961,
+              79.3292465209961
+            ],
+            "median": 80.18855285644531,
+            "min": 79.3136215209961,
+            "max": 90.3604965209961
+          },
+          "web_content": {
+            "values": [
+              298.09496307373047,
+              159.0948944091797,
+              194.6886215209961,
+              164.2198486328125,
+              270.6574401855469
+            ],
+            "median": 194.6886215209961,
+            "min": 159.0948944091797,
+            "max": 298.09496307373047
+          },
+          "web_gpu": {
+            "values": [
+              19.18841552734375,
+              20.610244750976562,
+              19.95397186279297,
+              20.875869750976562,
+              20.53205108642578
+            ],
+            "median": 20.53205108642578,
+            "min": 19.18841552734375,
+            "max": 20.875869750976562
+          },
+          "web_network": {
+            "values": [
+              6.422309875488281,
+              6.500434875488281,
+              6.0160369873046875,
+              6.1410369873046875,
+              6.156730651855469
+            ],
+            "median": 6.156730651855469,
+            "min": 6.0160369873046875,
+            "max": 6.500434875488281
+          },
+          "other_helpers": {
+            "values": [
+              17.923110961914062,
+              17.98565673828125,
+              17.87628173828125,
+              15.64190673828125,
+              15.51690673828125
+            ],
+            "median": 17.87628173828125,
+            "min": 15.51690673828125,
+            "max": 17.98565673828125
+          }
+        },
+        "hidden": {
+          "host": {
+            "values": [
+              70.3761215209961,
+              82.8292465209961,
+              61.87605285644531,
+              79.2198715209961,
+              65.6417465209961
+            ],
+            "median": 70.3761215209961,
+            "min": 61.87605285644531,
+            "max": 82.8292465209961
+          },
+          "web_content": {
+            "values": [
+              77.12621307373047,
+              158.8761444091797,
+              189.9542465209961,
+              164.0635986328125,
+              76.23556518554688
+            ],
+            "median": 158.8761444091797,
+            "min": 76.23556518554688,
+            "max": 189.9542465209961
+          },
+          "web_gpu": {
+            "values": [
+              12.68841552734375,
+              12.375869750976562,
+              12.828971862792969,
+              12.719619750976562,
+              12.860176086425781
+            ],
+            "median": 12.719619750976562,
+            "min": 12.375869750976562,
+            "max": 12.860176086425781
+          },
+          "web_network": {
+            "values": [
+              6.422309875488281,
+              6.500434875488281,
+              6.0160369873046875,
+              6.1410369873046875,
+              6.156730651855469
+            ],
+            "median": 6.156730651855469,
+            "min": 6.0160369873046875,
+            "max": 6.500434875488281
+          },
+          "other_helpers": {
+            "values": [
+              15.548133850097656,
+              15.68878173828125,
+              15.54815673828125,
+              15.59503173828125,
+              15.50128173828125
+            ],
+            "median": 15.54815673828125,
+            "min": 15.50128173828125,
+            "max": 15.68878173828125
+          }
+        },
+        "after_settings": {
+          "host": {
+            "values": [
+              71.37619018554688,
+              77.20433807373047,
+              59.688575744628906,
+              70.00116729736328,
+              76.82929229736328
+            ],
+            "median": 71.37619018554688,
+            "min": 59.688575744628906,
+            "max": 77.20433807373047
+          },
+          "web_content": {
+            "values": [
+              128.36145782470703,
+              217.18953704833984,
+              245.39263916015625,
+              191.00201416015625,
+              129.86143493652344
+            ],
+            "median": 191.00201416015625,
+            "min": 128.36145782470703,
+            "max": 245.39263916015625
+          },
+          "web_gpu": {
+            "values": [
+              16.282440185546875,
+              14.579246520996094,
+              13.641769409179688,
+              13.532325744628906,
+              13.907302856445312
+            ],
+            "median": 13.907302856445312,
+            "min": 13.532325744628906,
+            "max": 16.282440185546875
+          },
+          "web_network": {
+            "values": [
+              7.328559875488281,
+              6.469184875488281,
+              5.9535369873046875,
+              6.0785369873046875,
+              6.422355651855469
+            ],
+            "median": 6.422355651855469,
+            "min": 5.9535369873046875,
+            "max": 7.328559875488281
+          },
+          "other_helpers": {
+            "values": [
+              18.423133850097656,
+              18.09503173828125,
+              15.70440673828125,
+              15.79815673828125,
+              15.97003173828125
+            ],
+            "median": 15.97003173828125,
+            "min": 15.70440673828125,
+            "max": 18.423133850097656
+          }
+        }
+      },
+      "latency": {
+        "apps": {
+          "n": 100,
+          "p50_ms": 52.15139585197903,
+          "p95_ms": 65.70829165866598,
+          "min_ms": 15.905708307400346,
+          "max_ms": 71.23391662025824,
+          "run_p50": {
+            "values": [
+              49.21222914708778,
+              52.834375004749745,
+              50.069937511580065,
+              35.841458331560716,
+              54.33095831540413
+            ],
+            "median": 50.069937511580065,
+            "min": 35.841458331560716,
+            "max": 54.33095831540413
+          },
+          "run_p95": {
+            "values": [
+              62.52470827894285,
+              61.634333338588476,
+              65.51966664846987,
+              62.7197083667852,
+              66.52024999493733
+            ],
+            "median": 62.7197083667852,
+            "min": 61.634333338588476,
+            "max": 66.52024999493733
+          }
+        },
+        "arithmetic": {
+          "n": 100,
+          "p50_ms": 18.05647913715802,
+          "p95_ms": 51.541833323426545,
+          "min_ms": 8.605999988503754,
+          "max_ms": 59.73441665992141,
+          "run_p50": {
+            "values": [
+              26.328020845539868,
+              15.892520837951452,
+              26.002791651990265,
+              16.374999977415428,
+              26.72527081449516
+            ],
+            "median": 26.002791651990265,
+            "min": 15.892520837951452,
+            "max": 26.72527081449516
+          },
+          "run_p95": {
+            "values": [
+              52.238333330024034,
+              43.4265416697599,
+              48.56000002473593,
+              48.22616669116542,
+              58.30620834603906
+            ],
+            "median": 48.56000002473593,
+            "min": 43.4265416697599,
+            "max": 58.30620834603906
+          }
+        },
+        "reopen": {
+          "n": 100,
+          "p50_ms": 37.02795834396966,
+          "p95_ms": 46.187750005628914,
+          "min_ms": 20.63375001307577,
+          "max_ms": 57.1443333174102,
+          "run_p50": {
+            "values": [
+              39.67729167197831,
+              36.04918747441843,
+              40.40064584114589,
+              38.94045832566917,
+              28.309583343798295
+            ],
+            "median": 38.94045832566917,
+            "min": 28.309583343798295,
+            "max": 40.40064584114589
+          },
+          "run_p95": {
+            "values": [
+              46.187750005628914,
+              44.757958326954395,
+              56.57754163257778,
+              44.414499949198216,
+              38.33320835838094
+            ],
+            "median": 44.757958326954395,
+            "min": 38.33320835838094,
+            "max": 56.57754163257778
+          }
+        },
+        "settings": {
+          "n": 100,
+          "p50_ms": 9.421458467841148,
+          "p95_ms": 76.34916598908603,
+          "min_ms": 2.6377500034868717,
+          "max_ms": 285.585124976933,
+          "run_p50": {
+            "values": [
+              9.567604516632855,
+              9.108916507102549,
+              10.077041486511007,
+              7.715146493865177,
+              10.636958497343585
+            ],
+            "median": 9.567604516632855,
+            "min": 7.715146493865177,
+            "max": 10.636958497343585
+          },
+          "run_p95": {
+            "values": [
+              39.36270799022168,
+              38.39854197576642,
+              76.34916598908603,
+              37.73024998372421,
+              40.226416022051126
+            ],
+            "median": 39.36270799022168,
+            "min": 37.73024998372421,
+            "max": 76.34916598908603
+          }
+        },
+        "settings_first": {
+          "n": 5,
+          "p50_ms": 283.612750004977,
+          "p95_ms": 285.585124976933,
+          "min_ms": 273.9624999812804,
+          "max_ms": 285.585124976933,
+          "run_p50": {
+            "values": [
+              276.29820798756555,
+              283.612750004977,
+              273.9624999812804,
+              285.585124976933,
+              284.35541701037437
+            ],
+            "median": 283.612750004977,
+            "min": 273.9624999812804,
+            "max": 285.585124976933
+          },
+          "run_p95": {
+            "values": [
+              276.29820798756555,
+              283.612750004977,
+              273.9624999812804,
+              285.585124976933,
+              284.35541701037437
+            ],
+            "median": 283.612750004977,
+            "min": 273.9624999812804,
+            "max": 285.585124976933
+          }
+        },
+        "settings_reopen": {
+          "n": 95,
+          "p50_ms": 9.06220800243318,
+          "p95_ms": 38.39854197576642,
+          "min_ms": 2.6377500034868717,
+          "max_ms": 76.34916598908603,
+          "run_p50": {
+            "values": [
+              8.979875012300909,
+              9.06220800243318,
+              9.551666968036443,
+              7.547958986833692,
+              10.519333009142429
+            ],
+            "median": 9.06220800243318,
+            "min": 7.547958986833692,
+            "max": 10.519333009142429
+          },
+          "run_p95": {
+            "values": [
+              39.36270799022168,
+              38.39854197576642,
+              76.34916598908603,
+              37.73024998372421,
+              40.226416022051126
+            ],
+            "median": 39.36270799022168,
+            "min": 37.73024998372421,
+            "max": 76.34916598908603
+          }
+        }
+      }
+    }
+  },
+  "corpus_sha256": "4708364962f486361dabe2815f93f9104bdaca5d0ce7cf4f229e7782fd5c9525",
+  "comparisons": [
+    {
+      "profile": "controlled",
+      "parent": "baseline2",
+      "candidate": "icon-final",
+      "complete": true,
+      "footprint": {
+        "visible": {
+          "delta_mib": 21.9375,
+          "delta_percent": 16.058020356783466,
+          "same_build_range_mib": 129.07835388183594,
+          "resolves_range": false
+        },
+        "hidden": {
+          "delta_mib": 19.156112670898438,
+          "delta_percent": 15.077433960451334,
+          "same_build_range_mib": 34.46870422363281,
+          "resolves_range": false
+        },
+        "after_settings": {
+          "delta_mib": -3.8906478881835938,
+          "delta_percent": -2.054403222362001,
+          "same_build_range_mib": 49.14055633544922,
+          "resolves_range": false
+        },
+        "peak": {
+          "delta_mib": 37.82936096191406,
+          "delta_percent": 11.182659051418621,
+          "same_build_range_mib": 114.765625,
+          "resolves_range": false
+        },
+        "peak_before_settings": {
+          "delta_mib": -35.21881866455078,
+          "delta_percent": -10.410962049185054,
+          "same_build_range_mib": 154.78138732910156,
+          "resolves_range": false
+        }
+      },
+      "latency": {
+        "apps": {
+          "p50_delta_ms": 1.0170000023208559,
+          "p95_delta_ms": 3.404458286240697,
+          "p50_budget_ms": 2,
+          "p95_budget_ms": 5.369387503014877,
+          "within_observed_budget": true,
+          "p50_same_build_range_ms": 6.3685416826047,
+          "p95_same_build_range_ms": 20.14420833438635,
+          "verdict": "inconclusive"
+        },
+        "arithmetic": {
+          "p50_delta_ms": -0.5691458063665777,
+          "p95_delta_ms": -0.21370837930589914,
+          "p50_budget_ms": 2,
+          "p95_budget_ms": 5.034712504129857,
+          "within_observed_budget": true,
+          "p50_same_build_range_ms": 9.781958331586793,
+          "p95_same_build_range_ms": 22.76016667019576,
+          "verdict": "inconclusive"
+        },
+        "reopen": {
+          "p50_delta_ms": -2.1770416642539203,
+          "p95_delta_ms": -1.2098333681933582,
+          "p50_budget_ms": 2,
+          "p95_budget_ms": 5,
+          "within_observed_budget": true,
+          "p50_same_build_range_ms": 14.309374993899837,
+          "p95_same_build_range_ms": 8.288708340842277,
+          "verdict": "inconclusive"
+        }
+      }
+    },
+    {
+      "profile": "daily",
+      "parent": "baseline2",
+      "candidate": "icon-final",
+      "complete": true,
+      "footprint": {
+        "visible": {
+          "delta_mib": -34.093910217285156,
+          "delta_percent": -9.662902902957448,
+          "same_build_range_mib": 163.2499542236328,
+          "resolves_range": false
+        },
+        "hidden": {
+          "delta_mib": 90.14069366455078,
+          "delta_percent": 48.42894667709826,
+          "same_build_range_mib": 109.82796478271484,
+          "resolves_range": false
+        },
+        "after_settings": {
+          "delta_mib": 57.187339782714844,
+          "delta_percent": 23.90526616213502,
+          "same_build_range_mib": 98.59352111816406,
+          "resolves_range": false
+        },
+        "peak": {
+          "delta_mib": -38.1875,
+          "delta_percent": -7.000998499753666,
+          "same_build_range_mib": 135.4363555908203,
+          "resolves_range": false
+        },
+        "peak_before_settings": {
+          "delta_mib": -38.1875,
+          "delta_percent": -7.000998499753666,
+          "same_build_range_mib": 138.71881866455078,
+          "resolves_range": false
+        }
+      },
+      "latency": {
+        "apps": {
+          "p50_delta_ms": 2.4491041840519756,
+          "p95_delta_ms": 1.6115416656248271,
+          "p50_budget_ms": 2.485114583396353,
+          "p95_budget_ms": 6.409674999304116,
+          "within_observed_budget": true,
+          "p50_same_build_range_ms": 18.489499983843416,
+          "p95_same_build_range_ms": 5.555208364967257,
+          "verdict": "inconclusive"
+        },
+        "arithmetic": {
+          "p50_delta_ms": 2.2236458025872707,
+          "p95_delta_ms": 2.715291630011052,
+          "p50_budget_ms": 2,
+          "p95_budget_ms": 5,
+          "within_observed_budget": false,
+          "p50_same_build_range_ms": 10.83274997654371,
+          "p95_same_build_range_ms": 14.879666676279157,
+          "verdict": "inconclusive"
+        },
+        "reopen": {
+          "p50_delta_ms": 2.6479999942239374,
+          "p95_delta_ms": -1.1559583363123238,
+          "p50_budget_ms": 2,
+          "p95_budget_ms": 5,
+          "within_observed_budget": false,
+          "p50_same_build_range_ms": 12.091062497347593,
+          "p95_same_build_range_ms": 18.244333274196833,
+          "verdict": "inconclusive"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+--- a/src-tauri/src/lib.rs
++++ b/src-tauri/src/lib.rs
+@@ -1,3 +1,4 @@
++mod memory_probe;
+ mod currency;
+ mod db;
+ mod error;
+@@ -146,6 +147,7 @@
+             }
+             app.manage(LauncherState::new(settings, warnings));
+             launcher::scan_apps(app.handle());
++            memory_probe::install(app.handle().clone());
+             Ok(())
+         })
+         .on_window_event(|window, event| {
+@@ -174,6 +176,7 @@
+             _ => {}
+         }})
+         .invoke_handler(tauri::generate_handler![
++            memory_probe::snapshot,
+             launcher::launcher_ready,
+             launcher::preferences::get_settings,
+             launcher::preferences::save_settings,
+@@ -194,6 +197,7 @@
+         .build(tauri::generate_context!())
+         .context("Build the desktop launcher")?;
+     app.run(|_app, _event| {
++        if let tauri::RunEvent::ExitRequested { api, .. } = &_event { api.prevent_exit(); }
+         if matches!(_event, tauri::RunEvent::Exit) {
+             _app.state::<LauncherState>().clipboard.stop();
+             _app.state::<LauncherState>().files.stop();
+--- a/src-tauri/src/platform/macos.rs
++++ b/src-tauri/src/platform/macos.rs
+@@ -120,9 +120,11 @@
+ }
+ 
+ pub fn load_app_icons(mut apps: Vec<AppEntry>) -> Vec<AppEntry> {
++    if std::path::Path::new(env!("TINYDASH_PROBE_DIR")).join("no-icons").exists() { return apps; }
+     for entry in &mut apps {
+         entry.icon = icons::application_icon(&entry.path);
+     }
++    let _ = std::fs::write(std::path::Path::new(env!("TINYDASH_PROBE_DIR")).join("icons.json"), serde_json::json!({"count": apps.len(), "icons": apps.iter().filter(|a| a.icon.is_some()).count(), "encoded_bytes": apps.iter().filter_map(|a| a.icon.as_ref()).map(|s| s.len()).sum::<usize>()}).to_string());
+     apps
+ }
+ 
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -766,6 +766,7 @@
+             focusInput();
+             if (clear !== true) input.select();
+           }),
++          register("probe-clear-results", () => { setResults([]); }),
+           register("launcher-hidden", () => {
+             setVisible(false);
+             // One running Rust search may finish. Ignore its reply and drop
+--- a/src-tauri/tauri.conf.json
++++ b/src-tauri/tauri.conf.json
+@@ -1,8 +1,8 @@
+ {
+   "$schema": "https://schema.tauri.app/config/2",
+-  "productName": "TinyDash",
++  "productName": "TinyDashMemoryProbe",
+   "version": "0.1.0",
+-  "identifier": "dev.tinydash.launcher",
++  "identifier": "dev.tinydash.memoryprobe.20260919",
+   "build": {
+     "beforeDevCommand": "bun run dev",
+     "devUrl": "http://127.0.0.1:1420",
+@@ -45,6 +45,8 @@
+       "icons/icon.icns",
+       "icons/icon.ico"
+     ],
+-    "macOS": { "minimumSystemVersion": "12.0" }
++    "macOS": {
++      "minimumSystemVersion": "12.0"
++    }
+   }
+ }
+--- /dev/null
++++ b/src-tauri/src/memory_probe.rs
+@@ -0,0 +1,62 @@
++// Temporary diagnostic code. Never include this module in a product build.
++use tauri::{Emitter, Manager};
++
++fn directory() -> std::path::PathBuf {
++    std::path::PathBuf::from(env!("TINYDASH_PROBE_DIR"))
++}
++
++#[tauri::command]
++pub fn snapshot(payload: serde_json::Value) {
++    let _ = std::fs::write(directory().join("snapshot.json"), payload.to_string());
++}
++
++pub fn install(app: tauri::AppHandle) {
++    std::thread::spawn(move || loop {
++        std::thread::sleep(std::time::Duration::from_millis(100));
++        let path = directory().join("command.json");
++        let Ok(bytes) = std::fs::read(&path) else { continue };
++        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else { continue };
++        let _ = std::fs::remove_file(&path);
++        let action = value["action"].as_str().unwrap_or("").to_string();
++        let id = value["id"].clone();
++        let result: Result<(), String> = (|| {
++            match action.as_str() {
++                "hide" => crate::launcher::window::hide(&app).map_err(|e| e.to_string())?,
++                "show" => {
++                    if app.get_webview_window("main").is_none() {
++                        tauri::WebviewWindowBuilder::from_config(&app, &app.config().app.windows[0])
++                            .map_err(|e| e.to_string())?.build().map_err(|e| e.to_string())?;
++                    }
++                    crate::launcher::window::show(&app).map_err(|e| e.to_string())?;
++                }
++                "blank" => app.get_webview_window("main").ok_or("No main window")?
++                    .navigate("about:blank".parse().unwrap()).map_err(|e| e.to_string())?,
++                "destroy" => app.get_webview_window("main").ok_or("No main window")?
++                    .destroy().map_err(|e| e.to_string())?,
++                "settings" => {
++                    let handle = app.clone();
++                    tauri::async_runtime::block_on(crate::launcher::preferences::open_settings(handle))?;
++                }
++                "hide-settings" => app.get_webview_window("settings").ok_or("No settings window")?
++                    .close().map_err(|e| e.to_string())?,
++                "destroy-settings" => app.get_webview_window("settings").ok_or("No settings window")?
++                    .destroy().map_err(|e| e.to_string())?,
++                "clear" => app.get_webview_window("main").ok_or("No main window")?
++                    .emit("probe-clear-results", ()).map_err(|e| e.to_string())?,
++                "snapshot" => app.get_webview_window("main").ok_or("No main window")?
++                    .eval(r#"window.__TAURI_INTERNALS__.invoke('snapshot', { payload: {
++                        nodes: document.querySelectorAll('*').length,
++                        images: [...document.images].map(i => ({width: i.naturalWidth, height: i.naturalHeight, srcBytes: i.getAttribute('src')?.length ?? 0})),
++                        scripts: [...document.scripts].map(s => s.src.split('/').at(-1)),
++                        resultRows: document.querySelectorAll('[role=option]').length,
++                        devicePixelRatio: window.devicePixelRatio,
++                        hidden: document.hidden
++                    }})"#).map_err(|e| e.to_string())?,
++                _ => return Err(format!("Unknown action: {action}")),
++            }
++            Ok(())
++        })();
++        let _ = std::fs::write(directory().join("ack.json"),
++            serde_json::json!({"id": id, "action": action, "error": result.err()}).to_string());
++    });
++}

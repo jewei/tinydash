@@ -1,0 +1,1748 @@
+{
+  "icons": {
+    "p3a": {
+      "independent_runs": 5,
+      "runs": [
+        {
+          "trial": 1,
+          "file": "p3a-icons-1.json",
+          "after_warm_visible": {
+            "total_mib": 254.80172729492188,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2659454345703125,
+              "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+              "com.apple.WebKit.GPU": 26.75098419189453,
+              "com.apple.WebKit.Networking": 6.266082763671875,
+              "com.apple.WebKit.WebContent": 173.9073486328125,
+              "com.apple.audio.SandboxHelper": 5.3130035400390625,
+              "tinydash": 29.797927856445312
+            }
+          },
+          "hidden": {
+            "total_mib": 137.70802307128906,
+            "process_mib": {
+              "SetStoreUpdateService": 2.1722183227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.437934875488281,
+              "com.apple.WebKit.GPU": 13.297859191894531,
+              "com.apple.WebKit.Networking": 6.062957763671875,
+              "com.apple.WebKit.WebContent": 68.3761215209961,
+              "com.apple.audio.SandboxHelper": 5.2505035400390625,
+              "tinydash": 32.11042785644531
+            }
+          },
+          "sampled_peak_mib": 460.5048522949219,
+          "unique_representation_bytes": 15547172,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 17.0,
+              "p95_ms": 28,
+              "min_ms": 6,
+              "max_ms": 28
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 58.5,
+              "p95_ms": 61,
+              "min_ms": 56,
+              "max_ms": 61
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 6,
+              "min_ms": 4,
+              "max_ms": 13
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 27.0,
+              "p95_ms": 28,
+              "min_ms": 9,
+              "max_ms": 33
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.5,
+              "p95_ms": 5,
+              "min_ms": 4,
+              "max_ms": 5
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 39.0,
+              "p95_ms": 50,
+              "min_ms": 28,
+              "max_ms": 50
+            }
+          },
+          "delayed": {
+            "textMs": 2,
+            "decodedIconMs": 545
+          }
+        },
+        {
+          "trial": 2,
+          "file": "p3a-icons-2.json",
+          "after_warm_visible": {
+            "total_mib": 377.5047607421875,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2503204345703125,
+              "com.apple.SafariPlatformSupport.Helper": 10.469161987304688,
+              "com.apple.WebKit.GPU": 26.594711303710938,
+              "com.apple.WebKit.Networking": 6.594184875488281,
+              "com.apple.WebKit.WebContent": 296.4229507446289,
+              "com.apple.audio.SandboxHelper": 5.3442535400390625,
+              "tinydash": 29.829177856445312
+            }
+          },
+          "hidden": {
+            "total_mib": 177.1141815185547,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2347183227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.453559875488281,
+              "com.apple.WebKit.GPU": 13.407211303710938,
+              "com.apple.WebKit.Networking": 6.3597869873046875,
+              "com.apple.WebKit.WebContent": 104.2510986328125,
+              "com.apple.audio.SandboxHelper": 5.2817535400390625,
+              "tinydash": 35.14167785644531
+            }
+          },
+          "sampled_peak_mib": 379.8329315185547,
+          "unique_representation_bytes": 15547172,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 21.0,
+              "p95_ms": 26,
+              "min_ms": 16,
+              "max_ms": 26
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 60.0,
+              "p95_ms": 64,
+              "min_ms": 56,
+              "max_ms": 64
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 6,
+              "min_ms": 4,
+              "max_ms": 11
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 27.0,
+              "p95_ms": 28,
+              "min_ms": 25,
+              "max_ms": 49
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.0,
+              "p95_ms": 4,
+              "min_ms": 4,
+              "max_ms": 4
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 37.5,
+              "p95_ms": 46,
+              "min_ms": 29,
+              "max_ms": 46
+            }
+          },
+          "delayed": {
+            "textMs": 3,
+            "decodedIconMs": 546
+          }
+        },
+        {
+          "trial": 3,
+          "file": "p3a-icons-3.json",
+          "after_warm_visible": {
+            "total_mib": 259.37964630126953,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2815933227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.562934875488281,
+              "com.apple.WebKit.GPU": 26.141403198242188,
+              "com.apple.WebKit.Networking": 6.766105651855469,
+              "com.apple.WebKit.WebContent": 178.5010528564453,
+              "com.apple.audio.SandboxHelper": 5.3442535400390625,
+              "tinydash": 29.782302856445312
+            }
+          },
+          "hidden": {
+            "total_mib": 136.36404418945312,
+            "process_mib": {
+              "SetStoreUpdateService": 2.1722183227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.437934875488281,
+              "com.apple.WebKit.GPU": 13.219528198242188,
+              "com.apple.WebKit.Networking": 6.500480651855469,
+              "com.apple.WebKit.WebContent": 66.39167785644531,
+              "com.apple.audio.SandboxHelper": 5.2817535400390625,
+              "tinydash": 32.360450744628906
+            }
+          },
+          "sampled_peak_mib": 290.53589630126953,
+          "unique_representation_bytes": 15547172,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 17.0,
+              "p95_ms": 28,
+              "min_ms": 6,
+              "max_ms": 28
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 52.0,
+              "p95_ms": 60,
+              "min_ms": 44,
+              "max_ms": 60
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 6,
+              "min_ms": 4,
+              "max_ms": 7
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 27.0,
+              "p95_ms": 28,
+              "min_ms": 23,
+              "max_ms": 29
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.0,
+              "p95_ms": 4,
+              "min_ms": 4,
+              "max_ms": 4
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 43.0,
+              "p95_ms": 58,
+              "min_ms": 28,
+              "max_ms": 58
+            }
+          },
+          "delayed": {
+            "textMs": 2,
+            "decodedIconMs": 546
+          }
+        },
+        {
+          "trial": 4,
+          "file": "p3a-icons-4.json",
+          "after_warm_visible": {
+            "total_mib": 333.2078857421875,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2346954345703125,
+              "com.apple.SafariPlatformSupport.Helper": 10.453559875488281,
+              "com.apple.WebKit.GPU": 26.047698974609375,
+              "com.apple.WebKit.Networking": 6.547332763671875,
+              "com.apple.WebKit.WebContent": 253.14179229736328,
+              "com.apple.audio.SandboxHelper": 5.3442535400390625,
+              "tinydash": 29.438552856445312
+            }
+          },
+          "hidden": {
+            "total_mib": 134.4735107421875,
+            "process_mib": {
+              "SetStoreUpdateService": 2.1253204345703125,
+              "com.apple.SafariPlatformSupport.Helper": 10.406684875488281,
+              "com.apple.WebKit.GPU": 13.375823974609375,
+              "com.apple.WebKit.Networking": 6.344207763671875,
+              "com.apple.WebKit.WebContent": 68.92304229736328,
+              "com.apple.audio.SandboxHelper": 2.9848785400390625,
+              "tinydash": 30.313552856445312
+            }
+          },
+          "sampled_peak_mib": 331.4578857421875,
+          "unique_representation_bytes": 15547172,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 16.0,
+              "p95_ms": 25,
+              "min_ms": 7,
+              "max_ms": 25
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 53.5,
+              "p95_ms": 57,
+              "min_ms": 50,
+              "max_ms": 57
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 5,
+              "min_ms": 4,
+              "max_ms": 8
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 28.0,
+              "p95_ms": 28,
+              "min_ms": 25,
+              "max_ms": 29
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.0,
+              "p95_ms": 4,
+              "min_ms": 4,
+              "max_ms": 4
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 39.5,
+              "p95_ms": 51,
+              "min_ms": 28,
+              "max_ms": 51
+            }
+          },
+          "delayed": {
+            "textMs": 3,
+            "decodedIconMs": 547
+          }
+        },
+        {
+          "trial": 5,
+          "file": "p3a-icons-5.json",
+          "after_warm_visible": {
+            "total_mib": 244.14520263671875,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2659454345703125,
+              "com.apple.SafariPlatformSupport.Helper": 10.422309875488281,
+              "com.apple.WebKit.GPU": 26.375755310058594,
+              "com.apple.WebKit.Networking": 6.3285369873046875,
+              "com.apple.WebKit.WebContent": 163.6885757446289,
+              "com.apple.audio.SandboxHelper": 5.3442535400390625,
+              "tinydash": 29.719825744628906
+            }
+          },
+          "hidden": {
+            "total_mib": 133.72335052490234,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2347183227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.406684875488281,
+              "com.apple.WebKit.GPU": 13.407005310058594,
+              "com.apple.WebKit.Networking": 6.1410369873046875,
+              "com.apple.WebKit.WebContent": 67.8448257446289,
+              "com.apple.audio.SandboxHelper": 2.9848785400390625,
+              "tinydash": 30.704200744628906
+            }
+          },
+          "sampled_peak_mib": 308.31705474853516,
+          "unique_representation_bytes": 15547172,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 22.5,
+              "p95_ms": 25,
+              "min_ms": 20,
+              "max_ms": 25
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 54.5,
+              "p95_ms": 61,
+              "min_ms": 48,
+              "max_ms": 61
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 5,
+              "min_ms": 4,
+              "max_ms": 6
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 27.0,
+              "p95_ms": 28,
+              "min_ms": 25,
+              "max_ms": 29
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.0,
+              "p95_ms": 4,
+              "min_ms": 4,
+              "max_ms": 4
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 38.5,
+              "p95_ms": 48,
+              "min_ms": 29,
+              "max_ms": 48
+            }
+          },
+          "delayed": {
+            "textMs": 3,
+            "decodedIconMs": 547
+          }
+        }
+      ],
+      "hidden_mib": {
+        "values": [
+          137.70802307128906,
+          177.1141815185547,
+          136.36404418945312,
+          134.4735107421875,
+          133.72335052490234
+        ],
+        "median": 136.36404418945312,
+        "min": 133.72335052490234,
+        "max": 177.1141815185547
+      },
+      "sampled_peak_mib": {
+        "values": [
+          460.5048522949219,
+          379.8329315185547,
+          290.53589630126953,
+          331.4578857421875,
+          308.31705474853516
+        ],
+        "median": 331.4578857421875,
+        "min": 290.53589630126953,
+        "max": 460.5048522949219
+      },
+      "latency": {
+        "cold": {
+          "text": {
+            "run_p50_ms": {
+              "values": [
+                17.0,
+                21.0,
+                17.0,
+                16.0,
+                22.5
+              ],
+              "median": 17.0,
+              "min": 16.0,
+              "max": 22.5
+            },
+            "run_p95_ms": {
+              "values": [
+                28,
+                26,
+                28,
+                25,
+                25
+              ],
+              "median": 26,
+              "min": 25,
+              "max": 28
+            }
+          },
+          "decoded_icons": {
+            "run_p50_ms": {
+              "values": [
+                58.5,
+                60.0,
+                52.0,
+                53.5,
+                54.5
+              ],
+              "median": 54.5,
+              "min": 52.0,
+              "max": 60.0
+            },
+            "run_p95_ms": {
+              "values": [
+                61,
+                64,
+                60,
+                57,
+                61
+              ],
+              "median": 61,
+              "min": 57,
+              "max": 64
+            }
+          }
+        },
+        "warm": {
+          "text": {
+            "run_p50_ms": {
+              "values": [
+                5.0,
+                5.0,
+                5.0,
+                5.0,
+                5.0
+              ],
+              "median": 5.0,
+              "min": 5.0,
+              "max": 5.0
+            },
+            "run_p95_ms": {
+              "values": [
+                6,
+                6,
+                6,
+                5,
+                5
+              ],
+              "median": 6,
+              "min": 5,
+              "max": 6
+            }
+          },
+          "decoded_icons": {
+            "run_p50_ms": {
+              "values": [
+                27.0,
+                27.0,
+                27.0,
+                28.0,
+                27.0
+              ],
+              "median": 27.0,
+              "min": 27.0,
+              "max": 28.0
+            },
+            "run_p95_ms": {
+              "values": [
+                28,
+                28,
+                28,
+                28,
+                28
+              ],
+              "median": 28,
+              "min": 28,
+              "max": 28
+            }
+          }
+        },
+        "after_eviction": {
+          "text": {
+            "run_p50_ms": {
+              "values": [
+                4.5,
+                4.0,
+                4.0,
+                4.0,
+                4.0
+              ],
+              "median": 4.0,
+              "min": 4.0,
+              "max": 4.5
+            },
+            "run_p95_ms": {
+              "values": [
+                5,
+                4,
+                4,
+                4,
+                4
+              ],
+              "median": 4,
+              "min": 4,
+              "max": 5
+            }
+          },
+          "decoded_icons": {
+            "run_p50_ms": {
+              "values": [
+                39.0,
+                37.5,
+                43.0,
+                39.5,
+                38.5
+              ],
+              "median": 39.0,
+              "min": 37.5,
+              "max": 43.0
+            },
+            "run_p95_ms": {
+              "values": [
+                50,
+                46,
+                58,
+                51,
+                48
+              ],
+              "median": 50,
+              "min": 46,
+              "max": 58
+            }
+          }
+        }
+      }
+    },
+    "p3b": {
+      "independent_runs": 5,
+      "runs": [
+        {
+          "trial": 1,
+          "file": "p3b-icons-1.json",
+          "after_warm_visible": {
+            "total_mib": 522.9425582885742,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2347183227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.641059875488281,
+              "com.apple.WebKit.GPU": 26.297767639160156,
+              "com.apple.WebKit.Networking": 8.094207763671875,
+              "com.apple.WebKit.WebContent": 440.7670211791992,
+              "com.apple.audio.SandboxHelper": 5.297355651855469,
+              "tinydash": 29.610427856445312
+            }
+          },
+          "hidden": {
+            "total_mib": 219.8957290649414,
+            "process_mib": {
+              "SetStoreUpdateService": 2.6878433227539062,
+              "com.apple.SafariPlatformSupport.Helper": 12.922309875488281,
+              "com.apple.WebKit.GPU": 16.391517639160156,
+              "com.apple.WebKit.Networking": 7.562957763671875,
+              "com.apple.WebKit.WebContent": 142.6576690673828,
+              "com.apple.audio.SandboxHelper": 5.234855651855469,
+              "tinydash": 32.438575744628906
+            }
+          },
+          "sampled_peak_mib": 487.03626251220703,
+          "unique_representation_bytes": 11651696,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 12.0,
+              "p95_ms": 18,
+              "min_ms": 6,
+              "max_ms": 18
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 69.5,
+              "p95_ms": 78,
+              "min_ms": 61,
+              "max_ms": 78
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 7,
+              "min_ms": 4,
+              "max_ms": 10
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 28.0,
+              "p95_ms": 29,
+              "min_ms": 25,
+              "max_ms": 34
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.5,
+              "p95_ms": 5,
+              "min_ms": 4,
+              "max_ms": 5
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 36.5,
+              "p95_ms": 44,
+              "min_ms": 29,
+              "max_ms": 44
+            }
+          },
+          "delayed": {
+            "textMs": 3,
+            "decodedIconMs": 528
+          }
+        },
+        {
+          "trial": 2,
+          "file": "p3b-icons-2.json",
+          "after_warm_visible": {
+            "total_mib": 473.6613311767578,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2815933227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.594184875488281,
+              "com.apple.WebKit.GPU": 26.266448974609375,
+              "com.apple.WebKit.Networking": 7.8130035400390625,
+              "com.apple.WebKit.WebContent": 391.2357940673828,
+              "com.apple.audio.SandboxHelper": 5.3442535400390625,
+              "tinydash": 30.126052856445312
+            }
+          },
+          "hidden": {
+            "total_mib": 182.614501953125,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2503433227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.437934875488281,
+              "com.apple.WebKit.GPU": 13.110221862792969,
+              "com.apple.WebKit.Networking": 6.3755035400390625,
+              "com.apple.WebKit.WebContent": 110.3295669555664,
+              "com.apple.audio.SandboxHelper": 5.2817535400390625,
+              "tinydash": 34.82917785644531
+            }
+          },
+          "sampled_peak_mib": 469.0363311767578,
+          "unique_representation_bytes": 11651696,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 16.0,
+              "p95_ms": 26,
+              "min_ms": 6,
+              "max_ms": 26
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 60.5,
+              "p95_ms": 61,
+              "min_ms": 60,
+              "max_ms": 61
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 6,
+              "min_ms": 4,
+              "max_ms": 11
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 28.0,
+              "p95_ms": 29,
+              "min_ms": 22,
+              "max_ms": 35
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.5,
+              "p95_ms": 5,
+              "min_ms": 4,
+              "max_ms": 5
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 35.0,
+              "p95_ms": 41,
+              "min_ms": 29,
+              "max_ms": 41
+            }
+          },
+          "delayed": {
+            "textMs": 2,
+            "decodedIconMs": 544
+          }
+        },
+        {
+          "trial": 3,
+          "file": "p3b-icons-3.json",
+          "after_warm_visible": {
+            "total_mib": 340.8016586303711,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2971954345703125,
+              "com.apple.SafariPlatformSupport.Helper": 10.578559875488281,
+              "com.apple.WebKit.GPU": 26.26642608642578,
+              "com.apple.WebKit.Networking": 7.828559875488281,
+              "com.apple.WebKit.WebContent": 258.90750885009766,
+              "com.apple.audio.SandboxHelper": 5.3442535400390625,
+              "tinydash": 29.57915496826172
+            }
+          },
+          "hidden": {
+            "total_mib": 246.6610565185547,
+            "process_mib": {
+              "SetStoreUpdateService": 2.8128433227539062,
+              "com.apple.SafariPlatformSupport.Helper": 12.750434875488281,
+              "com.apple.WebKit.GPU": 16.51642608642578,
+              "com.apple.WebKit.Networking": 7.625434875488281,
+              "com.apple.WebKit.WebContent": 169.20438385009766,
+              "com.apple.audio.SandboxHelper": 2.9848785400390625,
+              "tinydash": 34.76665496826172
+            }
+          },
+          "sampled_peak_mib": 344.0516586303711,
+          "unique_representation_bytes": 11651696,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 15.0,
+              "p95_ms": 16,
+              "min_ms": 14,
+              "max_ms": 16
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 67.0,
+              "p95_ms": 76,
+              "min_ms": 58,
+              "max_ms": 76
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 5,
+              "min_ms": 4,
+              "max_ms": 6
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 29.0,
+              "p95_ms": 29,
+              "min_ms": 26,
+              "max_ms": 29
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.0,
+              "p95_ms": 5,
+              "min_ms": 3,
+              "max_ms": 5
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 35.5,
+              "p95_ms": 42,
+              "min_ms": 29,
+              "max_ms": 42
+            }
+          },
+          "delayed": {
+            "textMs": 2,
+            "decodedIconMs": 545
+          }
+        },
+        {
+          "trial": 4,
+          "file": "p3b-icons-4.json",
+          "after_warm_visible": {
+            "total_mib": 378.5360794067383,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2972183227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.625434875488281,
+              "com.apple.WebKit.GPU": 26.735267639160156,
+              "com.apple.WebKit.Networking": 8.047309875488281,
+              "com.apple.WebKit.WebContent": 295.73558807373047,
+              "com.apple.audio.SandboxHelper": 5.312980651855469,
+              "tinydash": 29.78227996826172
+            }
+          },
+          "hidden": {
+            "total_mib": 169.02047729492188,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2347183227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.578559875488281,
+              "com.apple.WebKit.GPU": 13.14154052734375,
+              "com.apple.WebKit.Networking": 6.812934875488281,
+              "com.apple.WebKit.WebContent": 101.86058807373047,
+              "com.apple.audio.SandboxHelper": 2.9536056518554688,
+              "tinydash": 31.43852996826172
+            }
+          },
+          "sampled_peak_mib": 380.6142044067383,
+          "unique_representation_bytes": 11651696,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 20.0,
+              "p95_ms": 30,
+              "min_ms": 10,
+              "max_ms": 30
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 67.0,
+              "p95_ms": 73,
+              "min_ms": 61,
+              "max_ms": 73
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 8,
+              "min_ms": 4,
+              "max_ms": 14
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 28.0,
+              "p95_ms": 30,
+              "min_ms": 22,
+              "max_ms": 57
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 5.5,
+              "p95_ms": 7,
+              "min_ms": 4,
+              "max_ms": 7
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 33.5,
+              "p95_ms": 37,
+              "min_ms": 30,
+              "max_ms": 37
+            }
+          },
+          "delayed": {
+            "textMs": 2,
+            "decodedIconMs": 544
+          }
+        },
+        {
+          "trial": 5,
+          "file": "p3b-icons-5.json",
+          "after_warm_visible": {
+            "total_mib": 279.0828399658203,
+            "process_mib": {
+              "SetStoreUpdateService": 2.2503433227539062,
+              "com.apple.SafariPlatformSupport.Helper": 10.625434875488281,
+              "com.apple.WebKit.GPU": 26.266380310058594,
+              "com.apple.WebKit.Networking": 7.703582763671875,
+              "com.apple.WebKit.WebContent": 197.42306518554688,
+              "com.apple.audio.SandboxHelper": 5.3442535400390625,
+              "tinydash": 29.46977996826172
+            }
+          },
+          "hidden": {
+            "total_mib": 179.84844207763672,
+            "process_mib": {
+              "SetStoreUpdateService": 2.3753433227539062,
+              "com.apple.SafariPlatformSupport.Helper": 12.797309875488281,
+              "com.apple.WebKit.GPU": 14.828880310058594,
+              "com.apple.WebKit.Networking": 7.000457763671875,
+              "com.apple.WebKit.WebContent": 107.59494018554688,
+              "com.apple.audio.SandboxHelper": 2.9848785400390625,
+              "tinydash": 32.266632080078125
+            }
+          },
+          "sampled_peak_mib": 323.56712341308594,
+          "unique_representation_bytes": 11651696,
+          "unique_icon_requests": 496,
+          "missing_icons": 0,
+          "cold": {
+            "text": {
+              "n": 2,
+              "p50_ms": 16.0,
+              "p95_ms": 26,
+              "min_ms": 6,
+              "max_ms": 26
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 60.0,
+              "p95_ms": 61,
+              "min_ms": 59,
+              "max_ms": 61
+            }
+          },
+          "warm": {
+            "text": {
+              "n": 100,
+              "p50_ms": 5.0,
+              "p95_ms": 6,
+              "min_ms": 3,
+              "max_ms": 7
+            },
+            "decoded_icons": {
+              "n": 100,
+              "p50_ms": 29.0,
+              "p95_ms": 29,
+              "min_ms": 20,
+              "max_ms": 30
+            }
+          },
+          "after_eviction": {
+            "text": {
+              "n": 2,
+              "p50_ms": 4.0,
+              "p95_ms": 4,
+              "min_ms": 4,
+              "max_ms": 4
+            },
+            "decoded_icons": {
+              "n": 2,
+              "p50_ms": 34.5,
+              "p95_ms": 39,
+              "min_ms": 30,
+              "max_ms": 39
+            }
+          },
+          "delayed": {
+            "textMs": 2,
+            "decodedIconMs": 546
+          }
+        }
+      ],
+      "hidden_mib": {
+        "values": [
+          219.8957290649414,
+          182.614501953125,
+          246.6610565185547,
+          169.02047729492188,
+          179.84844207763672
+        ],
+        "median": 182.614501953125,
+        "min": 169.02047729492188,
+        "max": 246.6610565185547
+      },
+      "sampled_peak_mib": {
+        "values": [
+          487.03626251220703,
+          469.0363311767578,
+          344.0516586303711,
+          380.6142044067383,
+          323.56712341308594
+        ],
+        "median": 380.6142044067383,
+        "min": 323.56712341308594,
+        "max": 487.03626251220703
+      },
+      "latency": {
+        "cold": {
+          "text": {
+            "run_p50_ms": {
+              "values": [
+                12.0,
+                16.0,
+                15.0,
+                20.0,
+                16.0
+              ],
+              "median": 16.0,
+              "min": 12.0,
+              "max": 20.0
+            },
+            "run_p95_ms": {
+              "values": [
+                18,
+                26,
+                16,
+                30,
+                26
+              ],
+              "median": 26,
+              "min": 16,
+              "max": 30
+            }
+          },
+          "decoded_icons": {
+            "run_p50_ms": {
+              "values": [
+                69.5,
+                60.5,
+                67.0,
+                67.0,
+                60.0
+              ],
+              "median": 67.0,
+              "min": 60.0,
+              "max": 69.5
+            },
+            "run_p95_ms": {
+              "values": [
+                78,
+                61,
+                76,
+                73,
+                61
+              ],
+              "median": 73,
+              "min": 61,
+              "max": 78
+            }
+          }
+        },
+        "warm": {
+          "text": {
+            "run_p50_ms": {
+              "values": [
+                5.0,
+                5.0,
+                5.0,
+                5.0,
+                5.0
+              ],
+              "median": 5.0,
+              "min": 5.0,
+              "max": 5.0
+            },
+            "run_p95_ms": {
+              "values": [
+                7,
+                6,
+                5,
+                8,
+                6
+              ],
+              "median": 6,
+              "min": 5,
+              "max": 8
+            }
+          },
+          "decoded_icons": {
+            "run_p50_ms": {
+              "values": [
+                28.0,
+                28.0,
+                29.0,
+                28.0,
+                29.0
+              ],
+              "median": 28.0,
+              "min": 28.0,
+              "max": 29.0
+            },
+            "run_p95_ms": {
+              "values": [
+                29,
+                29,
+                29,
+                30,
+                29
+              ],
+              "median": 29,
+              "min": 29,
+              "max": 30
+            }
+          }
+        },
+        "after_eviction": {
+          "text": {
+            "run_p50_ms": {
+              "values": [
+                4.5,
+                4.5,
+                4.0,
+                5.5,
+                4.0
+              ],
+              "median": 4.5,
+              "min": 4.0,
+              "max": 5.5
+            },
+            "run_p95_ms": {
+              "values": [
+                5,
+                5,
+                5,
+                7,
+                4
+              ],
+              "median": 5,
+              "min": 4,
+              "max": 7
+            }
+          },
+          "decoded_icons": {
+            "run_p50_ms": {
+              "values": [
+                36.5,
+                35.0,
+                35.5,
+                33.5,
+                34.5
+              ],
+              "median": 35.0,
+              "min": 33.5,
+              "max": 36.5
+            },
+            "run_p95_ms": {
+              "values": [
+                44,
+                41,
+                42,
+                37,
+                39
+              ],
+              "median": 41,
+              "min": 37,
+              "max": 44
+            }
+          }
+        }
+      }
+    }
+  },
+  "settings_growth": {
+    "independent_runs": 1,
+    "initial": {
+      "total_mib": 134.20781707763672,
+      "process_mib": {
+        "SetStoreUpdateService": 2.3440933227539062,
+        "com.apple.SafariPlatformSupport.Helper": 10.609809875488281,
+        "com.apple.WebKit.GPU": 13.047698974609375,
+        "com.apple.WebKit.Networking": 6.422332763671875,
+        "com.apple.WebKit.WebContent": 64.5323257446289,
+        "com.apple.audio.SandboxHelper": 5.266105651855469,
+        "tinydash": 31.985450744628906
+      }
+    },
+    "groups": [
+      {
+        "cycles": 20,
+        "total_mib": 155.6453857421875,
+        "process_mib": {
+          "SetStoreUpdateService": 2.3128433227539062,
+          "com.apple.SafariPlatformSupport.Helper": 10.578559875488281,
+          "com.apple.WebKit.GPU": 13.344596862792969,
+          "com.apple.WebKit.Networking": 6.391082763671875,
+          "com.apple.WebKit.WebContent": 64.4385757446289,
+          "com.apple.audio.SandboxHelper": 5.266105651855469,
+          "tinydash": 53.313621520996094
+        }
+      },
+      {
+        "cycles": 40,
+        "total_mib": 169.3485336303711,
+        "process_mib": {
+          "SetStoreUpdateService": 2.2972183227539062,
+          "com.apple.SafariPlatformSupport.Helper": 10.578559875488281,
+          "com.apple.WebKit.GPU": 13.360244750976562,
+          "com.apple.WebKit.Networking": 6.406707763671875,
+          "com.apple.WebKit.WebContent": 64.4385757446289,
+          "com.apple.audio.SandboxHelper": 2.9692306518554688,
+          "tinydash": 69.2979965209961
+        }
+      },
+      {
+        "cycles": 60,
+        "total_mib": 201.2704086303711,
+        "process_mib": {
+          "SetStoreUpdateService": 2.8284683227539062,
+          "com.apple.SafariPlatformSupport.Helper": 12.859809875488281,
+          "com.apple.WebKit.GPU": 17.71959686279297,
+          "com.apple.WebKit.Networking": 7.781707763671875,
+          "com.apple.WebKit.WebContent": 70.7354507446289,
+          "com.apple.audio.SandboxHelper": 2.9692306518554688,
+          "tinydash": 86.37614440917969
+        }
+      },
+      {
+        "cycles": 80,
+        "total_mib": 219.5360107421875,
+        "process_mib": {
+          "SetStoreUpdateService": 2.8440933227539062,
+          "com.apple.SafariPlatformSupport.Helper": 12.797309875488281,
+          "com.apple.WebKit.GPU": 17.469573974609375,
+          "com.apple.WebKit.Networking": 7.625457763671875,
+          "com.apple.WebKit.WebContent": 70.7198257446289,
+          "com.apple.audio.SandboxHelper": 2.9692306518554688,
+          "tinydash": 105.12614440917969
+        }
+      },
+      {
+        "cycles": 100,
+        "total_mib": 234.4422836303711,
+        "process_mib": {
+          "SetStoreUpdateService": 2.8440933227539062,
+          "com.apple.SafariPlatformSupport.Helper": 12.844184875488281,
+          "com.apple.WebKit.GPU": 16.813323974609375,
+          "com.apple.WebKit.Networking": 7.687957763671875,
+          "com.apple.WebKit.WebContent": 70.7198257446289,
+          "com.apple.audio.SandboxHelper": 2.9692306518554688,
+          "tinydash": 120.56366729736328
+        }
+      }
+    ]
+  },
+  "repeated": {
+    "baseline2": {
+      "independent_runs": 1,
+      "groups": [
+        {
+          "group": 1,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 162.2078399658203,
+          "process_mib": {
+            "SetStoreUpdateService": 2.2815933227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.547309875488281,
+            "com.apple.WebKit.GPU": 12.875869750976562,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 87.8135757446289,
+            "com.apple.audio.SandboxHelper": 5.2505035400390625,
+            "tinydash": 37.09477996826172
+          }
+        },
+        {
+          "group": 2,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 192.2079086303711,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3284683227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.531684875488281,
+            "com.apple.WebKit.GPU": 12.89154052734375,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 119.9854736328125,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 37.17290496826172
+          }
+        },
+        {
+          "group": 3,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 130.2391357421875,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.469184875488281,
+            "com.apple.WebKit.GPU": 12.719642639160156,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 58.9698486328125,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 36.46977996826172
+          }
+        },
+        {
+          "group": 4,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 128.9735565185547,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.75091552734375,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 59.172996520996094,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 34.93852996826172
+          }
+        },
+        {
+          "group": 5,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 129.20795440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.797813415527344,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 59.344871520996094,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 34.95415496826172
+          }
+        },
+        {
+          "group": 6,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 129.4735336303711,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.782142639160156,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 59.626121520996094,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 34.95415496826172
+          }
+        },
+        {
+          "group": 7,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 129.64545440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.907188415527344,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 59.657371520996094,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 34.96977996826172
+          }
+        },
+        {
+          "group": 8,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 129.67670440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.875938415527344,
+            "com.apple.WebKit.Networking": 6.344207763671875,
+            "com.apple.WebKit.WebContent": 59.704246520996094,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 34.98540496826172
+          }
+        },
+        {
+          "group": 9,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 140.89547729492188,
+          "process_mib": {
+            "SetStoreUpdateService": 2.8597183227539062,
+            "com.apple.SafariPlatformSupport.Helper": 12.312934875488281,
+            "com.apple.WebKit.GPU": 15.282211303710938,
+            "com.apple.WebKit.Networking": 7.250457763671875,
+            "com.apple.WebKit.WebContent": 64.9229965209961,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 35.31352996826172
+          }
+        },
+        {
+          "group": 10,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 174.3641815185547,
+          "process_mib": {
+            "SetStoreUpdateService": 2.9222183227539062,
+            "com.apple.SafariPlatformSupport.Helper": 12.734809875488281,
+            "com.apple.WebKit.GPU": 16.23529052734375,
+            "com.apple.WebKit.Networking": 7.297332763671875,
+            "com.apple.WebKit.WebContent": 96.0011215209961,
+            "com.apple.audio.SandboxHelper": 2.9536285400390625,
+            "tinydash": 36.21977996826172
+          }
+        }
+      ],
+      "sampled_peak_mib": 398.4422607421875
+    },
+    "icon-final": {
+      "independent_runs": 1,
+      "groups": [
+        {
+          "group": 1,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 288.4578857421875,
+          "process_mib": {
+            "SetStoreUpdateService": 2.2815933227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 13.016471862792969,
+            "com.apple.WebKit.Networking": 6.375457763671875,
+            "com.apple.WebKit.WebContent": 219.5792694091797,
+            "com.apple.audio.SandboxHelper": 5.234855651855469,
+            "tinydash": 31.469802856445312
+          }
+        },
+        {
+          "group": 2,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 130.1766357421875,
+          "process_mib": {
+            "SetStoreUpdateService": 2.2972183227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.875846862792969,
+            "com.apple.WebKit.Networking": 6.359832763671875,
+            "com.apple.WebKit.WebContent": 61.39176940917969,
+            "com.apple.audio.SandboxHelper": 5.234855651855469,
+            "tinydash": 31.516677856445312
+          }
+        },
+        {
+          "group": 3,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 131.0673065185547,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3284683227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.813346862792969,
+            "com.apple.WebKit.Networking": 6.375457763671875,
+            "com.apple.WebKit.WebContent": 62.719940185546875,
+            "com.apple.audio.SandboxHelper": 5.234855651855469,
+            "tinydash": 31.094802856445312
+          }
+        },
+        {
+          "group": 4,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 130.59857940673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3284683227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.797744750976562,
+            "com.apple.WebKit.Networking": 6.375457763671875,
+            "com.apple.WebKit.WebContent": 62.860565185546875,
+            "com.apple.audio.SandboxHelper": 5.234855651855469,
+            "tinydash": 30.501052856445312
+          }
+        },
+        {
+          "group": 5,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 130.14545440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3284683227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.844619750976562,
+            "com.apple.WebKit.Networking": 6.375457763671875,
+            "com.apple.WebKit.WebContent": 62.376190185546875,
+            "com.apple.audio.SandboxHelper": 5.234855651855469,
+            "tinydash": 30.485427856445312
+          }
+        },
+        {
+          "group": 6,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 129.80170440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3284683227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.875869750976562,
+            "com.apple.WebKit.Networking": 6.375457763671875,
+            "com.apple.WebKit.WebContent": 62.782440185546875,
+            "com.apple.audio.SandboxHelper": 5.234855651855469,
+            "tinydash": 29.704177856445312
+          }
+        },
+        {
+          "group": 7,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 128.39545440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.828994750976562,
+            "com.apple.WebKit.Networking": 6.375457763671875,
+            "com.apple.WebKit.WebContent": 63.688690185546875,
+            "com.apple.audio.SandboxHelper": 2.9379806518554688,
+            "tinydash": 29.751052856445312
+          }
+        },
+        {
+          "group": 8,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 127.42670440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.844619750976562,
+            "com.apple.WebKit.Networking": 6.359832763671875,
+            "com.apple.WebKit.WebContent": 62.704315185546875,
+            "com.apple.audio.SandboxHelper": 2.9379806518554688,
+            "tinydash": 29.751052856445312
+          }
+        },
+        {
+          "group": 9,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 127.59857940673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.922744750976562,
+            "com.apple.WebKit.Networking": 6.375457763671875,
+            "com.apple.WebKit.WebContent": 62.735565185546875,
+            "com.apple.audio.SandboxHelper": 2.9379806518554688,
+            "tinydash": 29.813552856445312
+          }
+        },
+        {
+          "group": 10,
+          "dom": {
+            "images": 0,
+            "nodes": 100
+          },
+          "total_mib": 128.08295440673828,
+          "process_mib": {
+            "SetStoreUpdateService": 2.3128433227539062,
+            "com.apple.SafariPlatformSupport.Helper": 10.500434875488281,
+            "com.apple.WebKit.GPU": 12.813369750976562,
+            "com.apple.WebKit.Networking": 6.359832763671875,
+            "com.apple.WebKit.WebContent": 63.344940185546875,
+            "com.apple.audio.SandboxHelper": 2.9379806518554688,
+            "tinydash": 29.813552856445312
+          }
+        }
+      ],
+      "sampled_peak_mib": 467.7547607421875
+    }
+  },
+  "capacity": {
+    "baseline2": {
+      "independent_runs": 1,
+      "clipboard_rows": [
+        {
+          "pinned": false,
+          "count": 500,
+          "text_bytes": 8192000
+        },
+        {
+          "pinned": true,
+          "count": 101,
+          "text_bytes": 1654784
+        }
+      ],
+      "hidden": {
+        "total_mib": 232.66078186035156,
+        "process_mib": {
+          "SetStoreUpdateService": 2.3440933227539062,
+          "com.apple.SafariPlatformSupport.Helper": 10.578559875488281,
+          "com.apple.WebKit.GPU": 11.656913757324219,
+          "com.apple.WebKit.Networking": 6.375480651855469,
+          "com.apple.WebKit.WebContent": 49.46971130371094,
+          "com.apple.audio.SandboxHelper": 2.9692306518554688,
+          "tinydash": 149.26679229736328
+        }
+      },
+      "after_refresh": {
+        "total_mib": 199.89513397216797,
+        "process_mib": {
+          "SetStoreUpdateService": 2.3440933227539062,
+          "com.apple.SafariPlatformSupport.Helper": 10.578559875488281,
+          "com.apple.WebKit.GPU": 11.656913757324219,
+          "com.apple.WebKit.Networking": 6.375480651855469,
+          "com.apple.WebKit.WebContent": 49.45408630371094,
+          "com.apple.audio.SandboxHelper": 2.9692306518554688,
+          "tinydash": 116.51676940917969
+        }
+      },
+      "sampled_peak_mib": 263.39515686035156
+    },
+    "icon-final": {
+      "independent_runs": 1,
+      "clipboard_rows": [
+        {
+          "pinned": false,
+          "count": 500,
+          "text_bytes": 8192000
+        },
+        {
+          "pinned": true,
+          "count": 101,
+          "text_bytes": 1654784
+        }
+      ],
+      "hidden": {
+        "total_mib": 195.4887924194336,
+        "process_mib": {
+          "SetStoreUpdateService": 2.2659683227539062,
+          "com.apple.SafariPlatformSupport.Helper": 10.437934875488281,
+          "com.apple.WebKit.GPU": 11.375595092773438,
+          "com.apple.WebKit.Networking": 6.281684875488281,
+          "com.apple.WebKit.WebContent": 50.735313415527344,
+          "com.apple.audio.SandboxHelper": 5.2817535400390625,
+          "tinydash": 109.11054229736328
+        }
+      },
+      "after_refresh": {
+        "total_mib": 177.00439453125,
+        "process_mib": {
+          "SetStoreUpdateService": 2.2659683227539062,
+          "com.apple.SafariPlatformSupport.Helper": 10.437934875488281,
+          "com.apple.WebKit.GPU": 11.391220092773438,
+          "com.apple.WebKit.Networking": 6.281684875488281,
+          "com.apple.WebKit.WebContent": 50.344688415527344,
+          "com.apple.audio.SandboxHelper": 5.2817535400390625,
+          "tinydash": 91.00114440917969
+        }
+      },
+      "sampled_peak_mib": 247.2856674194336
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "started_utc": "2026-09-19T12:41:06.302513+00:00",
+  "free_before_bytes": 3188400128,
+  "reason": "User requested build cleanup because disk was full. Daily trial 2 of the selected build overlapped cleanup; controlled trial 2 finished before cleanup started.",
+  "removed": [
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/baseline/src-tauri/target",
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/p1/src-tauri/target",
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/p2/src-tauri/target",
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/p3a/src-tauri/target",
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/p3b/src-tauri/target",
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/lifecycle/src-tauri/target",
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/baseline2/src-tauri/target (except required .app bundle)",
+    "/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/final/src-tauri/target (except required .app bundle)",
+    "/Users/jewei/Dev/tinydash/src-tauri/target"
+  ],
+  "completed_utc": "2026-09-19T12:41:59.926457+00:00",
+  "free_after_bytes": 25704230912,
+  "freed_bytes": 22515830784,
+  "settled_free_bytes": 30918676480,
+  "settled_check_utc": "2026-09-19T12:43:26.331595+00:00",
+  "affected_run": "final-daily-real-2.json",
+  "repeat_policy": "Repeat the complete daily trial 2 baseline/candidate pair in fresh processes. Keep all original records in the raw evidence."
+}

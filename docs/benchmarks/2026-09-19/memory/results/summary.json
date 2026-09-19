@@ -1,0 +1,148 @@
+{
+  "lifecycle": {
+    "stages": {
+      "baseline": {
+        "total_mib": 171.692626953125,
+        "processes_mib": {
+          "tinydash": 36.2667236328125,
+          "SetStoreUpdateService": 2.2972183227539062,
+          "com.apple.WebKit.GPU": 12.141426086425781,
+          "com.apple.WebKit.WebContent": 80.7667007446289,
+          "com.apple.WebKit.Networking": 6.000457763671875,
+          "com.apple.audio.SandboxHelper": 5.2817535400390625,
+          "MTLCompilerService": 18.156661987304688,
+          "com.apple.SafariPlatformSupport.Helper": 10.781684875488281
+        }
+      },
+      "settings_hidden": {
+        "total_mib": 203.31847381591797,
+        "processes_mib": {
+          "tinydash": 40.001121520996094,
+          "SetStoreUpdateService": 2.2972183227539062,
+          "com.apple.WebKit.GPU": 12.375846862792969,
+          "com.apple.WebKit.WebContent": 80.7823257446289,
+          "com.apple.WebKit.Networking": 5.953582763671875,
+          "com.apple.audio.SandboxHelper": 2.9848785400390625,
+          "MTLCompilerService": 18.156661987304688,
+          "com.apple.SafariPlatformSupport.Helper": 10.781684875488281,
+          "com.apple.WebKit.WebContent-97327": 29.985153198242188
+        }
+      },
+      "settings_destroyed": {
+        "total_mib": 173.4895248413086,
+        "processes_mib": {
+          "tinydash": 40.219871520996094,
+          "SetStoreUpdateService": 2.2972183227539062,
+          "com.apple.WebKit.GPU": 12.282051086425781,
+          "com.apple.WebKit.WebContent": 80.7823257446289,
+          "com.apple.WebKit.Networking": 5.984832763671875,
+          "com.apple.audio.SandboxHelper": 2.9848785400390625,
+          "MTLCompilerService": 18.156661987304688,
+          "com.apple.SafariPlatformSupport.Helper": 10.781684875488281
+        }
+      },
+      "main_blank": {
+        "total_mib": 172.9426498413086,
+        "processes_mib": {
+          "tinydash": 40.172996520996094,
+          "SetStoreUpdateService": 2.2972183227539062,
+          "com.apple.WebKit.GPU": 12.188301086425781,
+          "com.apple.WebKit.WebContent": 80.4073257446289,
+          "com.apple.WebKit.Networking": 5.953582763671875,
+          "com.apple.audio.SandboxHelper": 2.9848785400390625,
+          "MTLCompilerService": 18.156661987304688,
+          "com.apple.SafariPlatformSupport.Helper": 10.781684875488281
+        }
+      },
+      "main_destroyed": {
+        "total_mib": 97.56648254394531,
+        "processes_mib": {
+          "tinydash": 39.594871520996094,
+          "SetStoreUpdateService": 2.4065933227539062,
+          "com.apple.WebKit.GPU": 14.250709533691406,
+          "com.apple.WebKit.Networking": 7.047332763671875,
+          "com.apple.audio.SandboxHelper": 2.9848785400390625,
+          "MTLCompilerService": 18.156661987304688,
+          "com.apple.SafariPlatformSupport.Helper": 13.125434875488281
+        }
+      }
+    },
+    "measured_query_checks": 40,
+    "measured_reopen_checks": 10,
+    "error": "{\"ready\": false}"
+  },
+  "no-icons": {
+    "stages": {
+      "baseline": {
+        "total_mib": 151.23899841308594,
+        "processes_mib": {
+          "tinydash": 30.876075744628906,
+          "SetStoreUpdateService": 2.3128433227539062,
+          "com.apple.WebKit.GPU": 12.766380310058594,
+          "com.apple.WebKit.WebContent": 83.45417785644531,
+          "com.apple.WebKit.Networking": 6.000480651855469,
+          "com.apple.audio.SandboxHelper": 5.266105651855469,
+          "com.apple.SafariPlatformSupport.Helper": 10.562934875488281
+        }
+      }
+    },
+    "measured_query_checks": 40,
+    "measured_reopen_checks": 10,
+    "error": null
+  },
+  "growth": {
+    "stages": {
+      "baseline": {
+        "total_mib": 154.64520263671875,
+        "processes_mib": {
+          "tinydash": 37.03230285644531,
+          "SetStoreUpdateService": 2.2659683227539062,
+          "com.apple.WebKit.GPU": 12.860130310058594,
+          "com.apple.WebKit.WebContent": 80.87602996826172,
+          "com.apple.WebKit.Networking": 5.953605651855469,
+          "com.apple.audio.SandboxHelper": 5.234855651855469,
+          "com.apple.SafariPlatformSupport.Helper": 10.422309875488281
+        }
+      },
+      "cycle_1": {
+        "total_mib": 159.42647552490234,
+        "processes_mib": {
+          "tinydash": 37.51667785644531,
+          "SetStoreUpdateService": 2.2659683227539062,
+          "com.apple.WebKit.GPU": 12.907005310058594,
+          "com.apple.WebKit.WebContent": 87.37605285644531,
+          "com.apple.WebKit.Networking": 5.953605651855469,
+          "com.apple.audio.SandboxHelper": 2.9379806518554688,
+          "com.apple.SafariPlatformSupport.Helper": 10.469184875488281
+        }
+      },
+      "cycle_2": {
+        "total_mib": 161.45772552490234,
+        "processes_mib": {
+          "tinydash": 37.84480285644531,
+          "SetStoreUpdateService": 2.3128433227539062,
+          "com.apple.WebKit.GPU": 12.860153198242188,
+          "com.apple.WebKit.WebContent": 89.25105285644531,
+          "com.apple.WebKit.Networking": 5.906707763671875,
+          "com.apple.audio.SandboxHelper": 2.9379806518554688,
+          "com.apple.SafariPlatformSupport.Helper": 10.344184875488281
+        }
+      },
+      "cycle_3": {
+        "total_mib": 162.36397552490234,
+        "processes_mib": {
+          "tinydash": 38.01667785644531,
+          "SetStoreUpdateService": 2.2972183227539062,
+          "com.apple.WebKit.GPU": 12.922653198242188,
+          "com.apple.WebKit.WebContent": 89.89167785644531,
+          "com.apple.WebKit.Networking": 5.906707763671875,
+          "com.apple.audio.SandboxHelper": 2.9379806518554688,
+          "com.apple.SafariPlatformSupport.Helper": 10.391059875488281
+        }
+      }
+    },
+    "measured_query_checks": 340,
+    "measured_reopen_checks": 70,
+    "error": null
+  }
+}

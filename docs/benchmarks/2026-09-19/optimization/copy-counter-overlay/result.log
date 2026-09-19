@@ -1,0 +1,10 @@
+   Compiling tinydash v0.1.0 (/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/baseline/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.99s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/tinydash_lib-7a56ba961bc6cfc6)
+
+running 1 test
+baseline payload copies: search=(99, 3244032), catalog=(100, 3276800)
+test launcher::search::memory_tests::record_old_payload_copy_count ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 0.01s
+

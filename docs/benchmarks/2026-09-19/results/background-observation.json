@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-09-19T09:17:17.265239+08:00",
+  "cpu_snapshot": [
+    " %CPU COMM",
+    " 99.4 /Users/jewei/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc",
+    " 98.5 /Users/jewei/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rustc",
+    " 16.6 /usr/libexec/xprotectd",
+    " 13.8 /System/Library/PrivateFrameworks/SkyLight.framework/Resources/WindowServer",
+    "  4.8 /Applications/Brave Browser.app/Contents/Frameworks/Brave Browser Framework.framework/Versions/153.1.95.101/Helpers/Brave Browser Helper (Renderer).app/Contents/MacOS/Brave Browser Helper (Renderer)",
+    "  4.4 /usr/sbin/coreaudiod",
+    "  3.7 /bin/zsh",
+    "  2.5 codex",
+    "  2.4 /opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+    "  2.3 /opt/homebrew/bin/herdr",
+    "  2.1 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/FSEvents.framework/Versions/A/Support/fseventsd"
+  ],
+  "note": "Other work in this desktop session included Rust builds during part of the measurement. No user process was stopped."
+}

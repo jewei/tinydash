@@ -1,0 +1,1283 @@
+diff --git a/src/Settings.tsx b/src/Settings.tsx
+index 318b4ef..82e1bd8 100644
+--- a/src/Settings.tsx
++++ b/src/Settings.tsx
+@@ -37,6 +37,7 @@ import {
+   normalizeCategories,
+ } from "./categories";
+ import "./styles/settings.css";
++import type { AppEditorSession, SettingsSessionData } from "./settings-session";
+ 
+ const sections = [
+   {
+@@ -163,6 +164,19 @@ export default function Settings() {
+   const [importing, setImporting] = createSignal(false);
+   const [updateBusy, setUpdateBusy] = createSignal(false);
+   const [updateStatus, setUpdateStatus] = createSignal<UpdateStatus>();
++  const [closing, setClosing] = createSignal(false);
++  const [pendingOperations, setPendingOperations] = createSignal(0);
++  const [appEditor, setAppEditor] = createSignal<AppEditorSession>({
++    filter: "",
++    selected: "",
++    aliases: null,
++  });
++  const [editorReset, setEditorReset] = createSignal(0);
++  const [historyLimitText, setHistoryLimitText] = createSignal<string>();
++  const [fileLimitText, setFileLimitText] = createSignal<string>();
++  let closeGeneration: number | undefined;
++  let sessionRevision = 0;
++  let sessionLoaded = false;
+   let disposed = false;
+   let recordingSequence = 0;
+   let recorder!: HTMLButtonElement;
+@@ -206,6 +220,9 @@ export default function Settings() {
+   });
+ 
+   function resetDraft(settings: SettingsValues) {
++    setHistoryLimitText(undefined);
++    setFileLimitText(undefined);
++    setEditorReset((value) => value + 1);
+     setDraft({
+       ...structuredClone(settings),
+       visibleCategories: normalizeCategories(settings.visibleCategories),
+@@ -248,18 +265,32 @@ export default function Settings() {
+         return;
+       }
+       setDraft(merged);
++      if (
++        current.clipboardHistoryLimit === previous.clipboardHistoryLimit &&
++        next.clipboardHistoryLimit !== previous.clipboardHistoryLimit
++      )
++        setHistoryLimitText(undefined);
++      if (
++        current.fileSearchLimit === previous.fileSearchLimit &&
++        next.fileSearchLimit !== previous.fileSearchLimit
++      )
++        setFileLimitText(undefined);
+       // Keep incomplete folder input while another window changes settings.
+       if (
+         JSON.stringify(current.fileSearchRoots) ===
+           JSON.stringify(previous.fileSearchRoots) &&
+-        folderMode() === folderModeFor(previous)
++        folderMode() === folderModeFor(previous) &&
++        JSON.stringify(next.fileSearchRoots) !==
++          JSON.stringify(previous.fileSearchRoots)
+       ) {
+         setFolderMode(folderModeFor(merged));
+         setFoldersText(merged.fileSearchRoots?.join("\n") ?? "");
+       }
+       if (
+         JSON.stringify(current.fileSearchExcludedDirs) ===
+-        JSON.stringify(previous.fileSearchExcludedDirs)
++          JSON.stringify(previous.fileSearchExcludedDirs) &&
++        JSON.stringify(next.fileSearchExcludedDirs) !==
++          JSON.stringify(previous.fileSearchExcludedDirs)
+       ) {
+         setExcludedText(merged.fileSearchExcludedDirs.join("\n"));
+       }
+@@ -292,15 +323,148 @@ export default function Settings() {
+       return;
+     }
+     try {
++      let restoredScroll: number | undefined;
++      if (!sessionLoaded) {
++        const snapshot = await backend.settingsSession();
++        if (disposed) return;
++        sessionLoaded = true;
++        if (snapshot) {
++          sessionRevision = snapshot.revision;
++          const data = snapshot.data;
++          if (data.version !== 1)
++            throw new Error("The Settings session is not supported.");
++          batch(() => {
++            setSaved(data.saved);
++            setDraft(data.draft);
++            setSection(
++              sections.some((section) => section.id === data.section)
++                ? (data.section as Section)
++                : "shortcut",
++            );
++            setFolderMode(data.folderMode);
++            setFoldersText(data.foldersText);
++            setExcludedText(data.excludedText);
++            const currentAppearance = readAppearance();
++            setAppearance(
++              data.appearance === data.savedAppearance
++                ? currentAppearance
++                : data.appearance,
++            );
++            setSavedAppearance(currentAppearance);
++            setAppEditor(data.appEditor);
++            setHistoryLimitText(data.historyLimitText);
++            setFileLimitText(data.fileLimitText);
++            setPendingImport(data.pendingImport);
++            setClearOpen(data.clearOpen);
++            setClearKeepPinned(data.clearKeepPinned);
++            setError(data.error);
++            setDialogError(data.dialogError);
++            setStatus(data.status);
++            setUpdateStatus(data.updateStatus);
++          });
++          restoredScroll = data.scroll;
++        }
++      }
+       const response = await backend.settings();
+       if (disposed) return;
+       setInfo(response);
+       receiveSettings(response.settings);
++      if (restoredScroll !== undefined)
++        requestAnimationFrame(() => {
++          if (!disposed) content?.scrollTo(0, restoredScroll);
++        });
+     } catch (reason) {
+       if (!disposed) setError(String(reason));
+     }
+   }
+ 
++  async function keepAlive<T>(operation: () => Promise<T>): Promise<T> {
++    setPendingOperations((value) => value + 1);
++    try {
++      return await operation();
++    } finally {
++      setPendingOperations((value) => value - 1);
++    }
++  }
++
++  function resumeEditing(generation: number, reason?: string | null) {
++    if (generation !== closeGeneration) return;
++    closeGeneration = undefined;
++    setClosing(false);
++    if (reason) setError(reason);
++  }
++
++  async function captureSession(generation: number) {
++    if (disposed) return;
++    closeGeneration = generation;
++    // Commit active onChange input to the draft before disabling its control.
++    const active = document.activeElement;
++    if (
++      active instanceof HTMLInputElement ||
++      active instanceof HTMLTextAreaElement
++    )
++      active.dispatchEvent(new Event("change", { bubbles: true }));
++    setClosing(true);
++    try {
++      await stopRecording();
++      while (
++        !disposed &&
++        closeGeneration === generation &&
++        (!info() ||
++          saving() ||
++          preparing() ||
++          importing() ||
++          clearing() ||
++          updateBusy() ||
++          pendingOperations())
++      )
++        await new Promise((resolve) => setTimeout(resolve, 10));
++      if (disposed || closeGeneration !== generation) return;
++      const data: SettingsSessionData = {
++        version: 1,
++        draft: value(),
++        saved: saved()!,
++        section: section(),
++        folderMode: folderMode(),
++        foldersText: foldersText(),
++        excludedText: excludedText(),
++        appearance: appearance(),
++        savedAppearance: savedAppearance(),
++        scroll: content.scrollTop,
++        appEditor: appEditor(),
++        historyLimitText: historyLimitText(),
++        fileLimitText: fileLimitText(),
++        pendingImport: pendingImport(),
++        clearOpen: clearOpen(),
++        clearKeepPinned: clearKeepPinned(),
++        error: error(),
++        dialogError: dialogError(),
++        status: status(),
++        updateStatus: updateStatus(),
++      };
++      const captured = await backend.captureSettingsSession(generation, {
++        revision: ++sessionRevision,
++        data,
++      });
++      if (!captured || disposed || closeGeneration !== generation) {
++        resumeEditing(generation);
++        return;
++      }
++      // Native release is a second command, after capture has been acknowledged.
++      if (!(await backend.finishSettingsClose(generation)))
++        resumeEditing(generation);
++    } catch (reason) {
++      if (disposed || closeGeneration !== generation) return;
++      try {
++        await backend.cancelSettingsClose(generation);
++      } catch (cleanupError) {
++        reason = `${String(reason)} ${String(cleanupError)}`;
++      }
++      resumeEditing(generation, String(reason));
++      setError(String(reason));
++    }
++  }
++
+   async function stopRecording() {
+     recordingSequence += 1;
+     if (!recording() && !preparing()) return;
+@@ -339,6 +503,7 @@ export default function Settings() {
+     }
+   }
+   function navigate(next: Section) {
++    if (closing()) return;
+     void stopRecording();
+     setSection(next);
+     content?.scrollTo(0, 0);
+@@ -376,7 +541,14 @@ export default function Settings() {
+     return true;
+   }
+   async function save() {
+-    if (!dirty() || saving() || recording() || preparing() || !validate())
++    if (
++      closing() ||
++      !dirty() ||
++      saving() ||
++      recording() ||
++      preparing() ||
++      !validate()
++    )
+       return;
+     setSaving(true);
+     setError(undefined);
+@@ -426,7 +598,9 @@ export default function Settings() {
+   async function exportCurrentSettings() {
+     setError(undefined);
+     try {
+-      const exported = await backend.exportSettings(savedAppearance());
++      const exported = await keepAlive(() =>
++        backend.exportSettings(savedAppearance()),
++      );
+       setStatus(exported ? "Saved settings exported." : "Export canceled.");
+     } catch (reason) {
+       setError(String(reason));
+@@ -434,7 +608,7 @@ export default function Settings() {
+   }
+   async function revealBackup() {
+     try {
+-      await backend.revealBackup();
++      await keepAlive(() => backend.revealBackup());
+       setStatus("Backup folder opened.");
+     } catch (reason) {
+       setError(String(reason));
+@@ -485,6 +659,11 @@ export default function Settings() {
+     }
+   }
+   function onKey(event: KeyboardEvent) {
++    if (closing()) {
++      event.preventDefault();
++      event.stopPropagation();
++      return;
++    }
+     if (event.isComposing || event.keyCode === 229 || clearOpen()) return;
+     if (recording()) {
+       if (event.key === "Tab") {
+@@ -545,12 +724,25 @@ export default function Settings() {
+     document.addEventListener("keydown", onKey, true);
+     window.addEventListener("blur", onBlur);
+     if (desktop) {
+-      void listen<SettingsValues>("settings-changed", (event) =>
+-        receiveSettings(event.payload),
+-      )
+-        .then((stop) => {
+-          if (disposed) return stop();
+-          stops.push(stop);
++      void Promise.all([
++        listen<SettingsValues>("settings-changed", (event) =>
++          receiveSettings(event.payload),
++        ),
++        listen<number>("settings-close-requested", (event) => {
++          void captureSession(event.payload);
++        }),
++        listen<{ generation: number; error?: string | null }>(
++          "settings-close-cancelled",
++          (event) =>
++            resumeEditing(event.payload.generation, event.payload.error),
++        ),
++      ])
++        .then((listeners) => {
++          if (disposed) {
++            listeners.forEach((stop) => stop());
++            return;
++          }
++          stops.push(...listeners);
+           return load();
+         })
+         .catch((reason) => {
+@@ -576,7 +768,12 @@ export default function Settings() {
+   });
+ 
+   return (
+-    <main class="settings-shell" aria-label="TinyDash settings">
++    <main
++      class="settings-shell"
++      aria-label="TinyDash settings"
++      inert={closing()}
++      aria-busy={closing()}
++    >
+       <aside class="settings-sidebar">
+         <div class="settings-brand">
+           <span class="tiny-mark" aria-hidden="true">
+@@ -642,7 +839,7 @@ export default function Settings() {
+               </div>
+             }
+           >
+-            <fieldset class="settings-fields" disabled={saving()}>
++            <fieldset class="settings-fields" disabled={saving() || closing()}>
+               <Show when={section() === "shortcut"}>
+                 <div class="settings-group">
+                   <h2>Launch shortcut</h2>
+@@ -857,6 +1054,9 @@ export default function Settings() {
+                   <AppPreferences
+                     value={value().appPreferences}
+                     onChange={(next) => field("appPreferences", next)}
++                    session={appEditor()}
++                    onSessionChange={setAppEditor}
++                    resetVersion={editorReset()}
+                   />
+                 </div>
+                 <div class="settings-group settings-separated">
+@@ -970,13 +1170,14 @@ export default function Settings() {
+                     min="1"
+                     max="500"
+                     step="1"
+-                    value={value().clipboardHistoryLimit}
+-                    onInput={(event) =>
++                    value={historyLimitText() ?? value().clipboardHistoryLimit}
++                    onInput={(event) => {
++                      setHistoryLimitText(event.currentTarget.value);
+                       field(
+                         "clipboardHistoryLimit",
+                         Number(event.currentTarget.value),
+-                      )
+-                    }
++                      );
++                    }}
+                   />
+                 </label>
+                 <div class="settings-group settings-separated">
+@@ -1080,13 +1281,14 @@ export default function Settings() {
+                       min="1"
+                       max="100000"
+                       step="1"
+-                      value={value().fileSearchLimit}
+-                      onInput={(event) =>
++                      value={fileLimitText() ?? value().fileSearchLimit}
++                      onInput={(event) => {
++                        setFileLimitText(event.currentTarget.value);
+                         field(
+                           "fileSearchLimit",
+                           Number(event.currentTarget.value),
+-                        )
+-                      }
++                        );
++                      }}
+                     />
+                   </label>
+                   <div class="settings-group settings-separated">
+@@ -1409,7 +1611,7 @@ export default function Settings() {
+                 <button
+                   type="button"
+                   class="settings-button"
+-                  disabled={saving() || recording() || preparing()}
++                  disabled={closing() || saving() || recording() || preparing()}
+                   onClick={() => {
+                     resetDraft(saved()!);
+                     setAppearance(savedAppearance());
+@@ -1423,7 +1625,13 @@ export default function Settings() {
+               <button
+                 class="settings-button settings-save"
+                 type="submit"
+-                disabled={!dirty() || saving() || recording() || preparing()}
++                disabled={
++                  closing() ||
++                  !dirty() ||
++                  saving() ||
++                  recording() ||
++                  preparing()
++                }
+               >
+                 {saving() ? "Saving..." : "Save changes"}
+               </button>
+@@ -1444,8 +1652,8 @@ export default function Settings() {
+               : "This deletes all saved text entries, including pinned entries. The current system clipboard stays available."
+           }
+           confirmLabel={clearKeepPinned() ? "Clear unpinned" : "Clear history"}
+-          busyLabel="Clearing..."
+-          busy={clearing()}
++          busyLabel={clearing() ? "Clearing..." : "Closing..."}
++          busy={clearing() || closing()}
+           error={dialogError()}
+           onClose={() => setClearOpen(false)}
+           onConfirm={() => void clearHistory(clearKeepPinned())}
+diff --git a/src/bridge.ts b/src/bridge.ts
+index 9d86853..2c7c02f 100644
+--- a/src/bridge.ts
++++ b/src/bridge.ts
+@@ -1,4 +1,5 @@
+ import { invoke } from "@tauri-apps/api/core";
++import type { SettingsSessionSnapshot } from "./settings-session";
+ 
+ export type Action =
+   "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
+@@ -161,6 +162,11 @@ export const backend = {
+   ready: () => invoke<LauncherInfo>("launcher_ready"),
+   openSettings: () => invoke<void>("open_settings"),
+   settings: () => invoke<SettingsInfo>("get_settings"),
++  settingsSession: () => invoke<SettingsSessionSnapshot | null>("get_settings_session"),
++  captureSettingsSession: (generation: number, snapshot: SettingsSessionSnapshot) =>
++    invoke<boolean>("capture_settings_session", { generation, snapshot }),
++  finishSettingsClose: (generation: number) => invoke<boolean>("finish_settings_close", { generation }),
++  cancelSettingsClose: (generation: number) => invoke<void>("cancel_settings_close", { generation }),
+   saveSettings: (settings: SettingsValues) =>
+     invoke<SettingsValues>("save_settings", { settings }),
+   chooseClipboardHistory: (enabled: boolean) =>
+diff --git a/src/components/SearchPreferences.tsx b/src/components/SearchPreferences.tsx
+index 341b54a..5e2662b 100644
+--- a/src/components/SearchPreferences.tsx
++++ b/src/components/SearchPreferences.tsx
+@@ -5,6 +5,7 @@ import {
+   For,
+   Index,
+   onCleanup,
++  on,
+   onMount,
+   Show,
+ } from "solid-js";
+@@ -14,14 +15,35 @@ import {
+   type SettingsValues,
+   type WebSearch,
+ } from "../bridge";
++import type { AppEditorSession } from "../settings-session";
+ 
+ export function AppPreferences(props: {
+   value: SettingsValues["appPreferences"];
+   onChange: (value: SettingsValues["appPreferences"]) => void;
++  session?: AppEditorSession;
++  onSessionChange?: (session: AppEditorSession) => void;
++  resetVersion?: number;
+ }) {
+   const [apps, setApps] = createSignal<SearchResult[]>([]);
+-  const [filter, setFilter] = createSignal("");
+-  const [selected, setSelected] = createSignal("");
++  const [filter, setFilter] = createSignal(props.session?.filter ?? "");
++  const [selected, setSelected] = createSignal(props.session?.selected ?? "");
++  const [aliasesText, setAliasesText] = createSignal<string | null>(
++    props.session?.aliases ?? null,
++  );
++  createEffect(() =>
++    props.onSessionChange?.({
++      filter: filter(),
++      selected: selected(),
++      aliases: aliasesText(),
++    }),
++  );
++  createEffect(
++    on(
++      () => props.resetVersion,
++      () => setAliasesText(null),
++      { defer: true },
++    ),
++  );
+   const [error, setError] = createSignal("");
+   let disposed = false;
+   onCleanup(() => {
+@@ -73,11 +95,14 @@ export function AppPreferences(props: {
+         <select
+           size={6}
+           value={selected()}
+-          onChange={(event) => setSelected(event.currentTarget.value)}
++          onChange={(event) => {
++            setAliasesText(null);
++            setSelected(event.currentTarget.value);
++          }}
+         >
+           <For each={visible()}>
+             {(app) => (
+-              <option value={app.id}>
++              <option value={app.id} selected={selected() === app.id}>
+                 {app.title}
+                 {props.value[app.id]?.hidden ? " (hidden)" : ""}
+               </option>
+@@ -90,7 +115,8 @@ export function AppPreferences(props: {
+           Aliases, one per line
+           <textarea
+             rows={3}
+-            value={current().aliases.join("\n")}
++            value={aliasesText() ?? current().aliases.join("\n")}
++            onInput={(event) => setAliasesText(event.currentTarget.value)}
+             onChange={(event) =>
+               update(
+                 event.currentTarget.value
+diff --git a/src/settings-session.ts b/src/settings-session.ts
+new file mode 100644
+index 0000000..13c30aa
+--- /dev/null
++++ b/src/settings-session.ts
+@@ -0,0 +1,36 @@
++import type { Appearance } from "./appearance";
++import type { SettingsImport, SettingsValues, UpdateStatus } from "./bridge";
++
++export interface AppEditorSession {
++  filter: string;
++  selected: string;
++  aliases: string | null;
++}
++
++export interface SettingsSessionData {
++  version: 1;
++  draft: SettingsValues;
++  saved: SettingsValues;
++  section: string;
++  folderMode: "default" | "custom" | "off";
++  foldersText: string;
++  excludedText: string;
++  appearance: Appearance;
++  savedAppearance: Appearance;
++  scroll: number;
++  appEditor: AppEditorSession;
++  historyLimitText?: string;
++  fileLimitText?: string;
++  pendingImport?: SettingsImport;
++  clearOpen: boolean;
++  clearKeepPinned: boolean;
++  error?: string;
++  dialogError?: string;
++  status: string;
++  updateStatus?: UpdateStatus;
++}
++
++export interface SettingsSessionSnapshot {
++  revision: number;
++  data: SettingsSessionData;
++}
+diff --git a/src-tauri/Cargo.lock b/src-tauri/Cargo.lock
+index 13154f2..4c0a28f 100644
+--- a/src-tauri/Cargo.lock
++++ b/src-tauri/Cargo.lock
+@@ -4774,6 +4774,7 @@ dependencies = [
+  "tauri-plugin-updater",
+  "tempfile",
+  "thiserror 2.0.20",
++ "tokio",
+  "tracing",
+  "tracing-subscriber",
+  "unicode-normalization",
+diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
+index 1ba8819..da4a959 100644
+--- a/src-tauri/Cargo.toml
++++ b/src-tauri/Cargo.toml
+@@ -24,6 +24,7 @@ rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"
+ tar = "0.4.46"
+ serde = { version = "1", features = ["derive"] }
+ serde_json = "1"
++tokio = { version = "1.53.1", features = ["sync", "time"] }
+ nucleo-matcher = "0.3.1"
+ unicode-normalization = "0.1.25"
+ walkdir = "2.5"
+diff --git a/src-tauri/src/launcher/mod.rs b/src-tauri/src/launcher/mod.rs
+index 26bd66b..407a932 100644
+--- a/src-tauri/src/launcher/mod.rs
++++ b/src-tauri/src/launcher/mod.rs
+@@ -9,6 +9,7 @@ pub mod preferences;
+ pub mod query;
+ pub mod result;
+ pub mod search;
++pub mod settings_session;
+ pub mod startup;
+ mod storage;
+ pub mod updates;
+diff --git a/src-tauri/src/launcher/preferences.rs b/src-tauri/src/launcher/preferences.rs
+index 159f579..0f3adcc 100644
+--- a/src-tauri/src/launcher/preferences.rs
++++ b/src-tauri/src/launcher/preferences.rs
+@@ -52,11 +52,15 @@ pub fn get_settings(app: AppHandle) -> Result<SettingsInfo, String> {
+ 
+ #[tauri::command]
+ pub async fn open_settings(app: AppHandle) -> Result<(), String> {
++    super::settings_session::open(app).await
++}
++
++pub(super) fn show_settings_window(app: &AppHandle) -> Result<(), String> {
+     // Window creation must not block the event loop on Windows.
+     let window = match app.get_webview_window("settings") {
+         Some(window) => window,
+         None => WebviewWindowBuilder::new(
+-            &app,
++            app,
+             "settings",
+             WebviewUrl::App("index.html?view=settings".into()),
+         )
+@@ -71,7 +75,7 @@ pub async fn open_settings(app: AppHandle) -> Result<(), String> {
+     window.unminimize().map_err(|error| error.to_string())?;
+     window.show().map_err(|error| error.to_string())?;
+     window.set_focus().map_err(|error| error.to_string())?;
+-    super::window::hide(&app).map_err(|error| error.to_string())?;
++    super::window::hide(app).map_err(|error| error.to_string())?;
+     Ok(())
+ }
+ 
+@@ -344,6 +348,21 @@ pub fn restore_shortcut(app: &AppHandle) -> Result<(), String> {
+     Ok(())
+ }
+ 
++pub(super) fn finish_settings_recording(app: &AppHandle) -> Result<(), String> {
++    if platform::is_wayland() {
++        return Ok(());
++    }
++    let state = app.state::<LauncherState>();
++    let _update = state
++        .settings_update
++        .lock()
++        .map_err(|_| "Settings are unavailable.")?;
++    let settings = state.settings();
++    let result = restore_shortcuts(&NativeShortcuts(app), &settings.shortcuts());
++    state.shortcut_recording.store(false, Ordering::Release);
++    result
++}
++
+ pub fn restore_shortcut_in_background(app: &AppHandle) {
+     let app = app.clone();
+     tauri::async_runtime::spawn_blocking(move || {
+diff --git a/src-tauri/src/launcher/settings_session.rs b/src-tauri/src/launcher/settings_session.rs
+new file mode 100644
+index 0000000..517a87a
+--- /dev/null
++++ b/src-tauri/src/launcher/settings_session.rs
+@@ -0,0 +1,336 @@
++//! Keep an editing session outside the Settings webview. Never commit a draft.
++use std::{sync::Mutex, time::Duration};
++
++use serde::{Deserialize, Serialize};
++use serde_json::Value;
++use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
++use tokio::sync::oneshot;
++
++// Two settings copies can contain 512 app IDs and 16 aliases per app. Allow
++// those copies, an import preview, and raw editor text. Oversized drafts stay
++// in the live window; we never truncate them to meet this limit.
++const MAX_SESSION_BYTES: usize = 16 * 1024 * 1024;
++const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
++
++#[derive(Clone, Debug, Deserialize, Serialize)]
++#[serde(rename_all = "camelCase")]
++pub struct Snapshot {
++    revision: u64,
++    data: Value,
++}
++
++struct Pending {
++    generation: u64,
++    captured: bool,
++    _cancel: oneshot::Sender<()>,
++}
++
++#[derive(Default)]
++struct Session {
++    generation: u64,
++    pending: Option<Pending>,
++    snapshot: Option<Snapshot>,
++}
++
++impl Session {
++    fn begin(&mut self) -> Option<(u64, oneshot::Receiver<()>)> {
++        if self.pending.is_some() {
++            return None;
++        }
++        self.generation += 1;
++        let (cancel, receiver) = oneshot::channel();
++        self.pending = Some(Pending {
++            generation: self.generation,
++            captured: false,
++            _cancel: cancel,
++        });
++        Some((self.generation, receiver))
++    }
++
++    fn current(&self, generation: u64) -> bool {
++        self.pending
++            .as_ref()
++            .is_some_and(|pending| pending.generation == generation)
++    }
++
++    fn cancel(&mut self, generation: Option<u64>) -> Option<u64> {
++        if generation.is_some_and(|generation| !self.current(generation)) {
++            return None;
++        }
++        self.pending.take().map(|pending| pending.generation)
++    }
++
++    fn capture(&mut self, generation: u64, snapshot: Snapshot) -> Result<bool, String> {
++        if !self.current(generation) {
++            return Ok(false);
++        }
++        if self
++            .snapshot
++            .as_ref()
++            .is_some_and(|saved| snapshot.revision <= saved.revision)
++        {
++            return Err(
++                "The Settings snapshot is out of date. Keep this window open and try again.".into(),
++            );
++        }
++        if snapshot.data["version"] != 1
++            || !snapshot.data["draft"].is_object()
++            || !snapshot.data["saved"].is_object()
++        {
++            return Err(
++                "Could not preserve the Settings session. Your changes are still in this window."
++                    .into(),
++            );
++        }
++        if serde_json::to_vec(&snapshot)
++            .map_err(|e| e.to_string())?
++            .len()
++            > MAX_SESSION_BYTES
++        {
++            return Err("The Settings draft is too large to close safely. Save or shorten it, then try again.".into());
++        }
++        self.snapshot = Some(snapshot);
++        self.pending.as_mut().unwrap().captured = true;
++        Ok(true)
++    }
++}
++
++#[derive(Default)]
++pub struct SettingsSession {
++    session: Mutex<Session>,
++    // Serialize native creation and destruction, without blocking the UI loop.
++    operation: tokio::sync::Mutex<()>,
++}
++
++fn settings_only(window: &WebviewWindow) -> Result<(), String> {
++    if window.label() == "settings" {
++        Ok(())
++    } else {
++        Err("This operation requires Settings.".into())
++    }
++}
++
++async fn restore_shortcuts(app: &AppHandle) -> Result<(), String> {
++    let app = app.clone();
++    tauri::async_runtime::spawn_blocking(move || {
++        super::preferences::finish_settings_recording(&app)
++    })
++    .await
++    .map_err(|e| e.to_string())?
++}
++
++async fn cancel(app: &AppHandle, generation: u64, error: Option<String>) -> Result<(), String> {
++    let cancelled = app
++        .state::<SettingsSession>()
++        .session
++        .lock()
++        .unwrap()
++        .cancel(Some(generation));
++    if cancelled.is_none() {
++        return Ok(());
++    }
++    let restored = restore_shortcuts(app).await;
++    let error = restored.as_ref().err().cloned().or(error);
++    if let Some(window) = app.get_webview_window("settings") {
++        let _ = window.emit(
++            "settings-close-cancelled",
++            serde_json::json!({"generation": generation, "error": error}),
++        );
++    }
++    restored
++}
++
++pub fn request_close(app: &AppHandle) {
++    let Some((generation, receiver)) = app
++        .state::<SettingsSession>()
++        .session
++        .lock()
++        .unwrap()
++        .begin()
++    else {
++        return;
++    };
++    let app = app.clone();
++    tauri::async_runtime::spawn(async move {
++        let sent = app
++            .get_webview_window("settings")
++            .ok_or_else(|| "Settings window is unavailable.".to_string())
++            .and_then(|window| {
++                window
++                    .emit("settings-close-requested", generation)
++                    .map_err(|e| e.to_string())
++            });
++        if let Err(error) = sent {
++            let _ = cancel(&app, generation, Some(error)).await;
++        } else if tokio::time::timeout(CLOSE_TIMEOUT, receiver).await.is_err() {
++            let _ = cancel(
++                &app,
++                generation,
++                Some(
++                    "Settings could not close in time. Your changes are still in this window."
++                        .into(),
++                ),
++            )
++            .await;
++        }
++    });
++}
++
++pub async fn open(app: AppHandle) -> Result<(), String> {
++    let state = app.state::<SettingsSession>();
++    // Cancel before waiting for native cleanup. A new activation wins over a
++    // close that has captured state but has not destroyed the window yet.
++    let cancelled = state.session.lock().unwrap().cancel(None);
++    if let Some(generation) = cancelled {
++        if let Some(window) = app.get_webview_window("settings") {
++            let _ = window.emit(
++                "settings-close-cancelled",
++                serde_json::json!({"generation": generation, "error": null}),
++            );
++        }
++        restore_shortcuts(&app).await?;
++    }
++    let _operation = state.operation.lock().await;
++    super::preferences::show_settings_window(&app)
++}
++
++#[tauri::command]
++pub fn get_settings_session(
++    window: WebviewWindow,
++    app: AppHandle,
++) -> Result<Option<Snapshot>, String> {
++    settings_only(&window)?;
++    Ok(app
++        .state::<SettingsSession>()
++        .session
++        .lock()
++        .unwrap()
++        .snapshot
++        .clone())
++}
++
++#[tauri::command]
++pub fn capture_settings_session(
++    window: WebviewWindow,
++    app: AppHandle,
++    generation: u64,
++    snapshot: Snapshot,
++) -> Result<bool, String> {
++    settings_only(&window)?;
++    app.state::<SettingsSession>()
++        .session
++        .lock()
++        .unwrap()
++        .capture(generation, snapshot)
++}
++
++#[tauri::command]
++pub async fn cancel_settings_close(
++    window: WebviewWindow,
++    app: AppHandle,
++    generation: u64,
++) -> Result<(), String> {
++    settings_only(&window)?;
++    cancel(&app, generation, None).await
++}
++
++#[tauri::command]
++pub async fn finish_settings_close(
++    window: WebviewWindow,
++    app: AppHandle,
++    generation: u64,
++) -> Result<bool, String> {
++    settings_only(&window)?;
++    let state = app.state::<SettingsSession>();
++    let _operation = state.operation.lock().await;
++    let captured = state
++        .session
++        .lock()
++        .unwrap()
++        .pending
++        .as_ref()
++        .is_some_and(|pending| pending.generation == generation && pending.captured);
++    if !captured {
++        return Ok(false);
++    }
++    if let Err(error) = restore_shortcuts(&app).await {
++        let _ = cancel(&app, generation, Some(error.clone())).await;
++        return Err(error);
++    }
++    // No await between the final generation check and the destruction request.
++    let result = {
++        let mut session = state.session.lock().unwrap();
++        if !session.current(generation) {
++            return Ok(false);
++        }
++        let result = window.destroy();
++        if result.is_ok() {
++            session.cancel(Some(generation));
++        }
++        result
++    };
++    if let Err(error) = result {
++        let _ = cancel(&app, generation, Some(error.to_string())).await;
++        return Err(error.to_string());
++    }
++    Ok(true)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use serde_json::json;
++
++    fn snapshot(revision: u64) -> Snapshot {
++        Snapshot {
++            revision,
++            data: json!({"version":1,"draft":{"fileSearchLimit":0},"saved":{},"foldersText":"  unfinished\n"}),
++        }
++    }
++
++    #[test]
++    fn retains_invalid_draft_without_committing_it() {
++        let mut session = Session::default();
++        let (generation, _cancelled) = session.begin().unwrap();
++        assert!(session.capture(generation, snapshot(1)).unwrap());
++        session.cancel(Some(generation));
++        assert_eq!(
++            session.snapshot.unwrap().data["draft"]["fileSearchLimit"],
++            0
++        );
++    }
++
++    #[test]
++    fn reopen_rejects_a_late_capture_and_does_not_replace_newer_input() {
++        let mut session = Session::default();
++        let (old, mut cancelled) = session.begin().unwrap();
++        assert!(session.begin().is_none());
++        session.cancel(None);
++        assert_eq!(
++            cancelled.try_recv(),
++            Err(oneshot::error::TryRecvError::Closed)
++        );
++        let (new, _receiver) = session.begin().unwrap();
++        assert!(session.capture(new, snapshot(2)).unwrap());
++        assert!(!session.capture(old, snapshot(1)).unwrap());
++        assert_eq!(session.snapshot.as_ref().unwrap().revision, 2);
++        assert!(session.cancel(Some(old)).is_none());
++        assert!(session.current(new));
++    }
++
++    #[test]
++    fn failed_capture_keeps_previous_snapshot_and_pending_window() {
++        let mut session = Session::default();
++        let (first, _receiver) = session.begin().unwrap();
++        session.capture(first, snapshot(1)).unwrap();
++        session.cancel(Some(first));
++        let (second, _receiver) = session.begin().unwrap();
++        assert!(session.capture(second, snapshot(1)).is_err());
++        let mut large = snapshot(2);
++        large.data["foldersText"] = Value::String("x".repeat(MAX_SESSION_BYTES));
++        assert!(session.capture(second, large).is_err());
++        assert!(session.current(second));
++        assert!(!session.pending.as_ref().unwrap().captured);
++        assert_eq!(session.snapshot.unwrap().revision, 1);
++    }
++}
+diff --git a/src-tauri/src/lib.rs b/src-tauri/src/lib.rs
+index 6bcdead..1980134 100644
+--- a/src-tauri/src/lib.rs
++++ b/src-tauri/src/lib.rs
+@@ -96,6 +96,7 @@ pub fn run() -> anyhow::Result<()> {
+     let app = tauri::Builder::default()
+         .manage(launcher::startup::Startup(std::sync::Mutex::new(request)))
+         .manage(launcher::updates::UpdateState::default())
++        .manage(launcher::settings_session::SettingsSession::default())
+         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+             match launcher::startup::LaunchRequest::parse(args.into_iter().skip(1)) {
+                 Ok(request) => launcher::startup::activate(app, request),
+@@ -170,10 +171,8 @@ pub fn run() -> anyhow::Result<()> {
+             if window.label() == "settings" {
+                 match event {
+                     tauri::WindowEvent::CloseRequested { api, .. } => {
+-                        // Keep an unfinished settings form when its window closes.
+                         api.prevent_close();
+-                        launcher::preferences::restore_shortcut_in_background(window.app_handle());
+-                        if let Err(error) = window.hide() { tracing::warn!(%error, "Could not hide settings"); }
++                        launcher::settings_session::request_close(window.app_handle());
+                     }
+                     tauri::WindowEvent::Focused(false) => launcher::preferences::restore_shortcut_in_background(window.app_handle()),
+                     _ => {}
+@@ -194,6 +193,10 @@ pub fn run() -> anyhow::Result<()> {
+         .invoke_handler(tauri::generate_handler![
+             launcher::launcher_ready,
+             launcher::preferences::get_settings,
++            launcher::settings_session::get_settings_session,
++            launcher::settings_session::capture_settings_session,
++            launcher::settings_session::finish_settings_close,
++            launcher::settings_session::cancel_settings_close,
+             launcher::preferences::save_settings,
+             launcher::preferences::choose_clipboard_history,
+             launcher::preferences::app_catalog,
+diff --git a/tests/mock-backend.ts b/tests/mock-backend.ts
+index e4fcd0a..0d6692f 100644
+--- a/tests/mock-backend.ts
++++ b/tests/mock-backend.ts
+@@ -9,6 +9,7 @@ import type {
+   UpdateStatus,
+ } from "../src/bridge";
+ import { defaultCategories, resultCategories } from "../src/categories";
++import type { SettingsSessionSnapshot } from "../src/settings-session";
+ 
+ declare global {
+   interface Window {
+@@ -18,6 +19,12 @@ declare global {
+       settings: SettingsValues;
+       platform: "macos" | "windows" | "linux";
+       rejectSettings: string | null;
++      holdSettings: boolean;
++      releaseSettings?: () => void;
++      rejectCapture: string | null;
++      holdCapture: boolean;
++      releaseCapture?: () => void;
++      settingsClosed: boolean;
+       pins: Partial<Record<SearchMode, string[]>>;
+       rejectPin: boolean;
+       emojiGrid: boolean;
+@@ -252,6 +259,10 @@ window.__launcherTest = {
+       "macos" | "windows" | "linux") ?? "macos",
+   settings: { ...defaultSettings, ...savedSettings },
+   rejectSettings: null,
++  holdSettings: false,
++  rejectCapture: null,
++  holdCapture: false,
++  settingsClosed: false,
+   pins: Array.isArray(savedPins)
+     ? { all: savedPins, apps: savedPins }
+     : savedPins,
+@@ -331,7 +342,25 @@ mockIPC(
+         shortcutsAvailable: true,
+       };
+     }
++    if (command === "get_settings_session") {
++      return JSON.parse(sessionStorage.getItem("tinydash.test.session") ?? "null");
++    }
++    if (command === "capture_settings_session") {
++      if (state.holdCapture) await new Promise<void>((resolve) => { state.releaseCapture = resolve; });
++      if (state.rejectCapture) throw new Error(state.rejectCapture);
++      sessionStorage.setItem("tinydash.test.session", JSON.stringify((payload as { snapshot: SettingsSessionSnapshot }).snapshot));
++      return true;
++    }
++    if (command === "finish_settings_close") {
++      state.settingsClosed = true;
++      return true;
++    }
++    if (command === "cancel_settings_close") {
++      await emit("settings-close-cancelled", payload);
++      return;
++    }
+     if (command === "save_settings") {
++      if (state.holdSettings) await new Promise<void>((resolve) => { state.releaseSettings = resolve; });
+       if (state.rejectSettings) throw new Error(state.rejectSettings);
+       state.settings = (payload as { settings: SettingsValues }).settings;
+       localStorage.setItem(
+diff --git a/tests/settings.spec.ts b/tests/settings.spec.ts
+index 5ce9c2d..5399446 100644
+--- a/tests/settings.spec.ts
++++ b/tests/settings.spec.ts
+@@ -16,6 +16,190 @@ async function openSettings(page: Page) {
+   await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
+ }
+ 
++async function closeSettings(page: Page, generation = 1) {
++  await page.evaluate(
++    (generation) =>
++      window.__launcherTest.emit("settings-close-requested", generation),
++    generation,
++  );
++}
++
++test("restores incomplete raw file input without saving it", async ({
++  page,
++}) => {
++  await openSettings(page);
++  await page.getByRole("button", { name: "File search", exact: true }).click();
++  await page
++    .getByLabel("Search folders", { exact: true })
++    .selectOption("custom");
++  await page
++    .getByLabel("Folder paths", { exact: true })
++    .fill("  ~/unfinished folder\n\n");
++  await page.getByRole("spinbutton", { name: "File limit" }).fill("");
++  await closeSettings(page);
++  await expect
++    .poll(() => page.evaluate(() => window.__launcherTest.settingsClosed))
++    .toBe(true);
++  expect(
++    await page.evaluate(() => window.__launcherTest.settings.fileSearchLimit),
++  ).toBe(50000);
++  await page.reload();
++  await expect(
++    page.getByRole("heading", { name: "File search", exact: true }),
++  ).toBeVisible();
++  await expect(page.getByLabel("Folder paths", { exact: true })).toHaveValue(
++    "  ~/unfinished folder\n\n",
++  );
++  await expect(
++    page.getByRole("spinbutton", { name: "File limit" }),
++  ).toHaveValue("");
++  await expect(
++    page.getByRole("button", { name: "Save changes" }),
++  ).toBeEnabled();
++});
++
++test("preserves raw formatting when the saved values have not changed", async ({
++  page,
++}) => {
++  await openSettings(page);
++  await page.getByRole("button", { name: "File search", exact: true }).click();
++  const excluded = page.getByLabel("Excluded folder names", { exact: true });
++  const raw = `  ${await excluded.inputValue()}\n\n`;
++  await excluded.fill(raw);
++  await closeSettings(page);
++  await expect
++    .poll(() => page.evaluate(() => window.__launcherTest.settingsClosed))
++    .toBe(true);
++  await page.reload();
++  await expect(excluded).toHaveValue(raw);
++});
++
++test("restores the selected app, filter, and unblurred alias text", async ({
++  page,
++}) => {
++  await openSettings(page);
++  await page.getByRole("button", { name: "Search", exact: true }).click();
++  await page.getByLabel("Find an app").fill("Finder");
++  await page.locator('select[size="6"]').selectOption("app-0");
++  await page.getByLabel("Aliases, one per line").fill("  work files\n\n");
++  await closeSettings(page);
++  await expect
++    .poll(() => page.evaluate(() => window.__launcherTest.settingsClosed))
++    .toBe(true);
++  await page.reload();
++  await expect(page.getByLabel("Find an app")).toHaveValue("Finder");
++  await expect(page.locator('select[size="6"]')).toHaveValue("app-0");
++  await expect(page.getByLabel("Aliases, one per line")).toHaveValue(
++    "  work files\n\n",
++  );
++  await page.getByRole("button", { name: "Discard" }).click();
++  await expect(page.getByLabel("Aliases, one per line")).toHaveValue("");
++});
++
++for (const failed of [false, true]) {
++  test(`close waits for a ${failed ? "failed" : "successful"} Save continuation`, async ({
++    page,
++  }) => {
++    await openSettings(page);
++    await page
++      .getByRole("switch", { name: "Clear the search each time" })
++      .uncheck();
++    await page.evaluate((failed) => {
++      window.__launcherTest.holdSettings = true;
++      if (failed) window.__launcherTest.rejectSettings = "Test save failed";
++    }, failed);
++    await page.getByRole("button", { name: "Save changes" }).click();
++    await expect
++      .poll(() => page.evaluate(() => !!window.__launcherTest.releaseSettings))
++      .toBe(true);
++    await closeSettings(page);
++    expect(
++      await page.evaluate(() =>
++        window.__launcherTest.calls.some(
++          (call) => call.command === "capture_settings_session",
++        ),
++      ),
++    ).toBe(false);
++    await page.evaluate(() => window.__launcherTest.releaseSettings?.());
++    await expect
++      .poll(() => page.evaluate(() => window.__launcherTest.settingsClosed))
++      .toBe(true);
++    await page.reload();
++    await expect(
++      page.getByRole("switch", { name: "Clear the search each time" }),
++    ).not.toBeChecked();
++    if (failed) {
++      await expect(page.getByRole("alert")).toContainText("Test save failed");
++      await expect(
++        page.getByRole("button", { name: "Save changes" }),
++      ).toBeEnabled();
++    } else
++      await expect(
++        page.getByRole("button", { name: "Save changes" }),
++      ).toBeDisabled();
++  });
++}
++
++test("capture failure keeps edits and ends shortcut recording", async ({
++  page,
++}) => {
++  await openSettings(page);
++  await page
++    .getByRole("switch", { name: "Clear the search each time" })
++    .uncheck();
++  await page.getByRole("button", { name: "Record new" }).click();
++  await page.evaluate(() => {
++    window.__launcherTest.rejectCapture = "Capture failed";
++  });
++  await closeSettings(page);
++  await expect(page.getByRole("alert")).toContainText("Capture failed");
++  await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
++  await expect(
++    page.getByRole("switch", { name: "Clear the search each time" }),
++  ).not.toBeChecked();
++  expect(await page.evaluate(() => window.__launcherTest.settingsClosed)).toBe(
++    false,
++  );
++  expect(
++    await page.evaluate(
++      () =>
++        window.__launcherTest.calls
++          .filter((call) => call.command === "set_shortcut_recording")
++          .at(-1)?.payload,
++    ),
++  ).toEqual({ recording: false });
++});
++
++test("reopen cancellation rejects a late capture acknowledgement", async ({
++  page,
++}) => {
++  await openSettings(page);
++  await page.evaluate(() => {
++    window.__launcherTest.holdCapture = true;
++  });
++  await closeSettings(page);
++  await expect
++    .poll(() => page.evaluate(() => !!window.__launcherTest.releaseCapture))
++    .toBe(true);
++  await page.evaluate(() =>
++    window.__launcherTest.emit("settings-close-cancelled", { generation: 1 }),
++  );
++  await page
++    .getByRole("switch", { name: "Clear the search each time" })
++    .uncheck();
++  await page.evaluate(() => window.__launcherTest.releaseCapture?.());
++  await expect(
++    page.getByRole("switch", { name: "Clear the search each time" }),
++  ).not.toBeChecked();
++  expect(
++    await page.evaluate(() =>
++      window.__launcherTest.calls.some(
++        (call) => call.command === "finish_settings_close",
++      ),
++    ),
++  ).toBe(false);
++});
++
+ for (const editBeforeUpdate of [false, true]) {
+   test(`keeps external settings changes with a ${editBeforeUpdate ? "dirty" : "clean"} draft`, async ({
+     page,
