@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="TinyDash is a keyboard launcher for apps, files, clipboard history, and quick calculations. A small search bar for everyday desktop tasks."
+    />
+    <meta name="theme-color" content="#fcf8f2" />
+    <meta property="og:title" content="TinyDash | Small tasks. Fewer clicks." />
+    <meta
+      property="og:description"
+      content="Open apps, find files, and do quick calculations from one search bar."
+    />
+    <meta property="og:type" content="website" />
+    <title>TinyDash | Small tasks. Fewer clicks.</title>
+    <link rel="icon" href="./assets/icon.png" type="image/png" />
+    <link
+      rel="preload"
+      href="./assets/fonts/caprasimo-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="./assets/fonts/figtree-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./assets/downloads.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header page-width">
+      <a class="wordmark" href="./" aria-label="TinyDash home"
+        ><span class="tiny-mark" aria-hidden="true"><i></i><i></i></span
+        >TinyDash</a
+      >
+      <a class="quiet-link" href="https://github.com/jewei/tinydash"
+        >View on GitHub <span aria-hidden="true">↗</span></a
+      >
+    </header>
+    <main id="main">
+      <section class="intro page-width" aria-labelledby="headline">
+        <div>
+          <h1 id="headline">Small tasks.<br />Fewer clicks.</h1>
+          <p class="intro-copy">
+            Open apps, find files, and do quick calculations from one search
+            bar.
+          </p>
+        </div>
+        <div class="intro-action">
+          <a class="button primary" id="primary-download" href="#downloads"
+            >Choose your download <span aria-hidden="true">↓</span></a
+          >
+          <p id="primary-detail">{{primaryDetail}}</p>
+          <a class="text-link" href="#downloads">See all platforms</a>
+        </div>
+      </section>
+      <figure class="product-view page-width">
+        <img
+          src="./assets/launcher-macos-light.png"
+          width="2052"
+          height="1332"
+          alt="TinyDash on macOS in the light theme. A search field sits above categories for clipboard history, emoji, calculator, system commands, passwords, dates, URLs, and web search."
+          fetchpriority="high"
+        />
+        <figcaption>
+          <span>A place to start your next task.</span
+          ><span>macOS · Light theme · Some categories hidden</span>
+        </figcaption>
+      </figure>
+      <section class="everyday page-width" aria-labelledby="everyday-heading">
+        <div class="section-intro">
+          <h2 id="everyday-heading">Open. Type. Done.</h2>
+          <p>
+            Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd> to open
+            TinyDash. Type what you need. Press <kbd>Enter</kbd> to use the
+            result.
+          </p>
+          <p class="muted">
+            Change the shortcut in Settings. On Wayland, set it in your desktop
+            settings.
+          </p>
+        </div>
+        <dl class="task-list">
+          <div>
+            <dt>Launch an app</dt>
+            <dd>Type its name. Move through results with the arrow keys.</dd>
+          </div>
+          <div>
+            <dt>Find a file</dt>
+            <dd>
+              Search the folders you choose. Open the file or reveal its folder.
+            </dd>
+          </div>
+          <div>
+            <dt>Do a quick calculation</dt>
+            <dd>Type <code>12 × 8</code>. Copy <code>96</code> with Enter.</dd>
+          </div>
+          <div>
+            <dt>Use text again</dt>
+            <dd>
+              Turn on clipboard history when you want it. Saved text stays on
+              your computer.
+            </dd>
+          </div>
+        </dl>
+      </section>
+      <section
+        class="downloads-section"
+        id="downloads"
+        aria-labelledby="downloads-heading"
+      >
+        <div class="page-width">
+          <div class="download-heading">
+            <h2 id="downloads-heading">Get TinyDash.</h2>
+            <p id="release-status" role="status">{{releaseStatus}}</p>
+            <noscript
+              ><p>
+                You can also check
+                <a href="https://github.com/jewei/tinydash/releases"
+                  >GitHub releases</a
+                >
+                for installers.
+              </p></noscript
+            >
+          </div>
+          <div class="download-list">
+            <article class="download-row" data-platform="macos">
+              <div class="platform-title">
+                <h3>macOS</h3>
+                <p>Apple silicon · DMG</p>
+              </div>
+              <div class="platform-instructions">
+                <p>
+                  Open the disk image. Drag TinyDash to Applications, then open
+                  it.
+                </p>
+                <p class="muted">
+                  The first release targets Apple silicon Macs. Intel Macs are
+                  not included.
+                </p>
+                <p class="asset-detail" data-detail>{{macosDetail}}</p>
+              </div>
+              <div class="download-action">{{macosDownload}}</div>
+            </article>
+            <article class="download-row" data-platform="windows">
+              <div class="platform-title">
+                <h3>Windows</h3>
+                <p>Windows 11 · x64 · EXE</p>
+              </div>
+              <div class="platform-instructions">
+                <p>
+                  Run the installer. TinyDash installs for your user account.
+                </p>
+                <p>
+                  Unsigned preview. Windows may show a warning or block
+                  installation.
+                </p>
+                <p class="muted">
+                  An internet connection is required if WebView2 is missing.
+                </p>
+                <p class="asset-detail" data-detail>{{windowsDetail}}</p>
+              </div>
+              <div class="download-action">{{windowsDownload}}</div>
+            </article>
+            <article class="download-row" data-platform="linux">
+              <div class="platform-title">
+                <h3>Ubuntu</h3>
+                <p>Ubuntu 24.04 · x64 · DEB</p>
+              </div>
+              <div class="platform-instructions">
+                <p>
+                  Install the package with your package manager. To update, quit
+                  TinyDash and install the new DEB.
+                </p>
+                <p class="muted">
+                  On Wayland, set a desktop shortcut to start TinyDash.
+                  Background clipboard access can be limited.
+                </p>
+                <p class="asset-detail" data-detail>{{linuxDetail}}</p>
+              </div>
+              <div class="download-action">{{linuxDownload}}</div>
+            </article>
+          </div>
+          <div class="download-links">
+            <a id="release-notes" href="{{releaseNotesUrl}}">Release notes</a
+            ><a
+              href="https://github.com/jewei/tinydash/blob/main/docs/install.md"
+              >Install and remove TinyDash</a
+            >
+          </div>
+        </div>
+      </section>
+      <section class="privacy page-width" aria-labelledby="privacy-heading">
+        <h2 id="privacy-heading">Your choices, on your computer.</h2>
+        <div>
+          <p>
+            Choose whether to save clipboard history. Choose which folders to
+            search. Your settings and saved history stay in your user account.
+          </p>
+          <p>
+            Web searches open your browser. Currency rates use an internet
+            service. You can turn rate updates off in Settings.
+          </p>
+          <p class="muted">
+            Removing the app keeps your settings and history. The removal guide
+            explains how to delete them, including recovery backups.
+          </p>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer page-width">
+      <span class="footer-brand">TinyDash</span>
+      <nav aria-label="Footer">
+        <a href="https://github.com/jewei/tinydash/issues">Report a problem</a
+        ><a href="https://github.com/jewei/tinydash">Source code</a>
+      </nav>
+    </footer>
+  </body>
+</html>

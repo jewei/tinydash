@@ -27,6 +27,7 @@ for (const name of [
   "OS",
   "Architecture",
   "Distribution",
+  "Publisher signing",
 ]) {
   assert(fields[name], `Missing build metadata field: ${name}`);
 }
@@ -74,6 +75,11 @@ assert.equal(
 );
 if (process.env.RELEASE_MODE === "true") {
   assert.equal(
+    process.env.UPDATER_ARTIFACTS === "true",
+    expectedPlatform !== "linux",
+    "Release updates require signatures on Mac and Windows; Linux uses manual .deb updates",
+  );
+  assert.equal(
     fields.Source,
     "clean worktree",
     "Release source had local changes",
@@ -83,12 +89,24 @@ if (process.env.RELEASE_MODE === "true") {
       ? "release candidate with updater signatures"
       : "release candidate";
   assert.equal(fields.Distribution, expectedDistribution);
+  const expectedPublisher =
+    expectedPlatform === "darwin"
+      ? "Developer ID"
+      : expectedPlatform === "win32"
+        ? "none (unsigned preview)"
+        : "none";
+  assert.equal(
+    fields["Publisher signing"],
+    expectedPublisher,
+    "Publisher signing does not match the release policy",
+  );
 } else {
   assert.equal(
     fields.Distribution,
     "unsigned test build",
     "Unexpected distribution type in test mode",
   );
+  assert.equal(fields["Publisher signing"], "none");
 }
 
 const names = (await readdir(directory)).sort();
@@ -152,12 +170,23 @@ if (process.env.UPDATER_ARTIFACTS === "true") {
       updaterSignatures[0] === `${updaterArchives[0]}.sig`,
       "macOS updater signature does not match its archive",
     );
+    assert(
+      (await readFile(join(directory, updaterSignatures[0]), "utf8")).trim(),
+      "macOS updater signature is empty",
+    );
   } else if (expectedPlatform === "win32") {
     const signature = `_${version}_x64-setup.exe.sig`;
     assert(
       names.filter((name) => name.endsWith("-setup.exe.sig")).length === 1 &&
-        names.filter((name) => name.endsWith(signature)).length === 1,
+        names.filter((name) => name.endsWith(signature)).length === 1 &&
+        names.includes(`${packageNames[0]}.sig`),
       "Expected one Windows updater signature with the release architecture",
+    );
+    assert(
+      (
+        await readFile(join(directory, `${packageNames[0]}.sig`), "utf8")
+      ).trim(),
+      "Windows updater signature is empty",
     );
   } else {
     throw new Error("Updater artifacts are unsupported for Linux .deb builds");

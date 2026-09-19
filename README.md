@@ -240,7 +240,7 @@ Build on each target operating system. Tauri uses the platform configuration to 
 bun run tauri build --bundles app
 ```
 
-CI produces unsigned test packages for Apple silicon Macs, Windows x64, and Ubuntu 24.04 x64. Public distribution still needs signing, Mac notarization, and physical desktop checks.
+CI produces development packages for Apple silicon Macs, Windows x64, and Ubuntu 24.04 x64. The release policy uses a signed and notarized Mac app, an unsigned Windows preview, and an Ubuntu package with SHA-256 checksums. Mac and Windows updates use separate Tauri signatures. Actual release packages still need verification. See [release setup](docs/release-setup.md).
 
 The release profile preserves symbols in build tools to avoid a [Rust linker issue on macOS 27](https://github.com/rust-lang/rust/issues/157750). The shipped application remains stripped.
 
@@ -359,4 +359,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
 
 ## Next step
 
-Complete desktop checks on physical Windows and Linux systems, including Wayland. Then configure Mac signing and notarization and Windows signing before public distribution. Keep the MVP feature set fixed.
+Follow the [public release plan](docs/release-plan.md) for a combined macOS, Windows, and Linux release. Record evidence in [release verification](docs/release-verification.md). The plan covers signing, installation, updates, the download page, and user checks. Keep the MVP tool set fixed while completing this work.

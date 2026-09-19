@@ -1,7 +1,14 @@
 # Release checkpoint
 
 Date: 19 September 2026.
-Status: **Paused at the maintainer's request.** Resume only when requested.
+Status at checkpoint: **Paused at the maintainer's request.**
+
+Work resumed later on 19 September 2026 at the maintainer's request. The accepted
+policy is a signed and notarized Mac app, an unsigned Windows preview, and a
+Linux `.deb` with SHA-256 checksums. Mac and Windows keep separate Tauri update
+signatures. This task now owns the release workflow and scripts. See the current
+[plan](release-plan.md) and [setup guide](release-setup.md). The record below
+describes the earlier checkpoint; its source archive remains unchanged.
 
 This checkpoint records this release task. Another coding task is active in the
 same workspace. Its work can continue independently.

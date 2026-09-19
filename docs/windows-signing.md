@@ -1,7 +1,8 @@
 # Windows signing options
 
-Status: paused at the maintainer's request on 19 September 2026.
-See the [release checkpoint](release-checkpoint.md) before resuming work.
+Status: resumed on 19 September 2026. The maintainer accepted an unsigned
+Windows preview for the first release. Publisher signing is deferred.
+See [release setup](release-setup.md) for the active configuration.
 
 TinyDash is a small open source project maintained by one individual in
 Malaysia. The maintainer excludes services that cost more than $10. Use free
@@ -64,20 +65,21 @@ key. See [Tauri update signing](https://v2.tauri.app/plugin/updater/#signing-upd
 These update signatures and hashes do not establish a trusted Windows publisher
 for the first installation. Keep that distinction clear on the download page.
 
-## Recommendation for resuming work
+## Selected route
 
 Keep GitHub Releases and the existing static site. Use GitHub Pages or
-Cloudflare Pages with its supplied domain. Check SignPath eligibility first.
-Treat a clearly labeled unsigned Windows preview as an optional temporary
-route. Consider MSIX only if the maintainer prefers the Store installation
-experience enough to justify the packaging work.
+Cloudflare Pages with its supplied domain. Publish the existing NSIS installer
+as an unsigned Windows preview. Add SHA-256 checksums and keep Tauri update
+signatures. The workflow no longer imports a Windows PFX or requires Windows
+publisher credentials. No signing service or Store conversion is needed now.
 
-No Windows route has been selected. An unsigned preview would change the
-earlier signed-Windows release requirement. Record that choice before adapting
-the workflow or publishing. The combined Mac, Windows, and Ubuntu release
-scope remains unchanged.
+State the warning beside the Windows download. Test installation and launch
+on Windows 11 with a standard user account. Record the exact trust prompt.
+Systems that block unsigned software are outside preview support. Do not call
+a blocked installation a pass or ask users to disable security controls.
+The combined Mac, Windows, and Ubuntu release scope remains unchanged.
 
 Keep the completed backup and site work. Reuse the existing CI. Retain the
 basic install, launch, update, data-preservation, and removal checks.
-The longer verification list remains a reference while the release process
-is reduced to fit a solo project.
+There is no tester quota. Keep one report per supported system. Revisit
+SignPath if project eligibility improves, or the Store if users request it.

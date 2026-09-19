@@ -12,8 +12,11 @@ const plugins = { updater: { pubkey: publicKey } };
 
 let config: object;
 if (platform === "macos") {
-  const signingIdentity = process.env.APPLE_SIGNING_IDENTITY;
-  assert(signingIdentity, "Missing signing configuration for macos");
+  const signingIdentity = process.env.APPLE_SIGNING_IDENTITY?.trim();
+  assert(
+    signingIdentity?.startsWith("Developer ID Application: "),
+    "A Developer ID Application identity is required for macos",
+  );
   config = {
     plugins,
     bundle: {
@@ -22,16 +25,13 @@ if (platform === "macos") {
     },
   };
 } else {
-  const certificateThumbprint = process.env.WINDOWS_CERTIFICATE_THUMBPRINT;
-  assert(certificateThumbprint, "Missing signing configuration for windows");
   config = {
     plugins,
     bundle: {
       createUpdaterArtifacts: true,
       windows: {
-        certificateThumbprint,
-        digestAlgorithm: "sha256",
-        timestampUrl: "https://timestamp.digicert.com",
+        certificateThumbprint: null,
+        signCommand: null,
       },
     },
   };
