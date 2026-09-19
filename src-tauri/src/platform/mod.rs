@@ -12,16 +12,14 @@ pub use linux::{read_clipboard, watch_clipboard};
 #[cfg(target_os = "macos")]
 pub use macos::LauncherFocus;
 #[cfg(target_os = "macos")]
-pub use macos::clipboard_snapshot;
+pub use macos::application_icon;
 #[cfg(target_os = "macos")]
-pub use macos::load_app_icons;
+pub use macos::clipboard_snapshot;
 #[cfg(target_os = "macos")]
 pub use macos::{discover_apps, launch, run_system_command, system_commands};
 #[cfg(not(target_os = "macos"))]
-pub fn load_app_icons(
-    apps: Vec<crate::providers::apps::AppEntry>,
-) -> Vec<crate::providers::apps::AppEntry> {
-    apps
+pub fn application_icon(_path: &std::path::Path, _pixels: u16) -> Option<Vec<u8>> {
+    None
 }
 #[cfg(target_os = "windows")]
 pub use windows::clipboard_snapshot;
@@ -62,42 +60,51 @@ mod tests {
     #[test]
     #[ignore = "Uses installed macOS applications and WindowServer. Run with --ignored."]
     fn installed_app_results_have_native_icons() {
-        use crate::launcher::{query::SearchMode, search::SearchManager};
-        use crate::providers::apps::AppProvider;
+        let apps = super::discover_apps().expect("discover installed applications");
+        let activity = apps
+            .iter()
+            .find(|app| app.name == "Activity Monitor")
+            .expect("Activity Monitor");
+        let store = apps
+            .iter()
+            .find(|app| app.name == "App Store")
+            .expect("App Store");
+        let activity_icon =
+            super::application_icon(&activity.path, 72).expect("Activity Monitor image");
+        let store_icon = super::application_icon(&store.path, 72).expect("App Store image");
+        for image in [&activity_icon, &store_icon] {
+            assert_eq!(&image[..8], b"\x89PNG\r\n\x1a\n");
+            assert_eq!(u32::from_be_bytes(image[16..20].try_into().unwrap()), 72);
+            assert_eq!(u32::from_be_bytes(image[20..24].try_into().unwrap()), 72);
+        }
+        assert_ne!(activity_icon, store_icon);
+        let preview = super::application_icon(&activity.path, 128).expect("preview image");
+        assert_eq!(u32::from_be_bytes(preview[16..20].try_into().unwrap()), 128);
+        assert!(super::application_icon(&activity.path, 257).is_none());
 
-        let apps =
-            super::load_app_icons(super::discover_apps().expect("discover installed applications"));
-        let mut manager = SearchManager::default();
-        manager.replace_apps(AppProvider::new(apps));
-        let results = manager
-            .search("Activity Monitor", SearchMode::Apps)
-            .unwrap()
-            .results;
-        let activity = results
-            .iter()
-            .find(|result| result.title == "Activity Monitor")
-            .expect("Activity Monitor is installed on macOS");
-        assert!(
-            activity
-                .icon
-                .as_deref()
-                .is_some_and(|icon| icon.starts_with("data:image/png;base64,")),
-            "The native search response must include Activity Monitor's image"
-        );
-        let activity_icon = activity.icon.clone();
-        let store = manager
-            .search("App Store", SearchMode::Apps)
-            .unwrap()
-            .results;
-        let store = store
-            .iter()
-            .find(|result| result.title == "App Store")
-            .expect("App Store is installed");
-        assert!(store.icon.is_some());
-        assert_ne!(
-            activity_icon, store.icon,
-            "Installed apps must have distinct native icons"
-        );
+        // Exercise Finder custom icons on a temporary directory, without
+        // changing an installed application or relying on its cached image.
+        use objc2_app_kit::{NSWorkspace, NSWorkspaceIconCreationOptions};
+        use objc2_foundation::NSString;
+        let fixture = tempfile::tempdir().unwrap();
+        let path = NSString::from_str(fixture.path().to_str().unwrap());
+        let workspace = NSWorkspace::sharedWorkspace();
+        let original = super::application_icon(fixture.path(), 72).unwrap();
+        let custom = workspace.iconForFile(&NSString::from_str(activity.path.to_str().unwrap()));
+        assert!(workspace.setIcon_forFile_options(
+            Some(&custom),
+            &path,
+            NSWorkspaceIconCreationOptions::empty()
+        ));
+        let first = super::application_icon(fixture.path(), 72).unwrap();
+        assert_ne!(original, first);
+        let replacement = workspace.iconForFile(&NSString::from_str(store.path.to_str().unwrap()));
+        assert!(workspace.setIcon_forFile_options(
+            Some(&replacement),
+            &path,
+            NSWorkspaceIconCreationOptions::empty()
+        ));
+        assert_ne!(first, super::application_icon(fixture.path(), 72).unwrap());
     }
 
     #[test]

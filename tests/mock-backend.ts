@@ -18,6 +18,15 @@ declare global {
       settings: SettingsValues;
       platform: "macos" | "windows" | "linux";
       rejectSettings: string | null;
+      nativeIcons: boolean;
+      holdIcons: boolean;
+      busyIcons: boolean;
+      heldIcons: {
+        request: string;
+        key: string;
+        pixels: number;
+        release: () => void;
+      }[];
       pins: Partial<Record<SearchMode, string[]>>;
       rejectPin: boolean;
       emojiGrid: boolean;
@@ -252,6 +261,10 @@ window.__launcherTest = {
       "macos" | "windows" | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
   rejectSettings: null,
+  nativeIcons: false,
+  holdIcons: false,
+  busyIcons: false,
+  heldIcons: [],
   pins: Array.isArray(savedPins)
     ? { all: savedPins, apps: savedPins }
     : savedPins,
@@ -331,6 +344,18 @@ mockIPC(
         shortcutsAvailable: true,
       };
     }
+    if (command === "app_icon") {
+      if (state.busyIcons) throw "busy";
+      if (state.holdIcons)
+        await new Promise<void>((release) => {
+          state.heldIcons.push({
+            ...(payload as { request: string; key: string; pixels: number }),
+            release,
+          });
+        });
+      return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1sAAAAASUVORK5CYII=";
+    }
+    if (command === "cancel_app_icon") return;
     if (command === "save_settings") {
       if (state.rejectSettings) throw new Error(state.rejectSettings);
       state.settings = (payload as { settings: SettingsValues }).settings;
@@ -520,7 +545,13 @@ mockIPC(
           : null;
       return {
         preferredSelectionId,
-        results: described,
+        results: state.nativeIcons
+          ? described.map((result) =>
+              result.kind === "app"
+                ? { ...result, icon: `app-icon:test:${result.id}` }
+                : result,
+            )
+          : described,
         total: apps.length,
         indexing: false,
         indexError: null,
