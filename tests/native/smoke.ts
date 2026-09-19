@@ -668,7 +668,7 @@ try {
   await clickMenuItemText("Pin to All");
   const thirdClip = `TinyDash third ${fixtures.nonce}`;
   setClipboardText(thirdClip);
-  await keys(inputId, "\uE009a\uE008\uE000");
+  await keys(inputId, "\uE009a\uE000\uE003");
   await until(
     "the newer unpinned clipboard entry is selected after the pinned entry",
     async () => {
