@@ -1,0 +1,118 @@
+diff --git a/src-tauri/src/platform/mod.rs b/src-tauri/src/platform/mod.rs
+index 1cb90b2..d829504 100644
+--- a/src-tauri/src/platform/mod.rs
++++ b/src-tauri/src/platform/mod.rs
+@@ -81,6 +81,30 @@ mod tests {
+         let preview = super::application_icon(&activity.path, 128).expect("preview image");
+         assert_eq!(u32::from_be_bytes(preview[16..20].try_into().unwrap()), 128);
+         assert!(super::application_icon(&activity.path, 257).is_none());
++
++        // Exercise Finder custom icons on a temporary directory, without
++        // changing an installed application or relying on its cached image.
++        use objc2_app_kit::{NSWorkspace, NSWorkspaceIconCreationOptions};
++        use objc2_foundation::NSString;
++        let fixture = tempfile::tempdir().unwrap();
++        let path = NSString::from_str(fixture.path().to_str().unwrap());
++        let workspace = NSWorkspace::sharedWorkspace();
++        let original = super::application_icon(fixture.path(), 72).unwrap();
++        let custom = workspace.iconForFile(&NSString::from_str(activity.path.to_str().unwrap()));
++        assert!(workspace.setIcon_forFile_options(
++            Some(&custom),
++            &path,
++            NSWorkspaceIconCreationOptions::empty()
++        ));
++        let first = super::application_icon(fixture.path(), 72).unwrap();
++        assert_ne!(original, first);
++        let replacement = workspace.iconForFile(&NSString::from_str(store.path.to_str().unwrap()));
++        assert!(workspace.setIcon_forFile_options(
++            Some(&replacement),
++            &path,
++            NSWorkspaceIconCreationOptions::empty()
++        ));
++        assert_ne!(first, super::application_icon(fixture.path(), 72).unwrap());
+     }
+ 
+     #[test]
+diff --git a/tests/fixtures/README.md b/tests/fixtures/README.md
+new file mode 100644
+index 0000000..bbc977f
+--- /dev/null
++++ b/tests/fixtures/README.md
+@@ -0,0 +1,7 @@
++# Search result fixture
++
++`app-selection.json` contains results from the source frozen before memory optimization. The base commit is `568972bbc92df37f2bbfd2951e8ab478b061e205`. The frozen source also includes the working changes recorded by the memory benchmark's baseline manifest and patch.
++
++The fixture uses 100 applications, tied names, aliases, Unicode, hidden applications, fixed usage timestamps, and more than 30 pins. It records result identities, order, scores, pin data, and actions. It omits icon payloads. The test compares the new search implementation with these results.
++
++The fixture was generated in the isolated original source with `TINYDASH_WRITE_SELECTION_FIXTURE`. Normal tests only read it. Do not regenerate it from the changed search implementation to make a failed comparison pass.
+diff --git a/tests/launcher.spec.ts b/tests/launcher.spec.ts
+index 162c802..256869b 100644
+--- a/tests/launcher.spec.ts
++++ b/tests/launcher.spec.ts
+@@ -126,6 +126,65 @@ test("capacity notification retries only visible icons", async ({ page }) => {
+   await expect(page.getByRole("option").locator("img")).toBeVisible();
+ });
+ 
++test("a display scale change replaces pending icon sizes", async ({ page }) => {
++  await page.addInitScript(() => {
++    const media: MediaQueryList[] = [];
++    const original = window.matchMedia.bind(window);
++    window.matchMedia = (query) => {
++      const value = original(query);
++      if (query.startsWith("(resolution:")) media.push(value);
++      return value;
++    };
++    Object.assign(window, {
++      changeTestScale: () => {
++        Object.defineProperty(window, "devicePixelRatio", {
++          value: 2,
++          configurable: true,
++        });
++        for (const value of [...media])
++          value.dispatchEvent(new Event("change"));
++      },
++    });
++  });
++  await openLauncher(page);
++  await page.evaluate(() => {
++    window.__launcherTest.nativeIcons = true;
++    window.__launcherTest.holdIcons = true;
++  });
++  await selectCategory(page, "Apps");
++  await expect
++    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
++    .toBeGreaterThan(0);
++  const previous = await page.evaluate(() =>
++    window.__launcherTest.heldIcons.map((icon) => icon.request),
++  );
++  await page.evaluate(() =>
++    (window as unknown as { changeTestScale: () => void }).changeTestScale(),
++  );
++  await expect
++    .poll(() =>
++      page.evaluate(
++        () =>
++          window.__launcherTest.calls.filter(
++            (call) =>
++              call.command === "app_icon" &&
++              (call.payload as { pixels: number }).pixels === 128,
++          ).length,
++      ),
++    )
++    .toBeGreaterThan(0);
++  const cancelled = await page.evaluate(() =>
++    window.__launcherTest.calls
++      .filter((call) => call.command === "cancel_app_icon")
++      .map((call) => (call.payload as { request: string }).request),
++  );
++  expect(previous.every((request) => cancelled.includes(request))).toBe(true);
++  await page.evaluate(() =>
++    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
++  );
++  await expect(page.getByRole("option").first().locator("img")).toBeVisible();
++});
++
+ test("installed app icons appear in the result list and detail panel", async ({
+   page,
+ }) => {

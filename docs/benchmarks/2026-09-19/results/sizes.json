@@ -1,0 +1,20 @@
+{
+  "tinydash": {
+    "executable_bytes": 13901216,
+    "bundle_file_bytes": 13945516,
+    "executable_sha256": "4154cf51ab71f47007182965514d872c23ae89afaa33c71c00fb576d2dcd45aa",
+    "file_description": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash: Mach-O 64-bit executable arm64"
+  },
+  "bopop": {
+    "executable_bytes": 3134048,
+    "bundle_file_bytes": 6781761,
+    "executable_sha256": "6ba491bfaf627c0d95f34fb1af0e97b7d3d9f75df528a3c966b18e1ade9f2071",
+    "file_description": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop: Mach-O 64-bit executable arm64"
+  },
+  "tinycast": {
+    "executable_bytes": 11824128,
+    "bundle_file_bytes": 13924480,
+    "executable_sha256": "df684514dc1c58f3c0c9ecfbf42f49e06d56b7da80649b6198603166f772ba0f",
+    "file_description": "/private/tmp/launcher-perf-20260919/tinycast-build/Build/Products/Release/Tinycast.app/Contents/MacOS/Tinycast: Mach-O 64-bit executable arm64"
+  }
+}

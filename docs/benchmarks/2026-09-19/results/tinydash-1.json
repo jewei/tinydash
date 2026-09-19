@@ -1,0 +1,3284 @@
+{
+  "app": "tinydash",
+  "trial": 1,
+  "pid": 43066,
+  "process_discovery_ms": 191.35570799699053,
+  "launch_timestamp": "2026-09-19T09:08:58+0800",
+  "initial_show": {
+    "ready": true
+  },
+  "queries": {
+    "samples": [
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 708.3222500223201,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 214.34408336062916,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 144.22520832158625,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 35.86670832009986,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 36.73445832100697,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 19.039583334233612,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 17.110499989939854,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 10.64883332583122,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 31.847458332777023,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 29.410999995889142,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 17.360083322273567,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 57.874999998603016,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 48.87158333440311,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 37.52949999761768,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 23.28970833332278,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 25.256416673073545,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 28.874000010546297,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 33.81470832391642,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 11.057166673708707,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 27.862291666679084,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 47.465291660046205,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 47.26716666482389,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 15.46704166685231,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 24.02195835020393,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 35.89191666105762,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 36.934625008143485,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 24.95095835183747,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 24.888583342544734,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 33.091333316406235,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 31.32912499131635,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 22.921124997083098,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 38.906625006347895,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 21.08341665007174,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 17.545125010656193,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 21.646166685968637,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 14.591291692340747,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 39.01595831848681,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 35.5192499991972,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 47.21920832525939,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 8.96316664875485,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 35.08891665842384,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 35.8109166554641,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 21.7547083448153,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 20.948791672708467,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 34.83466667239554,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 40.91933331801556,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 14.63841664372012,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 22.334083332680166,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "summon": {
+    "samples": [
+      {
+        "iteration": -2,
+        "ms": 69.5621249906253,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": -1,
+        "ms": 36.865125002805144,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": 0,
+        "ms": 40.68008332978934,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 1,
+        "ms": 62.52608331851661,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "ms": 35.52104166010395,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "ms": 39.50166667345911,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 4,
+        "ms": 29.058625019388273,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 5,
+        "ms": 36.20045832940377,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 6,
+        "ms": 28.869708330603316,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 7,
+        "ms": 38.2112083316315,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 8,
+        "ms": 40.41441666777246,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 9,
+        "ms": 40.79495833138935,
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "visible_samples": [
+    {
+      "monotonic": 245749.215806041,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78171246,
+          "system_ns": 30100030,
+          "idle_wakeups": 11,
+          "interrupt_wakeups": 2236,
+          "rss_bytes": 91750400,
+          "footprint_bytes": 38618264
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1153432,
+          "system_ns": 817881,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 4276224,
+          "footprint_bytes": 3047784
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 11607096,
+          "system_ns": 7188584,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 347,
+          "rss_bytes": 28409856,
+          "footprint_bytes": 23593752
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 37164414,
+          "system_ns": 17437212,
+          "idle_wakeups": 4,
+          "interrupt_wakeups": 647,
+          "rss_bytes": 103251968,
+          "footprint_bytes": 99026048
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 748036,
+          "system_ns": 910026,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 140,
+          "rss_bytes": 9945088,
+          "footprint_bytes": 7307744
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6602752,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3064551,
+          "system_ns": 3839569,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 36,
+          "rss_bytes": 23003136,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245750.25804975,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78357222,
+          "system_ns": 30201969,
+          "idle_wakeups": 11,
+          "interrupt_wakeups": 2303,
+          "rss_bytes": 91750400,
+          "footprint_bytes": 38519960
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1153432,
+          "system_ns": 817881,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 4276224,
+          "footprint_bytes": 3047784
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 11740771,
+          "system_ns": 7285757,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 359,
+          "rss_bytes": 28278784,
+          "footprint_bytes": 23413528
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 37377232,
+          "system_ns": 17542016,
+          "idle_wakeups": 4,
+          "interrupt_wakeups": 676,
+          "rss_bytes": 103251968,
+          "footprint_bytes": 88851584
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 753727,
+          "system_ns": 913641,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 149,
+          "rss_bytes": 9945088,
+          "footprint_bytes": 7307744
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6602752,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3065769,
+          "system_ns": 3840480,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 37,
+          "rss_bytes": 23003136,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245751.298502208,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78491921,
+          "system_ns": 30292075,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2370,
+          "rss_bytes": 91750400,
+          "footprint_bytes": 38503576
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1153432,
+          "system_ns": 817881,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 4276224,
+          "footprint_bytes": 3047784
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 11844726,
+          "system_ns": 7362175,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 371,
+          "rss_bytes": 27754496,
+          "footprint_bytes": 23266048
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 37528647,
+          "system_ns": 17625125,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 702,
+          "rss_bytes": 103251968,
+          "footprint_bytes": 88818816
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 753727,
+          "system_ns": 913641,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 149,
+          "rss_bytes": 9945088,
+          "footprint_bytes": 7307744
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6602752,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3066244,
+          "system_ns": 3840661,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 38,
+          "rss_bytes": 23003136,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245752.348637583,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78743075,
+          "system_ns": 30420388,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2434,
+          "rss_bytes": 91652096,
+          "footprint_bytes": 38552728
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1156933,
+          "system_ns": 824200,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 4276224,
+          "footprint_bytes": 3047784
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12098392,
+          "system_ns": 7520090,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 385,
+          "rss_bytes": 28033024,
+          "footprint_bytes": 26641152
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 37711182,
+          "system_ns": 17710364,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 727,
+          "rss_bytes": 103284736,
+          "footprint_bytes": 108774528
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 762035,
+          "system_ns": 924718,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 156,
+          "rss_bytes": 9945088,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6602752,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3079453,
+          "system_ns": 3846292,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 38,
+          "rss_bytes": 21413888,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245753.448669916,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78781316,
+          "system_ns": 30438505,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2472,
+          "rss_bytes": 88424448,
+          "footprint_bytes": 38519960
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1156933,
+          "system_ns": 824200,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 4210688,
+          "footprint_bytes": 3047784
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12112895,
+          "system_ns": 7534788,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 394,
+          "rss_bytes": 25477120,
+          "footprint_bytes": 27050752
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 37745133,
+          "system_ns": 17724939,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 741,
+          "rss_bytes": 95944704,
+          "footprint_bytes": 90162304
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 766953,
+          "system_ns": 927895,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 165,
+          "rss_bytes": 9895936,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3080603,
+          "system_ns": 3847483,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 39,
+          "rss_bytes": 21102592,
+          "footprint_bytes": 13910472
+        }
+      ]
+    }
+  ],
+  "hidden_check": {
+    "hidden": true
+  },
+  "idle_samples": [
+    {
+      "monotonic": 245784.714800791,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12399006,
+          "system_ns": 7841735,
+          "idle_wakeups": 3,
+          "interrupt_wakeups": 571,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38286935,
+          "system_ns": 17975868,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1023,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245785.719987416,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12406814,
+          "system_ns": 7847538,
+          "idle_wakeups": 3,
+          "interrupt_wakeups": 577,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38301208,
+          "system_ns": 17983147,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1031,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245786.717050291,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12413714,
+          "system_ns": 7851965,
+          "idle_wakeups": 4,
+          "interrupt_wakeups": 582,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38315307,
+          "system_ns": 17988464,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1039,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245787.719364041,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12420741,
+          "system_ns": 7856663,
+          "idle_wakeups": 4,
+          "interrupt_wakeups": 588,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38330800,
+          "system_ns": 17994497,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1049,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245788.722332208,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12429190,
+          "system_ns": 7862068,
+          "idle_wakeups": 4,
+          "interrupt_wakeups": 594,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38347191,
+          "system_ns": 17999175,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1057,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245789.713351291,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12434764,
+          "system_ns": 7865760,
+          "idle_wakeups": 4,
+          "interrupt_wakeups": 599,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38359188,
+          "system_ns": 18003698,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1065,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245790.719595916,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12441612,
+          "system_ns": 7871397,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 604,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38374030,
+          "system_ns": 18011291,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1075,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245791.724982333,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12448672,
+          "system_ns": 7877258,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 611,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38386933,
+          "system_ns": 18017578,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1083,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245792.710568916,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12454385,
+          "system_ns": 7881451,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 616,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38399804,
+          "system_ns": 18023585,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1091,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245793.703140083,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955200,
+          "system_ns": 30542389,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2526,
+          "rss_bytes": 87801856,
+          "footprint_bytes": 38274200
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12460673,
+          "system_ns": 7885387,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 621,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38411657,
+          "system_ns": 18028291,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1099,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245794.702622791,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 87785472,
+          "footprint_bytes": 38257816
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12466325,
+          "system_ns": 7890499,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 627,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38425650,
+          "system_ns": 18035295,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1109,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245795.700275666,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 87785472,
+          "footprint_bytes": 38257816
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12471910,
+          "system_ns": 7895568,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 632,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38436721,
+          "system_ns": 18041173,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1117,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89474152
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245796.702434875,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 87785472,
+          "footprint_bytes": 38257816
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12477819,
+          "system_ns": 7899971,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 637,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38448409,
+          "system_ns": 18046822,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1125,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89457768
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245797.700267375,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 87785472,
+          "footprint_bytes": 38257816
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12484777,
+          "system_ns": 7906359,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 644,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38462868,
+          "system_ns": 18054604,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1135,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89457768
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245798.697909416,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 87785472,
+          "footprint_bytes": 38257816
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3964928,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12489258,
+          "system_ns": 7909284,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 649,
+          "rss_bytes": 23674880,
+          "footprint_bytes": 15631128
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38472895,
+          "system_ns": 18059442,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1143,
+          "rss_bytes": 95633408,
+          "footprint_bytes": 89457768
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19234816,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245799.703266041,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 87752704,
+          "footprint_bytes": 38257816
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3932160,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12494294,
+          "system_ns": 7913465,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 654,
+          "rss_bytes": 22478848,
+          "footprint_bytes": 15647512
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38484277,
+          "system_ns": 18065556,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1151,
+          "rss_bytes": 80396288,
+          "footprint_bytes": 89785448
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 9191424,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19152896,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245800.695446583,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 81674240,
+          "footprint_bytes": 38257816
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3932160,
+          "footprint_bytes": 2965864
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12500742,
+          "system_ns": 7919014,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 661,
+          "rss_bytes": 18956288,
+          "footprint_bytes": 16368408
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38496662,
+          "system_ns": 18072965,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1160,
+          "rss_bytes": 59260928,
+          "footprint_bytes": 91767912
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 8945664,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 19021824,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245801.707608958,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78955554,
+          "system_ns": 30543683,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 77086720,
+          "footprint_bytes": 38290584
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3145728,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12505913,
+          "system_ns": 7923417,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 666,
+          "rss_bytes": 16302080,
+          "footprint_bytes": 16565016
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38508968,
+          "system_ns": 18079502,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1169,
+          "rss_bytes": 53739520,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 8830976,
+          "footprint_bytes": 7242208
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17891328,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245802.706855125,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78966676,
+          "system_ns": 30551690,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 75890688,
+          "footprint_bytes": 38405272
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3145728,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12511423,
+          "system_ns": 7928739,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 671,
+          "rss_bytes": 15941632,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38522272,
+          "system_ns": 18087690,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1178,
+          "rss_bytes": 52707328,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 8011776,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17891328,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245803.696470583,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78977096,
+          "system_ns": 30556008,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 75890688,
+          "footprint_bytes": 38405272
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3145728,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12516479,
+          "system_ns": 7934050,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 677,
+          "rss_bytes": 15941632,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38533601,
+          "system_ns": 18093434,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1187,
+          "rss_bytes": 52707328,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 8011776,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6586368,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17891328,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245804.697236791,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78977096,
+          "system_ns": 30556008,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 73515008,
+          "footprint_bytes": 38405272
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3145728,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12521638,
+          "system_ns": 7938095,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 683,
+          "rss_bytes": 15941632,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38543544,
+          "system_ns": 18097935,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1195,
+          "rss_bytes": 52707328,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 8011776,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6569984,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17891328,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245805.701200541,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 78977096,
+          "system_ns": 30556008,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 70500352,
+          "footprint_bytes": 38405272
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3129344,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12527228,
+          "system_ns": 7942947,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 688,
+          "rss_bytes": 15925248,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38556279,
+          "system_ns": 18105583,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1203,
+          "rss_bytes": 52707328,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 8011776,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6569984,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3089084,
+          "system_ns": 3856167,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17891328,
+          "footprint_bytes": 13861320
+        }
+      ]
+    },
+    {
+      "monotonic": 245806.703943208,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79025459,
+          "system_ns": 30576049,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2527,
+          "rss_bytes": 70713344,
+          "footprint_bytes": 38454424
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3129344,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12533705,
+          "system_ns": 7949203,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 694,
+          "rss_bytes": 15925248,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38570360,
+          "system_ns": 18112962,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1213,
+          "rss_bytes": 52690944,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7979008,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6569984,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3104037,
+          "system_ns": 3870917,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17940480,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245807.712148,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79267401,
+          "system_ns": 30654637,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2534,
+          "rss_bytes": 72007680,
+          "footprint_bytes": 38634648
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3129344,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12540168,
+          "system_ns": 7953688,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 700,
+          "rss_bytes": 15892480,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38581956,
+          "system_ns": 18118561,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1221,
+          "rss_bytes": 52690944,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7979008,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6553600,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3110945,
+          "system_ns": 3874736,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17940480,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245808.707834166,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79453781,
+          "system_ns": 30689780,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2542,
+          "rss_bytes": 72007680,
+          "footprint_bytes": 38634648
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3129344,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12544524,
+          "system_ns": 7957378,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 705,
+          "rss_bytes": 15843328,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38593467,
+          "system_ns": 18125486,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1230,
+          "rss_bytes": 52690944,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7979008,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6553600,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3110945,
+          "system_ns": 3874736,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17940480,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245809.704530208,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79458989,
+          "system_ns": 30692141,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2545,
+          "rss_bytes": 71467008,
+          "footprint_bytes": 38634648
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3096576,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12549902,
+          "system_ns": 7962194,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 711,
+          "rss_bytes": 15630336,
+          "footprint_bytes": 16614168
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38605945,
+          "system_ns": 18131968,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1240,
+          "rss_bytes": 52592640,
+          "footprint_bytes": 91915368
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7733248,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6553600,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3112522,
+          "system_ns": 3878110,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 18055168,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245810.70744425,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79458989,
+          "system_ns": 30692141,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2545,
+          "rss_bytes": 69484544,
+          "footprint_bytes": 38765720
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3096576,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12554306,
+          "system_ns": 7966456,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 716,
+          "rss_bytes": 13320192,
+          "footprint_bytes": 16745240
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38615385,
+          "system_ns": 18137369,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1248,
+          "rss_bytes": 49381376,
+          "footprint_bytes": 92013672
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7323648,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6275072,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3112522,
+          "system_ns": 3878110,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17580032,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245811.700747,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79494590,
+          "system_ns": 30708236,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2545,
+          "rss_bytes": 61440000,
+          "footprint_bytes": 38798488
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3096576,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12559099,
+          "system_ns": 7971922,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 721,
+          "rss_bytes": 13254656,
+          "footprint_bytes": 16745240
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38626475,
+          "system_ns": 18143860,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1256,
+          "rss_bytes": 42188800,
+          "footprint_bytes": 92013672
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7307264,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6275072,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3131075,
+          "system_ns": 3892900,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17514496,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245812.707387291,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79743838,
+          "system_ns": 30816833,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2553,
+          "rss_bytes": 49414144,
+          "footprint_bytes": 38831256
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3096576,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12565268,
+          "system_ns": 7978114,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 727,
+          "rss_bytes": 12713984,
+          "footprint_bytes": 16745240
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38638892,
+          "system_ns": 18150155,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1265,
+          "rss_bytes": 32800768,
+          "footprint_bytes": 92013672
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7307264,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6275072,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3140073,
+          "system_ns": 3899539,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17514496,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245813.694468708,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 79932860,
+          "system_ns": 30882680,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2560,
+          "rss_bytes": 49004544,
+          "footprint_bytes": 38831256
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3096576,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12570443,
+          "system_ns": 7981822,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 733,
+          "rss_bytes": 12615680,
+          "footprint_bytes": 16745240
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38648245,
+          "system_ns": 18154830,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1274,
+          "rss_bytes": 32784384,
+          "footprint_bytes": 92013672
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7307264,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6275072,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3152270,
+          "system_ns": 3910233,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17580032,
+          "footprint_bytes": 13910472
+        }
+      ]
+    },
+    {
+      "monotonic": 245814.724326875,
+      "processes": [
+        {
+          "pid": 43066,
+          "executable": "/private/tmp/launcher-perf-20260919/TinyDashPerf.app/Contents/MacOS/tinydash",
+          "user_ns": 80161039,
+          "system_ns": 30935862,
+          "idle_wakeups": 12,
+          "interrupt_wakeups": 2571,
+          "rss_bytes": 47710208,
+          "footprint_bytes": 38831256
+        },
+        {
+          "pid": 43068,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1157635,
+          "system_ns": 827278,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3096576,
+          "footprint_bytes": 2982248
+        },
+        {
+          "pid": 43069,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.GPU.xpc/Contents/MacOS/com.apple.WebKit.GPU",
+          "user_ns": 12576234,
+          "system_ns": 7987004,
+          "idle_wakeups": 5,
+          "interrupt_wakeups": 739,
+          "rss_bytes": 11517952,
+          "footprint_bytes": 16745240
+        },
+        {
+          "pid": 43070,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent",
+          "user_ns": 38661491,
+          "system_ns": 18162679,
+          "idle_wakeups": 6,
+          "interrupt_wakeups": 1282,
+          "rss_bytes": 31260672,
+          "footprint_bytes": 92013672
+        },
+        {
+          "pid": 43071,
+          "executable": "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.xpc/Contents/MacOS/com.apple.WebKit.Networking",
+          "user_ns": 777305,
+          "system_ns": 946622,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 7274496,
+          "footprint_bytes": 7258592
+        },
+        {
+          "pid": 43075,
+          "executable": "/System/Library/Frameworks/AudioToolbox.framework/XPCServices/com.apple.audio.SandboxHelper.xpc/Contents/MacOS/com.apple.audio.SandboxHelper",
+          "user_ns": 595758,
+          "system_ns": 197456,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 2,
+          "rss_bytes": 6275072,
+          "footprint_bytes": 3228176
+        },
+        {
+          "pid": 43081,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 3157164,
+          "system_ns": 3914600,
+          "idle_wakeups": 1,
+          "interrupt_wakeups": 42,
+          "rss_bytes": 17088512,
+          "footprint_bytes": 13910472
+        }
+      ]
+    }
+  ],
+  "final_hidden_status": {
+    "active": false,
+    "finished": true,
+    "input": false,
+    "onscreen": false
+  },
+  "remaining_responsible_processes_after_exit": {}
+}

@@ -1,0 +1,1844 @@
+{
+  "app": "bopop",
+  "trial": 2,
+  "pid": 44521,
+  "process_discovery_ms": 402.5978749850765,
+  "launch_timestamp": "2026-09-19T09:13:40+0800",
+  "initial_show": {
+    "ready": true
+  },
+  "queries": {
+    "samples": [
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 72.45887501630932,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -2,
+        "ms": 42.57183335721493,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 67.2516250051558,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -2,
+        "ms": 145.6402916519437,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 59.024249989306554,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": -1,
+        "ms": 53.178833331912756,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 40.508666686946526,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": -1,
+        "ms": 76.69529164559208,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": true
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 58.02558333380148,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 0,
+        "ms": 104.9135000212118,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 45.413833344355226,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 0,
+        "ms": 46.60683334805071,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 35.65841665840708,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 1,
+        "ms": 48.978416656609625,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 36.565833317581564,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 1,
+        "ms": 66.60254165763035,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 45.85208333446644,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 2,
+        "ms": 44.409333349904045,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 51.90195832983591,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 2,
+        "ms": 46.71083332505077,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 34.92883333819918,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 3,
+        "ms": 104.2377500270959,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 51.79399999906309,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 3,
+        "ms": 36.30787500878796,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 37.284749996615574,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 4,
+        "ms": 37.79658331768587,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 50.014874985208735,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 4,
+        "ms": 63.22783333598636,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 34.33929168386385,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 5,
+        "ms": 45.05375001463108,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 29.220458323834464,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 5,
+        "ms": 45.63808333477937,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 44.32362498482689,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 6,
+        "ms": 35.962083318736404,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 45.77450000215322,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 6,
+        "ms": 45.92833333299495,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 38.05245834519155,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 7,
+        "ms": 114.15050001232885,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 69.4591666397173,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 7,
+        "ms": 32.182916678721085,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 42.766124999616295,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 8,
+        "ms": 54.48312498629093,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 33.17858331138268,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 8,
+        "ms": 43.20849999203347,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Safari",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 39.48662499897182,
+        "prior_result_absent": true,
+        "query": "saf",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "Terminal",
+        "group": "apps",
+        "iteration": 9,
+        "ms": 46.22608333011158,
+        "prior_result_absent": true,
+        "query": "term",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "96",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 39.255250012502074,
+        "prior_result_absent": true,
+        "query": "12 * 8",
+        "success": true,
+        "warmup": false
+      },
+      {
+        "expected": "579",
+        "group": "arithmetic",
+        "iteration": 9,
+        "ms": 47.68625000724569,
+        "prior_result_absent": true,
+        "query": "123 + 456",
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "summon": {
+    "samples": [
+      {
+        "iteration": -2,
+        "ms": 188.67008332745172,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": -1,
+        "ms": 102.82800000277348,
+        "success": true,
+        "warmup": true
+      },
+      {
+        "iteration": 0,
+        "ms": 41.911874985089526,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 1,
+        "ms": 53.55633332510479,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "ms": 65.99916666164063,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "ms": 66.58654168131761,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 4,
+        "ms": 92.5334166677203,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 5,
+        "ms": 52.12883334024809,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 6,
+        "ms": 79.23416665289551,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 7,
+        "ms": 45.66891666036099,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 8,
+        "ms": 54.221291677094996,
+        "success": true,
+        "warmup": false
+      },
+      {
+        "iteration": 9,
+        "ms": 79.1540416830685,
+        "success": true,
+        "warmup": false
+      }
+    ]
+  },
+  "visible_samples": [
+    {
+      "monotonic": 246032.654107,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 86940240,
+          "system_ns": 24940004,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 364,
+          "rss_bytes": 67452928,
+          "footprint_bytes": 34735040
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1116565,
+          "system_ns": 225580,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 3915776,
+          "footprint_bytes": 3064168
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10756482,
+          "system_ns": 6994216,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 171,
+          "rss_bytes": 25886720,
+          "footprint_bytes": 14778824
+        }
+      ]
+    },
+    {
+      "monotonic": 246033.817144416,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87007944,
+          "system_ns": 24958813,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 372,
+          "rss_bytes": 67452928,
+          "footprint_bytes": 34341824
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1116565,
+          "system_ns": 225580,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 3915776,
+          "footprint_bytes": 3064168
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10769398,
+          "system_ns": 7015351,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 171,
+          "rss_bytes": 26001408,
+          "footprint_bytes": 14778824
+        }
+      ]
+    },
+    {
+      "monotonic": 246035.025842583,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87333016,
+          "system_ns": 25079811,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 379,
+          "rss_bytes": 67567616,
+          "footprint_bytes": 34325440
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1116565,
+          "system_ns": 225580,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 3915776,
+          "footprint_bytes": 3064168
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10807173,
+          "system_ns": 7034563,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 173,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14778824
+        }
+      ]
+    },
+    {
+      "monotonic": 246036.160294708,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87389698,
+          "system_ns": 25104490,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 387,
+          "rss_bytes": 67190784,
+          "footprint_bytes": 34276288
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120143,
+          "system_ns": 231701,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 3915776,
+          "footprint_bytes": 3064168
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10839747,
+          "system_ns": 7048952,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 174,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14778824
+        }
+      ]
+    },
+    {
+      "monotonic": 246037.228502541,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87401070,
+          "system_ns": 25113998,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 393,
+          "rss_bytes": 67190784,
+          "footprint_bytes": 34276288
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120143,
+          "system_ns": 231701,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 3,
+          "rss_bytes": 3915776,
+          "footprint_bytes": 3064168
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10843584,
+          "system_ns": 7050193,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 176,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14778824
+        }
+      ]
+    }
+  ],
+  "hidden_check": {
+    "hidden": true
+  },
+  "idle_samples": [
+    {
+      "monotonic": 246068.458552625,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87600611,
+          "system_ns": 25249764,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 463,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10858777,
+          "system_ns": 7062457,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14614984
+        }
+      ]
+    },
+    {
+      "monotonic": 246069.473461875,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87603972,
+          "system_ns": 25252033,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 465,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10858777,
+          "system_ns": 7062457,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14614984
+        }
+      ]
+    },
+    {
+      "monotonic": 246070.469420916,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87608463,
+          "system_ns": 25255960,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 467,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10858777,
+          "system_ns": 7062457,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14614984
+        }
+      ]
+    },
+    {
+      "monotonic": 246071.472864041,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87612832,
+          "system_ns": 25258626,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 469,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10858777,
+          "system_ns": 7062457,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14614984
+        }
+      ]
+    },
+    {
+      "monotonic": 246072.468362958,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87616707,
+          "system_ns": 25261649,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 471,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10858777,
+          "system_ns": 7062457,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14614984
+        }
+      ]
+    },
+    {
+      "monotonic": 246073.480080666,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87620654,
+          "system_ns": 25263809,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 473,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10858777,
+          "system_ns": 7062457,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14614984
+        }
+      ]
+    },
+    {
+      "monotonic": 246074.476141666,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87624446,
+          "system_ns": 25266005,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 475,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10858777,
+          "system_ns": 7062457,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14614984
+        }
+      ]
+    },
+    {
+      "monotonic": 246075.4716565,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87636035,
+          "system_ns": 25272154,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 477,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10874407,
+          "system_ns": 7067358,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 181,
+          "rss_bytes": 26083328,
+          "footprint_bytes": 14647752
+        }
+      ]
+    },
+    {
+      "monotonic": 246076.466421583,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87638969,
+          "system_ns": 25274170,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 479,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10875606,
+          "system_ns": 7068458,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26083328,
+          "footprint_bytes": 14647752
+        }
+      ]
+    },
+    {
+      "monotonic": 246077.452642208,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87641752,
+          "system_ns": 25276575,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 481,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10875606,
+          "system_ns": 7068458,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26083328,
+          "footprint_bytes": 14647752
+        }
+      ]
+    },
+    {
+      "monotonic": 246078.469456625,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87644817,
+          "system_ns": 25278680,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 483,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10875606,
+          "system_ns": 7068458,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26083328,
+          "footprint_bytes": 14647752
+        }
+      ]
+    },
+    {
+      "monotonic": 246079.482521541,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87647995,
+          "system_ns": 25280967,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 485,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 33981376
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10875606,
+          "system_ns": 7068458,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26083328,
+          "footprint_bytes": 14647752
+        }
+      ]
+    },
+    {
+      "monotonic": 246080.451136,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87651132,
+          "system_ns": 25283361,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 487,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 33981376
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10875606,
+          "system_ns": 7068458,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26083328,
+          "footprint_bytes": 14647752
+        }
+      ]
+    },
+    {
+      "monotonic": 246081.46252325,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87654082,
+          "system_ns": 25285847,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 489,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 33981376
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10875606,
+          "system_ns": 7068458,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26083328,
+          "footprint_bytes": 14647752
+        }
+      ]
+    },
+    {
+      "monotonic": 246082.440288458,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87659359,
+          "system_ns": 25289726,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 491,
+          "rss_bytes": 66584576,
+          "footprint_bytes": 33981376
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10890765,
+          "system_ns": 7078991,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26132480,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246083.457418541,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87669170,
+          "system_ns": 25295907,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 493,
+          "rss_bytes": 66650112,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10908608,
+          "system_ns": 7101274,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26165248,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246084.46423175,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87672782,
+          "system_ns": 25298195,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 495,
+          "rss_bytes": 66650112,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3883008,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10908608,
+          "system_ns": 7101274,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 182,
+          "rss_bytes": 26165248,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246085.468331625,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87677548,
+          "system_ns": 25301520,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 497,
+          "rss_bytes": 65142784,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3866624,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10931063,
+          "system_ns": 7119962,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26165248,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246086.477186875,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87681525,
+          "system_ns": 25303889,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 499,
+          "rss_bytes": 64585728,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10936400,
+          "system_ns": 7123708,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26034176,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246087.462752583,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87684366,
+          "system_ns": 25306031,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 501,
+          "rss_bytes": 64585728,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10936400,
+          "system_ns": 7123708,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246088.4851015,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87693517,
+          "system_ns": 25311264,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 503,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10951783,
+          "system_ns": 7133446,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26001408,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246089.461783041,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87696467,
+          "system_ns": 25313475,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 505,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10960093,
+          "system_ns": 7136790,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26001408,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246090.4610565,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87700751,
+          "system_ns": 25317327,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 507,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10960093,
+          "system_ns": 7136790,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26001408,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246091.453585166,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87707571,
+          "system_ns": 25321345,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 509,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10969058,
+          "system_ns": 7141530,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246092.466409833,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87710144,
+          "system_ns": 25323250,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 511,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10969058,
+          "system_ns": 7141530,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246093.462990291,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87713039,
+          "system_ns": 25325289,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 513,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10971293,
+          "system_ns": 7142994,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246094.468507958,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87716015,
+          "system_ns": 25327523,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 515,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10971293,
+          "system_ns": 7142994,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246095.456513666,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87723613,
+          "system_ns": 25331641,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 518,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10978102,
+          "system_ns": 7147040,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 26017792,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246096.471158916,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87727688,
+          "system_ns": 25334139,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 520,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10978102,
+          "system_ns": 7147040,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 183,
+          "rss_bytes": 25985024,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246097.475445208,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87731985,
+          "system_ns": 25337039,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 522,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10979070,
+          "system_ns": 7147397,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 184,
+          "rss_bytes": 25985024,
+          "footprint_bytes": 14696904
+        }
+      ]
+    },
+    {
+      "monotonic": 246098.479132833,
+      "processes": [
+        {
+          "pid": 44521,
+          "executable": "/private/tmp/launcher-perf-20260919/BopopPerf.app/Contents/MacOS/Bopop",
+          "user_ns": 87736348,
+          "system_ns": 25339525,
+          "idle_wakeups": 2,
+          "interrupt_wakeups": 524,
+          "rss_bytes": 64618496,
+          "footprint_bytes": 34030528
+        },
+        {
+          "pid": 44524,
+          "executable": "/System/Library/PrivateFrameworks/CascadeSets.framework/Versions/A/XPCServices/SetStoreUpdateService.xpc/Contents/MacOS/SetStoreUpdateService",
+          "user_ns": 1120362,
+          "system_ns": 232485,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 4,
+          "rss_bytes": 3735552,
+          "footprint_bytes": 3015016
+        },
+        {
+          "pid": 44664,
+          "executable": "/System/Library/PrivateFrameworks/SafariPlatformSupport.framework/Versions/A/XPCServices/com.apple.SafariPlatformSupport.Helper.xpc/Contents/MacOS/com.apple.SafariPlatformSupport.Helper",
+          "user_ns": 10979070,
+          "system_ns": 7147397,
+          "idle_wakeups": 0,
+          "interrupt_wakeups": 184,
+          "rss_bytes": 25985024,
+          "footprint_bytes": 14696904
+        }
+      ]
+    }
+  ],
+  "final_hidden_status": {
+    "active": false,
+    "finished": true,
+    "input": false,
+    "onscreen": false
+  },
+  "remaining_responsible_processes_after_exit": {}
+}

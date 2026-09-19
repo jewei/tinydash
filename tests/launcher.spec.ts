@@ -36,6 +36,155 @@ async function selectCategory(page: Page, name: string) {
     .click();
 }
 
+test("text search and selection do not wait for native icons", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+    window.__launcherTest.holdIcons = true;
+  });
+  await selectCategory(page, "Apps");
+  await expect(page.getByRole("option").first()).toContainText("Finder");
+  await expect
+    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
+    .toBeGreaterThan(0);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.press("ArrowDown");
+  await expect(page.locator(".result-row.selected")).toContainText("Safari");
+  await expect(page.locator(".app-avatar img")).toHaveCount(0);
+  await input.fill("sa");
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await expect(page.getByRole("option")).toContainText("Safari");
+  await page.evaluate(() =>
+    window.__launcherTest.heldIcons
+      .filter((icon) => icon.key.endsWith("app-0"))
+      .forEach((icon) => icon.release()),
+  );
+  await expect(page.locator(".app-avatar img")).toHaveCount(0);
+  await page.evaluate(() =>
+    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
+  );
+  await expect(page.getByRole("option").locator("img")).toBeVisible();
+  const requests = await page.evaluate(() =>
+    window.__launcherTest.calls
+      .filter((call) => call.command === "app_icon")
+      .map((call) => call.payload as { pixels: number }),
+  );
+  expect(
+    requests.every((request) => request.pixels >= 16 && request.pixels <= 256),
+  ).toBe(true);
+  expect(requests.some((request) => request.pixels >= 64)).toBe(true);
+});
+
+test("hidden launcher releases icon URLs and pending icon requests", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+  });
+  await selectCategory(page, "Apps");
+  await expect(page.getByRole("option").first().locator("img")).toBeVisible();
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-hidden", null),
+  );
+  await expect(page.locator(".app-avatar img")).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.some(
+        (call) => call.command === "cancel_app_icon",
+      ),
+    ),
+  ).toBe(true);
+});
+
+test("capacity notification retries only visible icons", async ({ page }) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+    window.__launcherTest.busyIcons = true;
+  });
+  await selectCategory(page, "Apps");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls.filter(
+            (call) => call.command === "app_icon",
+          ).length,
+      ),
+    )
+    .toBeGreaterThan(0);
+  await expect(page.locator(".app-avatar img")).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await page.evaluate(async () => {
+    window.__launcherTest.busyIcons = false;
+    await window.__launcherTest.emit("app-icons-ready", null);
+  });
+  await expect(page.getByRole("option").locator("img")).toBeVisible();
+});
+
+test("a display scale change replaces pending icon sizes", async ({ page }) => {
+  await page.addInitScript(() => {
+    const media: MediaQueryList[] = [];
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query) => {
+      const value = original(query);
+      if (query.startsWith("(resolution:")) media.push(value);
+      return value;
+    };
+    Object.assign(window, {
+      changeTestScale: () => {
+        Object.defineProperty(window, "devicePixelRatio", {
+          value: 2,
+          configurable: true,
+        });
+        for (const value of [...media])
+          value.dispatchEvent(new Event("change"));
+      },
+    });
+  });
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+    window.__launcherTest.holdIcons = true;
+  });
+  await selectCategory(page, "Apps");
+  await expect
+    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
+    .toBeGreaterThan(0);
+  const previous = await page.evaluate(() =>
+    window.__launcherTest.heldIcons.map((icon) => icon.request),
+  );
+  await page.evaluate(() =>
+    (window as unknown as { changeTestScale: () => void }).changeTestScale(),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls.filter(
+            (call) =>
+              call.command === "app_icon" &&
+              (call.payload as { pixels: number }).pixels === 128,
+          ).length,
+      ),
+    )
+    .toBeGreaterThan(0);
+  const cancelled = await page.evaluate(() =>
+    window.__launcherTest.calls
+      .filter((call) => call.command === "cancel_app_icon")
+      .map((call) => (call.payload as { request: string }).request),
+  );
+  expect(previous.every((request) => cancelled.includes(request))).toBe(true);
+  await page.evaluate(() =>
+    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
+  );
+  await expect(page.getByRole("option").first().locator("img")).toBeVisible();
+});
+
 test("installed app icons appear in the result list and detail panel", async ({
   page,
 }) => {

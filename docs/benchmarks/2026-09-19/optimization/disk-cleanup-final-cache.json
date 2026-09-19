@@ -1,0 +1,14 @@
+{
+  "started_utc": "2026-09-19T13:43:18Z",
+  "free_bytes_before": 25806970880,
+  "removed": [
+    "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/ordered/src-tauri/target",
+    "/private/var/folders/wh/b6v8zrp56yx4l5fm5rbhlmym0000gn/T/tinydash-memory-20260919-s9p96eln/final/src-tauri/target"
+  ],
+  "free_bytes_after": 28917735424,
+  "finished_utc": "2026-09-19T13:43:19Z",
+  "preserved_app_builds": [
+    "baseline2",
+    "icon-final"
+  ]
+}

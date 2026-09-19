@@ -3,7 +3,10 @@ import type { SearchResult } from "../bridge";
 import Icon from "./Icon";
 import AppAvatar from "./AppAvatar";
 
-export default function ResultIcon(props: { result: SearchResult }) {
+export default function ResultIcon(props: {
+  result: SearchResult;
+  active?: boolean;
+}) {
   return (
     <Switch>
       <Match
@@ -45,7 +48,7 @@ export default function ResultIcon(props: { result: SearchResult }) {
         </span>
       </Match>
       <Match when={props.result.kind === "app"}>
-        <AppAvatar icon={props.result.icon} />
+        <AppAvatar icon={props.result.icon} active={props.active} />
       </Match>
       <Match when={props.result.kind === "emoji"}>
         <span class="emoji-icon" aria-hidden="true">

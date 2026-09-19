@@ -1,0 +1,47 @@
+{
+  "commit": "bccaa245284cc22a7bc0c96d3083dace3a1950ca",
+  "command": "cargo test --release --manifest-path src-tauri/Cargo.toml --locked profile_search_50k_files -- --ignored --nocapture",
+  "execution": "Built once with --no-run, then copied and executed the test binary in five fresh processes with --test-threads 1.",
+  "runs": [
+    {
+      "run": 1,
+      "index_ms": 63,
+      "search_p50_us": 4071,
+      "search_p95_us": 4260,
+      "search_max_us": 4405,
+      "output": "\nrunning 1 test\ntest providers::files::tests::profile_search_50k_files ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 118 filtered out; finished in 0.37s\n\n50,000 files: index=63ms; search p50=4071\u00b5s p95=4260\u00b5s max=4405\u00b5s\n"
+    },
+    {
+      "run": 2,
+      "index_ms": 63,
+      "search_p50_us": 4100,
+      "search_p95_us": 4252,
+      "search_max_us": 4307,
+      "output": "\nrunning 1 test\ntest providers::files::tests::profile_search_50k_files ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 118 filtered out; finished in 0.37s\n\n50,000 files: index=63ms; search p50=4100\u00b5s p95=4252\u00b5s max=4307\u00b5s\n"
+    },
+    {
+      "run": 3,
+      "index_ms": 62,
+      "search_p50_us": 4092,
+      "search_p95_us": 4243,
+      "search_max_us": 4459,
+      "output": "\nrunning 1 test\ntest providers::files::tests::profile_search_50k_files ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 118 filtered out; finished in 0.36s\n\n50,000 files: index=62ms; search p50=4092\u00b5s p95=4243\u00b5s max=4459\u00b5s\n"
+    },
+    {
+      "run": 4,
+      "index_ms": 62,
+      "search_p50_us": 4089,
+      "search_p95_us": 4325,
+      "search_max_us": 4435,
+      "output": "\nrunning 1 test\ntest providers::files::tests::profile_search_50k_files ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 118 filtered out; finished in 0.36s\n\n50,000 files: index=62ms; search p50=4089\u00b5s p95=4325\u00b5s max=4435\u00b5s\n"
+    },
+    {
+      "run": 5,
+      "index_ms": 57,
+      "search_p50_us": 4214,
+      "search_p95_us": 4448,
+      "search_max_us": 5683,
+      "output": "\nrunning 1 test\ntest providers::files::tests::profile_search_50k_files ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 118 filtered out; finished in 0.37s\n\n50,000 files: index=57ms; search p50=4214\u00b5s p95=4448\u00b5s max=5683\u00b5s\n"
+    }
+  ]
+}

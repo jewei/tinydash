@@ -1,0 +1,1487 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index 1a93264..ac7292a 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -22,6 +22,7 @@ import {
+ } from "./bridge";
+ import Icon from "./components/Icon";
+ import ResultIcon from "./components/ResultIcon";
++import { disposeAppIcons } from "./app-icons";
+ import ResultPreview from "./components/ResultPreview";
+ import ConfirmDialog from "./components/ConfirmDialog";
+ import ClipboardCopyDialog from "./components/ClipboardCopyDialog";
+@@ -1065,6 +1066,7 @@ export default function App(
+ 
+   onCleanup(() => {
+     disposed = true;
++    disposeAppIcons();
+     sequence += 1;
+     unlisteners.forEach((stop) => stop());
+     document.removeEventListener("keydown", onKey);
+@@ -1293,7 +1295,7 @@ export default function App(
+                     onMouseDown={(event) => event.preventDefault()}
+                     onClick={() => void run(result.primaryAction, result)}
+                   >
+-                    <ResultIcon result={result} />
++                    <ResultIcon result={result} active={visible()} />
+                     <span class="result-copy">
+                       <span class="result-title" title={result.title}>
+                         {result.title}
+@@ -1440,6 +1442,7 @@ export default function App(
+         </div>
+         <Show when={mode() !== "emoji"}>
+           <ResultPreview
++            active={visible()}
+             result={current()}
+             welcome={!current()}
+             previewReady={visible() && !pending()}
+diff --git a/src/app-icons.ts b/src/app-icons.ts
+new file mode 100644
+index 0000000..083ce6f
+--- /dev/null
++++ b/src/app-icons.ts
+@@ -0,0 +1,111 @@
++import { listen } from "@tauri-apps/api/event";
++import { backend } from "./bridge";
++
++type Consumer = (url: string | undefined) => void;
++interface Entry {
++  key: string;
++  pixels: number;
++  request: string;
++  consumers: Set<Consumer>;
++  url?: string;
++  waiting: boolean;
++}
++
++// These entries belong only to mounted, visible images. Rust owns the cache.
++const entries = new Map<string, Entry>();
++const viewId = Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
++  value.toString(16),
++).join("-");
++let sequence = 0;
++let stop: (() => void) | undefined;
++let listening: Promise<void> | undefined;
++let disposed = false;
++let capacityRevision = 0;
++
++function retryWaiting() {
++  for (const entry of entries.values()) if (entry.waiting) void load(entry);
++}
++
++function startListening() {
++  return (listening ??= listen("app-icons-ready", () => {
++    capacityRevision += 1;
++    retryWaiting();
++  })
++    .then((unlisten) => {
++      if (disposed) unlisten();
++      else stop = unlisten;
++    })
++    .catch(() => {
++      /* In-flight completions also retry waiting visible images. */
++    }));
++}
++
++async function load(entry: Entry) {
++  entry.waiting = false;
++  await startListening();
++  if (disposed || entries.get(`${entry.key}/${entry.pixels}`) !== entry) return;
++  let capacity = false;
++  const revision = capacityRevision;
++  try {
++    const url = await backend.appIcon(entry.key, entry.pixels, entry.request);
++    if (disposed || entries.get(`${entry.key}/${entry.pixels}`) !== entry)
++      return;
++    entry.url = url;
++    for (const consumer of entry.consumers) consumer(url);
++    capacity = true;
++  } catch (reason) {
++    if (entries.get(`${entry.key}/${entry.pixels}`) !== entry) return;
++    entry.waiting = reason === "busy";
++    if (entry.waiting && revision !== capacityRevision)
++      queueMicrotask(() => {
++        if (entry.waiting) void load(entry);
++      });
++    capacity = !entry.waiting;
++  } finally {
++    if (capacity) retryWaiting();
++  }
++}
++
++export function loadAppIcon(
++  key: string,
++  pixels: number,
++  consumer: Consumer,
++): () => void {
++  const identity = `${key}/${pixels}`;
++  let entry = entries.get(identity);
++  if (!entry) {
++    // A launcher has at most 30 rows and one preview. Bound callers too.
++    if (disposed || entries.size >= 64) return () => {};
++    entry = {
++      key,
++      pixels,
++      request: `${viewId}:${++sequence}`,
++      consumers: new Set(),
++      waiting: false,
++    };
++    entries.set(identity, entry);
++    void load(entry);
++  }
++  entry.consumers.add(consumer);
++  consumer(entry.url);
++  return () => {
++    entry.consumers.delete(consumer);
++    if (entry.consumers.size) return;
++    entries.delete(identity);
++    if (entry.url) URL.revokeObjectURL(entry.url);
++    void backend
++      .cancelAppIcon(entry.request)
++      .then(retryWaiting)
++      .catch(() => {});
++  };
++}
++
++export function disposeAppIcons() {
++  disposed = true;
++  stop?.();
++  for (const entry of entries.values()) {
++    if (entry.url) URL.revokeObjectURL(entry.url);
++    void backend.cancelAppIcon(entry.request).catch(() => {});
++  }
++  entries.clear();
++}
+diff --git a/src/bridge.ts b/src/bridge.ts
+index 2c7c02f..700caef 100644
+--- a/src/bridge.ts
++++ b/src/bridge.ts
+@@ -162,16 +162,25 @@ export const backend = {
+   ready: () => invoke<LauncherInfo>("launcher_ready"),
+   openSettings: () => invoke<void>("open_settings"),
+   settings: () => invoke<SettingsInfo>("get_settings"),
+-  settingsSession: () => invoke<SettingsSessionSnapshot | null>("get_settings_session"),
+-  captureSettingsSession: (generation: number, snapshot: SettingsSessionSnapshot) =>
+-    invoke<boolean>("capture_settings_session", { generation, snapshot }),
+-  finishSettingsClose: (generation: number) => invoke<boolean>("finish_settings_close", { generation }),
+-  cancelSettingsClose: (generation: number) => invoke<void>("cancel_settings_close", { generation }),
++  settingsSession: () =>
++    invoke<SettingsSessionSnapshot | null>("get_settings_session"),
++  captureSettingsSession: (
++    generation: number,
++    snapshot: SettingsSessionSnapshot,
++  ) => invoke<boolean>("capture_settings_session", { generation, snapshot }),
++  finishSettingsClose: (generation: number) =>
++    invoke<boolean>("finish_settings_close", { generation }),
++  cancelSettingsClose: (generation: number) =>
++    invoke<void>("cancel_settings_close", { generation }),
+   saveSettings: (settings: SettingsValues) =>
+     invoke<SettingsValues>("save_settings", { settings }),
+   chooseClipboardHistory: (enabled: boolean) =>
+     invoke<SettingsValues>("choose_clipboard_history", { enabled }),
+   appCatalog: () => invoke<SearchResult[]>("app_catalog"),
++  appIcon: (key: string, pixels: number, request: string) =>
++    invoke<string>("app_icon", { key, pixels, request }),
++  cancelAppIcon: (request: string) =>
++    invoke<void>("cancel_app_icon", { request }),
+   setAppPreference: (id: string, aliases: string[], hidden: boolean) =>
+     invoke<SettingsValues>("set_app_preference", { id, aliases, hidden }),
+   previewWebSearch: (search: WebSearch, query: string) =>
+diff --git a/src/components/AppAvatar.tsx b/src/components/AppAvatar.tsx
+index 94b45e6..e623031 100644
+--- a/src/components/AppAvatar.tsx
++++ b/src/components/AppAvatar.tsx
+@@ -1,15 +1,64 @@
+-import { createSignal, Show } from "solid-js";
++import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+ import Icon from "./Icon";
++import { loadAppIcon } from "../app-icons";
+ 
+-export default function AppAvatar(props: { icon: string | null }) {
++export default function AppAvatar(props: {
++  icon: string | null;
++  active?: boolean;
++}) {
++  let element!: HTMLSpanElement;
++  const [nativeSource, setNativeSource] = createSignal<string>();
++  const [inView, setInView] = createSignal(false);
++  const [pixels, setPixels] = createSignal(72);
+   const [failedSource, setFailedSource] = createSignal<string>();
++  onMount(() => {
++    let scale: MediaQueryList;
++    const resize = () => {
++      const required = Math.ceil(
++        element.getBoundingClientRect().width * window.devicePixelRatio,
++      );
++      setPixels(
++        [16, 24, 32, 36, 48, 64, 72, 96, 108, 128, 144, 192, 256].find(
++          (size) => size >= required,
++        ) ?? 256,
++      );
++      scale?.removeEventListener("change", resize);
++      scale = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
++      scale.addEventListener("change", resize);
++    };
++    const sizes = new ResizeObserver(resize);
++    sizes.observe(element);
++    const visible = new IntersectionObserver(([entry]) =>
++      setInView(entry.isIntersecting),
++    );
++    visible.observe(element);
++    resize();
++    onCleanup(() => {
++      sizes.disconnect();
++      visible.disconnect();
++      scale.removeEventListener("change", resize);
++    });
++  });
++  createEffect(() => {
++    const key = props.icon;
++    setNativeSource(undefined);
++    if (key?.startsWith("app-icon:") && props.active !== false && inView()) {
++      onCleanup(loadAppIcon(key, pixels(), setNativeSource));
++    }
++  });
+   const source = () =>
+-    props.icon?.startsWith("data:image/png;base64,") &&
+-    props.icon !== failedSource()
+-      ? props.icon
++    (nativeSource() ??
++      (props.icon?.startsWith("data:image/png;base64,")
++        ? props.icon
++        : undefined)) !== failedSource()
++      ? (nativeSource() ??
++        (props.icon?.startsWith("data:image/png;base64,")
++          ? props.icon
++          : undefined))
+       : undefined;
+   return (
+     <span
++      ref={element}
+       class="app-avatar"
+       classList={{ "has-app-icon": !!source() }}
+       aria-hidden="true"
+diff --git a/src/components/ResultIcon.tsx b/src/components/ResultIcon.tsx
+index 6041b39..ea214b8 100644
+--- a/src/components/ResultIcon.tsx
++++ b/src/components/ResultIcon.tsx
+@@ -3,7 +3,10 @@ import type { SearchResult } from "../bridge";
+ import Icon from "./Icon";
+ import AppAvatar from "./AppAvatar";
+ 
+-export default function ResultIcon(props: { result: SearchResult }) {
++export default function ResultIcon(props: {
++  result: SearchResult;
++  active?: boolean;
++}) {
+   return (
+     <Switch>
+       <Match
+@@ -45,7 +48,7 @@ export default function ResultIcon(props: { result: SearchResult }) {
+         </span>
+       </Match>
+       <Match when={props.result.kind === "app"}>
+-        <AppAvatar icon={props.result.icon} />
++        <AppAvatar icon={props.result.icon} active={props.active} />
+       </Match>
+       <Match when={props.result.kind === "emoji"}>
+         <span class="emoji-icon" aria-hidden="true">
+diff --git a/src/components/ResultPreview.tsx b/src/components/ResultPreview.tsx
+index f84aba8..a047ef4 100644
+--- a/src/components/ResultPreview.tsx
++++ b/src/components/ResultPreview.tsx
+@@ -11,6 +11,7 @@ export default function ResultPreview(props: {
+   welcome: boolean;
+   previewReady: boolean;
+   enabled: boolean;
++  active?: boolean;
+   modifier: string;
+   pinOptions: PinOption[];
+   pinBusy: boolean;
+@@ -132,7 +133,7 @@ export default function ResultPreview(props: {
+           >
+             <div class="preview-topline">
+               <div class="preview-icon">
+-                <ResultIcon result={props.result!} />
++                <ResultIcon result={props.result!} active={props.active} />
+               </div>
+               <div class="pin-controls" role="group" aria-label="Pin item">
+                 <For each={props.pinOptions}>
+diff --git a/src-tauri/Cargo.lock b/src-tauri/Cargo.lock
+index 4c0a28f..ff4f65f 100644
+--- a/src-tauri/Cargo.lock
++++ b/src-tauri/Cargo.lock
+@@ -4742,6 +4742,7 @@ name = "tinydash"
+ version = "0.1.0"
+ dependencies = [
+  "anyhow",
++ "base64 0.22.1",
+  "chrono",
+  "chrono-tz",
+  "emojis",
+diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
+index da4a959..268dfec 100644
+--- a/src-tauri/Cargo.toml
++++ b/src-tauri/Cargo.toml
+@@ -24,6 +24,7 @@ rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"
+ tar = "0.4.46"
+ serde = { version = "1", features = ["derive"] }
+ serde_json = "1"
++base64 = "0.22.1"
+ tokio = { version = "1.53.1", features = ["sync", "time"] }
+ nucleo-matcher = "0.3.1"
+ unicode-normalization = "0.1.25"
+diff --git a/src-tauri/src/launcher/icon_tests.rs b/src-tauri/src/launcher/icon_tests.rs
+new file mode 100644
+index 0000000..5f93031
+--- /dev/null
++++ b/src-tauri/src/launcher/icon_tests.rs
+@@ -0,0 +1,267 @@
++use super::*;
++use std::sync::{
++    Condvar,
++    atomic::{AtomicUsize, Ordering},
++    mpsc,
++};
++
++fn store(
++    loader: impl Fn(&Path, u16) -> Option<Vec<u8>> + Send + Sync + 'static,
++    budget: usize,
++) -> (IconStore, Vec<String>) {
++    let store = IconStore(Arc::new(Inner {
++        state: Mutex::new(State::default()),
++        loader: Arc::new(loader),
++        budget,
++        enabled: true,
++    }));
++    let mut entries: Vec<_> = (0..100)
++        .map(|id| AppEntry::new(format!("App {id}"), format!("/fixture/{id}").into(), vec![]))
++        .collect();
++    store.replace_catalog(&mut entries);
++    (
++        store,
++        entries
++            .into_iter()
++            .map(|entry| entry.icon.unwrap())
++            .collect(),
++    )
++}
++
++fn request(
++    store: &IconStore,
++    key: &str,
++    pixels: u16,
++    id: usize,
++) -> Result<oneshot::Receiver<Reply>, IconError> {
++    store.request(
++        key.into(),
++        pixels,
++        Request {
++            window: "main".into(),
++            id: id.to_string(),
++        },
++    )
++}
++
++fn finish(receiver: oneshot::Receiver<Reply>) -> Reply {
++    tauri::async_runtime::block_on(async {
++        tokio::time::timeout(std::time::Duration::from_secs(5), receiver)
++            .await
++            .expect("icon completion")
++            .unwrap()
++    })
++}
++
++#[test]
++fn cold_warm_and_eviction_use_the_byte_budget() {
++    let loads = Arc::new(AtomicUsize::new(0));
++    let count = loads.clone();
++    let (store, keys) = store(
++        move |_, size| {
++            count.fetch_add(1, Ordering::SeqCst);
++            Some(vec![size as u8; 8])
++        },
++        16,
++    );
++    assert_eq!(
++        &**finish(request(&store, &keys[0], 72, 0).unwrap()).unwrap(),
++        &[72; 8]
++    );
++    finish(request(&store, &keys[1], 72, 1).unwrap()).unwrap();
++    finish(request(&store, &keys[0], 72, 2).unwrap()).unwrap();
++    assert_eq!(loads.load(Ordering::SeqCst), 2);
++    finish(request(&store, &keys[2], 128, 3).unwrap()).unwrap();
++    finish(request(&store, &keys[0], 72, 4).unwrap()).unwrap();
++    assert_eq!(
++        loads.load(Ordering::SeqCst),
++        3,
++        "recently used entry stays cached"
++    );
++    finish(request(&store, &keys[1], 72, 5).unwrap()).unwrap();
++    assert_eq!(loads.load(Ordering::SeqCst), 4, "oldest entry was evicted");
++    assert_eq!(store.0.state.lock().unwrap().bytes, 16);
++}
++
++#[test]
++fn duplicate_requests_share_work_and_obsolete_work_leaves_the_queue() {
++    let gate = Arc::new((Mutex::new(false), Condvar::new()));
++    let worker_gate = gate.clone();
++    let (started, starts) = mpsc::channel();
++    let (store, keys) = store(
++        move |_, size| {
++            started.send(size).unwrap();
++            let (lock, wake) = &*worker_gate;
++            let _guard = wake
++                .wait_while(lock.lock().unwrap(), |ready| !*ready)
++                .unwrap();
++            Some(vec![1; 8])
++        },
++        16,
++    );
++    let first = request(&store, &keys[0], 72, 0).unwrap();
++    let duplicate = request(&store, &keys[0], 72, 1).unwrap();
++    let second = request(&store, &keys[1], 128, 2).unwrap();
++    starts
++        .recv_timeout(std::time::Duration::from_secs(5))
++        .unwrap();
++    starts
++        .recv_timeout(std::time::Duration::from_secs(5))
++        .unwrap();
++    let mut queued = Vec::new();
++    for index in 2..66 {
++        queued.push(request(&store, &keys[index], 72, index + 1).unwrap());
++    }
++    assert_eq!(
++        request(&store, &keys[66], 72, 99).unwrap_err(),
++        IconError::Busy
++    );
++    {
++        let state = store.0.state.lock().unwrap();
++        assert_eq!(state.active, 2);
++        assert_eq!(state.queue.len(), 64);
++        assert_eq!(state.jobs.len(), 66);
++    }
++    store.cancel_window("main");
++    assert!(store.0.state.lock().unwrap().queue.is_empty());
++    assert_eq!(finish(duplicate), Err(IconError::Cancelled));
++    assert_eq!(finish(first), Err(IconError::Cancelled));
++    assert_eq!(finish(second), Err(IconError::Cancelled));
++    for receiver in queued {
++        assert_eq!(finish(receiver), Err(IconError::Cancelled));
++    }
++    *gate.0.lock().unwrap() = true;
++    gate.1.notify_all();
++    assert!(
++        starts.try_recv().is_err(),
++        "cancelled queued jobs never start"
++    );
++}
++
++#[test]
++fn oversized_and_missing_images_do_not_grow_the_cache() {
++    let (store, keys) = store(
++        |path, _| {
++            if path.ends_with("0") {
++                None
++            } else {
++                Some(vec![0; 32])
++            }
++        },
++        16,
++    );
++    assert_eq!(
++        finish(request(&store, &keys[0], 72, 0).unwrap()),
++        Err(IconError::Unavailable)
++    );
++    assert_eq!(
++        finish(request(&store, &keys[1], 72, 1).unwrap())
++            .unwrap()
++            .len(),
++        32
++    );
++    assert_eq!(store.0.state.lock().unwrap().bytes, 0);
++    assert_eq!(
++        store.0.state.lock().unwrap().cache.len(),
++        1,
++        "only the negative entry is cached"
++    );
++    assert_eq!(
++        request(&store, "/arbitrary/file", 72, 2).unwrap_err(),
++        IconError::Unavailable
++    );
++    assert_eq!(
++        request(&store, &keys[1], 257, 3).unwrap_err(),
++        IconError::InvalidSize
++    );
++}
++
++#[test]
++fn replacing_an_application_invalidates_old_identity_and_cached_image() {
++    let (store, keys) = store(|_, _| Some(vec![1; 8]), 16);
++    finish(request(&store, &keys[0], 72, 0).unwrap()).unwrap();
++    let mut entries = vec![AppEntry::new(
++        "Replaced app".into(),
++        "/fixture/0".into(),
++        vec![],
++    )];
++    store.replace_catalog(&mut entries);
++    assert_ne!(entries[0].icon.as_ref().unwrap(), &keys[0]);
++    assert_eq!(
++        request(&store, &keys[0], 72, 1).unwrap_err(),
++        IconError::Unavailable
++    );
++    assert_eq!(store.0.state.lock().unwrap().bytes, 0);
++    finish(request(&store, entries[0].icon.as_ref().unwrap(), 128, 2).unwrap()).unwrap();
++}
++
++#[test]
++fn negative_entries_and_duplicate_consumers_have_separate_limits() {
++    let (missing, keys) = store(|_, _| None, 16);
++    for pixels in [36, 72, 128] {
++        for (id, key) in keys.iter().enumerate() {
++            assert_eq!(
++                finish(request(&missing, key, pixels, id).unwrap()),
++                Err(IconError::Unavailable)
++            );
++            let state = missing.0.state.lock().unwrap();
++            assert!(state.cache.len() <= CACHE_ENTRIES);
++            assert_eq!(state.bytes, 0);
++        }
++    }
++    assert_eq!(missing.0.state.lock().unwrap().cache.len(), CACHE_ENTRIES);
++
++    let gate = Arc::new((Mutex::new(false), Condvar::new()));
++    let worker_gate = gate.clone();
++    let (store, keys) = store(
++        move |_, _| {
++            let (lock, wake) = &*worker_gate;
++            let _guard = wake
++                .wait_while(lock.lock().unwrap(), |ready| !*ready)
++                .unwrap();
++            Some(vec![1; 8])
++        },
++        16,
++    );
++    let waiting: Vec<_> = (0..WAITERS)
++        .map(|id| request(&store, &keys[0], 72, id).unwrap())
++        .collect();
++    let full = request(&store, &keys[0], 72, WAITERS).unwrap_err();
++    let jobs = store.0.state.lock().unwrap().jobs.len();
++    *gate.0.lock().unwrap() = true;
++    gate.1.notify_all();
++    assert_eq!(full, IconError::Busy);
++    assert_eq!(jobs, 1, "all consumers share one extraction");
++    for reply in waiting {
++        finish(reply).unwrap();
++    }
++}
++
++#[test]
++fn a_failed_loader_releases_capacity_and_source_changes_change_revision() {
++    let (store, keys) = store(
++        |path, _| {
++            if path.ends_with("0") {
++                panic!("injected native failure")
++            }
++            Some(vec![1; 8])
++        },
++        16,
++    );
++    assert_eq!(
++        finish(request(&store, &keys[0], 72, 0).unwrap()),
++        Err(IconError::Unavailable)
++    );
++    finish(request(&store, &keys[1], 72, 1).unwrap()).unwrap();
++    assert_eq!(store.0.state.lock().unwrap().active, 0);
++
++    let app = tempfile::tempdir().unwrap();
++    let before = source_revision(app.path());
++    std::fs::write(app.path().join("Icon\r"), b"custom Finder icon").unwrap();
++    let custom = source_revision(app.path());
++    assert_ne!(before, custom);
++    let resources = app.path().join("Contents/Resources");
++    std::fs::create_dir_all(&resources).unwrap();
++    std::fs::write(resources.join("AppIcon.icns"), b"replacement icon").unwrap();
++    assert_ne!(custom, source_revision(app.path()));
++}
+diff --git a/src-tauri/src/launcher/icons.rs b/src-tauri/src/launcher/icons.rs
+new file mode 100644
+index 0000000..eea442b
+--- /dev/null
++++ b/src-tauri/src/launcher/icons.rs
+@@ -0,0 +1,353 @@
++//! Application images are independent of search and have bounded retained work.
++use serde::Serialize;
++use base64::Engine;
++use std::{
++    collections::{HashMap, VecDeque},
++    hash::{Hash, Hasher},
++    path::{Path, PathBuf},
++    sync::{Arc, Mutex},
++};
++use tauri::{Emitter, Manager};
++use tokio::sync::oneshot;
++
++use crate::providers::apps::AppEntry;
++
++const CACHE_BYTES: usize = 2 * 1024 * 1024;
++const CACHE_ENTRIES: usize = 256;
++const ACTIVE_LOADS: usize = 2;
++const QUEUED_LOADS: usize = 64;
++const WAITERS: usize = 128;
++type Image = Arc<Vec<u8>>;
++type Loader = dyn Fn(&Path, u16) -> Option<Vec<u8>> + Send + Sync;
++type Reply = Result<Image, IconError>;
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
++#[serde(rename_all = "camelCase")]
++pub enum IconError {
++    Unavailable,
++    InvalidSize,
++    Busy,
++    Cancelled,
++}
++
++#[derive(Clone, Debug, Hash, PartialEq, Eq)]
++struct Key {
++    source: String,
++    pixels: u16,
++}
++#[derive(Clone, Debug, Hash, PartialEq, Eq)]
++struct Request {
++    window: String,
++    id: String,
++}
++struct Job {
++    active: bool,
++    path: PathBuf,
++    replies: HashMap<Request, oneshot::Sender<Reply>>,
++}
++struct Cached {
++    value: Reply,
++    used: u64,
++}
++impl Cached {
++    fn bytes(&self) -> usize {
++        self.value.as_ref().map_or(0, |bytes| bytes.len())
++    }
++}
++
++#[derive(Default)]
++struct State {
++    generation: u64,
++    catalog: HashMap<String, PathBuf>,
++    cache: HashMap<Key, Cached>,
++    bytes: usize,
++    clock: u64,
++    jobs: HashMap<Key, Job>,
++    queue: VecDeque<Key>,
++    active: usize,
++}
++
++struct Inner {
++    state: Mutex<State>,
++    loader: Arc<Loader>,
++    budget: usize,
++    enabled: bool,
++}
++
++#[derive(Clone)]
++pub struct IconStore(Arc<Inner>);
++impl Default for IconStore {
++    fn default() -> Self {
++        Self(Arc::new(Inner {
++            state: Mutex::new(State::default()),
++            loader: Arc::new(|path, pixels| crate::platform::application_icon(path, pixels).map(|bytes| format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)).into_bytes())),
++            budget: CACHE_BYTES,
++            enabled: cfg!(target_os = "macos"),
++        }))
++    }
++}
++
++// Finder can use an .icns file, an asset catalog, or a custom Icon\r resource.
++// A catalog refresh creates new identities even if the OS timestamp resolution
++// cannot distinguish two replacements.
++fn source_revision(path: &Path) -> u64 {
++    let mut hash = std::collections::hash_map::DefaultHasher::new();
++    let resources = path.join("Contents/Resources");
++    let mut files = vec![
++        path.to_owned(),
++        path.join("Icon\r"),
++        path.join("Contents/Info.plist"),
++        resources.clone(),
++    ];
++    if let Ok(entries) = std::fs::read_dir(resources) {
++        files.extend(entries.flatten().map(|entry| entry.path()).filter(|path| {
++            path.extension()
++                .is_some_and(|extension| extension == "icns" || extension == "car")
++        }));
++    }
++    files.sort();
++    for file in files {
++        file.hash(&mut hash);
++        if let Ok(meta) = file.metadata() {
++            meta.len().hash(&mut hash);
++            meta.modified().ok().hash(&mut hash);
++        }
++    }
++    hash.finish()
++}
++
++impl IconStore {
++    pub fn replace_catalog(&self, entries: &mut [AppEntry]) {
++        let sources: Vec<_> = if self.0.enabled {
++            entries
++                .iter()
++                .map(|entry| (entry.path.clone(), source_revision(&entry.path)))
++                .collect()
++        } else {
++            Vec::new()
++        };
++        let mut state = self.0.state.lock().unwrap();
++        state.generation += 1;
++        state.catalog.clear();
++        state.cache.clear();
++        state.bytes = 0;
++        state.queue.clear();
++        state.jobs.retain(|_, job| {
++            for (_, reply) in job.replies.drain() {
++                let _ = reply.send(Err(IconError::Cancelled));
++            }
++            job.active
++        });
++        for (index, entry) in entries.iter_mut().enumerate() {
++            entry.icon = sources.get(index).map(|(path, revision)| {
++                let key = format!("app-icon:{}:{index}:{revision:x}", state.generation);
++                state.catalog.insert(key.clone(), path.clone());
++                key
++            });
++        }
++    }
++
++    fn request(
++        &self,
++        source: String,
++        pixels: u16,
++        request: Request,
++    ) -> Result<oneshot::Receiver<Reply>, IconError> {
++        if !(16..=256).contains(&pixels) {
++            return Err(IconError::InvalidSize);
++        }
++        if request.id.len() > 96 {
++            return Err(IconError::Unavailable);
++        }
++        let key = Key { source, pixels };
++        let (reply, receiver) = oneshot::channel();
++        {
++            let mut state = self.0.state.lock().unwrap();
++            let path = state
++                .catalog
++                .get(&key.source)
++                .ok_or(IconError::Unavailable)?
++                .clone();
++            state.clock += 1;
++            let now = state.clock;
++            if let Some(cached) = state.cache.get_mut(&key) {
++                cached.used = now;
++                let _ = reply.send(cached.value.clone());
++                return Ok(receiver);
++            }
++            if state
++                .jobs
++                .values()
++                .map(|job| job.replies.len())
++                .sum::<usize>()
++                >= WAITERS
++            {
++                return Err(IconError::Busy);
++            }
++            if let Some(job) = state.jobs.get_mut(&key) {
++                if let Some(old) = job.replies.insert(request, reply) {
++                    let _ = old.send(Err(IconError::Cancelled));
++                }
++                return Ok(receiver);
++            }
++            if state.queue.len() >= QUEUED_LOADS {
++                return Err(IconError::Busy);
++            }
++            state.jobs.insert(
++                key.clone(),
++                Job {
++                    active: false,
++                    path,
++                    replies: HashMap::from([(request, reply)]),
++                },
++            );
++            state.queue.push_back(key);
++        }
++        self.start_jobs();
++        Ok(receiver)
++    }
++
++    fn cancel(&self, request: &Request) {
++        let mut state = self.0.state.lock().unwrap();
++        state.jobs.retain(|_, job| {
++            if let Some(reply) = job.replies.remove(request) {
++                let _ = reply.send(Err(IconError::Cancelled));
++            }
++            job.active || !job.replies.is_empty()
++        });
++        let State { jobs, queue, .. } = &mut *state;
++        queue.retain(|key| jobs.contains_key(key));
++    }
++
++    pub fn cancel_window(&self, window: &str) {
++        let requests: Vec<_> = self
++            .0
++            .state
++            .lock()
++            .unwrap()
++            .jobs
++            .values()
++            .flat_map(|job| job.replies.keys())
++            .filter(|request| request.window == window)
++            .cloned()
++            .collect();
++        for request in requests {
++            self.cancel(&request);
++        }
++    }
++
++    fn start_jobs(&self) {
++        let mut work = Vec::new();
++        {
++            let mut state = self.0.state.lock().unwrap();
++            while state.active < ACTIVE_LOADS {
++                let Some(key) = state.queue.pop_front() else {
++                    break;
++                };
++                let Some(job) = state.jobs.get_mut(&key) else {
++                    continue;
++                };
++                job.active = true;
++                let path = job.path.clone();
++                state.active += 1;
++                work.push((key, path));
++            }
++        }
++        for (key, path) in work {
++            let store = self.clone();
++            tauri::async_runtime::spawn_blocking(move || {
++                let value = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++                    (store.0.loader)(&path, key.pixels)
++                }))
++                .ok()
++                .flatten()
++                .map(Arc::new)
++                .ok_or(IconError::Unavailable);
++                store.complete(key, value);
++            });
++        }
++    }
++
++    fn complete(&self, key: Key, value: Reply) {
++        let replies = {
++            let mut state = self.0.state.lock().unwrap();
++            state.active -= 1;
++            let replies = state
++                .jobs
++                .remove(&key)
++                .map(|job| job.replies)
++                .unwrap_or_default();
++            let bytes = value.as_ref().map_or(0, |bytes| bytes.len());
++            if !replies.is_empty()
++                && state.catalog.contains_key(&key.source)
++                && bytes <= self.0.budget
++            {
++                while state.bytes + bytes > self.0.budget || state.cache.len() >= CACHE_ENTRIES {
++                    let Some(oldest) = state
++                        .cache
++                        .iter()
++                        .min_by_key(|(_, entry)| entry.used)
++                        .map(|(key, _)| key.clone())
++                    else {
++                        break;
++                    };
++                    state.bytes -= state.cache.remove(&oldest).unwrap().bytes();
++                }
++                state.clock += 1;
++                let used = state.clock;
++                state.bytes += bytes;
++                state.cache.insert(
++                    key,
++                    Cached {
++                        value: value.clone(),
++                        used,
++                    },
++                );
++            }
++            replies
++        };
++        for (_, reply) in replies {
++            let _ = reply.send(value.clone());
++        }
++        self.start_jobs();
++    }
++}
++
++#[tauri::command]
++pub async fn app_icon(
++    app: tauri::AppHandle,
++    window: tauri::WebviewWindow,
++    key: String,
++    pixels: u16,
++    request: String,
++) -> Result<String, IconError> {
++    if !window.is_visible().unwrap_or(false) {
++        return Err(IconError::Cancelled);
++    }
++    let store = &app.state::<super::LauncherState>().icons;
++    let receiver = store.request(
++        key,
++        pixels,
++        Request {
++            window: window.label().into(),
++            id: request,
++        },
++    )?;
++    let result = receiver.await.map_err(|_| IconError::Cancelled)?;
++    let _ = app.emit("app-icons-ready", ());
++    let bytes = result?;
++    String::from_utf8(bytes.as_ref().clone()).map_err(|_| IconError::Unavailable)
++}
++
++#[tauri::command]
++pub fn cancel_app_icon(app: tauri::AppHandle, window: tauri::WebviewWindow, request: String) {
++    app.state::<super::LauncherState>().icons.cancel(&Request {
++        window: window.label().into(),
++        id: request,
++    });
++    let _ = app.emit("app-icons-ready", ());
++}
++
++#[cfg(test)]
++#[path = "icon_tests.rs"]
++mod tests;
+diff --git a/src-tauri/src/launcher/mod.rs b/src-tauri/src/launcher/mod.rs
+index 407a932..5604d05 100644
+--- a/src-tauri/src/launcher/mod.rs
++++ b/src-tauri/src/launcher/mod.rs
+@@ -3,6 +3,7 @@ pub mod clipboard;
+ pub mod currency;
+ mod file_watch;
+ pub mod files;
++pub mod icons;
+ pub mod pins;
+ pub mod portability;
+ pub mod preferences;
+@@ -35,6 +36,7 @@ use search::SearchManager;
+ 
+ pub struct LauncherState {
+     pub search: Mutex<SearchManager>,
++    pub icons: icons::IconStore,
+     pub scanning: AtomicBool,
+     pub ready: AtomicBool,
+     #[cfg(target_os = "macos")]
+@@ -56,6 +58,7 @@ impl LauncherState {
+         search.apply_settings(&settings);
+         Self {
+             search: Mutex::new(search),
++            icons: icons::IconStore::default(),
+             scanning: AtomicBool::new(false),
+             ready: AtomicBool::new(false),
+             #[cfg(target_os = "macos")]
+@@ -242,24 +245,14 @@ pub fn scan_apps(app: &AppHandle) {
+         let started = std::time::Instant::now();
+         let worker_app = app.clone();
+         let scanned = tauri::async_runtime::spawn_blocking(move || {
+-            let entries = platform::discover_apps()?;
+-            // Native icon resolution can take longer than app discovery. Publish
+-            // searchable names first and never hold the search lock while loading images.
+-            #[cfg(target_os = "macos")]
+-            {
+-                let state = worker_app.state::<LauncherState>();
+-                state
+-                    .search
+-                    .lock()
+-                    .map_err(|_| Error::IndexUnavailable)?
+-                    .replace_apps(AppProvider::new(entries.clone()));
+-                if let Err(error) = worker_app.emit("apps-changed", ()) {
+-                    tracing::debug!(%error, "No index listener");
+-                }
+-            }
+-            #[cfg(not(target_os = "macos"))]
+-            let _ = worker_app;
+-            Ok::<_, Error>(AppProvider::new(platform::load_app_icons(entries)))
++            let mut entries = platform::discover_apps()?;
++            // Publish metadata and small icon identities. Image extraction starts
++            // only when a visible row requests it, outside the search lock.
++            worker_app
++                .state::<LauncherState>()
++                .icons
++                .replace_catalog(&mut entries);
++            Ok::<_, Error>(AppProvider::new(entries))
+         })
+         .await;
+         let state = app.state::<LauncherState>();
+diff --git a/src-tauri/src/launcher/window.rs b/src-tauri/src/launcher/window.rs
+index 4985782..0a9adf5 100644
+--- a/src-tauri/src/launcher/window.rs
++++ b/src-tauri/src/launcher/window.rs
+@@ -117,6 +117,9 @@ fn hide_window(app: &AppHandle, _restore_focus: bool) -> Result<()> {
+         #[cfg(target_os = "macos")]
+         let restore_focus = _restore_focus && window.is_focused()?;
+         window.hide()?;
++        if let Some(state) = app.try_state::<LauncherState>() {
++            state.icons.cancel_window("main");
++        }
+         #[cfg(target_os = "macos")]
+         if restore_focus && let Some(previous) = previous {
+             previous.restore();
+diff --git a/src-tauri/src/lib.rs b/src-tauri/src/lib.rs
+index 1980134..f2303ac 100644
+--- a/src-tauri/src/lib.rs
++++ b/src-tauri/src/lib.rs
+@@ -168,6 +168,10 @@ pub fn run() -> anyhow::Result<()> {
+             Ok(())
+         })
+         .on_window_event(|window, event| {
++            if matches!(event, tauri::WindowEvent::Destroyed)
++                && let Some(state) = window.app_handle().try_state::<LauncherState>() {
++                state.icons.cancel_window(window.label());
++            }
+             if window.label() == "settings" {
+                 match event {
+                     tauri::WindowEvent::CloseRequested { api, .. } => {
+@@ -192,6 +196,8 @@ pub fn run() -> anyhow::Result<()> {
+         }})
+         .invoke_handler(tauri::generate_handler![
+             launcher::launcher_ready,
++            launcher::icons::app_icon,
++            launcher::icons::cancel_app_icon,
+             launcher::preferences::get_settings,
+             launcher::settings_session::get_settings_session,
+             launcher::settings_session::capture_settings_session,
+diff --git a/src-tauri/src/platform/macos/icons.rs b/src-tauri/src/platform/macos/icons.rs
+index e46160c..10ff5cc 100644
+--- a/src-tauri/src/platform/macos/icons.rs
++++ b/src-tauri/src/platform/macos/icons.rs
+@@ -6,23 +6,20 @@ use objc2_core_graphics::{
+     CGBitmapContextCreate, CGBitmapContextCreateImage, CGColorSpace, CGContext, CGImageAlphaInfo,
+     CGInterpolationQuality,
+ };
+-use objc2_foundation::{
+-    NSDataBase64EncodingOptions, NSDictionary, NSPoint, NSRect, NSSize, NSString,
+-};
+-
+-const ICON_SIZE: usize = 192;
++use objc2_foundation::{NSDictionary, NSPoint, NSRect, NSSize, NSString};
+ 
+ /// Resolve the same icon Finder uses, including asset-catalog and custom icons.
+-/// Called by the background application scan. Searches reuse the encoded image.
+-pub fn application_icon(path: &Path) -> Option<String> {
+-    if !path.is_dir() {
++/// The icon store calls this outside the search lock, with at most two jobs.
++pub fn application_icon(path: &Path, pixels: u16) -> Option<Vec<u8>> {
++    if !(16..=256).contains(&pixels) || !path.is_dir() {
+         return None;
+     }
++    let size = usize::from(pixels);
+     autoreleasepool(|_| {
+         let image = NSWorkspace::sharedWorkspace().iconForFile(&NSString::from_str(path.to_str()?));
+         let mut rect = NSRect::new(
+             NSPoint::new(0.0, 0.0),
+-            NSSize::new(ICON_SIZE as f64, ICON_SIZE as f64),
++            NSSize::new(size as f64, size as f64),
+         );
+         // SAFETY: The proposed rectangle is valid for this call. There are no hints
+         // or borrowed graphics contexts, and the returned image is retained.
+@@ -33,10 +30,10 @@ pub fn application_icon(path: &Path) -> Option<String> {
+         let context = unsafe {
+             CGBitmapContextCreate(
+                 ptr::null_mut(),
+-                ICON_SIZE,
+-                ICON_SIZE,
++                size,
++                size,
+                 8,
+-                ICON_SIZE * 4,
++                size * 4,
+                 Some(&space),
+                 CGImageAlphaInfo::PremultipliedLast.0,
+             )
+@@ -44,7 +41,7 @@ pub fn application_icon(path: &Path) -> Option<String> {
+         CGContext::set_interpolation_quality(Some(&context), CGInterpolationQuality::High);
+         let target = NSRect::new(
+             NSPoint::new(0.0, 0.0),
+-            NSSize::new(ICON_SIZE as f64, ICON_SIZE as f64),
++            NSSize::new(size as f64, size as f64),
+         );
+         CGContext::draw_image(Some(&context), target, Some(&source));
+         let scaled = CGBitmapContextCreateImage(Some(&context))?;
+@@ -56,8 +53,7 @@ pub fn application_icon(path: &Path) -> Option<String> {
+                 &NSDictionary::new(),
+             )
+         }?;
+-        let encoded = png.base64EncodedStringWithOptions(NSDataBase64EncodingOptions::empty());
+-        Some(format!("data:image/png;base64,{encoded}"))
++        Some(png.to_vec())
+     })
+ }
+ 
+@@ -66,7 +62,8 @@ mod tests {
+     #[test]
+     fn missing_app_has_no_icon() {
+         assert!(
+-            super::application_icon(std::path::Path::new("/missing/TinyDash-test.app")).is_none()
++            super::application_icon(std::path::Path::new("/missing/TinyDash-test.app"), 72)
++                .is_none()
+         );
+     }
+ }
+diff --git a/src-tauri/src/platform/macos.rs b/src-tauri/src/platform/macos.rs
+index f4d72a6..fe9ee0e 100644
+--- a/src-tauri/src/platform/macos.rs
++++ b/src-tauri/src/platform/macos.rs
+@@ -119,12 +119,7 @@ fn read_bundle(path: &Path) -> Option<AppEntry> {
+     Some(app)
+ }
+ 
+-pub fn load_app_icons(mut apps: Vec<AppEntry>) -> Vec<AppEntry> {
+-    for entry in &mut apps {
+-        entry.icon = icons::application_icon(&entry.path);
+-    }
+-    apps
+-}
++pub use icons::application_icon;
+ 
+ pub fn launch(entry: &AppEntry) -> Result<()> {
+     tauri_plugin_opener::open_path(&entry.path, None::<&str>)
+diff --git a/src-tauri/src/platform/mod.rs b/src-tauri/src/platform/mod.rs
+index 8fd1472..1cb90b2 100644
+--- a/src-tauri/src/platform/mod.rs
++++ b/src-tauri/src/platform/mod.rs
+@@ -12,16 +12,14 @@ pub use linux::{read_clipboard, watch_clipboard};
+ #[cfg(target_os = "macos")]
+ pub use macos::LauncherFocus;
+ #[cfg(target_os = "macos")]
+-pub use macos::clipboard_snapshot;
++pub use macos::application_icon;
+ #[cfg(target_os = "macos")]
+-pub use macos::load_app_icons;
++pub use macos::clipboard_snapshot;
+ #[cfg(target_os = "macos")]
+ pub use macos::{discover_apps, launch, run_system_command, system_commands};
+ #[cfg(not(target_os = "macos"))]
+-pub fn load_app_icons(
+-    apps: Vec<crate::providers::apps::AppEntry>,
+-) -> Vec<crate::providers::apps::AppEntry> {
+-    apps
++pub fn application_icon(_path: &std::path::Path, _pixels: u16) -> Option<Vec<u8>> {
++    None
+ }
+ #[cfg(target_os = "windows")]
+ pub use windows::clipboard_snapshot;
+@@ -62,42 +60,27 @@ mod tests {
+     #[test]
+     #[ignore = "Uses installed macOS applications and WindowServer. Run with --ignored."]
+     fn installed_app_results_have_native_icons() {
+-        use crate::launcher::{query::SearchMode, search::SearchManager};
+-        use crate::providers::apps::AppProvider;
+-
+-        let apps =
+-            super::load_app_icons(super::discover_apps().expect("discover installed applications"));
+-        let mut manager = SearchManager::default();
+-        manager.replace_apps(AppProvider::new(apps));
+-        let results = manager
+-            .search("Activity Monitor", SearchMode::Apps)
+-            .unwrap()
+-            .results;
+-        let activity = results
++        let apps = super::discover_apps().expect("discover installed applications");
++        let activity = apps
+             .iter()
+-            .find(|result| result.title == "Activity Monitor")
+-            .expect("Activity Monitor is installed on macOS");
+-        assert!(
+-            activity
+-                .icon
+-                .as_deref()
+-                .is_some_and(|icon| icon.starts_with("data:image/png;base64,")),
+-            "The native search response must include Activity Monitor's image"
+-        );
+-        let activity_icon = activity.icon.clone();
+-        let store = manager
+-            .search("App Store", SearchMode::Apps)
+-            .unwrap()
+-            .results;
+-        let store = store
++            .find(|app| app.name == "Activity Monitor")
++            .expect("Activity Monitor");
++        let store = apps
+             .iter()
+-            .find(|result| result.title == "App Store")
+-            .expect("App Store is installed");
+-        assert!(store.icon.is_some());
+-        assert_ne!(
+-            activity_icon, store.icon,
+-            "Installed apps must have distinct native icons"
+-        );
++            .find(|app| app.name == "App Store")
++            .expect("App Store");
++        let activity_icon =
++            super::application_icon(&activity.path, 72).expect("Activity Monitor image");
++        let store_icon = super::application_icon(&store.path, 72).expect("App Store image");
++        for image in [&activity_icon, &store_icon] {
++            assert_eq!(&image[..8], b"\x89PNG\r\n\x1a\n");
++            assert_eq!(u32::from_be_bytes(image[16..20].try_into().unwrap()), 72);
++            assert_eq!(u32::from_be_bytes(image[20..24].try_into().unwrap()), 72);
++        }
++        assert_ne!(activity_icon, store_icon);
++        let preview = super::application_icon(&activity.path, 128).expect("preview image");
++        assert_eq!(u32::from_be_bytes(preview[16..20].try_into().unwrap()), 128);
++        assert!(super::application_icon(&activity.path, 257).is_none());
+     }
+ 
+     #[test]
+diff --git a/src-tauri/src/providers/apps.rs b/src-tauri/src/providers/apps.rs
+index c0a9fae..c3c1dce 100644
+--- a/src-tauri/src/providers/apps.rs
++++ b/src-tauri/src/providers/apps.rs
+@@ -49,7 +49,10 @@ impl AppEntry {
+     pub fn icon_payload(&self) -> Option<String> {
+         self.icon.as_ref().map(|icon| {
+             #[cfg(test)]
+-            ICON_COPIES.with(|counts| { let (count, bytes) = counts.get(); counts.set((count + 1, bytes + icon.len())); });
++            ICON_COPIES.with(|counts| {
++                let (count, bytes) = counts.get();
++                counts.set((count + 1, bytes + icon.len()));
++            });
+             icon.clone()
+         })
+     }
+@@ -110,10 +113,7 @@ impl AppProvider {
+     }
+ 
+     pub fn catalog(&self) -> Vec<SearchResult> {
+-        self.apps
+-            .iter()
+-            .map(|app| app.entry.result(0))
+-            .collect()
++        self.apps.iter().map(|app| app.entry.result(0)).collect()
+     }
+ 
+     pub fn apply_preferences(
+diff --git a/src-tauri/tauri.conf.json b/src-tauri/tauri.conf.json
+index 6f373d7..ffdc29b 100644
+--- a/src-tauri/tauri.conf.json
++++ b/src-tauri/tauri.conf.json
+@@ -29,7 +29,7 @@
+       }
+     ],
+     "security": {
+-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-src 'none'"
++      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-src 'none'"
+     }
+   },
+   "plugins": { "updater": { "pubkey": "" } },
+diff --git a/tests/launcher.spec.ts b/tests/launcher.spec.ts
+index 01db912..162c802 100644
+--- a/tests/launcher.spec.ts
++++ b/tests/launcher.spec.ts
+@@ -36,6 +36,96 @@ async function selectCategory(page: Page, name: string) {
+     .click();
+ }
+ 
++test("text search and selection do not wait for native icons", async ({
++  page,
++}) => {
++  await openLauncher(page);
++  await page.evaluate(() => {
++    window.__launcherTest.nativeIcons = true;
++    window.__launcherTest.holdIcons = true;
++  });
++  await selectCategory(page, "Apps");
++  await expect(page.getByRole("option").first()).toContainText("Finder");
++  await expect
++    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
++    .toBeGreaterThan(0);
++  const input = page.getByRole("combobox", { name: "Search TinyDash" });
++  await input.press("ArrowDown");
++  await expect(page.locator(".result-row.selected")).toContainText("Safari");
++  await expect(page.locator(".app-avatar img")).toHaveCount(0);
++  await input.fill("sa");
++  await expect(page.getByRole("option")).toHaveCount(1);
++  await expect(page.getByRole("option")).toContainText("Safari");
++  await page.evaluate(() =>
++    window.__launcherTest.heldIcons
++      .filter((icon) => icon.key.endsWith("app-0"))
++      .forEach((icon) => icon.release()),
++  );
++  await expect(page.locator(".app-avatar img")).toHaveCount(0);
++  await page.evaluate(() =>
++    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
++  );
++  await expect(page.getByRole("option").locator("img")).toBeVisible();
++  const requests = await page.evaluate(() =>
++    window.__launcherTest.calls
++      .filter((call) => call.command === "app_icon")
++      .map((call) => call.payload as { pixels: number }),
++  );
++  expect(
++    requests.every((request) => request.pixels >= 16 && request.pixels <= 256),
++  ).toBe(true);
++  expect(requests.some((request) => request.pixels >= 64)).toBe(true);
++});
++
++test("hidden launcher releases icon URLs and pending icon requests", async ({
++  page,
++}) => {
++  await openLauncher(page);
++  await page.evaluate(() => {
++    window.__launcherTest.nativeIcons = true;
++  });
++  await selectCategory(page, "Apps");
++  await expect(page.getByRole("option").first().locator("img")).toBeVisible();
++  await page.evaluate(() =>
++    window.__launcherTest.emit("launcher-hidden", null),
++  );
++  await expect(page.locator(".app-avatar img")).toHaveCount(0);
++  expect(
++    await page.evaluate(() =>
++      window.__launcherTest.calls.some(
++        (call) => call.command === "cancel_app_icon",
++      ),
++    ),
++  ).toBe(true);
++});
++
++test("capacity notification retries only visible icons", async ({ page }) => {
++  await openLauncher(page);
++  await page.evaluate(() => {
++    window.__launcherTest.nativeIcons = true;
++    window.__launcherTest.busyIcons = true;
++  });
++  await selectCategory(page, "Apps");
++  await expect
++    .poll(() =>
++      page.evaluate(
++        () =>
++          window.__launcherTest.calls.filter(
++            (call) => call.command === "app_icon",
++          ).length,
++      ),
++    )
++    .toBeGreaterThan(0);
++  await expect(page.locator(".app-avatar img")).toHaveCount(0);
++  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
++  await expect(page.getByRole("option")).toHaveCount(1);
++  await page.evaluate(async () => {
++    window.__launcherTest.busyIcons = false;
++    await window.__launcherTest.emit("app-icons-ready", null);
++  });
++  await expect(page.getByRole("option").locator("img")).toBeVisible();
++});
++
+ test("installed app icons appear in the result list and detail panel", async ({
+   page,
+ }) => {
+diff --git a/tests/mock-backend.ts b/tests/mock-backend.ts
+index 0d6692f..925498d 100644
+--- a/tests/mock-backend.ts
++++ b/tests/mock-backend.ts
+@@ -25,6 +25,15 @@ declare global {
+       holdCapture: boolean;
+       releaseCapture?: () => void;
+       settingsClosed: boolean;
++      nativeIcons: boolean;
++      holdIcons: boolean;
++      busyIcons: boolean;
++      heldIcons: {
++        request: string;
++        key: string;
++        pixels: number;
++        release: () => void;
++      }[];
+       pins: Partial<Record<SearchMode, string[]>>;
+       rejectPin: boolean;
+       emojiGrid: boolean;
+@@ -263,6 +272,10 @@ window.__launcherTest = {
+   rejectCapture: null,
+   holdCapture: false,
+   settingsClosed: false,
++  nativeIcons: false,
++  holdIcons: false,
++  busyIcons: false,
++  heldIcons: [],
+   pins: Array.isArray(savedPins)
+     ? { all: savedPins, apps: savedPins }
+     : savedPins,
+@@ -343,12 +356,37 @@ mockIPC(
+       };
+     }
+     if (command === "get_settings_session") {
+-      return JSON.parse(sessionStorage.getItem("tinydash.test.session") ?? "null");
++      return JSON.parse(
++        sessionStorage.getItem("tinydash.test.session") ?? "null",
++      );
++    }
++    if (command === "app_icon") {
++      if (state.busyIcons) throw "busy";
++      if (state.holdIcons)
++        await new Promise<void>((release) => {
++          state.heldIcons.push({
++            ...(payload as { request: string; key: string; pixels: number }),
++            release,
++          });
++        });
++      const bytes = atob(
++        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1sAAAAASUVORK5CYII=",
++      );
++      return Uint8Array.from(bytes, (byte) => byte.charCodeAt(0)).buffer;
+     }
++    if (command === "cancel_app_icon") return;
+     if (command === "capture_settings_session") {
+-      if (state.holdCapture) await new Promise<void>((resolve) => { state.releaseCapture = resolve; });
++      if (state.holdCapture)
++        await new Promise<void>((resolve) => {
++          state.releaseCapture = resolve;
++        });
+       if (state.rejectCapture) throw new Error(state.rejectCapture);
+-      sessionStorage.setItem("tinydash.test.session", JSON.stringify((payload as { snapshot: SettingsSessionSnapshot }).snapshot));
++      sessionStorage.setItem(
++        "tinydash.test.session",
++        JSON.stringify(
++          (payload as { snapshot: SettingsSessionSnapshot }).snapshot,
++        ),
++      );
+       return true;
+     }
+     if (command === "finish_settings_close") {
+@@ -360,7 +398,10 @@ mockIPC(
+       return;
+     }
+     if (command === "save_settings") {
+-      if (state.holdSettings) await new Promise<void>((resolve) => { state.releaseSettings = resolve; });
++      if (state.holdSettings)
++        await new Promise<void>((resolve) => {
++          state.releaseSettings = resolve;
++        });
+       if (state.rejectSettings) throw new Error(state.rejectSettings);
+       state.settings = (payload as { settings: SettingsValues }).settings;
+       localStorage.setItem(
+@@ -549,7 +590,13 @@ mockIPC(
+           : null;
+       return {
+         preferredSelectionId,
+-        results: described,
++        results: state.nativeIcons
++          ? described.map((result) =>
++              result.kind === "app"
++                ? { ...result, icon: `app-icon:test:${result.id}` }
++                : result,
++            )
++          : described,
+         total: apps.length,
+         indexing: false,
+         indexError: null,

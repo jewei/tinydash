@@ -1,0 +1,1804 @@
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 5f20a4f..562ff53 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -16,7 +16,7 @@ on:
+         default: false
+         type: boolean
+       release_mode:
+-        description: Require signing and updater secrets for a release candidate
++        description: Use Mac signing, Windows preview, and signed Mac/Windows updates
+         required: true
+         default: false
+         type: boolean
+@@ -96,51 +96,30 @@ jobs:
+         shell: bash
+         env:
+           RELEASE_MODE: "true"
+-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+-          APPLE_ID: ${{ secrets.APPLE_ID }}
+-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+-          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+-          TINYDASH_UPDATE_ENDPOINT: ${{ vars.TINYDASH_UPDATE_ENDPOINT }}
++          APPLE_CERTIFICATE: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE || '' }}
++          APPLE_CERTIFICATE_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
++          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && secrets.APPLE_SIGNING_IDENTITY || '' }}
++          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
++          APPLE_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
++          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
++          TAURI_SIGNING_PRIVATE_KEY: ${{ runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
++          TAURI_UPDATER_PUBLIC_KEY: ${{ runner.os != 'Linux' && secrets.TAURI_UPDATER_PUBLIC_KEY || '' }}
++          TINYDASH_UPDATE_ENDPOINT: ${{ runner.os != 'Linux' && vars.TINYDASH_UPDATE_ENDPOINT || '' }}
+         run: bash scripts/release/require-config.sh
+-      - name: Import Windows signing certificate
+-        if: ${{ inputs.release_mode == true && runner.os == 'Windows' }}
+-        shell: pwsh
+-        env:
+-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+-        run: |
+-          $path = Join-Path $env:RUNNER_TEMP 'tinydash-signing.pfx'
+-          "WINDOWS_CERTIFICATE_PATH=$path" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+-          [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+-          $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
+-          $certificates = @(Import-PfxCertificate -FilePath $path -CertStoreLocation Cert:\CurrentUser\My -Password $password)
+-          $certificate = $certificates | Where-Object HasPrivateKey | Select-Object -First 1
+-          if (-not $certificate) { throw 'The Windows signing certificate could not be imported.' }
+-          $thumbprint = $certificate.Thumbprint.Replace(' ', '').ToUpperInvariant()
+-          "WINDOWS_CERTIFICATE_THUMBPRINT=$thumbprint" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+       - name: Build application
+         shell: bash
+         env:
+           RELEASE_MODE: ${{ inputs.release_mode == true && 'true' || 'false' }}
+-          APPLE_CERTIFICATE: ${{ inputs.release_mode == true && secrets.APPLE_CERTIFICATE || '' }}
+-          APPLE_CERTIFICATE_PASSWORD: ${{ inputs.release_mode == true && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+-          APPLE_SIGNING_IDENTITY: ${{ inputs.release_mode == true && secrets.APPLE_SIGNING_IDENTITY || '' }}
+-          APPLE_ID: ${{ inputs.release_mode == true && secrets.APPLE_ID || '' }}
+-          APPLE_PASSWORD: ${{ inputs.release_mode == true && secrets.APPLE_PASSWORD || '' }}
+-          APPLE_TEAM_ID: ${{ inputs.release_mode == true && secrets.APPLE_TEAM_ID || '' }}
+-          WINDOWS_CERTIFICATE: ${{ inputs.release_mode == true && secrets.WINDOWS_CERTIFICATE || '' }}
+-          WINDOWS_CERTIFICATE_PASSWORD: ${{ inputs.release_mode == true && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+-          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.release_mode == true && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.release_mode == true && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+-          TAURI_UPDATER_PUBLIC_KEY: ${{ inputs.release_mode == true && secrets.TAURI_UPDATER_PUBLIC_KEY || '' }}
+-          TINYDASH_UPDATE_ENDPOINT: ${{ inputs.release_mode == true && vars.TINYDASH_UPDATE_ENDPOINT || '' }}
++          APPLE_CERTIFICATE: ${{ inputs.release_mode == true && runner.os == 'macOS' && secrets.APPLE_CERTIFICATE || '' }}
++          APPLE_CERTIFICATE_PASSWORD: ${{ inputs.release_mode == true && runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
++          APPLE_SIGNING_IDENTITY: ${{ inputs.release_mode == true && runner.os == 'macOS' && secrets.APPLE_SIGNING_IDENTITY || '' }}
++          APPLE_ID: ${{ inputs.release_mode == true && runner.os == 'macOS' && secrets.APPLE_ID || '' }}
++          APPLE_PASSWORD: ${{ inputs.release_mode == true && runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
++          APPLE_TEAM_ID: ${{ inputs.release_mode == true && runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
++          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.release_mode == true && runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
++          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.release_mode == true && runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
++          TAURI_UPDATER_PUBLIC_KEY: ${{ inputs.release_mode == true && runner.os != 'Linux' && secrets.TAURI_UPDATER_PUBLIC_KEY || '' }}
++          TINYDASH_UPDATE_ENDPOINT: ${{ inputs.release_mode == true && runner.os != 'Linux' && vars.TINYDASH_UPDATE_ENDPOINT || '' }}
+         run: |
+           if [[ "$RELEASE_MODE" == "true" ]]; then
+             if [[ "$RUNNER_OS" == 'macOS' ]]; then
+@@ -169,10 +148,10 @@ jobs:
+         env:
+           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+         run: bash scripts/release/verify-macos-signing.sh
+-      - name: Verify Windows signed output
++      - name: Verify unsigned Windows preview and updater pair
+         if: ${{ inputs.release_mode == true && runner.os == 'Windows' }}
+         shell: pwsh
+-        run: ./scripts/release/verify-windows-signing.ps1 -ExpectedThumbprint $env:WINDOWS_CERTIFICATE_THUMBPRINT
++        run: ./scripts/release/verify-windows-preview.ps1
+       - name: Collect updater artifact
+         if: ${{ inputs.release_mode == true && runner.os != 'Linux' }}
+         shell: bash
+@@ -203,16 +182,6 @@ jobs:
+           path: artifacts/packages/
+           if-no-files-found: error
+           retention-days: 14
+-      - name: Remove Windows signing certificate
+-        if: ${{ always() && inputs.release_mode == true && runner.os == 'Windows' }}
+-        shell: pwsh
+-        run: |
+-          if ($env:WINDOWS_CERTIFICATE_THUMBPRINT) {
+-            Remove-Item "Cert:\CurrentUser\My\$env:WINDOWS_CERTIFICATE_THUMBPRINT" -ErrorAction SilentlyContinue
+-          }
+-          if ($env:WINDOWS_CERTIFICATE_PATH) {
+-            Remove-Item $env:WINDOWS_CERTIFICATE_PATH -Force -ErrorAction SilentlyContinue
+-          }
+ 
+   stage-draft:
+     needs: build
+@@ -229,10 +198,10 @@ jobs:
+       - uses: oven-sh/setup-bun@v2.2.0
+         with:
+           bun-version-file: package.json
+-      - name: Refuse an unsigned draft
++      - name: Refuse a development build draft
+         if: ${{ inputs.release_mode != true }}
+         run: |
+-          echo 'stage_draft requires release_mode=true. Unsigned builds stay in Actions artifacts.' >&2
++          echo 'stage_draft requires release_mode=true. Development builds stay in Actions artifacts.' >&2
+           exit 1
+       - uses: actions/download-artifact@v8.0.1
+         with:
+@@ -262,4 +231,4 @@ jobs:
+           gh release create "$RELEASE_TAG" staged/release/* \
+             --draft \
+             --title "TinyDash ${RELEASE_TAG}" \
+-            --notes "Internal release candidate. Verify publisher signatures, updater signatures, desktop checks, and user checks before publication."
++            --notes "Internal release candidate. macOS uses Developer ID signing and notarization. Windows is an unsigned preview and may show warnings or be blocked by Windows security policy. Mac and Windows updates have separate Tauri signatures. Ubuntu uses SHA-256 checksums and manual DEB updates. Complete the desktop and update checks before publication."
+diff --git a/.gitignore b/.gitignore
+index 5f7a444..dd3c884 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -2,6 +2,7 @@ node_modules/
+ /designs/
+ .hallmark/
+ dist/
++site-dist/
+ src-tauri/target/
+ src-tauri/gen/
+ .DS_Store
+diff --git a/README.md b/README.md
+index 8d19b82..b8b1ae8 100644
+--- a/README.md
++++ b/README.md
+@@ -57,7 +57,7 @@ Tool pins save their input and output choice. When you open a category, TinyDash
+ 
+ ## Search
+ 
+-The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Emoji, Calculator, System, Passwords, Datetime, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows a welcome screen with search examples and keyboard hints. If you have pinned items to All, it shows those items instead. Select Apps to browse installed applications. The welcome examples work on macOS, Windows, and Linux.
++The **All** mode searches applications, files, clipboard entries, emoji, calculations, and system commands. It also recognizes tool commands and pasted URLs. Use the category bar to select Apps, Files, Clipboard, Calculator, System, Emoji, Passwords, Datetime, URLs, or Web. In All mode, start a query with `:` for emoji or `=` for the calculator. An empty All query shows a welcome screen with search examples and keyboard hints. If you have pinned items to All, it shows those items instead. Select Apps to browse installed applications. The welcome examples work on macOS, Windows, and Linux.
+ 
+ | Query            | Result                         |
+ | ---------------- | ------------------------------ |
+@@ -210,9 +210,11 @@ Set `fileSearchRoots` to `null` for the default folders, `[]` to disable file sc
+ 
+ ## Usage and ranking
+ 
+-Successful app launches, file opens, emoji copies, and accepted system commands update a use count and last-used time. Frequently used and recently used results move higher in the list. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches. A usage bonus cannot add an item that does not match the query.
++The **All** mode keeps text results together by category, in this order: Apps, Files, Clipboard, System, then Emoji. Matching apps appear first, so `sa` puts Safari above the exact emoji shortcode `:sa:`. Valid calculations appear before these groups. Explicit tool commands and the `:` and `=` prefixes keep their own search scope. Category priority applies before the 30-result limit.
+ 
+-The frequency bonus is 25 points per use, up to 500 points. The recency bonus starts at 500 points and decreases with the number of days since the last use. Their combined limit is 1,000 points, compared with 10,000 for an exact match and 2,000 for a prefix match. Results with equal scores retain their existing order. Calculator results remain first for valid calculations.
++Successful app launches, file opens, emoji copies, and accepted system commands update a use count and last-used time. Frequently used and recently used results move higher within their category. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches within each category. A usage bonus cannot add an item that does not match the query.
++
++The frequency bonus is 25 points per use, up to 500 points. The recency bonus starts at 500 points and decreases with the number of days since the last use. Their combined limit is 1,000 points, compared with 10,000 for an exact match and 2,000 for a prefix match. Results with equal scores in the same category retain their existing order.
+ 
+ TinyDash stores `result_id`, `use_count`, and `last_used_at` in `tinydash.sqlite3`:
+ 
+@@ -240,7 +242,7 @@ Build on each target operating system. Tauri uses the platform configuration to
+ bun run tauri build --bundles app
+ ```
+ 
+-CI produces unsigned test packages for Apple silicon Macs, Windows x64, and Ubuntu 24.04 x64. Public distribution still needs signing, Mac notarization, and physical desktop checks.
++CI produces development packages for Apple silicon Macs, Windows x64, and Ubuntu 24.04 x64. The release policy uses a signed and notarized Mac app, an unsigned Windows preview, and an Ubuntu package with SHA-256 checksums. Mac and Windows updates use separate Tauri signatures. Actual release packages still need verification. See [release setup](docs/release-setup.md).
+ 
+ The release profile preserves symbols in build tools to avoid a [Rust linker issue on macOS 27](https://github.com/rust-lang/rust/issues/157750). The shipped application remains stripped.
+ 
+@@ -359,4 +361,4 @@ Use the [desktop check guide](docs/desktop-checks.md) for global shortcuts, focu
+ 
+ ## Next step
+ 
+-Complete desktop checks on physical Windows and Linux systems, including Wayland. Then configure Mac signing and notarization and Windows signing before public distribution. Keep the MVP feature set fixed.
++Follow the [public release plan](docs/release-plan.md) for a combined macOS, Windows, and Linux release. Record evidence in [release verification](docs/release-verification.md). The plan covers signing, installation, updates, the download page, and user checks. Keep the MVP tool set fixed while completing this work.
+diff --git a/docs/desktop-checks.md b/docs/desktop-checks.md
+index 9758abe..7cd0a18 100644
+--- a/docs/desktop-checks.md
++++ b/docs/desktop-checks.md
+@@ -6,7 +6,7 @@ Use a Windows or Linux desktop session in a virtual machine or on a physical com
+ 
+ Open the GitHub Actions **Checks** run for the commit under test. Download the `TinyDash-<OS>-<architecture>` artifact. Check `build.txt` to confirm the commit and CPU architecture. Extract the artifact before starting the app.
+ 
+-Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. The Checks workflow supplies unsigned development builds. For a signed candidate, use the Release workflow artifacts and confirm the distribution in `build.txt`. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
++Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. The Checks workflow supplies unsigned development builds. For a release candidate, use the Release workflow artifacts. Confirm the distribution and publisher-signing fields in `build.txt`. Mac candidates require Developer ID signing and notarization. Windows candidates are unsigned previews with separate updater signatures. Ubuntu uses checksums and manual updates. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
+ 
+ Quit any older TinyDash process through its tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
+ 
+@@ -53,7 +53,7 @@ On macOS, run `swift tests/native/focus-macos.swift` with the built app open and
+ 11. Record a category shortcut. Save and use it while another app has focus. Confirm that it opens an empty search in that category. Remove the binding, save, and confirm that it stops working. Test a conflict without losing the previous binding. On Wayland, use a desktop shortcut for `tinydash --mode clipboard`. Test the command with both a stopped and a running TinyDash process.
+ 12. Turn on **Start at login**, save, and sign out and in. Confirm that one TinyDash process starts and the launcher stays hidden. Turn it off, save, and repeat. Confirm that TinyDash does not start.
+ 13. Export saved settings through **Privacy**. Preview the file through import. Cancel and confirm that nothing changes. Import again, apply the preview, and confirm that settings stay unchanged until **Save changes**. Check invalid JSON, unsupported versions, unknown keys, and file paths from another operating system. An invalid import must leave saved settings unchanged.
+-14. In **About**, check for updates in an unsigned build. Confirm that it gives package instructions. Use signed candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in [release verification](release-verification.md). Preserve the source files before manual recovery.
++14. In **About**, check for updates in a development build. Confirm that it gives package instructions. Use release candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in [release verification](release-verification.md). Windows previews have updater signatures but no publisher signature. Preserve the source files before manual recovery.
+ 
+ ## Check passwords, time zones, URLs, and web search
+ 
+diff --git a/docs/install.md b/docs/install.md
+index e329609..55fcc49 100644
+--- a/docs/install.md
++++ b/docs/install.md
+@@ -11,15 +11,22 @@ a draft GitHub Release. A draft can require GitHub access and is not an
+ anonymous tester download. Do not treat a draft as a public release.
+ 
+ Before installing a prepared candidate, confirm the version, tag, source
+-commit, package type, processor, publisher signature, and release verification
+-record supplied by the maintainer. Download the package for your system and
++commit, package type, processor, and release verification record supplied by
++the maintainer. The signing policy differs by system:
++
++- macOS: Developer ID signing and Apple notarization.
++- Windows: an unsigned preview. Windows can warn or block installation.
++- Ubuntu: a `.deb` with SHA-256 checksums and no publisher signature.
++
++Download the package for your system and
+ verify its `SHA256SUMS` file. Follow the package steps below. Keep the old
+ installation until the update and removal checks are complete.
+ 
+-The repository does not currently provide a signed public candidate. Manual
++The repository does not currently provide a verified public candidate. Manual
+ update checks and installs are available only in release builds with the
+-compiled updater endpoint and public key. Unsigned builds report that updates
+-are not configured. Do not invent a download URL or bypass an operating system
++compiled updater endpoint and public key. Development builds report that updates
++are not configured. The Windows preview has separate Tauri update signatures;
++these do not establish a trusted Windows publisher. Do not invent a download URL or bypass an operating system
+ trust warning. See [release setup](release-setup.md) for signing and updater
+ requirements.
+ 
+@@ -72,6 +79,11 @@ On macOS, open the DMG and drag `TinyDash.app` to Applications. Replace the prev
+ 
+ On Windows, run the file that ends in `-setup.exe`. The installer adds TinyDash to the current user's Start menu and installs to `%LOCALAPPDATA%\TinyDash`. It does not need an administrator account. If WebView2 is missing, the installer downloads Microsoft's runtime. This step needs an internet connection. CI already has WebView2; installation without WebView2 still needs a separate desktop check.
+ 
++The Windows preview has no Authenticode signature. An unknown-publisher or
++SmartScreen warning is possible. Smart App Control or organization policy can
++block it. Such systems are not supported by this preview. Do not disable
++security controls or install a custom root certificate to run TinyDash.
++
+ On Ubuntu 24.04 x64, run this command in the extracted directory:
+ 
+ ```sh
+@@ -81,6 +93,12 @@ tinydash
+ 
+ APT installs the declared libraries. The package adds `/usr/bin/tinydash`, a desktop entry, and icons. It uses the system GTK 3 and WebKitGTK 4.1 libraries. Do not assume this package works on older Ubuntu versions or every Debian-based distribution. The release artifact contains the installer and its checksum.
+ 
++To update Ubuntu v1, quit TinyDash, download the new `.deb`, check its SHA-256
++hash, and repeat the APT install command with the new filename. This preserves
++settings and data. There is no TinyDash APT repository or automatic Linux
++updater in v1. SHA-256 checksums detect changed bytes; they do not authenticate
++the publisher.
++
+ Press Control + Shift + Space to show or hide TinyDash. On native Wayland, assign a desktop or compositor shortcut to `tinydash`. Focus and placement depend on the compositor. See [desktop-checks.md](desktop-checks.md) before using a build for daily work.
+ 
+ ## Remove the app
+@@ -101,4 +119,8 @@ CI verifies each artifact's checksums. Mac CI mounts the DMG and checks the copi
+ 
+ Installation logs are in `native-results-<OS>-<architecture>/installer.txt`. Mac disk image results are in `test-results-macOS-<architecture>/dmg-check.txt`. The native workflow can test an existing Checks run that contains these installer artifacts. Runs from before installer support contain only standalone builds.
+ 
+-Public distribution still needs Mac signing and notarization, Windows signing, and physical desktop checks. Release builds use a manual updater check and install flow on Mac and Windows; Ubuntu updates remain manual `.deb` installs. Use the standard [Tauri distribution tools](https://v2.tauri.app/distribute/), [Mac signing configuration](https://v2.tauri.app/distribute/sign/macos/), and [Windows installer settings](https://v2.tauri.app/distribute/windows-installer/) when adding signing. Replace the Mac test signing identity `-` with a Developer ID identity for distribution.
++Public distribution still needs a verified Mac signature and notarization,
++update tests, and desktop checks on all three systems. Windows publisher
++signing is deferred. See [release setup](release-setup.md) for the current
++signing and update policy. Mac and Windows release builds let the user check
++for an update and choose when to install it.
+diff --git a/docs/performance.md b/docs/performance.md
+index ea15030..f5ad63d 100644
+--- a/docs/performance.md
++++ b/docs/performance.md
+@@ -42,3 +42,25 @@ Native tests also change files while the window is hidden. They verify that Rust
+ Before the dependency update, the release executable was 12,106,544 bytes. The previous Phase 7 executable was 11,228,016 bytes. These sizes exclude the app bundle metadata and OS webview libraries.
+ 
+ Set `RUST_LOG=tinydash_lib=debug` to record the duration of the Rust window-show function. This duration excludes the time needed for the webview to paint. Use a desktop recording to measure visible invocation time. The automated startup check includes driver overhead and does not measure pure cold-start time or visible invocation time.
++
++## Bounded release benchmark results
++
++Measured on 19 September 2026 on arm64 macOS 27.0 with Rust 1.98.1. No other Cargo process was running when this check started. The existing ignored test built an index from 50,000 synthetic file entries. It ran four queries 25 times each, for 100 searches.
++
++| Measurement                        |    Result |
++| ---------------------------------- | --------: |
++| Synthetic index build              |    130 ms |
++| Search p50                         |  9,589 µs |
++| Search p95                         | 12,932 µs |
++| Search maximum                     | 18,156 µs |
++| Full cold command                  |   1:57.22 |
++| Release compilation inside command |      1:55 |
++| Benchmark test body                |    0.94 s |
++
++Command:
++
++```sh
++time cargo test --release --manifest-path src-tauri/Cargo.toml --locked profile_search_50k_files -- --ignored --nocapture
++```
++
++This is one local sample. It does not measure native OS shortcut or window latency, total webview memory, filesystem traversal, IPC, rendering, or clipboard capture cost. Native OS timing and total webview memory remain unverified.
+diff --git a/docs/release-checkpoint.md b/docs/release-checkpoint.md
+index 91201db..b426c60 100644
+--- a/docs/release-checkpoint.md
++++ b/docs/release-checkpoint.md
+@@ -1,7 +1,14 @@
+ # Release checkpoint
+ 
+ Date: 19 September 2026.
+-Status: **Paused at the maintainer's request.** Resume only when requested.
++Status at checkpoint: **Paused at the maintainer's request.**
++
++Work resumed later on 19 September 2026 at the maintainer's request. The accepted
++policy is a signed and notarized Mac app, an unsigned Windows preview, and a
++Linux `.deb` with SHA-256 checksums. Mac and Windows keep separate Tauri update
++signatures. This task now owns the release workflow and scripts. See the current
++[plan](release-plan.md) and [setup guide](release-setup.md). The record below
++describes the earlier checkpoint; its source archive remains unchanged.
+ 
+ This checkpoint records this release task. Another coding task is active in the
+ same workspace. Its work can continue independently.
+diff --git a/docs/release-plan.md b/docs/release-plan.md
+index 35ca5ee..6e93752 100644
+--- a/docs/release-plan.md
++++ b/docs/release-plan.md
+@@ -1,157 +1,98 @@
+ # Public release plan
+ 
+-Status: **Paused on 19 September 2026.** Read the
+-[release checkpoint](release-checkpoint.md) before resuming. TinyDash is a
+-small open source project with one maintainer. Exclude services that cost more
+-than $10 and use free services as the default. The paid signing recommendation
+-is withdrawn. The detailed stages below are the previous plan and need to be
+-reduced before further implementation. The Windows distribution route remains
+-open; see the [free options](windows-signing.md).
+-
+-Release macOS, Windows, and Linux together. Include all three systems in both public testing and the stable launch. Use one version and source commit for each candidate. This is the agreed scope.
+-
+-The first public release must let a user download, install, open, update, and remove TinyDash without developer tools. Use direct downloads as the main route. Track the results in [release verification](release-verification.md).
+-
+-For v1, Mac and Windows users update through the app. Manual replacement with a new `.deb` is the supported Ubuntu update method.
+-
+-## Initial support
+-
+-| System  | Processor and package                      | Required desktop checks                                                                               |
+-| ------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+-| macOS   | Apple silicon; signed and notarized `.dmg` | Test each advertised macOS version. The configured minimum of macOS 12 is not proof of compatibility. |
+-| Windows | x64; signed NSIS `-setup.exe`              | Start with Windows 11. Test a standard user account, including a computer without WebView2.           |
+-| Linux   | Ubuntu 24.04 x64; `.deb`                   | Test GNOME with X11 and with Wayland. Document the Wayland shortcut setup and clipboard limits.       |
+-
+-Windows 11 is the proposed first Windows target. Record the exact OS builds before publication. Advertise Ubuntu support explicitly on the Linux download button. Intel Mac, Windows ARM, other Linux distributions, and other package formats need separate verification before we add them.
+-
+-The Windows installer will keep its current `downloadBootstrapper` setting. Internet access is required when WebView2 is missing. With WebView2 already installed, the downloaded TinyDash installer must work offline. State this requirement in the download page and installation instructions. An embedded offline runtime is outside v1 scope. This choice follows the [Tauri WebView2 installation options](https://v2.tauri.app/distribute/windows-installer/#webview2-installation-options).
+-
+-## Current position
+-
+-- The [Checks workflow](../.github/workflows/check.yml) already builds all three packages.
+-- The [native workflow](../.github/workflows/native.yml) tests installed Windows and Linux packages. Its Linux session uses X11.
+-- The [DMG check](../scripts/ci/check-dmg.sh) checks the copied Mac app and its local signature. It does not establish publisher trust or notarization.
+-- [Installation instructions](install.md) cover unsigned test builds and signed release candidates. Test builds expire from GitHub Actions after 14 days.
+-- The app has a welcome screen, local settings, and clipboard controls. Release builds have a manual updater check and install path for Mac and Windows. Ubuntu updates remain manual `.deb` installs. Start-at-login is still pending.
+-- Database migrations already use a transaction and have rollback tests. A local backup and recovery procedure still needs implementation and verification.
+-- There is no public release or configured website. GitHub reports no repository license. Choose the license and price before making related marketing claims.
+-
+-These observations describe the repository on 18 September 2026. They do not establish that a public release is ready.
+-
+-## Work sequence
+-
+-### 1. Set the release details
+-
+-The maintainer selects the version, publisher name, supported OS versions, license, and price. Keep the current tool set fixed.
+-
+-Use the same version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`. Keep the application identifier `dev.tinydash.launcher` so upgrades retain the existing data location.
+-
+-Arrange the Mac signing identity and notarization credentials. Select a Windows signing service that accepts the publisher's identity and country. Keep signing credentials in protected CI secrets. Record the publisher identity for verification.
+-
+-The release maintainer owns recovery of the separate Tauri updater key. Record the custodian, public-key fingerprint, backup location, and recovery procedure. Keep an encrypted offline backup outside CI. Store its recovery password separately. Verify a restored key against the public key in the candidate installer, using a disposable update file. Never include private keys in logs or release evidence.
+-
+-Record publisher-certificate expiry dates or the provider's managed renewal policy. Start manual renewal at least 30 days before expiry. Renew OS certificates without changing the updater key. Test the next signed package with the renewed certificate. Any planned updater-key change needs a tested client migration before retiring the old key.
+-
+-If the updater key is lost, restore the verified backup. If recovery is impossible, existing clients need a verified manual reinstall with the replacement key. On suspected compromise, stop update publication, remove compromised access, and replace affected keys or certificates. Publish recovery instructions through a channel under restored control. Do not trust an update signed only by the compromised key to repair that trust.
+-
+-Tauri explains why [losing the updater key prevents updates to existing clients](https://v2.tauri.app/plugin/updater/#signing-updates). Our backup and incident procedures are release requirements.
+-
+-Completion requires verification checks S1 through S4.
+-
+-### 2. Build public release packages
+-
+-Add a release workflow alongside the development workflows. Build all three systems from the selected tag. Assemble the packages in one draft GitHub Release for internal verification.
+-
+-Use a published GitHub prerelease for external testing. Draft downloads are not the tester distribution route. After the checks required before public testing pass, publish all three packages together with the prerelease flag. Keep the release out of the stable update feed and label the preview page as a release candidate. Check anonymous downloads before inviting testers. See [GitHub's release access rules](https://docs.github.com/en/rest/releases/releases#list-releases).
+-
+-Use the intended numeric version in the app and tag from the start, for example `0.1.0` and `v0.1.0`. The GitHub prerelease flag identifies the candidate. Promotion changes that flag and release metadata only. Keep the tag, installers, signatures, and checksums unchanged. If a published candidate needs a binary change, use a new version and repeat verification.
+-
+-On macOS, replace the test signing identity with a Developer ID identity. Sign, notarize, and staple the release. Follow the [Tauri Mac signing guide](https://v2.tauri.app/distribute/sign/macos/).
+-
+-On Windows, sign the app and installer and include a trusted timestamp. Check the publisher on a clean consumer desktop. A valid signature does not guarantee that SmartScreen will omit its reputation warning. See [Microsoft's explanation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
+-
+-On Linux, retain the current Debian package and verify its declared runtime dependencies on Ubuntu 24.04.
+-
+-Include the three installers, SHA-256 checksums, version, source commit, release notes, and installation instructions. Separate public release metadata from the existing `unsigned test build` metadata. Use versioned asset URLs. Keep a published version's files unchanged.
+-
+-Reuse the existing installer checks. Adapt their artifact input for release candidates. Test the signed output that users will receive. A later rebuild or signing step changes the candidate and requires new package verification.
+-
+-Completion requires checks B1 through B6 and I1 through I6. B6 runs after prerelease publication and before user testing. GitHub supports [changing prerelease status without replacing assets](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#editing-a-release).
+-
+-### 3. Complete first use and updates
+-
+-Keep the existing welcome screen. Show the launch shortcut and let the user run one example. Add a clipboard-history choice before the first capture on a new installation. Keep an existing user's saved choice during upgrades.
+-
+-Add an optional start-at-login setting. Enabling it must start one TinyDash process after login. Disabling it must remove that startup registration.
+-
+-Add an update command and an update notice for direct Mac and Windows installations. Let the user choose when to install and restart. Use Tauri's update signatures as well as the OS publisher signatures. They serve different checks.
+-
+-Use signed update packages on GitHub Releases and a static update manifest. Keep test and stable update feeds separate. Set `TINYDASH_UPDATE_ENDPOINT` to the intended feed at build time. Promotion must not require a new build or signature. The released app must default to the stable feed. A higher version in a public prerelease must not enter that feed automatically. Tauri supports this [static update setup](https://v2.tauri.app/plugin/updater/).
+-
+-For Ubuntu v1, instruct users to quit TinyDash, install the new `.deb` with APT, and reopen the app. This manual replacement is the supported update procedure. It must preserve settings and data, with one package registration, desktop entry, startup entry if enabled, and resident process. Installing a local `.deb` does not create an APT update repository. Tauri's Linux updater uses AppImage. Add an APT repository later if users need it.
+-
+-Before a data migration, pause writes and save a consistent local backup of the database and settings. Record the app and schema versions. Verify that the backup can be read before changing the data. If backup creation fails, stop the migration and show a recovery message.
+-
+-Keep migrations transactional. A failed migration must retain the prior schema, data, and clipboard-history choice. Preserve an unreadable or newer database and report the problem. Do not replace it with an empty database. The existing [migration tests](../src-tauri/src/db/migrations.rs) cover part of this behavior. Add installed-app tests for interruption and recovery.
+-
+-Keep one verified backup from before the most recent migration, with access limited to its owner. Replace it only after the next backup succeeds. Keep it on the device. Removal instructions must cover backups because they can contain saved clipboard text. Restoration requires an explicit user choice and an app version compatible with the backup's schema. Preserve the current files before restoration and explain that later changes will not be in the backup.
+-
+-For every release after v1, test the previous public version upgrading to the candidate on all three systems. For v1, use an earlier signed test version. Test interrupted downloads, interrupted installation, failed migrations, low disk space, and backup restoration. Test that recovery leaves one usable installation and retains saved preferences. Prefer a fixed newer app over an automatic binary downgrade.
+-
+-Completion requires checks F1 through F4 and U1 through U6.
+-
+-### 4. Create the download page
+-
+-Add a small static website in `site/`. Keep it outside the desktop application's build output. GitHub Pages is the initial hosting proposal. A custom domain can follow.
+-
+-Use this message:
+-
+-> Find apps, files, and copied text on macOS, Windows, and Linux.
+-
+-Show a main download button for the detected system. Always show all three downloads. Display the supported processor, OS version, package type, app version, and download size. Do not infer Mac processor support from the browser's OS label. Mobile and unknown systems must show the download list without starting a download.
+-
+-Include installation steps, update steps, removal steps, release notes, and a support link. Put download instructions above developer setup in the README once the release is public. Users must be able to download without a GitHub account.
+-
+-Use the supplied screenshot as the first visual reference. Reuse the app's cream background, peach selection color, and existing fonts. Add a short recording that opens an app, finds sample clipboard text, and converts a value. Record each advertised desktop separately.
+-
+-![TinyDash on macOS in Light appearance, with search examples and keyboard hints.](assets/launcher-macos-light.png)
+-
+-This is the user's Mac screenshot, copied without changes. It shows the welcome screen. Apps and Files tabs are absent in this image; category visibility is configurable. Use the default categories for the main feature demonstration. This image does not verify Windows or Linux behavior.
+-
+-Describe network use accurately. File and clipboard searches run locally. Currency updates download rates, web search opens an external service, and the manual updater check downloads release data when configured. Explain that saved clipboard history is local plain text. Use sample data in promotional images.
+-
+-Completion requires checks W1 through W5.
+-
+-### 5. Test with users and promote the release
+-
+-Recruit five test users per system for the initial usability check. Give them the preview page and direct downloads from the published prerelease. These links need no GitHub account. Keep the candidate out of the stable update feed. Ask users to install TinyDash, open it with a shortcut, complete a search, and remove it without live help.
+-
+-Require at least four of the five users on each system to complete these tasks without help. This small first-use check does not establish a general success rate. Record all attempts, including additional testers and failed attempts. Repeat affected checks after a fix.
+-
+-An unresolved data-loss, removal, signing/trust, or launch failure blocks the stable release regardless of the user count. An expected SmartScreen reputation warning is a separate observation; an invalid signature, unexpected publisher, or policy block is a failure. All required technical checks must pass.
+-
+-After candidate verification and user testing, promote the same GitHub prerelease to stable and mark it as latest. Download every installer without authentication and compare its checksum with the tested candidate. Then promote the website downloads and stable update manifest. Announce the release only after these checks pass for all three systems. Promotion must not rebuild or sign the files again.
+-
+-If one system fails, hold stable promotion for all three systems. Keep the last working stable release available. Fix a published defect with a new version. Do not replace published binaries or force users to downgrade their database.
+-
+-Completion requires checks P1 through P3 and L1 through L3.
+-
+-### 6. Add installation channels and marketing
+-
+-Create a Homebrew tap under the maintainer's account. Submit a WinGet package that points to the same tested Windows installer. Use versioned URLs and correct checksums. These channels do not delay the combined direct-download release. See [Homebrew taps](https://docs.brew.sh/How-to-Create-and-Maintain-a-Tap) and [WinGet submissions](https://learn.microsoft.com/en-us/windows/package-manager/package/repository).
+-
+-Publish each package-manager command only after a clean-machine installation succeeds. Define whether the app or package manager handles updates, and test that choice. The proposed Homebrew command is `brew install --cask jewei/tap/tinydash`; it is not available yet.
+-
+-Start with keyboard users and developer communities. Prepare a short demo, three platform screenshots, installation links, and release notes. Use one download page for every announcement. Post to Show HN after the app is available to try. Follow each community's posting rules.
+-
+-For the pilot, record page-to-install problems, time to first successful action, and whether users still use TinyDash after seven days. Ask testers directly. Do not collect their queries, clipboard text, or file paths. Download counts alone do not measure active users.
+-
+-App stores and wider Linux packaging follow later. The current Mac transparency uses private APIs, which [Tauri identifies as incompatible with Mac App Store acceptance](https://v2.tauri.app/reference/config/#transparent).
+-
+-Completion for each additional installation channel requires checks C1 and C2.
+-
+-## Immediate implementation order
+-
+-Set the release details and resolve the Windows test failure recorded in verification. Then prepare the signed release workflow. Build first-use controls and updates against candidate packages. The download page can proceed while signing is arranged. Finish with desktop verification, user testing, and one combined release.
+-
+-Read the [verification record](release-verification.md) with this plan. It defines the checks required before a public prerelease, before stable promotion, and before the announcement. It also contains current repository evidence and a template for each test result.
++Status: resumed on 19 September 2026 with the maintainer's approval.
++TinyDash is a solo open source project. Use the existing tools and free hosting.
++No new paid service is required. Services above $10 are outside scope.
++The [checkpoint](release-checkpoint.md) preserves the earlier work.
++
++Release macOS, Windows, and Linux together. Use one version and source commit.
++Users must be able to download, install, launch, update, and remove the app
++without developer tools. Record the results in [release verification](release-verification.md).
++
++## Signing and support
++
++| System                 | First package | Signing and updates                                                                                   |
++| ---------------------- | ------------- | ----------------------------------------------------------------------------------------------------- |
++| macOS on Apple silicon | DMG           | Developer ID signature, notarization, and stapled tickets. Tauri-signed updates.                      |
++| Windows 11 x64         | NSIS EXE      | Unsigned preview. Tauri-signed updates. Windows may warn or block installation.                       |
++| Ubuntu 24.04 x64       | DEB           | SHA-256 checksums. Manual replacement with a new `.deb`. No publisher signature or automatic updater. |
++
++Use the existing Mac identity, `Developer ID Application: Jewei Mak (4L4SS26L9J)`.
++The local keychain lists this identity. Notarization credentials and a signed
++candidate still need verification. See [release setup](release-setup.md).
++
++Windows publisher signing is deferred. Do not buy a certificate, add a signing
++service, create a private root certificate, or add Store packaging for v1.
++The download page must label Windows as an unsigned preview. Systems that
++block unsigned software are not supported by this preview. Do not ask users
++to disable security controls. The [Windows guide](windows-signing.md) records
++future free options.
++
++Tauri update signatures are separate from OS publisher signatures. Keep them
++for Mac and Windows. For Linux, publish `SHA256SUMS`; a checksum detects changed
++bytes but does not authenticate a publisher. A GPG key and APT repository can
++wait until users need them.
++
++Test each advertised macOS version; the configured minimum is not test evidence.
++Test Ubuntu GNOME under X11 and Wayland. Document the Wayland shortcut and
++clipboard limits. Intel Macs, Windows ARM, and other Linux distributions are
++outside v1 support.
++
++Keep the Windows WebView2 download bootstrapper. Internet access is required
++when the runtime is absent. An installed runtime must permit offline installation.
++Test a failed runtime download and retry. Do not bundle the large offline runtime.
++
++## Work to complete
++
++1. Record the source license and price. MIT and a free first release remain
++   recommendations until the maintainer selects them. Set one version in
++   `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
++   Keep the application identifier `dev.tinydash.launcher`.
++2. Configure the Mac and updater secrets using [release setup](release-setup.md).
++   Save an encrypted offline backup of the updater key and its password
++   separately. Verify recovery before the first public update.
++3. Build all three packages from one clean tag. The release workflow checks
++   the signing policy and stages a draft. Include checksums, source metadata,
++   install instructions, and update files. Check the actual final packages.
++4. On each supported system, test installation, launch, shortcut use, one
++   search, update, retained settings/data, and removal. Check clipboard choice,
++   start at login, failed updates, and migration backup/recovery. Use disposable
++   data for failure tests. Keep one report per system; no tester quota applies.
++5. Publish all three packages as a GitHub prerelease for public testing after
++   the required internal checks. Draft assets are not anonymous downloads.
++   Confirm anonymous downloads and checksums. Label the prerelease clearly
++   and keep it out of the stable update feed. Invite available testers.
++6. After the checks pass, promote the same release to stable. Keep its tag,
++   files, signatures, and hashes unchanged. Verify anonymous downloads again,
++   then publish the static download page and announce the release.
++
++A data-loss, launch, update-integrity, or removal failure on a supported system
++blocks release. An expected Windows unknown-publisher warning is a documented
++limitation. A security-policy block is not a successful installation. Record
++its configuration and the support limit. Hold the combined release if a
++supported system fails. Fix published defects with a new version; do not
++replace published files or force users to downgrade their database.
++
++After v1, test upgrades from the previous public version. For v1, use an older
++test version with the same updater key. Use the final candidate as the update
++target. Compile the stable feed into the candidate. Test data preservation
++and keep one verified local backup before migration. See [data recovery](data-recovery.md).
++
++## Distribution and marketing
++
++Host installers and checksums on GitHub Releases. Use the existing static page
++on GitHub Pages or Cloudflare Pages with a free domain. No R2 storage or custom
++download service is needed.
++
++Use the supplied Mac screenshot and describe its platform correctly. Extra
++screenshots and a short demo can follow. Show each package's OS, processor,
++version, size, checksum, and installation limits. Keep all three downloads
++available. See the [site guide](download-site.md).
++
++Explain local clipboard storage and the optional network features. Link to
++installation, removal, release notes, source code, and issue reporting. Do not
++claim support or performance that the candidate checks do not establish.
++
++Start with one release post and the download page. Ask users about installation
++problems and useful features. Homebrew, WinGet, app stores, broader Linux
++packaging, and further marketing automation are later work.
+diff --git a/docs/release-setup.md b/docs/release-setup.md
+index 451ee5f..8935d1e 100644
+--- a/docs/release-setup.md
++++ b/docs/release-setup.md
+@@ -1,101 +1,159 @@
+ # Release setup
+ 
+-This document describes the draft release workflow. It does not publish a
+-release and it does not create signing credentials.
+-
+-## Workflow use
+-
+-Push a `v<version>` tag to build the three packages. The workflow checks out
+-that tag on all runners, checks the version files, checks the CPU architecture,
+-and verifies package hashes. A tag push creates Actions artifacts only.
+-
+-Use **Run workflow** with an existing tag to repeat the build. Leave
+-`stage_draft` and `release_mode` clear for an unsigned verification build.
+-Unsigned builds stay in Actions artifacts.
+-
+-The workflow stages a draft GitHub Release only when both inputs are set:
+-
+-- `stage_draft=true`
+-- `release_mode=true`
+-
+-The draft step needs `contents: write`. It does not mark a release as a
+-prerelease or stable release. Complete the checks in
+-[`release-verification.md`](release-verification.md) before any publication.
+-Release mode labels its output as a release candidate only after the local
+-checks and signing configuration pass. Unsigned mode keeps the `unsigned test
+-build` label and cannot stage a draft.
+-
+-## Required release configuration
+-
+-Release mode fails before the build when any required value is absent. Store
+-these values as protected GitHub Actions secrets. Do not print them or commit
+-them.
+-
+-| Secret or variable                                    | Use                                                  |
+-| ----------------------------------------------------- | ---------------------------------------------------- |
+-| `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`     | macOS certificate import                             |
+-| `APPLE_SIGNING_IDENTITY`                              | Developer ID identity; `-` is not accepted           |
+-| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`         | macOS notarization credentials                       |
+-| `WINDOWS_CERTIFICATE`, `WINDOWS_CERTIFICATE_PASSWORD` | Base64 PFX and password for Windows Authenticode     |
+-| `TAURI_SIGNING_PRIVATE_KEY`                           | Tauri updater artifact signing                       |
+-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`                  | Optional password when the updater key is encrypted  |
+-| `TAURI_UPDATER_PUBLIC_KEY`                            | Public key to place in the app updater configuration |
+-| `TINYDASH_UPDATE_ENDPOINT`                            | HTTPS URL for the stable `latest.json` feed          |
+-
+-The workflow checks that these values exist. The Windows certificate is a
+-base64-encoded PFX. The workflow imports it into the temporary runner
+-certificate store, uses its thumbprint for Tauri signing, and removes it after
+-the build. `TINYDASH_UPDATE_ENDPOINT` is a repository variable. The endpoint should be the stable feed, for example
+-`https://github.com/jewei/tinydash/releases/latest/download/latest.json`.
+-The endpoint and public key are compiled into release builds. Missing values
+-make release mode fail. A value in a secret does not prove that a package was
+-signed or notarized; record those results in the release verification report.
+-If the updater private key is encrypted, store its password in
+-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Leave this optional secret empty for an
+-unencrypted key. Never print either value.
+-
+-## Updater contract
+-
+-Tauri requires a public key in the application updater configuration and a
+-private key during the build. The private key must stay outside the repository
+-and have an encrypted offline backup. Release builds must enable
+-`bundle.createUpdaterArtifacts`. The build must fail if the updater key or
+-endpoint is missing. The workflow enables this option only in `release_mode`;
+-unsigned tag checks do not create updater files.
+-
+-The workflow checks publisher signatures and notarization tickets on the macOS
+-app and DMG. It also runs a Gatekeeper assessment on the app. It checks the bundled Windows executable
+-and NSIS installer for a valid Authenticode signature, the expected
+-certificate thumbprint, and a signing timestamp. It extracts the bundled
+-`tinydash.exe` from the NSIS installer and checks that file too. It records
+-release metadata only after these checks. These CI checks do not replace
+-physical installation and launch checks on clean machines. Tauri notarizes and
+-staples the app during `tauri build` when the Apple credentials are present.
+-The workflow then submits the DMG explicitly to `notarytool`, staples it, and
+-validates both outputs.
+-
+-In Tauri CLI 2.11.4, the [DMG builder signs the disk image](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle/macos/dmg/mod.rs#L179), while the [app builder runs notarization](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle/macos/app.rs#L120). This requires the separate DMG step. The [Windows bundler restores the original executable after packaging](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle.rs#L182). This is why verification extracts the executable from the installer.
+-
+-The workflow creates `latest.json` from the updater artifacts. It contains a
+-SemVer `version` and a `platforms` object. Each platform entry contains a URL
+-and the literal signature text from its `.sig` file. The current feed contains
+-`darwin-aarch64` and `windows-x86_64`. Linux is excluded because v1 uses a
+-manual `.deb` update path. Do not add a Linux entry for a `.deb`: Tauri's Linux
+-updater expects an AppImage.
+-
+-The expected Tauri v2 updater files are:
+-
+-- macOS: an `.app.tar.gz` bundle and its `.sig` file;
+-- Windows: the NSIS setup executable and its `.sig` file;
+-- Linux: an AppImage and its `.sig` file.
+-
+-The v1 direct-download packages remain a DMG, NSIS setup executable, and
+-Ubuntu 24.04 `.deb`. The Linux `.deb` is updated manually. Do not use it as a
+-Tauri updater asset. The release workflow refuses a draft unless the matching
+-macOS and Windows updater artifacts and signatures exist. A draft is still an
+-internal candidate. A matching `.sig` file proves only that the manifest
+-copied the build output. The installed application still verifies the updater
+-signature during download. Complete the external update check in the release
+-verification record before publication.
+-
+-These updater details follow the [Tauri updater guide](https://v2.tauri.app/plugin/updater/).
++Use the existing GitHub workflow and free Tauri signing tools. This setup needs
++no Windows signing service. It does not publish a release.
++
++| System  | Publisher signing                                       | Update verification             |
++| ------- | ------------------------------------------------------- | ------------------------------- |
++| macOS   | Developer ID, notarization, and stapled app/DMG tickets | Tauri key                       |
++| Windows | None. Label the NSIS package as an unsigned preview.    | Tauri key                       |
++| Ubuntu  | None. Publish SHA-256 checksums for the `.deb`.         | Manual download and replacement |
++
++An updater signature does not establish a trusted Windows publisher. Linux
++checksums do not authenticate a publisher. No self-signed certificate is needed.
++
++## Configure Mac signing
++
++The local keychain lists this identity:
++
++```text
++Developer ID Application: Jewei Mak (4L4SS26L9J)
++```
++
++Use this Developer ID certificate, not an Apple Development certificate.
++In Keychain Access, open **My Certificates**, select this certificate with its
++private key, and export it as a password-protected `.p12` file. Save it outside
++the repository. Keep an encrypted backup.
++
++The current certificate expires on 1 February 2027 at 22:12:15 UTC. Renew it
++before that date. The certificate's public metadata supplied this date.
++
++In GitHub, open **Settings**, then **Secrets and variables**, then **Actions**.
++Add the repository secrets below. Do not put private values in chat, source
++files, or command arguments.
++
++All six Apple secret names are present in GitHub as of 19 September 2026.
++The maintainer supplied the certificate, passwords, and account. CI must still
++verify that the values work. The instructions below remain for future recovery.
++
++| Secret                       | Value                                              |
++| ---------------------------- | -------------------------------------------------- |
++| `APPLE_CERTIFICATE`          | Base64 contents of the exported `.p12` file        |
++| `APPLE_CERTIFICATE_PASSWORD` | Password set during export                         |
++| `APPLE_SIGNING_IDENTITY`     | `Developer ID Application: Jewei Mak (4L4SS26L9J)` |
++| `APPLE_ID`                   | Apple account email used for notarization          |
++| `APPLE_PASSWORD`             | An Apple app-specific password for that account    |
++| `APPLE_TEAM_ID`              | `4L4SS26L9J`                                       |
++
++The following command sends the encoded certificate directly to a GitHub secret.
++Replace the example path with the exported file path. It does not print the key.
++
++```sh
++base64 < '/absolute/path/TinyDash-Developer-ID.p12' | gh secret set APPLE_CERTIFICATE --repo jewei/tinydash
++```
++
++For passwords, use the GitHub secret form or the interactive CLI prompt:
++
++```sh
++gh secret set APPLE_CERTIFICATE_PASSWORD --repo jewei/tinydash
++gh secret set APPLE_PASSWORD --repo jewei/tinydash
++```
++
++Follow the [Tauri Mac signing guide](https://v2.tauri.app/distribute/sign/macos/)
++for the notarization account. An installed certificate alone does not prove
++that the account can notarize an app.
++
++## Configure the free updater key
++
++The maintainer added all three updater secrets on 19 September 2026. CI must
++still verify signing. Keep an offline backup of this key before publication.
++
++Use one updater key for Mac and Windows. If a key already exists, restore that
++key. Do not generate a replacement for an existing public release.
++
++For the first key, run this command in your own terminal. Choose a password
++when prompted. Keep its output private. Tauri may print key material.
++
++```sh
++mkdir -p "$HOME/.config/tinydash-signing"
++chmod 700 "$HOME/.config/tinydash-signing"
++umask 077
++bun run tauri signer generate -w "$HOME/.config/tinydash-signing/updater.key"
++```
++
++Upload the files directly and set the password through the interactive prompt:
++
++```sh
++gh secret set TAURI_SIGNING_PRIVATE_KEY --repo jewei/tinydash < "$HOME/.config/tinydash-signing/updater.key"
++gh secret set TAURI_UPDATER_PUBLIC_KEY --repo jewei/tinydash < "$HOME/.config/tinydash-signing/updater.key.pub"
++gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --repo jewei/tinydash
++```
++
++`TINYDASH_UPDATE_ENDPOINT` is already set as a repository **variable**:
++
++```text
++https://github.com/jewei/tinydash/releases/latest/download/latest.json
++```
++
++This URL becomes available when a stable release contains `latest.json`.
++A draft or prerelease does not supply the stable feed. Do not publish a stable
++release just to test the feed. Use a separate HTTPS test feed compiled into
++an older disposable test version. Keep the candidate's endpoint set to stable.
++Update from that older version to the exact candidate bytes.
++
++Jewei is the key custodian. Keep an encrypted offline copy of the private key
++and public key outside CI. Store its password separately. Record the public
++key's SHA-256 fingerprint and the backup location in a private maintainer note.
++Restore it into a temporary private directory and verify a signed test update
++with the public key in a test installation. Then remove the restored copy.
++Keep only public fingerprints and pass/fail evidence in release records.
++
++If the key is lost, restore the backup. Without it, existing clients need a
++manual reinstall with a new key. If compromise is suspected, stop update
++publication, remove compromised access, replace the affected key, and publish
++manual recovery instructions through an account under restored control. Do not
++use only the compromised key to establish trust in its replacement.
++
++Record the Mac certificate expiry date and renew it before expiry. Mac
++certificate renewal must keep the updater key unchanged. Verify the next app
++and DMG with the renewed certificate. These are different keys with different
++purposes. See [Tauri update signing](https://v2.tauri.app/plugin/updater/#signing-updates).
++
++## Run the workflow
++
++A `v<version>` tag push creates development artifacts only. These builds have
++no configured updater and cannot become a draft release.
++
++For a release candidate, use **Run workflow** with an existing version tag:
++
++- `release_mode=true` applies the signing policy in the table above.
++- `stage_draft=true` stages a draft after all three builds pass.
++
++The Mac job requires Apple and updater secrets. The Windows job requires only
++updater secrets. Linux requires neither. Apple credentials go only to the Mac
++runner; updater credentials go only to Mac and Windows. Missing required
++configuration fails the build. No Windows PFX, certificate password, or paid
++service is used.
++
++Tauri signs, notarizes, and staples the Mac app. The workflow also notarizes
++and staples the DMG. It checks Developer ID signatures, tickets, and Gatekeeper.
++The Windows check requires `NotSigned` for the NSIS installer and its extracted
++`tinydash.exe`. It checks that the matching updater signature file is present.
++`build.txt` records publisher signing separately from updater signing.
++
++The workflow stages these updater pairs:
++
++- Mac: `.app.tar.gz` and `.app.tar.gz.sig`.
++- Windows: `-setup.exe` and `-setup.exe.sig`.
++
++It creates `latest.json` with `darwin-aarch64` and `windows-x86_64` entries.
++Linux `.deb` files do not enter the feed. Tauri's Linux updater uses AppImage;
++v1 uses manual `.deb` updates instead. See the [Tauri updater guide](https://v2.tauri.app/plugin/updater/).
++
++A matching signature filename is not cryptographic verification. The installed
++app must accept a valid update and reject changed bytes or an invalid signature.
++Complete [release verification](release-verification.md) using the actual
++packages. CI configuration alone does not prove installation or publisher trust.
++
++Draft assets are for internal checks. Use a public prerelease for anonymous
++tester downloads. After verification, promote the same assets without rebuilding.
+diff --git a/docs/release-verification.md b/docs/release-verification.md
+index d295465..58a1f09 100644
+--- a/docs/release-verification.md
++++ b/docs/release-verification.md
+@@ -1,14 +1,15 @@
+ # Public release verification
+ 
+-Status: **Paused on 19 September 2026.** The maintainer set a $10 service-cost
+-limit and asked for a smaller process for this solo open source project.
+-See the [checkpoint](release-checkpoint.md). Existing results remain evidence
+-of the work already checked. The previous release gates are a reference until
+-the plan is reduced. No pending check is changed to a pass by this pause.
++Status: resumed on 19 September 2026. Use the existing tools and free services.
++The accepted policy is Mac Developer ID signing and notarization, an unsigned
++Windows preview, and Linux checksums with manual `.deb` updates. Mac and Windows
++keep separate Tauri updater signatures. The [checkpoint](release-checkpoint.md)
++preserves the earlier state. No pending package check becomes a pass because
++its workflow exists.
+ 
+ Use this record with the [release plan](release-plan.md). Both the public prerelease and stable launch include macOS, Windows, and Linux together.
+ 
+-Current release decision: **Not ready for public release.** Signing, updates, the download page, and release-candidate desktop checks remain incomplete.
++Current release decision: **Not ready for public release.** Credential validation in CI, actual package signing, installed updates, public downloads, and desktop checks remain incomplete.
+ 
+ ## Status rules
+ 
+@@ -19,7 +20,7 @@ Current release decision: **Not ready for public release.** Signing, updates, th
+ 
+ Run each applicable check separately on each supported desktop. A workflow definition proves only that a check is configured. An older successful run does not verify a new commit. The supplied screenshot proves only its visible appearance.
+ 
+-Any unresolved data-loss, removal, signing/trust, or launch failure blocks stable promotion, regardless of the usability result. This includes an invalid signature, unexpected publisher, or policy block. An expected SmartScreen reputation warning remains a separate recorded observation. All other required technical checks must also pass.
++Any unresolved data-loss, removal, update-integrity, or launch failure on a supported system blocks promotion. Mac publisher-signature or notarization failures also block it. Windows has no publisher signature by design. Record its warning and verify installation on the supported configuration. A policy block is not a successful installation; systems that prohibit unsigned software are outside this preview's support. All required technical checks must pass.
+ 
+ ## Initial evidence
+ 
+@@ -50,64 +51,68 @@ These results cover the working tree based on `bccaa245284cc22a7bc0c96d3083dace3
+ | U5            | PASS for automated database checks            | All 19 database tests passed, including three new backup checks in [backup.rs](../src-tauri/src/db/backup.rs). They cover a readable snapshot, exact settings preservation, restore reads, private Unix permissions, failed backup writes, and newer or unreadable databases. Installed-app migration and interruption checks remain pending. |
+ | W1, W3        | PASS for the local site                       | All 25 [site tests](../site/tests/downloads.spec.ts) and [publication tests](../site/tests/publication.spec.ts) passed. The tests include a fresh server run, downloads with JavaScript off, keyboard use, contrast, and responsive layouts. TypeScript and the static site build also passed.                                                |
+ | W2, L1        | PASS for the verification script's test cases | [Public download preparation](../scripts/site/release.ts) checks all three anonymous downloads against the reviewed local files. Tests reject changed bytes, a missing platform, inaccessible assets, drafts, prereleases, and an older release. These tests use simulated GitHub responses. Actual public downloads are still pending.       |
+-| W4            | PENDING                                       | The page uses the supplied Mac screenshot. Native Windows and Ubuntu captures and a product recording are still required.                                                                                                                                                                                                                     |
++| W4            | PENDING for the final release page            | The page uses the supplied Mac screenshot with a Mac caption. Extra platform captures and a product recording are optional. Verify any images used for the final candidate.                                                                                                                                                                   |
+ 
+ The Rust library passed `cargo clippy --manifest-path src-tauri/Cargo.toml --lib --locked -- -D warnings`. The local path test used `cargo test --manifest-path src-tauri/Cargo.toml --locked --lib launcher::files::tests::changing_roots_removes_old_results_and_rejects_an_unfinished_old_scan -- --exact`. No Windows test result is inferred from this Mac run.
+ 
+ The [download site guide](download-site.md) gives the build, preview, and publication commands. Site test images use simulated release details. The default site build has no installer links. Site hosting and deployment are pending.
+ 
+-The user confirmed that Mac signing is ready and Windows signing is not ready. This is a readiness report, not signature evidence. MIT, a free first release, and the public credit "TinyDash by Jewei" were recommended. The license, price, and signing publisher identity still need a recorded decision for S1.
++MIT, a free first release, and the public credit "TinyDash by Jewei" remain recommendations. The source license and price need a decision for S1. The local Mac certificate identity is recorded below. Windows has no certificate publisher in this preview.
+ 
+-## Windows signing setup review, 19 September 2026
++## Signing strategy checks, 19 September 2026
+ 
+-The [Windows signing guide](windows-signing.md) records provider eligibility,
+-costs, setup steps, and required verification. The maintainer confirmed the
+-publisher type as an individual in Malaysia. The service and verified
+-certificate name remain open. Microsoft Artifact Signing does not accept this
+-publisher type and country under its current public signing rules. The earlier
+-SSL.com recommendation is withdrawn because it exceeds the maintainer's budget.
+-The guide now records free options. No signing service has been purchased or
+-configured.
++The maintainer resumed this task and assigned it the release workflow and
++scripts. No paid service is required. The [setup guide](release-setup.md) lists
++the remaining Mac and updater configuration.
+ 
+-The current release workflow imports a PFX file. It does not yet integrate with
+-a cloud signing service. The workflow owner must replace that path after
+-service selection. This source review does not pass B4. The signed app,
+-installer, installed files, timestamps, and actual Windows trust behavior still
+-need verification.
++| Check                              | Result                      | Evidence and limit                                                                                                                                                                                                                                                                                                                 |
++| ---------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
++| Local Mac identity                 | PASS for identity discovery | `security find-identity -v -p codesigning` lists `Developer ID Application: Jewei Mak (4L4SS26L9J)`. Its public certificate expires on 1 February 2027 at 22:12:15 UTC. No private key was exported. This is not package or notarization evidence.                                                                                 |
++| Repository signing configuration   | PENDING                     | The maintainer added all nine requested secrets. `gh secret list --json name` confirms the expected names. The stable-feed variable has the expected GitHub Releases URL. This verifies configuration names only; certificate import, passwords, notarization, and update signing still need a CI run. No secret values were read. |
++| Release configuration and metadata | PASS locally                | 26 tests passed in `tests/release-config.spec.ts` and `tests/release-artifacts.spec.ts`. They cover per-system requirements, missing updater keys, HTTPS, Developer ID, publisher labels, and empty or mismatched updater signatures. Artifact tests use temporary fixtures, not real installers.                                  |
++| Type and shell checks              | PASS locally                | App and site TypeScript checks passed. `bash -n` passed for the changed preflight/staging scripts and the Mac verification/notarization scripts.                                                                                                                                                                                   |
++| Workflow validation                | PASS locally                | Actionlint v1.7.12 accepted `.github/workflows/release.yml`. ShellCheck and Pyflakes were disabled because they are not installed. This does not execute the workflow.                                                                                                                                                             |
++| Download page                      | PASS locally                | All 25 site tests passed after adding the Windows preview warning. The Windows main download button has the warning beside it. The static site build passed and still contains no public installer links.                                                                                                                          |
++| Actual signing and trust           | PENDING                     | Mac notarization, the Windows PowerShell check, and clean desktop installation have not run on a candidate. Linux package checks and installed update-signature verification also remain pending.                                                                                                                                  |
++
++The workflow no longer imports a Windows PFX. It checks that the installer and
++its extracted TinyDash executable are unsigned. It also requires a matching,
++nonempty updater signature file. This source change does not pass B4. The
++Windows desktop still needs an installation and launch result.
+ 
+ ## Open CI issue
+ 
+ The Windows test `launcher::files::tests::changing_roots_removes_old_results_and_rejects_an_unfinished_old_scan` failed at line 300 of [the file-index tests](../src-tauri/src/launcher/files.rs).
+ 
+-The assertion compared a regular Windows path with a path that included the `\\?\` prefix. The failure also occurred in the [Windows job for `bccaa245`](https://github.com/jewei/tinydash/actions/runs/35324561816/job/105534607159). Both Windows jobs reported 106 passed tests, one failed test, and two ignored tests. Diagnose the path comparison and obtain a passing Windows run for the release commit.
++The assertion compared a regular Windows path with a path that included the `\\?\` prefix. The failure also occurred in the [Windows job for `bccaa245`](https://github.com/jewei/tinydash/actions/runs/35324561816/job/105534607159). Both Windows jobs reported 106 passed tests, one failed test, and two ignored tests. The assertion now compares resolved paths and passed locally on Mac. Obtain a passing Windows run for the release commit.
+ 
+ ## Required release checks
+ 
+ All checks in this section start as `PENDING`. Add a result record for each check and platform. The owner must supply the evidence before changing a result to `PASS`.
+ 
+-Use the publication stages below. B6 requires a published prerelease, P1 through P3 require testers, and L1 requires stable promotion. Those checks cannot run while all downloads remain in a draft release.
++Use the publication stages below. B6 requires a published prerelease, P1 through P3 record desktop checks and available tester feedback, and L1 requires stable promotion. Those checks cannot run while all downloads remain in a draft release.
+ 
+ ### Scope and source
+ 
+-| ID  | Pass criteria                                                                                                                                                                                                                                                           | Evidence                                                                                                   |
+-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+-| S1  | Release notes name the supported OS versions, processors, package types, and Linux session limits. The license, price, and publisher are recorded.                                                                                                                      | Release notes and support matrix.                                                                          |
+-| S2  | All version files and the release tag agree. Every package uses the selected source commit. The application identifier remains unchanged.                                                                                                                               | Tag, source SHA, package metadata, and workflow run.                                                       |
+-| S3  | The updater key has a named custodian and an encrypted offline backup outside CI. A restored key signs a test file that verifies with the public key from the candidate installer. Recovery secrets remain private.                                                     | Custodian, public-key fingerprint, protected backup reference, and successful restore/sign/verify report.  |
+-| S4  | Loss, compromise, planned key changes, and publisher-certificate renewal have documented procedures. Test recovery with disposable keys, including manual reinstall if the old key is unavailable or untrusted. OS certificate renewal keeps the updater key unchanged. | Expiry/renewal record and recovery exercise. Record how affected access and certificates would be revoked. |
++| ID  | Pass criteria                                                                                                                                                                                                       | Evidence                                                                                                  |
++| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
++| S1  | Release notes name the supported OS versions, processors, package types, and Linux session limits. The license, price, and publisher are recorded.                                                                  | Release notes and support matrix.                                                                         |
++| S2  | All version files and the release tag agree. Every package uses the selected source commit. The application identifier remains unchanged.                                                                           | Tag, source SHA, package metadata, and workflow run.                                                      |
++| S3  | The updater key has a named custodian and an encrypted offline backup outside CI. A restored key signs a test file that verifies with the public key from the candidate installer. Recovery secrets remain private. | Custodian, public-key fingerprint, protected backup reference, and successful restore/sign/verify report. |
++| S4  | Loss, compromise, planned key changes, and Mac certificate renewal have documented procedures. Mac certificate renewal keeps the updater key unchanged.                                                             | Procedure in release setup, certificate expiry, and the S3 backup recovery result.                        |
+ 
+ ### Build and package integrity
+ 
+-| ID  | Pass criteria                                                                                                                                                                                                                      | Evidence                                                                       |
+-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+-| B1  | Formatting, type checks, Rust checks, browser tests, all three builds, and Windows/Linux native checks pass for the selected source commit and candidate packages.                                                                 | Completed CI run and job links.                                                |
+-| B2  | The release contains all three installers. Their versions and processor types match their labels. Checksums match the final signed files.                                                                                          | Asset inventory, build metadata, and SHA-256 results.                          |
+-| B3  | The Mac app has the expected Developer ID signature. Notarization succeeds, the ticket validates, and Gatekeeper accepts a browser-downloaded copy.                                                                                | Signing, notarization, ticket, and Gatekeeper logs.                            |
+-| B4  | The Windows app and installer have valid signatures, the expected publisher, and trusted timestamps. Record any SmartScreen prompt separately.                                                                                     | Authenticode output and screenshots from a clean Windows desktop.              |
+-| B5  | A clean Ubuntu 24.04 installation resolves the package's declared libraries. Its executable, desktop entry, and icons are installed correctly.                                                                                     | APT log, package metadata, and desktop screenshot.                             |
+-| B6  | All three published prerelease assets download without authentication and match the final candidate checksums. The prerelease is not latest, and the stable feed remains unchanged. The preview page labels the release candidate. | Release metadata, anonymous download logs, checksums, and a stable-feed check. |
++| ID  | Pass criteria                                                                                                                                                                                                                      | Evidence                                                                                                              |
++| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
++| B1  | Formatting, type checks, Rust checks, browser tests, all three builds, and Windows/Linux native checks pass for the selected source commit and candidate packages.                                                                 | Completed CI run and job links.                                                                                       |
++| B2  | The release contains all three installers. Their versions and processor types match their labels. Checksums match the final files after Mac signing and notarization. Publisher metadata follows the platform policy.              | Asset inventory, build metadata, and SHA-256 results.                                                                 |
++| B3  | The Mac app has the expected Developer ID signature. Notarization succeeds, the ticket validates, and Gatekeeper accepts a browser-downloaded copy.                                                                                | Signing, notarization, ticket, and Gatekeeper logs.                                                                   |
++| B4  | The Windows installer and extracted TinyDash executable report NotSigned. The matching updater signature is present. The page labels the unsigned preview. Record installation, launch, and the actual warning on Windows 11.      | PowerShell output and a clean Windows desktop report. Policy-blocked systems are recorded as unsupported, not passed. |
++| B5  | A clean Ubuntu 24.04 installation resolves the package's declared libraries. Its executable, desktop entry, and icons are installed correctly.                                                                                     | APT log, package metadata, and desktop screenshot.                                                                    |
++| B6  | All three published prerelease assets download without authentication and match the final candidate checksums. The prerelease is not latest, and the stable feed remains unchanged. The preview page labels the release candidate. | Release metadata, anonymous download logs, checksums, and a stable-feed check.                                        |
+ 
+-A SmartScreen reputation warning alone does not invalidate a valid publisher signature. Record its exact text and effect on installation. An invalid signature or policy block fails the applicable installation check. Do not describe signing as a guarantee of no warnings. See [Microsoft's SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
++The Windows preview can show unknown-publisher or SmartScreen warnings. Record the exact prompt and installation result. Do not report a trusted publisher. A security-policy block is an unsupported configuration, not a pass. Do not disable security controls for the test. See [Microsoft's signing guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options).
+ 
+ ### Installation and removal
+ 
+@@ -133,20 +138,20 @@ Use [desktop-checks.md](desktop-checks.md) for the full app checks. Use test dat
+ 
+ ### Updates and recovery
+ 
+-After v1, the required upgrade source is the previous public version. Before v1, use an earlier signed test version A and the candidate B. Mark only the unavailable previous-public-version case as `NOT APPLICABLE`, with the reason. The A-to-B upgrade test is still required. An A-to-A reinstall does not prove that upgrades work.
++After v1, the required upgrade source is the previous public version. Before v1, use an earlier test version A and candidate B with the same updater key. A Mac candidate also needs Developer ID signing; Windows remains an unsigned preview. Mark only the unavailable previous-public-version case as `NOT APPLICABLE`, with the reason. The A-to-B upgrade test is still required. An A-to-A reinstall does not prove that upgrades work.
+ 
+-Use the same application identifier and exact candidate bytes. Select a separate test feed through runtime configuration in disposable profiles. Record both versions, schema versions, and checksums. Populate settings, pins, sample history, and both clipboard-history choices. Verify the backup and restoration procedure before running interruption or migration-failure cases.
++Use the same application identifier and exact candidate bytes. Compile a separate HTTPS test feed into the older disposable test version. Point it at the exact candidate artifacts. The candidate keeps its compiled stable endpoint. There is no runtime feed override. Record both versions, schema versions, and checksums. Populate settings, pins, sample history, and both clipboard-history choices. Verify the backup and restoration procedure before running interruption or migration-failure cases.
+ 
+ | ID  | Pass criteria                                                                                                                                                                                                                                                                                           | Evidence                                                                                                                                   |
+ | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+-| U1  | Mac and Windows update the previous public version to the candidate. For v1, use an earlier signed test version. Settings, pins, history, and clipboard-history choices remain. The current version shows no update to itself.                                                                          | Source and target versions, checksums, and before-and-after data checks.                                                                   |
++| U1  | Mac and Windows update the previous public version to the candidate. For v1, use an older test version with the same updater key. Settings, pins, history, and clipboard choice remain. The current version does not update to itself.                                                                  | Source and target versions, checksums, and before-and-after data checks.                                                                   |
+ | U2  | The update flow rejects changed files and invalid signatures. It handles offline checks, missing assets, invalid metadata, and interrupted downloads without replacing the working app.                                                                                                                 | Failure-case logs and a successful launch of the retained version.                                                                         |
+-| U3  | Each updater selects the correct OS and processor package. The user can defer installation. Candidate builds use the compile-time `TINYDASH_UPDATE_ENDPOINT`; public builds use the stable feed. The stable feed excludes public prereleases.                                                           | Per-system feed and update tests using the same candidate bytes.                                                                           |
++| U3  | Each updater selects the correct OS and processor. The user can defer installation. The older test build may use a separate compiled HTTPS feed. The exact candidate uses the stable feed, which excludes prereleases.                                                                                  | Feed and update checks for each system. Do not rebuild the candidate for promotion.                                                        |
+ | U4  | Ubuntu uses the supported manual procedure: quit, install the new .deb with APT, and reopen. The required source version follows U1. Data and preferences remain, with one package, desktop entry, startup entry if enabled, and resident process.                                                      | APT log, version and data checks, registration inventory, and process count. Instructions state that v1 has no APT update feed.            |
+ | U5  | Before migration, a readable backup preserves database and settings with recorded schema versions. Backup failure stops migration. Migration failure rolls back schema/version and preserves data and clipboard choice. Restore to a compatible app succeeds. Newer schemas are retained without reset. | Disk-backed migration/failure results, backup/restore checks, and existing migration unit tests. Include full disk and denied-write cases. |
+ | U6  | Interrupt installation during replacement and interrupt first startup separately. Recovery or documented repair restores one usable installation with retained data. It preserves the pre-migration backup and requires an explicit choice before restoring older data.                                 | Interruption-point logs, repair steps, version/data checks, and duplicate-registration/process checks for each system.                     |
+ 
+-Tauri requires signed updater files. Those signatures do not replace Mac or Windows publisher signing. Its Linux updater package is AppImage, not `.deb`. See the [Tauri updater documentation](https://v2.tauri.app/plugin/updater/).
++Tauri requires signed updater files. Those signatures do not establish OS publisher trust. Mac also uses Developer ID; the Windows preview has no publisher signature. Its Linux updater package is AppImage, not `.deb`. See the [Tauri updater documentation](https://v2.tauri.app/plugin/updater/).
+ 
+ ### Download page and release images
+ 
+@@ -155,50 +160,50 @@ Tauri requires signed updater files. Those signatures do not replace Mac or Wind
+ | W1  | The main button selects the correct OS. All downloads remain available. Unknown systems and mobile browsers show manual choices. Processor support is explicit.                                                                 | Browser tests for Mac, Windows, Linux, mobile, and unknown OS values.                   |
+ | W2  | Before prerelease publication, staged mappings select the correct installer and version for every button. Unsupported systems receive clear instructions. B6 and L1 separately verify downloads after their publication stages. | Staged link mappings and package checks. Public download evidence belongs to B6 and L1. |
+ | W3  | At 375, 768, and 1440 CSS pixels, content has no horizontal overflow. Keyboard focus, links, contrast, and image descriptions are usable.                                                                                       | Browser screenshots and keyboard checks.                                                |
+-| W4  | The Mac reference image has a Mac caption. Windows and Linux images come from their own candidate builds. Images use sample data and match the advertised features.                                                             | Image inventory with source version and OS.                                             |
+-| W5  | The page states price, system limits, network use, clipboard storage, manual Ubuntu updates, the Windows runtime download requirement, backup/removal steps, and support accurately. Performance claims have measurements.      | Copy review against the candidate, update policy, and installation instructions.        |
++| W4  | The supplied Mac image has a Mac caption. Any extra images identify their actual platform and contain sample data. Extra platform images and a recording are optional.                                                          | Review of the images used on the page.                                                  |
++| W5  | The page states price, system limits, network use, clipboard storage, manual Ubuntu updates, the unsigned Windows preview, the WebView2 internet requirement, removal, and support accurately.                                  | Copy review against the candidate and install instructions.                             |
+ 
+ Use [the supplied image](assets/launcher-macos-light.png) to check the intended appearance. Do not require other platforms to reproduce Mac key symbols or font rendering. Confirm the page works at the deployed GitHub Pages base path as well as in local preview.
+ 
+ ### User verification
+ 
+-| ID  | Pass criteria                                                                                                                                                                                           | Evidence                                                                 |
+-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+-| P1  | Five users per system join the initial check. Record each OS, processor, version, and installation route. Keep all attempts and any additional tester results.                                          | Anonymous tester IDs and complete task records.                          |
+-| P2  | At least four of the initial five users on each system install, open, search, and remove the app without live help. Record time to first success and each failure.                                      | Raw task counts per system. Do not present a general success percentage. |
+-| P3  | All required technical failures are fixed and retested. No unresolved data-loss, removal, signing/trust, or launch failure remains, regardless of P2. Supported limitations appear in the instructions. | Issue links, retest evidence, and updated instructions.                  |
++| ID  | Pass criteria                                                                                                                                                                                                    | Evidence                                                                   |
++| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
++| P1  | Keep one completed desktop report for each supported system. The maintainer can run these checks. Record OS, processor, version, and installation route.                                                         | Three platform reports, with X11 and Wayland coverage in the Linux report. |
++| P2  | Record available tester attempts to install, launch, search, and remove the app. No quota or percentage applies. If no external testers are available, mark this optional check NOT APPLICABLE with that reason. | Task results and feedback, or the explicit reason no external check ran.   |
++| P3  | Fix and retest technical failures on supported systems. Keep installation warnings and unsupported security-policy configurations in the instructions.                                                           | Issues, retest evidence, and accurate support limits.                      |
+ 
+-Four successful users out of five is a small first-use check, not an estimate of a general success rate. Keep the initial group and all additional results in the record. Do not remove failed attempts to meet the target. An unresolved critical failure from any tester blocks promotion.
++There is no tester quota or success percentage. One maintainer can complete the desktop checks. Record all external attempts when testers are available. A critical failure on a supported system must be fixed and retested before promotion.
+ 
+ Ask testers after seven days whether they still use TinyDash and why. This follow-up informs later work; it is not a release requirement. Download counts do not establish continued use.
+ 
+ ### Publication
+ 
+-| ID  | Pass criteria                                                                                                                                                                                                                                | Evidence                                                                                           |
+-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+-| L1  | All earlier promotion checks pass. After stable promotion, anonymous downloads return all three installers. The release ID, tag, versions, assets, signatures, and SHA-256 values match the tested prerelease. No rebuild occurred.          | Candidate and stable release inventories, before-and-after checksums, and anonymous download logs. |
+-| L2  | The stable website and update feed change only after L1 passes. All three systems are available before announcements. The test feed remains separate.                                                                                        | Website deployment, stable manifest, and final link checks.                                        |
+-| L3  | A rehearsal demonstrates stopping update promotion and recovering a usable installation with retained data. It covers the verified backup, compatible app/schema pairs, and key-incident procedures. It does not force a database downgrade. | Recovery procedure, U5/U6 reports, S3/S4 evidence, and a rehearsal on the test feed.               |
++| ID  | Pass criteria                                                                                                                                                                                                                       | Evidence                                                                                           |
++| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
++| L1  | All earlier promotion checks pass. After stable promotion, anonymous downloads return all three installers. The release ID, tag, versions, assets, signatures, and SHA-256 values match the tested prerelease. No rebuild occurred. | Candidate and stable release inventories, before-and-after checksums, and anonymous download logs. |
++| L2  | Marking the release latest makes its existing latest.json available through the stable feed. L1 verifies that feed and all three installers. Publish the website links after L1, before announcements. Keep the test feed separate. | Release metadata, stable feed, website deployment, and final link checks.                          |
++| L3  | The recovery instructions match the backup and interrupted-update checks. They explain restoring data with a compatible app and recovering a lost updater key. They do not force a database downgrade.                              | U5/U6 results and the S3/S4 recovery instructions. No separate incident exercise is required.      |
+ 
+ Use these stages to avoid circular requirements:
+ 
+-| Stage               | Checks required to proceed                                                                             | Action                                                                                                 |
+-| ------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+-| Internal candidate  | S1 through S4, B1 through B5, I1 through I6, F1 through F4, U1 through U6, W1 through W5, and L3 pass. | Publish all three packages together as a prerelease. Leave the stable feed unchanged.                  |
+-| Public candidate    | B6 passes on the published prerelease.                                                                 | Give anonymous download links to the test users. Run P1 through P3.                                    |
+-| Stable promotion    | All earlier required checks and P1 through P3 pass, with no unresolved critical failure.               | Promote the same release by changing its prerelease/latest metadata. Preserve the tag and every asset. |
+-| Stable verification | L1 passes after promotion.                                                                             | Update the stable website links and update manifest, then complete L2 before announcements.            |
++| Stage               | Checks required to proceed                                                                                                        | Action                                                                                                                        |
++| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
++| Internal candidate  | S1 through S4, B1 through B5, I1 through I6, F1 through F4, U1 through U6, W1 through W5, and L3 pass.                            | Publish all three packages together as a prerelease. Leave the stable feed unchanged.                                         |
++| Public candidate    | B6 passes on the published prerelease.                                                                                            | Give anonymous download links to the test users. Run P1 through P3.                                                           |
++| Stable promotion    | All earlier required checks, P1, and P3 pass. P2 feedback is recorded or marked optional. No unresolved critical failure remains. | Promote the same release by changing its prerelease/latest metadata. Preserve the tag and every asset, including latest.json. |
++| Stable verification | L1 passes after promotion, including the stable feed.                                                                             | Update the stable website links, then complete L2 before announcements.                                                       |
+ 
+-A required `FAIL` or `PENDING` result prevents its stage from proceeding. Additional package-manager channels do not hold the direct-download release. GitHub supports [changing prerelease status while retaining release assets](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#editing-a-release).
++A required `FAIL` or `PENDING` result prevents its stage from proceeding. P2 external feedback is optional. Complete P1 platform reports and P3 failure review. Additional package-manager channels do not hold the direct-download release. GitHub supports [changing prerelease status while retaining release assets](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#editing-a-release).
+ 
+ ## Additional installation channels
+ 
+ Run these checks before advertising a Homebrew or WinGet command. They start as `PENDING` and apply only when that channel is offered.
+ 
+-| ID  | Pass criteria                                                                                                                                            | Evidence                                            |
+-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+-| C1  | The published command installs the expected signed release on a clean system. Its manifest uses the correct versioned URL, processor type, and checksum. | Package review or publication link and install log. |
+-| C2  | The documented update and removal commands work. App updates and package-manager updates do not cause a downgrade or remove saved data unexpectedly.     | Update, removal, and retained-data checks.          |
++| ID  | Pass criteria                                                                                                                                                             | Evidence                                            |
++| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
++| C1  | The advertised command installs the expected release on a clean system. Its manifest uses the correct versioned URL, processor, checksum, and signing-policy description. | Package review or publication link and install log. |
++| C2  | The documented update and removal commands work. App updates and package-manager updates do not cause a downgrade or remove saved data unexpectedly.                      | Update, removal, and retained-data checks.          |
+ 
+ ## Test result template
+ 
+diff --git a/docs/windows-signing.md b/docs/windows-signing.md
+index 7cf0df5..0ce72d4 100644
+--- a/docs/windows-signing.md
++++ b/docs/windows-signing.md
+@@ -1,7 +1,8 @@
+ # Windows signing options
+ 
+-Status: paused at the maintainer's request on 19 September 2026.
+-See the [release checkpoint](release-checkpoint.md) before resuming work.
++Status: resumed on 19 September 2026. The maintainer accepted an unsigned
++Windows preview for the first release. Publisher signing is deferred.
++See [release setup](release-setup.md) for the active configuration.
+ 
+ TinyDash is a small open source project maintained by one individual in
+ Malaysia. The maintainer excludes services that cost more than $10. Use free
+@@ -64,20 +65,21 @@ key. See [Tauri update signing](https://v2.tauri.app/plugin/updater/#signing-upd
+ These update signatures and hashes do not establish a trusted Windows publisher
+ for the first installation. Keep that distinction clear on the download page.
+ 
+-## Recommendation for resuming work
++## Selected route
+ 
+ Keep GitHub Releases and the existing static site. Use GitHub Pages or
+-Cloudflare Pages with its supplied domain. Check SignPath eligibility first.
+-Treat a clearly labeled unsigned Windows preview as an optional temporary
+-route. Consider MSIX only if the maintainer prefers the Store installation
+-experience enough to justify the packaging work.
++Cloudflare Pages with its supplied domain. Publish the existing NSIS installer
++as an unsigned Windows preview. Add SHA-256 checksums and keep Tauri update
++signatures. The workflow no longer imports a Windows PFX or requires Windows
++publisher credentials. No signing service or Store conversion is needed now.
+ 
+-No Windows route has been selected. An unsigned preview would change the
+-earlier signed-Windows release requirement. Record that choice before adapting
+-the workflow or publishing. The combined Mac, Windows, and Ubuntu release
+-scope remains unchanged.
++State the warning beside the Windows download. Test installation and launch
++on Windows 11 with a standard user account. Record the exact trust prompt.
++Systems that block unsigned software are outside preview support. Do not call
++a blocked installation a pass or ask users to disable security controls.
++The combined Mac, Windows, and Ubuntu release scope remains unchanged.
+ 
+ Keep the completed backup and site work. Reuse the existing CI. Retain the
+ basic install, launch, update, data-preservation, and removal checks.
+-The longer verification list remains a reference while the release process
+-is reduced to fit a solo project.
++There is no tester quota. Keep one report per supported system. Revisit
++SignPath if project eligibility improves, or the Store if users request it.
+diff --git a/scripts/ci/artifacts.ts b/scripts/ci/artifacts.ts
+index c42b245..87bd12c 100644
+--- a/scripts/ci/artifacts.ts
++++ b/scripts/ci/artifacts.ts
+@@ -130,9 +130,16 @@ if (command === "verify") {
+   const modified = execFileSync("git", ["status", "--porcelain"], {
+     encoding: "utf8",
+   }).trim();
++  const publisherSigning = releaseMode
++    ? process.platform === "darwin"
++      ? "Developer ID"
++      : process.platform === "win32"
++        ? "none (unsigned preview)"
++        : "none"
++    : "none";
+   await writeFile(
+     join(output, "build.txt"),
+-    `Commit: ${commit}\nSource: ${modified ? "modified worktree" : "clean worktree"}\nVersion: ${config.version}\nOS: ${process.platform}\nArchitecture: ${arch}\nDistribution: ${process.env.RELEASE_MODE === "true" ? (process.env.UPDATER_ARTIFACTS === "true" ? "release candidate with updater signatures" : "release candidate") : "unsigned test build"}\n`,
++    `Commit: ${commit}\nSource: ${modified ? "modified worktree" : "clean worktree"}\nVersion: ${config.version}\nOS: ${process.platform}\nArchitecture: ${arch}\nDistribution: ${releaseMode ? (process.env.UPDATER_ARTIFACTS === "true" ? "release candidate with updater signatures" : "release candidate") : "unsigned test build"}\nPublisher signing: ${publisherSigning}\n`,
+   );
+   files.push("build.txt");
+   await writeChecksums(files);
+diff --git a/scripts/release/require-config.sh b/scripts/release/require-config.sh
+index f133ac7..1cb93d4 100755
+--- a/scripts/release/require-config.sh
++++ b/scripts/release/require-config.sh
+@@ -2,36 +2,38 @@
+ set -euo pipefail
+ 
+ if [[ "${RELEASE_MODE:-false}" != "true" ]]; then
+-  echo 'Release signing checks are disabled for an unsigned build.'
++  echo 'Release configuration checks are disabled for a development build.'
+   exit 0
+ fi
+ 
+-required=(
+-  APPLE_CERTIFICATE
+-  APPLE_CERTIFICATE_PASSWORD
+-  APPLE_SIGNING_IDENTITY
+-  APPLE_ID
+-  APPLE_PASSWORD
+-  APPLE_TEAM_ID
+-  WINDOWS_CERTIFICATE
+-  WINDOWS_CERTIFICATE_PASSWORD
+-  TAURI_SIGNING_PRIVATE_KEY
+-  TAURI_UPDATER_PUBLIC_KEY
+-  TINYDASH_UPDATE_ENDPOINT
+-)
++required=()
++case "${RUNNER_OS:-}" in
++  macOS)
++    required=(APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY
++      APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID)
++    ;;
++  Windows) ;; # The Windows preview has no Authenticode certificate.
++  Linux)
++    echo 'Linux uses SHA-256 checksums and manual .deb updates. No signing secrets are required.'
++    exit 0
++    ;;
++  *) echo 'Release mode requires RUNNER_OS=macOS, Windows, or Linux.' >&2; exit 1 ;;
++esac
++required+=(TAURI_SIGNING_PRIVATE_KEY TAURI_UPDATER_PUBLIC_KEY TINYDASH_UPDATE_ENDPOINT)
+ missing=()
+ for name in "${required[@]}"; do
+-  if [[ -z "${!name:-}" ]]; then missing+=("$name"); fi
++  value=${!name:-}
++  if [[ -z "${value//[[:space:]]/}" ]]; then missing+=("$name"); fi
+ done
+-if [[ "${APPLE_SIGNING_IDENTITY:-}" == "-" ]]; then
+-  missing+=("APPLE_SIGNING_IDENTITY (Developer ID identity required; '-' is ad-hoc)")
++if [[ "$RUNNER_OS" == "macOS" && "${APPLE_SIGNING_IDENTITY:-}" != 'Developer ID Application: '* ]]; then
++  missing+=("APPLE_SIGNING_IDENTITY (Developer ID Application identity required)")
+ fi
+ if [[ -n "${TINYDASH_UPDATE_ENDPOINT:-}" && "${TINYDASH_UPDATE_ENDPOINT}" != https://* ]]; then
+   missing+=("TINYDASH_UPDATE_ENDPOINT (HTTPS URL required)")
+ fi
+ if ((${#missing[@]})); then
+-  printf 'Release mode needs signing and updater configuration. Missing:\n' >&2
++  printf 'Release mode needs valid configuration for %s. Missing or invalid:\n' "$RUNNER_OS" >&2
+   printf '  %s\n' "${missing[@]}" >&2
+   exit 1
+ fi
+-echo 'Release signing and updater configuration is present.'
++echo "Release configuration is present for $RUNNER_OS."
+diff --git a/scripts/release/stage-assets.sh b/scripts/release/stage-assets.sh
+index 61b0181..8b69788 100755
+--- a/scripts/release/stage-assets.sh
++++ b/scripts/release/stage-assets.sh
+@@ -40,7 +40,7 @@ for directory in "$@"; do
+   RELEASE_MODE=true UPDATER_ARTIFACTS="$updater_artifacts" \
+     bun scripts/release/verify-artifacts.ts "$directory" "$platform" "$architecture"
+   if grep -Fxq 'Distribution: unsigned test build' "$directory/build.txt"; then
+-    echo "Refusing unsigned build in a staged release: $directory" >&2
++    echo "Refusing development build in a staged release: $directory" >&2
+     exit 1
+   fi
+   while IFS= read -r -d '' file; do
+diff --git a/scripts/release/tauri-build-config.ts b/scripts/release/tauri-build-config.ts
+index 1fbb1bd..0463b4d 100644
+--- a/scripts/release/tauri-build-config.ts
++++ b/scripts/release/tauri-build-config.ts
+@@ -12,8 +12,11 @@ const plugins = { updater: { pubkey: publicKey } };
+ 
+ let config: object;
+ if (platform === "macos") {
+-  const signingIdentity = process.env.APPLE_SIGNING_IDENTITY;
+-  assert(signingIdentity, "Missing signing configuration for macos");
++  const signingIdentity = process.env.APPLE_SIGNING_IDENTITY?.trim();
++  assert(
++    signingIdentity?.startsWith("Developer ID Application: "),
++    "A Developer ID Application identity is required for macos",
++  );
+   config = {
+     plugins,
+     bundle: {
+@@ -22,16 +25,13 @@ if (platform === "macos") {
+     },
+   };
+ } else {
+-  const certificateThumbprint = process.env.WINDOWS_CERTIFICATE_THUMBPRINT;
+-  assert(certificateThumbprint, "Missing signing configuration for windows");
+   config = {
+     plugins,
+     bundle: {
+       createUpdaterArtifacts: true,
+       windows: {
+-        certificateThumbprint,
+-        digestAlgorithm: "sha256",
+-        timestampUrl: "https://timestamp.digicert.com",
++        certificateThumbprint: null,
++        signCommand: null,
+       },
+     },
+   };
+diff --git a/scripts/release/verify-artifacts.ts b/scripts/release/verify-artifacts.ts
+index 1846629..94a0bcf 100644
+--- a/scripts/release/verify-artifacts.ts
++++ b/scripts/release/verify-artifacts.ts
+@@ -27,6 +27,7 @@ for (const name of [
+   "OS",
+   "Architecture",
+   "Distribution",
++  "Publisher signing",
+ ]) {
+   assert(fields[name], `Missing build metadata field: ${name}`);
+ }
+@@ -73,6 +74,11 @@ assert.equal(
+   "Build was not made from the checked-out commit",
+ );
+ if (process.env.RELEASE_MODE === "true") {
++  assert.equal(
++    process.env.UPDATER_ARTIFACTS === "true",
++    expectedPlatform !== "linux",
++    "Release updates require signatures on Mac and Windows; Linux uses manual .deb updates",
++  );
+   assert.equal(
+     fields.Source,
+     "clean worktree",
+@@ -83,12 +89,24 @@ if (process.env.RELEASE_MODE === "true") {
+       ? "release candidate with updater signatures"
+       : "release candidate";
+   assert.equal(fields.Distribution, expectedDistribution);
++  const expectedPublisher =
++    expectedPlatform === "darwin"
++      ? "Developer ID"
++      : expectedPlatform === "win32"
++        ? "none (unsigned preview)"
++        : "none";
++  assert.equal(
++    fields["Publisher signing"],
++    expectedPublisher,
++    "Publisher signing does not match the release policy",
++  );
+ } else {
+   assert.equal(
+     fields.Distribution,
+     "unsigned test build",
+     "Unexpected distribution type in test mode",
+   );
++  assert.equal(fields["Publisher signing"], "none");
+ }
+ 
+ const names = (await readdir(directory)).sort();
+@@ -152,13 +170,24 @@ if (process.env.UPDATER_ARTIFACTS === "true") {
+       updaterSignatures[0] === `${updaterArchives[0]}.sig`,
+       "macOS updater signature does not match its archive",
+     );
++    assert(
++      (await readFile(join(directory, updaterSignatures[0]), "utf8")).trim(),
++      "macOS updater signature is empty",
++    );
+   } else if (expectedPlatform === "win32") {
+     const signature = `_${version}_x64-setup.exe.sig`;
+     assert(
+       names.filter((name) => name.endsWith("-setup.exe.sig")).length === 1 &&
+-        names.filter((name) => name.endsWith(signature)).length === 1,
++        names.filter((name) => name.endsWith(signature)).length === 1 &&
++        names.includes(`${packageNames[0]}.sig`),
+       "Expected one Windows updater signature with the release architecture",
+     );
++    assert(
++      (
++        await readFile(join(directory, `${packageNames[0]}.sig`), "utf8")
++      ).trim(),
++      "Windows updater signature is empty",
++    );
+   } else {
+     throw new Error("Updater artifacts are unsupported for Linux .deb builds");
+   }
+diff --git a/scripts/release/verify-windows-signing.ps1 b/scripts/release/verify-windows-signing.ps1
+deleted file mode 100644
+index c48f3ea..0000000
+--- a/scripts/release/verify-windows-signing.ps1
++++ /dev/null
+@@ -1,38 +0,0 @@
+-param(
+-    [Parameter(Mandatory = $true)]
+-    [string]$ExpectedThumbprint
+-)
+-
+-$ErrorActionPreference = 'Stop'
+-function Test-SignedFile([string]$Path, [string]$Label) {
+-    if (-not (Test-Path $Path -PathType Leaf)) { throw "Missing signed ${Label}: $Path" }
+-    $signature = Get-AuthenticodeSignature $Path
+-    if ($signature.Status -ne 'Valid') { throw "$Label signature is $($signature.Status)." }
+-    if (-not $signature.SignerCertificate) { throw "$Label has no signer certificate." }
+-    $actualThumbprint = $signature.SignerCertificate.Thumbprint.Replace(' ', '').ToUpperInvariant()
+-    if ($actualThumbprint -ne $ExpectedThumbprint.Replace(' ', '').ToUpperInvariant()) {
+-        throw "Unexpected $Label signing certificate: $actualThumbprint"
+-    }
+-    if (-not $signature.TimeStamperCertificate) { throw "$Label has no Authenticode timestamp." }
+-}
+-$installer = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe' -File)
+-if ($installer.Count -ne 1) { throw 'Expected one NSIS installer.' }
+-Test-SignedFile $installer[0].FullName 'NSIS installer'
+-$extract = Join-Path $env:RUNNER_TEMP ('tinydash-installer-' + [guid]::NewGuid().ToString())
+-$sevenZip = (Get-Command 7z.exe -ErrorAction Stop).Source
+-try {
+-    New-Item -ItemType Directory -Path $extract | Out-Null
+-    & $sevenZip x $installer[0].FullName "-o$extract" -y
+-    if ($LASTEXITCODE -ne 0) { throw "7-Zip failed with exit code $LASTEXITCODE." }
+-    $binaries = @(Get-ChildItem $extract -Recurse -File -Filter 'tinydash.exe')
+-    if ($binaries.Count -ne 1) { throw 'Expected one bundled tinydash.exe in the NSIS installer.' }
+-    Test-SignedFile $binaries[0].FullName 'extracted bundled executable'
+-}
+-finally {
+-    Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
+-}
+-$updater = @(Get-ChildItem 'src-tauri/target/release/bundle/nsis/*-setup.exe.sig')
+-if ($updater.Count -ne 1) { throw 'Expected one Windows updater signature.' }
+-$artifact = $updater[0].FullName.Substring(0, $updater[0].FullName.Length - 4)
+-if (-not (Test-Path $artifact)) { throw 'Windows updater artifact is missing.' }
+-Write-Output 'PASS: Windows Authenticode signature and updater pair'
+diff --git a/src-tauri/src/launcher/files.rs b/src-tauri/src/launcher/files.rs
+index 0939104..9839497 100644
+--- a/src-tauri/src/launcher/files.rs
++++ b/src-tauri/src/launcher/files.rs
+@@ -298,7 +298,7 @@ mod tests {
+         let results = search.search("example", SearchMode::Files).unwrap().results;
+         assert_eq!(results.len(), 1);
+         assert_eq!(
+-            PathBuf::from(&results[0].subtitle),
++            PathBuf::from(&results[0].subtitle).canonicalize().unwrap(),
+             downloads.canonicalize().unwrap().join("example.txt")
+         );
+         drop(search);
+diff --git a/src-tauri/src/launcher/search.rs b/src-tauri/src/launcher/search.rs
+index 16049e1..93ab5bf 100644
+--- a/src-tauri/src/launcher/search.rs
++++ b/src-tauri/src/launcher/search.rs
+@@ -453,7 +453,7 @@ impl SearchManager {
+             || (query.mode == SearchMode::All && !query.text.is_empty())
+         {
+             // File results include usage before their own top-N limit. This
+-            // preserves global ranking without allocating a result per file.
++            // preserves file ranking without allocating a result per file.
+             results.extend(self.files.search(
+                 query.text,
+                 &mut self.matcher,
+@@ -472,6 +472,119 @@ impl SearchManager {
+ #[cfg(test)]
+ mod tests {
+     use super::*;
++    use crate::{
++        launcher::result::ResultKind,
++        providers::{
++            files::{ScanReport, scan},
++            system::SystemCommand,
++        },
++    };
++
++    #[test]
++    fn app_prefix_precedes_exact_emoji_shortcode_in_all() {
++        let mut manager = SearchManager::default();
++        manager.replace_apps(AppProvider::new(vec![AppEntry::new(
++            "Safari".into(),
++            "/apps/Safari.app".into(),
++            vec![],
++        )]));
++        let emoji = manager.search(":sa:", SearchMode::All).unwrap().results[0].clone();
++        assert!(emoji.subtitle.starts_with(":sa:"));
++        for _ in 0..20 {
++            manager.record_usage(&emoji.id, ranking::now());
++        }
++
++        for input in ["sa", " SA "] {
++            let results = manager.search(input, SearchMode::All).unwrap().results;
++            assert_eq!(results[0].title, "Safari");
++            assert_eq!(results[0].primary_action, Action::Launch);
++            let emoji = results.iter().find(|result| result.id == emoji.id).unwrap();
++            assert!(emoji.score > results[0].score);
++        }
++
++        for (input, mode) in [("sa", SearchMode::Emoji), (":sa:", SearchMode::All)] {
++            let results = manager.search(input, mode).unwrap().results;
++            assert_eq!(results[0].id, emoji.id);
++            assert!(
++                results
++                    .iter()
++                    .all(|result| result.kind == ResultKind::Emoji)
++            );
++        }
++    }
++
++    #[test]
++    fn all_search_keeps_categories_together_in_launcher_order() {
++        let mut manager = SearchManager::default();
++        manager.replace_apps(AppProvider::new(vec![
++            AppEntry::new("Clock".into(), "/apps/Clock.app".into(), vec![]),
++            AppEntry::new("Logseq".into(), "/apps/Logseq.app".into(), vec![]),
++        ]));
++        let directory = tempfile::tempdir().unwrap();
++        std::fs::write(directory.path().join("lo"), "").unwrap();
++        manager.replace_files(scan(
++            vec![directory.path().to_owned()],
++            &[],
++            10,
++            &mut ScanReport::default(),
++        ));
++        manager.clipboard = ClipboardProvider::new(vec![ClipboardEntry {
++            id: 1,
++            content: "lo".into(),
++            created_at: 100,
++            last_used_at: None,
++        }]);
++        manager.system = Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec()));
++
++        let results = manager.search("lo", SearchMode::All).unwrap().results;
++        assert_eq!(results[0].title, "Logseq");
++        assert_eq!(results[1].title, "Clock");
++        let mut groups: Vec<_> = results.iter().map(|result| result.kind).collect();
++        groups.dedup();
++        assert_eq!(
++            groups,
++            [
++                ResultKind::App,
++                ResultKind::File,
++                ResultKind::Clipboard,
++                ResultKind::SystemCommand,
++                ResultKind::Emoji,
++            ]
++        );
++    }
++
++    #[test]
++    fn application_priority_applies_before_the_result_limit() {
++        let mut manager = SearchManager::default();
++        manager.replace_apps(AppProvider::new(
++            (0..40)
++                .map(|i| {
++                    AppEntry::new(format!("Safari {i:02}"), format!("/app/{i}").into(), vec![])
++                })
++                .collect(),
++        ));
++        manager.record_usage("app:/app/39", ranking::now());
++
++        let results = manager.search("sa", SearchMode::All).unwrap().results;
++        assert_eq!(results.len(), RESULT_LIMIT);
++        assert!(results.iter().all(|result| result.kind == ResultKind::App));
++        assert_eq!(results[0].title, "Safari 39");
++    }
++
++    #[test]
++    fn valid_calculation_precedes_an_app_with_the_same_name() {
++        let mut manager = SearchManager::default();
++        manager.replace_apps(AppProvider::new(vec![AppEntry::new(
++            "12 * 8".into(),
++            "/apps/calculator.app".into(),
++            vec![],
++        )]));
++
++        let results = manager.search("12 * 8", SearchMode::All).unwrap().results;
++        assert_eq!(results[0].kind, ResultKind::Calculation);
++        assert_eq!(results[0].title, "96");
++        assert_eq!(results[1].kind, ResultKind::App);
++    }
+ 
+     #[test]
+     fn pins_precede_the_result_limit_but_do_not_change_typed_search() {
+@@ -710,7 +823,6 @@ mod tests {
+ 
+     #[test]
+     fn system_search_is_lazy_scoped_and_uses_durable_ranking() {
+-        use crate::providers::system::SystemCommand;
+         let mut manager = manager();
+         manager.search("", SearchMode::All).expect("home");
+         assert!(manager.system.is_none());
+diff --git a/src-tauri/src/ranking/mod.rs b/src-tauri/src/ranking/mod.rs
+index 48d80cc..c661d8b 100644
+--- a/src-tauri/src/ranking/mod.rs
++++ b/src-tauri/src/ranking/mod.rs
+@@ -43,10 +43,26 @@ pub fn score_with_usage(score: u32, id: &str, usage: &HashMap<String, Usage>, no
+     score.saturating_add(usage.get(id).map_or(0, |stats| usage_bonus(*stats, now)))
+ }
+ 
+-/// Rank after provider collection and before limiting the response.
++/// Group by category, then rank matches before limiting the response.
+ pub fn top_results(mut results: Vec<SearchResult>, limit: usize) -> Vec<SearchResult> {
+-    // Stable sorting preserves the alphabetical provider order for ties.
+-    results.sort_by_key(|result| std::cmp::Reverse(result.score));
++    // An exact emoji shortcode must not displace an app prefix such as "sa".
++    // Explicit tools return separately; calculations can mix with text matches.
++    // Stable sorting keeps provider order for equal scores within a category.
++    results.sort_by_key(|result| {
++        let priority = match result.kind {
++            ResultKind::Calculation
++            | ResultKind::Password
++            | ResultKind::Timezone
++            | ResultKind::CleanedUrl
++            | ResultKind::WebSearch => 0,
++            ResultKind::App => 1,
++            ResultKind::File => 2,
++            ResultKind::Clipboard => 3,
++            ResultKind::SystemCommand => 4,
++            ResultKind::Emoji => 5,
++        };
++        (priority, std::cmp::Reverse(result.score))
++    });
+     results.truncate(limit);
+     results
+ }
+diff --git a/src-tauri/src/settings.rs b/src-tauri/src/settings.rs
+index 3a07bb3..c662643 100644
+--- a/src-tauri/src/settings.rs
++++ b/src-tauri/src/settings.rs
+@@ -130,9 +130,9 @@ impl Default for Settings {
+                 SearchMode::Apps,
+                 SearchMode::Files,
+                 SearchMode::Clipboard,
+-                SearchMode::Emoji,
+                 SearchMode::Calculator,
+                 SearchMode::System,
++                SearchMode::Emoji,
+                 SearchMode::Password,
+                 SearchMode::Timezone,
+                 SearchMode::Url,
+diff --git a/src/categories.ts b/src/categories.ts
+index 05f8a7c..ce7236b 100644
+--- a/src/categories.ts
++++ b/src/categories.ts
+@@ -24,9 +24,9 @@ export const categories = [
+   { id: "apps", label: "Apps" },
+   { id: "files", label: "Files" },
+   { id: "clipboard", label: "Clipboard" },
+-  { id: "emoji", label: "Emoji" },
+   { id: "calculator", label: "Calculator" },
+   { id: "system", label: "System" },
++  { id: "emoji", label: "Emoji" },
+   { id: "password", label: "Passwords" },
+   { id: "timezone", label: "Datetime" },
+   { id: "url", label: "URLs" },
+diff --git a/tests/categories.spec.ts b/tests/categories.spec.ts
+index 566cfc8..93fb868 100644
+--- a/tests/categories.spec.ts
++++ b/tests/categories.spec.ts
+@@ -42,7 +42,19 @@ test("Tab changes the category on the first press and keeps focus and query", as
+   page,
+ }) => {
+   await openLauncher(page);
+-  await expect(bar(page).getByRole("button")).toHaveCount(11);
++  await expect(bar(page).getByRole("button")).toHaveText([
++    "All",
++    "Apps",
++    "Files",
++    "Clipboard",
++    "Calculator",
++    "System",
++    "Emoji",
++    "Passwords",
++    "Datetime",
++    "URLs",
++    "Web",
++  ]);
+   await expect(page.locator(".scope-chip, .scope-popover")).toHaveCount(0);
+   await input(page).press("Tab");
+   await expect(active(page)).toHaveAccessibleName("Apps");
+@@ -116,7 +128,7 @@ test("the category bar stays usable in narrow windows and Escape hides the launc
+     .click();
+   await expect(input(page)).toBeFocused();
+   await input(page).press("Tab");
+-  await expect(active(page)).toHaveAccessibleName("Emoji");
++  await expect(active(page)).toHaveAccessibleName("Calculator");
+   await expect(active(page)).toBeInViewport({ ratio: 1 });
+   await input(page).press("Shift+Tab");
+   await expect(active(page)).toHaveAccessibleName("Clipboard");
+diff --git a/tests/release-config.spec.ts b/tests/release-config.spec.ts
+index acafbe9..c7b4cfc 100644
+--- a/tests/release-config.spec.ts
++++ b/tests/release-config.spec.ts
+@@ -1,22 +1,51 @@
+ import { execFileSync, spawnSync } from "node:child_process";
+ import { expect, test } from "@playwright/test";
+ 
++function releaseEnvironment(values: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
++  const env = { ...process.env };
++  for (const key of Object.keys(env)) {
++    if (
++      /^(APPLE_|WINDOWS_|TAURI_|TINYDASH_UPDATE_ENDPOINT$|RUNNER_OS$|RELEASE_MODE$)/.test(
++        key,
++      )
++    )
++      delete env[key];
++  }
++  return { ...env, RELEASE_MODE: "true", ...values };
++}
++
++const updater = {
++  TAURI_SIGNING_PRIVATE_KEY: "test-private-key",
++  TAURI_UPDATER_PUBLIC_KEY: "test-public-key",
++  TINYDASH_UPDATE_ENDPOINT: "https://example.com/latest.json",
++};
++const apple = {
++  APPLE_CERTIFICATE: "test-certificate",
++  APPLE_CERTIFICATE_PASSWORD: "test-password",
++  APPLE_SIGNING_IDENTITY: "Developer ID Application: Test",
++  APPLE_ID: "test@example.com",
++  APPLE_PASSWORD: "test-app-password",
++  APPLE_TEAM_ID: "TEST",
++};
++
+ for (const platform of ["macos", "windows"]) {
+   test(`${platform} release configuration supplies the updater public key`, () => {
+     const publicKey = "test-updater-public-key";
+     const config = JSON.parse(
+       execFileSync("bun", ["scripts/release/tauri-build-config.ts", platform], {
+         encoding: "utf8",
+-        env: {
+-          ...process.env,
++        env: releaseEnvironment({
+           APPLE_SIGNING_IDENTITY: "Developer ID Application: Test",
+-          WINDOWS_CERTIFICATE_THUMBPRINT: "TEST",
+           TAURI_UPDATER_PUBLIC_KEY: ` ${publicKey}\n`,
+-        },
++        }),
+       }),
+     );
+     expect(config.bundle.createUpdaterArtifacts).toBe(true);
+     expect(config.plugins.updater.pubkey).toBe(publicKey);
++    if (platform === "windows") {
++      expect(config.bundle.windows.certificateThumbprint).toBeNull();
++      expect(config.bundle.windows.signCommand).toBeNull();
++    }
+   });
+ 
+   test(`${platform} release configuration rejects a missing updater key`, () => {
+@@ -25,12 +54,10 @@ for (const platform of ["macos", "windows"]) {
+       ["scripts/release/tauri-build-config.ts", platform],
+       {
+         encoding: "utf8",
+-        env: {
+-          ...process.env,
++        env: releaseEnvironment({
+           APPLE_SIGNING_IDENTITY: "Developer ID Application: Test",
+-          WINDOWS_CERTIFICATE_THUMBPRINT: "TEST",
+           TAURI_UPDATER_PUBLIC_KEY: " \n",
+-        },
++        }),
+       },
+     );
+     expect(result.status).not.toBe(0);
+@@ -38,3 +65,90 @@ for (const platform of ["macos", "windows"]) {
+     expect(result.stdout).toBe("");
+   });
+ }
++
++test("Mac release configuration rejects an ad-hoc identity", () => {
++  const result = spawnSync(
++    "bun",
++    ["scripts/release/tauri-build-config.ts", "macos"],
++    {
++      encoding: "utf8",
++      env: releaseEnvironment({ ...updater, APPLE_SIGNING_IDENTITY: "-" }),
++    },
++  );
++  expect(result.status).not.toBe(0);
++  expect(result.stderr).toContain(
++    "Developer ID Application identity is required",
++  );
++  expect(result.stdout).toBe("");
++});
++
++for (const [platform, values] of [
++  ["macOS", { ...updater, ...apple }],
++  ["Windows", updater],
++  ["Linux", {}],
++] as const) {
++  test(`${platform} preflight requires only its own release credentials`, () => {
++    const result = spawnSync("bash", ["scripts/release/require-config.sh"], {
++      encoding: "utf8",
++      env: releaseEnvironment({ RUNNER_OS: platform, ...values }),
++    });
++    expect(result.stderr).toBe("");
++    expect(result.status).toBe(0);
++  });
++}
++
++for (const platform of ["macOS", "Windows"]) {
++  for (const key of Object.keys(updater)) {
++    test(`${platform} preflight rejects missing ${key}`, () => {
++      const result = spawnSync("bash", ["scripts/release/require-config.sh"], {
++        encoding: "utf8",
++        env: releaseEnvironment({
++          RUNNER_OS: platform,
++          ...apple,
++          ...updater,
++          [key]: " \n",
++        }),
++      });
++      expect(result.status).not.toBe(0);
++      expect(result.stderr).toContain(key);
++      expect(result.stderr).not.toContain(updater.TAURI_SIGNING_PRIVATE_KEY);
++      expect(result.stderr).not.toContain(apple.APPLE_PASSWORD);
++    });
++  }
++  test(`${platform} preflight rejects an HTTP update feed`, () => {
++    const result = spawnSync("bash", ["scripts/release/require-config.sh"], {
++      encoding: "utf8",
++      env: releaseEnvironment({
++        RUNNER_OS: platform,
++        ...apple,
++        ...updater,
++        TINYDASH_UPDATE_ENDPOINT: "http://example.com/latest.json",
++      }),
++    });
++    expect(result.status).not.toBe(0);
++    expect(result.stderr).toContain("HTTPS URL required");
++  });
++}
++
++test("Mac preflight rejects an Apple Development identity", () => {
++  const result = spawnSync("bash", ["scripts/release/require-config.sh"], {
++    encoding: "utf8",
++    env: releaseEnvironment({
++      RUNNER_OS: "macOS",
++      ...apple,
++      ...updater,
++      APPLE_SIGNING_IDENTITY: "Apple Development: Test",
++    }),
++  });
++  expect(result.status).not.toBe(0);
++  expect(result.stderr).toContain("Developer ID Application identity required");
++});
++
++test("release preflight rejects an unknown runner", () => {
++  const result = spawnSync("bash", ["scripts/release/require-config.sh"], {
++    encoding: "utf8",
++    env: releaseEnvironment({ RUNNER_OS: "unknown" }),
++  });
++  expect(result.status).not.toBe(0);
++  expect(result.stderr).toContain("RUNNER_OS");
++});

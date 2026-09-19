@@ -1,0 +1,221 @@
+{
+  "purpose": "Minimal page control; distinct diagnostic protocol with response-length tracing enabled.",
+  "metric": "macOS physical footprint, host and every attributed helper",
+  "length_unit": "UTF-16 code units (the old trace field is named bytes)",
+  "configurations": {
+    "real": {
+      "independent_runs": 5,
+      "runs": [
+        {
+          "file": "baseline-controlled-real-1.json",
+          "trial": 1,
+          "page_identity": {
+            "height": 620,
+            "marker": "launcher",
+            "minimal": false,
+            "scale": 2,
+            "url": "tauri://localhost",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 165.28587341308594,
+          "hidden_mib": 122.00462341308594
+        },
+        {
+          "file": "baseline-controlled-real-2.json",
+          "trial": 2,
+          "page_identity": {
+            "height": 620,
+            "marker": "launcher",
+            "minimal": false,
+            "scale": 2,
+            "url": "tauri://localhost",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 149.53578186035156,
+          "hidden_mib": 128.95763397216797
+        },
+        {
+          "file": "baseline-controlled-real-3.json",
+          "trial": 3,
+          "page_identity": {
+            "height": 620,
+            "marker": "launcher",
+            "minimal": false,
+            "scale": 2,
+            "url": "tauri://localhost",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 191.48904418945312,
+          "hidden_mib": 134.42652130126953
+        },
+        {
+          "file": "baseline-controlled-real-4.json",
+          "trial": 4,
+          "page_identity": {
+            "height": 620,
+            "marker": "launcher",
+            "minimal": false,
+            "scale": 2,
+            "url": "tauri://localhost",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 171.8328628540039,
+          "hidden_mib": 166.9109878540039
+        },
+        {
+          "file": "baseline-controlled-real-5.json",
+          "trial": 5,
+          "page_identity": {
+            "height": 620,
+            "marker": "launcher",
+            "minimal": false,
+            "scale": 2,
+            "url": "tauri://localhost",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 179.09837341308594,
+          "hidden_mib": 136.19212341308594
+        }
+      ],
+      "footprint": {
+        "visible": {
+          "values": [
+            165.28587341308594,
+            149.53578186035156,
+            191.48904418945312,
+            171.8328628540039,
+            179.09837341308594
+          ],
+          "median": 171.8328628540039,
+          "min": 149.53578186035156,
+          "max": 191.48904418945312
+        },
+        "hidden": {
+          "values": [
+            122.00462341308594,
+            128.95763397216797,
+            134.42652130126953,
+            166.9109878540039,
+            136.19212341308594
+          ],
+          "median": 134.42652130126953,
+          "min": 122.00462341308594,
+          "max": 166.9109878540039
+        }
+      }
+    },
+    "minimal": {
+      "independent_runs": 5,
+      "runs": [
+        {
+          "file": "baseline-controlled-minimal-1.json",
+          "trial": 1,
+          "page_identity": {
+            "height": 620,
+            "marker": "minimal",
+            "minimal": true,
+            "scale": 2,
+            "url": "tauri://localhost/minimal.html",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 79.98808288574219,
+          "hidden_mib": 84.25370788574219
+        },
+        {
+          "file": "baseline-controlled-minimal-2.json",
+          "trial": 2,
+          "page_identity": {
+            "height": 620,
+            "marker": "minimal",
+            "minimal": true,
+            "scale": 2,
+            "url": "tauri://localhost/minimal.html",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 76.95687866210938,
+          "hidden_mib": 89.47250366210938
+        },
+        {
+          "file": "baseline-controlled-minimal-3.json",
+          "trial": 3,
+          "page_identity": {
+            "height": 620,
+            "marker": "minimal",
+            "minimal": true,
+            "scale": 2,
+            "url": "tauri://localhost/minimal.html",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 78.25379943847656,
+          "hidden_mib": 88.37879943847656
+        },
+        {
+          "file": "baseline-controlled-minimal-4.json",
+          "trial": 4,
+          "page_identity": {
+            "height": 620,
+            "marker": "minimal",
+            "minimal": true,
+            "scale": 2,
+            "url": "tauri://localhost/minimal.html",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 79.58190155029297,
+          "hidden_mib": 88.69127655029297
+        },
+        {
+          "file": "baseline-controlled-minimal-5.json",
+          "trial": 5,
+          "page_identity": {
+            "height": 620,
+            "marker": "minimal",
+            "minimal": true,
+            "scale": 2,
+            "url": "tauri://localhost/minimal.html",
+            "width": 980
+          },
+          "queries": 108,
+          "visible_mib": 116.0828857421875,
+          "hidden_mib": 114.5516586303711
+        }
+      ],
+      "footprint": {
+        "visible": {
+          "values": [
+            79.98808288574219,
+            76.95687866210938,
+            78.25379943847656,
+            79.58190155029297,
+            116.0828857421875
+          ],
+          "median": 79.58190155029297,
+          "min": 76.95687866210938,
+          "max": 116.0828857421875
+        },
+        "hidden": {
+          "values": [
+            84.25370788574219,
+            89.47250366210938,
+            88.37879943847656,
+            88.69127655029297,
+            114.5516586303711
+          ],
+          "median": 88.69127655029297,
+          "min": 84.25370788574219,
+          "max": 114.5516586303711
+        }
+      }
+    }
+  },
+  "binary_sha256": "9e3b9482c5a0a6d620e24c4c24d3afd30464963f8fb68188ce1194734d419be9",
+  "matched_backend_requests_and_response_lengths": true
+}

@@ -1,0 +1,51 @@
+{
+  "rustc": {
+    "command": [
+      "rustc",
+      "--version"
+    ],
+    "exit_code": 0,
+    "output": "rustc 1.98.1 (48a229cea 2026-09-01)"
+  },
+  "cargo": {
+    "command": [
+      "cargo",
+      "--version"
+    ],
+    "exit_code": 0,
+    "output": "cargo 1.98.1 (797e8a9bc 2026-08-05)"
+  },
+  "bun": {
+    "command": [
+      "bun",
+      "--version"
+    ],
+    "exit_code": 0,
+    "output": "1.4.2"
+  },
+  "xcode": {
+    "command": [
+      "xcodebuild",
+      "-version"
+    ],
+    "exit_code": 0,
+    "output": "Xcode 27.0\nBuild version 27A266a"
+  },
+  "swift": {
+    "command": [
+      "swiftc",
+      "--version"
+    ],
+    "exit_code": 0,
+    "output": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx27.0.0"
+  },
+  "hardware": {
+    "command": [
+      "system_profiler",
+      "SPHardwareDataType",
+      "-json"
+    ],
+    "exit_code": 0,
+    "output": "{\"machine_model\": \"Mac14,2\", \"chip_type\": \"Apple M2\", \"physical_memory\": \"16 GB\"}"
+  }
+}

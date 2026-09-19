@@ -42,3 +42,25 @@ Native tests also change files while the window is hidden. They verify that Rust
 Before the dependency update, the release executable was 12,106,544 bytes. The previous Phase 7 executable was 11,228,016 bytes. These sizes exclude the app bundle metadata and OS webview libraries.
 
 Set `RUST_LOG=tinydash_lib=debug` to record the duration of the Rust window-show function. This duration excludes the time needed for the webview to paint. Use a desktop recording to measure visible invocation time. The automated startup check includes driver overhead and does not measure pure cold-start time or visible invocation time.
+
+## Bounded release benchmark results
+
+Measured on 19 September 2026 on arm64 macOS 27.0 with Rust 1.98.1. No other Cargo process was running when this check started. The existing ignored test built an index from 50,000 synthetic file entries. It ran four queries 25 times each, for 100 searches.
+
+| Measurement                        |    Result |
+| ---------------------------------- | --------: |
+| Synthetic index build              |    130 ms |
+| Search p50                         |  9,589 µs |
+| Search p95                         | 12,932 µs |
+| Search maximum                     | 18,156 µs |
+| Full cold command                  |   1:57.22 |
+| Release compilation inside command |      1:55 |
+| Benchmark test body                |    0.94 s |
+
+Command:
+
+```sh
+time cargo test --release --manifest-path src-tauri/Cargo.toml --locked profile_search_50k_files -- --ignored --nocapture
+```
+
+This is one local sample. It does not measure native OS shortcut or window latency, total webview memory, filesystem traversal, IPC, rendering, or clipboard capture cost. Native OS timing and total webview memory remain unverified.

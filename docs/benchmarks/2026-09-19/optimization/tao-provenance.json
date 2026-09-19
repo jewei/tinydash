@@ -1,0 +1,9 @@
+{
+  "version": "0.35.3",
+  "source": "https://static.crates.io/crates/tao/tao-0.35.3.crate",
+  "crate_sha256": "d1c93047acf68669466a34690ac58cca7010bd1b201e1ec86f1fd0a75d3dd4a9",
+  "modified_files": [
+    "src/platform_impl/macos/window.rs"
+  ],
+  "published_files": 119
+}
