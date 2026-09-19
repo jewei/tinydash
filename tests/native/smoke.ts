@@ -33,6 +33,29 @@ const binary = resolve(
 );
 await access(binary);
 const fixtures = await installFixtures();
+const settingsPath =
+  process.platform === "win32"
+    ? resolve(
+        process.env.APPDATA ?? "",
+        "dev.tinydash.launcher",
+        "settings.json",
+      )
+    : resolve(
+        fixtures.env.XDG_CONFIG_HOME ?? "",
+        "dev.tinydash.launcher",
+        "settings.json",
+      );
+const fixtureSettings = JSON.parse(
+  await readFile(settingsPath, "utf8"),
+) as Record<string, unknown>;
+await writeFile(
+  settingsPath,
+  JSON.stringify({
+    ...fixtureSettings,
+    clipboardHistoryEnabled: false,
+    clipboardHistoryDecided: false,
+  }),
+);
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 let session: string | undefined;
 let driver: ChildProcess | undefined;
@@ -112,8 +135,9 @@ async function until(
   throw new Error(`Timed out: ${description}`, { cause: lastError });
 }
 
-const observe = <T>(script: string) =>
-  request<T>(`/session/${session}/execute/sync`, "POST", { script, args: [] });
+const observeArgs = <T>(script: string, args: unknown[]) =>
+  request<T>(`/session/${session}/execute/sync`, "POST", { script, args });
+const observe = <T>(script: string) => observeArgs<T>(script, []);
 
 const keys = (element: string, text: string) =>
   request(`/session/${session}/element/${element}/value`, "POST", {
@@ -196,19 +220,39 @@ async function click(selector: string) {
   );
 }
 
+async function clickButtonText(text: string) {
+  const clicked = await observeArgs<boolean>(
+    `const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === arguments[0]);
+     if (!button || button.disabled) return false;
+     button.click();
+     return true;`,
+    [text],
+  );
+  assert(clicked, `Could not click button: ${text}`);
+}
+
+async function clickMenuItemText(text: string) {
+  await until(`menu item is available: ${text}`, () =>
+    observeArgs<boolean>(
+      `const item = [...document.querySelectorAll('[role=menuitem]')].find((element) => element.textContent?.trim() === arguments[0]);
+       if (!item || item.disabled || item.getAttribute('aria-disabled') === 'true') return false;
+       item.click();
+       return true;`,
+      [text],
+    ),
+  );
+}
+
 async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
   // All mode also matches paths. Isolate the intended provider so temporary
   // file paths do not affect app or clipboard result assertions.
-  // WebKitWebDriver can change the option without delivering its change
-  // event. Select as browser test drivers do, through the normal DOM events.
-  // This still runs the frontend handler and real Rust IPC; no results are mocked.
-  await request(`/session/${session}/execute/sync`, "POST", {
-    script: `const select = document.querySelector('select');
-      select.value = arguments[0];
-      select.dispatchEvent(new Event('input', { bubbles: true }));
-      select.dispatchEvent(new Event('change', { bubbles: true }));`,
-    args: [mode],
-  });
+  const label = {
+    apps: "Apps",
+    clipboard: "Clipboard",
+    files: "Files",
+    system: "System",
+  }[mode];
+  await clickButtonText(label);
   const placeholder = {
     apps: "Search applications...",
     clipboard: "Search clipboard history...",
@@ -217,7 +261,9 @@ async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
   }[mode];
   await until(`${mode} mode is ready`, () =>
     observe<boolean>(
-      `return document.querySelector('input')?.placeholder === ${JSON.stringify(placeholder)} && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
+      `return document.querySelector('.category-tab[aria-pressed=true]')?.textContent === ${JSON.stringify(label)}
+        && document.querySelector('input[role=combobox]')?.placeholder === ${JSON.stringify(placeholder)}
+        && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'`,
     ),
   );
 }
@@ -246,12 +292,14 @@ async function reopen() {
   } finally {
     if (child.exitCode === null) child.kill();
   }
-  await until("the existing window reopens with an empty query", () =>
+  await until("the existing window reopens on the welcome screen", () =>
     observe<boolean>(
       `return document.querySelector('input[role=combobox]')?.value === ''
       && document.activeElement?.getAttribute('role') === 'combobox'
       && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
-      && document.querySelectorAll('[role=option]').length > 0`,
+      && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
+      && document.querySelector('.welcome-suggestions') !== null
+      && document.querySelectorAll('[role=option]').length === 0`,
     ),
   );
   reopenCheckMs.push(performance.now() - started);
@@ -363,6 +411,37 @@ try {
   );
   const inputId = input[elementKey];
   assert(inputId, "The search field has a WebDriver element ID");
+  await until("the first-use clipboard choice is visible", () =>
+    observe<boolean>(
+      "return !!document.querySelector('.first-use[aria-label=\"Clipboard history choice\"]')",
+    ),
+  );
+  // This value can be captured after consent. Keep it distinct from the
+  // clipboard search fixture used below so it cannot change that selection.
+  const beforeChoice = `TinyDash consent probe ${fixtures.nonce}`;
+  setClipboardText(beforeChoice);
+  await delay(1_000);
+  const beforeChoiceEntries = await request<string[]>(
+    `/session/${session}/execute/async`,
+    "POST",
+    {
+      script: `const done = arguments[arguments.length - 1];
+        window.__TAURI_INTERNALS__.invoke('search', { query: arguments[0], mode: 'clipboard' })
+          .then(response => done(response.results.map(result => result.title)), error => done([String(error)]));`,
+      args: [beforeChoice],
+    },
+  );
+  assert.deepEqual(beforeChoiceEntries, []);
+  pass("Clipboard capture stays off until the first-use choice is made");
+  await clickButtonText("Enable history");
+  await until(
+    "the first-use clipboard choice closes after enabling history",
+    () =>
+      observe<boolean>(
+        "return !document.querySelector('.first-use[aria-label=\"Clipboard history choice\"]')",
+      ),
+  );
+  pass("The native smoke flow explicitly enables clipboard history");
   const expectedNames = [`${fixtures.prefix} Alpha`, `${fixtures.prefix} Beta`];
   const titles = () =>
     observe<string[]>(
@@ -499,6 +578,7 @@ try {
   pass("Enter launches the selected fixture through the OS");
 
   await reopen();
+  await selectMode("apps");
   await until(
     "the launched app ranks first in the complete index",
     async () => (await titles())[0] === orderedNames[1],
@@ -582,6 +662,32 @@ try {
     "the other entry is still available",
     async () => (await titles())[0] === secondClip,
   );
+  await click(".actions-button");
+  await clickMenuItemText("Pin to Clipboard");
+  await click(".actions-button");
+  await clickMenuItemText("Pin to All");
+  const thirdClip = `TinyDash third ${fixtures.nonce}`;
+  setClipboardText(thirdClip);
+  await click(".clear-query");
+  await until(
+    "the newer unpinned clipboard entry is selected after the pinned entry",
+    async () => {
+      const entries = await titles();
+      return (
+        entries[0] === secondClip &&
+        entries.includes(thirdClip) &&
+        (await selectedTitle()) === thirdClip
+      );
+    },
+  );
+  assert.equal((await titles())[0], secondClip);
+  assert.equal(await selectedTitle(), thirdClip);
+  assert.equal(
+    await observe<string>(
+      "return document.querySelector('input[role=combobox]')?.value ?? ''",
+    ),
+    "",
+  );
   await click(".clear-history");
   await until("clear asks for confirmation with Cancel selected", () =>
     observe<boolean>(
@@ -593,11 +699,27 @@ try {
   await click(".clear-history");
   await click("dialog .confirm-button");
   await until(
-    "confirmed clear removes remaining history",
+    "confirmed clear removes unpinned history but keeps pinned history",
+    async () =>
+      (await titles()).length === 1 && (await titles())[0] === secondClip,
+  );
+  assert.equal(await selectedTitle(), secondClip);
+  await click(".actions-button");
+  await clickMenuItemText("Clear all clipboard history");
+  await until("clear all asks for its separate confirmation", () =>
+    observe<boolean>(
+      "return document.querySelector('dialog[open] h2')?.textContent === 'Clear all clipboard history?'",
+    ),
+  );
+  await click("dialog .confirm-button");
+  await until(
+    "confirmed clear all removes pinned history",
     async () => (await titles()).length === 0,
   );
-  assert.equal(clipboardText(), firstClip);
-  pass("Clear history requires confirmation and preserves the OS clipboard");
+  assert.equal(clipboardText(), thirdClip);
+  pass(
+    "Clear unpinned protects pinned clipboard history, clear all removes it, and both preserve the OS clipboard",
+  );
 
   await reopen();
   await selectMode("files");

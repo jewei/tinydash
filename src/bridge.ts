@@ -63,6 +63,7 @@ export interface SearchResult {
         source: string;
         local: string;
         sourceZone: string;
+        targetZone?: string;
         ambiguous: boolean;
       }
     | {
@@ -81,6 +82,7 @@ export interface SearchResult {
 }
 
 export interface SearchResponse {
+  preferredSelectionId?: string | null;
   results: SearchResult[];
   total: number;
   indexing: boolean;
@@ -95,7 +97,12 @@ export interface SettingsValues {
   clearQueryOnOpen: boolean;
   hideOnBlur: boolean;
   shortcut: string;
+  categoryShortcuts: { mode: SearchMode; shortcut: string }[];
+  startAtLogin: boolean;
+  appPreferences: Record<string, { aliases: string[]; hidden: boolean }>;
+  webSearches: WebSearch[];
   clipboardHistoryEnabled: boolean;
+  clipboardHistoryDecided: boolean;
   clipboardHistoryLimit: number;
   fileSearchRoots: string[] | null;
   fileSearchLimit: number;
@@ -105,10 +112,32 @@ export interface SettingsValues {
   visibleCategories: SearchMode[];
 }
 
+export interface WebSearch {
+  name: string;
+  keyword: string;
+  template: string;
+  enabled: boolean;
+}
+
+export interface SettingsImport {
+  settings: SettingsValues;
+  ignoredKeys: string[];
+  appearance?: string | null;
+}
+
+export interface UpdateStatus {
+  available: boolean;
+  version: string | null;
+  notes: string | null;
+  message: string;
+}
+
 export interface LauncherInfo {
   settings: SettingsValues;
   platform: "macos" | "windows" | "linux";
   warnings: string[];
+  visible?: boolean;
+  initialMode?: SearchMode | null;
 }
 
 export interface SettingsInfo {
@@ -134,6 +163,20 @@ export const backend = {
   settings: () => invoke<SettingsInfo>("get_settings"),
   saveSettings: (settings: SettingsValues) =>
     invoke<SettingsValues>("save_settings", { settings }),
+  chooseClipboardHistory: (enabled: boolean) =>
+    invoke<SettingsValues>("choose_clipboard_history", { enabled }),
+  appCatalog: () => invoke<SearchResult[]>("app_catalog"),
+  setAppPreference: (id: string, aliases: string[], hidden: boolean) =>
+    invoke<SettingsValues>("set_app_preference", { id, aliases, hidden }),
+  previewWebSearch: (search: WebSearch, query: string) =>
+    invoke<string>("preview_web_search", { search, query }),
+  exportSettings: (appearance: string) =>
+    invoke<boolean>("export_settings", { appearance }),
+  importSettings: () =>
+    invoke<SettingsImport | null>("preview_settings_import"),
+  revealBackup: () => invoke<void>("reveal_backup"),
+  checkUpdate: () => invoke<UpdateStatus>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
   recordShortcut: (recording: boolean) =>
     invoke<void>("set_shortcut_recording", { recording }),
   revealSettings: (data = false) =>
@@ -150,7 +193,14 @@ export const backend = {
     }),
   clipboardPreview: (id: string) =>
     invoke<ClipboardEntry>("clipboard_preview", { id }),
-  clearClipboard: () => invoke<void>("clear_clipboard_history"),
+  clearClipboard: (keepPinned = false) =>
+    invoke<void>("clear_clipboard_history", { keepPinned }),
+  editClipboardCopy: (id: string, text: string) =>
+    invoke<void>("edit_clipboard_history", { id, text }),
+  copyClipboardSelection: (ids: string[], separator: string) =>
+    invoke<void>("copy_clipboard_selection", { ids, separator }),
+  saveClipboardFile: (id: string) =>
+    invoke<boolean>("save_clipboard_file", { id }),
   hide: () => invoke<void>("hide_launcher"),
   refresh: () => invoke<void>("refresh_apps"),
   refreshFiles: () => invoke<void>("refresh_files"),

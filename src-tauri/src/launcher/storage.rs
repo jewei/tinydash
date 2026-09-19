@@ -8,7 +8,9 @@ use super::search::SearchManager;
 use crate::{
     db::Database,
     error::Error,
-    providers::clipboard::{ClipboardProvider, valid_text},
+    providers::clipboard::{
+        ClipboardProvider, MAX_SELECTION_ENTRIES, combine_entries, entry_id, valid_text,
+    },
     ranking,
 };
 
@@ -50,11 +52,16 @@ impl Storage {
         self.database.get_or_init(|| {
             let loaded = (|| -> anyhow::Result<Database> {
                 let path = app.path().app_data_dir()?.join("tinydash.sqlite3");
-                let database = Database::open(&path)?;
+                let settings = app.path().app_config_dir()?.join("settings.json");
+                let database = Database::open_with_settings(&path, &settings)?;
                 let usage = database.load_usage()?;
                 let pins = database.load_pins()?;
-                database
-                    .prune_clipboard(app.state::<LauncherState>().settings().clipboard_limit())?;
+                let settings = app.state::<LauncherState>().settings();
+                // An unreadable settings file uses undecided first-use values.
+                // Those fallback limits must not prune existing history.
+                if settings.clipboard_history_decided {
+                    database.prune_clipboard(settings.clipboard_limit())?;
+                }
                 let clipboard = ClipboardProvider::new(database.load_clipboard()?);
                 let rates = match database.load_rates() {
                     Ok(rates) => rates,
@@ -79,6 +86,16 @@ impl Storage {
                     Ok(database) => Some(database),
                     Err(error) => {
                         self.failed(&error);
+                        let recovery = match error.downcast_ref::<crate::db::Error>() {
+                            Some(crate::db::Error::Backup(_)) => Some("Could not save a recovery backup. Your database was not migrated. Check disk space and folder access, then restart TinyDash."),
+                            Some(crate::db::Error::NewerSchema { .. }) => Some("Your saved data needs a compatible TinyDash version. Your database was kept. Use a version that supports its schema."),
+                            _ => None,
+                        };
+                        if let Some(message) = recovery
+                            && let Ok(mut warning) = self.warning.lock()
+                        {
+                            *warning = Some(message.into());
+                        }
                         None
                     }
                 },
@@ -287,12 +304,81 @@ impl Storage {
         Ok(())
     }
 
+    pub fn edit_clipboard(&self, app: &AppHandle, id: &str, text: String) -> Result<(), String> {
+        use tauri_plugin_clipboard_manager::ClipboardExt;
+        if !valid_text(&text) {
+            return Err("Clipboard text is empty or too large.".into());
+        }
+        let state = app.state::<LauncherState>();
+        let mut session = self
+            .session(app, &state.search)
+            .lock()
+            .map_err(|_| "Clipboard storage is unavailable.")?;
+        state
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?
+            .clipboard_entry(id)
+            .map_err(|error| error.to_string())?;
+        app.clipboard()
+            .write_text(text.clone())
+            .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;
+        state.clipboard.invalidate();
+        session.observed.copied(text.clone(), false);
+        // Editing a copy must not modify history or evict the original entry.
+        Ok(())
+    }
+
+    pub fn copy_clipboard_selection(
+        &self,
+        app: &AppHandle,
+        ids: &[String],
+        separator: &str,
+    ) -> Result<(), String> {
+        use tauri_plugin_clipboard_manager::ClipboardExt;
+        if ids.is_empty() {
+            return Err("Select at least one clipboard entry.".into());
+        }
+        if ids.len() > MAX_SELECTION_ENTRIES {
+            return Err(format!(
+                "Select no more than {MAX_SELECTION_ENTRIES} clipboard entries."
+            ));
+        }
+        let numeric_ids = ids
+            .iter()
+            .map(|id| entry_id(id).ok_or("A clipboard entry is no longer available."))
+            .collect::<Result<Vec<_>, _>>()?;
+        let state = app.state::<LauncherState>();
+        let mut session = self
+            .session(app, &state.search)
+            .lock()
+            .map_err(|_| "Clipboard storage is unavailable.")?;
+        let entries = state
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?
+            .clipboard
+            .entries_for_ids(&numeric_ids)
+            .ok_or("A clipboard entry is no longer available.")?;
+        let text = combine_entries(&entries, separator)?;
+        app.clipboard()
+            .write_text(text.clone())
+            .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;
+        state.clipboard.invalidate();
+        session.observed.copied(text, false);
+        Ok(())
+    }
+
     pub fn delete_clipboard(&self, app: &AppHandle, id: Option<i64>) -> Result<(), String> {
         let state = app.state::<LauncherState>();
         let mut session = self
             .session(app, &state.search)
             .lock()
             .map_err(|_| "Clipboard storage is unavailable.")?;
+        let mut search = state
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?;
         let database = session
             .database
             .as_ref()
@@ -309,15 +395,46 @@ impl Storage {
             );
         }
         state.clipboard.invalidate();
-        let mut search = state
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?;
         match id {
             Some(id) => search.clipboard.remove(id),
             None => search.clipboard = ClipboardProvider::default(),
         }
         search.forget_clipboard_pins(id);
+        drop(search);
+        super::clipboard::changed(app);
+        Ok(())
+    }
+
+    pub fn clear_unpinned_clipboard(&self, app: &AppHandle) -> Result<(), String> {
+        let state = app.state::<LauncherState>();
+        let mut session = self
+            .session(app, &state.search)
+            .lock()
+            .map_err(|_| "Clipboard storage is unavailable.")?;
+        let mut search = state
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?;
+        let database = session
+            .database
+            .as_ref()
+            .ok_or("Clipboard storage is unavailable. Restart TinyDash to try again.")?;
+        let removed = match database.clear_unpinned_clipboard() {
+            Ok(removed) => removed,
+            Err(error) => {
+                self.failed(&error);
+                session.database = None;
+                return Err(
+                    "Could not clear unpinned clipboard history. Restart TinyDash to try again."
+                        .into(),
+                );
+            }
+        };
+        state.clipboard.invalidate();
+        search.clipboard.remove_many(&removed);
+        for id in removed {
+            search.forget_clipboard_pins(Some(id));
+        }
         drop(search);
         super::clipboard::changed(app);
         Ok(())

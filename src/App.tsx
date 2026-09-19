@@ -24,6 +24,7 @@ import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
 import ResultPreview from "./components/ResultPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
+import ClipboardCopyDialog from "./components/ClipboardCopyDialog";
 import WelcomeSuggestions from "./components/WelcomeSuggestions";
 import {
   appearances,
@@ -88,16 +89,25 @@ export default function App(
   const [storageError, setStorageError] = createSignal<string>();
   const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [menuFilter, setMenuFilter] = createSignal("");
+  const [clipboardTool, setClipboardTool] = createSignal<{
+    mode: "edit" | "combine";
+    entry: SearchResult;
+    entries: SearchResult[];
+  }>();
   const [clearOpen, setClearOpen] = createSignal(false);
+  const [keepPins, setKeepPins] = createSignal(true);
   const [pendingAction, setPendingAction] = createSignal<SearchResult>();
   let input!: HTMLInputElement;
   let menu: HTMLDivElement | undefined;
+  let menuInput: HTMLInputElement | undefined;
   let list!: HTMLUListElement;
   let categoryBar!: HTMLDivElement;
   let sequence = 0;
   let disposed = false;
   let searchTask: Promise<void> | undefined;
   let displayedQuery: { value: string; mode: SearchMode } | undefined;
+  let selectionChangedByUser = false;
   let queuedSearch:
     | {
         value: string;
@@ -141,6 +151,7 @@ export default function App(
     !busy() &&
     !pending() &&
     !clearOpen() &&
+    !clipboardTool() &&
     !pendingAction();
   const message = () =>
     error() ??
@@ -194,6 +205,223 @@ export default function App(
                         : "What are you looking for?";
   const focusInput = () => input.focus({ preventScroll: true });
 
+  const matchesMenu = (label: string) =>
+    label.toLocaleLowerCase().includes(menuFilter().trim().toLocaleLowerCase());
+  const resultActions = createMemo(() => {
+    type MenuAction = {
+      label: string;
+      icon: Parameters<typeof Icon>[0]["name"];
+      run: () => void;
+      disabled: boolean;
+      key?: string;
+    };
+    const actions: MenuAction[] = [
+      {
+        label:
+          primaryLabel() === "Open"
+            ? current()?.kind === "file"
+              ? "Open file"
+              : "Open application"
+            : primaryLabel(),
+        icon: current()?.primaryAction === "copy" ? "copy" : "return",
+        run: runPrimary,
+        disabled: !canOpen(),
+        key: "↵",
+      },
+    ];
+    if (current()?.secondaryActions.includes("reveal"))
+      actions.push({
+        label: "Show in folder",
+        icon: "folder",
+        run: () => void run("reveal"),
+        disabled: !canOpen(),
+        key: `${modifier()} ↵`,
+      });
+    for (const option of pinOptions())
+      actions.push({
+        label: option.label,
+        icon: "pin",
+        run: () => void togglePin(option.category),
+        disabled: !canOpen() || pinBusy(),
+      });
+    if (current()?.kind === "app")
+      actions.push({
+        label: "Hide application",
+        icon: "apps",
+        run: () => void hideApplication(),
+        disabled: !canOpen(),
+      });
+    if (current()?.kind === "clipboard") {
+      actions.push(
+        {
+          label: "Edit a copy",
+          icon: "clipboard",
+          run: () => openClipboardTool("edit"),
+          disabled: !canOpen(),
+        },
+        {
+          label: "Copy selected entries",
+          icon: "copy",
+          run: () => openClipboardTool("combine"),
+          disabled: !canOpen(),
+        },
+        {
+          label: "Save text as a file",
+          icon: "file",
+          run: () => void saveClipboardFile(),
+          disabled: !canOpen(),
+        },
+      );
+    }
+    for (const [action, label, icon] of [
+      ["delete", "Delete entry", "delete"],
+      ["copy", "Copy URL", "copy"],
+      ["open", "Open cleaned URL", "globe"],
+      ["regenerate", "Generate another", "refresh"],
+    ] as const) {
+      if (current()?.secondaryActions.includes(action))
+        actions.push({
+          label,
+          icon,
+          run: () => void run(action),
+          disabled: !canOpen(),
+          key: action === "delete" ? `${modifier()} ⌫` : undefined,
+        });
+    }
+    if (mode() === "clipboard" || current()?.kind === "clipboard") {
+      actions.push(
+        {
+          label: "Clear unpinned history",
+          icon: "delete",
+          run: () => confirmClear(true),
+          disabled: !desktop || busy(),
+        },
+        {
+          label: "Clear all clipboard history",
+          icon: "delete",
+          run: () => confirmClear(false),
+          disabled: !desktop || busy(),
+        },
+      );
+    }
+    return actions.filter((action) => matchesMenu(action.label));
+  });
+  const launcherActions = createMemo(() =>
+    [
+      {
+        label: "Settings",
+        icon: "system" as const,
+        run: () => void openSettings(),
+        disabled: !desktop,
+        key: `${modifier()} ,`,
+      },
+      {
+        label: "Refresh currency rates",
+        icon: "refresh" as const,
+        run: () => void refresh("currency"),
+        disabled: !desktop || currency().refreshing,
+        key: mode() === "calculator" ? `${modifier()} R` : undefined,
+      },
+      {
+        label: "Refresh applications",
+        icon: "refresh" as const,
+        run: () => void refresh("apps"),
+        disabled: !desktop || indexing(),
+        key:
+          mode() !== "files" && mode() !== "calculator"
+            ? `${modifier()} R`
+            : undefined,
+      },
+      {
+        label: "Refresh files",
+        icon: "refresh" as const,
+        run: () => void refresh("files"),
+        disabled: !desktop || files().indexing,
+        key: mode() === "files" ? `${modifier()} R` : undefined,
+      },
+      {
+        label: "Quit TinyDash",
+        icon: "quit" as const,
+        run: () =>
+          void backend.quit().catch((reason) => setError(String(reason))),
+        disabled: !desktop,
+        key: `${modifier()} Q`,
+      },
+    ].filter((action) => matchesMenu(action.label)),
+  );
+
+  function openClipboardTool(tool: "edit" | "combine") {
+    const entry = current();
+    if (!entry || entry.kind !== "clipboard" || !canOpen()) return;
+    setMenuOpen(false);
+    setClipboardTool({
+      mode: tool,
+      entry,
+      entries: results().filter((entry) => entry.kind === "clipboard"),
+    });
+  }
+
+  function closeClipboardTool() {
+    setClipboardTool(undefined);
+    focusInput();
+  }
+
+  async function saveClipboardFile() {
+    const entry = current();
+    if (!entry || !canOpen()) return;
+    setMenuOpen(false);
+    setBusy(true);
+    setError(undefined);
+    try {
+      if (await backend.saveClipboardFile(entry.id))
+        setNotice("Text file saved.");
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+      focusInput();
+    }
+  }
+
+  async function hideApplication() {
+    const entry = current();
+    if (!entry || entry.kind !== "app" || !canOpen()) return;
+    setMenuOpen(false);
+    setBusy(true);
+    setError(undefined);
+    try {
+      const settings = await backend.setAppPreference(
+        entry.id,
+        info()?.settings.appPreferences[entry.id]?.aliases ?? [],
+        true,
+      );
+      setInfo((current) => (current ? { ...current, settings } : current));
+      await search();
+      setNotice("Application hidden. You can show it again in Settings.");
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+      focusInput();
+    }
+  }
+
+  async function chooseClipboardHistory(enabled: boolean) {
+    if (busy()) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const settings = await backend.chooseClipboardHistory(enabled);
+      setInfo((current) => (current ? { ...current, settings } : current));
+      await search();
+      focusInput();
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   createEffect(() => {
     document.documentElement.dataset.appearance = appearance();
   });
@@ -226,6 +454,7 @@ export default function App(
 
   function search(value = query(), preserveSelection = false) {
     if (!desktop || !visible() || disposed) return Promise.resolve();
+    if (!preserveSelection) selectionChangedByUser = false;
     queuedSearch = {
       value,
       mode: mode(),
@@ -261,8 +490,14 @@ export default function App(
           if (disposed || request !== sequence) continue;
           // Read selection after the response. The user can navigate while a
           // refresh runs, but a different query must select its first result.
+          const followNewestClipboard =
+            searchMode === "clipboard" &&
+            !value.trim() &&
+            !selectionChangedByUser &&
+            response.preferredSelectionId != null;
           const selectedId =
             preserveSelection &&
+            !followNewestClipboard &&
             displayedQuery?.value === value &&
             displayedQuery.mode === searchMode
               ? resultKey(current())
@@ -275,11 +510,21 @@ export default function App(
           const matchedIndex = response.results.findIndex(
             (result) => resultKey(result) === selectedId,
           );
+          const preferredIndex = response.results.findIndex(
+            (result) => result.id === response.preferredSelectionId,
+          );
           displayedQuery = { value, mode: searchMode };
           batch(() => {
             setResults(response.results);
             setSelected(
-              Math.max(0, matchedIndex >= 0 ? matchedIndex : stableToolIndex),
+              Math.max(
+                0,
+                matchedIndex >= 0
+                  ? matchedIndex
+                  : selectedId
+                    ? stableToolIndex
+                    : preferredIndex,
+              ),
             );
             setTotal(response.total);
             setIndexing(response.indexing);
@@ -407,10 +652,11 @@ export default function App(
     if (result) void execute(result, result.primaryAction, true);
   }
 
-  function confirmClear() {
+  function confirmClear(keepPinned = true) {
     setMenuOpen(false);
     setError(undefined);
     setClearOpen(true);
+    setKeepPins(keepPinned);
   }
 
   function closeClear() {
@@ -424,7 +670,7 @@ export default function App(
     setBusy(true);
     setError(undefined);
     try {
-      await backend.clearClipboard();
+      await backend.clearClipboard(keepPins());
       closeClear();
       await search();
     } catch (reason) {
@@ -469,13 +715,10 @@ export default function App(
   }
 
   function toggleMenu() {
+    setMenuFilter("");
     setMenuOpen(!menuOpen());
     if (menuOpen()) {
-      queueMicrotask(() =>
-        menu
-          ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
-          ?.focus(),
-      );
+      queueMicrotask(() => menuInput?.focus());
     } else {
       focusInput();
     }
@@ -483,6 +726,7 @@ export default function App(
 
   function onKey(event: KeyboardEvent) {
     if (event.isComposing || event.keyCode === 229) return;
+    if (clipboardTool()) return;
     if (clearOpen() || pendingAction()) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -534,9 +778,19 @@ export default function App(
           document.activeElement as HTMLButtonElement,
         );
         buttons[
-          (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) %
+          (index < 0
+            ? event.key === "ArrowDown"
+              ? 0
+              : buttons.length - 1
+            : index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) %
             buttons.length
         ]?.focus();
+      } else if (event.key === "Enter" && event.target === menuInput) {
+        event.preventDefault();
+        if (!event.repeat)
+          menu
+            ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+            ?.click();
       } else if (event.key === "Tab") {
         setMenuOpen(false);
         focusInput();
@@ -616,6 +870,7 @@ export default function App(
       event.preventDefault();
       if (results().length) {
         const count = results().length;
+        selectionChangedByUser = true;
         setSelected((index) => {
           if (
             emojiGrid &&
@@ -718,8 +973,18 @@ export default function App(
                     settings: payload as LauncherInfo["settings"],
                     warnings: current.warnings.filter(
                       (warning) =>
-                        !warning.startsWith("Could not register ") &&
-                        !warning.startsWith("Could not read settings."),
+                        !(
+                          warning.startsWith("Could not register ") &&
+                          (current.settings.shortcut !==
+                            (payload as LauncherInfo["settings"]).shortcut ||
+                            JSON.stringify(
+                              current.settings.categoryShortcuts,
+                            ) !==
+                              JSON.stringify(
+                                (payload as LauncherInfo["settings"])
+                                  .categoryShortcuts,
+                              ))
+                        ) && !warning.startsWith("Could not read settings."),
                     ),
                   }
                 : current,
@@ -755,6 +1020,7 @@ export default function App(
               setMenuOpen(false);
               setClearOpen(false);
               setPendingAction(undefined);
+              setClipboardTool(undefined);
               setError(undefined);
               if (clear === true) {
                 setMode(enabledCategories()[0]);
@@ -766,6 +1032,13 @@ export default function App(
             focusInput();
             if (clear !== true) input.select();
           }),
+          register("launcher-category", (payload) => {
+            const category = categories.find(({ id }) => id === payload);
+            if (category) {
+              setQuery("");
+              changeMode(category.id);
+            }
+          }),
           register("launcher-hidden", () => {
             setVisible(false);
             // One running Rust search may finish. Ignore its reply and drop
@@ -776,8 +1049,11 @@ export default function App(
           }),
         ]);
         if (disposed) return;
-        setInfo(await backend.ready());
-        keepVisibleCategory();
+        const initial = await backend.ready();
+        setInfo(initial);
+        setVisible(initial.visible ?? true);
+        if (initial.initialMode) setMode(initial.initialMode);
+        else keepVisibleCategory();
         await search();
         focusInput();
       } catch (reason) {
@@ -873,6 +1149,45 @@ export default function App(
         </nav>
       </header>
       <Show
+        when={desktop && info()?.settings.clipboardHistoryDecided === false}
+      >
+        <aside class="first-use" aria-label="Clipboard history choice">
+          <div>
+            <strong>Save clipboard history?</strong>
+            <p>
+              TinyDash saves copied text on this device as plain text. It can
+              include passwords and other private text. Choose before capture
+              starts.
+            </p>
+            <p>
+              Launcher shortcut: <kbd>{info()?.settings.shortcut}</kbd>. You can
+              change this in Settings.
+            </p>
+            <Show when={info()?.platform === "linux"}>
+              <p>On Wayland, set a desktop shortcut to run tinydash.</p>
+            </Show>
+            <p>
+              Currency tools can download exchange rates. Turn off these
+              requests in Settings &gt; Currency.
+            </p>
+          </div>
+          <div class="first-use-actions">
+            <button
+              disabled={busy()}
+              onClick={() => void chooseClipboardHistory(false)}
+            >
+              Keep history off
+            </button>
+            <button
+              disabled={busy()}
+              onClick={() => void chooseClipboardHistory(true)}
+            >
+              Enable history
+            </button>
+          </div>
+        </aside>
+      </Show>
+      <Show
         when={!message() && !welcome() && mode() === "all" && files().indexing}
       >
         <div class="status-line indexing-status">
@@ -924,9 +1239,9 @@ export default function App(
               <button
                 class="text-button clear-history"
                 disabled={!desktop || busy()}
-                onClick={confirmClear}
+                onClick={() => confirmClear(true)}
               >
-                Clear history
+                Clear unpinned
               </button>
             </div>
           </Show>
@@ -971,6 +1286,7 @@ export default function App(
                     }}
                     onPointerMove={() => {
                       if (!pending()) {
+                        selectionChangedByUser = true;
                         setSelected(index());
                       }
                     }}
@@ -1217,187 +1533,104 @@ export default function App(
                 role="menu"
                 aria-label="Launcher actions"
               >
+                <input
+                  ref={menuInput}
+                  class="actions-filter"
+                  type="search"
+                  aria-label="Search actions"
+                  placeholder="Search actions..."
+                  autocomplete="off"
+                  value={menuFilter()}
+                  onInput={(event) => setMenuFilter(event.currentTarget.value)}
+                />
                 <div class="menu-column">
-                  <div class="menu-heading">
-                    {current()?.title ?? "TinyDash"}
-                  </div>
-                  <button
-                    role="menuitem"
-                    disabled={!canOpen()}
-                    onClick={runPrimary}
-                  >
-                    <Icon
-                      name={
-                        current()?.primaryAction === "copy" ? "copy" : "return"
-                      }
-                    />
-                    {primaryLabel() === "Open"
-                      ? current()?.kind === "file"
-                        ? "Open file"
-                        : "Open application"
-                      : primaryLabel()}
-                    <kbd>↵</kbd>
-                  </button>
-                  <Show when={current()?.secondaryActions.includes("reveal")}>
-                    <button
-                      role="menuitem"
-                      disabled={!canOpen()}
-                      onClick={() => void run("reveal")}
-                    >
-                      <Icon name="folder" />
-                      Show in folder<kbd>{modifier()} ↵</kbd>
-                    </button>
+                  <Show when={resultActions().length > 0}>
+                    <div class="menu-heading">
+                      {current()?.title ?? "TinyDash"}
+                    </div>
                   </Show>
-                  <For each={pinOptions()}>
-                    {(option) => (
+                  <For each={resultActions()}>
+                    {(action) => (
                       <button
                         role="menuitem"
-                        disabled={!canOpen() || pinBusy()}
-                        onClick={() => void togglePin(option.category)}
+                        disabled={action.disabled}
+                        onClick={action.run}
                       >
-                        <Icon name="pin" />
-                        {option.label}
+                        <Icon name={action.icon} />
+                        {action.label}
+                        <Show when={action.key}>
+                          <kbd>{action.key}</kbd>
+                        </Show>
                       </button>
                     )}
                   </For>
-                  <Show when={current()?.secondaryActions.includes("delete")}>
-                    <button
-                      role="menuitem"
-                      disabled={!canOpen()}
-                      onClick={() => void run("delete")}
-                    >
-                      <Icon name="delete" />
-                      Delete entry<kbd>{modifier()} ⌫</kbd>
-                    </button>
-                  </Show>
-                  <Show when={current()?.secondaryActions.includes("copy")}>
-                    <button
-                      role="menuitem"
-                      disabled={!canOpen()}
-                      onClick={() => void run("copy")}
-                    >
-                      <Icon name="copy" />
-                      Copy URL
-                    </button>
-                  </Show>
-                  <Show when={current()?.secondaryActions.includes("open")}>
-                    <button
-                      role="menuitem"
-                      disabled={!canOpen()}
-                      onClick={() => void run("open")}
-                    >
-                      <Icon name="globe" />
-                      Open cleaned URL
-                    </button>
-                  </Show>
-                  <Show
-                    when={current()?.secondaryActions.includes("regenerate")}
-                  >
-                    <button
-                      role="menuitem"
-                      disabled={!canOpen()}
-                      onClick={() => void run("regenerate")}
-                    >
-                      <Icon name="refresh" />
-                      Generate another
-                    </button>
-                  </Show>
-                  <Show
-                    when={
-                      mode() === "clipboard" || current()?.kind === "clipboard"
-                    }
-                  >
-                    <button
-                      role="menuitem"
-                      disabled={!desktop || busy()}
-                      onClick={confirmClear}
-                    >
-                      <Icon name="delete" />
-                      Clear clipboard history
-                    </button>
-                  </Show>
                 </div>
                 <div class="menu-column">
-                  <div
-                    class="appearance-group"
-                    role="group"
-                    aria-label="Appearance"
+                  <Show
+                    when={appearances.some((item) =>
+                      matchesMenu(`Appearance ${item.label}`),
+                    )}
                   >
-                    <div class="menu-heading">Appearance</div>
-                    <div class="appearance-options">
-                      <For each={appearances}>
-                        {(item) => (
-                          <button
-                            role="menuitemradio"
-                            aria-checked={appearance() === item.id}
-                            title={item.description}
-                            onClick={() => changeAppearance(item.id)}
-                          >
-                            <span
-                              class={`appearance-swatch swatch-${item.id}`}
-                              aria-hidden="true"
-                            />
-                            {item.label}
-                          </button>
-                        )}
-                      </For>
+                    <div
+                      class="appearance-group"
+                      role="group"
+                      aria-label="Appearance"
+                    >
+                      <div class="menu-heading">Appearance</div>
+                      <div class="appearance-options">
+                        <For
+                          each={appearances.filter((item) =>
+                            matchesMenu(`Appearance ${item.label}`),
+                          )}
+                        >
+                          {(item) => (
+                            <button
+                              role="menuitemradio"
+                              aria-checked={appearance() === item.id}
+                              title={item.description}
+                              onClick={() => changeAppearance(item.id)}
+                            >
+                              <span
+                                class={`appearance-swatch swatch-${item.id}`}
+                                aria-hidden="true"
+                              />
+                              {item.label}
+                            </button>
+                          )}
+                        </For>
+                      </div>
                     </div>
-                  </div>
-                  <div class="menu-divider" />
-                  <button
-                    role="menuitem"
-                    disabled={!desktop}
-                    onClick={() => void openSettings()}
-                  >
-                    <Icon name="system" />
-                    Settings<kbd>{modifier()} ,</kbd>
-                  </button>
-                  <button
-                    role="menuitem"
-                    disabled={!desktop || currency().refreshing}
-                    onClick={() => void refresh("currency")}
-                  >
-                    <Icon name="refresh" />
-                    Refresh currency rates
-                    <Show when={mode() === "calculator"}>
-                      <kbd>{modifier()} R</kbd>
-                    </Show>
-                  </button>
-                  <button
-                    role="menuitem"
-                    disabled={!desktop || indexing()}
-                    onClick={() => void refresh("apps")}
-                  >
-                    <Icon name="refresh" />
-                    Refresh applications
-                    <Show when={mode() !== "files" && mode() !== "calculator"}>
-                      <kbd>{modifier()} R</kbd>
-                    </Show>
-                  </button>
-                  <button
-                    role="menuitem"
-                    disabled={!desktop || files().indexing}
-                    onClick={() => void refresh("files")}
-                  >
-                    <Icon name="refresh" />
-                    Refresh files
-                    <Show when={mode() === "files"}>
-                      <kbd>{modifier()} R</kbd>
-                    </Show>
-                  </button>
-                  <button
-                    role="menuitem"
-                    disabled={!desktop}
-                    onClick={() =>
-                      void backend
-                        .quit()
-                        .catch((reason) => setError(String(reason)))
-                    }
-                  >
-                    <Icon name="quit" />
-                    Quit TinyDash<kbd>{modifier()} Q</kbd>
-                  </button>
+                    <div class="menu-divider" />
+                  </Show>
+                  <For each={launcherActions()}>
+                    {(action) => (
+                      <button
+                        role="menuitem"
+                        disabled={action.disabled}
+                        onClick={action.run}
+                      >
+                        <Icon name={action.icon} />
+                        {action.label}
+                        <Show when={action.key}>
+                          <kbd>{action.key}</kbd>
+                        </Show>
+                      </button>
+                    )}
+                  </For>
                 </div>
+                <Show
+                  when={
+                    !resultActions().length &&
+                    !launcherActions().length &&
+                    !appearances.some((item) =>
+                      matchesMenu(`Appearance ${item.label}`),
+                    )
+                  }
+                >
+                  <p role="status" class="actions-empty">
+                    No matching actions
+                  </p>
+                </Show>
               </div>
             </Show>
           </div>
@@ -1405,15 +1638,37 @@ export default function App(
       </footer>
       <Show when={clearOpen()}>
         <ConfirmDialog
-          title="Clear clipboard history?"
-          description="This deletes all saved text entries, including pinned entries. The current system clipboard stays available."
-          confirmLabel="Clear history"
+          title={
+            keepPins()
+              ? "Clear unpinned history?"
+              : "Clear all clipboard history?"
+          }
+          description={
+            keepPins()
+              ? "This deletes unpinned text. Entries pinned in All or Clipboard stay saved. The system clipboard does not change."
+              : "This deletes all saved text, including entries pinned in All and Clipboard. The system clipboard does not change."
+          }
+          confirmLabel={keepPins() ? "Clear unpinned" : "Clear all history"}
           busyLabel="Clearing..."
           busy={busy()}
           error={error()}
           onClose={closeClear}
           onConfirm={() => void clearHistory()}
         />
+      </Show>
+      <Show when={clipboardTool()} keyed>
+        {(tool) => (
+          <ClipboardCopyDialog
+            {...tool}
+            onClose={closeClipboardTool}
+            onCopied={() => {
+              closeClipboardTool();
+              void search(query(), true).then(() =>
+                setNotice("Text copied. Paste it in the target app."),
+              );
+            }}
+          />
+        )}
       </Show>
       <Show when={pendingAction()?.confirmation} keyed>
         {(confirmation) => (

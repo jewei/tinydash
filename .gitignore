@@ -2,6 +2,7 @@ node_modules/
 /designs/
 .hallmark/
 dist/
+site-dist/
 src-tauri/target/
 src-tauri/gen/
 .DS_Store

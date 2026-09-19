@@ -79,6 +79,14 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 pub fn run() -> anyhow::Result<()> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    if args.as_slice() == ["--help"] || args.as_slice() == ["-h"] {
+        println!(
+            "TinyDash [--settings | --background | --mode CATEGORY]\nCategories: all, apps, files, clipboard, calculator, system, emoji, password, timezone, url, web.\nA category command opens that category with an empty query."
+        );
+        return Ok(());
+    }
+    let request = launcher::startup::LaunchRequest::parse(args)?;
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -86,16 +94,19 @@ pub fn run() -> anyhow::Result<()> {
         )
         .try_init();
     let app = tauri::Builder::default()
+        .manage(launcher::startup::Startup(std::sync::Mutex::new(request)))
+        .manage(launcher::updates::UpdateState::default())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
-            if args.iter().any(|arg| arg == "--settings") {
-                let app = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Err(error) = launcher::preferences::open_settings(app).await { tracing::warn!(%error, "Could not open settings"); }
-                });
-            } else if let Err(error) = window::show(app) { tracing::warn!(%error, "Could not activate existing launcher"); }
+            match launcher::startup::LaunchRequest::parse(args.into_iter().skip(1)) {
+                Ok(request) => launcher::startup::activate(app, request),
+                Err(error) => tracing::warn!(%error, "Invalid launch command"),
+            }
         }))
         .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::Builder::new().args(["--background"]).build())
+        .plugin(tauri_plugin_updater::Builder::new().pubkey(option_env!("TAURI_UPDATER_PUBLIC_KEY").unwrap_or("")).build())
         .setup(|app| {
             let mut warnings = Vec::new();
             let config = app.path().app_config_dir().map_err(anyhow::Error::from)
@@ -105,7 +116,7 @@ pub fn run() -> anyhow::Result<()> {
                 Err(error) => {
                     tracing::warn!(%error, "Using default settings");
                     warnings.push("Could not read settings. TinyDash is using the default settings.".into());
-                    settings::Settings::default()
+                    settings::Settings::fresh_install()
                 }
             };
 
@@ -117,22 +128,29 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 let shortcut_result = app.handle().plugin(
                     tauri_plugin_global_shortcut::Builder::new().with_handler(|app, shortcut, event| {
-                        if event.state() == ShortcutState::Pressed
-                            && app.try_state::<LauncherState>().is_some_and(|state| {
-                                !state.shortcut_recording.load(std::sync::atomic::Ordering::Acquire)
-                                    && state.settings().shortcut.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|active| active.id() == shortcut.id())
-                            })
-                            && let Err(error) = window::toggle(app)
-                        {
-                            tracing::warn!(%error, "Could not toggle launcher");
-                        }
+                        if event.state() != ShortcutState::Pressed { return; }
+                        let Some(state) = app.try_state::<LauncherState>() else { return; };
+                        if state.shortcut_recording.load(std::sync::atomic::Ordering::Acquire) { return; }
+                        let settings = state.settings();
+                        let matches = |value: &str| value.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|active| active.id() == shortcut.id());
+                        let result = if matches(&settings.shortcut) {
+                            window::toggle(app)
+                        } else if let Some(binding) = settings.category_shortcuts.iter().find(|binding| matches(&binding.shortcut)) {
+                            window::show_category(app, binding.mode)
+                        } else { return; };
+                        if let Err(error) = result { tracing::warn!(%error, "Could not open launcher"); }
                     }).build()
-                ).and_then(|()| app.global_shortcut().register(settings.shortcut.as_str()).map_err(|error| tauri::Error::Anyhow(error.into())));
+                );
                 if let Err(error) = shortcut_result {
                     tracing::warn!(%error, "Global shortcut is unavailable");
                     warnings.push(format!("Could not register {}. Use the tray menu or change settings.json.", settings.shortcut));
                 } else {
-                    tracing::info!(shortcut = settings.shortcut, "Global shortcut registered");
+                    for shortcut in settings.shortcuts() {
+                        if let Err(error) = app.global_shortcut().register(shortcut) {
+                            tracing::warn!(%error, shortcut, "Global shortcut is unavailable");
+                            warnings.push(format!("Could not register {shortcut}. Use the tray menu or change Settings."));
+                        }
+                    }
                 }
             }
 
@@ -177,6 +195,10 @@ pub fn run() -> anyhow::Result<()> {
             launcher::launcher_ready,
             launcher::preferences::get_settings,
             launcher::preferences::save_settings,
+            launcher::preferences::choose_clipboard_history,
+            launcher::preferences::app_catalog,
+            launcher::preferences::set_app_preference,
+            launcher::preferences::preview_web_search,
             launcher::preferences::open_settings,
             launcher::preferences::set_shortcut_recording,
             launcher::preferences::reveal_settings_path,
@@ -189,6 +211,14 @@ pub fn run() -> anyhow::Result<()> {
             launcher::actions::execute_action,
             launcher::clipboard::clipboard_preview,
             launcher::clipboard::clear_clipboard_history,
+            launcher::clipboard::edit_clipboard_history,
+            launcher::clipboard::copy_clipboard_selection,
+            launcher::portability::export_settings,
+            launcher::portability::preview_settings_import,
+            launcher::portability::save_clipboard_file,
+            launcher::portability::reveal_backup,
+            launcher::updates::check_update,
+            launcher::updates::install_update,
             window::hide_launcher,
         ])
         .build(tauri::generate_context!())

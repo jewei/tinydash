@@ -6,7 +6,7 @@ Use a Windows or Linux desktop session in a virtual machine or on a physical com
 
 Open the GitHub Actions **Checks** run for the commit under test. Download the `TinyDash-<OS>-<architecture>` artifact. Check `build.txt` to confirm the commit and CPU architecture. Extract the artifact before starting the app.
 
-Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. These are unsigned development builds. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
+Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. The Checks workflow supplies unsigned development builds. For a release candidate, use the Release workflow artifacts. Confirm the distribution and publisher-signing fields in `build.txt`. Mac candidates require Developer ID signing and notarization. Windows candidates are unsigned previews with separate updater signatures. Ubuntu uses checksums and manual updates. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
 
 Quit any older TinyDash process through its tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
 
@@ -31,6 +31,8 @@ CI checks installation, same-version replacement, and removal. On a physical des
 13. Move the selection with the arrow keys while refreshing the file or application index. Confirm that the refresh keeps the latest selection if that result still exists. Enter a new query and confirm that it selects the first result.
 14. Type a query, then immediately press Escape. Add a file in a configured folder while TinyDash is hidden. Reopen TinyDash and confirm that the new file is searchable. Repeat after hiding through the global shortcut and after opening a result.
 15. With the default categories shown, press Tab in the search field. Confirm that Apps is selected immediately. Type a query, then press Tab again. Confirm that Files is selected, the query stays unchanged, and the search field keeps focus. Use Shift + Tab to move back. Check that selection wraps between the first and last visible categories. Make the window narrow and confirm that the bar scrolls to show the selected category. Press Escape once to hide the launcher.
+16. Enable a Japanese, Chinese, or Korean input method. Start a composition in the search field, accept it, and cancel one composition with Escape. Confirm that the candidate window stays with the search field and that Escape hides TinyDash only after the composition is cancelled. Record the input method and OS.
+17. Repeat the shortcut, typing, Tab, Shift + Tab, and Escape checks with a non-US keyboard layout. Check both a physical key combination and the displayed shortcut. Confirm that the shortcut opens TinyDash and that punctuation and composed characters enter the expected text.
 
 The default global shortcut uses Control on all platforms. For shortcuts shown as Command/Ctrl, use Ctrl on Windows and Linux, and Command on macOS. If a shortcut conflicts with another application, change it in Settings and repeat the check. On macOS 27, Command + Shift + Space opens Siri Visual Intelligence and must not be used as TinyDash's default.
 
@@ -45,7 +47,13 @@ On macOS, run `swift tests/native/focus-macos.swift` with the built app open and
 5. Choose Light, Dark, and Compact in Appearance. Confirm that the launcher changes immediately and keeps the choice after a restart.
 6. In a separate test profile, change the clipboard limit and file folders. Save and confirm that the history limit and file index update without a restart. Turn currency updates off and confirm that saved rates remain usable.
 7. Change a field without saving, close Settings, and reopen it. Confirm that the edit remains. Select **Discard** and confirm that the saved value returns.
-8. Open **Categories**. Clear some checkboxes, including the active category, then select **Save changes**. Confirm that the bar shows only the selected categories and selects the first visible one. Check that Tab and Shift + Tab skip hidden categories. Keep only one checkbox selected and confirm that you cannot clear it. Restart TinyDash and confirm that the choices remain saved. Restore the original category choices after this check.
+8. Close Settings with its window close control, Escape, and the launcher shortcut. Confirm that TinyDash stays running, the launcher can reopen, and only one Settings window exists after reopening. Repeat while another app has focus.
+9. Open **Categories**. Clear some checkboxes, including the active category, then select **Save changes**. Confirm that the bar shows only the selected categories and selects the first visible one. Check that Tab and Shift + Tab skip hidden categories. Keep only one checkbox selected and confirm that you cannot clear it. Restart TinyDash and confirm that the choices remain saved. Restore the original category choices after this check.
+10. In **Search**, add an app alias with accented, Chinese, or Japanese text. Save and search by that alias. Remove it and confirm that its matches disappear. Hide the app, refresh applications, and restart. Confirm that it stays hidden. Restore it in Settings. Check a weak alias against another app's exact name.
+11. Record a category shortcut. Save and use it while another app has focus. Confirm that it opens an empty search in that category. Remove the binding, save, and confirm that it stops working. Test a conflict without losing the previous binding. On Wayland, use a desktop shortcut for `tinydash --mode clipboard`. Test the command with both a stopped and a running TinyDash process.
+12. Turn on **Start at login**, save, and sign out and in. Confirm that one TinyDash process starts and the launcher stays hidden. Turn it off, save, and repeat. Confirm that TinyDash does not start.
+13. Export saved settings through **Privacy**. Preview the file through import. Cancel and confirm that nothing changes. Import again, apply the preview, and confirm that settings stay unchanged until **Save changes**. Check invalid JSON, unsupported versions, unknown keys, and file paths from another operating system. An invalid import must leave saved settings unchanged.
+14. In **About**, check for updates in a development build. Confirm that it gives package instructions. Use release candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in [release verification](release-verification.md). Windows previews have updater signatures but no publisher signature. Preserve the source files before manual recovery.
 
 ## Check passwords, time zones, URLs, and web search
 
@@ -59,6 +67,8 @@ Use generated test values for these checks. Restore the original clipboard when 
 5. Paste `https://www.youtube.com/watch?v=demo&t=90&si=test&utm_source=share`. Confirm that two fields are removed and `v` and `t` remain. Copy the result and check the exact URL. Repeat with an Amazon product URL containing `tag` and a Spotify URL containing `si`.
 6. Use **Open cleaned URL** with a known public page. Confirm that the default browser opens the cleaned address.
 7. Enter `web rust & c++`. Confirm that Google, DuckDuckGo, Bing, Brave, YouTube, and GitHub appear. Copy each search URL and confirm that the complete query is one parameter. Open a search and confirm that the chosen engine receives that text. Check `ddg rust`, `yt rust`, and `gh rust` for one-engine searches. In All mode, enter `gh`, `brave`, or `google` without search text. Confirm that matching installed apps appear without an empty web search warning. With Ghostty installed, check that `gh` finds it and `gh rust` still searches GitHub.
+8. In **Settings > Search**, add a web search with keyword `docs` and template `https://example.com/search?q={query}`. Preview spaces, Unicode, `&`, `+`, and trailing newlines. Save and search `docs rust & c++`. Copy the URL and confirm that the query remains one value. Pin the result, reorder templates, and confirm that the pin still uses the same keyword. Disable or remove the template and confirm that it cannot run through the pin.
+9. Check `September 18 2026`, `18 September`, `3pm SGT to London`, and `time in Tokyo to London`. Confirm the dates and target-zone labels. Check an invalid date and an unknown source or target zone. TinyDash must report an error instead of using an unrelated zone.
 
 Password generation, time conversion, and URL cleaning must also work with the network disconnected. Web searches need a connection only after opening them in the browser.
 
@@ -74,6 +84,7 @@ Password generation, time conversion, and URL cleaning must also work with the n
 7. While online, enter `100 USD to MYR` in Calculator mode. Confirm that the result includes the ECB rate date. Use Command/Ctrl + R to refresh and confirm that typing remains responsive.
 8. After a successful refresh, disconnect the network and restart TinyDash. Confirm that currency conversion still works from SQLite. Refresh again and confirm that the error does not remove the saved result. Arithmetic and units must also work without any saved rates.
 9. Set `currencyRatesEnabled` to `false` and restart. Confirm that saved rates remain usable and a manual refresh reports the disabled setting. Restore the setting after the check.
+10. With saved rates, compare `10 USD CAD` and `10 USD to CAD`. Confirm that both give the same value and rate date. Confirm that ordinary unit conversions still work.
 
 Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. Automatic paste is not implemented.
 
@@ -93,16 +104,22 @@ The existing usage history can affect the order. Use a separate test profile for
 
 Use test text for these checks. History stores text without encryption. These checks delete saved history, so use a separate test profile.
 
+On a fresh profile, copy text before choosing a history setting. Confirm that TinyDash captures nothing. Choose **Keep history off** and restart. Confirm that capture stays off. Enable history in Settings before the following checks. Repeat with a fresh profile and **Enable history**. Confirm that the choice survives a restart.
+
 1. Copy a short text with several lines, spaces, and an emoji from a text editor. Open TinyDash and select Clipboard. Confirm that the entry appears within two seconds and the preview preserves its text.
 2. Copy the same text twice. Confirm that only one entry exists. Copy different text, then the first text again. Confirm that the first entry moves to the top.
 3. Search for a word from the second line. Confirm that both Clipboard mode and All mode find the entry. Confirm that Apps mode does not return clipboard text.
 4. Copy another value in the editor. Select the older entry in TinyDash and press Enter. Paste into the editor. Confirm that the full historical text is restored.
 5. Delete that entry with Command/Ctrl + Backspace. Confirm that the launcher stays open. Reopen it and confirm that the unchanged clipboard does not restore the deleted entry during this session.
-6. Select Clear history. Confirm that Cancel receives focus. Cancel first and confirm that entries remain. Then confirm the clear action and check that all entries disappear. Confirm that the current system clipboard is unchanged.
+6. Select **Actions > Clear all clipboard history**. Confirm that Cancel receives focus. Cancel first and confirm that entries remain. Then confirm the clear action and check that all entries disappear. Confirm that the current system clipboard is unchanged.
 7. Capture new test text, quit TinyDash fully, then start it again. Confirm that saved entries remain. Startup also captures the current system clipboard.
 8. Set `clipboardHistoryLimit` to 2 and restart. Copy three distinct values at least two seconds apart. Confirm that only the newest two remain. Restore the setting to 100.
 9. Set `clipboardHistoryEnabled` to `false` and restart. Copy new text and confirm that no new entry appears. Confirm that existing entries can still be copied and cleared. Restore the setting when finished.
 10. Copy an image, whitespace-only text, and text larger than 16 KiB. Confirm that none becomes an entry. Test clipboard capture while the launcher is hidden and after reopening it.
+11. Create an older pinned entry and then copy a newer unpinned entry. Open Clipboard with an empty query. Confirm that both entries appear, pins keep their visual group, and the selected entry is the newest copied entry. Record the selected entry if the pinned entry receives focus instead.
+12. Pin one entry in All and another in Clipboard. Keep two unpinned entries. Use **Actions > Clear unpinned history** and restart. Confirm that both pins remain and the unpinned entries are gone. Use **Clear all clipboard history**, restart, and confirm that all entries and their pins are gone. Before each restart, copy whitespace-only text in another app so startup capture cannot add the previous clipboard value again.
+13. Use **Edit a copy** on multiline text with spaces and Unicode. Copy the edit into a text editor. Confirm that the exact edit was copied and the original history entry is unchanged. Test cancellation and an edit over 16,384 bytes. The error must keep the dialog open without changing the clipboard.
+14. Use **Copy selected entries**. Select entries in a different order from the list. Check each separator and compare the pasted output. Test a combined value over 16,384 bytes. Use **Save text as a file**, cancel once, then save. Confirm that the file contains the full original text and that neither action changes the history entries.
 
 macOS and Windows read their clipboard change counters once per second. Copies made within the same interval can be missed. Linux uses GTK clipboard events. On Wayland, the compositor can limit access while TinyDash lacks focus; record which changes appear only after opening the launcher.
 

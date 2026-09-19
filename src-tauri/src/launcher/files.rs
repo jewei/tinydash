@@ -298,7 +298,7 @@ mod tests {
         let results = search.search("example", SearchMode::Files).unwrap().results;
         assert_eq!(results.len(), 1);
         assert_eq!(
-            PathBuf::from(&results[0].subtitle),
+            PathBuf::from(&results[0].subtitle).canonicalize().unwrap(),
             downloads.canonicalize().unwrap().join("example.txt")
         );
         drop(search);

@@ -101,6 +101,8 @@ pub enum ToolDetail {
         source: String,
         local: String,
         source_zone: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        target_zone: Option<String>,
         ambiguous: bool,
     },
     DateCalculation {
@@ -122,6 +124,7 @@ pub enum ToolDetail {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResponse {
+    pub preferred_selection_id: Option<String>,
     pub results: Vec<SearchResult>,
     pub total: usize,
     pub indexing: bool,

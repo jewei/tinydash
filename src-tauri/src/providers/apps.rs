@@ -53,6 +53,7 @@ struct IndexedApp {
     normalized_name: String,
     aliases: Vec<(Utf32String, String)>,
     path: Utf32String,
+    hidden: bool,
 }
 
 #[derive(Default)]
@@ -77,6 +78,7 @@ impl AppProvider {
                     .map(|alias| (alias.as_str().into(), ranking::normalize(alias)))
                     .collect(),
                 path: entry.path.to_string_lossy().as_ref().into(),
+                hidden: false,
                 entry,
             })
             .collect();
@@ -90,8 +92,37 @@ impl AppProvider {
     pub fn get(&self, id: &str) -> Option<&AppEntry> {
         self.apps
             .iter()
-            .find(|app| app.entry.id == id)
+            .find(|app| app.entry.id == id && !app.hidden)
             .map(|app| &app.entry)
+    }
+
+    pub fn catalog(&self) -> Vec<SearchResult> {
+        self.apps
+            .iter()
+            .map(|app| {
+                let mut result = app.entry.result(0);
+                result.icon = None;
+                result
+            })
+            .collect()
+    }
+
+    pub fn apply_preferences(
+        &mut self,
+        preferences: &std::collections::BTreeMap<String, crate::settings::AppPreference>,
+    ) {
+        for app in &mut self.apps {
+            let preference = preferences.get(&app.entry.id);
+            app.hidden = preference.is_some_and(|value| value.hidden);
+            app.aliases = app
+                .entry
+                .aliases
+                .iter()
+                .chain(preference.into_iter().flat_map(|value| &value.aliases))
+                .filter(|alias| !alias.trim().is_empty())
+                .map(|alias| (alias.as_str().into(), ranking::normalize(alias)))
+                .collect();
+        }
     }
 
     pub fn search(
@@ -103,6 +134,7 @@ impl AppProvider {
         let matches: Vec<_> = self
             .apps
             .iter()
+            .filter(|app| !app.hidden)
             .filter_map(|app| {
                 if query.is_empty() {
                     return Some((app, 0));
@@ -133,5 +165,87 @@ impl AppProvider {
             .into_iter()
             .map(|(app, score)| app.entry.result(score))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nucleo_matcher::{
+        Config, Matcher,
+        pattern::{AtomKind, CaseMatching, Normalization},
+    };
+
+    fn search(provider: &AppProvider, query: &str) -> Vec<SearchResult> {
+        let mut matcher = Matcher::new(Config::DEFAULT);
+        let pattern = Pattern::new(
+            &ranking::normalize(query),
+            CaseMatching::Ignore,
+            Normalization::Smart,
+            AtomKind::Fuzzy,
+        );
+        provider.search(query, &pattern, &mut matcher)
+    }
+
+    #[test]
+    fn exact_alias_beats_a_weaker_alias_match() {
+        let provider = AppProvider::new(vec![
+            AppEntry::new(
+                "Notepad".into(),
+                "/apps/notepad".into(),
+                vec!["notes".into()],
+            ),
+            AppEntry::new("Noteshelf".into(), "/apps/noteshelf".into(), vec![]),
+        ]);
+        let results = search(&provider, "notes");
+        assert_eq!(results[0].title, "Notepad");
+        assert!(results[0].score > results[1].score);
+    }
+
+    #[test]
+    fn matches_literal_localized_names_and_aliases() {
+        let provider = AppProvider::new(vec![
+            AppEntry::new(
+                "カレンダー".into(),
+                "/apps/calendar-jp".into(),
+                vec!["日历".into(), "Calendário".into()],
+            ),
+            AppEntry::new("Éditeur".into(), "/apps/editor-fr".into(), vec![]),
+        ]);
+
+        for (query, expected) in [
+            ("カレンダー", "カレンダー"),
+            ("日历", "カレンダー"),
+            ("Calendário", "カレンダー"),
+            ("éditeur", "Éditeur"),
+        ] {
+            let results = search(&provider, query);
+            assert_eq!(
+                results.first().map(|result| result.title.as_str()),
+                Some(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn preferences_remove_aliases_and_restore_hidden_apps() {
+        let entry = AppEntry::new("Editor".into(), "/apps/editor".into(), vec!["edit".into()]);
+        let id = entry.id.clone();
+        let mut provider = AppProvider::new(vec![entry]);
+        let mut preferences = std::collections::BTreeMap::new();
+        preferences.insert(
+            id.clone(),
+            crate::settings::AppPreference {
+                aliases: vec!["write".into()],
+                hidden: true,
+            },
+        );
+        provider.apply_preferences(&preferences);
+        assert!(provider.get(&id).is_none());
+        assert!(search(&provider, "write").is_empty());
+
+        provider.apply_preferences(&std::collections::BTreeMap::new());
+        assert!(provider.get(&id).is_some());
+        assert_eq!(search(&provider, "edit")[0].title, "Editor");
     }
 }

@@ -61,7 +61,10 @@ export default function ToolDetails(props: {
                 <dd>{detail().source}</dd>
               </div>
               <div>
-                <dt>Your local time</dt>
+                <dt>
+                  {detail().targetZone?.replaceAll("_", " ") ??
+                    "Your local time"}
+                </dt>
                 <dd>{detail().local}</dd>
               </div>
             </dl>
