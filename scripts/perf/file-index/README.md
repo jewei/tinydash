@@ -81,6 +81,9 @@ The source root is explicit above; if omitted, the build expects the harness at
   Storage facade validation and platform clipboard access are not exercised.
 - Optional file arguments: `<ascii|mixed> [rounds=100] [files=50000]`. Allocation
   builds ignore `rounds`. `clipboard` requires the allocation build; `equivalence`
-  works in either build. The committed raw records use defaults shown above.
+  works in either build. The archived raw records use defaults shown above.
 
-The source bundle and original raw observations are preserved in the review evidence. The local follow-up results and source hashes are linked from `docs/file-index-clipboard-performance.md`.
+The [evidence index](../../../docs/benchmarks/2026-09-20-file-index/README.md)
+contains the original raw observations, both local provider runs, native test
+records, and source hashes. The [performance report](../../../docs/file-index-clipboard-performance.md)
+explains the results and the decision to keep the PR as a draft.

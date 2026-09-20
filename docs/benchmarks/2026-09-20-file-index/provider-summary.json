@@ -1,0 +1,155 @@
+{
+  "files": {
+    "ascii": {
+      "before_retained_bytes": 16540000,
+      "after_retained_bytes": 13645000,
+      "saving_percent": 17.50302297460702,
+      "before_allocations": 650001,
+      "after_allocations": 150001,
+      "before_constructor_ms": 43.741416,
+      "after_constructor_ms": 4.000459,
+      "search": [
+        {
+          "query": "",
+          "baseline_p50_ms": 0.263458,
+          "baseline_p95_ms": 0.284291,
+          "candidate_p50_ms": 0.264167,
+          "candidate_p95_ms": 0.291375
+        },
+        {
+          "query": "doc",
+          "baseline_p50_ms": 4.069333,
+          "baseline_p95_ms": 4.166875,
+          "candidate_p50_ms": 4.130583,
+          "candidate_p95_ms": 4.214
+        },
+        {
+          "query": "dcm123",
+          "baseline_p50_ms": 1.743709,
+          "baseline_p95_ms": 1.80075,
+          "candidate_p50_ms": 1.7645,
+          "candidate_p95_ms": 1.829125
+        },
+        {
+          "query": "Project-72",
+          "baseline_p50_ms": 4.12375,
+          "baseline_p95_ms": 4.22175,
+          "candidate_p50_ms": 4.1565,
+          "candidate_p95_ms": 4.267416
+        },
+        {
+          "query": "no-such-filename",
+          "baseline_p50_ms": 0.967459,
+          "baseline_p95_ms": 1.0195,
+          "candidate_p50_ms": 0.970417,
+          "candidate_p95_ms": 1.014834
+        },
+        {
+          "query": "caf\u00e9",
+          "baseline_p50_ms": 0.401042,
+          "baseline_p95_ms": 0.422042,
+          "candidate_p50_ms": 0.429833,
+          "candidate_p95_ms": 0.463125
+        },
+        {
+          "query": "\u6771\u4eac",
+          "baseline_p50_ms": 0.400709,
+          "baseline_p95_ms": 0.433291,
+          "candidate_p50_ms": 0.429417,
+          "candidate_p95_ms": 0.456
+        },
+        {
+          "query": "Project-72\\Document",
+          "baseline_p50_ms": 2.485042,
+          "baseline_p95_ms": 2.563042,
+          "candidate_p50_ms": 2.52175,
+          "candidate_p95_ms": 2.597334
+        }
+      ]
+    },
+    "mixed": {
+      "before_retained_bytes": 18203500,
+      "after_retained_bytes": 15598000,
+      "saving_percent": 14.313181531024256,
+      "before_allocations": 700001,
+      "after_allocations": 250001,
+      "before_constructor_ms": 55.078042,
+      "after_constructor_ms": 19.954292,
+      "search": [
+        {
+          "query": "",
+          "baseline_p50_ms": 0.26425,
+          "baseline_p95_ms": 0.291417,
+          "candidate_p50_ms": 0.264042,
+          "candidate_p95_ms": 0.287083
+        },
+        {
+          "query": "doc",
+          "baseline_p50_ms": 6.19975,
+          "baseline_p95_ms": 6.317375,
+          "candidate_p50_ms": 6.246625,
+          "candidate_p95_ms": 6.375083
+        },
+        {
+          "query": "dcm123",
+          "baseline_p50_ms": 3.857916,
+          "baseline_p95_ms": 3.969375,
+          "candidate_p50_ms": 3.881375,
+          "candidate_p95_ms": 3.967833
+        },
+        {
+          "query": "Project-72",
+          "baseline_p50_ms": 6.163209,
+          "baseline_p95_ms": 6.290458,
+          "candidate_p50_ms": 6.193625,
+          "candidate_p95_ms": 6.306709
+        },
+        {
+          "query": "no-such-filename",
+          "baseline_p50_ms": 2.584042,
+          "baseline_p95_ms": 2.668417,
+          "candidate_p50_ms": 2.576209,
+          "candidate_p95_ms": 2.657417
+        },
+        {
+          "query": "caf\u00e9",
+          "baseline_p50_ms": 3.1415,
+          "baseline_p95_ms": 3.208208,
+          "candidate_p50_ms": 3.171917,
+          "candidate_p95_ms": 3.278875
+        },
+        {
+          "query": "\u6771\u4eac",
+          "baseline_p50_ms": 3.719208,
+          "baseline_p95_ms": 3.806958,
+          "candidate_p50_ms": 3.791,
+          "candidate_p95_ms": 3.90325
+        },
+        {
+          "query": "Project-72\\Document",
+          "baseline_p50_ms": 4.003125,
+          "baseline_p95_ms": 4.115833,
+          "candidate_p50_ms": 4.0535,
+          "candidate_p95_ms": 4.138791
+        }
+      ]
+    }
+  },
+  "clipboard": [
+    {
+      "case": "valid_100_entries",
+      "before_peak_extra_bytes": 39267,
+      "after_peak_extra_bytes": 17123,
+      "before_allocations": 107,
+      "after_allocations": 7
+    },
+    {
+      "case": "oversized_100_entries",
+      "before_peak_extra_bytes": 1645668,
+      "after_peak_extra_bytes": 1124,
+      "before_allocations": 107,
+      "after_allocations": 7
+    }
+  ],
+  "equivalence_cases": 128
+}
