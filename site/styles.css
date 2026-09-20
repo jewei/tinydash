@@ -122,20 +122,10 @@ kbd {
   white-space: nowrap;
 }
 .tiny-mark {
-  display: grid;
-  gap: var(--space-2xs);
-  width: 25px;
-  transform: rotate(-8deg);
-}
-.tiny-mark i {
   display: block;
-  height: 5px;
-  width: 19px;
-  border-radius: var(--radius-sm);
-  background: var(--color-accent);
-}
-.tiny-mark i + i {
-  margin-inline-start: var(--space-2xs);
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
 }
 .quiet-link {
   font-size: var(--text-small);

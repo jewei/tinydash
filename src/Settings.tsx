@@ -36,6 +36,7 @@ import {
   defaultCategories,
   normalizeCategories,
 } from "./categories";
+import appIconUrl from "../app-icon.svg";
 import "./styles/settings.css";
 
 const sections = [
@@ -579,10 +580,13 @@ export default function Settings() {
     <main class="settings-shell" aria-label="TinyDash settings">
       <aside class="settings-sidebar">
         <div class="settings-brand">
-          <span class="tiny-mark" aria-hidden="true">
-            <i />
-            <i />
-          </span>
+          <img
+            class="tiny-mark"
+            src={appIconUrl}
+            alt=""
+            width="32"
+            height="32"
+          />
           TinyDash
         </div>
         <nav aria-label="Settings sections">
@@ -1289,10 +1293,13 @@ export default function Settings() {
               </Show>
               <Show when={section() === "about"}>
                 <div class="settings-about">
-                  <span class="tiny-mark" aria-hidden="true">
-                    <i />
-                    <i />
-                  </span>
+                  <img
+                    class="tiny-mark"
+                    src={appIconUrl}
+                    alt=""
+                    width="48"
+                    height="48"
+                  />
                   <div>
                     <h2>TinyDash</h2>
                     <p>Version {info()?.version}</p>

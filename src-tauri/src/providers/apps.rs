@@ -37,7 +37,7 @@ impl AppEntry {
             subtitle: self.description.clone(),
             path: Some(self.path.to_string_lossy().into_owned()),
             score,
-            icon: self.icon.clone(),
+            icon: None,
             primary_action: Action::Launch,
             secondary_actions: vec![Action::Reveal],
             pin: None,
@@ -45,6 +45,22 @@ impl AppEntry {
             detail: None,
         }
     }
+
+    pub fn icon_payload(&self) -> Option<String> {
+        #[cfg(test)]
+        if let Some(icon) = &self.icon {
+            ICON_COPIES.with(|counts| {
+                let (count, bytes) = counts.get();
+                counts.set((count + 1, bytes + icon.len()));
+            });
+        }
+        self.icon.clone()
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static ICON_COPIES: std::cell::Cell<(usize, usize)> = const { std::cell::Cell::new((0, 0)) };
 }
 
 struct IndexedApp {
@@ -97,14 +113,7 @@ impl AppProvider {
     }
 
     pub fn catalog(&self) -> Vec<SearchResult> {
-        self.apps
-            .iter()
-            .map(|app| {
-                let mut result = app.entry.result(0);
-                result.icon = None;
-                result
-            })
-            .collect()
+        self.apps.iter().map(|app| app.entry.result(0)).collect()
     }
 
     pub fn apply_preferences(
@@ -131,6 +140,8 @@ impl AppProvider {
         pattern: &Pattern,
         matcher: &mut Matcher,
     ) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(super::search_work::Provider::Apps, self.apps.len());
         let matches: Vec<_> = self
             .apps
             .iter()

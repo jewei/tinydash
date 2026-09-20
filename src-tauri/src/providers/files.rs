@@ -91,7 +91,7 @@ pub struct FileProvider {
 }
 
 impl FileProvider {
-    fn new(entries: Vec<FileEntry>) -> Self {
+    pub(crate) fn new(entries: Vec<FileEntry>) -> Self {
         let mut files: Vec<_> = entries
             .into_iter()
             .map(|entry| {
@@ -139,6 +139,8 @@ impl FileProvider {
         now: i64,
         limit: usize,
     ) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(super::search_work::Provider::Files, self.files.len());
         let normalized: String = ranking::normalize(query).nfc().collect();
         let pattern = Pattern::new(
             &normalized,

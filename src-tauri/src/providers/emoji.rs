@@ -70,6 +70,8 @@ impl EmojiProvider {
     }
 
     pub fn search(&self, query: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(super::search_work::Provider::Emoji, self.entries.len());
         let query = ranking::normalize(&query.replace('_', " "));
         let pattern = Pattern::new(
             &query,
