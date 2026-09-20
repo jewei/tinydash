@@ -18,7 +18,7 @@ fn store(
     let mut entries: Vec<_> = (0..100)
         .map(|id| AppEntry::new(format!("App {id}"), format!("/fixture/{id}").into(), vec![]))
         .collect();
-    store.replace_catalog(&mut entries);
+    store.replace_catalog(&mut entries, || {});
     (
         store,
         entries
@@ -41,6 +41,7 @@ fn request(
             window: "main".into(),
             id: id.to_string(),
         },
+        Arc::new(|| {}),
     )
 }
 
@@ -51,6 +52,285 @@ fn finish(receiver: oneshot::Receiver<Reply>) -> Reply {
             .expect("icon completion")
             .unwrap()
     })
+}
+
+#[test]
+fn cache_hits_do_not_send_capacity_notifications() {
+    let (store, keys) = store(|_, _| Some(b"image".to_vec()), 16);
+    finish(request(&store, &keys[0], 72, 0).unwrap()).unwrap();
+    let notifications = Arc::new(AtomicUsize::new(0));
+    let count = notifications.clone();
+    let ready: Arc<Notify> = Arc::new(move || {
+        count.fetch_add(1, Ordering::SeqCst);
+    });
+    for id in 1..=10 {
+        assert_eq!(
+            tauri::async_runtime::block_on(store.image(
+                keys[0].clone(),
+                72,
+                Request {
+                    window: "main".into(),
+                    id: id.to_string()
+                },
+                ready.clone(),
+            )),
+            Ok("image".into())
+        );
+    }
+    assert_eq!(notifications.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn cancelling_unknown_requests_does_not_send_capacity_notifications() {
+    let (store, _) = store(|_, _| None, 16);
+    let notifications = AtomicUsize::new(0);
+    store.cancel_request(
+        &Request {
+            window: "main".into(),
+            id: "settled".into(),
+        },
+        || {
+            notifications.fetch_add(1, Ordering::SeqCst);
+        },
+    );
+    assert_eq!(notifications.load(Ordering::SeqCst), 0);
+}
+
+#[derive(Default)]
+struct LoadGate(Arc<(Mutex<bool>, Condvar)>);
+
+impl LoadGate {
+    fn open(&self) {
+        *self.0.0.lock().unwrap() = true;
+        self.0.1.notify_all();
+    }
+}
+
+impl Drop for LoadGate {
+    fn drop(&mut self) {
+        self.open();
+    }
+}
+
+fn wait_for_gate(gate: &Arc<(Mutex<bool>, Condvar)>) {
+    let _guard = gate
+        .1
+        .wait_while(gate.0.lock().unwrap(), |open| !*open)
+        .unwrap();
+}
+
+fn notification_counter() -> (Arc<AtomicUsize>, Arc<Notify>, mpsc::Receiver<()>) {
+    let count = Arc::new(AtomicUsize::new(0));
+    let counter = count.clone();
+    let (send, receive) = mpsc::channel();
+    let notify = Arc::new(move || {
+        counter.fetch_add(1, Ordering::SeqCst);
+        let _ = send.send(());
+    });
+    (count, notify, receive)
+}
+
+fn tracked_request(
+    store: &IconStore,
+    key: &str,
+    window: &str,
+    id: usize,
+    ready: &Arc<Notify>,
+) -> Result<oneshot::Receiver<Reply>, IconError> {
+    store.request(
+        key.into(),
+        72,
+        Request {
+            window: window.into(),
+            id: id.to_string(),
+        },
+        ready.clone(),
+    )
+}
+
+#[test]
+fn window_cancellation_wakes_another_window_once() {
+    let gate = LoadGate::default();
+    let worker_gate = gate.0.clone();
+    let (store, keys) = store(
+        move |_, _| {
+            wait_for_gate(&worker_gate);
+            Some(b"image".to_vec())
+        },
+        1024,
+    );
+    let (count, ready, _) = notification_counter();
+    let replies: Vec<_> = keys
+        .iter()
+        .take(ACTIVE_LOADS + QUEUED_LOADS)
+        .enumerate()
+        .map(|(id, key)| tracked_request(&store, key, "main", id, &ready).unwrap())
+        .collect();
+    assert_eq!(
+        tracked_request(&store, &keys[66], "settings", 100, &ready).unwrap_err(),
+        IconError::Busy
+    );
+    store.cancel_window("main", || ready());
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+    for reply in replies {
+        assert_eq!(finish(reply), Err(IconError::Cancelled));
+    }
+    store.cancel_window("main", || ready());
+    store.cancel_request(
+        &Request {
+            window: "main".into(),
+            id: "0".into(),
+        },
+        || ready(),
+    );
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+    let resumed = tracked_request(&store, &keys[66], "settings", 100, &ready).unwrap();
+    gate.open();
+    finish(resumed).unwrap();
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn a_waiter_can_retry_a_duplicate_even_when_the_queue_is_full() {
+    let gate = LoadGate::default();
+    let worker_gate = gate.0.clone();
+    let (store, keys) = store(
+        move |_, _| {
+            wait_for_gate(&worker_gate);
+            Some(b"image".to_vec())
+        },
+        1024,
+    );
+    let (count, ready, _) = notification_counter();
+    let mut replies: Vec<_> = (0..WAITERS)
+        .map(|id| {
+            tracked_request(
+                &store,
+                &keys[if id < 66 { id } else { 0 }],
+                "main",
+                id,
+                &ready,
+            )
+            .unwrap()
+        })
+        .collect();
+    assert_eq!(
+        tracked_request(&store, &keys[0], "settings", 200, &ready).unwrap_err(),
+        IconError::Busy
+    );
+    store.cancel_request(
+        &Request {
+            window: "main".into(),
+            id: "0".into(),
+        },
+        || ready(),
+    );
+    assert_eq!(finish(replies.remove(0)), Err(IconError::Cancelled));
+    assert_eq!(store.0.state.lock().unwrap().queue.len(), QUEUED_LOADS);
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+    let resumed = tracked_request(&store, &keys[0], "settings", 200, &ready).unwrap();
+    gate.open();
+    for reply in replies {
+        finish(reply).unwrap();
+    }
+    finish(resumed).unwrap();
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn completion_without_consumers_still_wakes_a_blocked_window() {
+    let first = LoadGate::default();
+    let others = LoadGate::default();
+    let first_worker = first.0.clone();
+    let other_workers = others.0.clone();
+    let (store, keys) = store(
+        move |path, _| {
+            wait_for_gate(if path.ends_with("0") {
+                &first_worker
+            } else {
+                &other_workers
+            });
+            Some(b"image".to_vec())
+        },
+        1024,
+    );
+    let (count, ready, notifications) = notification_counter();
+    let mut replies: Vec<_> = keys
+        .iter()
+        .take(ACTIVE_LOADS + QUEUED_LOADS)
+        .enumerate()
+        .map(|(id, key)| tracked_request(&store, key, "main", id, &ready).unwrap())
+        .collect();
+    assert_eq!(
+        tracked_request(&store, &keys[66], "settings", 100, &ready).unwrap_err(),
+        IconError::Busy
+    );
+    store.cancel_request(
+        &Request {
+            window: "main".into(),
+            id: "0".into(),
+        },
+        || ready(),
+    );
+    assert_eq!(finish(replies.remove(0)), Err(IconError::Cancelled));
+    assert_eq!(count.load(Ordering::SeqCst), 0, "the queue is still full");
+    first.open();
+    notifications
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("orphaned completion must release a queue slot");
+    let resumed = tracked_request(&store, &keys[66], "settings", 100, &ready).unwrap();
+    others.open();
+    for reply in replies {
+        finish(reply).unwrap();
+    }
+    finish(resumed).unwrap();
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn catalog_replacement_notifies_blocked_consumers_and_invalidates_old_requests() {
+    let gate = LoadGate::default();
+    let worker_gate = gate.0.clone();
+    let (store, keys) = store(
+        move |_, _| {
+            wait_for_gate(&worker_gate);
+            Some(b"image".to_vec())
+        },
+        1024,
+    );
+    let (count, ready, _) = notification_counter();
+    let replies: Vec<_> = (0..WAITERS)
+        .map(|id| tracked_request(&store, &keys[0], "main", id, &ready).unwrap())
+        .collect();
+    assert_eq!(
+        tracked_request(&store, &keys[0], "settings", 200, &ready).unwrap_err(),
+        IconError::Busy
+    );
+    let mut entries = vec![AppEntry::new(
+        "New app".into(),
+        "/fixture/new".into(),
+        vec![],
+    )];
+    store.replace_catalog(&mut entries, || ready());
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+    for reply in replies {
+        assert_eq!(finish(reply), Err(IconError::Cancelled));
+    }
+    assert_eq!(
+        tracked_request(&store, &keys[0], "settings", 200, &ready).unwrap_err(),
+        IconError::Unavailable
+    );
+    let resumed = tracked_request(
+        &store,
+        entries[0].icon.as_ref().unwrap(),
+        "settings",
+        200,
+        &ready,
+    )
+    .unwrap();
+    gate.open();
+    finish(resumed).unwrap();
+    assert_eq!(count.load(Ordering::SeqCst), 1);
 }
 
 #[test]
@@ -122,7 +402,7 @@ fn duplicate_requests_share_work_and_obsolete_work_leaves_the_queue() {
         assert_eq!(state.queue.len(), 64);
         assert_eq!(state.jobs.len(), 66);
     }
-    store.cancel_window("main");
+    store.cancel_window("main", || {});
     assert!(store.0.state.lock().unwrap().queue.is_empty());
     assert_eq!(finish(duplicate), Err(IconError::Cancelled));
     assert_eq!(finish(first), Err(IconError::Cancelled));
@@ -185,7 +465,7 @@ fn replacing_an_application_invalidates_old_identity_and_cached_image() {
         "/fixture/0".into(),
         vec![],
     )];
-    store.replace_catalog(&mut entries);
+    store.replace_catalog(&mut entries, || {});
     assert_ne!(entries[0].icon.as_ref().unwrap(), &keys[0]);
     assert_eq!(
         request(&store, &keys[0], 72, 1).unwrap_err(),

@@ -77,15 +77,16 @@ test("text search and selection do not wait for native icons", async ({
   expect(requests.some((request) => request.pixels >= 64)).toBe(true);
 });
 
-test("hidden launcher releases icon URLs and pending icon requests", async ({
+test("hidden launcher releases settled icons without cancellation requests", async ({
   page,
 }) => {
   await openLauncher(page);
   await page.evaluate(() => {
     window.__launcherTest.nativeIcons = true;
   });
-  await selectCategory(page, "Apps");
-  await expect(page.getByRole("option").first().locator("img")).toBeVisible();
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
+  await expect(page.getByRole("option").locator("img")).toBeVisible();
+  await expect(page.locator(".preview-icon img")).toBeVisible();
   await page.evaluate(() =>
     window.__launcherTest.emit("launcher-hidden", null),
   );
@@ -96,7 +97,74 @@ test("hidden launcher releases icon URLs and pending icon requests", async ({
         (call) => call.command === "cancel_app_icon",
       ),
     ),
-  ).toBe(true);
+  ).toBe(false);
+});
+
+test("hidden launcher cancels live icons and ignores late replies", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+    window.__launcherTest.holdIcons = true;
+  });
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
+  await expect
+    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
+    .toBe(2);
+  const requests = await page.evaluate(() =>
+    window.__launcherTest.heldIcons.map((icon) => icon.request),
+  );
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-hidden", null),
+  );
+  const cancellations = await page.evaluate(() =>
+    window.__launcherTest.calls
+      .filter((call) => call.command === "cancel_app_icon")
+      .map((call) => (call.payload as { request: string }).request),
+  );
+  expect(cancellations.sort()).toEqual(requests.sort());
+  await page.evaluate(() =>
+    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
+  );
+  await expect(page.locator(".app-avatar img")).toHaveCount(0);
+  await page.evaluate(() => {
+    window.__launcherTest.holdIcons = false;
+    return window.__launcherTest.emit("launcher-opened", false);
+  });
+  await expect(page.getByRole("option").locator("img")).toBeVisible();
+  await expect(page.locator(".preview-icon img")).toBeVisible();
+});
+
+test("hidden launcher does not cancel icon requests rejected for capacity", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+    window.__launcherTest.busyIcons = true;
+  });
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls.filter(
+            (call) => call.command === "app_icon",
+          ).length,
+      ),
+    )
+    .toBe(2);
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-hidden", null),
+  );
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "cancel_app_icon",
+      ),
+    ),
+  ).toEqual([]);
 });
 
 test("capacity notification retries only visible icons", async ({ page }) => {
@@ -124,6 +192,27 @@ test("capacity notification retries only visible icons", async ({ page }) => {
     await window.__launcherTest.emit("app-icons-ready", null);
   });
   await expect(page.getByRole("option").locator("img")).toBeVisible();
+});
+
+test("a capacity notification before the busy reply still retries the icon", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+    window.__launcherTest.iconReadyBeforeBusy = true;
+  });
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
+  await expect(page.getByRole("option").locator("img")).toBeVisible();
+  await expect(page.locator(".preview-icon img")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.filter(
+          (call) => call.command === "app_icon",
+        ).length,
+    ),
+  ).toBe(3);
 });
 
 test("a display scale change replaces pending icon sizes", async ({ page }) => {

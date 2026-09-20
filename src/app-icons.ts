@@ -9,6 +9,7 @@ interface Entry {
   consumers: Set<Consumer>;
   url?: string;
   waiting: boolean;
+  inFlight: boolean;
 }
 
 // These entries belong only to mounted, visible images. Rust owns the cache.
@@ -41,19 +42,23 @@ function startListening() {
 }
 
 async function load(entry: Entry) {
+  if (entry.inFlight) return;
   entry.waiting = false;
   await startListening();
   if (disposed || entries.get(`${entry.key}/${entry.pixels}`) !== entry) return;
   let capacity = false;
   const revision = capacityRevision;
+  entry.inFlight = true;
   try {
     const url = await backend.appIcon(entry.key, entry.pixels, entry.request);
+    entry.inFlight = false;
     if (disposed || entries.get(`${entry.key}/${entry.pixels}`) !== entry)
       return;
     entry.url = url;
     for (const consumer of entry.consumers) consumer(url);
     capacity = true;
   } catch (reason) {
+    entry.inFlight = false;
     if (entries.get(`${entry.key}/${entry.pixels}`) !== entry) return;
     entry.waiting = reason === "busy";
     if (entry.waiting && revision !== capacityRevision)
@@ -82,6 +87,7 @@ export function loadAppIcon(
       request: `${viewId}:${++sequence}`,
       consumers: new Set(),
       waiting: false,
+      inFlight: false,
     };
     entries.set(identity, entry);
     void load(entry);
@@ -92,10 +98,11 @@ export function loadAppIcon(
     entry.consumers.delete(consumer);
     if (entry.consumers.size) return;
     entries.delete(identity);
-    void backend
-      .cancelAppIcon(entry.request)
-      .then(retryWaiting)
-      .catch(() => {});
+    if (entry.inFlight)
+      void backend
+        .cancelAppIcon(entry.request)
+        .then(retryWaiting)
+        .catch(() => {});
   };
 }
 
@@ -103,7 +110,8 @@ export function disposeAppIcons() {
   disposed = true;
   stop?.();
   for (const entry of entries.values()) {
-    void backend.cancelAppIcon(entry.request).catch(() => {});
+    if (entry.inFlight)
+      void backend.cancelAppIcon(entry.request).catch(() => {});
   }
   entries.clear();
 }

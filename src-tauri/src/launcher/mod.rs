@@ -250,7 +250,9 @@ pub fn scan_apps(app: &AppHandle) {
             worker_app
                 .state::<LauncherState>()
                 .icons
-                .replace_catalog(&mut entries);
+                .replace_catalog(&mut entries, || {
+                    let _ = worker_app.emit("app-icons-ready", ());
+                });
             Ok::<_, Error>(AppProvider::new(entries))
         })
         .await;

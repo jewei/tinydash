@@ -145,3 +145,32 @@ test("a narrower query reuses an unchanged app identity and icon size", async ({
     await image.dispose();
   }
 });
+
+test("a removed result releases its row and a later result gets a new subscription", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const row = await page.getByRole("option").elementHandle();
+  if (!row) throw new Error("Expected a mounted Safari row");
+  const traffic = await iconTraffic(page);
+  try {
+    const input = page.getByRole("combobox", { name: "Search TinyDash" });
+    await input.fill("missing");
+    await expect(page.getByRole("option")).toHaveCount(0);
+    expect(await row.evaluate((node) => node.isConnected)).toBe(false);
+    await input.fill("sa");
+    await settle(page);
+    expect(
+      await row.evaluate(
+        (node) =>
+          node === document.querySelector('#search-results [role="option"]'),
+      ),
+    ).toBe(false);
+    expect(await iconTraffic(page)).toEqual({
+      loads: traffic.loads + 2,
+      cancels: traffic.cancels,
+    });
+  } finally {
+    await row.dispose();
+  }
+});

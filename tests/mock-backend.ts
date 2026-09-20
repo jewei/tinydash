@@ -21,6 +21,7 @@ declare global {
       nativeIcons: boolean;
       holdIcons: boolean;
       busyIcons: boolean;
+      iconReadyBeforeBusy: boolean;
       heldIcons: {
         request: string;
         key: string;
@@ -265,6 +266,7 @@ window.__launcherTest = {
   nativeIcons: false,
   holdIcons: false,
   busyIcons: false,
+  iconReadyBeforeBusy: false,
   heldIcons: [],
   pins: Array.isArray(savedPins)
     ? { all: savedPins, apps: savedPins }
@@ -347,6 +349,11 @@ mockIPC(
       };
     }
     if (command === "app_icon") {
+      if (state.iconReadyBeforeBusy) {
+        state.iconReadyBeforeBusy = false;
+        await emit("app-icons-ready", null);
+        throw "busy";
+      }
       if (state.busyIcons) throw "busy";
       if (state.holdIcons)
         await new Promise<void>((release) => {

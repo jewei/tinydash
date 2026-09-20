@@ -19,6 +19,7 @@ const QUEUED_LOADS: usize = 64;
 const WAITERS: usize = 128;
 type Image = Arc<Vec<u8>>;
 type Loader = dyn Fn(&Path, u16) -> Option<Vec<u8>> + Send + Sync;
+type Notify = dyn Fn() + Send + Sync;
 type Reply = Result<Image, IconError>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -65,6 +66,25 @@ struct State {
     jobs: HashMap<Key, Job>,
     queue: VecDeque<Key>,
     active: usize,
+    blocked_waiters: bool,
+    blocked_queue: bool,
+}
+
+impl State {
+    fn waiter_count(&self) -> usize {
+        self.jobs.values().map(|job| job.replies.len()).sum()
+    }
+
+    // A broadcast is useful only after a rejected request can retry. Keep
+    // separate reasons: a duplicate may join a job even while the queue is full.
+    fn take_capacity_notification(&mut self) -> bool {
+        let waiter_slot = self.waiter_count() < WAITERS;
+        let waiters = self.blocked_waiters && waiter_slot;
+        let queue = self.blocked_queue && waiter_slot && self.queue.len() < QUEUED_LOADS;
+        self.blocked_waiters &= !waiters;
+        self.blocked_queue &= !queue;
+        waiters || queue
+    }
 }
 
 struct Inner {
@@ -125,7 +145,26 @@ fn source_revision(path: &Path) -> u64 {
 }
 
 impl IconStore {
-    pub fn replace_catalog(&self, entries: &mut [AppEntry]) {
+    async fn image(
+        &self,
+        source: String,
+        pixels: u16,
+        request: Request,
+        ready: Arc<Notify>,
+    ) -> Result<String, IconError> {
+        let receiver = self.request(source, pixels, request, ready)?;
+        let result = receiver.await.map_err(|_| IconError::Cancelled)?;
+        let bytes = result?;
+        String::from_utf8(bytes.as_ref().clone()).map_err(|_| IconError::Unavailable)
+    }
+
+    fn cancel_request(&self, request: &Request, ready: impl Fn()) {
+        if self.cancel(request) {
+            ready();
+        }
+    }
+
+    pub fn replace_catalog(&self, entries: &mut [AppEntry], ready: impl Fn()) {
         let sources: Vec<_> = if self.0.enabled {
             entries
                 .iter()
@@ -153,6 +192,11 @@ impl IconStore {
                 key
             });
         }
+        let notify = state.take_capacity_notification();
+        drop(state);
+        if notify {
+            ready();
+        }
     }
 
     fn request(
@@ -160,6 +204,7 @@ impl IconStore {
         source: String,
         pixels: u16,
         request: Request,
+        ready: Arc<Notify>,
     ) -> Result<oneshot::Receiver<Reply>, IconError> {
         if !(16..=256).contains(&pixels) {
             return Err(IconError::InvalidSize);
@@ -183,13 +228,8 @@ impl IconStore {
                 let _ = reply.send(cached.value.clone());
                 return Ok(receiver);
             }
-            if state
-                .jobs
-                .values()
-                .map(|job| job.replies.len())
-                .sum::<usize>()
-                >= WAITERS
-            {
+            if state.waiter_count() >= WAITERS {
+                state.blocked_waiters = true;
                 return Err(IconError::Busy);
             }
             if let Some(job) = state.jobs.get_mut(&key) {
@@ -199,6 +239,7 @@ impl IconStore {
                 return Ok(receiver);
             }
             if state.queue.len() >= QUEUED_LOADS {
+                state.blocked_queue = true;
                 return Err(IconError::Busy);
             }
             state.jobs.insert(
@@ -211,11 +252,11 @@ impl IconStore {
             );
             state.queue.push_back(key);
         }
-        self.start_jobs();
+        self.start_jobs(&ready);
         Ok(receiver)
     }
 
-    fn cancel(&self, request: &Request) {
+    fn cancel(&self, request: &Request) -> bool {
         let mut state = self.0.state.lock().unwrap();
         state.jobs.retain(|_, job| {
             if let Some(reply) = job.replies.remove(request) {
@@ -225,9 +266,10 @@ impl IconStore {
         });
         let State { jobs, queue, .. } = &mut *state;
         queue.retain(|key| jobs.contains_key(key));
+        state.take_capacity_notification()
     }
 
-    pub fn cancel_window(&self, window: &str) {
+    pub fn cancel_window(&self, window: &str, ready: impl Fn()) {
         let requests: Vec<_> = self
             .0
             .state
@@ -239,14 +281,18 @@ impl IconStore {
             .filter(|request| request.window == window)
             .cloned()
             .collect();
+        let mut notify = false;
         for request in requests {
-            self.cancel(&request);
+            notify |= self.cancel(&request);
+        }
+        if notify {
+            ready();
         }
     }
 
-    fn start_jobs(&self) {
+    fn start_jobs(&self, ready: &Arc<Notify>) {
         let mut work = Vec::new();
-        {
+        let notify = {
             let mut state = self.0.state.lock().unwrap();
             while state.active < ACTIVE_LOADS {
                 let Some(key) = state.queue.pop_front() else {
@@ -260,9 +306,14 @@ impl IconStore {
                 state.active += 1;
                 work.push((key, path));
             }
+            state.take_capacity_notification()
+        };
+        if notify {
+            ready();
         }
         for (key, path) in work {
             let store = self.clone();
+            let ready = ready.clone();
             tauri::async_runtime::spawn_blocking(move || {
                 let value = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     (store.0.loader)(&path, key.pixels)
@@ -271,12 +322,12 @@ impl IconStore {
                 .flatten()
                 .map(Arc::new)
                 .ok_or(IconError::Unavailable);
-                store.complete(key, value);
+                store.complete(key, value, ready);
             });
         }
     }
 
-    fn complete(&self, key: Key, value: Reply) {
+    fn complete(&self, key: Key, value: Reply, ready: Arc<Notify>) {
         let replies = {
             let mut state = self.0.state.lock().unwrap();
             state.active -= 1;
@@ -317,7 +368,7 @@ impl IconStore {
         for (_, reply) in replies {
             let _ = reply.send(value.clone());
         }
-        self.start_jobs();
+        self.start_jobs(&ready);
     }
 }
 
@@ -333,27 +384,35 @@ pub async fn app_icon(
         return Err(IconError::Cancelled);
     }
     let store = &app.state::<super::LauncherState>().icons;
-    let receiver = store.request(
-        key,
-        pixels,
-        Request {
-            window: window.label().into(),
-            id: request,
-        },
-    )?;
-    let result = receiver.await.map_err(|_| IconError::Cancelled)?;
-    let _ = app.emit("app-icons-ready", ());
-    let bytes = result?;
-    String::from_utf8(bytes.as_ref().clone()).map_err(|_| IconError::Unavailable)
+    store
+        .image(
+            key,
+            pixels,
+            Request {
+                window: window.label().into(),
+                id: request,
+            },
+            Arc::new({
+                let app = app.clone();
+                move || {
+                    let _ = app.emit("app-icons-ready", ());
+                }
+            }),
+        )
+        .await
 }
 
 #[tauri::command]
 pub fn cancel_app_icon(app: tauri::AppHandle, window: tauri::WebviewWindow, request: String) {
-    app.state::<super::LauncherState>().icons.cancel(&Request {
-        window: window.label().into(),
-        id: request,
-    });
-    let _ = app.emit("app-icons-ready", ());
+    app.state::<super::LauncherState>().icons.cancel_request(
+        &Request {
+            window: window.label().into(),
+            id: request,
+        },
+        || {
+            let _ = app.emit("app-icons-ready", ());
+        },
+    );
 }
 
 #[cfg(test)]
