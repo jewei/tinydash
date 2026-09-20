@@ -1,0 +1,20 @@
+[package]
+name = "tinydash-file-provider-profile"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[features]
+track-allocations = []
+
+[dependencies]
+nucleo-matcher = "=0.3.1"
+unicode-normalization = "=0.1.25"
+walkdir = "=2.5.0"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
