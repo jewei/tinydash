@@ -158,6 +158,8 @@ impl ClipboardProvider {
     }
 
     pub fn search(&self, input: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(super::search_work::Provider::Clipboard, self.entries.len());
         let query = ranking::normalize(input);
         let pattern = Pattern::new(
             &query,

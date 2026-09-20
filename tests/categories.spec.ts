@@ -42,7 +42,19 @@ test("Tab changes the category on the first press and keeps focus and query", as
   page,
 }) => {
   await openLauncher(page);
-  await expect(bar(page).getByRole("button")).toHaveCount(11);
+  await expect(bar(page).getByRole("button")).toHaveText([
+    "All",
+    "Apps",
+    "Files",
+    "Clipboard",
+    "Calculator",
+    "System",
+    "Emoji",
+    "Passwords",
+    "Datetime",
+    "URLs",
+    "Web",
+  ]);
   await expect(page.locator(".scope-chip, .scope-popover")).toHaveCount(0);
   await input(page).press("Tab");
   await expect(active(page)).toHaveAccessibleName("Apps");
@@ -116,7 +128,7 @@ test("the category bar stays usable in narrow windows and Escape hides the launc
     .click();
   await expect(input(page)).toBeFocused();
   await input(page).press("Tab");
-  await expect(active(page)).toHaveAccessibleName("Emoji");
+  await expect(active(page)).toHaveAccessibleName("Calculator");
   await expect(active(page)).toBeInViewport({ ratio: 1 });
   await input(page).press("Shift+Tab");
   await expect(active(page)).toHaveAccessibleName("Clipboard");

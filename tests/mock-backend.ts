@@ -51,6 +51,7 @@ declare global {
       holdSearch: boolean;
       holdNextSearch: boolean;
       reverseSystem: boolean;
+      resultOverrides: Record<string, Partial<SearchResult>>;
       holdAction: boolean;
       releaseAction?: () => void;
       releaseSearch?: () => void;
@@ -297,6 +298,7 @@ window.__launcherTest = {
   holdSearch: false,
   holdNextSearch: false,
   reverseSystem: false,
+  resultOverrides: {},
   holdAction: false,
   emit,
 };
@@ -482,7 +484,7 @@ mockIPC(
                           ]
                       : query === "slow"
                         ? [apps[0]]
-                        : query === "sa"
+                        : query === "sa" || query === "saf"
                           ? [apps[1]]
                           : query === "missing"
                             ? []
@@ -520,7 +522,13 @@ mockIPC(
           : null;
       return {
         preferredSelectionId,
-        results: described,
+        // Native IPC returns independent objects, including nested action data.
+        results: structuredClone(
+          described.map((result) => ({
+            ...result,
+            ...state.resultOverrides[result.id],
+          })),
+        ),
         total: apps.length,
         indexing: false,
         indexError: null,
