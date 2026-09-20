@@ -24,20 +24,10 @@
   font: 21px/1.2 var(--font-heading);
 }
 .tiny-mark {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 22px;
-  color: var(--color-accent);
-}
-.tiny-mark i {
-  width: 16px;
-  height: 4px;
-  border-radius: 2px;
-  background: currentColor;
-}
-.tiny-mark i + i {
-  margin-left: 6px;
+  display: block;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
 }
 .settings-sidebar nav {
   display: grid;
@@ -447,8 +437,8 @@
   padding: 4px 0 24px;
 }
 .settings-about .tiny-mark {
-  transform: scale(1.5);
-  margin: 12px;
+  width: 48px;
+  height: 48px;
 }
 .settings-about h2 {
   margin: 0;
