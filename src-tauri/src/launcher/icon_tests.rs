@@ -536,12 +536,15 @@ fn a_failed_loader_releases_capacity_and_source_changes_change_revision() {
     assert_eq!(store.0.state.lock().unwrap().active, 0);
 
     let app = tempfile::tempdir().unwrap();
+    #[cfg(target_os = "macos")]
+    {
+        let before = source_revision(app.path());
+        std::fs::write(app.path().join("Icon\r"), b"custom Finder icon").unwrap();
+        assert_ne!(before, source_revision(app.path()));
+    }
     let before = source_revision(app.path());
-    std::fs::write(app.path().join("Icon\r"), b"custom Finder icon").unwrap();
-    let custom = source_revision(app.path());
-    assert_ne!(before, custom);
     let resources = app.path().join("Contents/Resources");
     std::fs::create_dir_all(&resources).unwrap();
     std::fs::write(resources.join("AppIcon.icns"), b"replacement icon").unwrap();
-    assert_ne!(custom, source_revision(app.path()));
+    assert_ne!(before, source_revision(app.path()));
 }
