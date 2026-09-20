@@ -81,6 +81,4 @@ The source root is explicit above; if omitted, the build expects the harness at
   Storage facade validation and platform clipboard access are not exercised.
 - Optional file arguments: `<ascii|mixed> [rounds=100] [files=50000]`. Allocation
   builds ignore `rounds`. `clipboard` requires the allocation build; `equivalence`
-  works in either build. The committed raw records use defaults shown above.
-
-The source bundle and original raw observations are preserved in the review evidence. The local follow-up results and source hashes are linked from `docs/file-index-clipboard-performance.md`.
+  works in either build. The archived raw records use defaults shown above.
