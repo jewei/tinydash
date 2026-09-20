@@ -180,7 +180,7 @@ function clipboardText(): string {
         "-Command",
         "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); Get-Clipboard -Raw",
       ],
-      { encoding: "utf8", timeout: 5_000 },
+      { encoding: "utf8", timeout: 5_000, windowsHide: true },
     ).trimEnd();
   }
   return execFileSync("xclip", ["-selection", "clipboard", "-o"], {
@@ -202,6 +202,8 @@ function setClipboardText(text: string) {
       {
         env: { ...process.env, TINYDASH_TEST_CLIPBOARD: text },
         timeout: 5_000,
+        // A helper console can take focus and trigger the launcher's hide-on-blur.
+        windowsHide: true,
       },
     );
   } else {
