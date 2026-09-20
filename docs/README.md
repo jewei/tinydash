@@ -27,6 +27,7 @@ Choose a document for the task you want to complete. The structure follows [Diá
 ## Explanation
 
 - [Architecture](explanation/architecture.md)
+- [Future plugin support](explanation/plugin-readiness.md)
 - [Data storage and privacy](explanation/data-and-privacy.md)
 
-Public documents describe supported behavior and repeatable procedures. Keep research, benchmark results, release work records, and design drafts in ignored local folders. Test procedures and synthetic test fixtures stay in Git.
+Public documents describe supported behavior, accepted architecture decisions, and repeatable procedures. Keep research, benchmark results, release work records, and design drafts in ignored local folders. Test procedures and synthetic test fixtures stay in Git.

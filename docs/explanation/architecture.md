@@ -17,6 +17,8 @@ The path is `query → SearchManager → providers → ranking → top 30 result
 
 The providers use direct methods. No provider trait is needed. The shared result and action enums contain only implemented variants. Future providers can join `SearchManager` without moving logic into TypeScript.
 
+The plugin system and public SDK are deferred. Preserve the current module responsibilities so a future SDK can use them. Follow the [future plugin support decision](plugin-readiness.md) when changing search, actions, storage, or frontend communication. Add plugin infrastructure only when implementation starts for a concrete command.
+
 The frontend lives in `src/`. The Rust application lives in `src-tauri/`. Shared frontend styles use `tokens.css`. Tests and build scripts are separate from application code.
 
 See the [feature catalog](../reference/features/README.md) for supported behavior.

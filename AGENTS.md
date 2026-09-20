@@ -26,6 +26,8 @@ Use two spaces in TypeScript, TSX, and CSS. Use double quotes and semicolons in 
 
 Format with `bun run format` and `cargo fmt --manifest-path src-tauri/Cargo.toml`. Keep search logic and OS operations in Rust.
 
+Plugin implementation is deferred. Follow the [future plugin support decision](docs/explanation/plugin-readiness.md) when changing search, actions, storage, or frontend communication. Preserve the existing module responsibilities; add abstractions and dependencies only for implemented behavior.
+
 ## Testing guidelines
 
 Name Playwright files `tests/<feature>.spec.ts`. Keep Rust tests in `#[cfg(test)]` modules or existing `*_tests.rs` files. No numeric coverage target is configured. Test changed behavior.
