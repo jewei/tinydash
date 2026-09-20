@@ -353,14 +353,19 @@ impl Storage {
             .session(app, &state.search)
             .lock()
             .map_err(|_| "Clipboard storage is unavailable.")?;
-        let entries = state
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?
-            .clipboard
-            .entries_for_ids(&numeric_ids)
-            .ok_or("A clipboard entry is no longer available.")?;
-        let text = combine_entries(&entries, separator)?;
+        let text = {
+            let search = state
+                .search
+                .lock()
+                .map_err(|_| Error::IndexUnavailable.to_string())?;
+            // Borrow history while validating the combined size. Oversized
+            // selections must not allocate a copy of every selected payload.
+            let entries = search
+                .clipboard
+                .entries_for_ids(&numeric_ids)
+                .ok_or("A clipboard entry is no longer available.")?;
+            combine_entries(&entries, separator)?
+        };
         app.clipboard()
             .write_text(text.clone())
             .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;

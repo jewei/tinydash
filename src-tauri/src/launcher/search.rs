@@ -260,8 +260,8 @@ impl SearchManager {
         self.apps.get(id).cloned().ok_or(Error::AppNotFound)
     }
 
-    pub fn clipboard_entry(&self, id: &str) -> Result<ClipboardEntry> {
-        self.clipboard.get(id).cloned().ok_or(Error::ResultExpired)
+    pub fn clipboard_entry(&self, id: &str) -> Result<&ClipboardEntry> {
+        self.clipboard.get(id).ok_or(Error::ResultExpired)
     }
 
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
@@ -290,9 +290,9 @@ impl SearchManager {
                 .copy_value(id)
                 .map(|value| ResolvedAction::Copy(value.to_owned()))
                 .ok_or(Error::ResultExpired),
-            Action::Copy if id.starts_with("clipboard:") => {
-                Ok(ResolvedAction::Copy(self.clipboard_entry(id)?.content))
-            }
+            Action::Copy if id.starts_with("clipboard:") => Ok(ResolvedAction::Copy(
+                self.clipboard_entry(id)?.content.clone(),
+            )),
             Action::Delete if id.starts_with("clipboard:") => {
                 Ok(ResolvedAction::Delete(self.clipboard_entry(id)?.id))
             }
