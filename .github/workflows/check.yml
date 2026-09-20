@@ -2,7 +2,15 @@ name: Checks
 
 on:
   push:
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.markdown"
+      - "docs/**"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.markdown"
+      - "docs/**"
   workflow_dispatch:
 
 permissions:

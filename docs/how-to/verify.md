@@ -40,6 +40,12 @@ bun run test:ui tests/pins.spec.ts
 
 Direct browser runs use port 1421. Set `TINYDASH_TEST_PORT` to a different unused port for concurrent runs. No test attaches to an existing Vite server.
 
+## CI triggers
+
+The Checks workflow skips branch pushes and pull requests when all changed files are Markdown files with the `.md` or `.markdown` extension, or files under `docs/`. This also skips the desktop builds and native app checks. If any other file changes, the workflow runs.
+
+Manual runs and tag pushes still run the checks. The Release candidate workflow also runs for version tags or manual requests. See [GitHub path filters](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore) for the trigger rules.
+
 ## Drive the real desktop app
 
 Use Windows or Linux X11 in a test session. Quit an existing TinyDash process first. The native suite replaces clipboard contents and clears test clipboard history. On Windows, use a separate test user with no personal TinyDash data. On Linux, the suite creates isolated application data and configuration folders, but the session clipboard is shared.
