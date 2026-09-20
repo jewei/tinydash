@@ -151,4 +151,49 @@ test.describe("repository privacy", { tag: "@smoke" }, () => {
       expect(result.status).toBe(0);
     });
   });
+
+  for (const mergeFormat of ["separate", "off"]) {
+    test(`rejects private files added and removed only by merges with log.diffMerges=${mergeFormat}`, async () => {
+      await fixture(async (root) => {
+        const git = (...args: string[]) =>
+          execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+        const commitTree = (tree: string, message: string, parents: string[]) =>
+          git(
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit-tree",
+            tree,
+            "-m",
+            message,
+            ...parents.flatMap((parent) => ["-p", parent]),
+          );
+        await file(root, "README.md", "# Public example\n");
+        git("add", ".");
+        const clean = git("write-tree");
+        const base = commitTree(clean, "Base", []);
+        const left = commitTree(clean, "Left", [base]);
+        const right = commitTree(clean, "Right", [base]);
+        await file(root, ".local/private.md", "Private test data\n");
+        git("add", ".local/private.md");
+        const added = commitTree(git("write-tree"), "Merge adds private file", [
+          left,
+          right,
+        ]);
+        const side = commitTree(clean, "Side", [right]);
+        const removed = commitTree(clean, "Merge removes private file", [
+          added,
+          side,
+        ]);
+        git("update-ref", "HEAD", removed);
+        git("read-tree", clean);
+        git("config", "log.diffMerges", mergeFormat);
+        expect(check(root).status).toBe(0);
+        const result = checkHistory(root);
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain(".local/private.md");
+      });
+    });
+  }
 });

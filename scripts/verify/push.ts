@@ -9,7 +9,15 @@ for (const line of readFileSync(0, "utf8").trim().split("\n")) {
   if (/^0+$/.test(sha)) continue; // A deleted ref introduces no history.
   const paths = execFileSync(
     "git",
-    ["log", sha, "--format=", "--name-only", "--no-renames", "-z"],
+    [
+      "log",
+      "--diff-merges=separate",
+      sha,
+      "--format=",
+      "--name-only",
+      "--no-renames",
+      "-z",
+    ],
     { encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
   );
   for (const path of paths.split("\0")) {

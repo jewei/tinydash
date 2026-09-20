@@ -1,15 +1,17 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createWriteStream, existsSync } from "node:fs";
-import { mkdir, open, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { nativeTestBinary } from "./native.ts";
+import { cancellation } from "./lifecycle.ts";
 
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
 const mode = process.argv[2] ?? "quick";
 if (!["quick", "full", "native"].includes(mode) || process.argv.length > 3)
   throw new Error("Usage: bun scripts/verify/run.ts [quick|full|native]");
+const cancelled = cancellation();
 const output = resolve(
   "test-results/verification",
   `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}-${mode}`,
@@ -23,6 +25,11 @@ const env: NodeJS.ProcessEnv = {
 };
 let failure: string | undefined;
 let lock: Awaited<ReturnType<typeof open>> | undefined;
+const native: {
+  cleanup: "not-started" | "unknown" | "complete" | "incomplete";
+} = {
+  cleanup: "not-started",
+};
 const lockPath = resolve("test-results/verification/native.lock");
 const commit = execFileSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf8",
@@ -32,6 +39,7 @@ const dirty =
     .length > 0;
 
 async function run(command: string[]) {
+  cancelled.signal.throwIfAborted();
   const start = performance.now();
   const log = createWriteStream(
     resolve(output, `${String(steps.length + 1).padStart(2, "0")}.log`),
@@ -42,28 +50,54 @@ async function run(command: string[]) {
     command.slice(1),
     {
       env,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio:
+        mode === "native"
+          ? ["ignore", "pipe", "pipe", "ipc"]
+          : ["ignore", "pipe", "pipe"],
+      // Keep terminal signals out of the suite. It receives cancellation over IPC.
+      detached: mode === "native",
+      windowsHide: true,
     },
   );
-  const forward = () => child.kill("SIGINT");
-  process.once("SIGINT", forward);
-  child.stdout.on("data", (chunk) => {
+  if (mode === "native") native.cleanup = "unknown";
+  let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
+  const forward = () => {
+    if (mode === "native") {
+      // A signal sent through child.kill() can terminate Windows children
+      // without running their handlers. Ask the suite to cancel over IPC.
+      if (child.connected)
+        child.send({ type: "cancel" }, (error: Error | null) => {
+          if (error) console.error("Cannot send cancellation:", error);
+        });
+    } else child.kill("SIGINT");
+    shutdownTimer ??= setTimeout(() => {
+      console.error("Verification shutdown timed out. Cleanup is unconfirmed.");
+      child.kill("SIGKILL");
+    }, 90_000);
+  };
+  cancelled.signal.addEventListener("abort", forward, { once: true });
+  child.once("spawn", () => {
+    if (cancelled.signal.aborted) forward();
+  });
+  child.stdout!.on("data", (chunk) => {
     process.stdout.write(chunk);
     log.write(chunk);
   });
-  child.stderr.on("data", (chunk) => {
+  child.stderr!.on("data", (chunk) => {
     process.stderr.write(chunk);
     log.write(chunk);
   });
   let spawnError: Error | undefined;
   child.once("error", (error) => {
     spawnError = error;
+    if (mode === "native" && !child.pid) native.cleanup = "not-started";
     log.write(String(error));
   });
   const status = await new Promise<number>((done) =>
     child.once("close", (code) => done(code ?? 1)),
   );
-  process.removeListener("SIGINT", forward);
+  cancelled.signal.removeEventListener("abort", forward);
+  clearTimeout(shutdownTimer);
   await new Promise<void>((done) => log.end(done));
   steps.push({
     command,
@@ -71,6 +105,7 @@ async function run(command: string[]) {
     seconds: Math.round((performance.now() - start) / 10) / 100,
   });
   if (spawnError) throw spawnError;
+  cancelled.signal.throwIfAborted();
   if (status !== 0)
     throw new Error(`${command.join(" ")} failed with exit code ${status}`);
 }
@@ -91,6 +126,7 @@ async function freePort(): Promise<string> {
 }
 
 try {
+  cancelled.signal.throwIfAborted();
   if (mode === "native") {
     const binary = nativeTestBinary();
     lock = await open(lockPath, "wx");
@@ -186,9 +222,32 @@ try {
   console.error(failure);
   process.exitCode = 1;
 } finally {
+  if (native.cleanup === "unknown") {
+    try {
+      const result = JSON.parse(
+        await readFile(
+          resolve(env.TINYDASH_NATIVE_OUTPUT!, "cleanup.json"),
+          "utf8",
+        ),
+      );
+      native.cleanup = result.complete === true ? "complete" : "incomplete";
+    } catch {
+      // A missing or damaged result cannot establish that cleanup finished.
+    }
+    if (native.cleanup !== "complete") {
+      failure ??= "Native cleanup is incomplete or unconfirmed.";
+      console.error(`${failure} Retaining lock: ${lockPath}`);
+      process.exitCode = 1;
+    }
+  }
   if (lock) {
     await lock.close();
-    await rm(lockPath);
+    if (native.cleanup === "not-started" || native.cleanup === "complete")
+      await rm(lockPath);
+  }
+  if (cancelled.signal.aborted) {
+    failure ??= String(cancelled.signal.reason);
+    process.exitCode = 1;
   }
   await writeFile(
     resolve(output, "result.json"),
@@ -201,10 +260,12 @@ try {
         passed: !failure,
         failure,
         steps,
+        ...(mode === "native" ? { nativeCleanup: native.cleanup } : {}),
       },
       null,
       2,
     ) + "\n",
   );
   console.log(`Evidence: ${output}`);
+  cancelled.dispose();
 }

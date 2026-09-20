@@ -22,7 +22,7 @@ The separate history checker reads a ref name and commit ID from each line of st
 printf 'HEAD %s\n' "$(git rev-parse HEAD)" | bun scripts/verify/push.ts
 ```
 
-This checks all commits reachable from the supplied commit, including paths that later commits deleted. It permits the former public guide paths. Regular verification and CI check the current files; they do not run this history check.
+This checks all commits reachable from the supplied commit, including merge changes and paths that later commits deleted. It requests separate merge diffs so the result does not depend on `log.diffMerges`. It permits the former public guide paths. Regular verification and CI check the current files; they do not run this history check.
 
 ## Run all source checks
 
@@ -60,7 +60,11 @@ bun run verify:native
 
 On a separate local Windows test account, set `$env:TINYDASH_NATIVE_TEST_PROFILE = '1'` in PowerShell before the command. Set `TINYDASH_NATIVE_BINARY` to test a specific installed executable.
 
-The initial check verifies the platform and executable and refuses to drive an existing TinyDash process. A lock prevents two native wrapper runs in the same checkout. If a previous run was forcibly terminated, inspect its PID in `test-results/verification/native.lock` and confirm it has stopped before removing that lock.
+The initial check verifies the platform and executable and refuses to drive an existing TinyDash process. A lock prevents two native wrapper runs in the same checkout. On cancellation, the wrapper asks the suite to stop through a process message. The suite stops pending requests and waits, stops its owned processes, then restores fixtures and settings. Repeated cancellation requests do not interrupt cleanup.
+
+The wrapper removes `test-results/verification/native.lock` only after confirmed cleanup. A failed test can still complete cleanup. Failed or unconfirmed cleanup retains the lock and records the state in the wrapper's `result.json`. Inspect the native `owned-resources.json`, `cleanup.json`, and `cleanup-failure.txt` before removing a retained lock. If the suite was forcibly terminated, its cleanup record can be missing. Confirm that the wrapper, suite, and owned processes have stopped, and restore any remaining fixtures first. Failed Windows settings restoration retains `settings-backup.json` in the temporary fixture directory.
+
+Run `bun run test:ui tests/native-cancellation.spec.ts` for cancellation regression tests. These run the real wrapper and suite with a dummy driver and temporary settings. They cover setup, compilation, pending requests, repeated cancellation, forced process termination, and missing or failed cleanup records. They do not replace Windows and Linux desktop checks.
 
 The suite checks application launch markers, calculator and emoji clipboard values, clipboard history, file watching, and canceled system commands. It starts and stops its own driver and fixture processes. Native evidence is separate from browser evidence.
 

@@ -5,7 +5,7 @@ import {
   spawnSync,
   type ChildProcess,
 } from "node:child_process";
-import { closeSync, openSync } from "node:fs";
+import { closeSync, openSync, writeFileSync } from "node:fs";
 import {
   access,
   mkdir,
@@ -17,42 +17,29 @@ import {
 } from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
+import { setTimeout as sleep } from "node:timers/promises";
 import { nativeTestBinary } from "../../scripts/verify/native.ts";
+import {
+  cancellation,
+  cleanupAll,
+  errorDetails,
+  stopProcessTree,
+  waitForExit,
+} from "../../scripts/verify/lifecycle.ts";
 import { installFixtures } from "./fixtures";
 
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
 const binary = nativeTestBinary();
+const cancelled = cancellation();
+const delay = (milliseconds: number) =>
+  sleep(milliseconds, undefined, { signal: cancelled.signal });
 const output = resolve(
   process.env.TINYDASH_NATIVE_OUTPUT ?? "test-results/native",
 );
-await mkdir(output, { recursive: true });
-await access(binary);
-const fixtures = await installFixtures();
-const settingsPath =
-  process.platform === "win32"
-    ? resolve(
-        process.env.APPDATA ?? "",
-        "dev.tinydash.launcher",
-        "settings.json",
-      )
-    : resolve(
-        fixtures.env.XDG_CONFIG_HOME ?? "",
-        "dev.tinydash.launcher",
-        "settings.json",
-      );
-const fixtureSettings = JSON.parse(
-  await readFile(settingsPath, "utf8"),
-) as Record<string, unknown>;
-await writeFile(
-  settingsPath,
-  JSON.stringify({
-    ...fixtureSettings,
-    clipboardHistoryEnabled: false,
-    clipboardHistoryDecided: false,
-  }),
-);
+let fixtures!: Awaited<ReturnType<typeof installFixtures>>;
+let cleanupFixtures: (() => Promise<void>) | undefined;
+let fixtureDirectory: string | undefined;
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
 let session: string | undefined;
 let driver: ChildProcess | undefined;
@@ -63,6 +50,24 @@ let log: number | undefined;
 let appLog: number | undefined;
 const passed: string[] = [];
 const reopenCheckMs: number[] = [];
+const secondInstances = new Set<ChildProcess>();
+
+function recordOwnedResources() {
+  writeFileSync(
+    resolve(output, "owned-resources.json"),
+    JSON.stringify(
+      {
+        suite: process.pid,
+        fixtureDirectory,
+        driver: driver?.pid,
+        application: application?.pid,
+        secondInstances: [...secondInstances].map((child) => child.pid),
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+}
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -78,21 +83,23 @@ async function freePort(): Promise<number> {
   });
 }
 
-const port = await freePort();
-let nativePort = await freePort();
-while (nativePort === port) nativePort = await freePort();
+let port: number;
+let nativePort: number;
 
 async function request<T>(
   path: string,
   method = "GET",
   body?: unknown,
   timeout = 15_000,
+  cancellable = true,
 ): Promise<T> {
   const response = await fetch(`http://127.0.0.1:${port}${path}`, {
     method,
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(timeout),
+    signal: cancellable
+      ? AbortSignal.any([cancelled.signal, AbortSignal.timeout(timeout)])
+      : AbortSignal.timeout(timeout),
   }).catch((error: unknown) => {
     throw new Error(`${method} ${path} failed: ${String(error)}`, {
       cause: error,
@@ -117,6 +124,7 @@ async function until(
   const deadline = Date.now() + timeout;
   let lastError: unknown;
   while (Date.now() < deadline) {
+    cancelled.signal.throwIfAborted();
     if (driverError) throw driverError;
     if (applicationError) throw applicationError;
     if (driver && driver.exitCode !== null) {
@@ -125,6 +133,7 @@ async function until(
     try {
       if (await check()) return;
     } catch (error) {
+      cancelled.signal.throwIfAborted();
       lastError = error;
     }
     await delay(100);
@@ -266,28 +275,23 @@ async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
 }
 
 async function reopen() {
+  cancelled.signal.throwIfAborted();
   const started = performance.now();
   // Start the executable as a desktop shortcut would. Its single-instance
   // handler must show the resident window and reset the search field.
-  const child = spawn(binary, [], { env: fixtures.env, stdio: "ignore" });
+  const child = spawn(binary, [], {
+    env: fixtures.env,
+    stdio: "ignore",
+    detached: process.platform !== "win32",
+  });
+  secondInstances.add(child);
   try {
-    await new Promise<void>((resolveExit, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error("The second instance did not exit")),
-        10_000,
-      );
-      child.once("error", (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-      child.once("exit", (code) => {
-        clearTimeout(timeout);
-        if (code === 0) resolveExit();
-        else reject(new Error(`The second instance exited with code ${code}`));
-      });
-    });
+    recordOwnedResources();
+    await waitForExit(child, cancelled.signal, 10_000);
   } finally {
-    if (child.exitCode === null) child.kill();
+    if (child.exitCode === null && child.signalCode === null)
+      await stopProcessTree(child);
+    secondInstances.delete(child);
   }
   await until("the existing window reopens on the welcome screen", () =>
     observe<boolean>(
@@ -303,6 +307,38 @@ async function reopen() {
 }
 
 try {
+  await mkdir(output, { recursive: true });
+  recordOwnedResources();
+  cancelled.signal.throwIfAborted();
+  await access(binary);
+  fixtures = await installFixtures(cancelled.signal, (cleanup, directory) => {
+    cleanupFixtures = cleanup;
+    fixtureDirectory = directory;
+    recordOwnedResources();
+  });
+  cancelled.signal.throwIfAborted();
+  const settingsPath = resolve(
+    process.platform === "win32"
+      ? (process.env.APPDATA ?? "")
+      : (fixtures.env.XDG_CONFIG_HOME ?? ""),
+    "dev.tinydash.launcher",
+    "settings.json",
+  );
+  const fixtureSettings = JSON.parse(
+    await readFile(settingsPath, "utf8"),
+  ) as Record<string, unknown>;
+  await writeFile(
+    settingsPath,
+    JSON.stringify({
+      ...fixtureSettings,
+      clipboardHistoryEnabled: false,
+      clipboardHistoryDecided: false,
+    }),
+  );
+  port = await freePort();
+  nativePort = await freePort();
+  while (nativePort === port) nativePort = await freePort();
+  cancelled.signal.throwIfAborted();
   log = openSync(resolve(output, "driver.log"), "w");
   const driverArgs = [
     "--port",
@@ -313,9 +349,11 @@ try {
   driver = spawn("tauri-driver", driverArgs, {
     env: fixtures.env,
     stdio: ["ignore", log, log],
-    detached: process.platform !== "win32",
+    detached: true,
+    windowsHide: true,
   });
   driver.once("error", (error) => (driverError = error));
+  recordOwnedResources();
   await until("WebDriver startup", async () => {
     const status = await request<{ ready: boolean }>(
       "/status",
@@ -355,11 +393,15 @@ try {
         `TinyDash exited: code=${code}, signal=${signal}`,
       );
     });
+    recordOwnedResources();
     await until("TinyDash starts its WebView2 instance", async () => {
       const response = await fetch(
         `http://127.0.0.1:${debugPort}/json/version`,
         {
-          signal: AbortSignal.timeout(1_000),
+          signal: AbortSignal.any([
+            cancelled.signal,
+            AbortSignal.timeout(1_000),
+          ]),
         },
       );
       return response.ok;
@@ -999,20 +1041,23 @@ try {
     JSON.stringify({ passed }, null, 2),
   );
 } catch (error) {
+  process.exitCode = 1;
   console.error(error);
-  await writeFile(
-    resolve(output, "file-fixture.json"),
-    JSON.stringify(
-      {
-        expected: fixtures.filePath,
-        marker: await readFile(fixtures.fileMarker, "utf8").catch(() => null),
-        files: await readdir(fixtures.fileRoot).catch(() => []),
-      },
-      null,
-      2,
-    ),
-  );
-  if (process.platform === "win32") {
+  if (fixtures) {
+    await writeFile(
+      resolve(output, "file-fixture.json"),
+      JSON.stringify(
+        {
+          expected: fixtures.filePath,
+          marker: await readFile(fixtures.fileMarker, "utf8").catch(() => null),
+          files: await readdir(fixtures.fileRoot).catch(() => []),
+        },
+        null,
+        2,
+      ),
+    );
+  }
+  if (process.platform === "win32" && !cancelled.signal.aborted) {
     const diagnostic = spawnSync(
       "powershell.exe",
       [
@@ -1032,46 +1077,75 @@ try {
     resolve(output, "failure.txt"),
     String(error instanceof Error ? error.stack : error),
   );
-  if (session) {
+  if (session && !cancelled.signal.aborted) {
     await saveScreen("failure.png").catch(() => {});
     await request<string>(`/session/${session}/source`)
       .then((source) => writeFile(resolve(output, "failure.html"), source))
       .catch(() => {});
   }
-  process.exitCode = 1;
 } finally {
-  if (session) {
-    await request(`/session/${session}`, "DELETE", undefined, 5_000).catch(
-      () => {},
-    );
-  }
-  if (driver?.pid) {
-    if (process.platform === "win32") {
-      spawnSync("taskkill.exe", ["/PID", String(driver.pid), "/T", "/F"], {
-        stdio: "ignore",
-      });
-    } else {
-      try {
-        process.kill(-driver.pid, "SIGTERM");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ESRCH")
-          console.error(error);
-      }
+  const errors: string[] = [];
+  const attempt = async (action: () => void | Promise<void>) => {
+    try {
+      await action();
+      return true;
+    } catch (error) {
+      errors.push(errorDetails(error));
+      return false;
     }
-  }
-  if (application?.pid) {
-    spawnSync("taskkill.exe", ["/PID", String(application.pid), "/T", "/F"], {
-      stdio: "ignore",
-    });
-  }
-  if (log !== undefined) closeSync(log);
-  if (appLog !== undefined) closeSync(appLog);
-  await fixtures.cleanup().catch(async (error: unknown) => {
-    console.error("Failed to remove the temporary application fixtures", error);
-    await writeFile(
-      resolve(output, "cleanup-failure.txt"),
-      String(error instanceof Error ? error.stack : error),
+  };
+  // Windows taskkill needs live roots to stop their descendants. Do not let
+  // a WebDriver delete close the application before stopping its whole tree.
+  if (session && process.platform !== "win32") {
+    await request(
+      `/session/${session}`,
+      "DELETE",
+      undefined,
+      5_000,
+      false,
+    ).catch((error: unknown) =>
+      console.error("Cannot close WebDriver session:", error),
     );
+  }
+  const processes = [application, driver, ...secondInstances].filter(
+    (child): child is ChildProcess => child !== undefined,
+  );
+  const stopped = await attempt(() =>
+    cleanupAll(processes.map((child) => () => stopProcessTree(child))),
+  );
+  for (const descriptor of [log, appLog]) {
+    if (descriptor !== undefined) await attempt(() => closeSync(descriptor));
+  }
+  // A surviving application could overwrite restored settings. Keep the
+  // fixtures and recovery evidence until every owned process has stopped.
+  if (stopped && cleanupFixtures) await attempt(cleanupFixtures);
+  if (errors.length) {
     process.exitCode = 1;
-  });
+    console.error("Native cleanup failed:", errors.join("\n"));
+    await writeFile(resolve(output, "cleanup-failure.txt"), errors.join("\n"));
+  }
+  if (cancelled.signal.aborted) {
+    process.exitCode = 1;
+    await writeFile(
+      resolve(output, "failure.txt"),
+      errorDetails(cancelled.signal.reason),
+    );
+  }
+  try {
+    await writeFile(
+      resolve(output, "cleanup.json"),
+      JSON.stringify(
+        {
+          complete: errors.length === 0,
+          cancelled: cancelled.signal.aborted,
+          processes: processes.map((child) => child.pid),
+          errors,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+  } finally {
+    cancelled.dispose();
+  }
 }
