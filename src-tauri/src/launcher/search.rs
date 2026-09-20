@@ -352,6 +352,13 @@ impl SearchManager {
             outcome.results.push(latest);
         }
         outcome.results.truncate(RESULT_LIMIT);
+        // Pins, usage, category order, and all response limits have now been
+        // applied. Only returned apps need an icon payload.
+        for result in &mut outcome.results {
+            if result.kind == super::result::ResultKind::App {
+                result.icon = self.apps.get(&result.id).and_then(AppEntry::icon_payload);
+            }
+        }
         for result in &outcome.results {
             if let Some(pin) = &result.pin {
                 self.issued_pins.push_back((
@@ -468,6 +475,10 @@ impl SearchManager {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "search_memory_tests.rs"]
+mod memory_tests;
 
 #[cfg(test)]
 mod tests {
