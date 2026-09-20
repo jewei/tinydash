@@ -28,38 +28,40 @@ const calls = (page: Page) =>
       .map((call) => call.payload),
   );
 
-test("password results show strength and regenerate the selected type before copying", async ({
-  page,
-}) => {
-  await openLauncher(page);
-  await input(page).fill("password 32");
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(4);
-  await expect(
-    page.getByText("Strength estimate", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("meter", { name: "Password entropy" }),
-  ).toHaveAttribute("value", "99");
-  await expect(
-    page.getByRole("button", { name: /^Copy generated password/ }),
-  ).toBeInViewport({ ratio: 1 });
-  await input(page).press("ArrowDown");
-  await page
-    .getByRole("button", { name: "Generate another", exact: true })
-    .click();
-  await expect(
-    page.getByRole("listbox").getByRole("option").nth(1),
-  ).toHaveAttribute("aria-selected", "true");
-  await expect(
-    page.getByRole("listbox").getByRole("option").nth(1),
-  ).toContainText("Revision1");
-  await expect(input(page)).toBeFocused();
-  await input(page).press("Enter");
-  expect(await calls(page)).toEqual([
-    { id: "password:1-0", action: "regenerate" },
-    { id: "password:1-1", action: "copy" },
-  ]);
-});
+test(
+  "password results show strength and regenerate the selected type before copying",
+  { tag: "@smoke" },
+  async ({ page }) => {
+    await openLauncher(page);
+    await input(page).fill("password 32");
+    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(4);
+    await expect(
+      page.getByText("Strength estimate", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("meter", { name: "Password entropy" }),
+    ).toHaveAttribute("value", "99");
+    await expect(
+      page.getByRole("button", { name: /^Copy generated password/ }),
+    ).toBeInViewport({ ratio: 1 });
+    await input(page).press("ArrowDown");
+    await page
+      .getByRole("button", { name: "Generate another", exact: true })
+      .click();
+    await expect(
+      page.getByRole("listbox").getByRole("option").nth(1),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByRole("listbox").getByRole("option").nth(1),
+    ).toContainText("Revision1");
+    await expect(input(page)).toBeFocused();
+    await input(page).press("Enter");
+    expect(await calls(page)).toEqual([
+      { id: "password:1-0", action: "regenerate" },
+      { id: "password:1-1", action: "copy" },
+    ]);
+  },
+);
 
 test("time results show both dates and preserve selection through a clock refresh", async ({
   page,

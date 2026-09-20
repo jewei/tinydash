@@ -78,28 +78,32 @@ for (const platform of ["macos", "windows", "linux"]) {
   });
 }
 
-test("welcome examples start searches, keep input focus, and do not execute results", async ({
-  page,
-}) => {
-  await openLauncher(page);
-  await welcome(page).getByRole("button", { name: "128 × 1.08" }).click();
-  await expect(input(page)).toHaveValue("128 * 1.08");
-  await expect(input(page)).toBeFocused();
-  await expect(page.getByRole("option")).toHaveCount(1);
-  await expect(page.getByRole("option")).toContainText("138.24");
-  await expect(welcome(page)).toHaveCount(0);
+test(
+  "welcome examples start searches, keep input focus, and do not execute results",
+  { tag: "@smoke" },
+  async ({ page }) => {
+    await openLauncher(page);
+    await welcome(page).getByRole("button", { name: "128 × 1.08" }).click();
+    await expect(input(page)).toHaveValue("128 * 1.08");
+    await expect(input(page)).toBeFocused();
+    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("option")).toContainText("138.24");
+    await expect(welcome(page)).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Clear search", exact: true }).click();
-  await expect(welcome(page)).toBeVisible();
-  await welcome(page).getByRole("button", { name: "Find an emoji" }).click();
-  await expect(input(page)).toHaveValue(":smile");
-  await expect(input(page)).toBeFocused();
-  await expect(page.getByRole("option").locator(".emoji-icon")).toBeVisible();
-  await input(page).fill("   ");
-  await expect(welcome(page)).toBeVisible();
-  await expect(page.getByRole("option")).toHaveCount(0);
-  expect(await calls(page)).toEqual([]);
-});
+    await page
+      .getByRole("button", { name: "Clear search", exact: true })
+      .click();
+    await expect(welcome(page)).toBeVisible();
+    await welcome(page).getByRole("button", { name: "Find an emoji" }).click();
+    await expect(input(page)).toHaveValue(":smile");
+    await expect(input(page)).toBeFocused();
+    await expect(page.getByRole("option").locator(".emoji-icon")).toBeVisible();
+    await input(page).fill("   ");
+    await expect(welcome(page)).toBeVisible();
+    await expect(page.getByRole("option")).toHaveCount(0);
+    expect(await calls(page)).toEqual([]);
+  },
+);
 
 test("arrow keys select welcome buttons and Enter browses apps", async ({
   page,

@@ -1,0 +1,22 @@
+# Architecture
+
+The path is `query → SearchManager → providers → ranking → top 30 results → SolidJS`.
+
+- One Rust crate owns discovery, matching, ranking, usage persistence, indexed app IDs, launch actions, window lifecycle, settings, and shortcuts.
+- `SearchManager` reuses a `nucleo-matcher` instance. Names, aliases, and paths are prepared when the app index changes. Matching ignores case and supports Unicode normalization. Match and usage bonuses are applied in `ranking/mod.rs` before selecting the top 30. Unused apps keep a stable alphabetical order when the query is empty.
+- `AppProvider`, `FileProvider`, `ClipboardProvider`, `EmojiProvider`, `CalculatorProvider`, `SystemCommandProvider`, and `ToolProvider` return the same result model. Rust parses search modes and prefixes. The emoji index and small system command catalog load on their first search. Calculations use a fresh `fend-core` context with random values disabled and a cooperative 50 ms time limit. Tool results use a bounded cache of 64 issued IDs. Password refreshes keep the displayed value; a new password search or **Generate another** produces new values.
+- Discovery builds a new index off the UI thread. The old index remains available during refresh. Tauri's existing async runtime runs application scans, searches, launch work, and currency requests. A file worker owns the scanner and watcher. A clipboard worker handles observations and database writes. Only macOS and Windows use the one-second clipboard counter timer.
+- Currency lookup reads a shared, immutable rate table in memory. Network requests and SQLite writes run outside the search lock. `currency.rs` contains the source request and parser; the calculator does not depend on the HTTP response format. The HTTP client reuses the reqwest version already required by Tauri and uses the OS TLS stack.
+- Clipboard capture, copy, delete, and clear use the same storage lock. A generation number rejects reads already in progress when an entry is removed. Search never waits for disk access. Linux coalesces pending clipboard observations in a bounded queue. Results include short text summaries; a separate request fetches the selected entry's preview.
+- SolidJS keeps UI state and sends queries without a debounce timer. It sends one search request at a time and retains only the newest waiting query. This prevents IPC arrival order from cancelling the current query when startup events overlap. Request numbers prevent late replies from replacing newer results. Enter cannot execute an old result while a new query is pending.
+- Hiding the window stops frontend search requests, drops waiting input, and ignores any late search reply. File indexing and clipboard capture continue in Rust. Reopening requests current results. A background refresh preserves the user's latest selection for the same query; a new query selects its first result.
+- The frontend sends a result ID and an action. Rust resolves app paths, indexed file paths, emoji values, and calculation values. It checks that a file still exists before opening it. A bounded cache holds the last 32 calculation results so copying an issued result does not evaluate it again. The webview has no general shell, opener, filesystem, clipboard, or global-shortcut permissions.
+- System command IDs resolve against the Rust catalog. Rust owns command aliases, confirmation text, and the confirmation rule. The frontend supplies explicit consent after the dialog. Platform modules contain the native API calls; no shell command text comes from the webview.
+- The official global shortcut, opener, and clipboard manager plugins supply desktop integration through Rust. The official single-instance plugin brings the existing process forward when the user starts TinyDash again.
+- macOS app icons come from NSWorkspace. Unavailable icons use initials. The UI uses bundled fonts and local CSS. It makes no network requests.
+
+The providers use direct methods. No provider trait is needed. The shared result and action enums contain only implemented variants. Future providers can join `SearchManager` without moving logic into TypeScript.
+
+The frontend lives in `src/`. The Rust application lives in `src-tauri/`. Shared frontend styles use `tokens.css`. Tests and build scripts are separate from application code.
+
+See the [feature catalog](../reference/features/README.md) for supported behavior.

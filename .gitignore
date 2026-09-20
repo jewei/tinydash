@@ -1,6 +1,10 @@
 node_modules/
+/.local/
 /designs/
-.hallmark/
+/.hallmark/
+/site/
+/docs/benchmarks/
+/scripts/perf/memory/
 dist/
 site-dist/
 src-tauri/target/
@@ -11,8 +15,7 @@ test-results/
 playwright-report/
 artifacts/
 native-build/
-/.local/
-/.hallmark/
-/site/
-/docs/benchmarks/
-/scripts/perf/memory/
+__pycache__/
+scripts/perf/**/target*/
+scripts/perf/**/bin/
+scripts/perf/**/results/

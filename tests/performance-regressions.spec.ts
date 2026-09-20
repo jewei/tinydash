@@ -1,8 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type {} from "./mock-backend";
 
-// Adapted from the supplied ChatGPT review bundle.
-// Reviewed source: 06475d20f5b782da8334afc3b85d23e3868f91c7.
 // These are work/identity regressions, not physical-footprint benchmarks.
 
 async function openLauncher(page: Page) {

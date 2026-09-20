@@ -82,3 +82,7 @@ The source root is explicit above; if omitted, the build expects the harness at
 - Optional file arguments: `<ascii|mixed> [rounds=100] [files=50000]`. Allocation
   builds ignore `rounds`. `clipboard` requires the allocation build; `equivalence`
   works in either build. The archived raw records use defaults shown above.
+
+Keep generated results in the ignored `results/` folder or `.local/benchmarks/`.
+Record the source versions, command, platform, and measurement limits with each
+run. Public changes should retain reproducible test code and synthetic fixtures.

@@ -27,7 +27,7 @@ update checks and installs are available only in release builds with the
 compiled updater endpoint and public key. Development builds report that updates
 are not configured. The Windows preview has separate Tauri update signatures;
 these do not establish a trusted Windows publisher. Do not invent a download URL or bypass an operating system
-trust warning. See [release setup](release-setup.md) for signing and updater
+trust warning. See [release preparation](https://github.com/jewei/tinydash/blob/main/docs/how-to/release.md) for signing and updater
 requirements.
 
 ## Existing unsigned test builds
@@ -109,7 +109,7 @@ Quit TinyDash first.
 - On Windows, use Settings, Apps, Installed apps, TinyDash, Uninstall. Leave the option to delete application data unselected if you want to keep it.
 - On Ubuntu, run `sudo apt remove tiny-dash`.
 
-Normal removal keeps settings and saved history. Reinstallation can use them again. Saved clipboard text remains on disk until you clear it in TinyDash or remove its data directory. See the settings and storage paths in the [repository README](https://github.com/jewei/tinydash#settings).
+Normal removal keeps settings and saved history. Reinstallation can use them again. Saved clipboard text remains on disk until you clear it in TinyDash or remove its data directory. See the settings and storage paths in the [repository README](https://github.com/jewei/tinydash/blob/main/docs/explanation/data-and-privacy.md).
 
 ## Build and package checks
 
@@ -121,6 +121,6 @@ Installation logs are in `native-results-<OS>-<architecture>/installer.txt`. Mac
 
 Public distribution still needs a verified Mac signature and notarization,
 update tests, and desktop checks on all three systems. Windows publisher
-signing is deferred. See [release setup](release-setup.md) for the current
+signing is deferred. See [release preparation](https://github.com/jewei/tinydash/blob/main/docs/how-to/release.md) for the current
 signing and update policy. Mac and Windows release builds let the user check
 for an update and choose when to install it.

@@ -122,8 +122,8 @@ if (command === "verify") {
     default:
       throw new Error(`Unsupported build platform: ${process.platform}`);
   }
-  await copy("docs/install.md");
-  await copy("docs/desktop-checks.md");
+  await copy("docs/how-to/install.md");
+  await copy("docs/how-to/desktop-checks.md");
   const commit = execFileSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();

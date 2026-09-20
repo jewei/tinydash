@@ -25,7 +25,9 @@ if (process.platform !== "win32" && process.platform !== "linux") {
 }
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
-const output = resolve("test-results/native");
+const output = resolve(
+  process.env.TINYDASH_NATIVE_OUTPUT ?? "test-results/native",
+);
 await mkdir(output, { recursive: true });
 const binary = resolve(
   process.env.TINYDASH_NATIVE_BINARY ??
