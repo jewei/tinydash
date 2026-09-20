@@ -140,6 +140,8 @@ impl AppProvider {
         pattern: &Pattern,
         matcher: &mut Matcher,
     ) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(super::search_work::Provider::Apps, self.apps.len());
         let matches: Vec<_> = self
             .apps
             .iter()

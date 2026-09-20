@@ -140,6 +140,8 @@ impl SystemCommandProvider {
     }
 
     pub fn search(&self, query: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(super::search_work::Provider::System, self.commands.len());
         let query = ranking::normalize(query);
         let pattern = Pattern::new(
             &query,
