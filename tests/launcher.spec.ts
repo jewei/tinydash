@@ -594,6 +594,135 @@ test("confirmation keeps the selected command through a ranking update and preve
   await expect(dialog).toHaveCount(0);
 });
 
+test("confirmation keeps an immutable command when the same result ID changes", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("reboot");
+  await expect(page.locator(".result-title").first()).toHaveText("Restart");
+  await input.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Restart this computer?" });
+  await expect(dialog).toBeVisible();
+  await page.evaluate(() => {
+    window.__launcherTest.resultOverrides["system:restart"] = {
+      title: "Updated command",
+      primaryAction: "copy",
+      confirmation: {
+        title: "Updated confirmation",
+        description: "This must not replace the open dialog.",
+        confirmLabel: "Updated action",
+      },
+    };
+    return window.__launcherTest.emit("usage-changed", null);
+  });
+  await expect(page.locator(".result-title").first()).toHaveText(
+    "Updated command",
+  );
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Save your work before you continue.");
+  await dialog.getByRole("button", { name: "Restart", exact: true }).click();
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "system:restart", action: "run", confirmed: true },
+      },
+    ]);
+});
+
+test("reused rows move and update metadata, pins, icons, and actions", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await page.evaluate(() => {
+    window.__launcherTest.nativeIcons = true;
+  });
+  await selectCategory(page, "Apps");
+  const safari = page.getByRole("option").filter({ hasText: "Safari" });
+  await expect(safari.locator("img")).toBeVisible();
+  const row = await safari.elementHandle();
+  const before = await page.evaluate(
+    () =>
+      window.__launcherTest.calls.filter(
+        (call) =>
+          call.command === "app_icon" &&
+          (call.payload as { key: string }).key === "app-icon:test:app-1",
+      ).length,
+  );
+  await page.evaluate(() => {
+    window.__launcherTest.usedAppFirst = true;
+    window.__launcherTest.pins.apps = ["app-1"];
+    window.__launcherTest.resultOverrides["app-1"] = {
+      title: "Safari Preview",
+      subtitle: "Updated browser",
+      icon: "app-icon:revision-2:app-1",
+      primaryAction: "reveal",
+      secondaryActions: [],
+    };
+    return window.__launcherTest.emit("apps-changed", null);
+  });
+  const first = page.getByRole("option").first();
+  await expect(first).toContainText("Safari Preview");
+  expect(await first.evaluate((node, previous) => node === previous, row)).toBe(
+    true,
+  );
+  await expect(first).toContainText("Updated browser");
+  await expect(first.getByLabel("Pinned to Apps")).toBeVisible();
+  await expect(first.locator(".result-shortcut")).toHaveText("⌘1");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls.filter(
+            (call) =>
+              call.command === "app_icon" &&
+              (call.payload as { key: string }).key ===
+                "app-icon:revision-2:app-1",
+          ).length,
+      ),
+    )
+    .toBeGreaterThan(0);
+  expect(before).toBeGreaterThan(0);
+  await first.click();
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "app-1", action: "reveal" },
+      },
+    ]);
+  await row?.dispose();
+});
+
+test("clipboard copy choices keep their snapshot during a result update", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Clipboard");
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitem", { name: "Copy selected entries" }).click();
+  const dialog = page.getByRole("dialog", { name: "Copy selected entries" });
+  await expect(dialog.getByLabel("Meeting notes")).toBeVisible();
+  await dialog.getByLabel("Meeting notes").check();
+  await page.evaluate(() => {
+    window.__launcherTest.resultOverrides["clipboard:1"] = {
+      title: "Updated notes",
+    };
+    window.__launcherTest.clipboardDeleted = ["clipboard:2"];
+    return window.__launcherTest.emit("clipboard-changed", null);
+  });
+  await expect(page.locator(".result-title")).toHaveText("Updated notes");
+  await expect(dialog.getByLabel("Meeting notes")).toBeChecked();
+  await expect(dialog.getByLabel("Project link")).toBeVisible();
+  await dialog.getByRole("button", { name: "Copy 1 entries" }).click();
+  await expect
+    .poll(() => page.evaluate(() => window.__launcherTest.copiedSelection))
+    .toEqual({ ids: ["clipboard:1"], separator: "\n" });
+});
+
 test("system failures remain in the dialog and reopening discards pending confirmation", async ({
   page,
 }) => {

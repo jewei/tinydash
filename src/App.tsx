@@ -8,6 +8,7 @@ import {
   onMount,
   Show,
 } from "solid-js";
+import { createStore, reconcile, unwrap } from "solid-js/store";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -54,6 +55,10 @@ const groupLabels: Record<SearchResult["kind"], string> = {
   webSearch: "Web search",
 };
 
+function snapshotResult(result: SearchResult): SearchResult {
+  return structuredClone(unwrap(result));
+}
+
 export default function App(
   props: {
     initialAppearance?: Appearance;
@@ -67,7 +72,12 @@ export default function App(
   const [visible, setVisible] = createSignal(true);
   const [query, setQuery] = createSignal("");
   const [mode, setMode] = createSignal<SearchMode>("all");
-  const [results, setResults] = createSignal<SearchResult[]>([]);
+  const [resultView, setResultView] = createStore<{ results: SearchResult[] }>({
+    results: [],
+  });
+  const results = () => resultView.results;
+  const setResults = (next: SearchResult[]) =>
+    setResultView("results", reconcile(next, { key: "id" }));
   const [selected, setSelected] = createSignal(0);
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
@@ -357,8 +367,10 @@ export default function App(
     setMenuOpen(false);
     setClipboardTool({
       mode: tool,
-      entry,
-      entries: results().filter((entry) => entry.kind === "clipboard"),
+      entry: snapshotResult(entry),
+      entries: results()
+        .filter((entry) => entry.kind === "clipboard")
+        .map(snapshotResult),
     });
   }
 
@@ -602,7 +614,7 @@ export default function App(
     if (result.confirmation && action === result.primaryAction) {
       // Capture the issued result. Background search updates must not change
       // the command that the dialog asks the user to confirm.
-      setPendingAction(result);
+      setPendingAction(snapshotResult(result));
       return;
     }
     await execute(result, action);
