@@ -8,9 +8,21 @@ Run commands from the repository root. Install dependencies with `bun install --
 bun run verify
 ```
 
-This checks public file paths, local Markdown links and anchors, formatting, Rust formatting, and TypeScript. It then runs the browser tests tagged `@smoke`. These cover welcome search, category navigation, password actions, and the repository guards.
+This checks public file paths, local Markdown links and anchors, Prettier and Rust formatting, and TypeScript. It then runs the browser tests tagged `@smoke`. These cover welcome search, category navigation, password actions, and the repository guards.
 
 The command selects a free loopback port. Playwright starts its own Vite process and refuses to reuse another server. Each run uses a separate browser context and output directory. The app backend is mocked in browser tests.
+
+## Check repository paths and history
+
+Run `bun run check:repo` to check tracked and untracked public files. Use `bun scripts/verify/repository.ts --staged` to check only the staged tree.
+
+The separate history checker reads a ref name and commit ID from each line of standard input. To check the history of the current commit:
+
+```sh
+printf 'HEAD %s\n' "$(git rev-parse HEAD)" | bun scripts/verify/push.ts
+```
+
+This checks all commits reachable from the supplied commit, including paths that later commits deleted. It permits the former public guide paths. Regular verification and CI check the current files; they do not run this history check.
 
 ## Run all source checks
 

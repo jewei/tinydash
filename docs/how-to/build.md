@@ -6,7 +6,6 @@ Install Bun 1.4.2, Rust 1.98.1 or later, and the [Tauri 2 platform prerequisites
 
 ```sh
 bun install --frozen-lockfile
-bun run hooks:install
 bun run tauri dev
 ```
 
@@ -30,4 +29,4 @@ Use [verification](verify.md) before submitting a change. Use [release preparati
 
 Use `.local/research/`, `.local/benchmarks/`, and `.local/plans/` for private work. `designs/` and `.hallmark/` are also ignored. The build and tests must work without these folders.
 
-The commit hook checks the staged tree for private paths and broken documentation links. The same check runs in CI. `bun run hooks:install` refuses to replace an existing custom hook configuration.
+Run `bun run check:repo` to check for private paths and broken documentation links. This check also runs in `bun run verify` and CI. See [repository checks](verify.md#check-repository-paths-and-history) to check staged files or commit history.

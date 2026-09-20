@@ -14,11 +14,10 @@ TinyDash is a desktop launcher built with SolidJS, TypeScript, Rust, and Tauri 2
 Install Bun 1.4.2, Rust 1.98.1 or later, and the platform dependencies in the [build guide](docs/how-to/build.md).
 
 - `bun install --frozen-lockfile` installs JavaScript dependencies.
-- `bun run hooks:install` installs repository Git hooks.
 - `bun run tauri dev` starts the desktop app. `bun run dev` starts only the browser frontend.
 - `bun run build` checks TypeScript and builds the frontend.
 - `bun run tauri build` creates desktop packages for the host OS.
-- `bun run verify` checks repository files, formatting, types, and browser smoke tests.
+- `bun run verify` checks repository files, Prettier and Rust formatting, types, and browser smoke tests.
 - `bun run verify:full` adds all browser tests, Rust tests, Clippy, and the frontend build. Run this before merge.
 
 ## Coding style and naming

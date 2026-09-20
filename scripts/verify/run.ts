@@ -3,6 +3,9 @@ import { createWriteStream, existsSync } from "node:fs";
 import { mkdir, open, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
+import { nativeTestBinary } from "./native.ts";
+
+if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
 const mode = process.argv[2] ?? "quick";
 if (!["quick", "full", "native"].includes(mode) || process.argv.length > 3)
@@ -72,7 +75,7 @@ async function run(command: string[]) {
     throw new Error(`${command.join(" ")} failed with exit code ${status}`);
 }
 
-async function testPort(): Promise<string> {
+async function freePort(): Promise<string> {
   const server = createServer();
   return new Promise((done, reject) => {
     server.once("error", reject);
@@ -89,10 +92,7 @@ async function testPort(): Promise<string> {
 
 try {
   if (mode === "native") {
-    if (process.platform !== "win32" && process.platform !== "linux")
-      throw new Error(
-        "Native WebDriver checks require Windows or Linux. Use docs/how-to/desktop-checks.md on macOS.",
-      );
+    const binary = nativeTestBinary();
     lock = await open(lockPath, "wx");
     await lock.writeFile(String(process.pid));
     if (
@@ -103,10 +103,6 @@ try {
       throw new Error(
         "Use a separate Windows test user, then set TINYDASH_NATIVE_TEST_PROFILE=1. This suite clears clipboard history.",
       );
-    const binary = resolve(
-      process.env.TINYDASH_NATIVE_BINARY ??
-        `src-tauri/target/release/tinydash${process.platform === "win32" ? ".exe" : ""}`,
-    );
     if (!existsSync(binary))
       throw new Error(
         `Build or install the native application first: ${binary}`,
@@ -132,7 +128,7 @@ try {
     );
     await run(["bun", "tests/native/smoke.ts"]);
   } else {
-    env.TINYDASH_TEST_PORT = await testPort();
+    env.TINYDASH_TEST_PORT = await freePort();
     await run(["bun", "scripts/verify/repository.ts"]);
     await run(["bun", "run", "format:check"]);
     await run([
@@ -205,7 +201,6 @@ try {
         passed: !failure,
         failure,
         steps,
-        nativeEvidence: mode === "native" ? "native" : undefined,
       },
       null,
       2,

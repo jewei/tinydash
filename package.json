@@ -18,8 +18,7 @@
     "verify": "bun scripts/verify/run.ts quick",
     "verify:full": "bun scripts/verify/run.ts full",
     "verify:native": "bun scripts/verify/run.ts native",
-    "check:repo": "bun scripts/verify/repository.ts",
-    "hooks:install": "bun scripts/verify/install-hook.ts"
+    "check:repo": "bun scripts/verify/repository.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",

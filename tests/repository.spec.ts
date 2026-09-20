@@ -32,6 +32,35 @@ function check(root: string) {
   });
 }
 
+function commit(root: string, message: string) {
+  execFileSync(
+    "git",
+    [
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "commit",
+      "--quiet",
+      "-m",
+      message,
+    ],
+    { cwd: root },
+  );
+}
+
+function checkHistory(root: string) {
+  const sha = execFileSync("git", ["rev-parse", "HEAD"], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
+  return spawnSync("bun", [pushChecker], {
+    cwd: root,
+    encoding: "utf8",
+    input: `refs/heads/main ${sha} refs/heads/main ${"0".repeat(40)}\n`,
+  });
+}
+
 test.describe("repository privacy", { tag: "@smoke" }, () => {
   test("rejects a private file added with force", async () => {
     await fixture(async (root) => {
@@ -96,34 +125,11 @@ test.describe("repository privacy", { tag: "@smoke" }, () => {
         process.platform === "win32" ? "private name.md" : "private\nname.md";
       await file(root, `designs/${name}`, "Private design\n");
       execFileSync("git", ["add", "."], { cwd: root });
-      const commit = (message: string) =>
-        execFileSync(
-          "git",
-          [
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "--quiet",
-            "-m",
-            message,
-          ],
-          { cwd: root },
-        );
-      commit("Add design");
+      commit(root, "Add design");
       execFileSync("git", ["rm", "-r", "designs"], { cwd: root });
-      commit("Remove design");
+      commit(root, "Remove design");
       expect(check(root).status).toBe(0);
-      const sha = execFileSync("git", ["rev-parse", "HEAD"], {
-        cwd: root,
-        encoding: "utf8",
-      }).trim();
-      const result = spawnSync("bun", [pushChecker], {
-        cwd: root,
-        encoding: "utf8",
-        input: `refs/heads/main ${sha} refs/heads/main ${"0".repeat(40)}\n`,
-      });
+      const result = checkHistory(root);
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("private paths remain");
     });
@@ -133,38 +139,15 @@ test.describe("repository privacy", { tag: "@smoke" }, () => {
     await fixture(async (root) => {
       await file(root, "docs/install.md", "# Install\nPublic instructions.\n");
       execFileSync("git", ["add", "."], { cwd: root });
-      const commit = (message: string) =>
-        execFileSync(
-          "git",
-          [
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "--quiet",
-            "-m",
-            message,
-          ],
-          { cwd: root },
-        );
-      commit("Add installation guide");
+      commit(root, "Add installation guide");
       expect(check(root).status).toBe(1);
       await mkdir(join(root, "docs/how-to"), { recursive: true });
       execFileSync("git", ["mv", "docs/install.md", "docs/how-to/install.md"], {
         cwd: root,
       });
-      commit("Move public guide");
+      commit(root, "Move public guide");
       expect(check(root).status).toBe(0);
-      const sha = execFileSync("git", ["rev-parse", "HEAD"], {
-        cwd: root,
-        encoding: "utf8",
-      }).trim();
-      const result = spawnSync("bun", [pushChecker], {
-        cwd: root,
-        encoding: "utf8",
-        input: `refs/heads/main ${sha} refs/heads/main ${"0".repeat(40)}\n`,
-      });
+      const result = checkHistory(root);
       expect(result.status).toBe(0);
     });
   });

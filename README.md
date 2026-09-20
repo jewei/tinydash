@@ -30,9 +30,8 @@ Press **Control + Shift + Space** to show or hide the launcher. On native Waylan
 ## Development checks
 
 ```sh
-bun run hooks:install
 bun run verify
 bun run verify:full
 ```
 
-The fast check runs repository checks, formatting, type checks, and browser smoke tests. The full check also runs all browser tests, Rust tests, Clippy, and the frontend build. Native desktop checks use a separate command and test session.
+The fast check runs repository checks, Prettier and Rust formatting checks, type checks, and browser smoke tests. The full check also runs all browser tests, Rust tests, Clippy, and the frontend build. Native desktop checks use a separate command and test session.

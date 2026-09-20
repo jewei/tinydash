@@ -18,21 +18,16 @@ import {
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { nativeTestBinary } from "../../scripts/verify/native.ts";
 import { installFixtures } from "./fixtures";
 
-if (process.platform !== "win32" && process.platform !== "linux") {
-  throw new Error("Native WebDriver checks require Windows or Linux.");
-}
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
+const binary = nativeTestBinary();
 const output = resolve(
   process.env.TINYDASH_NATIVE_OUTPUT ?? "test-results/native",
 );
 await mkdir(output, { recursive: true });
-const binary = resolve(
-  process.env.TINYDASH_NATIVE_BINARY ??
-    `src-tauri/target/release/tinydash${process.platform === "win32" ? ".exe" : ""}`,
-);
 await access(binary);
 const fixtures = await installFixtures();
 const settingsPath =
