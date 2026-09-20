@@ -8,6 +8,22 @@ See [platform support](../platform-support.md) for the directories and applicati
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/launcher.spec.ts tests/settings.spec.ts
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- providers::apps
+```
+
+Use Apps and All. Find an application by name, abbreviation, and alias. Press Enter on the selected fixture and check its marker. Verify reveal and refresh through each changed entry point. A hidden application must remain hidden after refresh and restart.
+
+Run `bun run verify:native` on Windows and Linux X11 for real discovery and launch. Use the application and Settings desktop checks for reveal, tray refresh, aliases, and macOS. Platform discovery changes need a check on the affected OS.
+
 Search for a temporary application fixture, select it, and press Enter. Check both the selected UI result and the marker written by the launched process.
 
 Tests: [tests/launcher.spec.ts](../../../tests/launcher.spec.ts), [tests/settings.spec.ts](../../../tests/settings.spec.ts), [tests/native/smoke.ts](../../../tests/native/smoke.ts).

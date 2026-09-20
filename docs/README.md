@@ -13,6 +13,7 @@ Choose a document for the task you want to complete. The structure follows [Diá
 - [Configure search and shortcuts](how-to/configure.md)
 - [Recover saved data](how-to/recover-data.md)
 - [Verify a change](how-to/verify.md)
+- [Test the verification procedure](how-to/verify-verification.md)
 - [Check desktop behavior](how-to/desktop-checks.md)
 - [Prepare a release](how-to/release.md)
 

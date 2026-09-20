@@ -40,6 +40,7 @@ async function withArtifacts(
       [installer]: "Test fixture only, not an installer.",
       "install.md": "Test fixture instructions.",
       "desktop-checks.md": "Test fixture instructions.",
+      "build.json": JSON.stringify({ platform: target.os, source: { commit } }),
       "build.txt": `Commit: ${commit}\nSource: clean worktree\nVersion: ${version}\nOS: ${target.os}\nArchitecture: ${target.arch}\nDistribution: release candidate${target.os === "linux" ? "" : " with updater signatures"}\nPublisher signing: ${target.publisher}\n`,
     };
     const signature =

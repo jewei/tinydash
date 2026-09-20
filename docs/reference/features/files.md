@@ -14,6 +14,22 @@ The [notify](https://docs.rs/notify/8.2.0/notify/) watcher uses FSEvents on macO
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/launcher.spec.ts --grep "file|scan"
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- providers::files
+```
+
+Use Files and All with an isolated root. Create, rename, and delete a file without manual refresh. Confirm the visible result changes. Open a selected file and check the handler marker. Exercise Refresh files and Ctrl/Command + R when manual refresh changes.
+
+Run `bun run verify:native` on Windows and Linux X11. Run the file-search desktop checks on macOS for FSEvents, permissions, and OS associations, and on Wayland when session behavior changes. A mocked result update does not prove filesystem notifications.
+
 Create, rename, and delete files in the isolated test root. Confirm the result list follows each change. Open a result and check the temporary handler marker.
 
 Tests: [tests/launcher.spec.ts](../../../tests/launcher.spec.ts), [tests/native/smoke.ts](../../../tests/native/smoke.ts).

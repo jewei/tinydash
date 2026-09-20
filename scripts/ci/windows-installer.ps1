@@ -58,7 +58,10 @@ if ($Action -eq 'Install') {
     # Check same-version replacement without deleting the saved profile.
     Run-Installer $installers[0].FullName '/S'
     Check-Data
+    bun scripts/verify/installed.ts native-build $installers[0].FullName $payload[0].FullName $binary test-results/native/installed-build.json
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot identify the installed build.' }
     "TINYDASH_NATIVE_BINARY=$binary" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+    "TINYDASH_NATIVE_MANIFEST=$(Join-Path $PWD 'test-results/native/installed-build.json')" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
     Write-Output 'PASS: per-user installation, executable, shortcut, uninstall entry, and reinstall'
 } else {
     # _?= prevents NSIS from detaching a temporary child process. Keep the path

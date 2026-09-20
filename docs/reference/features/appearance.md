@@ -8,6 +8,22 @@ Settings, Categories controls visible categories. Keep at least one selected. Th
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/categories.spec.ts tests/settings.spec.ts tests/tools.spec.ts tests/welcome.spec.ts
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- settings
+```
+
+Change Light, Dark, and Compact through Actions and Settings when affected. Inspect 320-pixel and desktop widths. Save visible categories, reopen, and check Tab and Shift + Tab use only those categories. Verify the selected fallback when hiding the active category.
+
+Use desktop launcher and Settings checks on each affected OS for transparent corners, multiple windows, persistence after process restart, scaling, and placement. Browser viewport checks cannot establish native window behavior.
+
 Change appearance, select a result, and inspect desktop and narrow widths. Hide a category, save, reopen, and confirm keyboard navigation uses the visible categories.
 
 Tests: [tests/categories.spec.ts](../../../tests/categories.spec.ts), [tests/settings.spec.ts](../../../tests/settings.spec.ts), [tests/tools.spec.ts](../../../tests/tools.spec.ts), [tests/welcome.spec.ts](../../../tests/welcome.spec.ts).

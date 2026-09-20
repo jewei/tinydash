@@ -6,6 +6,22 @@ Tool pins save their input and output choice. When you open a category, TinyDash
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/pins.spec.ts
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- pins
+```
+
+Pin through the detail panel and Actions when affected. Pin the same item in All and its category, remove one pin, and confirm the other remains. Check empty and typed queries. Fully restart the desktop process to prove SQLite persistence.
+
+Use the usage-ranking desktop checks on each affected OS for restart persistence. Browser reloads restore mock data and do not prove SQLite writes. The native suite uses a clipboard pin but does not prove every pin category or migration.
+
 Pin an item to All and its own category. Remove one pin and confirm the other remains. Check the empty-query list and a typed search separately.
 
 Tests: [tests/pins.spec.ts](../../../tests/pins.spec.ts).

@@ -14,6 +14,22 @@ macOS checks the [pasteboard change counter](https://developer.apple.com/documen
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/launcher.spec.ts tests/settings.spec.ts tests/tinycast-features.spec.ts --grep "clipboard|Clipboard|copy|Copy|history|first-use"
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- clipboard
+```
+
+Start with a fresh capture choice. Enable capture, copy known multiline text from another process, find it in Clipboard and All, and copy it back. Compare exact bytes. Delete an entry and confirm the system clipboard stays unchanged. Check clear, pin, edit, and combine paths when affected.
+
+Run `bun run verify:native` on Windows and Linux X11. Use the clipboard desktop checks on macOS and Wayland, and for restart persistence or native Save dialogs. Use disposable history; a settings backup cannot restore deleted history.
+
 Enable history in an isolated profile, copy known text from another process, find it, copy an older entry, then delete it. Verify copied bytes and confirm deletion leaves the system clipboard unchanged.
 
 Tests: [tests/launcher.spec.ts](../../../tests/launcher.spec.ts), [tests/settings.spec.ts](../../../tests/settings.spec.ts), [tests/tinycast-features.spec.ts](../../../tests/tinycast-features.spec.ts), [tests/native/smoke.ts](../../../tests/native/smoke.ts).

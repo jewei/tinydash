@@ -2,6 +2,8 @@
 
 This is the maintained feature catalog. Each page states supported behavior, entry points, expected results, tests, and proof limits. Update the relevant page when behavior or its verification changes.
 
+For a development change, run the affected recipes and add proof for behavior they do not cover. Each browser recipe uses `verify:browser` to retain successful traces. Run the required final source checks after the last edit. During a maintenance audit, inspect every feature against source and exercise every feature live. Record missing desktop prerequisites separately; do not count them as passes.
+
 | Feature                                        | Current checks                               |
 | ---------------------------------------------- | -------------------------------------------- |
 | [Launcher and navigation](launcher.md)         | Native and browser                           |

@@ -6,6 +6,22 @@ Character passwords support 6 to 64 characters and default to 20. Passphrases su
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/tools.spec.ts tests/pins.spec.ts --grep "password|Password"
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- providers::tools::password
+```
+
+Use Passwords and explicit commands in All. Generate each affected type, select Generate another, and copy the displayed value. Check length and alphabet rules in Rust. Verify that clipboard history does not capture the generated test password and pins do not store it.
+
+Use the password desktop checks on each affected OS for system clipboard bytes and history exclusion. There is no native password journey in the current automated suite. Browser generation uses fixtures.
+
 Generate a password, select another type, use Generate another, then copy. Check that copying uses the value currently displayed.
 
 Tests: [tests/tools.spec.ts](../../../tests/tools.spec.ts), [tests/pins.spec.ts](../../../tests/pins.spec.ts).

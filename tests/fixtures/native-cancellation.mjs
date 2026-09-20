@@ -81,6 +81,24 @@ if (process.argv[2] === "worker" || process.argv[2] === "compiler") {
     },
   }));
   if (process.argv[2] === "wrapper") {
+    // Lifecycle cases deliberately change files in their temporary checkout.
+    // Identity and stale-build rejection have their own regression tests.
+    const identityPath = resolve(source, "scripts/verify/identity.ts");
+    const identity = await import(identityPath);
+    const fixtureSource = await identity.sourceIdentity();
+    const binary = { path: process.execPath, sha256: "0".repeat(64), bytes: 1 };
+    mock.module(identityPath, () => ({
+      ...identity,
+      sourceIdentity: async () => fixtureSource,
+      readBuildRecord: async () => ({
+        schema: 1,
+        source: fixtureSource,
+        binary,
+        kind: "local",
+      }),
+      verifyBuild: async () => binary,
+    }));
+    process.env.TINYDASH_NATIVE_MANIFEST = "synthetic-lifecycle-build.json";
     process.argv = [process.execPath, "scripts/verify/run.ts", "native"];
     await import(resolve(source, "scripts/verify/run.ts"));
   } else {

@@ -6,6 +6,22 @@ Time conversion uses the bundled [IANA database through chrono-tz](https://docs.
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/tools.spec.ts --grep "time|Datetime"
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- providers::tools::timezones
+```
+
+Use Datetime and explicit commands in All. Check `2028-02-28 + 1 day` gives `2028-02-29`. Use explicit dates for daylight saving cases and compare Copy with the displayed date or time. Check both results for repeated times and the error for missing times.
+
+Use the datetime desktop checks on each affected OS for local-zone detection and system clipboard behavior. The automated native suite does not exercise datetime. Mocked time results cannot establish the Rust calculation.
+
 Enter `2028-02-28 + 1 day` in Datetime and check `2028-02-29`. Check an explicit source date and zone, including an ambiguous daylight saving time.
 
 Tests: [tests/tools.spec.ts](../../../tests/tools.spec.ts).

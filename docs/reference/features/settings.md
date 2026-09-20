@@ -12,6 +12,24 @@ About has an explicit update check. Mac and Windows release builds need an updat
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/settings.spec.ts tests/tinycast-features.spec.ts tests/release-config.spec.ts
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- settings
+bun run test:rust -- db::backup
+bun run test:rust -- db::migrations
+```
+
+Open Settings through Actions, tray, Ctrl/Command + comma, and `tinydash --settings` when those paths change. Save and reopen; also check Discard and an unsaved close. Export, preview an import, cancel, and confirm saved state is unchanged. An invalid import must preserve saved state.
+
+Use desktop Settings checks on each affected OS for shortcut registration, login behavior, native file dialogs, and persistence. Recovery requires a disposable database and the recovery procedure. Updates require an installed release candidate, test feed, signature checks, and installation evidence. These are explicit gaps in the mocked tests and current native smoke suite.
+
 Change a setting, save, and reopen. Export settings, preview a changed import, cancel it, then confirm saved state is unchanged. Check the unconfigured updater message in a development build.
 
 Tests: [tests/settings.spec.ts](../../../tests/settings.spec.ts), [tests/tinycast-features.spec.ts](../../../tests/tinycast-features.spec.ts), [tests/release-config.spec.ts](../../../tests/release-config.spec.ts).

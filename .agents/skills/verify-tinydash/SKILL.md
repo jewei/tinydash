@@ -1,32 +1,38 @@
 ---
 name: verify-tinydash
-description: Verify TinyDash changes with repository checks, browser tests, Rust tests, and real desktop checks. Use when validating launcher behavior or a repository change. Browser tests use a mock backend; native checks need a controlled Windows or Linux session.
+description: Verify and repair TinyDash changes with focused browser tests, Rust checks, and identified desktop builds. Use during development and before reporting a change complete, or when auditing the verification procedure. Browser tests mock IPC; desktop proof needs a controlled platform session.
 ---
 
 # Verify TinyDash
 
-Read [the verification procedure](../../../docs/how-to/verify.md) and the relevant page in [the feature map](../../../docs/reference/features/README.md). These documents define the commands, supported entry points, expected results, and proof limits.
+Read [the verification procedure](../../../docs/how-to/verify.md) and the affected pages in [the feature map](../../../docs/reference/features/README.md). Keep feature recipes there. Do not create another feature catalog in this skill.
 
-## Launch and initial check
+## Select the proof
 
-Run `bun run verify` from the repository root for fast feedback. It creates an isolated browser run, starts Vite on an unused loopback port, and checks readiness before tests start. It never reuses the user's development server.
+Use the task, changed source, and feature pages to state observable acceptance criteria. Include affected entry points, error paths, persistence, and OS effects. Existing tests are evidence only for behavior they exercise. Add or adapt a regression test when a behavior change has no suitable proof. For a bug, reproduce the failure before the repair when possible.
 
-Run `bun run verify:full` before treating a source change as verified. For native behavior, follow the platform prerequisites and use `bun run verify:native` in a controlled test session. The native wrapper checks for an executable and an existing app process before it changes test state.
+Keep a short acceptance record under `.local/` or `test-results/`: criterion, required platform, command or user actions, expected UI and external result, outcome, and evidence path. Distinguish passed, failed, and not run. A missing required platform is a blocker for that proof.
 
-When startup fails, inspect the first failed command log, port ownership, and the selected build. Do not drive another running TinyDash instance to bypass the failure. Native tests alter clipboard history; a normal Windows user profile is unsuitable.
+Choose the required level for each criterion. Browser tests prove SolidJS behavior against mocked IPC. Rust tests prove backend rules. Desktop checks prove the integrated application and OS effects. A pass at one level cannot replace a required check at another level.
 
-## Drive
+## Run and repair
 
-Use the existing test for the feature. Browser tests use accessible names such as `Search TinyDash`, `Search categories`, and the feature's action buttons. They prove frontend behavior against mocked IPC.
+1. Run `bun run verify` for initial feedback. Use `bun run verify:browser tests/<feature>.spec.ts` for focused browser proof with retained successful traces. Use the feature's focused Rust command while repairing backend behavior. Each wrapper run has its own evidence directory and browser server.
+2. For desktop proof, follow the guide's local or CI route. Identify the tested build and test source separately. Rebuild after relevant source edits. Never use an older package as proof of a new local change. Quit or isolate an existing app before testing; do not attach to a personal instance. Native checks change clipboard contents and require a disposable Windows profile.
+3. Drive the required user entry points. Use accessible names such as `Search TinyDash` and `Search categories`. Check the action, the resulting UI state, and external effects. Application launch needs the selected fixture's output marker. Copy needs the exact system clipboard value. File watching needs creation, rename, and deletion without manual refresh. Internal setters or direct IPC can support a backend check but cannot replace the user path. Keep power operations canceled.
+4. On failure, retain the evidence and classify the cause as product, test tool, or environment. Repair within the authorized development task. Fix missing test coverage instead of accepting a mock as desktop proof. Do not weaken an assertion, change the expected behavior, or skip a required test to obtain a pass.
+5. Before retrying, inspect the failed command and build identity. Recheck readiness and reset fixture state or restart the owned instance after surprising behavior. Confirm cleanup before another native run. Do not delete a retained lock until its owned processes and recovery state have been checked. Each retry needs a repair, a reset, or a new diagnostic step. Continue while useful diagnosis or repair remains possible.
 
-Native tests use the real Rust backend. For an application launch, select a temporary app fixture through the launcher and check its output marker. For calculator or emoji copying, check the displayed result and the system clipboard. For file watching, create, rename, and delete files in the fixture root and check the visible results.
+After the final relevant edit, repeat the affected proofs and run `bun run verify:full` for source changes. Repeat required native checks against the resulting build. Documentation-only changes need repository and formatting checks; changes to verification instructions also need the exercise below. Do not repeat a passing check without a change or unresolved concern that invalidates it.
 
-Use every entry point required by the feature page for the change under review. Do not replace user actions with internal setters as proof of the whole feature. Keep power operations canceled during automated checks.
+## Finish with evidence
 
-## Evidence and cleanup
+Inspect command logs, `result.json`, and the relevant browser traces or native records. Retain a successful trace for each changed browser journey. Evidence must identify the final source, executable when applicable, platform, commands, outcomes, and coverage limits. Check that proof files still exist after cleanup. A wrapper pass reports its commands; use the acceptance record to decide whether the task is complete.
 
-Report the tested commit and working-tree state, commands, result, and coverage limits. Wrapper output gives the evidence directory under `test-results/verification/`. Review its command logs, result JSON, and browser traces or native records.
+Report **verified** only when all required criteria pass for the final source and identified build, evidence remains available, and cleanup is complete. State the features and platforms covered. A skipped check or unsupported platform is not a pass. If access, credentials, desktop capabilities, or a decision outside the task prevents completion, report the exact blocker, attempts, evidence, and behavior still unverified. Do not return a repairable failure merely because the first check failed.
 
-Cleanup must stop only processes started by the test and preserve evidence. Confirm that the result file and relevant proof still exist after cleanup. An unsupported native platform is a coverage gap, not a passing test. macOS currently uses the documented desktop checks.
+## Maintain and test this skill
 
-Keep the feature map current. Do not create another feature catalog in this skill.
+During ordinary development, update the affected feature recipes. During a requested maintenance audit, check every feature page against source and exercise every feature live at its required level. Separate documentation drift, test-tool gaps, and product regressions. Repair documentation and test tools within the audit; report product regressions unless product repair is also authorized. Do not change the documented behavior to hide a regression.
+
+After a substantial skill or runner change, follow [the verification exercises](../../../docs/how-to/verify-verification.md). Use an isolated checkout with a realistic task. Check actual agent actions and evidence, including recovery from a failed attempt. Static Markdown validation alone does not prove that the agent can use the skill.

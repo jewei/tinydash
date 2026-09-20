@@ -10,6 +10,22 @@ Settings, Search can add custom keyword templates. See [configuration](../../how
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/tools.spec.ts tests/settings.spec.ts --grep "web search|custom web"
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- providers::tools::web
+```
+
+Use Web, an explicit engine command in All, and an affected custom keyword. Check that spaces, Unicode, and `&` remain in one query value. Exercise Copy search URL and Open separately. A bare engine alias must still allow application matches.
+
+Use the web-search desktop checks on each affected OS for copied bytes and the default-browser request. There is no automated native web-search journey. Browser tests prove the requested action against mocked IPC.
+
 Enter `web rust`, select an engine, and verify the encoded URL for that engine. Check Copy search URL separately.
 
 Tests: [tests/tools.spec.ts](../../../tests/tools.spec.ts), [tests/settings.spec.ts](../../../tests/settings.spec.ts).

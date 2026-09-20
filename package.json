@@ -17,6 +17,7 @@
     "test:native": "bun tests/native/smoke.ts",
     "verify": "bun scripts/verify/run.ts quick",
     "verify:full": "bun scripts/verify/run.ts full",
+    "verify:browser": "bun scripts/verify/run.ts browser",
     "verify:native": "bun scripts/verify/run.ts native",
     "check:repo": "bun scripts/verify/repository.ts"
   },

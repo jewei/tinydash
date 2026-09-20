@@ -10,6 +10,22 @@ The actions menu uses Command/Ctrl + K. The tray can open the launcher, open Set
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/welcome.spec.ts tests/categories.spec.ts tests/launcher.spec.ts
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- launcher
+```
+
+Open with the global shortcut, tray, and a second process when those entry points change. Check focus, arrow selection, Enter, Escape, and reopen. The selected fixture must launch and a second launcher process must not remain.
+
+Run `bun run verify:native` on Windows and Linux X11 for launch and reopen. Use the desktop launcher checks for macOS, focus return, tray, physical shortcuts, input methods, and Wayland. The native suite does not prove those additional paths.
+
 Open All with no pins. The welcome controls appear and the search field has focus. Choose Apps by keyboard, select a result, and confirm that Enter launches the selected fixture application.
 
 Tests: [tests/welcome.spec.ts](../../../tests/welcome.spec.ts), [tests/categories.spec.ts](../../../tests/categories.spec.ts), [tests/launcher.spec.ts](../../../tests/launcher.spec.ts).

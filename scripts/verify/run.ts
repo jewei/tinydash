@@ -1,16 +1,40 @@
 import { execFileSync, spawn } from "node:child_process";
-import { createWriteStream, existsSync } from "node:fs";
+import { createWriteStream } from "node:fs";
 import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 import { nativeTestBinary } from "./native.ts";
 import { cancellation } from "./lifecycle.ts";
+import {
+  assertSameSource,
+  readBuildRecord,
+  sourceIdentity,
+  verifyBuild,
+  type BuildRecord,
+  type SourceIdentity,
+} from "./identity.ts";
 
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
 const mode = process.argv[2] ?? "quick";
-if (!["quick", "full", "native"].includes(mode) || process.argv.length > 3)
-  throw new Error("Usage: bun scripts/verify/run.ts [quick|full|native]");
+const selection = process.argv.slice(3);
+if (
+  !["quick", "full", "browser", "native"].includes(mode) ||
+  (mode !== "browser" && selection.length > 0)
+)
+  throw new Error(
+    "Usage: bun scripts/verify/run.ts quick|full|native|browser [test files and --grep pattern]",
+  );
+// Focused proof must execute tests and keep this wrapper's isolated output.
+// Use Playwright directly for discovery or other runner configuration.
+for (let i = 0; i < selection.length; i++) {
+  if (selection[i] === "--grep" || selection[i] === "-g") {
+    if (!selection[++i])
+      throw new Error("Expected a test-name pattern after --grep");
+  } else if (!/^tests\/[\w./-]+\.spec\.ts$/.test(selection[i])) {
+    throw new Error(`Unsupported browser selection: ${selection[i]}`);
+  }
+}
 const cancelled = cancellation();
 const output = resolve(
   "test-results/verification",
@@ -31,15 +55,13 @@ const native: {
   cleanup: "not-started",
 };
 const lockPath = resolve("test-results/verification/native.lock");
-const commit = execFileSync("git", ["rev-parse", "HEAD"], {
-  encoding: "utf8",
-}).trim();
-const dirty =
-  execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim()
-    .length > 0;
+let source: SourceIdentity | undefined;
+let finalSource: SourceIdentity | undefined;
+let build: BuildRecord | undefined;
 
-async function run(command: string[]) {
+async function run(command: string[], nativeSuite = false) {
   cancelled.signal.throwIfAborted();
+  const managed = nativeSuite || command[1] === "scripts/verify/build.ts";
   const start = performance.now();
   const log = createWriteStream(
     resolve(output, `${String(steps.length + 1).padStart(2, "0")}.log`),
@@ -50,19 +72,18 @@ async function run(command: string[]) {
     command.slice(1),
     {
       env,
-      stdio:
-        mode === "native"
-          ? ["ignore", "pipe", "pipe", "ipc"]
-          : ["ignore", "pipe", "pipe"],
+      stdio: managed
+        ? ["ignore", "pipe", "pipe", "ipc"]
+        : ["ignore", "pipe", "pipe"],
       // Keep terminal signals out of the suite. It receives cancellation over IPC.
-      detached: mode === "native",
+      detached: managed,
       windowsHide: true,
     },
   );
-  if (mode === "native") native.cleanup = "unknown";
+  if (nativeSuite) native.cleanup = "unknown";
   let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
   const forward = () => {
-    if (mode === "native") {
+    if (managed) {
       // A signal sent through child.kill() can terminate Windows children
       // without running their handlers. Ask the suite to cancel over IPC.
       if (child.connected)
@@ -90,7 +111,7 @@ async function run(command: string[]) {
   let spawnError: Error | undefined;
   child.once("error", (error) => {
     spawnError = error;
-    if (mode === "native" && !child.pid) native.cleanup = "not-started";
+    if (nativeSuite && !child.pid) native.cleanup = "not-started";
     log.write(String(error));
   });
   const status = await new Promise<number>((done) =>
@@ -127,6 +148,7 @@ async function freePort(): Promise<string> {
 
 try {
   cancelled.signal.throwIfAborted();
+  source = await sourceIdentity();
   if (mode === "native") {
     const binary = nativeTestBinary();
     lock = await open(lockPath, "wx");
@@ -139,9 +161,12 @@ try {
       throw new Error(
         "Use a separate Windows test user, then set TINYDASH_NATIVE_TEST_PROFILE=1. This suite clears clipboard history.",
       );
-    if (!existsSync(binary))
+    if (
+      process.env.TINYDASH_NATIVE_BINARY &&
+      !process.env.TINYDASH_NATIVE_MANIFEST
+    )
       throw new Error(
-        `Build or install the native application first: ${binary}`,
+        "A selected executable needs TINYDASH_NATIVE_MANIFEST. Use the build or installed-package procedure in docs/how-to/verify.md.",
       );
     const probe =
       process.platform === "win32"
@@ -159,62 +184,80 @@ try {
       throw new Error(
         "Quit the existing TinyDash process before running native checks.",
       );
+    if (!process.env.TINYDASH_NATIVE_MANIFEST)
+      await run(["bun", "scripts/verify/build.ts", "--no-bundle"]);
+    build = await readBuildRecord(
+      process.env.TINYDASH_NATIVE_MANIFEST ??
+        "src-tauri/target/verification-build.json",
+    );
+    if (build.kind === "local") assertSameSource(build.source, source);
+    build.binary = await verifyBuild(build, binary);
+    await writeFile(
+      resolve(output, "build.json"),
+      JSON.stringify(build, null, 2) + "\n",
+    );
     console.log(
       `Doctor passed. Binary: ${binary}. No existing TinyDash process was found.`,
     );
-    await run(["bun", "tests/native/smoke.ts"]);
+    await run(["bun", "tests/native/smoke.ts"], true);
+    await verifyBuild(build, binary);
   } else {
     env.TINYDASH_TEST_PORT = await freePort();
-    await run(["bun", "scripts/verify/repository.ts"]);
-    await run(["bun", "run", "format:check"]);
-    await run([
-      "cargo",
-      "fmt",
-      "--manifest-path",
-      "src-tauri/Cargo.toml",
-      "--check",
-    ]);
-    await run([
-      "rustfmt",
-      "--check",
-      "--edition",
-      "2024",
-      "tests/native/fixture.rs",
-    ]);
-    if (mode === "quick") {
+    if (mode === "browser") {
       env.TINYDASH_VERIFY_TRACE = "1";
-      await run(["bun", "run", "typecheck"]);
-      await run([
-        "bun",
-        "x",
-        "--bun",
-        "--no-install",
-        "playwright",
-        "test",
-        "--grep",
-        "@smoke",
-      ]);
+      await run(["bun", "run", "test:ui", ...selection]);
     } else {
-      await run(["bun", "run", "build"]);
+      await run(["bun", "scripts/verify/repository.ts"]);
+      await run(["bun", "run", "format:check"]);
       await run([
         "cargo",
-        "clippy",
+        "fmt",
         "--manifest-path",
         "src-tauri/Cargo.toml",
-        "--all-targets",
-        "--locked",
-        "--",
-        "-D",
-        "warnings",
+        "--check",
       ]);
       await run([
-        "cargo",
-        "test",
-        "--manifest-path",
-        "src-tauri/Cargo.toml",
-        "--locked",
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "tests/native/fixture.rs",
       ]);
-      await run(["bun", "run", "test:ui"]);
+      if (mode === "quick") {
+        env.TINYDASH_VERIFY_TRACE = "1";
+        await run(["bun", "run", "typecheck"]);
+        await run([
+          "bun",
+          "x",
+          "--bun",
+          "--no-install",
+          "playwright",
+          "test",
+          "--grep",
+          "@smoke",
+        ]);
+      } else {
+        await run(["bun", "run", "build"]);
+        await run([
+          "cargo",
+          "clippy",
+          "--manifest-path",
+          "src-tauri/Cargo.toml",
+          "--all-targets",
+          "--locked",
+          "--",
+          "-D",
+          "warnings",
+        ]);
+        await run([
+          "cargo",
+          "test",
+          "--manifest-path",
+          "src-tauri/Cargo.toml",
+          "--locked",
+        ]);
+        await run(["bun", "run", "test:ui"]);
+      }
     }
   }
 } catch (error) {
@@ -222,6 +265,14 @@ try {
   console.error(failure);
   process.exitCode = 1;
 } finally {
+  try {
+    finalSource = await sourceIdentity();
+    if (source) assertSameSource(source, finalSource);
+  } catch (error) {
+    failure ??= String(error);
+    console.error(String(error));
+    process.exitCode = 1;
+  }
   if (native.cleanup === "unknown") {
     try {
       const result = JSON.parse(
@@ -241,9 +292,14 @@ try {
     }
   }
   if (lock) {
-    await lock.close();
-    if (native.cleanup === "not-started" || native.cleanup === "complete")
-      await rm(lockPath);
+    try {
+      await lock.close();
+      if (native.cleanup === "not-started" || native.cleanup === "complete")
+        await rm(lockPath);
+    } catch (error) {
+      failure ??= `Cannot release the native lock: ${String(error)}`;
+      process.exitCode = 1;
+    }
   }
   if (cancelled.signal.aborted) {
     failure ??= String(cancelled.signal.reason);
@@ -254,8 +310,17 @@ try {
     JSON.stringify(
       {
         mode,
-        commit,
-        dirty,
+        commit: source?.commit,
+        dirty: source?.dirty,
+        source,
+        finalSource,
+        build,
+        buildMatchesSource:
+          build && source
+            ? build.source.commit === source.commit &&
+              build.source.sha256 === source.sha256
+            : undefined,
+        selection,
         platform: process.platform,
         passed: !failure,
         failure,

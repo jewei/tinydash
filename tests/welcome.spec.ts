@@ -200,7 +200,9 @@ test("welcome fits all appearances at narrow and desktop widths", async ({
       if (width === 375 || width === 980) {
         await page.mouse.move(0, 0);
         await page.screenshot({
-          path: `test-results/welcome-${appearance.toLowerCase()}-${width}.png`,
+          path: test
+            .info()
+            .outputPath(`welcome-${appearance.toLowerCase()}-${width}.png`),
         });
       }
     }

@@ -10,6 +10,23 @@ Opening the launcher starts a background refresh when rates are missing or the l
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/launcher.spec.ts --grep "calculation|calculator|currency|conversion"
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- calculator
+bun run test:rust -- currency
+```
+
+Use Calculator and All. Enter `12 * 8`, select `96`, and copy it. Compare the system clipboard with `96`. Repeat `5 ft to cm` and an invalid expression. For currency changes, check refresh, failed refresh, disabled requests, and saved rates after restart.
+
+Run `bun run verify:native` on Windows and Linux X11 for real calculation and copy. Use the calculation desktop checks on macOS and for currency downloads and offline restart. Native CI disables live currency requests.
+
 Enter `12 * 8`, check `96`, copy it, and verify the clipboard bytes. Repeat a unit conversion. Test currency parsing and cached rates without a live service dependency.
 
 Tests: [tests/launcher.spec.ts](../../../tests/launcher.spec.ts), [tests/native/smoke.ts](../../../tests/native/smoke.ts).

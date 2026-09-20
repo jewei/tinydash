@@ -32,17 +32,20 @@ bun run verify:full
 
 This adds the frontend build, Clippy, Rust tests, and all browser tests. A warm Rust cache reduces the time. Compilation is part of the first run. The fast check does not replace these checks before a merge.
 
-For a focused browser check, use a file from the [feature map](../reference/features/README.md):
+For a focused browser check with retained successful traces, use a recipe from the [feature map](../reference/features/README.md):
 
 ```sh
-bun run test:ui tests/pins.spec.ts
+bun run verify:browser tests/pins.spec.ts
+bun run verify:browser tests/launcher.spec.ts --grep "copies calculation results"
 ```
 
-Direct browser runs use port 1421. Set `TINYDASH_TEST_PORT` to a different unused port for concurrent runs. No test attaches to an existing Vite server.
+The focused wrapper selects its own port and output directory. It accepts test-file paths and `--grep` or `-g`. Use direct Playwright commands for test discovery. Direct `bun run test:ui` runs use port 1421 and do not produce the wrapper's source record. No test attaches to an existing Vite server.
+
+Use focused tests during diagnosis. After the final relevant edit, repeat affected proofs and run `verify:full` for source changes. For each task, record expected behavior, required platforms, outcomes, and evidence paths under `.local/` or `test-results/`. A command pass does not establish behavior outside that command's coverage. Missing required evidence prevents a verified result.
 
 ## CI triggers
 
-The Checks workflow skips branch pushes and pull requests when all changed files are Markdown files with the `.md` or `.markdown` extension, or files under `docs/`. This also skips the desktop builds and native app checks. If any other file changes, the workflow runs.
+The Checks workflow skips branch pushes and pull requests when all changed files are Markdown files with the `.md` or `.markdown` extension, or files under `docs/`. This also skips the desktop builds and native app checks. If any other file changes, the workflow runs. The separate Verification tools workflow checks changes to the verification skill, procedures, feature map, and tools, including Markdown-only changes. It does not replace the agent exercises in [test the verification procedure](verify-verification.md).
 
 Manual runs and tag pushes still run the checks. The Release candidate workflow also runs for version tags or manual requests. See [GitHub path filters](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore) for the trigger rules.
 
@@ -54,11 +57,18 @@ Install `tauri-driver` 2.0.6. Linux also needs `WebKitWebDriver`, `xclip`, `xdg-
 
 ```sh
 cargo install tauri-driver --version 2.0.6 --locked
-bun run tauri build --no-bundle
 bun run verify:native
 ```
 
-On a separate local Windows test account, set `$env:TINYDASH_NATIVE_TEST_PROFILE = '1'` in PowerShell before the command. Set `TINYDASH_NATIVE_BINARY` to test a specific installed executable.
+On a separate local Windows test account, set `$env:TINYDASH_NATIVE_TEST_PROFILE = '1'` in PowerShell before the command. Run only one native suite in a desktop session, including suites from other checkouts.
+
+By default, `verify:native` runs `bun scripts/verify/build.ts --no-bundle` before driving the app. This builds the frontend and native executable, fingerprints the source before and after the build, and records the executable hash. A build that changes its source cannot produce a valid record. The build helper uses the default release target directory and removes the previous executable before building. Its lock prevents concurrent verification builds in that checkout.
+
+The helper accepts `--config` with a file path or inline JSON. It records inline settings and hashes settings files. A changed settings file invalidates a local build record. If cancellation leaves `src-tauri/target/verification-build.lock`, inspect its process ID and confirm that the owned build processes have stopped before removing it.
+
+To reuse that build, set `TINYDASH_NATIVE_MANIFEST` to `src-tauri/target/verification-build.json`. A local record must match the current source and executable. Set `TINYDASH_NATIVE_BINARY` as well when selecting another executable path. An executable path alone is insufficient. The initial check rejects non-native files, missing execute permission, mismatched platforms, stale local source, and changed executable bytes.
+
+CI builds use the same build helper and include `build.json` in the package checksums. The installer checks compare the installed executable with the extracted package after replacement. They create `installed-build.json` with the package hash, executable hash, and build source. The native wrapper uses this record without rebuilding the installed package. Its evidence records the package source and test-code source separately. Older packages without a build record need a new identified build.
 
 The initial check verifies the platform and executable and refuses to drive an existing TinyDash process. A lock prevents two native wrapper runs in the same checkout. On cancellation, the wrapper asks the suite to stop through a process message. The suite stops pending requests and waits, stops its owned processes, then restores fixtures and settings. Repeated cancellation requests do not interrupt cleanup.
 
@@ -70,13 +80,25 @@ The suite checks application launch markers, calculator and emoji clipboard valu
 
 Use the Native app checks workflow to verify an existing CI package without rebuilding it. Set its build run ID. Use `release_artifacts=true` for a release candidate. The workflow records both the build commit and test-code commit.
 
+An agent with GitHub access can use an existing controlled CI session. First select the Checks run for the required source commit:
+
+```sh
+gh run list --workflow check.yml --commit "$(git rev-parse HEAD)" --json databaseId,headSha,status,conclusion
+```
+
+Inspect that run and its native jobs with `gh run view RUN_ID` and wait with `gh run watch RUN_ID --exit-status`. Download its evidence with `gh run download RUN_ID --dir test-results/ci/RUN_ID`. Replace `RUN_ID` with the selected numeric ID. A local uncommitted change is not part of a CI build. Use the same source in a controlled VM or an authorized pushed revision before using CI as proof of that change.
+
+For an explicitly selected existing package, dispatch `native.yml` with `build_run_id` and the intended test-code ref. For example, `gh workflow run native.yml --ref TEST_REF -f build_run_id=BUILD_RUN_ID -f release_artifacts=false`. Inspect the resulting run's IDs and source records before attributing its evidence to the task. The workflow checks Windows and Linux X11; it does not establish macOS or Wayland behavior.
+
 macOS has no WebDriver adapter in this repository. Use [desktop checks](desktop-checks.md). `tests/native/focus-macos.swift` is an optional interactive focus check that needs Accessibility access; it is not an isolated replacement for the native suite. Adding an embedded macOS driver is separate work.
+
+Tauri documents an [embedded WebDriver option](https://v2.tauri.app/develop/tests/webdriver/) for macOS. Evaluate it in an isolated test build before adopting it. Keep the driver out of release builds, disable IPC mocks, and identify the instrumented build in evidence. Start with a real calculator search, then test teardown and data isolation. This route still needs separate proof for physical shortcuts, focus return, tray actions, and installed packages. See the [plugin setup](https://webdriver.io/docs/desktop-testing/tauri/plugin-setup/) for its dependency and permissions requirements.
 
 ## Inspect the evidence
 
-Each wrapper run writes `test-results/verification/<timestamp>-<pid>-<mode>/`. It contains numbered command logs and `result.json` with the source commit, working-tree state, platform, command results, and times. Native results go in its `native/` subfolder.
+Each wrapper run writes `test-results/verification/<timestamp>-<pid>-<mode>/`. It contains numbered command logs and `result.json` with the source commit, working-tree state, source fingerprint, platform, command results, and times. The fingerprint covers tracked files, tracked deletions, and untracked files that Git does not ignore. Generated output and private evidence remain excluded by the repository's ignore rules. The wrapper checks the fingerprint again at the end and fails if the source changed during the run. Native results go in its `native/` subfolder; `build.json` identifies the executable and build source.
 
-Fast browser tests retain screenshots and traces in the run's `browser/` folder. A trace records actions and their results. Full browser runs retain traces on failure. Open a trace with:
+Fast and focused browser tests retain screenshots and traces in the run's `browser/` folder. Explicit screenshots use each test's output directory, so later runs and retries cannot replace earlier evidence. A trace records actions and their results. Full browser runs retain traces on failure; use a focused run to retain a successful trace for each changed user journey. Open a trace with:
 
 ```sh
 bunx --bun --no-install playwright show-trace path/to/trace.zip

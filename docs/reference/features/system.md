@@ -16,6 +16,22 @@ The Mac integration adds the small `objc2-core-services` binding with only the r
 
 ## Verification
 
+Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
+
+```sh
+bun run verify:browser tests/launcher.spec.ts --grep "system|confirmation"
+```
+
+For affected backend behavior:
+
+```sh
+bun run test:rust -- providers::system
+```
+
+Use System and All. Open a power confirmation through Enter, a numbered shortcut, and Actions when those paths change. Confirm Cancel has focus. Cancel or press Escape and check that no operation is sent. Check that Rust rejects an unconfirmed request.
+
+Run `bun run verify:native` on Windows and Linux X11 for cancellation and backend rejection. Use desktop checks for macOS and opening OS settings. Actual lock, sleep, restart, and shutdown need an explicitly selected disposable session and are not part of automated verification.
+
 Find Restart, open its confirmation dialog, and cancel it. Confirm the dialog closes and no power action runs.
 
 Tests: [tests/launcher.spec.ts](../../../tests/launcher.spec.ts), [tests/native/smoke.ts](../../../tests/native/smoke.ts).
