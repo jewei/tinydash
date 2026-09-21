@@ -1,6 +1,7 @@
-import { createEffect, createSignal, onSettled, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import Icon from "./Icon";
 import { loadAppIcon } from "../app-icons";
+import { observeIconDisplay } from "../icon-display";
 
 export default function AppAvatar(props: {
   icon: string | null;
@@ -11,34 +12,17 @@ export default function AppAvatar(props: {
   const [inView, setInView] = createSignal(false);
   const [pixels, setPixels] = createSignal(72);
   const [failedSource, setFailedSource] = createSignal<string>();
-  onSettled(() => {
-    let scale: MediaQueryList;
-    const resize = () => {
-      const required = Math.ceil(
-        element.getBoundingClientRect().width * window.devicePixelRatio,
-      );
-      setPixels(
-        [16, 24, 32, 36, 48, 64, 72, 96, 108, 128, 144, 192, 256].find(
-          (size) => size >= required,
-        ) ?? 256,
-      );
-      scale?.removeEventListener("change", resize);
-      scale = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-      scale.addEventListener("change", resize);
-    };
-    const sizes = new ResizeObserver(resize);
-    sizes.observe(element);
-    const visible = new IntersectionObserver(([entry]) =>
-      setInView(entry.isIntersecting),
-    );
-    visible.observe(element);
-    resize();
-    return () => {
-      sizes.disconnect();
-      visible.disconnect();
-      scale.removeEventListener("change", resize);
-    };
-  });
+  createEffect(
+    () => ({ icon: props.icon, active: props.active }),
+    ({ icon, active }) => {
+      setInView(false);
+      if (!icon?.startsWith("app-icon:") || active === false) return;
+      return observeIconDisplay(element, (visible, required) => {
+        setPixels(required);
+        setInView(visible);
+      });
+    },
+  );
   createEffect(
     () => ({
       key: props.icon,

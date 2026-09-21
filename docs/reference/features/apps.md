@@ -12,6 +12,8 @@ On macOS, search returns icon keys. The launcher loads icons for visible results
 
 See [platform support](../platform-support.md) for the directories and application formats that each operating system discovers.
 
+Visible native icons can start loading when they mount. A shared observer defers clipped icons until scrolling makes them visible. CSS tokens define row and preview sizes. The launcher shares its display-scale listener and releases display observers when no active native icon needs them. Static images and fallback icons do not register native loading observers.
+
 ## Verification
 
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
