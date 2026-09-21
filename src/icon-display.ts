@@ -17,7 +17,7 @@ function pixels(element: HTMLElement) {
 function visible(element: HTMLElement) {
   const bounds = element.getBoundingClientRect();
   // These are the two scrolling containers that own application avatars.
-  const container = element.closest(".result-list, .result-preview");
+  const container = element.closest(".result-list, .preview-content");
   const clip = container?.getBoundingClientRect();
   return (
     bounds.width > 0 &&

@@ -113,6 +113,65 @@ test("a clipped app loads when scrolling makes it visible", async ({
   await expect(last.locator("img")).toBeVisible();
 });
 
+for (const change of ["resize", "selection"] as const) {
+  test(`a scrolled preview stays inactive after ${change}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 980, height: 420 });
+    await openApps(page);
+    const avatar = page.locator(".preview-icon .app-avatar");
+    await expect(avatar.locator("img")).toHaveCount(1);
+    const clipped = await page
+      .locator(".preview-content")
+      .evaluate((content) => {
+        const icon = content.querySelector(".app-avatar")!;
+        const bounds = icon.getBoundingClientRect();
+        content.scrollTop =
+          bounds.bottom - content.getBoundingClientRect().top + 1;
+        return {
+          bottom: icon.getBoundingClientRect().bottom,
+          scrollTop: content.getBoundingClientRect().top,
+          outerTop: content.closest(".result-preview")!.getBoundingClientRect()
+            .top,
+        };
+      });
+    expect(clipped.bottom).toBeLessThan(clipped.scrollTop);
+    expect(clipped.bottom).toBeGreaterThan(clipped.outerTop);
+    await expect(avatar.locator("img")).toHaveCount(0);
+    if (change === "resize") {
+      await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+    } else {
+      await page.getByRole("option").filter({ hasText: "Safari" }).click();
+      await expect(page.locator(".preview-title")).toHaveText("Safari");
+    }
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await expect(avatar.locator("img")).toHaveCount(0);
+    if (change === "selection") {
+      expect(
+        await page.evaluate(
+          () =>
+            window.__launcherTest.calls.filter(
+              (call) =>
+                call.command === "app_icon" &&
+                (call.payload as { key: string }).key ===
+                  "app-icon:test:app-1" &&
+                (call.payload as { pixels: number }).pixels === 64,
+            ).length,
+        ),
+      ).toBe(0);
+    }
+    await page.locator(".preview-content").evaluate((content) => {
+      content.scrollTop = 0;
+    });
+    await expect(avatar.locator("img")).toBeVisible();
+  });
+}
+
 test("appearance and viewport changes keep native sizes and preview visibility correct", async ({
   page,
 }) => {
