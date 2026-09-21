@@ -12,8 +12,35 @@ interface Entry {
   inFlight: boolean;
 }
 
-// These entries belong only to mounted, visible images. Rust owns the cache.
+// Active entries own subscriptions. Idle entries retain only completed strings,
+// not consumers, image elements, observers, or pending requests.
 const entries = new Map<string, Entry>();
+const WARM_BYTES = 512 * 1024;
+const WARM_ENTRIES = 64;
+const warm = new Map<string, { url: string; bytes: number }>();
+let warmBytes = 0;
+
+function takeWarm(identity: string): string | undefined {
+  const cached = warm.get(identity);
+  if (!cached) return undefined;
+  warm.delete(identity);
+  warmBytes -= cached.bytes;
+  return cached.url;
+}
+
+function retainWarm(identity: string, url: string) {
+  // Conservative UTF-16 payload accounting, not a WebKit footprint bound.
+  const bytes = url.length * 2;
+  if (bytes > WARM_BYTES) return;
+  takeWarm(identity);
+  while (warm.size >= WARM_ENTRIES || warmBytes + bytes > WARM_BYTES) {
+    const oldest = warm.keys().next().value;
+    if (oldest === undefined) break;
+    takeWarm(oldest);
+  }
+  warm.set(identity, { url, bytes });
+  warmBytes += bytes;
+}
 const viewId = Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) =>
   value.toString(16),
 ).join("-");
@@ -86,18 +113,23 @@ export function loadAppIcon(
       pixels,
       request: `${viewId}:${++sequence}`,
       consumers: new Set(),
+      url: takeWarm(identity),
       waiting: false,
       inFlight: false,
     };
     entries.set(identity, entry);
-    void load(entry);
+    if (entry.url === undefined) void load(entry);
   }
   entry.consumers.add(consumer);
   consumer(entry.url);
+  let released = false;
   return () => {
+    if (released) return;
+    released = true;
     entry.consumers.delete(consumer);
-    if (entry.consumers.size) return;
+    if (entry.consumers.size || entries.get(identity) !== entry) return;
     entries.delete(identity);
+    if (entry.url !== undefined) retainWarm(identity, entry.url);
     if (entry.inFlight)
       void backend
         .cancelAppIcon(entry.request)
@@ -114,4 +146,6 @@ export function disposeAppIcons() {
       void backend.cancelAppIcon(entry.request).catch(() => {});
   }
   entries.clear();
+  warm.clear();
+  warmBytes = 0;
 }

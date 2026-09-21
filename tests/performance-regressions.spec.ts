@@ -144,7 +144,7 @@ test("a narrower query reuses an unchanged app identity and icon size", async ({
   }
 });
 
-test("a removed result releases its row and a later result gets a new subscription", async ({
+test("a removed result releases its row and reuses settled icon payloads on return", async ({
   page,
 }) => {
   await openLauncher(page);
@@ -164,11 +164,25 @@ test("a removed result releases its row and a later result gets a new subscripti
           node === document.querySelector('#search-results [role="option"]'),
       ),
     ).toBe(false);
-    expect(await iconTraffic(page)).toEqual({
-      loads: traffic.loads + 2,
-      cancels: traffic.cancels,
-    });
+    expect(await iconTraffic(page)).toEqual(traffic);
   } finally {
     await row.dispose();
   }
+});
+
+test("hide and reopen release image nodes but reuse settled icon payloads", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const traffic = await iconTraffic(page);
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-hidden", null),
+  );
+  await expect(page.locator(".app-avatar img")).toHaveCount(0);
+  expect(await iconTraffic(page)).toEqual(traffic);
+  await page.evaluate(() =>
+    window.__launcherTest.emit("launcher-opened", false),
+  );
+  await settle(page);
+  expect(await iconTraffic(page)).toEqual(traffic);
 });
