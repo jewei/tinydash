@@ -22,7 +22,7 @@ try {
     New-ItemProperty -Path $key -Name $appName -PropertyType String -Value "--remote-debugging-port=$debugPort" -Force | Out-Null
     $env:TINYDASH_NATIVE_DEBUG_PORT = "$debugPort"
     Write-Host "Testing an elevated WebView2 host on loopback port $debugPort."
-    bun run test:native
+    bun run verify:native
     if ($LASTEXITCODE -ne 0) { throw "Native test failed with exit code $LASTEXITCODE." }
 } finally {
     if ($null -ne $existing) {

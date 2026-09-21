@@ -378,7 +378,9 @@ test("saves app preferences, custom web searches, category shortcuts, and login 
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: "test-results/settings-search-320.png" });
+  await page.screenshot({
+    path: test.info().outputPath("settings-search-320.png"),
+  });
   await page.setViewportSize({ width: 768, height: 640 });
   await page.locator('select[size="6"]').selectOption("app-0");
   await page.getByLabel("Aliases, one per line").fill("files\nwork files");
@@ -450,7 +452,9 @@ test("previews imports without replacing saved settings and preserves failed imp
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: "test-results/settings-import-320.png" });
+  await page.screenshot({
+    path: test.info().outputPath("settings-import-320.png"),
+  });
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   expect(
     await page.evaluate(() => window.__launcherTest.settings.hideOnBlur),

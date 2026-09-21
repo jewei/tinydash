@@ -1,10 +1,11 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     path::{Path, PathBuf},
 };
 
 use nucleo_matcher::{
-    Matcher, Utf32String,
+    Matcher, Utf32Str, Utf32String,
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
 use unicode_normalization::UnicodeNormalization;
@@ -80,9 +81,27 @@ impl FileEntry {
 
 struct IndexedFile {
     entry: FileEntry,
-    name: Utf32String,
+    // ASCII matcher input can borrow the entry's existing UTF-8 bytes. Cache
+    // only text that needs Unicode normalization or path separator conversion.
+    name: Option<Utf32String>,
     normalized_name: String,
-    path: Utf32String,
+    path: Option<Utf32String>,
+}
+
+impl IndexedFile {
+    fn name(&self) -> Utf32Str<'_> {
+        match &self.name {
+            Some(name) => name.slice(..),
+            None => Utf32Str::Ascii(self.entry.name.as_bytes()),
+        }
+    }
+
+    fn path(&self) -> Utf32Str<'_> {
+        match &self.path {
+            Some(path) => path.slice(..),
+            None => Utf32Str::Ascii(self.entry.path.as_bytes()),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -97,17 +116,23 @@ impl FileProvider {
             .map(|entry| {
                 // macOS can return decomposed accents. Canonicalize matching
                 // text only; keep the exact OS path for IDs and file actions.
-                let name: String = entry.name.nfc().collect();
+                let name: Cow<'_, str> = if entry.name.is_ascii() {
+                    Cow::Borrowed(&entry.name)
+                } else {
+                    Cow::Owned(entry.name.nfc().collect())
+                };
                 IndexedFile {
-                    name: name.as_str().into(),
+                    name: (!entry.name.is_ascii()).then(|| name.as_ref().into()),
                     normalized_name: ranking::normalize(&name),
                     // Accept forward slashes in Windows path queries as well.
-                    path: entry
-                        .path
-                        .replace('\\', "/")
-                        .nfc()
-                        .collect::<String>()
-                        .into(),
+                    path: (!entry.path.is_ascii() || entry.path.contains('\\')).then(|| {
+                        entry
+                            .path
+                            .replace('\\', "/")
+                            .nfc()
+                            .collect::<String>()
+                            .into()
+                    }),
                     entry,
                 }
             })
@@ -164,11 +189,11 @@ impl FileProvider {
                 let score = if normalized.is_empty() {
                     Some(0)
                 } else {
-                    let name = pattern.score(file.name.slice(..), matcher).map(|score| {
+                    let name = pattern.score(file.name(), matcher).map(|score| {
                         ranking::name_score(score, &file.normalized_name, &normalized)
                     });
                     let path = path_pattern
-                        .score(file.path.slice(..), matcher)
+                        .score(file.path(), matcher)
                         .map(|score| score / 2);
                     name.into_iter().chain(path).max()
                 }?;
@@ -394,6 +419,106 @@ mod tests {
         assert!(
             provider.search("café.txt", &mut matcher, &HashMap::new(), 0, 30)[0].score >= 10_000
         );
+    }
+
+    #[test]
+    fn ascii_matching_borrows_existing_entry_storage() {
+        let entry = FileEntry::new(Path::new("/Documents/Report.txt")).expect("entry");
+        let provider = FileProvider::new(vec![entry]);
+        let file = &provider.files[0];
+        assert!(file.name.is_none());
+        assert!(file.path.is_none());
+        let Utf32Str::Ascii(name) = file.name() else {
+            panic!("expected ASCII name");
+        };
+        let Utf32Str::Ascii(path) = file.path() else {
+            panic!("expected ASCII path");
+        };
+        assert!(std::ptr::eq(name, file.entry.name.as_bytes()));
+        assert!(std::ptr::eq(path, file.entry.path.as_bytes()));
+    }
+
+    #[test]
+    fn borrowed_matching_preserves_owned_matching_results() {
+        let entries = [
+            ("Report.txt", "/Documents/Report.txt"),
+            ("Report.txt", "/Archive/Report.txt"),
+            ("Report.txt", r"C:\Documents\Report.txt"),
+            ("Quarterly  Report.txt", "/Documents/Quarterly  Report.txt"),
+            ("Tab\tReport.txt", "/Documents/Tab\tReport.txt"),
+            ("Line\nReport.txt", "/Documents/Line\nReport.txt"),
+            ("CRLF\r\nReport.txt", "/Documents/CRLF\r\nReport.txt"),
+            ("café.txt", "/Documents/café.txt"),
+            ("cafe\u{301}.txt", "/Documents/cafe\u{301}.txt"),
+            // NFC can turn a non-ASCII source into ASCII. The original bytes
+            // still cannot be passed to the matcher's ASCII variant.
+            ("\u{212a}elvin.txt", "/Documents/\u{212a}elvin.txt"),
+            ("report.txt", "/日本語/report.txt"),
+            (r"report\draft.txt", r"/Documents/report\draft.txt"),
+        ]
+        .into_iter()
+        .map(|(name, path)| FileEntry {
+            id: format!("file:{path}"),
+            name: name.into(),
+            path: path.into(),
+        })
+        .collect::<Vec<_>>();
+        let provider = FileProvider::new(entries.clone());
+        let mut owned = FileProvider::new(entries);
+        // Recreate the previous index representation as a reference: every
+        // matching name and path owns a normalized string, including ASCII.
+        for file in &mut owned.files {
+            file.name = Some(file.entry.name.nfc().collect::<String>().into());
+            file.path = Some(
+                file.entry
+                    .path
+                    .replace('\\', "/")
+                    .nfc()
+                    .collect::<String>()
+                    .into(),
+            );
+        }
+        let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+        let mut reference_matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+        let mut usage = HashMap::new();
+        for with_usage in [false, true] {
+            if with_usage {
+                usage.insert(
+                    "file:/Archive/Report.txt".into(),
+                    ranking::Usage {
+                        count: 15,
+                        last_used_at: 100,
+                    },
+                );
+            }
+            for query in [
+                "",
+                "report",
+                "REPORT.TXT",
+                "quarterly report",
+                "tab report",
+                "line report",
+                "crlf report",
+                "cafe",
+                "café.txt",
+                "cafe\u{301}.txt",
+                "Documents/café",
+                r"Documents\Report",
+                "日本語",
+                "Kelvin",
+                "no-such-file",
+            ] {
+                for limit in [0, 1, 4, 30, usize::MAX] {
+                    let results = provider.search(query, &mut matcher, &usage, 100, limit);
+                    let expected = owned.search(query, &mut reference_matcher, &usage, 100, limit);
+                    assert_eq!(
+                        serde_json::to_value(results).expect("results"),
+                        serde_json::to_value(expected).expect("reference results"),
+                        "query={query:?}, limit={limit}, with_usage={with_usage}"
+                    );
+                }
+            }
+        }
     }
 
     fn write(root: &Path, relative: &str, text: &str) -> PathBuf {

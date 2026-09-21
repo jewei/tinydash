@@ -9,6 +9,12 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
+import {
+  assertSameSource,
+  readBuildRecord,
+  sourceIdentity,
+  verifyBuild,
+} from "../verify/identity.ts";
 
 const [command, directory] = process.argv.slice(2);
 assert(
@@ -50,6 +56,15 @@ if (command === "verify") {
     entries.map((entry) => entry.name).filter((name) => name !== "SHA256SUMS"),
   );
 } else if (command === "prepare") {
+  const build = await readBuildRecord(
+    "src-tauri/target/verification-build.json",
+  );
+  assertSameSource(build.source, await sourceIdentity());
+  assert(
+    !build.command.includes("--no-bundle"),
+    "Build packages before preparing artifacts",
+  );
+  await verifyBuild(build, build.binary.path);
   await mkdir(output, { recursive: true });
   assert.equal(
     (await readdir(output)).length,
@@ -122,8 +137,9 @@ if (command === "verify") {
     default:
       throw new Error(`Unsupported build platform: ${process.platform}`);
   }
-  await copy("docs/install.md");
-  await copy("docs/desktop-checks.md");
+  await copy("docs/how-to/install.md");
+  await copy("docs/how-to/desktop-checks.md");
+  await copy("src-tauri/target/verification-build.json", "build.json");
   const commit = execFileSync("git", ["rev-parse", "HEAD"], {
     encoding: "utf8",
   }).trim();

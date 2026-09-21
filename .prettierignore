@@ -8,6 +8,7 @@ test-results
 playwright-report
 artifacts
 native-build
-# Keep generated measurement records unchanged.
-docs/benchmarks/**/*.json
-docs/benchmarks/2026-09-19/optimization/comparison-tables.md
+.local
+designs
+.hallmark
+site-dist

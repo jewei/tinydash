@@ -50,6 +50,10 @@ for directory in "$@"; do
         cp "$file" "$output/build-$label.txt"
         continue
         ;;
+      build.json)
+        cp "$file" "$output/build-$label.json"
+        continue
+        ;;
       install.md|desktop-checks.md)
         if [[ ! -e "$output/$name" ]]; then
           cp "$file" "$output/$name"

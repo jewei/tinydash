@@ -38,47 +38,52 @@ async function setCategories(
   }, values);
 }
 
-test("Tab changes the category on the first press and keeps focus and query", async ({
-  page,
-}) => {
-  await openLauncher(page);
-  await expect(bar(page).getByRole("button")).toHaveText([
-    "All",
-    "Apps",
-    "Files",
-    "Clipboard",
-    "Calculator",
-    "System",
-    "Emoji",
-    "Passwords",
-    "Datetime",
-    "URLs",
-    "Web",
-  ]);
-  await expect(page.locator(".scope-chip, .scope-popover")).toHaveCount(0);
-  await input(page).press("Tab");
-  await expect(active(page)).toHaveAccessibleName("Apps");
-  await expect(input(page)).toBeFocused();
-  await expect(page.getByRole("listbox")).toHaveCount(1);
-  await input(page).fill("safari");
-  await input(page).press("Tab");
-  await expect(active(page)).toHaveAccessibleName("Files");
-  await expect(input(page)).toHaveValue("safari");
-  await expect(input(page)).toBeFocused();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__launcherTest.calls
-            .filter((call) => call.command === "search")
-            .at(-1)?.payload,
-      ),
-    )
-    .toEqual({ query: "safari", mode: "files" });
-  await input(page).press("Shift+Tab");
-  await expect(active(page)).toHaveAccessibleName("Apps");
-  await expect(input(page)).toHaveAttribute("aria-controls", "search-results");
-});
+test(
+  "Tab changes the category on the first press and keeps focus and query",
+  { tag: "@smoke" },
+  async ({ page }) => {
+    await openLauncher(page);
+    await expect(bar(page).getByRole("button")).toHaveText([
+      "All",
+      "Apps",
+      "Files",
+      "Clipboard",
+      "Calculator",
+      "System",
+      "Emoji",
+      "Passwords",
+      "Datetime",
+      "URLs",
+      "Web",
+    ]);
+    await expect(page.locator(".scope-chip, .scope-popover")).toHaveCount(0);
+    await input(page).press("Tab");
+    await expect(active(page)).toHaveAccessibleName("Apps");
+    await expect(input(page)).toBeFocused();
+    await expect(page.getByRole("listbox")).toHaveCount(1);
+    await input(page).fill("safari");
+    await input(page).press("Tab");
+    await expect(active(page)).toHaveAccessibleName("Files");
+    await expect(input(page)).toHaveValue("safari");
+    await expect(input(page)).toBeFocused();
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            window.__launcherTest.calls
+              .filter((call) => call.command === "search")
+              .at(-1)?.payload,
+        ),
+      )
+      .toEqual({ query: "safari", mode: "files" });
+    await input(page).press("Shift+Tab");
+    await expect(active(page)).toHaveAccessibleName("Apps");
+    await expect(input(page)).toHaveAttribute(
+      "aria-controls",
+      "search-results",
+    );
+  },
+);
 
 test("category keys wrap and result keys keep their normal actions", async ({
   page,

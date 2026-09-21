@@ -45,7 +45,9 @@ case "${1:-}" in
     printf '%s' 'preserve user data' > "$marker"
     sudo apt-get install --reinstall -y "$package"
     check_data
+    bun scripts/verify/installed.ts native-build "$package" "$expected/usr/bin/tinydash" /usr/bin/tinydash test-results/native/installed-build.json
     echo 'TINYDASH_NATIVE_BINARY=/usr/bin/tinydash' >> "$GITHUB_ENV"
+    echo "TINYDASH_NATIVE_MANIFEST=$PWD/test-results/native/installed-build.json" >> "$GITHUB_ENV"
     echo 'PASS: Debian installation, executable, desktop entry, libraries, and reinstall'
     ;;
   remove)

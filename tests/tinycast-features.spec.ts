@@ -382,7 +382,7 @@ test("new launcher panels fit supported widths and appearances", async ({
     await expect(choice).toBeVisible();
     await expectNoOverflow();
     await page.screenshot({
-      path: `test-results/tinycast-first-use-${width}.png`,
+      path: test.info().outputPath(`tinycast-first-use-${width}.png`),
     });
   }
   for (const appearance of ["Dark", "Compact", "Light"]) {
@@ -399,7 +399,9 @@ test("new launcher panels fit supported widths and appearances", async ({
     ).toHaveAttribute("aria-checked", "true");
     await expectNoOverflow();
     await page.screenshot({
-      path: `test-results/tinycast-actions-${appearance.toLowerCase()}.png`,
+      path: test
+        .info()
+        .outputPath(`tinycast-actions-${appearance.toLowerCase()}.png`),
     });
     await page.keyboard.press("Escape");
   }
@@ -418,7 +420,7 @@ test("new launcher panels fit supported widths and appearances", async ({
     ).toBeVisible();
     await expectNoOverflow();
     await page.screenshot({
-      path: `test-results/tinycast-edit-copy-${width}.png`,
+      path: test.info().outputPath(`tinycast-edit-copy-${width}.png`),
     });
     await page
       .getByRole("dialog", { name: "Edit a copy" })
@@ -434,7 +436,7 @@ test("new launcher panels fit supported widths and appearances", async ({
     ).toBeVisible();
     await expectNoOverflow();
     await page.screenshot({
-      path: `test-results/tinycast-combine-copy-${width}.png`,
+      path: test.info().outputPath(`tinycast-combine-copy-${width}.png`),
     });
     await page
       .getByRole("dialog", { name: "Copy selected entries" })

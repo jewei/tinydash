@@ -639,7 +639,9 @@ test("system commands ask before running and extra Enter cancels", async ({
   await page.keyboard.press("Meta+k");
   await page.getByRole("menuitem", { name: "Run command" }).click();
   await expect(dialog).toBeVisible();
-  await page.screenshot({ path: "test-results/system-confirmation.png" });
+  await page.screenshot({
+    path: test.info().outputPath("system-confirmation.png"),
+  });
   await page.keyboard.press("Escape");
   expect(await actions(page)).toEqual([]);
 });
@@ -1119,7 +1121,7 @@ test("opens and reveals files by ID, and refreshes files with the mode shortcut"
     page.getByRole("menuitem", { name: "Refresh files" }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.screenshot({ path: "test-results/files.png" });
+  await page.screenshot({ path: test.info().outputPath("files.png") });
 });
 
 test("keeps results usable during a file scan and shows scan warnings and empty results", async ({
@@ -1173,7 +1175,7 @@ test("previews plain text, copies by ID, and deletes without hiding the launcher
   await expect(page.getByLabel("Saved clipboard text")).toContainText(
     "  Keep the original spacing. 🚀",
   );
-  await page.screenshot({ path: "test-results/clipboard.png" });
+  await page.screenshot({ path: test.info().outputPath("clipboard.png") });
   await input.press("Enter");
   await expect
     .poll(() => actions(page))
@@ -1486,7 +1488,7 @@ test("the layout fits narrow windows and the desktop window", async ({
     ).toBeInViewport();
   }
   await page.setViewportSize({ width: 720, height: 550 });
-  await page.screenshot({ path: "test-results/launcher.png" });
+  await page.screenshot({ path: test.info().outputPath("launcher.png") });
 });
 
 test("copies calculation results and offers only their supported actions", async ({
@@ -1523,7 +1525,7 @@ test("copies calculation results and offers only their supported actions", async
         payload: { id: "calculation:1", action: "copy" },
       },
     ]);
-  await page.screenshot({ path: "test-results/calculator.png" });
+  await page.screenshot({ path: test.info().outputPath("calculator.png") });
 });
 
 test("changes search mode during a pending query and copies an emoji", async ({
@@ -1596,5 +1598,5 @@ test("shows calculator errors and fits both new result types in a narrow window"
     ).toBe(true);
   }
   await page.setViewportSize({ width: 720, height: 550 });
-  await page.screenshot({ path: "test-results/emoji.png" });
+  await page.screenshot({ path: test.info().outputPath("emoji.png") });
 });

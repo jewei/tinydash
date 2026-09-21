@@ -17,7 +17,7 @@ pub fn valid_text(text: &str) -> bool {
     text.len() <= MAX_TEXT_BYTES && !text.trim().is_empty() && !text.contains('\0')
 }
 
-pub fn combine_entries(entries: &[ClipboardEntry], separator: &str) -> Result<String, String> {
+pub fn combine_entries(entries: &[&ClipboardEntry], separator: &str) -> Result<String, String> {
     if entries.is_empty() {
         return Err("Select at least one clipboard entry.".into());
     }
@@ -138,13 +138,13 @@ impl ClipboardProvider {
             .map(|entry| format!("clipboard:{}", entry.entry.id))
     }
 
-    pub fn entries_for_ids(&self, ids: &[i64]) -> Option<Vec<ClipboardEntry>> {
+    pub fn entries_for_ids(&self, ids: &[i64]) -> Option<Vec<&ClipboardEntry>> {
         ids.iter()
             .map(|id| {
                 self.entries
                     .iter()
                     .find(|entry| entry.entry.id == *id)
-                    .map(|entry| entry.entry.clone())
+                    .map(|entry| &entry.entry)
             })
             .collect()
     }
@@ -241,18 +241,18 @@ mod tests {
         let first = entry(1, "  Café 🚀\n");
         let second = entry(2, "second");
         assert_eq!(
-            combine_entries(&[first.clone(), second.clone()], "\n---\n").expect("combine"),
+            combine_entries(&[&first, &second], "\n---\n").expect("combine"),
             "  Café 🚀\n\n---\nsecond"
         );
         assert_eq!(
-            combine_entries(&[second, first], "").expect("combine"),
+            combine_entries(&[&second, &first], "").expect("combine"),
             "second  Café 🚀\n"
         );
         assert!(combine_entries(&[], "\n").is_err());
-        assert!(combine_entries(&[entry(1, &"x".repeat(MAX_SELECTION_BYTES))], "y").is_ok());
+        assert!(combine_entries(&[&entry(1, &"x".repeat(MAX_SELECTION_BYTES))], "y").is_ok());
         assert!(
             combine_entries(
-                &[entry(1, &"x".repeat(MAX_SELECTION_BYTES)), entry(2, "z")],
+                &[&entry(1, &"x".repeat(MAX_SELECTION_BYTES)), &entry(2, "z")],
                 "y"
             )
             .is_err()
@@ -265,13 +265,29 @@ mod tests {
         assert_eq!(provider.newest_id().as_deref(), Some("clipboard:2"));
         assert_eq!(
             provider
-                .entries_for_ids(&[1, 2])
+                .entries_for_ids(&[1, 2, 1])
                 .expect("entries")
                 .into_iter()
                 .map(|entry| entry.id)
                 .collect::<Vec<_>>(),
-            [1, 2]
+            [1, 2, 1]
         );
         assert!(provider.entries_for_ids(&[2, 999]).is_none());
+    }
+
+    #[test]
+    fn rejects_oversized_selection_without_copying_selected_payloads() {
+        let provider = ClipboardProvider::new(
+            (1..=MAX_SELECTION_ENTRIES as i64)
+                .map(|id| entry(id, &"x".repeat(MAX_TEXT_BYTES)))
+                .collect(),
+        );
+        let ids: Vec<_> = (1..=MAX_SELECTION_ENTRIES as i64).rev().collect();
+        let selected = provider.entries_for_ids(&ids).expect("entries");
+        for (entry, id) in selected.iter().zip(ids) {
+            let original = provider.get(&format!("clipboard:{id}")).expect("entry");
+            assert!(std::ptr::eq(*entry, original));
+        }
+        assert!(combine_entries(&selected, "\n").is_err());
     }
 }

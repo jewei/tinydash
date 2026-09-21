@@ -96,7 +96,7 @@ jobs:
         env:
           GDK_BACKEND: x11
           XDG_SESSION_TYPE: x11
-        run: xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash -c 'openbox & exec bun run test:native'
+        run: xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash -c 'openbox & exec bun run verify:native'
       - name: Remove and check Windows package
         if: always() && steps.windows-install.outcome == 'success'
         shell: pwsh
@@ -110,6 +110,8 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           name: native-results-${{ runner.os }}-${{ runner.arch }}
-          path: test-results/native/
+          path: |
+            test-results/native/
+            test-results/verification/
           if-no-files-found: ignore
           retention-days: 14

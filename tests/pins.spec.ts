@@ -223,7 +223,9 @@ test("emoji arrows follow columns across the pinned section", async ({
     await input.press("ArrowUp");
     await expect(input).toHaveAttribute("aria-activedescendant", "result-0");
   }
-  await page.screenshot({ path: "test-results/category-pins-emoji.png" });
+  await page.screenshot({
+    path: test.info().outputPath("category-pins-emoji.png"),
+  });
 });
 
 test("pin controls fit the detail panel and the compact menu", async ({
@@ -236,7 +238,7 @@ test("pin controls fit the detail panel and the compact menu", async ({
   await page.getByRole("button", { name: "Pin to Apps", exact: true }).click();
   await page.getByRole("button", { name: "Pin to All", exact: true }).click();
   await expect(page.getByRole("group", { name: "Pin item" })).toBeVisible();
-  await page.screenshot({ path: "test-results/category-pins.png" });
+  await page.screenshot({ path: test.info().outputPath("category-pins.png") });
   await page.setViewportSize({ width: 360, height: 620 });
   await input.press("Meta+k");
   await expect(
@@ -250,7 +252,9 @@ test("pin controls fit the detail panel and the compact menu", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.screenshot({ path: "test-results/category-pins-compact.png" });
+  await page.screenshot({
+    path: test.info().outputPath("category-pins-compact.png"),
+  });
 });
 
 test("category buttons and option-arrow shortcuts select the same search scope", async ({

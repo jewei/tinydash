@@ -1,0 +1,50 @@
+name: Verification tools
+
+on:
+  push:
+    paths:
+      - ".agents/skills/verify-tinydash/**"
+      - "docs/how-to/verify*.md"
+      - "docs/reference/features/**"
+      - "scripts/verify/**"
+      - "tests/verification.spec.ts"
+      - "tests/native-cancellation.spec.ts"
+      - "tests/fixtures/native-cancellation.mjs"
+      - ".github/workflows/verification.yml"
+  pull_request:
+    paths:
+      - ".agents/skills/verify-tinydash/**"
+      - "docs/how-to/verify*.md"
+      - "docs/reference/features/**"
+      - "scripts/verify/**"
+      - "tests/verification.spec.ts"
+      - "tests/native-cancellation.spec.ts"
+      - "tests/fixtures/native-cancellation.mjs"
+      - ".github/workflows/verification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run check:repo
+      - run: bun run format:check
+      - run: bun run typecheck
+      - run: bun run verify:browser tests/verification.spec.ts tests/native-cancellation.spec.ts
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: verification-tools
+          path: test-results/verification/
+          if-no-files-found: ignore
+          retention-days: 7

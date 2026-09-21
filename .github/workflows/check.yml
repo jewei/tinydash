@@ -2,7 +2,15 @@ name: Checks
 
 on:
   push:
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.markdown"
+      - "docs/**"
   pull_request:
+    paths-ignore:
+      - "**/*.md"
+      - "**/*.markdown"
+      - "docs/**"
   workflow_dispatch:
 
 permissions:
@@ -14,6 +22,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quick:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: rustup component add rustfmt
+      - run: bun install --frozen-lockfile
+      - run: bunx --bun --no-install playwright install --with-deps chromium
+      - run: bun run verify
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: quick-verification
+          path: test-results/verification/
+          if-no-files-found: ignore
+          retention-days: 7
+
   desktop:
     timeout-minutes: 45
     strategy:
@@ -38,14 +67,11 @@ jobs:
         with:
           workspaces: src-tauri
       - run: bun install --frozen-lockfile
-      - run: bun run format:check
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: rustfmt --check --edition 2024 tests/native/fixture.rs
       - run: bun run build
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - name: Build application and installer
-        run: bun run tauri build
+        run: bun scripts/verify/build.ts
       - name: Check macOS disk image
         if: runner.os == 'macOS'
         shell: bash

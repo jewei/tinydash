@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import {
   mkdir,
   mkdtemp,
@@ -10,13 +10,25 @@ import {
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import {
+  cleanupAll,
+  stopProcessTree,
+  waitForExit,
+} from "../../scripts/verify/lifecycle.ts";
 
 // Install real, temporary OS app entries. The launcher uses its normal scanner.
-export async function installFixtures() {
-  // Resolve Windows 8.3 temp aliases before comparing paths from native APIs.
-  const directory = await realpath(
-    await mkdtemp(join(tmpdir(), "tinydash-native-")),
+export async function installFixtures(
+  signal: AbortSignal,
+  registerCleanup: (cleanup: () => Promise<void>, directory: string) => void,
+) {
+  signal.throwIfAborted();
+  const temporary = await mkdtemp(join(tmpdir(), "tinydash-native-"));
+  registerCleanup(
+    () => rm(temporary, { recursive: true, force: true }),
+    temporary,
   );
+  // Resolve Windows 8.3 temp aliases before comparing paths from native APIs.
+  const directory = await realpath(temporary);
   const marker = join(directory, "launched.txt");
   const binary = join(
     directory,
@@ -32,6 +44,7 @@ export async function installFixtures() {
   let association = false;
   let settingsPath: string | undefined;
   let originalSettings: Buffer | undefined;
+  let compiler: ChildProcess | undefined;
   const fileAssociation = (remove = false) =>
     execFileSync(
       "powershell.exe",
@@ -53,12 +66,36 @@ export async function installFixtures() {
   let shortcuts: string | undefined;
   const env = { ...process.env };
   const cleanup = async () => {
-    if (association) fileAssociation(true);
-    if (settingsPath) {
-      if (originalSettings) await writeFile(settingsPath, originalSettings);
-      else await rm(settingsPath, { force: true });
+    if (compiler) {
+      if (
+        process.platform !== "win32" ||
+        (compiler.exitCode === null && compiler.signalCode === null)
+      )
+        await stopProcessTree(compiler);
+      compiler = undefined;
     }
-    if (shortcuts) await rm(shortcuts, { recursive: true, force: true });
+    await cleanupAll([
+      () => {
+        if (association) {
+          fileAssociation(true);
+          association = false;
+        }
+      },
+      async () => {
+        if (settingsPath) {
+          if (originalSettings) await writeFile(settingsPath, originalSettings);
+          else await rm(settingsPath, { force: true });
+          settingsPath = undefined;
+        }
+      },
+      async () => {
+        if (shortcuts) {
+          await rm(shortcuts, { recursive: true, force: true });
+          shortcuts = undefined;
+        }
+      },
+    ]);
+    // Keep this directory and its settings backup if restoration failed.
     // WebView2 can retain profile files briefly after its host process exits.
     // Retry explicitly: Bun does not reliably apply rm's maxRetries option here.
     const deadline = Date.now() + 10_000;
@@ -80,6 +117,8 @@ export async function installFixtures() {
   };
 
   try {
+    registerCleanup(cleanup, directory);
+    signal.throwIfAborted();
     await mkdir(fileRoot, { recursive: true });
     await writeFile(
       filePath,
@@ -91,11 +130,15 @@ export async function installFixtures() {
       join(fileRoot, "node_modules", "excluded.txt"),
       "Excluded test file\n",
     );
-    execFileSync(
+    compiler = spawn(
       "rustc",
       ["--edition=2024", "tests/native/fixture.rs", "-o", binary],
-      { stdio: "inherit", timeout: 60_000 },
+      { stdio: "inherit", detached: true, windowsHide: true },
     );
+    await waitForExit(compiler, signal, 60_000);
+    if (process.platform !== "win32") await stopProcessTree(compiler);
+    compiler = undefined;
+    signal.throwIfAborted();
     if (process.platform === "win32") {
       fileAssociation();
       association = true;
@@ -132,6 +175,11 @@ export async function installFixtures() {
       const settings = originalSettings
         ? JSON.parse(originalSettings.toString("utf8"))
         : {};
+      if (originalSettings)
+        await writeFile(
+          join(directory, "settings-backup.json"),
+          originalSettings,
+        );
       settingsPath = path;
       await writeFile(
         path,
@@ -185,6 +233,7 @@ export async function installFixtures() {
         timeout: 15_000,
       });
     }
+    signal.throwIfAborted();
     // Check the OS association before starting the launcher. A missing handler
     // is a fixture failure, separate from a failure in TinyDash's open action.
     if (process.platform === "win32") {
@@ -223,19 +272,21 @@ export async function installFixtures() {
     }
     let opened: string | undefined;
     for (let attempt = 0; attempt < 50; attempt++) {
+      signal.throwIfAborted();
       try {
         opened = await readFile(fileMarker, "utf8");
         break;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
-      await delay(100);
+      await delay(100, undefined, { signal });
     }
     if (opened !== filePath)
       throw new Error(
         `Document fixture failed: expected ${filePath}, received ${opened ?? "no marker"}`,
       );
     await rm(fileMarker);
+    signal.throwIfAborted();
     return {
       directory,
       prefix,
@@ -249,7 +300,14 @@ export async function installFixtures() {
       cleanup,
     };
   } catch (error) {
-    await cleanup();
+    try {
+      await cleanup();
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        `Fixture setup failed. Recovery files: ${directory}`,
+      );
+    }
     throw error;
   }
 }

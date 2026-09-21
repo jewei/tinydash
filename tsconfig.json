@@ -21,7 +21,6 @@
     "src",
     "tests",
     "scripts",
-    "designs",
     "playwright.config.ts",
     "vite.config.ts"
   ]

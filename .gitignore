@@ -1,6 +1,10 @@
 node_modules/
+/.local/
 /designs/
-.hallmark/
+/.hallmark/
+/site/
+/docs/benchmarks/
+/scripts/perf/memory/
 dist/
 site-dist/
 src-tauri/target/
@@ -13,8 +17,6 @@ artifacts/
 native-build/
 __pycache__/
 *.pyc
-/.local/
-/.hallmark/
-/site/
-/docs/benchmarks/
-/scripts/perf/memory/
+scripts/perf/**/target*/
+scripts/perf/**/bin/
+scripts/perf/**/results/

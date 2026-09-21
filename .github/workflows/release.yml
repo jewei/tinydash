@@ -124,15 +124,15 @@ jobs:
           if [[ "$RELEASE_MODE" == "true" ]]; then
             if [[ "$RUNNER_OS" == 'macOS' ]]; then
               config=$(bun scripts/release/tauri-build-config.ts macos)
-              bun run tauri build --config "$config"
+              bun scripts/verify/build.ts --config "$config"
             elif [[ "$RUNNER_OS" == 'Windows' ]]; then
               config=$(bun scripts/release/tauri-build-config.ts windows)
-              bun run tauri build --config "$config"
+              bun scripts/verify/build.ts --config "$config"
             else
-              bun run tauri build
+              bun scripts/verify/build.ts
             fi
           else
-            bun run tauri build
+            bun scripts/verify/build.ts
           fi
       - name: Notarize and staple macOS DMG
         if: ${{ inputs.release_mode == true && runner.os == 'macOS' }}

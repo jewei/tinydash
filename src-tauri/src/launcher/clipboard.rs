@@ -195,6 +195,7 @@ pub async fn clipboard_preview(id: String, app: AppHandle) -> Result<ClipboardEn
             .lock()
             .map_err(|_| Error::IndexUnavailable.to_string())?
             .clipboard_entry(&id)
+            .cloned()
             .map_err(|error| error.to_string())
     })
     .await
