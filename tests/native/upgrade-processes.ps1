@@ -27,7 +27,9 @@ if ($Action -eq 'Record') {
     })
     ConvertTo-Json -InputObject @($owned) | Set-Content $Record
 } else {
-    $owned = @(Get-Content -Raw $Record | ConvertFrom-Json)
+    # Windows PowerShell returns the JSON array as one pipeline object.
+    # Wrapping that pipeline in @() would add an unwanted nested array.
+    $owned = ConvertFrom-Json -InputObject (Get-Content -Raw $Record)
     foreach ($entry in $owned) {
         $process = Get-Process -Id $entry.id -ErrorAction SilentlyContinue
         if ($process -and $process.StartTime.ToUniversalTime().ToString('o') -eq $entry.started) {

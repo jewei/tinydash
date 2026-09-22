@@ -50,6 +50,31 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify candidate bytes
         run: bun scripts/ci/artifacts.ts verify native-build
+      - name: Check Windows process cleanup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'tinydash-process-fixture.ps1'
+          $record = Join-Path $env:RUNNER_TEMP 'tinydash-process-fixture.json'
+          @'
+          Start-Process powershell.exe -WindowStyle Hidden -ArgumentList '-NoProfile -Command Start-Sleep -Seconds 120'
+          Start-Sleep -Seconds 120
+          '@ | Set-Content $fixture
+          $process = Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -File `"$fixture`"" -PassThru
+          try {
+            Start-Sleep -Seconds 2
+            powershell.exe -NoProfile -File tests/native/upgrade-processes.ps1 Record $process.Id $record
+            if ($LASTEXITCODE -ne 0) { throw 'Could not record the process fixture.' }
+            $owned = ConvertFrom-Json -InputObject (Get-Content -Raw $record)
+            if ($owned.Count -lt 2) { throw 'The process fixture needs a root and a child.' }
+            foreach ($attempt in 1..2) {
+              powershell.exe -NoProfile -File tests/native/upgrade-processes.ps1 Stop $process.Id $record
+              if ($LASTEXITCODE -ne 0) { throw 'Process cleanup failed.' }
+            }
+          } finally {
+            if (-not $process.HasExited) { taskkill.exe /PID $process.Id /T /F }
+            Remove-Item $fixture, $record -ErrorAction SilentlyContinue
+          }
       - name: Install Linux libraries and driver
         if: runner.os == 'Linux'
         run: |
