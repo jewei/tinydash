@@ -278,6 +278,13 @@ async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
 
 async function reopen() {
   cancelled.signal.throwIfAborted();
+  // The OS clipboard changes before execute_action hides the window and saves
+  // usage. Reopening during that interval can be hidden by the earlier action.
+  await until("the previous action finishes before reopening", () =>
+    observe<boolean>(
+      `return !/^(Copying|Opening|Running)\\.\\.\\./.test(document.querySelector('.open-button')?.textContent?.trim() ?? '')`,
+    ),
+  );
   const started = performance.now();
   // Start the executable as a desktop shortcut would. Its single-instance
   // handler must show the resident window and reset the search field.
@@ -1080,6 +1087,28 @@ try {
     String(error instanceof Error ? error.stack : error),
   );
   if (session && !cancelled.signal.aborted) {
+    await request(`/session/${session}/execute/async`, "POST", {
+      script: `const done = arguments[arguments.length - 1];
+        const query = document.querySelector('input[role=combobox]')?.value ?? '';
+        Promise.all([
+          window.__TAURI_INTERNALS__.invoke('launcher_ready'),
+          window.__TAURI_INTERNALS__.invoke('search', { query, mode: 'all' }),
+        ]).then(([info, response]) => done({
+          query, visible: info.visible,
+          action: document.querySelector('.open-button')?.textContent,
+          focused: document.activeElement?.getAttribute('role'),
+          rendered: [...document.querySelectorAll('[role=option] .result-title')].map(item => item.textContent),
+          backend: response.results.map(item => ({ id: item.id, title: item.title })),
+        }), error => done({ error: String(error) }));`,
+      args: [],
+    })
+      .then((diagnostic) =>
+        writeFile(
+          resolve(output, "failure-state.json"),
+          JSON.stringify(diagnostic, null, 2),
+        ),
+      )
+      .catch(() => {});
     await saveScreen("failure.png").catch(() => {});
     await request<string>(`/session/${session}/source`)
       .then((source) => writeFile(resolve(output, "failure.html"), source))
