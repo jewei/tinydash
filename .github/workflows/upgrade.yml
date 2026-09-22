@@ -89,6 +89,7 @@ jobs:
         env:
           GDK_BACKEND: x11
           XDG_SESSION_TYPE: x11
+          WEBKIT_DISABLE_DMABUF_RENDERER: 1
           TINYDASH_UPGRADE_TAG: ${{ inputs.candidate_tag }}
         run: xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash -c 'openbox & exec bun tests/native/upgrade.ts'
       - name: Retain upgrade evidence
