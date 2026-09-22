@@ -74,6 +74,7 @@ jobs:
           cp src-tauri/target/verification-build.json test-results/upgrade/older-build.json
       - name: Test Windows signed update
         if: runner.os == 'Windows'
+        timeout-minutes: 10
         shell: pwsh
         env:
           TINYDASH_UPGRADE_TAG: ${{ inputs.candidate_tag }}

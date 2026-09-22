@@ -82,6 +82,9 @@ const proof = {
   tag,
   platform: process.platform,
 };
+const progress = setInterval(() => {
+  console.log(JSON.stringify({ phase, passed, failure, cleanupErrors }));
+}, 30_000);
 
 function run(command: string, args: string[]) {
   cancelled.signal.throwIfAborted();
@@ -183,6 +186,7 @@ async function text() {
 }
 
 async function click(name: string) {
+  console.log(`Click: ${name}`);
   if (windows) {
     await page!.getByRole("button", { name, exact: true }).click();
     return;
@@ -203,6 +207,7 @@ async function click(name: string) {
 }
 
 async function start() {
+  console.log("Start installed app");
   if (windows) {
     const port = process.env.TINYDASH_NATIVE_DEBUG_PORT;
     assert(
@@ -220,6 +225,10 @@ async function start() {
       return response.ok;
     });
     browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
+    for (const context of browser.contexts()) {
+      context.setDefaultTimeout(15_000);
+      context.setDefaultNavigationTimeout(15_000);
+    }
     await wait("launcher page", async () => {
       page = browser!
         .contexts()
@@ -261,6 +270,7 @@ async function start() {
 }
 
 async function stop() {
+  console.log("Stop owned processes");
   if (windows && app?.pid) {
     const record = join(output, `process-${app.pid}.json`);
     if (app.exitCode === null && app.signalCode === null) {
@@ -395,6 +405,7 @@ try {
   targetHash = await fileHash(
     join(extracted, windows ? "tinydash.exe" : "usr/bin/tinydash"),
   );
+  phase = "install-older";
   install(older);
   await mkdir(config, { recursive: true });
   await mkdir(data, { recursive: true });
@@ -410,6 +421,7 @@ try {
   await writeFile(join(output, "before.json"), JSON.stringify(before, null, 2));
   const olderHash = await fileHash(binary);
   assert.notEqual(olderHash, targetHash);
+  phase = "before-upgrade";
   await start();
   await checkFixture("before-upgrade");
 
@@ -550,6 +562,7 @@ try {
   installedHash = await fileHash(binary);
   assert.equal(installedHash, targetHash);
   assert.deepEqual(await readUpgradeData(config, data), before);
+  phase = "after-upgrade";
   await start();
   await checkFixture("after-upgrade");
   if (windows) {
@@ -568,7 +581,7 @@ try {
   failure = String(error);
   if (page) {
     await page
-      .screenshot({ path: join(output, "failure.png") })
+      .screenshot({ path: join(output, "failure.png"), timeout: 5_000 })
       .catch(() => {});
     await page
       .content()
@@ -621,6 +634,7 @@ try {
     if (data !== config) await rm(data, { recursive: true });
   }
   closeSync(log);
+  clearInterval(progress);
   cancelled.dispose();
   await writeFile(
     join(output, "result.json"),
