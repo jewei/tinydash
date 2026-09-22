@@ -17,10 +17,6 @@ on:
         required: false
   workflow_dispatch:
     inputs:
-      recovery_recipient:
-        description: Temporary signing recovery recipient; leave empty for desktop checks
-        default: ""
-        type: string
       build_run_id:
         description: Workflow run containing the native build artifacts
         required: true
@@ -39,53 +35,8 @@ permissions:
   actions: read
 
 jobs:
-  recover-signing:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.recovery_recipient != '' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Encrypt the signing recovery file
-        env:
-          RECIPIENT: ${{ inputs.recovery_recipient }}
-          PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
-        run: |
-          node --input-type=module <<'JS'
-          import { constants, createCipheriv, createPublicKey, publicEncrypt, randomBytes } from 'node:crypto';
-          import { writeFileSync } from 'node:fs';
-          process.umask(0o077);
-          const recipient = createPublicKey(Buffer.from(process.env.RECIPIENT, 'base64'));
-          if (recipient.asymmetricKeyType !== 'rsa' || recipient.asymmetricKeyDetails.modulusLength < 3072) throw Error('Invalid recipient');
-          if (!process.env.PRIVATE_KEY || !process.env.PUBLIC_KEY || !process.env.KEY_PASSWORD) throw Error('Missing signing secret');
-          const payload = Buffer.from(JSON.stringify({
-            privateKey: process.env.PRIVATE_KEY,
-            password: process.env.KEY_PASSWORD,
-            publicKey: process.env.PUBLIC_KEY,
-          }));
-          const key = randomBytes(32), nonce = randomBytes(12);
-          const cipher = createCipheriv('aes-256-gcm', key, nonce);
-          cipher.setAAD(Buffer.from('TinyDash updater recovery v1'));
-          const ciphertext = Buffer.concat([cipher.update(payload), cipher.final()]);
-          const encode = value => value.toString('base64');
-          const envelope = {
-            schema: 1, algorithm: 'RSA-OAEP-SHA256/AES-256-GCM',
-            wrappedKey: encode(publicEncrypt({ key: recipient, oaepHash: 'sha256', padding: constants.RSA_PKCS1_OAEP_PADDING }, key)),
-            nonce: encode(nonce), tag: encode(cipher.getAuthTag()), ciphertext: encode(ciphertext),
-          };
-          writeFileSync('updater-recovery.json', JSON.stringify(envelope) + '\n', { mode: 0o600 });
-          payload.fill(0); key.fill(0);
-          console.log('Encrypted recovery file created.');
-          JS
-      - uses: actions/upload-artifact@v7.0.1
-        with:
-          name: encrypted-updater-recovery
-          path: updater-recovery.json
-          retention-days: 1
-          if-no-files-found: error
-
   upgrade:
-    if: ${{ inputs.upgrade_tag != '' && !inputs.recovery_recipient }}
+    if: ${{ inputs.upgrade_tag != '' }}
     uses: ./.github/workflows/upgrade.yml
     with:
       build_run_id: ${{ inputs.build_run_id }}
@@ -94,7 +45,7 @@ jobs:
       TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
 
   native:
-    if: ${{ inputs.upgrade_tag == '' && !inputs.recovery_recipient }}
+    if: ${{ inputs.upgrade_tag == '' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
