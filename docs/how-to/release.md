@@ -2,6 +2,10 @@
 
 Use this procedure after source and desktop checks pass. The release workflow can stage a draft. Publication is a separate step.
 
+The source uses the [MIT license](../../LICENSE). The first release is free to
+download and use. Keep the third-party font and word-list notices with their
+material. Include the project license with a published source archive.
+
 ## Configure signing
 
 | System  | Publisher signing                                           | Update verification        |
@@ -28,9 +32,37 @@ Configure these GitHub Actions secrets. Keep certificate exports and private key
 
 Set the repository variable `TINYDASH_UPDATE_ENDPOINT` to the HTTPS update feed. The stable GitHub feed is `https://github.com/jewei/tinydash/releases/latest/download/latest.json`. It requires a stable release containing that file.
 
-Use the same updater key for Mac and Windows. Restore the existing key when one exists. A replacement key does not verify updates for installed clients that trust the previous key. Keep an encrypted offline backup and store its password separately. Record certificate expiry and key recovery instructions in private maintainer notes.
+Use the same updater key for Mac and Windows. Restore the existing key when one exists. A replacement key does not verify updates for installed clients that trust the previous key. Keep an encrypted backup and store its password separately. Cloud storage is suitable for the encrypted file. Record certificate expiry and key recovery instructions in private maintainer notes.
 
 Follow the [Tauri Mac signing guide](https://v2.tauri.app/distribute/sign/macos/) and [updater signing guide](https://v2.tauri.app/plugin/updater/#signing-updates) for key setup. A Mac certificate and the updater key have different purposes. Renewing the Mac certificate must not replace the updater key.
+
+### Back up and test the updater key
+
+The backup must contain the private key, its password, and the matching public
+key. An encrypted key file alone is not sufficient when its password is lost.
+Use a separate password for the backup container. Store that password in a
+password manager.
+
+On a Mac, an [encrypted disk image](https://support.apple.com/guide/disk-utility/create-a-disk-image-dskutl11888/mac)
+can hold these files. Before copying it to cloud storage, open the image with
+the saved backup password. Restore its contents into a temporary private
+folder, sign a new test file, and verify that signature with the public key
+used by the release candidate. Confirm that verification rejects a changed
+test file. Then unmount the image and remove the temporary restored files.
+Keep only the result and public-key fingerprint in the verification record.
+
+If the only usable copy is in GitHub Actions secrets, use a temporary recovery
+workflow to encrypt those secrets for a public recovery key generated on the
+maintainer's computer. Download only the encrypted artifact and decrypt it on
+that computer. Do not print secrets in workflow logs or put them in workflow
+inputs. Test the recovered key, remove the recovery job and artifact, and make
+the encrypted backup. Do not generate a replacement updater key to avoid this
+recovery step.
+
+After a cloud copy is complete, download it and compare its SHA-256 checksum
+with the verified local file. Record the cloud location and recovery steps in
+private notes. Keep private keys and passwords out of ordinary notes and
+clipboard history.
 
 ## Build a candidate
 
@@ -50,6 +82,23 @@ The Mac job signs and notarizes the app and DMG. Windows remains an unsigned pre
 3. Complete [desktop checks](desktop-checks.md) on macOS, Windows, and the supported Linux sessions.
 4. On a disposable installation of an older version, install the exact candidate through its update path. Confirm that invalid signatures and changed bytes are rejected. Use a separate HTTPS test feed for the older test build.
 5. Check cancellation, network failure, data retention, recovery, reinstall, and removal. Keep the evidence in a private verification record.
+
+For automated version-upgrade checks, run **Native app checks** again with the
+same candidate build run ID and set `upgrade_tag` to its version tag. This
+selects the release packages and runs a separate Windows and Linux upgrade
+suite. Leave `upgrade_tag` empty for the ordinary smoke and reinstall checks.
+
+The upgrade suite builds a disposable `0.0.0` app. Windows uses a loopback HTTPS
+feed and the existing updater public key. The suite checks failed downloads,
+invalid metadata, invalid signatures, changed bytes, and a valid update through
+Settings. Linux uses APT to install the candidate over the older package. Both
+checks compare the installed executable with the package and verify saved
+settings, clipboard consent, clipboard text, pins, and usage history after
+restart and removal. The fixture data and process records stay in the workflow
+artifact. The temporary HTTPS certificate is removed from the Windows runner.
+
+These hosted checks do not verify Windows 11 security prompts, macOS updates,
+or a Wayland desktop. Complete those checks separately with the same packages.
 
 Mac updates use `.app.tar.gz` with its `.sig` file. Windows updates use `-setup.exe` with its `.sig` file. The feed contains `darwin-aarch64` and `windows-x86_64`. Ubuntu uses manual `.deb` replacement and does not enter the feed.
 

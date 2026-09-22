@@ -2,6 +2,9 @@
 
 A desktop launcher for macOS, Windows, and Linux, built with Rust, Tauri, and SolidJS.
 
+TinyDash source is available under the [MIT license](LICENSE). The first release
+will be free to download and use.
+
 Search applications, filenames, and clipboard history. Calculate values, convert units and currencies, find emoji, generate passwords, convert dates and times, clean URLs, and open web searches.
 
 ## Start
@@ -35,3 +38,10 @@ bun run verify:full
 ```
 
 The fast check runs repository checks, Prettier and Rust formatting checks, type checks, and browser smoke tests. The full check also runs all browser tests, Rust tests, Clippy, and the frontend build. Native desktop checks use a separate command and test session.
+
+## Third-party material
+
+Dependencies keep their own licenses. The bundled [Figtree](public/fonts/Figtree-OFL.txt)
+and [Caprasimo](public/fonts/Caprasimo-OFL.txt) fonts use the SIL Open Font License.
+The [EFF word list](src-tauri/src/providers/tools/data/README.md) uses Creative
+Commons Attribution 4.0.

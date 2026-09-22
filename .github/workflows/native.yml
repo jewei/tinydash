@@ -9,6 +9,12 @@ on:
       release_artifacts:
         default: false
         type: boolean
+      upgrade_tag:
+        default: ""
+        type: string
+    secrets:
+      TAURI_UPDATER_PUBLIC_KEY:
+        required: false
   workflow_dispatch:
     inputs:
       build_run_id:
@@ -19,13 +25,27 @@ on:
         description: Use packages from the Release candidate workflow
         default: false
         type: boolean
+      upgrade_tag:
+        description: Test an installed version upgrade to this candidate tag; leave empty for smoke checks
+        default: ""
+        type: string
 
 permissions:
   contents: read
   actions: read
 
 jobs:
+  upgrade:
+    if: ${{ inputs.upgrade_tag != '' }}
+    uses: ./.github/workflows/upgrade.yml
+    with:
+      build_run_id: ${{ inputs.build_run_id }}
+      candidate_tag: ${{ inputs.upgrade_tag }}
+    secrets:
+      TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+
   native:
+    if: ${{ inputs.upgrade_tag == '' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -96,6 +116,8 @@ jobs:
         env:
           GDK_BACKEND: x11
           XDG_SESSION_TYPE: x11
+          # Xvfb does not provide the DMA-BUF renderer used on a GPU desktop.
+          WEBKIT_DISABLE_DMABUF_RENDERER: 1
         run: xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash -c 'openbox & exec bun run verify:native'
       - name: Remove and check Windows package
         if: always() && steps.windows-install.outcome == 'success'

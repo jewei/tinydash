@@ -1,6 +1,7 @@
 [package]
 name = "tinydash"
-version = "0.1.0"
+version = "0.1.1"
+license = "MIT"
 description = "A small keyboard-first desktop application launcher"
 edition = "2024"
 rust-version = "1.98.1"

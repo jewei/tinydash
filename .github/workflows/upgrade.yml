@@ -1,0 +1,146 @@
+name: Installed version upgrade
+
+on:
+  workflow_call:
+    inputs:
+      build_run_id:
+        required: true
+        type: string
+      candidate_tag:
+        required: true
+        type: string
+    secrets:
+      TAURI_UPDATER_PUBLIC_KEY:
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  upgrade:
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: release-windows
+          - os: ubuntu-24.04
+            artifact: release-linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: rustup update stable --no-self-update
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: native-build/
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify candidate bytes
+        run: bun scripts/ci/artifacts.ts verify native-build
+      - name: Check cleanup after a partial installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/native/upgrade-failure.ps1
+      - name: Check Windows process cleanup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $fixture = Join-Path $env:RUNNER_TEMP 'tinydash-process-fixture.ps1'
+          $record = Join-Path $env:RUNNER_TEMP 'tinydash-process-fixture.json'
+          $mismatch = Join-Path $env:RUNNER_TEMP 'tinydash-process-mismatch.json'
+          @'
+          Start-Process powershell.exe -WindowStyle Hidden -ArgumentList '-NoProfile -Command Start-Sleep -Seconds 120'
+          Start-Sleep -Seconds 120
+          '@ | Set-Content $fixture
+          $process = Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile -File `"$fixture`"" -PassThru
+          try {
+            Start-Sleep -Seconds 2
+            powershell.exe -NoProfile -File tests/native/upgrade-processes.ps1 Record $process.Id $record
+            if ($LASTEXITCODE -ne 0) { throw 'Could not record the process fixture.' }
+            $owned = ConvertFrom-Json -InputObject (Get-Content -Raw $record)
+            if ($owned.Count -lt 2) { throw 'The process fixture needs a root and a child.' }
+            $different = @($owned | ForEach-Object { @{ id = $_.id; started = '2000-01-01T00:00:00.0000000Z' } })
+            ConvertTo-Json -InputObject $different | Set-Content $mismatch
+            powershell.exe -NoProfile -File tests/native/upgrade-processes.ps1 Stop $process.Id $mismatch
+            if ($LASTEXITCODE -ne 0) { throw 'Process identity check failed.' }
+            foreach ($entry in $owned) {
+              if (-not (Get-Process -Id $entry.id -ErrorAction SilentlyContinue)) {
+                throw 'Cleanup stopped a process with a different recorded start time.'
+              }
+            }
+            foreach ($attempt in 1..2) {
+              powershell.exe -NoProfile -File tests/native/upgrade-processes.ps1 Stop $process.Id $record
+              if ($LASTEXITCODE -ne 0) { throw 'Process cleanup failed.' }
+            }
+          } finally {
+            if (-not $process.HasExited) { taskkill.exe /PID $process.Id /T /F }
+            Remove-Item $fixture, $record, $mismatch -ErrorAction SilentlyContinue
+          }
+      - name: Install Linux libraries and driver
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev webkit2gtk-driver xvfb openbox dbus-x11 scrot
+          cargo install tauri-driver --version 2.0.6 --locked
+      - name: Prepare loopback HTTPS certificate
+        shell: bash
+        run: |
+          mkdir -p .local/upgrade test-results/upgrade
+          git rev-parse HEAD > test-results/upgrade/test-source.txt
+          MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+            -keyout .local/upgrade/localhost.key -out .local/upgrade/localhost.crt \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
+            -addext 'basicConstraints=critical,CA:FALSE' -addext 'extendedKeyUsage=serverAuth'
+      - name: Build the disposable older version
+        shell: bash
+        env:
+          TINYDASH_UPDATE_ENDPOINT: https://localhost:18443/latest.json
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+        run: |
+          bun scripts/verify/build.ts --config '{"version":"0.0.0"}'
+          cp src-tauri/target/verification-build.json test-results/upgrade/older-build.json
+      - name: Test Windows signed update
+        if: runner.os == 'Windows'
+        timeout-minutes: 10
+        shell: pwsh
+        env:
+          TINYDASH_UPGRADE_TAG: ${{ inputs.candidate_tag }}
+        run: |
+          # CurrentUser Root can open a trust dialog. This disposable hosted
+          # runner is elevated, so use its machine store without that dialog.
+          Write-Host 'Install the loopback test certificate on the disposable runner.'
+          $certificate = Import-Certificate -FilePath .local/upgrade/localhost.crt -CertStoreLocation Cert:\LocalMachine\Root
+          try {
+            ./scripts/ci/test-windows.ps1 -Test upgrade
+          } finally {
+            Remove-Item "Cert:\LocalMachine\Root\$($certificate.Thumbprint)" -ErrorAction Stop
+          }
+      - name: Test Linux manual version upgrade
+        if: runner.os == 'Linux'
+        env:
+          GDK_BACKEND: x11
+          XDG_SESSION_TYPE: x11
+          WEBKIT_DISABLE_DMABUF_RENDERER: 1
+          TINYDASH_UPGRADE_TAG: ${{ inputs.candidate_tag }}
+        run: xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- bash -c 'openbox & exec bun tests/native/upgrade.ts'
+      - name: Retain upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: upgrade-${{ runner.os }}-${{ runner.arch }}
+          path: test-results/upgrade/
+          if-no-files-found: error
+          retention-days: 14
