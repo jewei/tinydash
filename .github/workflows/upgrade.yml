@@ -40,6 +40,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2.9.2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
       - run: bun install --frozen-lockfile
       - uses: actions/download-artifact@v8.0.1
         with:
@@ -79,11 +80,14 @@ jobs:
         env:
           TINYDASH_UPGRADE_TAG: ${{ inputs.candidate_tag }}
         run: |
-          $certificate = Import-Certificate -FilePath .local/upgrade/localhost.crt -CertStoreLocation Cert:\CurrentUser\Root
+          # CurrentUser Root can open a trust dialog. This disposable hosted
+          # runner is elevated, so use its machine store without that dialog.
+          Write-Host 'Install the loopback test certificate on the disposable runner.'
+          $certificate = Import-Certificate -FilePath .local/upgrade/localhost.crt -CertStoreLocation Cert:\LocalMachine\Root
           try {
             ./scripts/ci/test-windows.ps1 -Test upgrade
           } finally {
-            Remove-Item "Cert:\CurrentUser\Root\$($certificate.Thumbprint)" -ErrorAction Stop
+            Remove-Item "Cert:\LocalMachine\Root\$($certificate.Thumbprint)" -ErrorAction Stop
           }
       - name: Test Linux manual version upgrade
         if: runner.os == 'Linux'
