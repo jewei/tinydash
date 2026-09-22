@@ -51,6 +51,23 @@ The Mac job signs and notarizes the app and DMG. Windows remains an unsigned pre
 4. On a disposable installation of an older version, install the exact candidate through its update path. Confirm that invalid signatures and changed bytes are rejected. Use a separate HTTPS test feed for the older test build.
 5. Check cancellation, network failure, data retention, recovery, reinstall, and removal. Keep the evidence in a private verification record.
 
+For automated version-upgrade checks, run **Native app checks** again with the
+same candidate build run ID and set `upgrade_tag` to its version tag. This
+selects the release packages and runs a separate Windows and Linux upgrade
+suite. Leave `upgrade_tag` empty for the ordinary smoke and reinstall checks.
+
+The upgrade suite builds a disposable `0.0.0` app. Windows uses a loopback HTTPS
+feed and the existing updater public key. The suite checks failed downloads,
+invalid metadata, invalid signatures, changed bytes, and a valid update through
+Settings. Linux uses APT to install the candidate over the older package. Both
+checks compare the installed executable with the package and verify saved
+settings, clipboard consent, clipboard text, pins, and usage history after
+restart and removal. The fixture data and process records stay in the workflow
+artifact. The temporary HTTPS certificate is removed from the Windows runner.
+
+These hosted checks do not verify Windows 11 security prompts, macOS updates,
+or a Wayland desktop. Complete those checks separately with the same packages.
+
 Mac updates use `.app.tar.gz` with its `.sig` file. Windows updates use `-setup.exe` with its `.sig` file. The feed contains `darwin-aarch64` and `windows-x86_64`. Ubuntu uses manual `.deb` replacement and does not enter the feed.
 
 ## Publish the tested files
