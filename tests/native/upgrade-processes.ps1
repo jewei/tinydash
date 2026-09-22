@@ -33,7 +33,13 @@ if ($Action -eq 'Record') {
     foreach ($entry in $owned) {
         $process = Get-Process -Id $entry.id -ErrorAction SilentlyContinue
         if ($process -and $process.StartTime.ToUniversalTime().ToString('o') -eq $entry.started) {
-            Stop-Process -Id $entry.id -Force
+            try {
+                Stop-Process -InputObject $process -Force -ErrorAction Stop
+            } catch {
+                # WebView children can exit after the parent is stopped.
+                # Suppress that race only when this exact process has exited.
+                if (-not $process.HasExited) { throw }
+            }
             if (-not $process.WaitForExit(10000)) { throw "Owned process did not stop: $($entry.id)" }
         }
     }
