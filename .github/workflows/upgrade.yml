@@ -59,7 +59,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p .local/upgrade test-results/upgrade
-          openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
+          git rev-parse HEAD > test-results/upgrade/test-source.txt
+          MSYS_NO_PATHCONV=1 openssl req -x509 -newkey rsa:2048 -sha256 -nodes -days 1 \
             -keyout .local/upgrade/localhost.key -out .local/upgrade/localhost.crt \
             -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
             -addext 'basicConstraints=critical,CA:FALSE' -addext 'extendedKeyUsage=serverAuth'
