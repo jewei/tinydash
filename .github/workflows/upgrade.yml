@@ -50,6 +50,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify candidate bytes
         run: bun scripts/ci/artifacts.ts verify native-build
+      - name: Check cleanup after a partial installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./tests/native/upgrade-failure.ps1
       - name: Check Windows process cleanup
         if: runner.os == 'Windows'
         shell: pwsh

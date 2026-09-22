@@ -60,7 +60,7 @@ const children = new Set<ChildProcess>();
 const passed: string[] = [];
 const cleanupErrors: string[] = [];
 let ownedProfile = false;
-let installed = false;
+let installationAttempted = false;
 let browser: Browser | undefined;
 let page: Page | undefined;
 let app: ChildProcess | undefined;
@@ -146,6 +146,8 @@ async function onlyPackage(directory: string) {
 }
 
 function install(path: string) {
+  // A failed installer can leave files or registration that need cleanup.
+  installationAttempted = true;
   if (windows) {
     // Pass paths as positional arguments, never as PowerShell source text.
     run("powershell.exe", [
@@ -156,7 +158,6 @@ function install(path: string) {
       path,
     ]);
   } else run("sudo", ["apt-get", "install", "-y", path]);
-  installed = true;
 }
 
 async function wd<T>(path: string, method = "GET", body?: unknown): Promise<T> {
@@ -603,7 +604,7 @@ try {
   }
   feed?.closeAllConnections();
   if (feed) await new Promise<void>((done) => feed!.close(() => done()));
-  if (installed) {
+  if (installationAttempted) {
     try {
       // Cleanup must also run after cancellation.
       if (windows)
