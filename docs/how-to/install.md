@@ -46,34 +46,29 @@ The Mac bundle declares macOS 12 as its minimum version. CI tests the current ho
 
 ## Check the download
 
-Each artifact contains `SHA256SUMS`. These hashes detect damaged or changed files. They do not replace a publisher signature. Run the check from the extracted artifact directory.
+Download `SHA256SUMS` with the package. These hashes detect damaged or changed files. They do not replace a publisher signature. Run the command for your system from the download directory. Compare its hash with the entry for the same filename in `SHA256SUMS`. The hashes must match exactly.
 
 On macOS:
 
 ```sh
-shasum -a 256 -c SHA256SUMS
+shasum -a 256 TinyDash_0.1.2_aarch64.dmg
 ```
 
 On Linux:
 
 ```sh
-sha256sum -c SHA256SUMS
+sha256sum TinyDash_0.1.2_amd64.deb
 ```
 
 On Windows, use PowerShell:
 
 ```powershell
-Get-Content SHA256SUMS | ForEach-Object {
-    $hash, $name = $_ -split '  ', 2
-    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $name).Hash -ne $hash) {
-        throw "Checksum mismatch: $name"
-    }
-}
+(Get-FileHash -Algorithm SHA256 -LiteralPath .\TinyDash_0.1.2_x64-setup.exe).Hash.ToLowerInvariant()
 ```
 
 ## Install or replace a build
 
-Quit the running TinyDash process through its tray menu before installation. Hiding the window does not stop the process. The bundle identifier remains `dev.tinydash.launcher`, so installed builds use the existing settings and database. The package version is currently `0.1.0`. Use the commit in `build.txt` to distinguish test builds of this version.
+Quit the running TinyDash process through its tray menu before installation. Hiding the window does not stop the process. The bundle identifier remains `dev.tinydash.launcher`, so installed builds use the existing settings and database. Read the version and commit in `build.txt` to identify the build. The commands below use version `0.1.2`; use your downloaded filename when installing another version.
 
 On macOS, open the DMG and drag `TinyDash.app` to Applications. Replace the previous copy if needed. Eject the disk image, then open TinyDash from Applications. The disk image check mounts it read-only and verifies the copied app. It does not test Gatekeeper approval or notarization.
 
@@ -87,7 +82,7 @@ security controls or install a custom root certificate to run TinyDash.
 On Ubuntu 24.04 x64, run this command in the extracted directory:
 
 ```sh
-sudo apt install ./TinyDash_0.1.0_amd64.deb
+sudo apt install ./TinyDash_0.1.2_amd64.deb
 tinydash
 ```
 

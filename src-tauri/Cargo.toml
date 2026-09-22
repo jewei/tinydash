@@ -1,6 +1,6 @@
 [package]
 name = "tinydash"
-version = "0.1.1"
+version = "0.1.2"
 license = "MIT"
 description = "A small keyboard-first desktop application launcher"
 edition = "2024"
