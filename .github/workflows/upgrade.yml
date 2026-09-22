@@ -60,6 +60,7 @@ jobs:
         run: |
           $fixture = Join-Path $env:RUNNER_TEMP 'tinydash-process-fixture.ps1'
           $record = Join-Path $env:RUNNER_TEMP 'tinydash-process-fixture.json'
+          $mismatch = Join-Path $env:RUNNER_TEMP 'tinydash-process-mismatch.json'
           @'
           Start-Process powershell.exe -WindowStyle Hidden -ArgumentList '-NoProfile -Command Start-Sleep -Seconds 120'
           Start-Sleep -Seconds 120
@@ -71,13 +72,22 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Could not record the process fixture.' }
             $owned = ConvertFrom-Json -InputObject (Get-Content -Raw $record)
             if ($owned.Count -lt 2) { throw 'The process fixture needs a root and a child.' }
+            $different = @($owned | ForEach-Object { @{ id = $_.id; started = '2000-01-01T00:00:00.0000000Z' } })
+            ConvertTo-Json -InputObject $different | Set-Content $mismatch
+            powershell.exe -NoProfile -File tests/native/upgrade-processes.ps1 Stop $process.Id $mismatch
+            if ($LASTEXITCODE -ne 0) { throw 'Process identity check failed.' }
+            foreach ($entry in $owned) {
+              if (-not (Get-Process -Id $entry.id -ErrorAction SilentlyContinue)) {
+                throw 'Cleanup stopped a process with a different recorded start time.'
+              }
+            }
             foreach ($attempt in 1..2) {
               powershell.exe -NoProfile -File tests/native/upgrade-processes.ps1 Stop $process.Id $record
               if ($LASTEXITCODE -ne 0) { throw 'Process cleanup failed.' }
             }
           } finally {
             if (-not $process.HasExited) { taskkill.exe /PID $process.Id /T /F }
-            Remove-Item $fixture, $record -ErrorAction SilentlyContinue
+            Remove-Item $fixture, $record, $mismatch -ErrorAction SilentlyContinue
           }
       - name: Install Linux libraries and driver
         if: runner.os == 'Linux'

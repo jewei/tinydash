@@ -32,7 +32,16 @@ if ($Action -eq 'Record') {
     $owned = ConvertFrom-Json -InputObject (Get-Content -Raw $Record)
     foreach ($entry in $owned) {
         $process = Get-Process -Id $entry.id -ErrorAction SilentlyContinue
-        if ($process -and $process.StartTime.ToUniversalTime().ToString('o') -eq $entry.started) {
+        if (-not $process) { continue }
+        try {
+            # Keep an OS handle open so PID reuse cannot change the target.
+            try {
+                $null = $process.Handle
+            } catch {
+                if ($process.HasExited) { continue }
+                throw
+            }
+            if ($process.StartTime.ToUniversalTime().ToString('o') -ne $entry.started) { continue }
             try {
                 Stop-Process -InputObject $process -Force -ErrorAction Stop
             } catch {
@@ -41,6 +50,8 @@ if ($Action -eq 'Record') {
                 if (-not $process.HasExited) { throw }
             }
             if (-not $process.WaitForExit(10000)) { throw "Owned process did not stop: $($entry.id)" }
+        } finally {
+            $process.Dispose()
         }
     }
     foreach ($entry in $owned) {
