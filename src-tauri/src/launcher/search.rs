@@ -430,15 +430,26 @@ impl SearchManager {
             }
         }
         let now = ranking::now();
-        // This order follows ranking::top_results. A later category cannot
-        // displace an earlier one, even when its usage or fuzzy score is higher.
-        for category in [
-            SearchMode::Apps,
-            SearchMode::Files,
-            SearchMode::Clipboard,
-            SearchMode::System,
-            SearchMode::Emoji,
-        ] {
+        // Command prefixes must survive a full page of fuzzy app or file
+        // matches. Other queries follow ranking::top_results.
+        let categories = if mixed && SystemCommandProvider::is_prefix_query(query.text) {
+            [
+                SearchMode::System,
+                SearchMode::Apps,
+                SearchMode::Files,
+                SearchMode::Clipboard,
+                SearchMode::Emoji,
+            ]
+        } else {
+            [
+                SearchMode::Apps,
+                SearchMode::Files,
+                SearchMode::System,
+                SearchMode::Clipboard,
+                SearchMode::Emoji,
+            ]
+        };
+        for category in categories {
             let remaining = RESULT_LIMIT - results.len();
             if remaining == 0 {
                 break;
@@ -541,10 +552,10 @@ mod tests {
         let mut manager = SearchManager::default();
         manager.replace_apps(AppProvider::new(vec![
             AppEntry::new("Clock".into(), "/apps/Clock.app".into(), vec![]),
-            AppEntry::new("Logseq".into(), "/apps/Logseq.app".into(), vec![]),
+            AppEntry::new("Octave".into(), "/apps/Octave.app".into(), vec![]),
         ]));
         let directory = tempfile::tempdir().unwrap();
-        std::fs::write(directory.path().join("lo"), "").unwrap();
+        std::fs::write(directory.path().join("oc"), "").unwrap();
         manager.replace_files(scan(
             vec![directory.path().to_owned()],
             &[],
@@ -553,14 +564,14 @@ mod tests {
         ));
         manager.clipboard = ClipboardProvider::new(vec![ClipboardEntry {
             id: 1,
-            content: "lo".into(),
+            content: "oc".into(),
             created_at: 100,
             last_used_at: None,
         }]);
         manager.system = Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec()));
 
-        let results = manager.search("lo", SearchMode::All).unwrap().results;
-        assert_eq!(results[0].title, "Logseq");
+        let results = manager.search("oc", SearchMode::All).unwrap().results;
+        assert_eq!(results[0].title, "Octave");
         assert_eq!(results[1].title, "Clock");
         let mut groups: Vec<_> = results.iter().map(|result| result.kind).collect();
         groups.dedup();
@@ -569,11 +580,179 @@ mod tests {
             [
                 ResultKind::App,
                 ResultKind::File,
-                ResultKind::Clipboard,
                 ResultKind::SystemCommand,
+                ResultKind::Clipboard,
                 ResultKind::Emoji,
             ]
         );
+    }
+
+    #[test]
+    fn all_search_keeps_system_commands_before_a_full_clipboard_page() {
+        let mut manager = SearchManager {
+            system: Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec())),
+            clipboard: ClipboardProvider::new(
+                (1..=RESULT_LIMIT as i64)
+                    .map(|id| ClipboardEntry {
+                        id,
+                        content: "sleep suspend standby restart reboot shutdown shut down".into(),
+                        created_at: id,
+                        last_used_at: None,
+                    })
+                    .collect(),
+            ),
+            ..SearchManager::default()
+        };
+        for _ in 0..20 {
+            manager.record_usage("clipboard:1", ranking::now());
+        }
+
+        for (input, command) in [
+            ("sleep", "system:sleep"),
+            (" SLEEP ", "system:sleep"),
+            ("slee", "system:sleep"),
+            ("suspend", "system:sleep"),
+            ("standby", "system:sleep"),
+            ("restart", "system:restart"),
+            ("reboot", "system:restart"),
+            ("shutdown", "system:shutdown"),
+            ("shut down", "system:shutdown"),
+        ] {
+            let results = manager.search(input, SearchMode::All).unwrap().results;
+            assert_eq!(results.len(), RESULT_LIMIT);
+            assert!(
+                results.iter().any(|result| result.id == command),
+                "missing {command} for query: {input}"
+            );
+            assert_eq!(results[0].id, command, "query: {input}");
+            assert!(results[0].confirmation.is_some());
+            assert!(
+                results[1..]
+                    .iter()
+                    .all(|result| result.kind == ResultKind::Clipboard),
+                "query: {input}"
+            );
+        }
+    }
+
+    #[test]
+    fn all_search_keeps_sleep_ahead_of_a_full_page_of_app_path_matches() {
+        for eager_search in [false, true] {
+            let mut manager = SearchManager {
+                eager_search,
+                ..SearchManager::default()
+            };
+            manager.replace_apps(AppProvider::new(
+                (0..RESULT_LIMIT)
+                    .map(|i| {
+                        AppEntry::new(
+                            format!("Utility {i:02}"),
+                            format!("/System/Library/CoreServices/Utility {i:02}.app").into(),
+                            vec![],
+                        )
+                    })
+                    .collect(),
+            ));
+
+            let results = manager.search("sleep", SearchMode::All).unwrap().results;
+            assert!(results.iter().any(|result| result.id == "system:sleep"));
+            assert_eq!(results[0].id, "system:sleep");
+            assert_eq!(results.len(), RESULT_LIMIT);
+            assert!(
+                results[1..]
+                    .iter()
+                    .all(|result| result.kind == ResultKind::App)
+            );
+        }
+    }
+
+    #[test]
+    fn all_search_keeps_short_system_prefixes_ahead_of_full_app_and_file_pages() {
+        for category in [SearchMode::Apps, SearchMode::Files] {
+            let mut manager = SearchManager::default();
+            let entries = (0..RESULT_LIMIT).map(|i| {
+                (
+                    format!("Utility {i:02}"),
+                    format!("/fixture/sleep-restart-shutdown-appearance-dark-empty-trash-log-out-lock-screen-show-desktop-mute-unmute/utility-{i:02}"),
+                )
+            });
+            match category {
+                SearchMode::Apps => manager.replace_apps(AppProvider::new(
+                    entries
+                        .map(|(name, path)| AppEntry::new(name, path.into(), vec![]))
+                        .collect(),
+                )),
+                SearchMode::Files => {
+                    manager.replace_files(FileProvider::new(
+                        entries
+                            .map(|(name, path)| FileEntry {
+                                id: format!("file:{path}"),
+                                name,
+                                path,
+                            })
+                            .collect(),
+                    ));
+                }
+                _ => unreachable!(),
+            }
+            for (input, command) in [
+                ("sle", "system:sleep"),
+                ("sl", "system:sleep"),
+                ("re", "system:restart"),
+                ("res", "system:restart"),
+                ("sh", "system:shutdown"),
+                ("shu", "system:shutdown"),
+                (" SHU ", "system:shutdown"),
+                ("dar", "system:appearance"),
+                ("app", "system:appearance"),
+                ("em", "system:empty-trash"),
+                ("log", "system:logout"),
+                ("loc", "system:lock"),
+                ("des", "system:desktop"),
+                ("mu", "system:mute"),
+                ("unm", "system:mute"),
+            ] {
+                let results = manager.search(input, SearchMode::All).unwrap().results;
+                assert_eq!(results.len(), RESULT_LIMIT);
+                assert_eq!(results[0].id, command, "{category:?}, query: {input}");
+                assert_eq!(
+                    results[0].confirmation.is_some(),
+                    matches!(
+                        command,
+                        "system:sleep"
+                            | "system:restart"
+                            | "system:shutdown"
+                            | "system:logout"
+                            | "system:empty-trash"
+                    )
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn all_search_keeps_sleep_ahead_of_a_full_page_of_file_matches() {
+        let mut manager = SearchManager::default();
+        manager.replace_files(FileProvider::new(
+            (0..RESULT_LIMIT)
+                .map(|i| FileEntry {
+                    id: format!("file:/fixture/sleep-{i}.txt"),
+                    name: format!("sleep-{i}.txt"),
+                    path: format!("/fixture/sleep-{i}.txt"),
+                })
+                .collect(),
+        ));
+
+        for input in ["sleep", " SLEEP "] {
+            let results = manager.search(input, SearchMode::All).unwrap().results;
+            assert_eq!(results[0].id, "system:sleep");
+            assert_eq!(results.len(), RESULT_LIMIT);
+            assert!(
+                results[1..]
+                    .iter()
+                    .all(|result| result.kind == ResultKind::File)
+            );
+        }
     }
 
     #[test]
@@ -871,7 +1050,7 @@ mod tests {
                 .expect("commands")
                 .results
                 .len(),
-            5
+            SystemCommand::ALL.len()
         );
         manager.record_usage("system:settings", ranking::now());
         assert_eq!(

@@ -50,11 +50,11 @@ plist = "1.10.1"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard", "NSWorkspace", "NSRunningApplication", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "objc2-core-graphics"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSDictionary", "NSGeometry", "NSString"] }
-objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage"] }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage", "CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation"] }
 objc2-core-services = { version = "0.3.2", default-features = false, features = ["std", "AE", "AEDataModel", "AEMach", "AERegistry"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Shutdown", "Win32_System_Power", "Win32_System_Threading", "Win32_Security"] }
+windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Shutdown", "Win32_System_Power", "Win32_System_Threading", "Win32_Security"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # GIO is used independently for application discovery and D-Bus commands.

@@ -425,6 +425,53 @@ test("the drag handle moves the window without taking input focus", async ({
   expect(calls.some((call) => call.command === "hide_launcher")).toBe(true);
 });
 
+test("All shows system command prefixes before apps and clipboard and confirms safely", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const [query, title, question] of [
+    ["sleep", "Sleep", "Put this computer to sleep?"],
+    ["sl", "Sleep", "Put this computer to sleep?"],
+    ["sle", "Sleep", "Put this computer to sleep?"],
+    ["re", "Restart", "Restart this computer?"],
+    ["res", "Restart", "Restart this computer?"],
+    ["sh", "Shut down", "Shut down this computer?"],
+    ["shu", "Shut down", "Shut down this computer?"],
+  ]) {
+    await input.fill(query);
+    await expect(page.locator(".result-title")).toHaveText([
+      title,
+      "Finder",
+      `${title} notes`,
+    ]);
+    await expect(page.locator(".result-group")).toHaveText([
+      /System commands\s*1/,
+      /Applications\s*1/,
+      /Clipboard history\s*1/,
+    ]);
+    await page.screenshot({
+      path: test.info().outputPath(`all-${query}.png`),
+    });
+    if (query.length > 2) {
+      await input.press("Enter");
+    } else {
+      await page
+        .getByRole("option")
+        .filter({ has: page.getByText(title, { exact: true }) })
+        .click();
+    }
+    const dialog = page.getByRole("dialog", {
+      name: question,
+    });
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(input).toBeFocused();
+    expect(await actions(page)).toEqual([]);
+  }
+});
+
 test("system commands ask before running and extra Enter cancels", async ({
   page,
 }) => {
@@ -435,7 +482,7 @@ test("system commands ask before running and extra Enter cancels", async ({
     "placeholder",
     "Search system commands...",
   );
-  await expect(page.locator(".list-count")).toHaveText("4 shown");
+  await expect(page.locator(".list-count")).toHaveText("10 shown");
   await input.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Restart this computer?" });
   await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
@@ -476,9 +523,7 @@ test("confirmation keeps the selected command through a ranking update and preve
     window.__launcherTest.holdAction = true;
     return window.__launcherTest.emit("usage-changed", null);
   });
-  await expect(page.locator(".result-title").first()).toHaveText(
-    "Open system settings",
-  );
+  await expect(page.locator(".result-title").first()).toHaveText("Toggle mute");
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Restart", exact: true }).click();
   await expect
@@ -616,7 +661,7 @@ test("system failures remain in the dialog and reopening discards pending confir
 }) => {
   await openLauncher(page);
   await selectCategory(page, "System");
-  await expect(page.locator(".result-title")).toHaveCount(4);
+  await expect(page.locator(".result-title")).toHaveCount(10);
   await page.keyboard.press("Meta+3");
   const dialog = page.getByRole("dialog", {
     name: "Put this computer to sleep?",
@@ -628,6 +673,7 @@ test("system failures remain in the dialog and reopening discards pending confir
   await expect(dialog.getByRole("alert")).toContainText(
     "The OS denied this system command.",
   );
+  await expect(page.locator('[role="alert"]')).toHaveCount(1);
   await expect(
     dialog.getByRole("button", { name: "Sleep", exact: true }),
   ).toBeEnabled();
@@ -652,7 +698,7 @@ test("settings runs directly and System mode has its own empty state", async ({
 }) => {
   await openLauncher(page);
   await selectCategory(page, "System");
-  await expect(page.locator(".result-title")).toHaveCount(4);
+  await expect(page.locator(".result-title")).toHaveCount(10);
   await page.keyboard.press("Meta+4");
   await expect
     .poll(() => actions(page))
@@ -671,6 +717,155 @@ test("settings runs directly and System mode has its own empty state", async ({
   await expect(
     page.getByRole("button", { name: "Run command" }),
   ).toBeDisabled();
+});
+
+test("new system actions appear in All and System with distinct icons", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const mode of ["All", "System"]) {
+    await selectCategory(page, mode);
+    for (const [query, title] of [
+      ["dar", "Toggle system appearance"],
+      ["em", "Empty Trash"],
+      ["log", "Log out"],
+      ["loc", "Lock screen"],
+      ["des", "Show desktop"],
+      ["mu", "Toggle mute"],
+    ]) {
+      await input.fill(query);
+      await expect(page.locator(".result-title").first()).toHaveText(title);
+      await expect(
+        page.getByRole("option").first().locator("svg path").first(),
+      ).toBeVisible();
+      if (title === "Toggle mute") {
+        await expect(page.getByRole("option").first()).toContainText(
+          "system sound output",
+        );
+      }
+    }
+  }
+  await input.fill("");
+  await expect(page.getByRole("option")).toHaveCount(10);
+  await page.screenshot({ path: test.info().outputPath("system-actions.png") });
+  expect(await actions(page)).toEqual([]);
+});
+
+test("trash and logout system actions require confirmation and preserve OS errors", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const [query, id, question, label] of [
+    ["empty trash", "system:empty-trash", "Empty the Trash?", "Empty Trash"],
+    ["log out", "system:logout", "Log out of your account?", "Log out"],
+  ]) {
+    await page.evaluate(() => {
+      window.__launcherTest.calls = [];
+    });
+    await input.fill(query);
+    await input.press("Enter");
+    const dialog = page.getByRole("dialog", { name: question });
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+    if (id === "system:empty-trash") {
+      await expect(dialog).toContainText("You cannot undo this action.");
+      await page.screenshot({
+        path: test.info().outputPath("empty-trash-confirmation.png"),
+      });
+    }
+    await page.keyboard.press("Enter");
+    await expect(dialog).toHaveCount(0);
+    expect(await actions(page)).toEqual([]);
+    await input.press("Enter");
+    await page.evaluate(() => {
+      window.__launcherTest.rejectActions = true;
+    });
+    await dialog.getByRole("button", { name: label, exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText(
+      "The OS denied this system command.",
+    );
+    expect(await actions(page)).toEqual([
+      {
+        command: "execute_action",
+        payload: { id, action: "run", confirmed: true },
+      },
+    ]);
+    await page.keyboard.press("Escape");
+    await expect(input).toBeFocused();
+    await page.evaluate(() => {
+      window.__launcherTest.rejectActions = false;
+    });
+  }
+});
+
+test("Finder cancellation appears once and Empty Trash can be retried", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("emp");
+  await expect(page.locator(".result-title").first()).toHaveText("Empty Trash");
+  await input.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Empty the Trash?" });
+  await page.evaluate(() => {
+    window.__launcherTest.rejectActions =
+      "Could not run the system command: macOS canceled the command (error -128).";
+  });
+  await dialog
+    .getByRole("button", { name: "Empty Trash", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Could not run the system command: macOS canceled the command (error -128).",
+  );
+  await expect(page.locator('[role="alert"]')).toHaveCount(1);
+  await expect(dialog).not.toContainText("Automation");
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  await expect(
+    dialog.getByRole("button", { name: "Empty Trash", exact: true }),
+  ).toBeEnabled();
+  await page.screenshot({ path: test.info().outputPath("trash-canceled.png") });
+  await page.evaluate(() => {
+    window.__launcherTest.rejectActions = false;
+  });
+  await dialog
+    .getByRole("button", { name: "Empty Trash", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('[role="alert"]')).toHaveCount(0);
+  expect(await actions(page)).toEqual([
+    {
+      command: "execute_action",
+      payload: { id: "system:empty-trash", action: "run", confirmed: true },
+    },
+    {
+      command: "execute_action",
+      payload: { id: "system:empty-trash", action: "run", confirmed: true },
+    },
+  ]);
+});
+
+test("appearance desktop lock and mute system actions run without a confirmation", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const [query, id] of [
+    ["toggle system appearance", "system:appearance"],
+    ["show desktop", "system:desktop"],
+    ["lock screen", "system:lock"],
+    ["toggle mute", "system:mute"],
+  ]) {
+    await page.evaluate(() => {
+      window.__launcherTest.calls = [];
+    });
+    await input.fill(query);
+    await input.press("Enter");
+    await expect
+      .poll(() => actions(page))
+      .toEqual([{ command: "execute_action", payload: { id, action: "run" } }]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
 });
 
 test("keeps only the latest waiting query when input and index events overlap", async ({

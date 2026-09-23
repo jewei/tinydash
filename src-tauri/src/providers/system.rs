@@ -16,15 +16,25 @@ pub enum SystemCommand {
     Restart,
     Shutdown,
     Settings,
+    ToggleAppearance,
+    EmptyTrash,
+    Logout,
+    ShowDesktop,
+    ToggleMute,
 }
 
 impl SystemCommand {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 10] = [
         Self::Lock,
         Self::Sleep,
         Self::Restart,
         Self::Shutdown,
         Self::Settings,
+        Self::ToggleAppearance,
+        Self::EmptyTrash,
+        Self::Logout,
+        Self::ShowDesktop,
+        Self::ToggleMute,
     ];
 
     pub fn id(self) -> &'static str {
@@ -34,6 +44,11 @@ impl SystemCommand {
             Self::Restart => "system:restart",
             Self::Shutdown => "system:shutdown",
             Self::Settings => "system:settings",
+            Self::ToggleAppearance => "system:appearance",
+            Self::EmptyTrash => "system:empty-trash",
+            Self::Logout => "system:logout",
+            Self::ShowDesktop => "system:desktop",
+            Self::ToggleMute => "system:mute",
         }
     }
 
@@ -44,6 +59,12 @@ impl SystemCommand {
             Self::Restart => "Restart",
             Self::Shutdown => "Shut down",
             Self::Settings => "Open system settings",
+            Self::ToggleAppearance => "Toggle system appearance",
+            Self::EmptyTrash if cfg!(target_os = "windows") => "Empty Recycle Bin",
+            Self::EmptyTrash => "Empty Trash",
+            Self::Logout => "Log out",
+            Self::ShowDesktop => "Show desktop",
+            Self::ToggleMute => "Toggle mute",
         }
     }
 
@@ -54,6 +75,11 @@ impl SystemCommand {
             Self::Restart => "Restart this computer · Confirmation required",
             Self::Shutdown => "Turn off this computer · Confirmation required",
             Self::Settings => "Open your operating system settings",
+            Self::ToggleAppearance => "Switch the system between light and dark appearance",
+            Self::EmptyTrash => "Permanently delete trashed items · Confirmation required",
+            Self::Logout => "Log out of your account · Confirmation required",
+            Self::ShowDesktop => "Move windows aside to show the desktop",
+            Self::ToggleMute => "Mute or unmute system sound output",
         }
     }
 
@@ -64,6 +90,11 @@ impl SystemCommand {
             Self::Restart => &["reboot"],
             Self::Shutdown => &["shutdown", "power off", "turn off"],
             Self::Settings => &["preferences", "control panel"],
+            Self::ToggleAppearance => &["appearance", "dark mode", "light mode", "toggle theme"],
+            Self::EmptyTrash => &["empty trash", "empty recycle bin", "trash", "recycle bin"],
+            Self::Logout => &["logout", "log off", "sign out", "sign off"],
+            Self::ShowDesktop => &["desktop", "reveal desktop", "hide windows"],
+            Self::ToggleMute => &["mute", "unmute", "toggle sound", "sound output", "volume"],
         }
     }
 
@@ -84,7 +115,25 @@ impl SystemCommand {
                 "Save your work before you continue. This closes applications and turns off the computer.",
                 "Shut down",
             ),
-            Self::Lock | Self::Settings => return None,
+            Self::EmptyTrash => (
+                if cfg!(target_os = "windows") {
+                    "Empty the Recycle Bin?"
+                } else {
+                    "Empty the Trash?"
+                },
+                "This permanently deletes all trashed items, including items on connected drives. You cannot undo this action.",
+                self.title(),
+            ),
+            Self::Logout => (
+                "Log out of your account?",
+                "Save your work before you continue. This closes applications and ends your current session.",
+                "Log out",
+            ),
+            Self::Lock
+            | Self::Settings
+            | Self::ToggleAppearance
+            | Self::ShowDesktop
+            | Self::ToggleMute => return None,
         };
         Some(ActionConfirmation {
             title: title.into(),
@@ -94,7 +143,7 @@ impl SystemCommand {
     }
 
     pub fn check_confirmation(self, confirmed: bool) -> Result<()> {
-        if !confirmed && matches!(self, Self::Sleep | Self::Restart | Self::Shutdown) {
+        if !confirmed && self.confirmation().is_some() {
             return Err(Error::ConfirmationRequired);
         }
         Ok(())
@@ -117,6 +166,20 @@ impl Default for SystemCommandProvider {
 }
 
 impl SystemCommandProvider {
+    /// Recognize at least two characters of a command name or alias prefix.
+    pub fn is_prefix_query(query: &str) -> bool {
+        let query = ranking::normalize(query);
+        query.len() >= 2
+            && SystemCommand::ALL.iter().any(|command| {
+                std::iter::once(command.title())
+                    .chain(command.aliases().iter().copied())
+                    .any(|term| {
+                        term.get(..query.len())
+                            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(&query))
+                    })
+            })
+    }
+
     pub fn new(commands: Vec<SystemCommand>) -> Self {
         Self {
             commands: commands
@@ -192,6 +255,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn prefix_queries_accept_names_and_aliases_from_two_characters() {
+        for command in SystemCommand::ALL {
+            for term in std::iter::once(command.title()).chain(command.aliases().iter().copied()) {
+                for length in 2..=term.len() {
+                    assert!(SystemCommandProvider::is_prefix_query(&term[..length]));
+                }
+                assert!(SystemCommandProvider::is_prefix_query(&format!(
+                    "  {}  ",
+                    term.to_uppercase().replace(' ', "   ")
+                )));
+            }
+        }
+        for query in ["", "s", "r", "sa", "rs", "sleep notes", "app:/sleep", "日"] {
+            assert!(!SystemCommandProvider::is_prefix_query(query));
+        }
+    }
+
+    #[test]
     fn finds_names_aliases_and_abbreviations_but_not_unknown_commands() {
         let provider = SystemCommandProvider::new(SystemCommand::ALL.to_vec());
         let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
@@ -201,6 +282,13 @@ mod tests {
             ("lck scr", "system:lock"),
             ("preferences", "system:settings"),
             ("suspend", "system:sleep"),
+            ("dark mode", "system:appearance"),
+            ("light mode", "system:appearance"),
+            ("empty trash", "system:empty-trash"),
+            ("recycle bin", "system:empty-trash"),
+            ("sign out", "system:logout"),
+            ("show desktop", "system:desktop"),
+            ("unmute", "system:mute"),
         ] {
             let results = provider.search(query, &mut matcher);
             assert!(
@@ -208,7 +296,10 @@ mod tests {
                 "{query}"
             );
         }
-        assert_eq!(provider.search("", &mut matcher).len(), 5);
+        assert_eq!(
+            provider.search("", &mut matcher).len(),
+            SystemCommand::ALL.len()
+        );
         assert!(provider.search("delete all files", &mut matcher).is_empty());
         assert!(provider.get("system:arbitrary command").is_none());
         assert!(
@@ -219,11 +310,15 @@ mod tests {
     }
 
     #[test]
-    fn power_commands_require_explicit_confirmation_and_expose_dialog_text() {
+    fn disruptive_commands_require_explicit_confirmation_and_expose_dialog_text() {
         for command in SystemCommand::ALL {
             let required = matches!(
                 command,
-                SystemCommand::Sleep | SystemCommand::Restart | SystemCommand::Shutdown
+                SystemCommand::Sleep
+                    | SystemCommand::Restart
+                    | SystemCommand::Shutdown
+                    | SystemCommand::EmptyTrash
+                    | SystemCommand::Logout
             );
             assert_eq!(command.confirmation().is_some(), required);
             assert_eq!(command.check_confirmation(false).is_err(), required);

@@ -2,6 +2,8 @@
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod system_process;
 #[cfg(target_os = "windows")]
 mod windows;
 

@@ -115,6 +115,21 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
             // SAFETY: No pointers; requests a lock of this interactive session.
             windows_result(unsafe { LockWorkStation() } != 0)
         }
+        SystemCommand::ToggleAppearance => toggle_appearance(),
+        SystemCommand::EmptyTrash => empty_recycle_bin(),
+        SystemCommand::ShowDesktop => send_system_keys(&[
+            windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_LWIN,
+            windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_D,
+        ]),
+        SystemCommand::ToggleMute => {
+            send_system_keys(&[windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_VOLUME_MUTE])
+        }
+        SystemCommand::Logout => {
+            use windows_sys::Win32::System::Shutdown::{EWX_LOGOFF, ExitWindowsEx};
+            // Logging out the current interactive session needs no shutdown
+            // privilege. Do not force applications with unsaved work to close.
+            windows_result(unsafe { ExitWindowsEx(EWX_LOGOFF, 0) } != 0)
+        }
         _ => {
             // Token privileges belong to the process. Serialize their temporary
             // changes so simultaneous IPC requests cannot restore stale state.
@@ -142,6 +157,200 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
             }
         }
     }
+}
+
+fn empty_recycle_bin() -> Result<()> {
+    use windows_sys::Win32::UI::Shell::{
+        SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW,
+    };
+    // The Rust action boundary already checked explicit confirmation. Null
+    // selects this user's Recycle Bins on all drives, not other users' files.
+    let result = unsafe {
+        SHEmptyRecycleBinW(
+            ptr::null_mut(),
+            ptr::null(),
+            SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND,
+        )
+    };
+    if result >= 0 {
+        Ok(())
+    } else {
+        Err(Error::SystemCommand(format!(
+            "Windows could not empty the Recycle Bin (0x{:08X}).",
+            result as u32
+        )))
+    }
+}
+
+fn send_system_keys(keys: &[u16]) -> Result<()> {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
+        VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    };
+    // A numbered result shortcut can still have a modifier held. Wait for its
+    // release rather than sending a different shortcut or releasing the user's keys.
+    let started = std::time::Instant::now();
+    while [VK_CONTROL, VK_SHIFT, VK_MENU, VK_LWIN, VK_RWIN]
+        .iter()
+        .any(|key| unsafe { GetAsyncKeyState(i32::from(*key)) } < 0)
+    {
+        if started.elapsed() > std::time::Duration::from_secs(2) {
+            return Err(Error::SystemCommand(
+                "Release the modifier keys, then try this command again.".into(),
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let event = |key, flags| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: key,
+                dwFlags: flags,
+                ..Default::default()
+            },
+        },
+    };
+    let inputs: Vec<_> = keys
+        .iter()
+        .map(|key| event(*key, 0))
+        .chain(keys.iter().rev().map(|key| event(*key, KEYEVENTF_KEYUP)))
+        .collect();
+    // SAFETY: The array contains initialized keyboard records and remains alive.
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            size_of::<INPUT>() as i32,
+        )
+    };
+    if sent != inputs.len() as u32 {
+        // Release any keys inserted before an incomplete send.
+        let releases: Vec<_> = keys
+            .iter()
+            .rev()
+            .map(|key| event(*key, KEYEVENTF_KEYUP))
+            .collect();
+        unsafe {
+            SendInput(
+                releases.len() as u32,
+                releases.as_ptr(),
+                size_of::<INPUT>() as i32,
+            );
+        }
+        return Err(Error::SystemCommand(
+            "Windows could not send the system shortcut. Check desktop permissions and try again."
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
+fn toggle_appearance() -> Result<()> {
+    use windows_sys::{
+        Win32::{
+            Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS},
+            System::Registry::{
+                HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_DWORD,
+                RRF_RT_REG_DWORD, RegCloseKey, RegDeleteValueW, RegGetValueW, RegOpenKeyExW,
+                RegSetValueExW,
+            },
+            UI::WindowsAndMessaging::{
+                HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
+            },
+        },
+        core::w,
+    };
+    struct Key(HKEY);
+    impl Drop for Key {
+        fn drop(&mut self) {
+            unsafe {
+                RegCloseKey(self.0);
+            }
+        }
+    }
+    let check = |status| {
+        if status == ERROR_SUCCESS {
+            Ok(())
+        } else {
+            Err(Error::SystemCommand(
+                std::io::Error::from_raw_os_error(status as i32).to_string(),
+            ))
+        }
+    };
+    let mut key = Key(ptr::null_mut());
+    // SAFETY: All names are static, null-terminated UTF-16; buffers match DWORD.
+    unsafe {
+        check(RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
+            0,
+            KEY_QUERY_VALUE | KEY_SET_VALUE,
+            &mut key.0,
+        ))?;
+        let read = |name| -> Result<Option<u32>> {
+            let mut value = 0u32;
+            let mut size = size_of::<u32>() as u32;
+            let status = RegGetValueW(
+                key.0,
+                ptr::null(),
+                name,
+                RRF_RT_REG_DWORD,
+                ptr::null_mut(),
+                (&mut value as *mut u32).cast(),
+                &mut size,
+            );
+            if status == ERROR_FILE_NOT_FOUND {
+                return Ok(None);
+            }
+            check(status)?;
+            Ok(Some(value))
+        };
+        let system_name = w!("SystemUsesLightTheme");
+        let apps_name = w!("AppsUseLightTheme");
+        let previous = read(system_name)?;
+        let next: u32 = u32::from(previous.unwrap_or(1) == 0);
+        let write = |name, value: &u32| {
+            check(RegSetValueExW(
+                key.0,
+                name,
+                0,
+                REG_DWORD,
+                (value as *const u32).cast(),
+                size_of::<u32>() as u32,
+            ))
+        };
+        write(system_name, &next)?;
+        if let Err(error) = write(apps_name, &next) {
+            // Restore the first value if the second write fails.
+            let restored = match previous {
+                Some(value) => write(system_name, &value),
+                None => check(RegDeleteValueW(key.0, system_name)),
+            };
+            if let Err(restore_error) = restored {
+                return Err(Error::SystemCommand(format!(
+                    "{error} Could not restore the previous appearance: {restore_error}"
+                )));
+            }
+            return Err(error);
+        }
+        let mut result = 0;
+        if SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            0,
+            w!("ImmersiveColorSet") as isize,
+            SMTO_ABORTIFHUNG,
+            1000,
+            &mut result,
+        ) == 0
+        {
+            tracing::debug!(
+                "Appearance changed; some applications did not acknowledge the refresh"
+            );
+        }
+    }
+    Ok(())
 }
 
 fn windows_result(success: bool) -> Result<()> {

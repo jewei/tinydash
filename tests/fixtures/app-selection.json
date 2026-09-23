@@ -2027,6 +2027,16 @@
     "query": "app",
     "results": [
       {
+        "id": "system:appearance",
+        "kind": "systemCommand",
+        "pin": { "categories": [], "key": "system:appearance" },
+        "primaryAction": "run",
+        "score": 1988,
+        "secondaryActions": [],
+        "subtitle": "Switch the system between light and dark appearance",
+        "title": "Toggle system appearance"
+      },
+      {
         "id": "app:/fixture/app-097",
         "kind": "app",
         "path": "/fixture/app-097",
@@ -2344,17 +2354,6 @@
         "secondaryActions": ["reveal"],
         "subtitle": "Application",
         "title": "Application 043"
-      },
-      {
-        "id": "app:/fixture/app-044",
-        "kind": "app",
-        "path": "/fixture/app-044",
-        "pin": { "categories": [], "key": "app:/fixture/app-044" },
-        "primaryAction": "launch",
-        "score": 2088,
-        "secondaryActions": ["reveal"],
-        "subtitle": "Application",
-        "title": "Application 044"
       }
     ]
   }

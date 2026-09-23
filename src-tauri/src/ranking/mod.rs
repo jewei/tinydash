@@ -57,8 +57,8 @@ pub fn top_results(mut results: Vec<SearchResult>, limit: usize) -> Vec<SearchRe
             | ResultKind::WebSearch => 0,
             ResultKind::App => 1,
             ResultKind::File => 2,
-            ResultKind::Clipboard => 3,
-            ResultKind::SystemCommand => 4,
+            ResultKind::SystemCommand => 3,
+            ResultKind::Clipboard => 4,
             ResultKind::Emoji => 5,
         };
         (priority, std::cmp::Reverse(result.score))

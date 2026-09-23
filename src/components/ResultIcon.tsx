@@ -1,7 +1,20 @@
 import { Match, Switch } from "solid-js";
 import type { SearchResult } from "../bridge";
-import Icon from "./Icon";
+import Icon, { type IconName } from "./Icon";
 import AppAvatar from "./AppAvatar";
+
+const systemIcons: Readonly<Record<string, IconName>> = {
+  "system:lock": "lock",
+  "system:sleep": "sleep",
+  "system:restart": "refresh",
+  "system:shutdown": "quit",
+  "system:settings": "system",
+  "system:appearance": "appearance",
+  "system:empty-trash": "delete",
+  "system:logout": "logout",
+  "system:desktop": "desktop",
+  "system:mute": "volume",
+};
 
 export default function ResultIcon(props: { result: SearchResult }) {
   return (
@@ -28,20 +41,7 @@ export default function ResultIcon(props: { result: SearchResult }) {
       </Match>
       <Match when={props.result.kind === "systemCommand"}>
         <span class="clipboard-icon" aria-hidden="true">
-          <Icon
-            name={
-              props.result.id === "system:lock"
-                ? "lock"
-                : props.result.id === "system:sleep"
-                  ? "sleep"
-                  : props.result.id === "system:restart"
-                    ? "refresh"
-                    : props.result.id === "system:shutdown"
-                      ? "quit"
-                      : "system"
-            }
-            size={24}
-          />
+          <Icon name={systemIcons[props.result.id] ?? "system"} size={24} />
         </span>
       </Match>
       <Match when={props.result.kind === "app"}>

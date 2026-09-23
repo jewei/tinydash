@@ -77,6 +77,11 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
                 .map_err(|error| Error::SystemCommand(error.to_string()))
         }
         SystemCommand::Lock => lock_session(),
+        SystemCommand::ToggleAppearance => toggle_appearance(),
+        SystemCommand::EmptyTrash => empty_trash(),
+        SystemCommand::Logout => logout(),
+        SystemCommand::ShowDesktop => show_desktop(),
+        SystemCommand::ToggleMute => toggle_mute(),
         _ => {
             let method = power_method(command)?;
             let bus = gio::bus_get_sync(gio::BusType::System, None::<&gio::Cancellable>)
@@ -100,6 +105,188 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
             Ok(())
         }
     }
+}
+
+fn session_call(
+    service: &str,
+    path: &str,
+    interface: &str,
+    method: &str,
+    parameters: Option<&gio::glib::Variant>,
+) -> Result<gio::glib::Variant> {
+    let bus = gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>)
+        .map_err(|error| Error::SystemCommand(error.to_string()))?;
+    bus.call_sync(
+        Some(service),
+        path,
+        interface,
+        method,
+        parameters,
+        None,
+        gio::DBusCallFlags::NONE,
+        5000,
+        None::<&gio::Cancellable>,
+    )
+    .map_err(|error| Error::SystemCommand(format!("The desktop could not {method}: {error}")))
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Desktop {
+    Gnome,
+    Kde,
+    Xfce,
+    Other,
+}
+
+fn desktop_kind(value: &str) -> Desktop {
+    for name in value.split(':') {
+        match name.to_ascii_lowercase().as_str() {
+            "gnome" | "ubuntu" | "unity" => return Desktop::Gnome,
+            "kde" | "plasma" => return Desktop::Kde,
+            "xfce" => return Desktop::Xfce,
+            _ => {}
+        }
+    }
+    Desktop::Other
+}
+
+fn current_desktop() -> Desktop {
+    desktop_kind(&std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default())
+}
+
+fn toggle_appearance() -> Result<()> {
+    use gio::glib::variant::ToVariant;
+    match current_desktop() {
+        Desktop::Gnome => {
+            // Check the schema before constructing Settings: GSettings aborts
+            // the process when a schema or key does not exist.
+            let schema = gio::SettingsSchemaSource::default()
+                .and_then(|source| source.lookup("org.gnome.desktop.interface", true))
+                .filter(|schema| schema.has_key("color-scheme"))
+                .ok_or_else(|| Error::SystemCommand("This GNOME version does not provide a light/dark appearance setting.".into()))?;
+            let settings = gio::Settings::new_full(&schema, None::<&gio::SettingsBackend>, None);
+            if !settings.is_writable("color-scheme") {
+                return Err(Error::SystemCommand("The system appearance is locked by desktop policy.".into()));
+            }
+            let next = if settings.string("color-scheme") == "prefer-dark" { "prefer-light" } else { "prefer-dark" };
+            settings.set_string("color-scheme", next)
+                .map_err(|error| Error::SystemCommand(error.to_string()))?;
+            gio::Settings::sync();
+            Ok(())
+        }
+        Desktop::Kde => {
+            // Use the desktop portal's actual appearance, not a guess based on
+            // a custom theme name. Plasma's utility applies the matching Breeze palette.
+            let program = program("plasma-apply-colorscheme")?;
+            let response = session_call("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+                "org.freedesktop.portal.Settings", "Read",
+                Some(&("org.freedesktop.appearance", "color-scheme").to_variant()))?;
+            let mut value = response.child_value(0);
+            while let Some(inner) = value.as_variant() { value = inner; }
+            let scheme = value.get::<u32>().ok_or_else(|| Error::SystemCommand("The desktop portal did not return a color scheme.".into()))?;
+            let next = if scheme == 1 { "BreezeLight" } else { "BreezeDark" };
+            super::system_process::output(program, &[next]).map(|_| ())
+        }
+        _ => Err(Error::SystemCommand("Appearance switching supports GNOME and KDE Plasma. Use this desktop's appearance settings.".into())),
+    }
+}
+
+fn empty_trash() -> Result<()> {
+    // GIO's trash backend owns the paths, metadata, and mounted-volume rules.
+    // Deleting a top-level trash URI removes that item recursively without
+    // following symlinks. Never recurse through arbitrary filesystem paths.
+    let trash = gio::File::for_uri("trash:///");
+    let entries = trash
+        .enumerate_children(
+            "standard::name",
+            gio::FileQueryInfoFlags::NOFOLLOW_SYMLINKS,
+            None::<&gio::Cancellable>,
+        )
+        .map_err(|error| {
+            Error::SystemCommand(format!("The desktop trash service is unavailable: {error}"))
+        })?;
+    loop {
+        let info = entries
+            .next_file(None::<&gio::Cancellable>)
+            .map_err(|error| {
+                Error::SystemCommand(format!("Some trash items could not be read: {error}"))
+            })?;
+        let Some(info) = info else {
+            break;
+        };
+        trash
+            .child(info.name())
+            .delete(None::<&gio::Cancellable>)
+            .map_err(|error| {
+                Error::SystemCommand(format!("Some trash items could not be deleted: {error}"))
+            })?;
+    }
+    let (closed, error) = entries.close(None::<&gio::Cancellable>);
+    if let Some(error) = error {
+        return Err(Error::SystemCommand(error.to_string()));
+    }
+    if !closed {
+        return Err(Error::SystemCommand(
+            "The desktop could not finish reading the Trash.".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn logout() -> Result<()> {
+    use gio::glib::variant::ToVariant;
+    match current_desktop() {
+        // Mode 1 skips a second prompt, but preserves inhibitors. Mode 2 would force logout.
+        Desktop::Gnome => session_call("org.gnome.SessionManager", "/org/gnome/SessionManager",
+            "org.gnome.SessionManager", "Logout", Some(&(1u32,).to_variant())),
+        Desktop::Kde => session_call("org.kde.Shutdown", "/Shutdown", "org.kde.Shutdown", "logout", None),
+        Desktop::Xfce => session_call("org.xfce.SessionManager", "/org/xfce/SessionManager",
+            "org.xfce.Session.Manager", "Logout", Some(&(false, true).to_variant())),
+        _ => return Err(Error::SystemCommand("Log out supports GNOME, KDE Plasma, and Xfce sessions. Use this desktop's log out command.".into())),
+    }.map(|_| ())
+}
+
+fn show_desktop() -> Result<()> {
+    use gio::glib::variant::ToVariant;
+    if current_desktop() == Desktop::Kde {
+        return session_call(
+            "org.kde.KWin",
+            "/KWin",
+            "org.kde.KWin",
+            "showDesktop",
+            Some(&(true,).to_variant()),
+        )
+        .map(|_| ());
+    }
+    if super::is_wayland() {
+        return Err(Error::SystemCommand("Show desktop is supported on KDE Plasma or an X11 desktop with wmctrl. Use your desktop shortcut in this Wayland session.".into()));
+    }
+    super::system_process::output(program("wmctrl")?, &["-k", "on"]).map(|_| ())
+}
+
+fn program(name: &str) -> Result<std::path::PathBuf> {
+    gio::glib::find_program_in_path(name).ok_or_else(|| {
+        Error::SystemCommand(format!(
+            "This action needs {name}, which is not installed or is not in PATH."
+        ))
+    })
+}
+
+fn toggle_mute() -> Result<()> {
+    if let Some(wpctl) = gio::glib::find_program_in_path("wpctl")
+        && super::system_process::output(&wpctl, &["get-volume", "@DEFAULT_AUDIO_SINK@"]).is_ok()
+    {
+        return super::system_process::output(
+            wpctl,
+            &["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"],
+        )
+        .map(|_| ());
+    }
+    // Select a working audio service before toggling. Never retry a failed
+    // mutation through another service, since that could toggle it twice.
+    let pactl = gio::glib::find_program_in_path("pactl")
+        .ok_or_else(|| Error::SystemCommand("Toggle mute needs PipeWire with wpctl or PulseAudio with pactl and an available sound output.".into()))?;
+    super::system_process::output(pactl, &["set-sink-mute", "@DEFAULT_SINK@", "toggle"]).map(|_| ())
 }
 
 fn power_method(command: crate::providers::system::SystemCommand) -> Result<&'static str> {
@@ -199,6 +386,16 @@ pub fn read_clipboard(received: impl FnOnce(Option<String>) + 'static) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn desktop_actions_use_the_current_session_and_reject_unknown_desktops() {
+        assert_eq!(desktop_kind("ubuntu:GNOME"), Desktop::Gnome);
+        assert_eq!(desktop_kind("KDE"), Desktop::Kde);
+        assert_eq!(desktop_kind("Plasma"), Desktop::Kde);
+        assert_eq!(desktop_kind("XFCE"), Desktop::Xfce);
+        assert_eq!(desktop_kind("sway"), Desktop::Other);
+        assert_eq!(desktop_kind(""), Desktop::Other);
+    }
 
     #[test]
     fn settings_follow_the_current_desktop_instead_of_another_installed_one() {

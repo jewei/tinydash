@@ -1,6 +1,6 @@
 import { Switch, Match } from "solid-js";
 
-type IconName =
+export type IconName =
   | "search"
   | "return"
   | "folder"
@@ -17,6 +17,10 @@ type IconName =
   | "system"
   | "lock"
   | "sleep"
+  | "appearance"
+  | "volume"
+  | "logout"
+  | "desktop"
   | "copy"
   | "clock"
   | "globe"
@@ -79,6 +83,20 @@ export default function Icon(props: { name: IconName; size?: number }) {
         </Match>
         <Match when={props.name === "sleep"}>
           <path d="M20 15a9 9 0 0 1-11-11 9 9 0 1 0 11 11Z" />
+        </Match>
+        <Match when={props.name === "appearance"}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3v18a9 9 0 0 0 0-18Z" fill="currentColor" />
+        </Match>
+        <Match when={props.name === "volume"}>
+          <path d="M11 4 5 9H2v6h3l6 5V4Zm5 5 6 6m0-6-6 6" />
+        </Match>
+        <Match when={props.name === "logout"}>
+          <path d="M10 3H4v18h6m-2-9h14m-5-5 5 5-5 5" />
+        </Match>
+        <Match when={props.name === "desktop"}>
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <path d="M8 21h8m-4-4v4" />
         </Match>
         <Match when={props.name === "file"}>
           <path d="M14 2H5v20h14V7l-5-5Zm0 0v5h5M8 12h8M8 16h6" />

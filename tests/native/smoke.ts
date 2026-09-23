@@ -942,7 +942,16 @@ try {
 
   await reopen();
   await selectMode("system");
-  assert.equal((await titles()).length, 5);
+  assert.equal((await titles()).length, 10);
+  for (const title of [
+    "Toggle system appearance",
+    "Log out",
+    "Lock screen",
+    "Show desktop",
+    "Toggle mute",
+  ]) {
+    assert((await titles()).includes(title), `System includes ${title}`);
+  }
   await keys(inputId, "reboot");
   await until("the system provider resolves the reboot alias", () =>
     observe<boolean>(
@@ -967,7 +976,13 @@ try {
   );
   // Intentionally omit consent. Never send confirmed:true for power actions
   // to a real backend: these tests must not disrupt the host or hosted runner.
-  for (const id of ["system:restart", "system:shutdown", "system:sleep"]) {
+  for (const id of [
+    "system:restart",
+    "system:shutdown",
+    "system:sleep",
+    "system:empty-trash",
+    "system:logout",
+  ]) {
     const rejection = await request<string>(
       `/session/${session}/execute/async`,
       "POST",
@@ -981,7 +996,7 @@ try {
     assert.match(rejection, /Confirm this system command before running it/);
   }
   pass(
-    "Rust rejects sleep, restart, and shutdown IPC requests without explicit confirmation",
+    "Rust rejects power, logout, and empty-trash IPC requests without explicit confirmation",
   );
   await reopen();
   const queryTimings: { query: string; elapsedMs: number }[] = [];

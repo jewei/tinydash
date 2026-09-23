@@ -1250,7 +1250,7 @@ export default function App(
           </span>
         </div>
       </Show>
-      <Show when={message()}>
+      <Show when={message() && !pendingAction() && !clearOpen()}>
         <div class="status-line">
           <span class="error-message" role="alert">
             {message()}

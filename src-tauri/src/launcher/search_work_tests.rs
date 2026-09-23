@@ -1,7 +1,11 @@
-// The eager evaluator is frozen at 06475d2. It remains test-only so selection
-// equivalence includes the real pin, action, and icon response paths.
+// The eager evaluator comes from 06475d2 and follows the current ranking policy.
+// It remains test-only so selection equivalence includes the real pin, action,
+// and icon response paths.
 use super::*;
-use crate::providers::{search_work, system::SystemCommand};
+use crate::{
+    launcher::result::ResultKind,
+    providers::{search_work, system::SystemCommand},
+};
 
 impl SearchManager {
     pub(super) fn search_unpinned_eager(&mut self, query: &Query<'_>) -> SearchOutcome {
@@ -99,10 +103,16 @@ impl SearchManager {
                 RESULT_LIMIT,
             ));
         }
-        SearchOutcome {
-            results: ranking::top_results(results, RESULT_LIMIT),
-            notice,
+        let mut results = ranking::top_results(results, usize::MAX);
+        if query.mode == SearchMode::All && SystemCommandProvider::is_prefix_query(query.text) {
+            results.sort_by_key(|result| match result.kind {
+                ResultKind::Calculation => 0,
+                ResultKind::SystemCommand => 1,
+                _ => 2,
+            });
         }
+        results.truncate(RESULT_LIMIT);
+        SearchOutcome { results, notice }
     }
 }
 
@@ -291,6 +301,32 @@ fn bounded_search_matches_eager_selection_across_seeded_corpora() {
                 "sa",
                 "app",
                 "lo",
+                "oc",
+                "s",
+                "sl",
+                "sle",
+                "re",
+                "res",
+                "sh",
+                "shu",
+                "su",
+                "sta",
+                "sleep",
+                " SLEEP ",
+                "suspend",
+                "reboot",
+                "shutdown",
+                "preferences",
+                "dark mode",
+                "em",
+                "empty trash",
+                "log",
+                "sign out",
+                "loc",
+                "des",
+                "show desktop",
+                "mu",
+                "unmute",
                 "work",
                 "日历",
                 "cafe",

@@ -23,7 +23,7 @@ declare global {
       rejectPin: boolean;
       emojiGrid: boolean;
       toolRevision: number;
-      rejectActions: boolean;
+      rejectActions: boolean | string;
       storageError: string | null;
       usedAppFirst: boolean;
       clipboardDeleted: string[];
@@ -103,13 +103,21 @@ const systemCommands: SearchResult[] = [
   ["shutdown", "Shut down", "Shut down this computer?"],
   ["sleep", "Sleep", "Put this computer to sleep?"],
   ["settings", "Open system settings", ""],
+  ["lock", "Lock screen", ""],
+  ["appearance", "Toggle system appearance", ""],
+  ["empty-trash", "Empty Trash", "Empty the Trash?"],
+  ["logout", "Log out", "Log out of your account?"],
+  ["desktop", "Show desktop", ""],
+  ["mute", "Toggle mute", ""],
 ].map(([id, title, question]) => ({
   id: `system:${id}`,
   kind: "systemCommand",
   title,
   subtitle: question
     ? "Confirmation required"
-    : "Open your operating system settings",
+    : id === "mute"
+      ? "Mute or unmute system sound output"
+      : title,
   score: 1000,
   icon: null,
   primaryAction: "run",
@@ -117,11 +125,38 @@ const systemCommands: SearchResult[] = [
   confirmation: question
     ? {
         title: question,
-        description: "Save your work before you continue.",
+        description:
+          id === "empty-trash"
+            ? "This permanently deletes all trashed items, including items on connected drives. You cannot undo this action."
+            : "Save your work before you continue.",
         confirmLabel: title,
       }
     : null,
 }));
+const commandQueries = new Map([
+  ["sleep", systemCommands[2]],
+  ["slee", systemCommands[2]],
+  ["sle", systemCommands[2]],
+  ["sl", systemCommands[2]],
+  ["re", systemCommands[0]],
+  ["res", systemCommands[0]],
+  ["sh", systemCommands[1]],
+  ["shu", systemCommands[1]],
+  ["loc", systemCommands[4]],
+  ["lock screen", systemCommands[4]],
+  ["dar", systemCommands[5]],
+  ["dark mode", systemCommands[5]],
+  ["toggle system appearance", systemCommands[5]],
+  ["em", systemCommands[6]],
+  ["emp", systemCommands[6]],
+  ["empty trash", systemCommands[6]],
+  ["log", systemCommands[7]],
+  ["log out", systemCommands[7]],
+  ["des", systemCommands[8]],
+  ["show desktop", systemCommands[8]],
+  ["mu", systemCommands[9]],
+  ["toggle mute", systemCommands[9]],
+]);
 const file: SearchResult = {
   id: "file:/Documents/Launch notes.md",
   kind: "file",
@@ -433,8 +468,16 @@ mockIPC(
           "The application index is unavailable. Restart TinyDash.",
         );
       // These fixed responses test rendering and IPC order, not TypeScript search.
+      const command = commandQueries.get(query);
+      const commandResults =
+        mode === "all" && command
+          ? [command, apps[0], { ...clips[0], title: `${command.title} notes` }]
+          : mode === "system" && command
+            ? [command]
+            : null;
       const results =
         toolResults(query, mode) ??
+        commandResults ??
         (mode === "system" || query === "reboot"
           ? query === "missing"
             ? []
@@ -585,6 +628,7 @@ mockIPC(
       });
     }
     if (command === "execute_action" && state.rejectActions) {
+      if (typeof state.rejectActions === "string") throw state.rejectActions;
       if ((payload as { action: string }).action === "run")
         throw new Error("The OS denied this system command.");
       throw new Error(

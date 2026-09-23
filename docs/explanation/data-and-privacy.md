@@ -6,7 +6,7 @@ Currency refresh downloads a shared rate table. Search text, amounts, clipboard 
 
 ## Usage and ranking
 
-The **All** mode keeps text results together by category, in this order: Apps, Files, Clipboard, System, then Emoji. Matching apps appear first, so `sa` puts Safari above the exact emoji shortcode `:sa:`. Valid calculations appear before these groups. Explicit tool commands and the `:` and `=` prefixes keep their own search scope. Category priority applies before the 30-result limit.
+The **All** mode keeps text results together by category, in this order: Apps, Files, System, Clipboard, then Emoji. A prefix of at least two characters from a system command name or alias puts System first. This includes complete names and aliases. For example, `sl`, `sle`, `re`, and `shu` keep their commands visible when app or file matches fill the 30-result limit. Other text queries keep matching apps first, so `sa` puts Safari above the exact emoji shortcode `:sa:`. Valid calculations appear before these groups. Explicit tool commands and the `:` and `=` prefixes keep their own search scope. Category priority applies before the result limit.
 
 Successful app launches, file opens, emoji copies, and accepted system commands update a use count and last-used time. Frequently used and recently used results move higher within their category. This also applies when the search field is empty. Exact and prefix match bonuses still favor close matches within each category. A usage bonus cannot add an item that does not match the query.
 

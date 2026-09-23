@@ -135,19 +135,13 @@ const LOCK_HELPER: &str =
     "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession";
 
 pub fn system_commands() -> Vec<crate::providers::system::SystemCommand> {
-    use crate::providers::system::SystemCommand;
-    // Recent macOS versions removed CGSession. Do not substitute display sleep
-    // for locking, use private APIs, or require Accessibility for key injection.
-    SystemCommand::ALL
-        .into_iter()
-        .filter(|command| *command != SystemCommand::Lock || Path::new(LOCK_HELPER).is_file())
-        .collect()
+    crate::providers::system::SystemCommand::ALL.to_vec()
 }
 
 pub fn run_system_command(command: crate::providers::system::SystemCommand) -> Result<()> {
     use crate::providers::system::SystemCommand;
     match command {
-        SystemCommand::Lock => {
+        SystemCommand::Lock if Path::new(LOCK_HELPER).is_file() => {
             let status = std::process::Command::new(LOCK_HELPER)
                 .arg("-suspend")
                 .status()
@@ -162,6 +156,10 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
                 )));
             }
             Ok(())
+        }
+        SystemCommand::Lock | SystemCommand::ShowDesktop => send_system_shortcut(command),
+        SystemCommand::ToggleAppearance | SystemCommand::EmptyTrash | SystemCommand::ToggleMute => {
+            run_script(script(command)?)
         }
         SystemCommand::Settings => {
             let path = [
@@ -192,6 +190,84 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
             apple_event_status(status)
         }
     }
+}
+
+fn run_script(script: &str) -> Result<()> {
+    // AppleScript supplies a numeric error independently of its localized text.
+    // Catch it inside the script instead of guessing from osascript's stderr.
+    let wrapped = format!(
+        "try\n{script}\nreturn \"ok\"\non error errorMessage number errorNumber\nreturn (errorNumber as text) & linefeed & errorMessage\nend try"
+    );
+    let reply = super::system_process::output("/usr/bin/osascript", &["-e", &wrapped])?;
+    if reply == "ok" {
+        return Ok(());
+    }
+    let (code, message) = reply
+        .split_once('\n')
+        .and_then(|(code, message)| code.parse::<i32>().ok().map(|code| (code, message)))
+        .ok_or_else(|| {
+            Error::SystemCommand("macOS returned an unexpected script response.".into())
+        })?;
+    Err(Error::SystemCommand(match code {
+        -128 => "macOS canceled the command (error -128).".into(),
+        -1743 => "macOS denied Automation access. Allow TinyDash in System Settings > Privacy & Security > Automation.".into(),
+        _ => format!("{message} (macOS error {code})."),
+    }))
+}
+
+fn script(command: crate::providers::system::SystemCommand) -> Result<&'static str> {
+    use crate::providers::system::SystemCommand;
+    match command {
+        SystemCommand::ToggleAppearance => Ok(
+            "tell application \"System Events\" to tell appearance preferences to set dark mode to not dark mode",
+        ),
+        SystemCommand::EmptyTrash => Ok(
+            "tell application \"Finder\"\nif (count of items of trash) > 0 then empty trash\nend tell",
+        ),
+        SystemCommand::ToggleMute => {
+            Ok("set volume output muted not (output muted of (get volume settings))")
+        }
+        _ => Err(Error::InvalidAction),
+    }
+}
+
+fn system_shortcut(
+    command: crate::providers::system::SystemCommand,
+) -> Result<(u16, objc2_core_graphics::CGEventFlags)> {
+    use crate::providers::system::SystemCommand;
+    use objc2_core_graphics::CGEventFlags;
+    match command {
+        // Apple's documented Control-Command-Q and Fn-F11 shortcuts. F11 is
+        // independent of the keyboard's text layout, unlike an injected H.
+        SystemCommand::Lock => Ok((12, CGEventFlags::MaskControl | CGEventFlags::MaskCommand)),
+        SystemCommand::ShowDesktop => Ok((103, CGEventFlags::MaskSecondaryFn)),
+        _ => Err(Error::InvalidAction),
+    }
+}
+
+fn send_system_shortcut(command: crate::providers::system::SystemCommand) -> Result<()> {
+    use objc2_core_graphics::{
+        CGEvent, CGEventTapLocation, CGPreflightPostEventAccess, CGRequestPostEventAccess,
+    };
+    let (key, flags) = system_shortcut(command)?;
+    // Ask only when the user runs a shortcut action. Never request access during search.
+    if !CGPreflightPostEventAccess() && !CGRequestPostEventAccess() {
+        return Err(Error::SystemCommand(
+            "Allow TinyDash in System Settings > Privacy & Security > Accessibility, then try again.".into(),
+        ));
+    }
+    let down = CGEvent::new_keyboard_event(None, key, true);
+    let up = CGEvent::new_keyboard_event(None, key, false);
+    let (Some(down), Some(up)) = (down, up) else {
+        return Err(Error::SystemCommand(
+            "Could not create the system keyboard shortcut.".into(),
+        ));
+    };
+    for event in [&down, &up] {
+        CGEvent::set_flags(Some(event), flags);
+        CGEvent::post(CGEventTapLocation::HIDEventTap, Some(event));
+    }
+    Ok(())
 }
 
 struct AppleEventDescriptor(objc2_core_services::AEDesc);
@@ -228,13 +304,14 @@ fn apple_event_status(status: i32) -> Result<()> {
 fn power_event(command: crate::providers::system::SystemCommand) -> Result<AppleEventDescriptor> {
     use crate::providers::system::SystemCommand;
     use objc2_core_services::{
-        AECreateAppleEvent, AECreateDesc, kAERestart, kAEShutDown, kAESleep, kAnyTransactionID,
-        kAutoGenerateReturnID, typeProcessSerialNumber,
+        AECreateAppleEvent, AECreateDesc, kAELogOut, kAERestart, kAEShutDown, kAESleep,
+        kAnyTransactionID, kAutoGenerateReturnID, typeProcessSerialNumber,
     };
     let event_id = match command {
         SystemCommand::Sleep => kAESleep,
         SystemCommand::Restart => kAERestart,
         SystemCommand::Shutdown => kAEShutDown,
+        SystemCommand::Logout => kAELogOut,
         _ => return Err(Error::InvalidAction),
     };
     // Apple's documented system-process address (ProcessSerialNumber {0, 1}).
@@ -290,6 +367,110 @@ mod tests {
     use super::*;
 
     #[test]
+    fn apple_script_cancellation_does_not_claim_permission_failure() {
+        // Execute a harmless script through the production runner. Never empty
+        // the developer's Trash or require another application's permission.
+        let error = run_script("error \"The operation can't be completed.\" number -128")
+            .unwrap_err()
+            .to_string();
+        assert!(!error.contains("Automation"), "{error}");
+        assert!(error.contains("canceled"), "{error}");
+        assert!(error.matches("Could not run the system command").count() <= 1);
+    }
+
+    #[test]
+    fn apple_script_permission_advice_requires_the_permission_error_code() {
+        let denied = run_script("error \"Not authorized\" number -1743")
+            .unwrap_err()
+            .to_string();
+        assert!(
+            denied.contains("Privacy & Security > Automation"),
+            "{denied}"
+        );
+        assert_eq!(
+            denied.matches("Could not run the system command").count(),
+            1
+        );
+
+        let other = run_script("error \"An item is locked (-1743)\" number -45")
+            .unwrap_err()
+            .to_string();
+        assert!(other.contains("An item is locked"), "{other}");
+        assert!(!other.contains("Automation"), "{other}");
+        assert!(other.contains("-45"), "{other}");
+        assert!(run_script("set fixture to 1").is_ok());
+    }
+
+    #[test]
+    fn empty_trash_skips_deletion_when_there_are_no_items() {
+        use crate::providers::system::SystemCommand;
+        // Exercise the command's AppleScript control flow. Replace only its OS
+        // reads and deletion with fixtures so no test can delete real items.
+        let fixture = script(SystemCommand::EmptyTrash)
+            .unwrap()
+            .replace("empty trash", "error \"Deletion requested\" number -2700");
+        for (count, should_delete) in [(0, false), (1, true), (20, true)] {
+            let result =
+                run_script(&fixture.replace("count of items of trash", &count.to_string()));
+            if should_delete {
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("Deletion requested")
+                );
+            } else {
+                assert!(
+                    result.is_ok(),
+                    "Empty Trash must do nothing when empty: {result:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn only_shortcut_commands_can_send_keys() {
+        use crate::providers::system::SystemCommand;
+        use objc2_core_graphics::CGEventFlags;
+        assert_eq!(
+            system_shortcut(SystemCommand::Lock).unwrap(),
+            (12, CGEventFlags::MaskControl | CGEventFlags::MaskCommand)
+        );
+        assert_eq!(
+            system_shortcut(SystemCommand::ShowDesktop).unwrap(),
+            (103, CGEventFlags::MaskSecondaryFn)
+        );
+        for command in SystemCommand::ALL {
+            assert_eq!(
+                system_shortcut(command).is_ok(),
+                matches!(command, SystemCommand::Lock | SystemCommand::ShowDesktop)
+            );
+        }
+    }
+
+    #[test]
+    fn scripts_compile_without_running_system_actions() {
+        use crate::providers::system::SystemCommand;
+        let directory = tempfile::tempdir().unwrap();
+        for command in [
+            SystemCommand::ToggleAppearance,
+            SystemCommand::EmptyTrash,
+            SystemCommand::ToggleMute,
+        ] {
+            let status = std::process::Command::new("/usr/bin/osacompile")
+                .args([
+                    "-o",
+                    directory.path().join("action.scpt").to_str().unwrap(),
+                    "-e",
+                    script(command).unwrap(),
+                ])
+                .status()
+                .unwrap();
+            assert!(status.success(), "{command:?}");
+        }
+    }
+
+    #[test]
     fn constructs_system_apple_events_without_sending_them() {
         use crate::providers::system::SystemCommand;
         use objc2_core_services::{AEGetAttributePtr, keyEventClassAttr, keyEventIDAttr, typeType};
@@ -297,6 +478,7 @@ mod tests {
             (SystemCommand::Sleep, *b"slep"),
             (SystemCommand::Restart, *b"rest"),
             (SystemCommand::Shutdown, *b"shut"),
+            (SystemCommand::Logout, *b"logo"),
         ] {
             let event = power_event(command).expect("create Apple event");
             for (key, expected) in [(keyEventClassAttr, *b"aevt"), (keyEventIDAttr, id)] {
@@ -321,10 +503,7 @@ mod tests {
             }
         }
         assert!(power_event(SystemCommand::Settings).is_err());
-        assert_eq!(
-            system_commands().contains(&SystemCommand::Lock),
-            Path::new(LOCK_HELPER).is_file()
-        );
+        assert!(system_commands().contains(&SystemCommand::Lock));
     }
 
     fn bundle(root: &Path, name: &str, extra: &str) -> PathBuf {

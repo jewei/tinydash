@@ -142,11 +142,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolved_power_actions_cannot_skip_confirmation() {
+    fn resolved_disruptive_actions_cannot_skip_confirmation() {
         for command in [
             SystemCommand::Sleep,
             SystemCommand::Restart,
             SystemCommand::Shutdown,
+            SystemCommand::EmptyTrash,
+            SystemCommand::Logout,
         ] {
             let action = ResolvedAction::System(command);
             assert!(matches!(
