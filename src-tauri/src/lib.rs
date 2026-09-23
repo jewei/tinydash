@@ -9,7 +9,7 @@ mod settings;
 
 use anyhow::Context;
 use tauri::{
-    Manager,
+    Emitter, Manager,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
@@ -167,6 +167,12 @@ pub fn run() -> anyhow::Result<()> {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed)
+                && let Some(state) = window.app_handle().try_state::<LauncherState>() {
+                state.icons.cancel_window(window.label(), || {
+                    let _ = window.app_handle().emit("app-icons-ready", ());
+                });
+            }
             if window.label() == "settings" {
                 match event {
                     tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -193,6 +199,8 @@ pub fn run() -> anyhow::Result<()> {
         }})
         .invoke_handler(tauri::generate_handler![
             launcher::launcher_ready,
+            launcher::icons::app_icon,
+            launcher::icons::cancel_app_icon,
             launcher::preferences::get_settings,
             launcher::preferences::save_settings,
             launcher::preferences::choose_clipboard_history,

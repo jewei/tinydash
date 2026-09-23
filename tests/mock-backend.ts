@@ -18,6 +18,16 @@ declare global {
       settings: SettingsValues;
       platform: "macos" | "windows" | "linux";
       rejectSettings: string | null;
+      nativeIcons: boolean;
+      holdIcons: boolean;
+      busyIcons: boolean;
+      iconReadyBeforeBusy: boolean;
+      heldIcons: {
+        request: string;
+        key: string;
+        pixels: number;
+        release: () => void;
+      }[];
       pins: Partial<Record<SearchMode, string[]>>;
       rejectPin: boolean;
       emojiGrid: boolean;
@@ -253,6 +263,11 @@ window.__launcherTest = {
       "macos" | "windows" | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
   rejectSettings: null,
+  nativeIcons: false,
+  holdIcons: false,
+  busyIcons: false,
+  iconReadyBeforeBusy: false,
+  heldIcons: [],
   pins: Array.isArray(savedPins)
     ? { all: savedPins, apps: savedPins }
     : savedPins,
@@ -333,6 +348,23 @@ mockIPC(
         shortcutsAvailable: true,
       };
     }
+    if (command === "app_icon") {
+      if (state.iconReadyBeforeBusy) {
+        state.iconReadyBeforeBusy = false;
+        await emit("app-icons-ready", null);
+        throw "busy";
+      }
+      if (state.busyIcons) throw "busy";
+      if (state.holdIcons)
+        await new Promise<void>((release) => {
+          state.heldIcons.push({
+            ...(payload as { request: string; key: string; pixels: number }),
+            release,
+          });
+        });
+      return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1sAAAAASUVORK5CYII=";
+    }
+    if (command === "cancel_app_icon") return;
     if (command === "save_settings") {
       if (state.rejectSettings) throw new Error(state.rejectSettings);
       state.settings = (payload as { settings: SettingsValues }).settings;
@@ -526,6 +558,9 @@ mockIPC(
         results: structuredClone(
           described.map((result) => ({
             ...result,
+            ...(state.nativeIcons && result.kind === "app"
+              ? { icon: `app-icon:test:${result.id}` }
+              : {}),
             ...state.resultOverrides[result.id],
           })),
         ),

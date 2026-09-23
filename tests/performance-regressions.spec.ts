@@ -20,9 +20,7 @@ async function openLauncher(page: Page) {
     page.getByRole("heading", { name: "What will you do next?" }),
   ).toBeVisible();
   await page.evaluate(() => {
-    window.__launcherTest.resultOverrides["app-1"] = {
-      icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1sAAAAASUVORK5CYII=",
-    };
+    window.__launcherTest.nativeIcons = true;
   });
   await page
     .getByRole("navigation", { name: "Search categories" })
@@ -59,12 +57,26 @@ async function searchCount(page: Page) {
   );
 }
 
-test("an unchanged refresh preserves the row and image", async ({ page }) => {
+async function iconTraffic(page: Page) {
+  return page.evaluate(() => ({
+    loads: window.__launcherTest.calls.filter(
+      (call) => call.command === "app_icon",
+    ).length,
+    cancels: window.__launcherTest.calls.filter(
+      (call) => call.command === "cancel_app_icon",
+    ).length,
+  }));
+}
+
+test("an unchanged refresh preserves the row, image, and icon subscription", async ({
+  page,
+}) => {
   await openLauncher(page);
   const row = await page.getByRole("option").elementHandle();
   const image = await page.getByRole("option").locator("img").elementHandle();
   if (!row || !image)
     throw new Error("Expected a mounted Safari row and image");
+  const traffic = await iconTraffic(page);
 
   try {
     for (let iteration = 0; iteration < 3; iteration += 1) {
@@ -87,6 +99,7 @@ test("an unchanged refresh preserves the row and image", async ({ page }) => {
             document.querySelector('#search-results [role="option"] img'),
         ),
       ).toBe(true);
+      expect(await iconTraffic(page)).toEqual(traffic);
     }
   } finally {
     await row.dispose();
@@ -94,12 +107,15 @@ test("an unchanged refresh preserves the row and image", async ({ page }) => {
   }
 });
 
-test("a narrower query retains the same row and image", async ({ page }) => {
+test("a narrower query reuses an unchanged app identity and icon size", async ({
+  page,
+}) => {
   await openLauncher(page);
   const row = await page.getByRole("option").elementHandle();
   const image = await page.getByRole("option").locator("img").elementHandle();
   if (!row || !image)
     throw new Error("Expected a mounted Safari row and image");
+  const traffic = await iconTraffic(page);
   const searches = await searchCount(page);
 
   try {
@@ -121,18 +137,20 @@ test("a narrower query retains the same row and image", async ({ page }) => {
           document.querySelector('#search-results [role="option"] img'),
       ),
     ).toBe(true);
+    expect(await iconTraffic(page)).toEqual(traffic);
   } finally {
     await row.dispose();
     await image.dispose();
   }
 });
 
-test("a removed result releases its row and a later result gets a new row", async ({
+test("a removed result releases its row and a later result gets a new subscription", async ({
   page,
 }) => {
   await openLauncher(page);
   const row = await page.getByRole("option").elementHandle();
   if (!row) throw new Error("Expected a mounted Safari row");
+  const traffic = await iconTraffic(page);
   try {
     const input = page.getByRole("combobox", { name: "Search TinyDash" });
     await input.fill("missing");
@@ -146,6 +164,10 @@ test("a removed result releases its row and a later result gets a new row", asyn
           node === document.querySelector('#search-results [role="option"]'),
       ),
     ).toBe(false);
+    expect(await iconTraffic(page)).toEqual({
+      loads: traffic.loads + 2,
+      cancels: traffic.cancels,
+    });
   } finally {
     await row.dispose();
   }

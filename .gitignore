@@ -16,6 +16,7 @@ playwright-report/
 artifacts/
 native-build/
 __pycache__/
+*.pyc
 scripts/perf/**/target*/
 scripts/perf/**/bin/
 scripts/perf/**/results/

@@ -23,6 +23,7 @@ import {
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
+import { disposeAppIcons } from "./app-icons";
 import ResultPreview from "./components/ResultPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
 import ClipboardCopyDialog from "./components/ClipboardCopyDialog";
@@ -1077,6 +1078,7 @@ export default function App(
 
   onCleanup(() => {
     disposed = true;
+    disposeAppIcons();
     sequence += 1;
     unlisteners.forEach((stop) => stop());
     document.removeEventListener("keydown", onKey);
@@ -1305,7 +1307,7 @@ export default function App(
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => void run(result.primaryAction, result)}
                   >
-                    <ResultIcon result={result} />
+                    <ResultIcon result={result} active={visible()} />
                     <span class="result-copy">
                       <span class="result-title" title={result.title}>
                         {result.title}
@@ -1452,6 +1454,7 @@ export default function App(
         </div>
         <Show when={mode() !== "emoji"}>
           <ResultPreview
+            active={visible()}
             result={current()}
             welcome={!current()}
             previewReady={visible() && !pending()}
