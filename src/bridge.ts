@@ -202,6 +202,7 @@ export const backend = {
   saveClipboardFile: (id: string) =>
     invoke<boolean>("save_clipboard_file", { id }),
   hide: () => invoke<void>("hide_launcher"),
+  resetPosition: () => invoke<void>("reset_launcher_position"),
   refresh: () => invoke<void>("refresh_apps"),
   refreshFiles: () => invoke<void>("refresh_files"),
   refreshCurrency: () => invoke<void>("refresh_currency"),

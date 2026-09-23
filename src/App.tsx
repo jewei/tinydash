@@ -326,6 +326,12 @@ export default function App(
         key: `${modifier()} ,`,
       },
       {
+        label: "Reset window position",
+        icon: "refresh" as const,
+        run: () => void resetPosition(),
+        disabled: !desktop,
+      },
+      {
         label: "Refresh currency rates",
         icon: "refresh" as const,
         run: () => void refresh("currency"),
@@ -359,6 +365,18 @@ export default function App(
       },
     ].filter((action) => matchesMenu(action.label)),
   );
+
+  async function resetPosition() {
+    setMenuOpen(false);
+    setError(undefined);
+    try {
+      await backend.resetPosition();
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      focusInput();
+    }
+  }
 
   function openClipboardTool(tool: "edit" | "combine") {
     const entry = current();
@@ -736,8 +754,26 @@ export default function App(
     }
   }
 
+  let composing = false;
+  let compositionTimer: number | undefined;
+  function clearComposition() {
+    window.clearTimeout(compositionTimer);
+    compositionTimer = undefined;
+    composing = false;
+  }
+  function startComposition() {
+    clearComposition();
+    composing = true;
+  }
+  function endComposition() {
+    // WebKit can end composition before delivering the Enter that commits it.
+    // Keep that event out of launcher navigation until this event turn finishes.
+    window.clearTimeout(compositionTimer);
+    compositionTimer = window.setTimeout(clearComposition, 0);
+  }
+
   function onKey(event: KeyboardEvent) {
-    if (event.isComposing || event.keyCode === 229) return;
+    if (composing || event.isComposing || event.keyCode === 229) return;
     if (clipboardTool()) return;
     if (clearOpen() || pendingAction()) {
       if (event.key === "Escape") {
@@ -964,6 +1000,8 @@ export default function App(
       else unlisteners.push(stop);
     });
     document.addEventListener("keydown", onKey);
+    document.addEventListener("compositionstart", startComposition);
+    document.addEventListener("compositionend", endComposition);
     document.addEventListener("pointerdown", outsideClick);
     if (!desktop) return;
     void (async () => {
@@ -1052,6 +1090,7 @@ export default function App(
             }
           }),
           register("launcher-hidden", () => {
+            clearComposition();
             setVisible(false);
             // One running Rust search may finish. Ignore its reply and drop
             // waiting input. Opening the window always requests current data.
@@ -1080,6 +1119,9 @@ export default function App(
     sequence += 1;
     unlisteners.forEach((stop) => stop());
     document.removeEventListener("keydown", onKey);
+    document.removeEventListener("compositionstart", startComposition);
+    document.removeEventListener("compositionend", endComposition);
+    clearComposition();
     document.removeEventListener("pointerdown", outsideClick);
   });
 
@@ -1390,7 +1432,7 @@ export default function App(
                           : mode() === "system"
                             ? "Try sleep, restart, or settings."
                             : mode() === "calculator"
-                              ? "Try 12 * 8, 5 ft to cm, or 100 USD to MYR."
+                              ? "Try 12 * 8, 5 ft to cm, or 100 USD MYR."
                               : mode() === "emoji"
                                 ? "Try a name, shortcode, or category, such as coffee or food."
                                 : mode() === "clipboard"
@@ -1407,8 +1449,8 @@ export default function App(
                                         ? "Try a filename or part of a path."
                                         : info()?.settings.fileSearchRoots
                                               ?.length === 0
-                                          ? "File search is off in settings.json."
-                                          : "Check your folders in settings.json, then refresh the file list."
+                                          ? "File search is off. Choose folders in Settings, File search."
+                                          : "Check your folders in Settings, File search, then refresh the file list."
                                     : mode() === "all" &&
                                         files().indexing &&
                                         query()

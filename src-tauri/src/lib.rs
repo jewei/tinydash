@@ -220,6 +220,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::updates::check_update,
             launcher::updates::install_update,
             window::hide_launcher,
+            window::reset_launcher_position,
         ])
         .build(tauri::generate_context!())
         .context("Build the desktop launcher")?;

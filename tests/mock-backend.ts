@@ -18,6 +18,7 @@ declare global {
       settings: SettingsValues;
       platform: "macos" | "windows" | "linux";
       rejectSettings: string | null;
+      rejectResetPosition: string | null;
       pins: Partial<Record<SearchMode, string[]>>;
       rejectPin: boolean;
       emojiGrid: boolean;
@@ -253,6 +254,7 @@ window.__launcherTest = {
       "macos" | "windows" | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
   rejectSettings: null,
+  rejectResetPosition: null,
   pins: Array.isArray(savedPins)
     ? { all: savedPins, apps: savedPins }
     : savedPins,
@@ -309,6 +311,10 @@ mockIPC(
     state.calls.push({ command, payload });
     if (command === "hide_launcher") {
       await emit("launcher-hidden");
+      return;
+    }
+    if (command === "reset_launcher_position") {
+      if (state.rejectResetPosition) throw new Error(state.rejectResetPosition);
       return;
     }
     if (command === "launcher_ready") {

@@ -131,6 +131,55 @@ pub fn hide_launcher(app: AppHandle) -> std::result::Result<(), String> {
     dismiss(&app).map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+pub fn reset_launcher_position(app: AppHandle) -> std::result::Result<(), String> {
+    if crate::platform::is_wayland() {
+        return Err(
+            "Your Wayland desktop controls window placement. Move the window with its drag handle."
+                .into(),
+        );
+    }
+    let window = app
+        .get_webview_window("main")
+        .ok_or("Launcher window is unavailable.")?;
+    let reset = || -> tauri::Result<()> {
+        let monitor = match window.current_monitor()? {
+            Some(monitor) => Some(monitor),
+            None => window.primary_monitor()?,
+        };
+        let position = match monitor {
+            Some(monitor) => centered_position(window.outer_size()?, monitor.work_area()),
+            None => None,
+        };
+        if let Some(position) = position {
+            window.set_position(position)?;
+        } else {
+            window.center()?;
+        }
+        window.set_focus()
+    };
+    reset().map_err(|error| format!("Could not reset window position: {error}"))
+}
+
+fn centered_position(
+    size: PhysicalSize<u32>,
+    area: &PhysicalRect<i32, u32>,
+) -> Option<PhysicalPosition<i32>> {
+    if area.size.width == 0 || area.size.height == 0 {
+        return None;
+    }
+    // Keep the handle within a small display, and account for displays left of
+    // or above the main display. Use the current monitor's physical coordinates.
+    let center = |start: i32, available: u32, length: u32| {
+        (i64::from(start) + i64::from(available.saturating_sub(length) / 2))
+            .min(i64::from(i32::MAX)) as i32
+    };
+    Some(PhysicalPosition::new(
+        center(area.position.x, area.size.width, size.width),
+        center(area.position.y, area.size.height, size.height),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -140,6 +189,25 @@ mod tests {
             position: PhysicalPosition::new(x, y),
             size: PhysicalSize::new(width, height),
         }
+    }
+
+    #[test]
+    fn centers_in_the_current_work_area_including_negative_origins() {
+        for (screen, size, expected) in [
+            (area(0, 68, 2940, 1844), (1440, 1102), (750, 439)),
+            (area(-1920, -1080, 1920, 1040), (720, 550), (-1320, -835)),
+            (area(0, 24, 640, 480), (720, 551), (0, 24)),
+            (area(i32::MAX - 5, 0, 100, 100), (10, 10), (i32::MAX, 45)),
+        ] {
+            assert_eq!(
+                centered_position(size.into(), &screen),
+                Some(expected.into())
+            );
+        }
+        assert_eq!(
+            centered_position((720, 550).into(), &area(0, 0, 0, 0)),
+            None
+        );
     }
 
     #[test]

@@ -2,9 +2,13 @@
 
 Open TinyDash with Control + Shift + Space, the tray menu, or the command line. The window stays resident after it hides. Drag the handle above the search field to move it. Window position lasts until the process exits.
 
+Use **Actions > Reset window position** to center the launcher in the current monitor's work area. The query, category, and selected result stay unchanged. On a display smaller than the window, the drag handle stays visible at the top left. Wayland controls placement through the compositor, so this action reports that limit there.
+
 All searches applications, files, clipboard text, emoji, calculations, system commands, and explicit tool commands. Empty All shows welcome examples or pinned items. Text categories have a fixed priority before the 30-result limit. See [ranking](../../explanation/data-and-privacy.md).
 
 Tab and Shift + Tab change categories while preserving the query and search focus. Arrow keys select results. Enter runs the selected action. Escape closes a dialog or menu before hiding the launcher. [Keyboard reference](../keyboard-shortcuts.md) lists the remaining controls.
+
+While an input method composes text, its keys do not run launcher actions. Enter that commits composition leaves the launcher open. A later Enter can run the selected result.
 
 The actions menu uses Command/Ctrl + K. The tray can open the launcher, open Settings, refresh data, and quit. A second app launch shows the existing process.
 
@@ -23,6 +27,8 @@ bun run test:rust -- launcher
 ```
 
 Open with the global shortcut, tray, and a second process when those entry points change. Check focus, arrow selection, Enter, Escape, and reopen. The selected fixture must launch and a second launcher process must not remain.
+
+Move the window, enter a query, select a result, and use **Reset window position** from Actions. Check that it centers on the same monitor and keeps the query, category, selection, and input focus. Repeat on a second monitor when available. Browser tests check the command and retained state; Rust tests check work-area geometry. Desktop checks prove the actual move.
 
 Run `bun run verify:native` on Windows and Linux X11 for launch and reopen. Use the desktop launcher checks for macOS, focus return, tray, physical shortcuts, input methods, and Wayland. The native suite does not prove those additional paths.
 

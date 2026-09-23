@@ -163,7 +163,12 @@ impl Settings {
 
     pub fn validate(&self) -> anyhow::Result<()> {
         use anyhow::ensure;
-        use tauri_plugin_global_shortcut::{Modifiers, Shortcut};
+        use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+        let allowed_shortcut = |key: &Shortcut| {
+            key.mods
+                .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER)
+                || (key.mods == Modifiers::SHIFT && key.key == Code::Space)
+        };
         ensure!(
             !self.visible_categories.is_empty(),
             "Select at least one category."
@@ -180,10 +185,8 @@ impl Settings {
             .parse()
             .map_err(|_| anyhow::anyhow!("Use a modifier and one key for the launch shortcut."))?;
         ensure!(
-            shortcut
-                .mods
-                .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER),
-            "Include Control, Option / Alt, or Command / Windows in the shortcut."
+            allowed_shortcut(&shortcut),
+            "Use Shift+Space, or include Control, Option / Alt, or Command / Windows."
         );
         ensure!(
             self.category_shortcuts.len() <= 11,
@@ -196,9 +199,8 @@ impl Settings {
                 anyhow::anyhow!("Use a modifier and one key for each category shortcut.")
             })?;
             ensure!(
-                key.mods
-                    .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER),
-                "Category shortcuts need Control, Option / Alt, or Command / Windows."
+                allowed_shortcut(&key),
+                "Use Shift+Space, or include Control, Option / Alt, or Command / Windows."
             );
             ensure!(keys.insert(key.id()), "Each shortcut must be different.");
             ensure!(modes.insert(binding.mode), "Use one shortcut per category.");
@@ -469,6 +471,46 @@ mod tests {
             assert!(save(dir.path(), &settings).is_err());
         }
         assert_eq!(std::fs::read_to_string(path).unwrap(), "{}");
+    }
+
+    #[test]
+    fn shift_space_is_allowed_without_allowing_shift_typing_shortcuts() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut settings = Settings {
+            shortcut: "Shift+Space".into(),
+            ..Settings::default()
+        };
+        save(dir.path(), &settings).expect("save Shift+Space");
+        let saved: Settings =
+            serde_json::from_slice(&std::fs::read(dir.path().join("settings.json")).unwrap())
+                .unwrap();
+        assert_eq!(saved.shortcut, "Shift+Space");
+
+        settings.category_shortcuts.push(CategoryShortcut {
+            mode: SearchMode::Clipboard,
+            shortcut: "Shift+Space".into(),
+        });
+        assert!(
+            settings
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("different")
+        );
+        settings.shortcut = DEFAULT_SHORTCUT.into();
+        settings.validate().expect("category Shift+Space");
+        for shortcut in ["Space", "Shift+KeyA", "Shift+Digit1", "Shift+Enter"] {
+            settings.category_shortcuts[0].shortcut = shortcut.into();
+            assert!(settings.validate().is_err(), "{shortcut}");
+            settings.category_shortcuts.clear();
+            settings.shortcut = shortcut.into();
+            assert!(settings.validate().is_err(), "{shortcut}");
+            settings.shortcut = DEFAULT_SHORTCUT.into();
+            settings.category_shortcuts.push(CategoryShortcut {
+                mode: SearchMode::Clipboard,
+                shortcut: "Shift+Space".into(),
+            });
+        }
     }
 
     #[test]

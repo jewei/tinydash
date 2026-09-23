@@ -504,11 +504,14 @@ export default function Settings() {
       )
         return;
       if (
-        (!event.ctrlKey && !event.altKey && !event.metaKey) ||
+        (!event.ctrlKey &&
+          !event.altKey &&
+          !event.metaKey &&
+          !(event.shiftKey && event.code === "Space")) ||
         event.getModifierState("AltGraph")
       ) {
         setError(
-          "Hold Control, Option / Alt, or Command / Windows, then press one key.",
+          "Hold Control, Option / Alt, or Command / Windows and press one key. You can also use Shift+Space.",
         );
         return;
       }
@@ -683,7 +686,7 @@ export default function Settings() {
                       ? "Global shortcuts are unavailable. On Wayland, set a desktop shortcut that starts TinyDash."
                       : recording()
                         ? "Hold a modifier and press one key. Press Escape to cancel."
-                        : "Click Record new, then press the keys you want to use."}
+                        : "Click Record new, then press the keys you want to use. Shift+Space is also supported."}
                   </p>
                   <button
                     type="button"
@@ -707,8 +710,8 @@ export default function Settings() {
                     onChange={(next) => field("hideOnBlur", next)}
                   />
                   <Toggle
-                    label="Clear the search each time"
-                    hint="Turn this off to keep your last search selected."
+                    label="Reset search and category on open"
+                    hint="Clear the query and return to the first visible category. Turn this off to keep your query and category."
                     checked={value().clearQueryOnOpen}
                     onChange={(next) => field("clearQueryOnOpen", next)}
                   />

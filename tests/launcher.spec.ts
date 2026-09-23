@@ -331,6 +331,60 @@ test("missing currency help is readable and its refresh action is available in A
   ).toBe(true);
 });
 
+test("reset window position keeps the search, category, selection and focus", async ({
+  page,
+}, testInfo) => {
+  await openLauncher(page);
+  await selectCategory(page, "Apps");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("a");
+  await expect(page.getByRole("option")).not.toHaveCount(0);
+  await input.press("ArrowDown");
+  const selected = await input.getAttribute("aria-activedescendant");
+  await page.keyboard.press("Meta+k");
+  const reset = page.getByRole("menuitem", { name: "Reset window position" });
+  await expect(reset).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("reset-position-action.png"),
+  });
+  await reset.click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("a");
+  await expect(input).toHaveAttribute("aria-activedescendant", selected!);
+  await expect(
+    page.getByRole("button", { name: "Apps", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "reset_launcher_position",
+      ),
+    ),
+  ).toHaveLength(1);
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.some((call) =>
+        ["hide_launcher", "execute_action"].includes(call.command),
+      ),
+    ),
+  ).toBe(false);
+
+  await page.evaluate(() => {
+    window.__launcherTest.rejectResetPosition =
+      "Your desktop controls window placement.";
+  });
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("searchbox", { name: "Search actions" }).fill("reset");
+  await reset.click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Your desktop controls window placement.",
+  );
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("a");
+  await expect(input).toHaveAttribute("aria-activedescendant", selected!);
+});
+
 test("the drag handle moves the window without taking input focus", async ({
   page,
 }) => {
@@ -1186,6 +1240,36 @@ test("shows action errors, handles empty results, and ignores IME confirmation",
   ).toBeDisabled();
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+});
+
+test("IME commit Enter does not execute a result when composition ends before keydown", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Apps");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("sa");
+  await expect(page.getByRole("option").first()).toContainText("Safari");
+  await input.evaluate((element) => {
+    element.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true }),
+    );
+    element.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true, data: "sa" }),
+    );
+    element.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        key: "Enter",
+        keyCode: 13,
+        isComposing: false,
+      }),
+    );
+  });
+  expect(await actions(page)).toHaveLength(0);
+  await expect(input).toHaveValue("sa");
+  await input.press("Enter");
+  await expect.poll(() => actions(page)).toHaveLength(1);
 });
 
 test("reopening clears or selects the prior query as configured", async ({

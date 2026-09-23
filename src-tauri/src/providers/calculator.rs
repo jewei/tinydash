@@ -167,6 +167,14 @@ fn calculate(
     }
     let mut context = Context::new();
     context.disable_rng();
+    // fend defines bps but otherwise resolves Bps to it through case-insensitive
+    // fallback. Define bytes per second so short prefixes keep their case.
+    context.define_custom_unit_v1(
+        "Bps",
+        "",
+        "byte / second",
+        &fend_core::CustomUnitAttribute::AllowShortPrefix,
+    );
     let used_rates = Arc::new(AtomicBool::new(false));
     context.set_exchange_rate_handler_v2(RateLookup {
         rates: rates.clone(),
@@ -274,6 +282,21 @@ mod tests {
             speed.contains("12.427") && speed.ends_with("mph"),
             "{speed}"
         );
+    }
+
+    #[test]
+    fn distinguishes_byte_and_bit_rates() {
+        for query in [
+            "1 TBps / (1 Tbps)",
+            "1 Bps / (1 bps)",
+            "1 MBps / (1 Mbps)",
+            "1 MiBps / (1 Mibps)",
+            "1 TB/s / (1 Tb/s)",
+        ] {
+            assert_eq!(calculate(query, &NoInterrupt).expect(query), "8", "{query}");
+        }
+        assert_eq!(calculate("8 Mbps to MBps", &NoInterrupt).unwrap(), "1 MBps");
+        assert_eq!(calculate("1 TBps", &NoInterrupt).unwrap(), "1 TBps");
     }
 
     #[test]

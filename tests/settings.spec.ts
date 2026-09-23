@@ -22,7 +22,7 @@ for (const editBeforeUpdate of [false, true]) {
   }) => {
     await openSettings(page);
     const clearSearch = page.getByRole("switch", {
-      name: "Clear the search each time",
+      name: "Reset search and category on open",
     });
     if (editBeforeUpdate) await clearSearch.uncheck();
     await page.evaluate(async () => {
@@ -105,7 +105,7 @@ test("records, saves, and reloads the launch shortcut and window preferences", a
   await page.keyboard.press("Control+Alt+KeyJ");
   await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
   await page
-    .getByRole("switch", { name: "Clear the search each time" })
+    .getByRole("switch", { name: "Reset search and category on open" })
     .uncheck();
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
@@ -122,7 +122,7 @@ test("records, saves, and reloads the launch shortcut and window preferences", a
   await page.reload();
   await expect(page.locator(".shortcut-keys")).toHaveText("ControlOptionJ");
   await expect(
-    page.getByRole("switch", { name: "Clear the search each time" }),
+    page.getByRole("switch", { name: "Reset search and category on open" }),
   ).not.toBeChecked();
 });
 
@@ -133,12 +133,14 @@ test("invalid recording and shortcut conflicts do not replace saved settings", a
   await page.getByRole("button", { name: "Record new" }).click();
   await page.keyboard.press("KeyK");
   await expect(page.getByRole("alert")).toContainText("Hold Control");
+  await page.keyboard.press("Shift+KeyK");
+  await expect(page.getByRole("alert")).toContainText("Hold Control");
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Save changes" }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Record new" }).click();
-  await page.keyboard.press("Control+Alt+KeyL");
+  await page.keyboard.press("Shift+Space");
   await page.evaluate(() => {
     window.__launcherTest.rejectSettings =
       "Could not use this shortcut. It may be in use by another app.";
@@ -150,6 +152,42 @@ test("invalid recording and shortcut conflicts do not replace saved settings", a
   ).toBe("Control+Shift+Space");
   await page.getByRole("button", { name: "Discard" }).click();
   await expect(page.locator(".shortcut-keys")).toHaveText("ControlShiftSpace");
+});
+
+test("records and persists Shift+Space for the launcher and a category", async ({
+  page,
+}, testInfo) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Record new" }).click();
+  await page.keyboard.press("Shift+Space");
+  await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".shortcut-keys")).toHaveText("ShiftSpace");
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.shortcut),
+  ).toBe("Shift+Space");
+  await expect(
+    page.getByText("Turn this off to keep your query and category.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("shortcut-guidance.png") });
+
+  await page.getByRole("button", { name: "Use default shortcut" }).click();
+  const category = page
+    .locator(".shortcut-category-row")
+    .filter({ has: page.getByText("Clipboard", { exact: true }) });
+  await category.getByRole("button", { name: "Record", exact: true }).click();
+  await page.keyboard.press("Shift+Space");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(category).toContainText("Shift + Space");
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.categoryShortcuts),
+  ).toEqual([{ mode: "clipboard", shortcut: "Shift+Space" }]);
 });
 
 test("saves file, clipboard, and currency preferences across sections", async ({

@@ -2,6 +2,8 @@
 
 Open **Actions → Settings**, press **Command+,** on macOS or **Ctrl+,** on Windows and Linux, or select **Settings** from the tray menu. The separate window opens on Shortcut. Click **Record new**, press a key combination, then click **Save changes**. Shortcut changes apply at once. If registration or saving fails, TinyDash keeps the previous shortcut.
 
+Shift + Space is supported for the launcher and category shortcuts. Other shortcuts need Control, Option/Alt, or Command/Windows. An input method or another app can already use the combination. Choose another binding if it interferes with typing. Native Wayland uses a desktop shortcut instead.
+
 Settings includes Shortcut, Appearance, Categories, Search, Clipboard history, File search, Currency, Privacy, and About. Save changes to apply visible categories, window behaviour, clipboard limits, file folders, file watching, and currency updates while TinyDash runs. Appearance applies immediately and stays in sync between windows. Closing Settings keeps an unfinished form. Use Discard to restore saved values.
 
 The Search section adds app aliases, hidden apps, and custom web search templates with a URL preview. Shortcut settings include direct category keys and start at login. Category shortcuts and `tinydash --mode clipboard` open an empty category search. Start at login uses `--background` and keeps the window hidden. Privacy settings can export saved settings, preview an import before saving, and show the recovery archive. About includes an explicit update check. Release builds need an updater key and HTTPS feed; Ubuntu updates use a new `.deb` package. See [configuration](../how-to/configure.md), [data recovery](../how-to/recover-data.md), and [release preparation](../how-to/release.md).
