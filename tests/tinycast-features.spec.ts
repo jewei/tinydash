@@ -385,17 +385,30 @@ test("new launcher panels fit supported widths and appearances", async ({
       path: test.info().outputPath(`tinycast-first-use-${width}.png`),
     });
   }
-  for (const appearance of ["Dark", "Compact", "Light"]) {
+  for (const appearance of [
+    "Dark",
+    "Sage",
+    "Rose",
+    "Ink",
+    "Compact",
+    "Light",
+  ]) {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.getByRole("button", { name: "Actions" }).click();
     await page
-      .getByRole("menuitemradio", { name: appearance, exact: true })
+      .getByRole(
+        appearance === "Compact" ? "menuitemcheckbox" : "menuitemradio",
+        { name: appearance, exact: true },
+      )
       .click();
     await page.getByRole("button", { name: "Actions" }).click();
     const filter = page.getByRole("searchbox", { name: "Search actions" });
     await expect(filter).toBeFocused();
     await expect(
-      page.getByRole("menuitemradio", { name: appearance, exact: true }),
+      page.getByRole(
+        appearance === "Compact" ? "menuitemcheckbox" : "menuitemradio",
+        { name: appearance, exact: true },
+      ),
     ).toHaveAttribute("aria-checked", "true");
     await expectNoOverflow();
     await page.screenshot({

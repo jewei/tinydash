@@ -2,9 +2,11 @@ use std::path::{Path, PathBuf};
 
 mod descriptions;
 mod focus;
+mod glass;
 mod icons;
 
 pub use focus::LauncherFocus;
+pub use glass::set_launcher_appearance;
 
 use crate::{
     error::{Error, Result},

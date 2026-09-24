@@ -327,8 +327,11 @@
 }
 .settings-appearances {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+.style-option:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 .style-option {
   position: relative;
@@ -366,6 +369,24 @@
   --style-field: var(--preview-dark-field);
   --style-selection: var(--preview-dark-selection);
 }
+.preview-sage {
+  --style-paper: var(--preview-sage-paper);
+  --style-field: var(--preview-sage-field);
+  --style-selection: var(--swatch-sage);
+}
+.preview-rose {
+  --style-paper: var(--preview-rose-paper);
+  --style-field: var(--preview-rose-field);
+  --style-selection: var(--swatch-rose);
+}
+.preview-ink {
+  --style-paper: var(--preview-ink-paper);
+  --style-field: var(--preview-ink-field);
+  --style-selection: var(--swatch-ink);
+  border-color: var(--swatch-ink);
+  border-width: 2px;
+  border-radius: 8px;
+}
 .style-search {
   position: absolute;
   top: 12px;
@@ -395,13 +416,6 @@
   position: absolute;
   inset: 30px 0 0 60%;
   background: var(--style-field);
-}
-.preview-compact .style-results {
-  width: calc(100% - 18px);
-  gap: 4px;
-}
-.preview-compact .style-detail {
-  display: none;
 }
 .style-option.is-selected .style-preview {
   border: 2px solid var(--color-accent);
@@ -652,4 +666,33 @@
     padding-inline: 9px;
     font-size: 12px;
   }
+}
+
+:root[data-appearance="ink"]
+  :is(.settings-brand, .settings-heading h1, .settings-about h2) {
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+:root[data-appearance="ink"] .settings-sidebar {
+  background: var(--color-field);
+  border-right: 2px solid var(--color-border);
+}
+:root[data-appearance="ink"]
+  :is(
+    .settings-button,
+    .settings-save-row,
+    .style-preview,
+    .settings-sidebar nav button
+  ) {
+  border-width: 2px;
+}
+:root[data-appearance="ink"] .settings-save-row {
+  border-top-color: var(--color-border);
+}
+:root[data-appearance="ink"] .settings-eyebrow {
+  font-family: var(--font-mono);
+}
+:root[data-appearance="ink"] .settings-sidebar nav button[aria-current="page"] {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
 }

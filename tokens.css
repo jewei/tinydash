@@ -1,5 +1,5 @@
 /* User-supplied TinyDash Canvas design: Organic palette, Figtree + Caprasimo.
- * Pre-emit critique: P5 H5 E5 S5 R5 V4. Light / Dark / Compact.
+ * Pre-emit critique: P5 H5 E5 S5 R5 V4. Light / Dark / Sage / Rose / Ink.
  */
 @font-face {
   font-family: "Caprasimo";
@@ -45,12 +45,20 @@
   --color-transparent: transparent;
   --swatch-light: #fbe4d4;
   --swatch-dark: #403b32;
-  --swatch-compact: #8fa073;
+  --swatch-sage: #a9c5ae;
+  --swatch-rose: #e8b7c6;
+  --swatch-ink: #111111;
   --preview-light-paper: #fcf8f2;
   --preview-light-field: #ebe5da;
   --preview-dark-paper: #302d27;
   --preview-dark-field: #403b32;
   --preview-dark-selection: #763f21;
+  --preview-sage-paper: #f1f5ee;
+  --preview-sage-field: #dfe8dc;
+  --preview-rose-paper: #fbf3f5;
+  --preview-rose-field: #eedfe4;
+  --preview-ink-paper: #f5f5f3;
+  --preview-ink-field: #d6d6d6;
   --font-heading: "Caprasimo", Georgia, serif;
   --font-body:
     "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -103,8 +111,93 @@
   --color-backdrop: #0c0b0a9e;
   --color-grip: #6f6458;
 }
-:root[data-appearance="compact"] {
+:root[data-compact="true"] {
   --text-search: 23px;
   --row-height: 46px;
   --icon-size: 32px;
+}
+
+:root[data-appearance="sage"] {
+  --color-paper: var(--preview-sage-paper);
+  --color-field: var(--preview-sage-field);
+  --color-raised: #f1f5ee;
+  --color-preview: #e8eee4;
+  --color-selected: #d4e7d7;
+  --color-selection-border: #98b59f;
+  --color-selection-ink: #2a5138;
+  --color-ink: #26362c;
+  --color-muted: #526557;
+  --color-subtle: #576959;
+  --color-rule: #d1ddce;
+  --color-border: #b8c9b5;
+  --color-accent: #356447;
+  --color-accent-hover: #264d35;
+  --color-hover: #e0eadd;
+  --color-focus: #356447;
+  --color-accent-ink: #f6fbf3;
+  --color-olive: #dce8cf;
+  --color-olive-ink: #425632;
+  --color-code: #f6f9f3;
+  --color-shadow: #25362622;
+  --color-backdrop: #25362666;
+  --color-grip: #a5b9a0;
+}
+:root[data-appearance="rose"] {
+  --color-paper: var(--preview-rose-paper);
+  --color-field: var(--preview-rose-field);
+  --color-raised: #fbf3f5;
+  --color-preview: #f3e8ee;
+  --color-selected: #f1dce5;
+  --color-selection-border: #cba0b1;
+  --color-selection-ink: #703f56;
+  --color-ink: #3c2b36;
+  --color-muted: #725664;
+  --color-subtle: #795b6a;
+  --color-rule: #e6d4dd;
+  --color-border: #d2b8c4;
+  --color-accent: #8b4265;
+  --color-accent-hover: #70344f;
+  --color-hover: #f0e1e8;
+  --color-focus: #8b4265;
+  --color-accent-ink: #fff7fa;
+  --color-olive: #eee0ed;
+  --color-olive-ink: #6b466b;
+  --color-code: #fcf7fa;
+  --color-shadow: #40243822;
+  --color-backdrop: #40243866;
+  --color-grip: #c5a8b7;
+}
+
+/* Ink uses the user's monochrome reference: off-white paper, black rules,
+ * bold sans-serif headings, and no accent hue. */
+:root[data-appearance="ink"] {
+  color-scheme: light;
+  --color-paper: var(--preview-ink-paper);
+  --color-field: #ffffff;
+  --color-raised: #ffffff;
+  --color-preview: #ececec;
+  --color-selected: #ececec;
+  --color-selection-border: #111111;
+  --color-selection-ink: #111111;
+  --color-ink: #111111;
+  --color-muted: #444444;
+  --color-subtle: #595959;
+  --color-rule: #d6d6d6;
+  --color-border: #1a1a1a;
+  --color-accent: #111111;
+  --color-accent-hover: #444444;
+  --color-hover: #ececec;
+  --color-focus: #111111;
+  --color-accent-ink: #ffffff;
+  --color-olive: #ececec;
+  --color-olive-ink: #111111;
+  --color-code: #ffffff;
+  --color-error: #111111;
+  --color-warning: #ececec;
+  --color-shadow: #11111100;
+  --color-backdrop: #11111180;
+  --color-grip: #444444;
+  --font-heading: var(--font-body);
+  --radius-sm: 4px;
+  --radius-md: 8px;
 }

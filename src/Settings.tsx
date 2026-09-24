@@ -20,9 +20,13 @@ import {
 } from "./bridge";
 import {
   appearances,
-  type Appearance,
+  isAppearance,
   readAppearance,
+  readCompact,
+  readFollowSystemGlass,
   saveAppearance,
+  saveCompact,
+  saveFollowSystemGlass,
   watchAppearance,
 } from "./appearance";
 import ConfirmDialog from "./components/ConfirmDialog";
@@ -146,6 +150,14 @@ export default function Settings() {
   const [section, setSection] = createSignal<Section>("shortcut");
   const [appearance, setAppearance] = createSignal(readAppearance());
   const [savedAppearance, setSavedAppearance] = createSignal(readAppearance());
+  const [compact, setCompact] = createSignal(readCompact());
+  const [savedCompact, setSavedCompact] = createSignal(readCompact());
+  const [followSystemGlass, setFollowSystemGlass] = createSignal(
+    readFollowSystemGlass(),
+  );
+  const [savedSystemGlass, setSavedSystemGlass] = createSignal(
+    readFollowSystemGlass(),
+  );
   const [folderMode, setFolderMode] = createSignal<FolderMode>("default");
   const [foldersText, setFoldersText] = createSignal("");
   const [excludedText, setExcludedText] = createSignal("");
@@ -176,7 +188,9 @@ export default function Settings() {
       !!draft() &&
       (JSON.stringify(draft()) !== JSON.stringify(saved()) ||
         folderMode() !== folderModeFor(saved()!) ||
-        appearance() !== savedAppearance()),
+        appearance() !== savedAppearance() ||
+        compact() !== savedCompact() ||
+        followSystemGlass() !== savedSystemGlass()),
   );
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
   const shortcutKeys = () => shortcutKeysFor("global");
@@ -389,6 +403,14 @@ export default function Settings() {
         saveAppearance(appearance());
         setSavedAppearance(appearance());
       }
+      if (compact() !== savedCompact()) {
+        saveCompact(compact());
+        setSavedCompact(compact());
+      }
+      if (followSystemGlass() !== savedSystemGlass()) {
+        saveFollowSystemGlass(followSystemGlass());
+        setSavedSystemGlass(followSystemGlass());
+      }
       setSaved(settings);
       resetDraft(settings);
       setStatus("Changes saved.");
@@ -416,18 +438,25 @@ export default function Settings() {
     const imported = pendingImport();
     if (!imported) return;
     resetDraft(imported.settings);
-    if (
-      imported.appearance &&
-      ["light", "dark", "compact"].includes(imported.appearance)
-    )
-      setAppearance(imported.appearance as Appearance);
+    if (isAppearance(imported.appearance)) setAppearance(imported.appearance);
+    else if (imported.appearance === "compact") {
+      setAppearance("light");
+      setCompact(true);
+    }
+    if (typeof imported.compact === "boolean") setCompact(imported.compact);
+    if (typeof imported.followSystemGlass === "boolean")
+      setFollowSystemGlass(imported.followSystemGlass);
     setPendingImport(undefined);
     setStatus("Import preview applied. Save changes to keep it.");
   }
   async function exportCurrentSettings() {
     setError(undefined);
     try {
-      const exported = await backend.exportSettings(savedAppearance());
+      const exported = await backend.exportSettings(
+        savedAppearance(),
+        savedCompact(),
+        savedSystemGlass(),
+      );
       setStatus(exported ? "Saved settings exported." : "Export canceled.");
     } catch (reason) {
       setError(String(reason));
@@ -563,9 +592,20 @@ export default function Settings() {
     } else {
       void load();
     }
-    void watchAppearance(setAppearance).then((stop) =>
-      disposed ? stop() : stops.push(stop),
-    );
+    void watchAppearance(
+      (value) => {
+        setAppearance(value);
+        setSavedAppearance(value);
+      },
+      (value) => {
+        setCompact(value);
+        setSavedCompact(value);
+      },
+      (value) => {
+        setFollowSystemGlass(value);
+        setSavedSystemGlass(value);
+      },
+    ).then((stop) => (disposed ? stop() : stops.push(stop)));
     if (desktop)
       void listen<string>("shortcut-error", (event) =>
         setError(event.payload),
@@ -798,11 +838,11 @@ export default function Settings() {
               </Show>
               <Show when={section() === "appearance"}>
                 <div class="settings-group">
-                  <h2>Launcher style</h2>
+                  <h2>Theme</h2>
                   <div
                     class="settings-appearances"
                     role="radiogroup"
-                    aria-label="Launcher style"
+                    aria-label="Theme"
                   >
                     <For each={appearances}>
                       {(item) => (
@@ -842,21 +882,49 @@ export default function Settings() {
                               {appearance() === item.id ? "✓" : ""}
                             </span>
                           </span>
-                          <span class="settings-hint">
-                            {item.id === "light"
-                              ? "Cream and peach"
-                              : item.id === "dark"
-                                ? "Charcoal and olive"
-                                : "A smaller result list"}
-                          </span>
+                          <span class="settings-hint">{item.description}</span>
                         </label>
                       )}
                     </For>
                   </div>
                   <p class="settings-note">
-                    Appearance changes apply at once in both windows.
+                    Theme changes apply at once in both windows.
                   </p>
                 </div>
+                <Toggle
+                  label="Compact layout"
+                  hint="Use shorter rows and a single result column with any theme."
+                  checked={compact()}
+                  onChange={(next) => {
+                    setCompact(next);
+                    saveCompact(next);
+                    setSavedCompact(next);
+                    setStatus("Layout saved.");
+                  }}
+                />
+                <Show when={info()?.platform === "macos"}>
+                  <Toggle
+                    label="Follow macOS Liquid Glass"
+                    hint="Use the macOS glass settings. Turn off for a solid theme background."
+                    checked={followSystemGlass()}
+                    onChange={(next) => {
+                      setFollowSystemGlass(next);
+                      saveFollowSystemGlass(next);
+                      setSavedSystemGlass(next);
+                      setStatus("Liquid Glass preference saved.");
+                    }}
+                  />
+                  <div class="settings-group">
+                    <h2>Liquid Glass</h2>
+                    <p class="settings-note">
+                      When enabled on macOS 26 or later, the launcher uses
+                      native Liquid Glass. On macOS 27, adjust Liquid Glass in
+                      System Settings, Appearance. macOS controls the blur and
+                      transparency and follows your accessibility settings.
+                      Earlier versions use a solid background.
+                    </p>
+                  </div>
+                </Show>
               </Show>
               <Show when={section() === "search"}>
                 <div class="settings-group">
@@ -1257,7 +1325,20 @@ export default function Settings() {
                             : "off"}
                           . Start at login:{" "}
                           {preview().settings.startAtLogin ? "on" : "off"}.
-                          Appearance: {preview().appearance ?? "keep current"}.
+                          Theme: {preview().appearance ?? "keep current"}.
+                          Compact layout:{" "}
+                          {preview().compact == null
+                            ? "keep current"
+                            : preview().compact
+                              ? "on"
+                              : "off"}
+                          . Follow macOS Liquid Glass:{" "}
+                          {preview().followSystemGlass == null
+                            ? "keep current"
+                            : preview().followSystemGlass
+                              ? "on"
+                              : "off"}
+                          .
                         </p>
                         <details open>
                           <summary>Settings to import</summary>
@@ -1423,6 +1504,8 @@ export default function Settings() {
                   onClick={() => {
                     resetDraft(saved()!);
                     setAppearance(savedAppearance());
+                    setCompact(savedCompact());
+                    setFollowSystemGlass(savedSystemGlass());
                     setError(undefined);
                     setStatus("Changes discarded.");
                   }}

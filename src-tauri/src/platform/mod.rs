@@ -18,6 +18,8 @@ pub use macos::clipboard_snapshot;
 #[cfg(target_os = "macos")]
 pub use macos::load_app_icons;
 #[cfg(target_os = "macos")]
+pub use macos::set_launcher_appearance;
+#[cfg(target_os = "macos")]
 pub use macos::{discover_apps, launch, run_system_command, system_commands};
 #[cfg(not(target_os = "macos"))]
 pub fn load_app_icons(

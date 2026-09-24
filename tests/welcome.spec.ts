@@ -178,10 +178,20 @@ test("welcome fits all appearances at narrow and desktop widths", async ({
   page,
 }) => {
   await openLauncher(page);
-  for (const appearance of ["Light", "Dark", "Compact"]) {
+  for (const appearance of [
+    "Light",
+    "Dark",
+    "Sage",
+    "Rose",
+    "Ink",
+    "Compact",
+  ]) {
     await page.getByRole("button", { name: "Actions" }).click();
     await page
-      .getByRole("menuitemradio", { name: appearance, exact: true })
+      .getByRole(
+        appearance === "Compact" ? "menuitemcheckbox" : "menuitemradio",
+        { name: appearance, exact: true },
+      )
       .click();
     for (const width of [320, 375, 414, 768, 980]) {
       await page.setViewportSize({ width, height: 620 });

@@ -23,6 +23,8 @@ pub struct SettingsImport {
     pub settings: Settings,
     pub ignored_keys: Vec<String>,
     pub appearance: Option<String>,
+    pub compact: Option<bool>,
+    pub follow_system_glass: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -31,16 +33,30 @@ struct SettingsExport<'a> {
     format_version: u64,
     settings: &'a Settings,
     appearance: &'a str,
+    compact: bool,
+    follow_system_glass: bool,
 }
 
 #[tauri::command]
-pub async fn export_settings(app: AppHandle, appearance: String) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || export_settings_blocking(&app, &appearance))
-        .await
-        .map_err(|error| error.to_string())?
+pub async fn export_settings(
+    app: AppHandle,
+    appearance: String,
+    compact: bool,
+    follow_system_glass: bool,
+) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        export_settings_blocking(&app, &appearance, compact, follow_system_glass)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
-fn export_settings_blocking(app: &AppHandle, appearance: &str) -> Result<bool, String> {
+fn export_settings_blocking(
+    app: &AppHandle,
+    appearance: &str,
+    compact: bool,
+    follow_system_glass: bool,
+) -> Result<bool, String> {
     validate_appearance(appearance)?;
     let settings = app.state::<LauncherState>().settings();
     settings.validate().map_err(|error| error.to_string())?;
@@ -48,6 +64,8 @@ fn export_settings_blocking(app: &AppHandle, appearance: &str) -> Result<bool, S
         format_version: FORMAT_VERSION,
         settings: &settings,
         appearance,
+        compact,
+        follow_system_glass,
     })
     .map_err(|error| format!("Could not encode settings: {error}"))?;
     ensure_size(bytes.len() as u64)?;
@@ -90,7 +108,12 @@ fn parse_settings_import(bytes: &[u8]) -> Result<SettingsImport, String> {
         .ok_or("The settings export must contain a JSON object.")?;
     let mut ignored_keys = object
         .keys()
-        .filter(|key| !matches!(key.as_str(), "formatVersion" | "settings" | "appearance"))
+        .filter(|key| {
+            !matches!(
+                key.as_str(),
+                "formatVersion" | "settings" | "appearance" | "compact" | "followSystemGlass"
+            )
+        })
         .cloned()
         .collect::<Vec<_>>();
     let version = object
@@ -134,11 +157,25 @@ fn parse_settings_import(bytes: &[u8]) -> Result<SettingsImport, String> {
         }
         Some(_) => return Err("The imported appearance must be a string or null.".into()),
     };
+    let compact = match object.get("compact") {
+        None | Some(Value::Null) => None,
+        Some(Value::Bool(value)) => Some(*value),
+        Some(_) => return Err("The imported compact layout must be a boolean or null.".into()),
+    };
+    let follow_system_glass = match object.get("followSystemGlass") {
+        None | Some(Value::Null) => None,
+        Some(Value::Bool(value)) => Some(*value),
+        Some(_) => {
+            return Err("The imported Liquid Glass preference must be a boolean or null.".into());
+        }
+    };
     ignored_keys.sort();
     Ok(SettingsImport {
         settings,
         ignored_keys,
         appearance,
+        compact,
+        follow_system_glass,
     })
 }
 
@@ -328,8 +365,16 @@ fn ensure_size(size: u64) -> Result<(), String> {
 }
 
 fn validate_appearance(value: &str) -> Result<(), String> {
-    if value.len() > MAX_APPEARANCE_BYTES || !matches!(value, "light" | "dark" | "compact") {
-        return Err("Appearance must be light, dark, or compact.".into());
+    if value.len() > MAX_APPEARANCE_BYTES
+        || !matches!(
+            value,
+            "light" | "dark" | "sage" | "rose" | "ink" | "compact"
+        )
+    {
+        return Err(
+            "Theme must be light, dark, sage, rose, or ink. Legacy compact is also accepted."
+                .into(),
+        );
     }
     Ok(())
 }
@@ -367,6 +412,43 @@ mod tests {
             imported.ignored_keys,
             ["futureTopLevel", "settings.futureSetting"]
         );
+    }
+
+    #[test]
+    fn themes_and_compact_layout_round_trip_independently() {
+        for appearance in ["light", "dark", "sage", "rose", "ink"] {
+            for compact in [false, true] {
+                for follow_system_glass in [false, true] {
+                    let settings = Settings::default();
+                    let bytes = serde_json::to_vec(&SettingsExport {
+                        format_version: FORMAT_VERSION,
+                        settings: &settings,
+                        appearance,
+                        compact,
+                        follow_system_glass,
+                    })
+                    .unwrap();
+                    let imported = parse_settings_import(&bytes).unwrap();
+                    assert_eq!(imported.appearance.as_deref(), Some(appearance));
+                    assert_eq!(imported.compact, Some(compact));
+                    assert_eq!(imported.follow_system_glass, Some(follow_system_glass));
+                    assert!(imported.ignored_keys.is_empty());
+                }
+            }
+        }
+        let mut legacy: Value =
+            serde_json::from_slice(&export(serde_json::to_value(Settings::default()).unwrap()))
+                .unwrap();
+        legacy["appearance"] = Value::from("compact");
+        let imported = parse_settings_import(&serde_json::to_vec(&legacy).unwrap()).unwrap();
+        assert_eq!(imported.appearance.as_deref(), Some("compact"));
+        assert_eq!(imported.compact, None);
+        assert_eq!(imported.follow_system_glass, None);
+        legacy["followSystemGlass"] = Value::from("false");
+        assert!(parse_settings_import(&serde_json::to_vec(&legacy).unwrap()).is_err());
+        legacy["followSystemGlass"] = Value::Null;
+        legacy["compact"] = Value::from("true");
+        assert!(parse_settings_import(&serde_json::to_vec(&legacy).unwrap()).is_err());
     }
 
     #[test]

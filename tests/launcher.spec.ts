@@ -36,6 +36,130 @@ async function selectCategory(page: Page, name: string) {
     .click();
 }
 
+test("native glass is exposed only after successful setup and themes reach macOS", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("tinydash.test.nativeGlass", "true"),
+  );
+  await openLauncher(page);
+  const launcher = page.getByRole("main", { name: "TinyDash launcher" });
+  await expect(launcher).toHaveAttribute("data-native-glass", "true");
+  await expect(launcher).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await selectCategory(page, "Apps");
+  await expect(page.locator(".result-preview")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls
+            .filter((call) => call.command === "set_launcher_appearance")
+            .at(-1)?.payload,
+      ),
+    )
+    .toEqual({ appearance: "dark" });
+  await page.evaluate(() => {
+    window.__launcherTest.rejectNativeGlass = true;
+  });
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitemradio", { name: "Sage", exact: true }).click();
+  await expect(launcher).not.toHaveAttribute("data-native-glass", "true");
+  await expect(launcher).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(
+    page.getByRole("combobox", { name: "Search TinyDash" }),
+  ).toBeFocused();
+});
+
+test("unsupported native glass keeps the themed background opaque", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await expect(page.locator(".launcher")).not.toHaveAttribute(
+    "data-native-glass",
+    "true",
+  );
+  await expect(page.locator(".launcher")).not.toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+});
+
+test("turning Liquid Glass off ignores a pending native response", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("tinydash.test.nativeGlass", "true"),
+  );
+  await openLauncher(page);
+  await expect(page.locator(".launcher")).toHaveAttribute(
+    "data-native-glass",
+    "true",
+  );
+  await page.evaluate(() => {
+    window.__launcherTest.holdNativeGlass = true;
+  });
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => !!window.__launcherTest.releaseNativeGlass))
+    .toBe(true);
+  await page.evaluate(async () => {
+    await window.__launcherTest.emit("system-glass-changed", false);
+    window.__launcherTest.releaseNativeGlass!();
+  });
+  await expect(page.locator(".launcher")).not.toHaveAttribute(
+    "data-native-glass",
+    "true",
+  );
+  await expect(page.locator(".launcher")).not.toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "dark");
+});
+
+test("Ink uses monochrome controls with readable selected rows in both layouts", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("tinydash.appearance", "ink"),
+  );
+  await page.setViewportSize({ width: 980, height: 620 });
+  await openLauncher(page);
+  await selectCategory(page, "Apps");
+  const row = page.getByRole("option", { selected: true });
+  await expect(row).toHaveCSS("background-color", "rgb(17, 17, 17)");
+  await expect(row.locator(".result-title")).toHaveCSS(
+    "color",
+    "rgb(255, 255, 255)",
+  );
+  await expect(row.locator(".result-subtitle")).toHaveCSS(
+    "color",
+    "rgb(255, 255, 255)",
+  );
+  await expect(row.locator(".result-shortcut")).toHaveCSS(
+    "color",
+    "rgb(17, 17, 17)",
+  );
+  await expect(page.locator(".preview-title")).toHaveCSS("font-weight", "700");
+  await page.screenshot({ path: test.info().outputPath("ink-launcher.png") });
+  await page.keyboard.press("Meta+k");
+  await page
+    .getByRole("menuitemcheckbox", { name: "Compact", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "ink");
+  await expect(page.locator("html")).toHaveAttribute("data-compact", "true");
+  await expect(
+    page.getByRole("complementary", { name: "Selected item details" }),
+  ).toBeHidden();
+  await page.screenshot({ path: test.info().outputPath("ink-compact.png") });
+});
+
 test("installed app icons appear in the result list and detail panel", async ({
   page,
 }) => {
@@ -84,11 +208,21 @@ test("rounded window corners remain transparent behind menus and dialogs", async
     // The first byte is the filter, followed by red, green, blue, and alpha.
     expect(inflateSync(Buffer.concat(chunks))[4]).toBe(0);
   }
-  for (const appearance of ["Dark", "Compact", "Light"]) {
+  for (const appearance of [
+    "Dark",
+    "Sage",
+    "Rose",
+    "Ink",
+    "Compact",
+    "Light",
+  ]) {
     await page.keyboard.press("Meta+k");
     await expectClearCorner();
     await page
-      .getByRole("menuitemradio", { name: appearance, exact: true })
+      .getByRole(
+        appearance === "Compact" ? "menuitemcheckbox" : "menuitemradio",
+        { name: appearance, exact: true },
+      )
       .click();
     await expectClearCorner();
   }
@@ -151,7 +285,9 @@ test("appearance choices persist and Compact keeps clipboard text available", as
   await openLauncher(page);
   for (const [label, value] of [
     ["Dark", "dark"],
-    ["Compact", "compact"],
+    ["Sage", "sage"],
+    ["Rose", "rose"],
+    ["Ink", "ink"],
     ["Light", "light"],
   ]) {
     await page.keyboard.press("Meta+k");
@@ -168,7 +304,24 @@ test("appearance choices persist and Compact keeps clipboard text available", as
     await expect(
       page.getByRole("heading", { name: "What will you do next?" }),
     ).toBeVisible();
-    if (value === "compact") {
+    if (value === "rose") {
+      await page.keyboard.press("Meta+k");
+      await page
+        .getByRole("menuitemcheckbox", { name: "Compact", exact: true })
+        .click();
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-compact",
+        "true",
+      );
+      await page.reload();
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-compact",
+        "true",
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-appearance",
+        "rose",
+      );
       await expect(
         page.getByRole("complementary", { name: "Selected item details" }),
       ).toBeHidden();
@@ -190,16 +343,21 @@ test("previous appearance names migrate to the Canvas choices", async ({
   for (const [previous, current] of [
     ["mint", "dark"],
     ["paper", "light"],
-    ["graphite", "compact"],
+    ["graphite", "light"],
+    ["compact", "light"],
   ]) {
-    await page.evaluate(
-      (value) => localStorage.setItem("tinydash.appearance", value),
-      previous,
-    );
+    await page.evaluate((value) => {
+      localStorage.removeItem("tinydash.compact");
+      localStorage.setItem("tinydash.appearance", value);
+    }, previous);
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute(
       "data-appearance",
       current,
+    );
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-compact",
+      String(["compact", "graphite"].includes(previous)),
     );
   }
 });

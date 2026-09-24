@@ -123,6 +123,8 @@ export interface SettingsImport {
   settings: SettingsValues;
   ignoredKeys: string[];
   appearance?: string | null;
+  compact?: boolean | null;
+  followSystemGlass?: boolean | null;
 }
 
 export interface UpdateStatus {
@@ -158,6 +160,9 @@ export interface ClipboardEntry {
 }
 
 export const backend = {
+  setLauncherAppearance: (
+    appearance: "light" | "dark" | "sage" | "rose" | "ink",
+  ) => invoke<boolean>("set_launcher_appearance", { appearance }),
   ready: () => invoke<LauncherInfo>("launcher_ready"),
   openSettings: () => invoke<void>("open_settings"),
   settings: () => invoke<SettingsInfo>("get_settings"),
@@ -170,8 +175,16 @@ export const backend = {
     invoke<SettingsValues>("set_app_preference", { id, aliases, hidden }),
   previewWebSearch: (search: WebSearch, query: string) =>
     invoke<string>("preview_web_search", { search, query }),
-  exportSettings: (appearance: string) =>
-    invoke<boolean>("export_settings", { appearance }),
+  exportSettings: (
+    appearance: string,
+    compact: boolean,
+    followSystemGlass: boolean,
+  ) =>
+    invoke<boolean>("export_settings", {
+      appearance,
+      compact,
+      followSystemGlass,
+    }),
   importSettings: () =>
     invoke<SettingsImport | null>("preview_settings_import"),
   revealBackup: () => invoke<void>("reveal_backup"),

@@ -7,6 +7,75 @@ body {
   overflow-x: clip;
 }
 
+/* AppKit draws the backdrop and follows the system Liquid Glass control.
+ * Keep menus and dialogs opaque, and expose glass only after native setup. */
+.launcher[data-native-glass="true"] {
+  background: transparent;
+}
+.launcher[data-native-glass="true"] .result-preview {
+  background: transparent;
+}
+
+/* Ink follows the supplied monochrome reference within the launcher layout. */
+:root[data-appearance="ink"]
+  :is(
+    .launcher,
+    .actions-menu,
+    .scope-popover,
+    .confirm-dialog,
+    .suggestion-button,
+    .pin-button
+  ) {
+  border-width: 2px;
+}
+:root[data-appearance="ink"] .search-header {
+  border-bottom: 2px solid var(--color-border);
+}
+:root[data-appearance="ink"] .result-column {
+  border-right-color: var(--color-border);
+  border-right-width: 2px;
+}
+:root[data-appearance="ink"]
+  :is(
+    .welcome-panel h1,
+    .preview-title,
+    .preview-content h2,
+    .confirm-dialog h2,
+    .empty-state h2
+  ) {
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+:root[data-appearance="ink"] .calculation-row .result-title {
+  font-family: var(--font-mono);
+}
+:root[data-appearance="ink"] .result-row.selected::before {
+  display: none;
+}
+:root[data-appearance="ink"]
+  :is(
+    .result-row.selected,
+    .category-tab[aria-pressed="true"],
+    .appearance-options button[aria-checked="true"]
+  ) {
+  --color-selection-ink: var(--color-accent-ink);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+:root[data-appearance="ink"]
+  .selected
+  :is(.result-shortcut, .app-avatar, .file-icon) {
+  color: var(--color-ink);
+}
+:root[data-appearance="ink"] .selected .result-pin {
+  color: var(--color-selection-ink);
+}
+:root[data-appearance="ink"]
+  .suggestion-button:is(:hover, :focus-visible)
+  > svg {
+  color: var(--color-selection-ink);
+}
+
 .launcher kbd {
   min-width: 20px;
   min-height: 20px;
@@ -586,46 +655,46 @@ body {
   height: calc(100dvh - 49px);
 }
 
-:root[data-appearance="compact"] .result-list {
+:root[data-compact="true"] .result-list {
   padding: 8px 14px 14px;
 }
-:root[data-appearance="compact"] .result-row {
+:root[data-compact="true"] .result-row {
   border-radius: 10px;
   padding: 6px 12px;
 }
-:root[data-appearance="compact"] .result-copy {
+:root[data-compact="true"] .result-copy {
   flex-direction: row;
   align-items: baseline;
   gap: 20px;
 }
-:root[data-appearance="compact"] .result-title {
+:root[data-compact="true"] .result-title {
   flex-shrink: 0;
   max-width: 55%;
   font-size: 13px;
 }
-:root[data-appearance="compact"] .result-subtitle {
+:root[data-compact="true"] .result-subtitle {
   margin-left: auto;
   font-size: 11px;
   text-align: right;
 }
-:root[data-appearance="compact"] .result-row.selected::before {
+:root[data-compact="true"] .result-row.selected::before {
   top: 11px;
   bottom: 11px;
 }
-:root[data-appearance="compact"] .search-header {
+:root[data-compact="true"] .search-header {
   padding-bottom: 0;
 }
-:root[data-appearance="compact"] .clipboard-results .result-copy {
+:root[data-compact="true"] .clipboard-results .result-copy {
   flex-direction: column;
   gap: 2px;
 }
-:root[data-appearance="compact"] .clipboard-results .result-title {
+:root[data-compact="true"] .clipboard-results .result-title {
   max-width: 100%;
 }
-:root[data-appearance="compact"] .clipboard-results .result-subtitle {
+:root[data-compact="true"] .clipboard-results .result-subtitle {
   margin-left: 0;
 }
-:root[data-appearance="compact"] .emoji-results .result-title {
+:root[data-compact="true"] .emoji-results .result-title {
   max-width: 100%;
 }
 
@@ -755,13 +824,13 @@ body {
   .list-tools {
     padding: 10px 20px 0;
   }
-  :root[data-appearance="compact"] .result-list {
+  :root[data-compact="true"] .result-list {
     padding-inline: 9px;
   }
-  :root[data-appearance="compact"] .result-copy {
+  :root[data-compact="true"] .result-copy {
     gap: 10px;
   }
-  :root[data-appearance="compact"] .result-title {
+  :root[data-compact="true"] .result-title {
     max-width: 65%;
   }
 }

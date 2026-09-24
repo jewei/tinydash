@@ -4,6 +4,8 @@ Open Settings from Actions, the tray, Command/Ctrl + comma, or `tinydash --setti
 
 Settings covers shortcuts, start at login, appearance, categories, application aliases, custom web searches, clipboard capture, file roots, currency requests, and privacy. See the [settings reference](../settings.md).
 
+Appearance has five themes: Light, Dark, Sage, Rose, and Ink. Compact is a separate layout switch. Both choices apply immediately and are included in settings exports. On macOS, Follow macOS Liquid Glass also saves immediately and is included in exports. Turn it off for a solid theme background. Import previews keep them unsaved until Save changes. The macOS launcher uses system-controlled Liquid Glass where supported. See [appearance](appearance.md) for the OS limits and desktop checks.
+
 The shortcut recorder accepts Shift + Space for the launcher or a visible category. Shift with an ordinary typing key remains invalid. **Reset search and category on open** clears the query and selects the first visible category. Turn it off to retain both the query and category.
 
 Privacy exports a versioned settings file and previews imports before application. Export and clipboard file saving refuse the live settings, database, and recovery paths. Unknown import keys appear in the preview.

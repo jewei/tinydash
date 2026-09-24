@@ -17,6 +17,10 @@ declare global {
       calls: { command: string; payload: unknown }[];
       settings: SettingsValues;
       platform: "macos" | "windows" | "linux";
+      nativeGlass: boolean;
+      rejectNativeGlass: boolean;
+      holdNativeGlass: boolean;
+      releaseNativeGlass?: () => void;
       rejectSettings: string | null;
       rejectResetPosition: string | null;
       pins: Partial<Record<SearchMode, string[]>>;
@@ -284,6 +288,9 @@ const savedSettings = JSON.parse(
 ) as Partial<SettingsValues> | null;
 window.__launcherTest = {
   calls: [],
+  nativeGlass: localStorage.getItem("tinydash.test.nativeGlass") === "true",
+  rejectNativeGlass: false,
+  holdNativeGlass: false,
   platform:
     (localStorage.getItem("tinydash.test.platform") as
       "macos" | "windows" | "linux") ?? "macos",
@@ -360,6 +367,14 @@ mockIPC(
         visible: state.initialVisible,
         initialMode: state.initialMode,
       };
+    }
+    if (command === "set_launcher_appearance") {
+      if (state.holdNativeGlass)
+        await new Promise<void>((resolve) => {
+          state.releaseNativeGlass = resolve;
+        });
+      if (state.rejectNativeGlass) throw new Error("Native glass unavailable");
+      return state.platform === "macos" && state.nativeGlass;
     }
     if (command === "get_settings") {
       return {

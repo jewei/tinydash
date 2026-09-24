@@ -30,7 +30,10 @@ import WelcomeSuggestions from "./components/WelcomeSuggestions";
 import {
   appearances,
   readAppearance,
+  readCompact,
+  readFollowSystemGlass,
   saveAppearance,
+  saveCompact,
   watchAppearance,
   type Appearance,
 } from "./appearance";
@@ -68,6 +71,11 @@ export default function App(
   const [appearance, setAppearance] = createSignal(
     props.initialAppearance ?? readAppearance(),
   );
+  const [nativeGlass, setNativeGlass] = createSignal(false);
+  const [followSystemGlass, setFollowSystemGlass] = createSignal(
+    readFollowSystemGlass(),
+  );
+  const [compact, setCompact] = createSignal(readCompact());
   const [visible, setVisible] = createSignal(true);
   const [query, setQuery] = createSignal("");
   const [mode, setMode] = createSignal<SearchMode>("all");
@@ -454,6 +462,27 @@ export default function App(
 
   createEffect(() => {
     document.documentElement.dataset.appearance = appearance();
+    if (!desktop || !followSystemGlass()) {
+      setNativeGlass(false);
+      return;
+    }
+    let current = true;
+    onCleanup(() => {
+      current = false;
+    });
+    void backend.setLauncherAppearance(appearance()).then(
+      (enabled) => {
+        if (current) setNativeGlass(enabled);
+      },
+      (reason: unknown) => {
+        if (current) setNativeGlass(false);
+        console.warn("Could not apply the native launcher background.", reason);
+      },
+    );
+  });
+
+  createEffect(() => {
+    document.documentElement.dataset.compact = String(compact());
   });
 
   function changeAppearance(value: Appearance) {
@@ -995,10 +1024,12 @@ export default function App(
 
   onMount(() => {
     focusInput();
-    void watchAppearance(setAppearance).then((stop) => {
-      if (disposed) stop();
-      else unlisteners.push(stop);
-    });
+    void watchAppearance(setAppearance, setCompact, setFollowSystemGlass).then(
+      (stop) => {
+        if (disposed) stop();
+        else unlisteners.push(stop);
+      },
+    );
     document.addEventListener("keydown", onKey);
     document.addEventListener("compositionstart", startComposition);
     document.addEventListener("compositionend", endComposition);
@@ -1126,7 +1157,11 @@ export default function App(
   });
 
   return (
-    <main class="launcher" aria-label="TinyDash launcher">
+    <main
+      class="launcher"
+      data-native-glass={nativeGlass() || undefined}
+      aria-label="TinyDash launcher"
+    >
       <div
         class="window-drag-handle"
         title="Drag to move window"
@@ -1656,6 +1691,22 @@ export default function App(
                     </div>
                     <div class="menu-divider" />
                   </Show>
+                  <Show when={matchesMenu("Compact layout")}>
+                    <button
+                      role="menuitemcheckbox"
+                      aria-checked={compact()}
+                      onClick={() => {
+                        const next = !compact();
+                        setCompact(next);
+                        saveCompact(next);
+                        setMenuOpen(false);
+                        focusInput();
+                      }}
+                    >
+                      <span aria-hidden="true">{compact() ? "✓" : "○"}</span>
+                      Compact
+                    </button>
+                  </Show>
                   <For each={launcherActions()}>
                     {(action) => (
                       <button
@@ -1676,6 +1727,7 @@ export default function App(
                   when={
                     !resultActions().length &&
                     !launcherActions().length &&
+                    !matchesMenu("Compact layout") &&
                     !appearances.some((item) =>
                       matchesMenu(`Appearance ${item.label}`),
                     )

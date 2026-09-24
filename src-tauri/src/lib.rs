@@ -192,6 +192,7 @@ pub fn run() -> anyhow::Result<()> {
             _ => {}
         }})
         .invoke_handler(tauri::generate_handler![
+            window::set_launcher_appearance,
             launcher::launcher_ready,
             launcher::preferences::get_settings,
             launcher::preferences::save_settings,

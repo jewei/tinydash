@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type {} from "./mock-backend";
 
-async function openSettings(page: Page) {
+async function mockBackend(page: Page) {
   await page.route(
     (url) => url.pathname === "/src/index.tsx",
     async (route) => {
@@ -12,9 +12,75 @@ async function openSettings(page: Page) {
       });
     },
   );
+}
+
+async function openSettings(page: Page) {
+  await mockBackend(page);
   await page.goto("/?view=settings");
   await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
 }
+
+test("five themes keep Compact independent and export both saved choices", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await page.getByRole("switch", { name: "Compact layout" }).check();
+  for (const theme of ["Light", "Dark", "Sage", "Rose", "Ink"]) {
+    await page.getByRole("radio", { name: new RegExp(theme) }).check();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-appearance",
+      theme.toLowerCase(),
+    );
+    await expect(
+      page.getByRole("switch", { name: "Compact layout" }),
+    ).toBeChecked();
+    await expect(
+      page.getByRole("button", { name: "Save changes" }),
+    ).toBeDisabled();
+    for (const width of [320, 375, 414, 768, 980]) {
+      await page.setViewportSize({ width, height: 740 });
+      await page
+        .getByRole("radio", { name: new RegExp(theme) })
+        .scrollIntoViewIfNeeded();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await expect(
+        page.getByRole("radio", { name: new RegExp(theme) }),
+      ).toBeInViewport();
+    }
+    await page
+      .getByRole("heading", { name: "Appearance", exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: test.info().outputPath(`theme-${theme.toLowerCase()}.png`),
+    });
+  }
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "ink");
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "Compact layout" }),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Export settings", exact: true })
+    .click();
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.find(
+          (call) => call.command === "export_settings",
+        )?.payload,
+    ),
+  ).toEqual({ appearance: "ink", compact: true, followSystemGlass: true });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "ink");
+  await expect(page.locator("html")).toHaveAttribute("data-compact", "true");
+});
 
 for (const editBeforeUpdate of [false, true]) {
   test(`keeps external settings changes with a ${editBeforeUpdate ? "dirty" : "clean"} draft`, async ({
@@ -60,6 +126,206 @@ for (const editBeforeUpdate of [false, true]) {
     });
   });
 }
+
+test("external theme and layout changes remain saved in Settings", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.evaluate(async () => {
+    await window.__launcherTest.emit("appearance-changed", "sage");
+    await window.__launcherTest.emit("compact-changed", true);
+    await window.__launcherTest.emit("system-glass-changed", false);
+  });
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "sage");
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "Compact layout" }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: "Follow macOS Liquid Glass" }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
+});
+
+test("imported theme and layout can be discarded or saved together", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.evaluate(() => {
+    window.__launcherTest.importPreview = {
+      settings: window.__launcherTest.settings,
+      ignoredKeys: [],
+      appearance: "rose",
+      compact: true,
+      followSystemGlass: false,
+    };
+  });
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  const apply = async () => {
+    await page
+      .getByRole("button", { name: "Import settings", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Apply import", exact: true })
+      .click();
+  };
+  await apply();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "rose");
+  expect(
+    await page.evaluate(() => localStorage.getItem("tinydash.appearance")),
+  ).toBeNull();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem("tinydash.followSystemGlass"),
+    ),
+  ).toBeNull();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-appearance",
+    "light",
+  );
+  await apply();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "rose");
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "Compact layout" }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: "Follow macOS Liquid Glass" }),
+  ).not.toBeChecked();
+});
+
+test("Liquid Glass switch applies across windows, persists, and exports the saved choice", async ({
+  page,
+  context,
+}) => {
+  await context.addInitScript(() =>
+    localStorage.setItem("tinydash.test.nativeGlass", "true"),
+  );
+  await openSettings(page);
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  const toggle = page.getByRole("switch", {
+    name: "Follow macOS Liquid Glass",
+  });
+  await expect(toggle).toBeChecked();
+  const launcherPage = await context.newPage();
+  await mockBackend(launcherPage);
+  await launcherPage.goto("/");
+  const launcher = launcherPage.locator(".launcher");
+  await expect(launcher).toHaveAttribute("data-native-glass", "true");
+  await launcherPage.getByRole("button", { name: "Apps", exact: true }).click();
+  await toggle.uncheck();
+  await expect(launcher).not.toHaveAttribute("data-native-glass", "true");
+  await expect(launcherPage.locator(".result-preview")).not.toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await page.getByRole("radio", { name: "Ink Black and off-white" }).check();
+  await expect(launcher).toHaveCSS("background-color", "rgb(245, 245, 243)");
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
+  await toggle.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: test.info().outputPath("liquid-glass-switch.png"),
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(toggle).not.toBeChecked();
+  await launcherPage.reload();
+  await expect(launcher).toHaveCSS("background-color", "rgb(245, 245, 243)");
+  expect(
+    await launcherPage.evaluate(() =>
+      window.__launcherTest.calls.some(
+        (call) => call.command === "set_launcher_appearance",
+      ),
+    ),
+  ).toBe(false);
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Export settings", exact: true })
+    .click();
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.find(
+          (call) => call.command === "export_settings",
+        )?.payload,
+    ),
+  ).toMatchObject({ followSystemGlass: false });
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await toggle.check();
+  await expect(launcher).toHaveAttribute("data-native-glass", "true");
+  await expect(launcher).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+});
+
+for (const platform of ["windows", "linux"]) {
+  test(`Liquid Glass switch is hidden on ${platform}`, async ({ page }) => {
+    await page.addInitScript(
+      (value) => localStorage.setItem("tinydash.test.platform", value),
+      platform,
+    );
+    await openSettings(page);
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
+    await expect(
+      page.getByRole("switch", { name: "Follow macOS Liquid Glass" }),
+    ).toHaveCount(0);
+  });
+}
+
+test("theme text and controls have readable contrast", async ({ page }) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  for (const theme of ["Light", "Dark", "Sage", "Rose", "Ink"]) {
+    await page.getByRole("radio", { name: new RegExp(theme) }).check();
+    const contrasts = await page.evaluate(() => {
+      const sample = document.createElement("span");
+      document.body.append(sample);
+      const luminance = (token: string) => {
+        sample.style.color = `var(--color-${token})`;
+        const rgb = getComputedStyle(sample)
+          .color.match(/[\d.]+/g)!
+          .slice(0, 3)
+          .map(Number);
+        const linear = rgb.map((v) => {
+          const s = v / 255;
+          return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+      };
+      const pairs = [
+        ["ink", "paper"],
+        ["muted", "paper"],
+        ["muted", "preview"],
+        ["subtle", "paper"],
+        ["selection-ink", "selected"],
+        ["accent-ink", "accent"],
+        ["olive-ink", "olive"],
+      ];
+      const values = pairs.map(([foreground, background]) => {
+        const a = luminance(foreground),
+          b = luminance(background);
+        return {
+          foreground,
+          background,
+          ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+        };
+      });
+      sample.remove();
+      return values;
+    });
+    for (const pair of contrasts)
+      expect(
+        pair.ratio,
+        `${theme}: ${pair.foreground} on ${pair.background}`,
+      ).toBeGreaterThanOrEqual(4.5);
+  }
+});
 
 test("keeps an edited alias when another window hides apps", async ({
   page,

@@ -5,6 +5,46 @@ use tauri::{
 use super::LauncherState;
 use crate::error::{Error, Result};
 
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LauncherAppearance {
+    Light,
+    Dark,
+    Sage,
+    Rose,
+    Ink,
+}
+
+#[tauri::command]
+pub async fn set_launcher_appearance(
+    window: WebviewWindow,
+    appearance: LauncherAppearance,
+) -> std::result::Result<bool, String> {
+    if window.label() != "main" {
+        return Ok(false);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let (sender, mut receiver) = tauri::async_runtime::channel(1);
+        window
+            .with_webview(move |webview| {
+                let _ = sender.try_send(crate::platform::set_launcher_appearance(
+                    webview, appearance,
+                ));
+            })
+            .map_err(|error| error.to_string())?;
+        receiver
+            .recv()
+            .await
+            .ok_or("Window appearance did not complete.")?
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = appearance;
+        Ok(false)
+    }
+}
+
 pub fn show(app: &AppHandle) -> Result<()> {
     show_in_category(app, None)
 }
