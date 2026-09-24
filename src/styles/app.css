@@ -79,7 +79,6 @@ kbd {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: clip;
   background: var(--color-paper);

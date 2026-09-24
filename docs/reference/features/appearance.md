@@ -6,11 +6,11 @@ In Settings, Appearance, **Follow macOS Liquid Glass** is on by default. Turn it
 
 With the switch on, macOS 26 or later uses an AppKit `NSGlassEffectView`. macOS draws the blur and transparency. On macOS 27, use the Liquid Glass slider in System Settings, Appearance. The native view follows the system's glass and accessibility settings, including Reduce transparency. TinyDash does not store a separate blur value. Menus and dialogs retain solid backgrounds. Earlier macOS versions, Windows, Linux, and browser previews use solid theme backgrounds. A native setup failure also keeps the solid background.
 
-The native view uses the regular glass style and matches the selected theme's light or dark appearance. It does not set a custom glass tint or opacity. See [Apple's Liquid Glass updates](https://developer.apple.com/videos/play/wwdc2026/102/) and [NSGlassEffectView](https://developer.apple.com/documentation/appkit/nsglasseffectview).
+The native view uses the regular glass style and matches the selected theme's light or dark appearance. Its content is clipped to the launcher's 20-point corner radius, including after glass is turned off. It does not set a custom glass tint or opacity. See [Apple's Liquid Glass updates](https://developer.apple.com/videos/play/wwdc2026/102/) and [NSGlassEffectView](https://developer.apple.com/documentation/appkit/nsglasseffectview).
 
 Ink uses a monochrome palette with off-white backgrounds, black controls, stronger borders, and bold sans-serif headings. Selected results use white text on black. The native glass can still show colors from the desktop behind the launcher.
 
-The app bundles Figtree and Caprasimo with their license files. It does not need a font service. The desktop window is 980 by 620. At narrow widths, the result list uses the full width and clipboard previews appear below it.
+The app bundles Figtree and Caprasimo with their license files. It does not need a font service. The desktop window is 980 by 620. The launcher has rounded corners and a native shadow, with no added outer border in any theme. At narrow widths, the result list uses the full width and clipboard previews appear below it.
 
 Settings, Categories controls visible categories. Keep at least one selected. The category bar scrolls when required. Hiding a category does not remove its results from All.
 
@@ -38,5 +38,7 @@ On macOS 27, turn Follow macOS Liquid Glass off and on in Settings. Confirm the 
 Tests: [tests/categories.spec.ts](../../../tests/categories.spec.ts), [tests/settings.spec.ts](../../../tests/settings.spec.ts), [tests/tools.spec.ts](../../../tests/tools.spec.ts), [tests/welcome.spec.ts](../../../tests/welcome.spec.ts).
 
 Browser dimensions do not prove native transparent corners or window placement. Check those on the desktop.
+
+On macOS, inspect all four corners with glass on, then off, and after hide/reopen. Check over a light background for square dark edges outside the rounded border. A window capture without the OS shadow must have transparent pixels at the outer corners.
 
 Use the [verification procedure](../../how-to/verify.md) and [desktop checks](../../how-to/desktop-checks.md).

@@ -26,6 +26,12 @@ pub fn set_launcher_appearance(
     let content = window
         .contentView()
         .ok_or("Launcher content is unavailable.")?;
+    // Clip every native child to the same outline as the web launcher. The
+    // glass corner radius alone leaves native drawing outside that outline.
+    content.setWantsLayer(true);
+    let layer = content.layer().ok_or("Launcher layer is unavailable.")?;
+    layer.setCornerRadius(20.0);
+    layer.setMasksToBounds(true);
     let glass = content
         .subviews()
         .iter()

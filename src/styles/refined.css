@@ -19,7 +19,6 @@ body {
 /* Ink follows the supplied monochrome reference within the launcher layout. */
 :root[data-appearance="ink"]
   :is(
-    .launcher,
     .actions-menu,
     .scope-popover,
     .confirm-dialog,

@@ -48,7 +48,8 @@ tauri-plugin-updater = { version = "2.11.0", default-features = false, features 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1.10.1"
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard", "NSWorkspace", "NSRunningApplication", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSAppearance", "NSGlassEffectView", "NSResponder", "NSView", "NSWindow", "objc2-core-foundation", "objc2-core-graphics"] }
+objc2-quartz-core = { version = "0.3.2", default-features = false, features = ["std", "CALayer", "objc2-core-foundation"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard", "NSWorkspace", "NSRunningApplication", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSAppearance", "NSGlassEffectView", "NSResponder", "NSView", "NSWindow", "objc2-quartz-core", "objc2-core-foundation", "objc2-core-graphics"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSDictionary", "NSGeometry", "NSString"] }
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage", "CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation"] }
 objc2-core-services = { version = "0.3.2", default-features = false, features = ["std", "AE", "AEDataModel", "AEMach", "AERegistry"] }
