@@ -41,10 +41,12 @@ fn known_folder(id: &GUID) -> Option<PathBuf> {
     }
 }
 
-pub fn discover_apps() -> Result<Vec<AppEntry>> {
-    let mut apps = Vec::new();
-    let mut skipped = 0;
-    for root in [
+// Discovery finds shortcuts up to this many levels below a folder.
+const APP_DEPTH: usize = 8;
+
+/// Start menu and desktop folders that contain application shortcuts.
+pub fn app_folders() -> Vec<PathBuf> {
+    [
         FOLDERID_Programs,
         FOLDERID_CommonPrograms,
         FOLDERID_Desktop,
@@ -52,10 +54,16 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
     ]
     .iter()
     .filter_map(known_folder)
-    {
+    .collect()
+}
+
+pub fn discover_apps() -> Result<Vec<AppEntry>> {
+    let mut apps = Vec::new();
+    let mut skipped = 0;
+    for root in app_folders() {
         let walker = walkdir::WalkDir::new(root)
             .follow_links(false)
-            .max_depth(8)
+            .max_depth(APP_DEPTH)
             .into_iter()
             .filter_entry(|entry| !entry.file_name().to_string_lossy().starts_with('.'));
         for entry in walker {
@@ -85,6 +93,29 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
         tracing::warn!(skipped, "Some application shortcuts could not be read");
     }
     Ok(apps)
+}
+
+/// Maps a changed path to the shortcut that discovery would index.
+pub fn app_change(path: &std::path::Path, roots: &[PathBuf]) -> Option<crate::platform::AppChange> {
+    use crate::platform::AppChange;
+    let root = roots.iter().find(|root| path.starts_with(root))?;
+    let relative = path.strip_prefix(root).ok()?;
+    let depth = relative.components().count();
+    if depth == 0
+        || depth > APP_DEPTH
+        || relative
+            .components()
+            .any(|component| component.as_os_str().to_string_lossy().starts_with('.'))
+    {
+        return None;
+    }
+    let extension = path.extension().and_then(|ext| ext.to_str());
+    if is_app_extension(extension) {
+        Some(AppChange::App(path.to_owned()))
+    } else {
+        // A named folder can hold shortcuts. Documents on the desktop cannot.
+        (extension.is_none() && depth < APP_DEPTH).then_some(AppChange::Folder)
+    }
 }
 
 fn is_app_extension(extension: Option<&str>) -> bool {
@@ -458,18 +489,25 @@ impl Drop for ShutdownPrivilege {
 }
 
 // Read only after the native counter changes. No window or frequent text polling.
-pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, Option<String>)>> {
-    use crate::providers::clipboard::{MAX_TEXT_BYTES, valid_text};
+pub fn clipboard_snapshot(
+    previous: Option<u64>,
+) -> anyhow::Result<Option<(u64, crate::providers::clipboard::Observed)>> {
+    use crate::providers::clipboard::{MAX_TEXT_BYTES, Observed, SECRET_FORMATS};
     use windows_sys::Win32::System::{
         DataExchange::{
-            CloseClipboard, GetClipboardData, GetClipboardSequenceNumber,
-            IsClipboardFormatAvailable, OpenClipboard,
+            CloseClipboard, CountClipboardFormats, GetClipboardData, GetClipboardSequenceNumber,
+            IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW,
         },
         Memory::{GlobalLock, GlobalSize, GlobalUnlock},
     };
     const UNICODE_TEXT: u32 = 13; // CF_UNICODETEXT, defined by Win32.
+    let format = |name: &str| {
+        let name = name.encode_utf16().chain([0]).collect::<Vec<_>>();
+        // Registration returns the existing ID for a known name, or 0.
+        unsafe { RegisterClipboardFormatW(name.as_ptr()) }
+    };
     // All pointers come from Win32. Clipboard ownership and the global memory
-    // lock remain held until the bounded UTF-16 slice has been copied.
+    // lock remain held until the bounded data has been copied.
     unsafe {
         let counter = u64::from(GetClipboardSequenceNumber());
         if previous == Some(counter) {
@@ -488,8 +526,33 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         }
         let _close = Close;
         let counter = u64::from(GetClipboardSequenceNumber());
+        if CountClipboardFormats() == 0 {
+            return Ok(Some((counter, Observed::Cleared)));
+        }
+        let available = |id: u32| id != 0 && IsClipboardFormatAvailable(id) != 0;
+        // Windows documents a DWORD 0 in this format as "exclude from history".
+        let history_excluded = || {
+            let id = format("CanIncludeInClipboardHistory");
+            if !available(id) {
+                return false;
+            }
+            let handle = GetClipboardData(id);
+            if handle.is_null() || GlobalSize(handle) < 4 {
+                return false;
+            }
+            let pointer = GlobalLock(handle);
+            if pointer.is_null() {
+                return false;
+            }
+            let value = pointer.cast::<u32>().read_unaligned();
+            GlobalUnlock(handle);
+            value == 0
+        };
+        if SECRET_FORMATS.iter().any(|name| available(format(name))) || history_excluded() {
+            return Ok(Some((counter, Observed::Secret)));
+        }
         if IsClipboardFormatAvailable(UNICODE_TEXT) == 0 {
-            return Ok(Some((counter, None)));
+            return Ok(Some((counter, Observed::Other)));
         }
         let handle = GetClipboardData(UNICODE_TEXT);
         if handle.is_null() {
@@ -497,7 +560,7 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         }
         let bytes = GlobalSize(handle);
         if bytes == 0 || bytes > (MAX_TEXT_BYTES + 1) * 2 || !bytes.is_multiple_of(2) {
-            return Ok(Some((counter, None)));
+            return Ok(Some((counter, Observed::Other)));
         }
         let pointer = GlobalLock(handle);
         if pointer.is_null() {
@@ -507,15 +570,49 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         let text = data
             .iter()
             .position(|value| *value == 0)
-            .and_then(|end| String::from_utf16(&data[..end]).ok())
-            .filter(|text| valid_text(text));
+            .and_then(|end| String::from_utf16(&data[..end]).ok());
         GlobalUnlock(handle);
-        Ok(Some((u64::from(GetClipboardSequenceNumber()), text)))
+        Ok(Some((
+            u64::from(GetClipboardSequenceNumber()),
+            Observed::from_text(text),
+        )))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn maps_changes_to_shortcuts_or_folders() {
+        use crate::platform::AppChange;
+        use std::path::{Path, PathBuf};
+        let roots = [
+            PathBuf::from(r"C:\Start\Programs"),
+            PathBuf::from(r"C:\Users\a\Desktop"),
+        ];
+        let app = |path: &str| Some(AppChange::App(PathBuf::from(path)));
+        for (path, expected) in [
+            (
+                r"C:\Start\Programs\Editor.lnk",
+                app(r"C:\Start\Programs\Editor.lnk"),
+            ),
+            (
+                r"C:\Users\a\Desktop\Tool.EXE",
+                app(r"C:\Users\a\Desktop\Tool.EXE"),
+            ),
+            (r"C:\Start\Programs\Suite", Some(AppChange::Folder)),
+            (r"C:\Users\a\Desktop\report.docx", None),
+            (r"C:\Users\a\Desktop\.hidden\Tool.lnk", None),
+            (r"C:\Start\Programs", None),
+            (r"C:\Other\Editor.lnk", None),
+        ] {
+            assert_eq!(
+                super::app_change(Path::new(path), &roots),
+                expected,
+                "{path}"
+            );
+        }
+    }
+
     #[test]
     fn shutdown_requests_never_force_apps_to_close() {
         use crate::providers::system::SystemCommand;

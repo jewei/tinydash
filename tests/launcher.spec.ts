@@ -1220,6 +1220,32 @@ test("a background event does not preserve selection from a different query", as
   ).toContainText("Finder");
 });
 
+test("shows folders as Files results that open and reveal by ID", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("Projects");
+  await expect(page.locator(".result-title")).toHaveText("Projects");
+  await expect(page.locator(".preview-content .eyebrow")).toHaveText("Folder");
+  await expect(page.locator(".preview-metadata")).toContainText("Folder");
+  await input.press("Enter");
+  await input.press("Meta+Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "file:/Documents/Projects", action: "open" },
+      },
+      {
+        command: "execute_action",
+        payload: { id: "file:/Documents/Projects", action: "reveal" },
+      },
+    ]);
+});
+
 test("opens and reveals files by ID, and refreshes files with the mode shortcut", async ({
   page,
 }) => {
@@ -1231,7 +1257,7 @@ test("opens and reveals files by ID, and refreshes files with the mode shortcut"
     "placeholder",
     "Search filenames and paths...",
   );
-  await expect(page.locator(".list-count")).toHaveText("1 file indexed");
+  await expect(page.locator(".list-count")).toHaveText("1 item indexed");
   await expect(page.locator(".result-title")).toHaveText("Launch notes.md");
   await input.press("Enter");
   await input.press("Meta+Enter");

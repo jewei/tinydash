@@ -112,6 +112,12 @@ impl AppProvider {
             .map(|app| &app.entry)
     }
 
+    /// Includes applications that the user hides from results.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn contains(&self, id: &str) -> bool {
+        self.apps.iter().any(|app| app.entry.id == id)
+    }
+
     pub fn catalog(&self) -> Vec<SearchResult> {
         self.apps.iter().map(|app| app.entry.result(0)).collect()
     }
@@ -158,7 +164,8 @@ impl AppProvider {
                     .iter()
                     .filter_map(|(alias, normalized)| {
                         pattern.score(alias.slice(..), matcher).map(|score| {
-                            ranking::name_score(score, normalized, query).saturating_sub(100)
+                            ranking::name_score(score, normalized, query)
+                                .saturating_sub(ranking::ALIAS_PENALTY)
                         })
                     })
                     .max();

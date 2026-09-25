@@ -777,7 +777,7 @@ try {
       (await titles()).length === 1 &&
       (await titles())[0] === fixtures.fileName &&
       (await observe<boolean>(
-        "return document.querySelector('.list-count')?.textContent === '1 file indexed'",
+        "return document.querySelector('.list-count')?.textContent === '1 item indexed'",
       )),
   );
   pass(

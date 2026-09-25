@@ -373,13 +373,26 @@ pub fn watch_clipboard(changed: impl Fn() + 'static) {
     });
 }
 
-pub fn read_clipboard(received: impl FnOnce(Option<String>) + 'static) {
+pub fn read_clipboard(received: impl FnOnce(crate::providers::clipboard::Observed) + 'static) {
+    use crate::providers::clipboard::{Observed, is_secret_format};
     let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
-    clipboard.request_text(move |_, text| {
-        received(
-            text.filter(|text| crate::providers::clipboard::valid_text(text))
-                .map(str::to_owned),
-        );
+    // Check the offered targets first. A marked secret is never requested.
+    // An empty target list is not a clear: X11 selections also disappear
+    // when the copying application exits.
+    // gtk-rs 0.18 does not bind gtk_clipboard_request_targets.
+    let targets = gtk::gdk::Atom::intern("TARGETS");
+    clipboard.request_contents(&targets, move |clipboard, selection| {
+        if selection.targets().is_some_and(|targets| {
+            targets
+                .iter()
+                .any(|target| is_secret_format(target.name().as_str()))
+        }) {
+            received(Observed::Secret);
+            return;
+        }
+        clipboard.request_text(move |_, text| {
+            received(Observed::from_text(text.map(str::to_owned)));
+        });
     });
 }
 

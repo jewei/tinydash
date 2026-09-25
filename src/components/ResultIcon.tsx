@@ -67,6 +67,11 @@ export default function ResultIcon(props: { result: SearchResult }) {
           <Icon name="file" size={24} />
         </span>
       </Match>
+      <Match when={props.result.kind === "folder"}>
+        <span class="file-icon" aria-hidden="true">
+          <Icon name="folder" size={24} />
+        </span>
+      </Match>
     </Switch>
   );
 }

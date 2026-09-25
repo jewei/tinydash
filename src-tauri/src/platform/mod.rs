@@ -32,6 +32,21 @@ pub use windows::clipboard_snapshot;
 #[cfg(target_os = "windows")]
 pub use windows::{discover_apps, launch, run_system_command, system_commands};
 
+/// A change in a folder that application discovery scans.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[derive(Debug, PartialEq, Eq)]
+pub enum AppChange {
+    /// An application bundle or shortcut. Compare it with the index.
+    App(std::path::PathBuf),
+    /// A folder that can contain applications. Its contents are unknown.
+    Folder,
+}
+
+#[cfg(target_os = "macos")]
+pub use macos::{app_change, app_folders};
+#[cfg(target_os = "windows")]
+pub use windows::{app_change, app_folders};
+
 pub fn is_wayland() -> bool {
     cfg!(target_os = "linux")
         && (std::env::var_os("WAYLAND_DISPLAY").is_some()

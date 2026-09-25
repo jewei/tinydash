@@ -21,16 +21,7 @@ impl SearchManager {
             };
         }
         if let Some(outcome) = self.tools.search(query) {
-            return match outcome {
-                Ok(results) => SearchOutcome {
-                    results: results.into_iter().take(RESULT_LIMIT).collect(),
-                    notice: None,
-                },
-                Err(notice) => SearchOutcome {
-                    results: vec![],
-                    notice: Some(notice),
-                },
-            };
+            return self.tool_outcome(query, outcome);
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -104,11 +95,13 @@ impl SearchManager {
             ));
         }
         let mut results = ranking::top_results(results, usize::MAX);
+        // A command prefix moves System to the front of each tier.
         if query.mode == SearchMode::All && SystemCommandProvider::is_prefix_query(query.text) {
-            results.sort_by_key(|result| match result.kind {
-                ResultKind::Calculation => 0,
-                ResultKind::SystemCommand => 1,
-                _ => 2,
+            results.sort_by_key(|result| {
+                (
+                    ranking::tier(result),
+                    result.kind != ResultKind::SystemCommand,
+                )
             });
         }
         results.truncate(RESULT_LIMIT);
@@ -137,6 +130,7 @@ fn fixture(apps: usize, files: usize) -> SearchManager {
                     id: format!("file:{path}"),
                     name: format!("Safari-{index:05}.txt"),
                     path,
+                    folder: false,
                 }
             })
             .collect(),

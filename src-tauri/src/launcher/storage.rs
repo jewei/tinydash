@@ -9,7 +9,7 @@ use crate::{
     db::Database,
     error::Error,
     providers::clipboard::{
-        ClipboardProvider, MAX_SELECTION_ENTRIES, combine_entries, entry_id, valid_text,
+        ClipboardProvider, MAX_SELECTION_ENTRIES, Observed, combine_entries, entry_id, valid_text,
     },
     ranking,
 };
@@ -20,8 +20,16 @@ struct Session {
     observed: Observation,
 }
 
+/// Seconds after a capture in which an upstream clear still deletes it. Apple
+/// Passwords sets no secret marker and empties the clipboard after about 90 s.
+const CLEARED_CAPTURE_SECONDS: i64 = 120;
+
 #[derive(Default)]
-struct Observation(Option<String>);
+struct Observation {
+    text: Option<String>,
+    // The entry that the monitor saved for `text`, and when.
+    captured: Option<(i64, i64)>,
+}
 
 impl Observation {
     fn copied(&mut self, text: String, sensitive: bool) -> bool {
@@ -31,11 +39,22 @@ impl Observation {
     }
     fn changed(&mut self, text: Option<String>) -> Option<String> {
         let text = text.filter(|text| valid_text(text));
-        if self.0 == text {
+        if self.text == text {
             return None;
         }
-        self.0.clone_from(&text);
+        self.text.clone_from(&text);
+        self.captured = None;
         text
+    }
+    // A source that empties the clipboard considered its content sensitive.
+    // Return only the entry saved for that content. Older history, copies
+    // from TinyDash, and captures outside the window stay.
+    fn cleared(&mut self, now: i64) -> Option<i64> {
+        self.text = None;
+        self.captured
+            .take()
+            .filter(|(_, at)| now.saturating_sub(*at) <= CLEARED_CAPTURE_SECONDS)
+            .map(|(id, _)| id)
     }
 }
 
@@ -209,35 +228,47 @@ impl Storage {
         }
     }
 
-    pub fn capture(&self, app: &AppHandle, text: Option<String>, generation: u64) {
+    pub fn capture(&self, app: &AppHandle, observed: Observed, generation: u64) {
         let state = app.state::<LauncherState>();
         let Ok(mut session) = self.session(app, &state.search).lock() else {
             return;
         };
         // A delete, clear, or copy invalidates reads that were already in flight.
-        if generation != state.clipboard.generation() || !state.settings().clipboard_history_enabled
-        {
+        if generation != state.clipboard.generation() {
+            return;
+        }
+        let text = match observed {
+            Observed::Cleared => {
+                if let Some(id) = session.observed.cleared(ranking::now()) {
+                    self.forget_cleared(app, &mut session, id);
+                }
+                return;
+            }
+            Observed::Text(text) => Some(text),
+            // A marked secret is never read, and it replaces the previous value.
+            Observed::Secret | Observed::Other => None,
+        };
+        if !state.settings().clipboard_history_enabled {
             return;
         }
         let Some(text) = session.observed.changed(text) else {
             return;
         };
-        self.save_clipboard(app, &mut session, &text);
+        if let Some(id) = self.save_clipboard(app, &mut session, &text) {
+            session.observed.captured = Some((id, ranking::now()));
+        }
     }
 
-    fn save_clipboard(&self, app: &AppHandle, session: &mut Session, text: &str) {
+    fn forget_cleared(&self, app: &AppHandle, session: &mut Session, id: i64) {
         let state = app.state::<LauncherState>();
-        if !state.settings().clipboard_history_enabled || !valid_text(text) {
-            return;
-        }
-        let Some(database) = session.database.as_mut() else {
+        let Some(database) = session.database.as_ref() else {
             return;
         };
-        match database.capture_clipboard(text, ranking::now(), state.settings().clipboard_limit()) {
-            Ok((entry, removed)) => {
-                let indexed = entry.into();
+        match database.delete_unpinned_clipboard(id) {
+            Ok(false) => {}
+            Ok(true) => {
                 if let Ok(mut search) = state.search.lock() {
-                    search.clipboard.update(indexed, &removed);
+                    search.clipboard.remove(id);
                 }
                 super::clipboard::changed(app);
             }
@@ -245,6 +276,31 @@ impl Storage {
                 self.failed(&error);
                 session.database = None;
                 super::clipboard::changed(app);
+            }
+        }
+    }
+
+    fn save_clipboard(&self, app: &AppHandle, session: &mut Session, text: &str) -> Option<i64> {
+        let state = app.state::<LauncherState>();
+        if !state.settings().clipboard_history_enabled || !valid_text(text) {
+            return None;
+        }
+        let database = session.database.as_mut()?;
+        match database.capture_clipboard(text, ranking::now(), state.settings().clipboard_limit()) {
+            Ok((entry, removed)) => {
+                let id = entry.id;
+                let indexed = entry.into();
+                if let Ok(mut search) = state.search.lock() {
+                    search.clipboard.update(indexed, &removed);
+                }
+                super::clipboard::changed(app);
+                Some(id)
+            }
+            Err(error) => {
+                self.failed(&error);
+                session.database = None;
+                super::clipboard::changed(app);
+                None
             }
         }
     }
@@ -273,13 +329,17 @@ impl Storage {
         } else {
             None
         };
-        app.clipboard()
-            .write_text(text.clone())
-            .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;
+        let secret = id.starts_with("password:");
+        if secret {
+            super::clipboard::write_secret(&text).map_err(|error| error.to_string())
+        } else {
+            app.clipboard()
+                .write_text(text.clone())
+                .map_err(|error| error.to_string())
+        }
+        .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;
         state.clipboard.invalidate();
-        let changed = session
-            .observed
-            .copied(text.clone(), id.starts_with("password:"));
+        let changed = session.observed.copied(text.clone(), secret);
         if let Some(id) = clipboard_id {
             if let Some(database) = session.database.as_mut() {
                 match database.touch_clipboard(id, ranking::now()) {
@@ -375,72 +435,48 @@ impl Storage {
     }
 
     pub fn delete_clipboard(&self, app: &AppHandle, id: Option<i64>) -> Result<(), String> {
-        let state = app.state::<LauncherState>();
-        let mut session = self
-            .session(app, &state.search)
-            .lock()
-            .map_err(|_| "Clipboard storage is unavailable.")?;
-        let mut search = state
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?;
-        let database = session
-            .database
-            .as_ref()
-            .ok_or("Clipboard storage is unavailable. Restart TinyDash to try again.")?;
-        let result = match id {
-            Some(id) => database.delete_clipboard(id),
-            None => database.clear_clipboard(),
-        };
-        if let Err(error) = result {
-            self.failed(&error);
-            session.database = None;
-            return Err(
-                "Could not delete clipboard history. Restart TinyDash to try again.".into(),
-            );
-        }
-        state.clipboard.invalidate();
-        match id {
-            Some(id) => search.clipboard.remove(id),
-            None => search.clipboard = ClipboardProvider::default(),
-        }
-        search.forget_clipboard_pins(id);
-        drop(search);
-        super::clipboard::changed(app);
-        Ok(())
+        self.delete_entries(
+            app,
+            id.map_or(Deletion::All, Deletion::Entry),
+            "Could not delete clipboard history. Restart TinyDash to try again.",
+        )
     }
 
     pub fn clear_unpinned_clipboard(&self, app: &AppHandle) -> Result<(), String> {
+        self.delete_entries(
+            app,
+            Deletion::Unpinned,
+            "Could not clear unpinned clipboard history. Restart TinyDash to try again.",
+        )
+    }
+
+    fn delete_entries(
+        &self,
+        app: &AppHandle,
+        deletion: Deletion,
+        failure: &str,
+    ) -> Result<(), String> {
         let state = app.state::<LauncherState>();
+        // The storage lock orders this with copies, captures, and pins.
         let mut session = self
             .session(app, &state.search)
             .lock()
             .map_err(|_| "Clipboard storage is unavailable.")?;
-        let mut search = state
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?;
         let database = session
             .database
             .as_ref()
             .ok_or("Clipboard storage is unavailable. Restart TinyDash to try again.")?;
-        let removed = match database.clear_unpinned_clipboard() {
-            Ok(removed) => removed,
-            Err(error) => {
+        match delete_and_publish(database, &state.search, deletion) {
+            Ok(()) => {}
+            Err(DeleteError::Storage(error)) => {
                 self.failed(&error);
                 session.database = None;
-                return Err(
-                    "Could not clear unpinned clipboard history. Restart TinyDash to try again."
-                        .into(),
-                );
+                return Err(failure.into());
             }
-        };
-        state.clipboard.invalidate();
-        search.clipboard.remove_many(&removed);
-        for id in removed {
-            search.forget_clipboard_pins(Some(id));
+            Err(DeleteError::Index) => return Err(Error::IndexUnavailable.to_string()),
         }
-        drop(search);
+        state.clipboard.invalidate();
+        drop(session);
         super::clipboard::changed(app);
         Ok(())
     }
@@ -455,6 +491,44 @@ impl Storage {
             *warning = Some("Storage is unavailable. Clipboard capture is paused. Ranking changes will be lost when TinyDash quits.".into());
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum Deletion {
+    Entry(i64),
+    All,
+    Unpinned,
+}
+
+enum DeleteError {
+    Storage(crate::db::Error),
+    Index,
+}
+
+// Persist first, then publish. Search does not wait while SQLite writes or
+// waits for its lock. A failed write leaves the visible entries unchanged.
+fn delete_and_publish(
+    database: &Database,
+    search: &Mutex<SearchManager>,
+    deletion: Deletion,
+) -> Result<(), DeleteError> {
+    let removed = match deletion {
+        Deletion::Entry(id) => database.delete_clipboard(id).map(|()| vec![id]),
+        Deletion::All => database.clear_clipboard().map(|()| Vec::new()),
+        Deletion::Unpinned => database.clear_unpinned_clipboard(),
+    }
+    .map_err(DeleteError::Storage)?;
+    let mut search = search.lock().map_err(|_| DeleteError::Index)?;
+    if let Deletion::All = deletion {
+        search.clipboard = ClipboardProvider::default();
+        search.forget_clipboard_pins(None);
+    } else {
+        search.clipboard.remove_many(&removed);
+        for id in removed {
+            search.forget_clipboard_pins(Some(id));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -472,6 +546,91 @@ mod tests {
             Some("ordinary text".into())
         );
         assert!(observed.copied("https://example.com".into(), false));
+    }
+
+    #[test]
+    fn upstream_clear_deletes_only_the_recent_capture_of_the_cleared_value() {
+        let mut observed = Observation::default();
+        observed.changed(Some("copied from a password manager".into()));
+        observed.captured = Some((7, 1_000));
+        assert_eq!(observed.cleared(1_000 + CLEARED_CAPTURE_SECONDS), Some(7));
+        // The clear also forgets the value, so a new copy is captured again.
+        assert_eq!(observed.cleared(1_001), None);
+        assert_eq!(
+            observed.changed(Some("copied from a password manager".into())),
+            Some("copied from a password manager".into())
+        );
+
+        observed.captured = Some((8, 1_000));
+        assert_eq!(observed.cleared(1_001 + CLEARED_CAPTURE_SECONDS), None);
+
+        // A later value replaces the capture. Clearing it keeps entry 9.
+        observed.changed(Some("A".into()));
+        observed.captured = Some((9, 1_000));
+        observed.changed(Some("B".into()));
+        assert_eq!(observed.cleared(1_001), None);
+
+        // Copies from TinyDash are never recorded as captures.
+        assert!(observed.copied("C".into(), false));
+        assert_eq!(observed.cleared(1_001), None);
+    }
+
+    #[test]
+    fn a_secret_forgets_the_previous_value() {
+        let mut observed = Observation::default();
+        assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
+        observed.captured = Some((1, 1_000));
+        // capture() maps Observed::Secret to no text.
+        assert_eq!(observed.changed(None), None);
+        assert_eq!(observed.cleared(1_001), None);
+        assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
+    }
+
+    #[test]
+    fn search_stays_available_while_a_delete_waits_for_sqlite() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("state.sqlite3");
+        let mut database = Database::open(&path).expect("open");
+        let id = database
+            .capture_clipboard("kept", 1, 100)
+            .expect("capture")
+            .0
+            .id;
+        let key = format!("clipboard:{id}");
+        let search = Mutex::new(SearchManager::default());
+        search.lock().expect("search").clipboard =
+            ClipboardProvider::new(database.load_clipboard().expect("load"));
+        let other = rusqlite::Connection::open(&path).expect("other connection");
+        other.execute_batch("BEGIN IMMEDIATE").expect("lock");
+
+        let search = &search;
+        let database = std::thread::scope(|scope| {
+            let deleting = scope.spawn(move || {
+                let result = delete_and_publish(&database, search, Deletion::Entry(id));
+                (result, database)
+            });
+            // SQLite waits for its busy timeout. Search must not wait too.
+            while !deleting.is_finished() {
+                drop(search.try_lock().expect("search is free during the write"));
+                std::thread::yield_now();
+            }
+            let (result, database) = deleting.join().expect("delete");
+            assert!(matches!(result, Err(DeleteError::Storage(_))));
+            database
+        });
+        // A failed write keeps the entry visible.
+        assert!(search.lock().expect("search").clipboard_entry(&key).is_ok());
+
+        other.execute_batch("ROLLBACK").expect("unlock");
+        assert!(delete_and_publish(&database, search, Deletion::Entry(id)).is_ok());
+        assert!(
+            search
+                .lock()
+                .expect("search")
+                .clipboard_entry(&key)
+                .is_err()
+        );
+        assert!(database.load_clipboard().expect("load").is_empty());
     }
 
     #[test]

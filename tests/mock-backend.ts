@@ -172,6 +172,17 @@ const file: SearchResult = {
   primaryAction: "open",
   secondaryActions: ["reveal"],
 };
+const folder: SearchResult = {
+  id: "file:/Documents/Projects",
+  kind: "folder",
+  title: "Projects",
+  subtitle: "/Documents/Projects",
+  path: "/Documents/Projects",
+  score: 2000,
+  icon: null,
+  primaryAction: "open",
+  secondaryActions: ["reveal"],
+};
 const emoji: SearchResult = {
   id: "emoji:🚀",
   kind: "emoji",
@@ -246,6 +257,7 @@ function restorePin(key: string): SearchResult | undefined {
   const available = [
     ...apps,
     file,
+    folder,
     emoji,
     ...gridEmoji,
     ...systemCommands,
@@ -502,7 +514,9 @@ mockIPC(
           : mode === "files" || query === "Launch notes.md"
             ? query === "missing"
               ? []
-              : [file]
+              : query === "Projects"
+                ? [folder]
+                : [file]
             : mode === "clipboard"
               ? clips.filter((entry) => {
                   const pinned = Object.values(state.pins).some((keys) =>

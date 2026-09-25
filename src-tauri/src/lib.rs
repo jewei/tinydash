@@ -164,6 +164,7 @@ pub fn run() -> anyhow::Result<()> {
             }
             app.manage(LauncherState::new(settings, warnings));
             launcher::scan_apps(app.handle());
+            launcher::app_watch::start(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {

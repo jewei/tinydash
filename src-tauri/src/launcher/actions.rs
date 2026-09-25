@@ -188,6 +188,7 @@ mod tests {
             id: "file:/test.txt".into(),
             name: "test.txt".into(),
             path: "/test.txt".into(),
+            folder: false,
         };
         assert_eq!(
             ResolvedAction::File(file.clone(), Action::Open).usage_id("ignored"),
