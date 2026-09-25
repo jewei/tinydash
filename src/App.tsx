@@ -47,6 +47,7 @@ import {
 const groupLabels: Record<SearchResult["kind"], string> = {
   app: "Applications",
   file: "Files",
+  folder: "Files",
   clipboard: "Clipboard history",
   emoji: "Emoji",
   calculation: "Calculator",
@@ -239,7 +240,9 @@ export default function App(
           primaryLabel() === "Open"
             ? current()?.kind === "file"
               ? "Open file"
-              : "Open application"
+              : current()?.kind === "folder"
+                ? "Open folder"
+                : "Open application"
             : primaryLabel(),
         icon: current()?.primaryAction === "copy" ? "copy" : "return",
         run: runPrimary,
@@ -1582,7 +1585,7 @@ export default function App(
                 : mode() === "files"
                   ? files().indexing
                     ? "Scanning files..."
-                    : `${files().total} ${files().total === 1 ? "file" : "files"} indexed`
+                    : `${files().total} ${files().total === 1 ? "item" : "items"} indexed`
                   : mode() === "emoji" ||
                       mode() === "clipboard" ||
                       mode() === "system" ||

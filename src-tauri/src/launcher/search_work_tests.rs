@@ -137,6 +137,7 @@ fn fixture(apps: usize, files: usize) -> SearchManager {
                     id: format!("file:{path}"),
                     name: format!("Safari-{index:05}.txt"),
                     path,
+                    folder: false,
                 }
             })
             .collect(),

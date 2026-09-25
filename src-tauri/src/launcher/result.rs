@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum ResultKind {
     App,
     File,
+    Folder,
     Calculation,
     Emoji,
     Clipboard,
@@ -20,7 +21,7 @@ impl ResultKind {
         use super::query::SearchMode;
         match self {
             Self::App => SearchMode::Apps,
-            Self::File => SearchMode::Files,
+            Self::File | Self::Folder => SearchMode::Files,
             Self::Calculation => SearchMode::Calculator,
             Self::Emoji => SearchMode::Emoji,
             Self::Clipboard => SearchMode::Clipboard,

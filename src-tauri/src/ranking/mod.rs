@@ -56,7 +56,7 @@ pub fn top_results(mut results: Vec<SearchResult>, limit: usize) -> Vec<SearchRe
             | ResultKind::CleanedUrl
             | ResultKind::WebSearch => 0,
             ResultKind::App => 1,
-            ResultKind::File => 2,
+            ResultKind::File | ResultKind::Folder => 2,
             ResultKind::SystemCommand => 3,
             ResultKind::Clipboard => 4,
             ResultKind::Emoji => 5,

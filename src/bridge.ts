@@ -32,6 +32,7 @@ export interface SearchResult {
   kind:
     | "app"
     | "file"
+    | "folder"
     | "emoji"
     | "calculation"
     | "clipboard"

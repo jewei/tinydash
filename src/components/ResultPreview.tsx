@@ -23,6 +23,8 @@ export default function ResultPreview(props: {
         return "Application";
       case "file":
         return "File";
+      case "folder":
+        return "Folder";
       case "clipboard":
         return "Clipboard history";
       case "calculation":
@@ -47,6 +49,8 @@ export default function ResultPreview(props: {
         return "Launch application";
       case "file":
         return "Open file";
+      case "folder":
+        return "Open folder";
       case "clipboard":
         return "Copy saved text";
       case "calculation":
@@ -164,14 +168,17 @@ export default function ResultPreview(props: {
                 props.result!.kind !== "clipboard" &&
                 props.result!.kind !== "timezone" &&
                 props.result!.kind !== "app" &&
-                props.result!.kind !== "file"
+                props.result!.kind !== "file" &&
+                props.result!.kind !== "folder"
               }
             >
               <p class="preview-subtitle">{props.result!.subtitle}</p>
             </Show>
             <Show
               when={
-                props.result!.kind === "app" || props.result!.kind === "file"
+                props.result!.kind === "app" ||
+                props.result!.kind === "file" ||
+                props.result!.kind === "folder"
               }
             >
               <dl class="preview-metadata">
@@ -194,7 +201,7 @@ export default function ResultPreview(props: {
                   </dd>
                 </div>
                 <div>
-                  <dt>File</dt>
+                  <dt>{props.result!.kind === "folder" ? "Folder" : "File"}</dt>
                   <dd title={pathParts().file}>{pathParts().file}</dd>
                 </div>
               </dl>

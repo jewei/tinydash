@@ -25,10 +25,13 @@ pub struct FileEntry {
     pub id: String,
     pub name: String,
     pub path: String,
+    pub folder: bool,
 }
 
 impl FileEntry {
-    fn new(path: &Path) -> Option<Self> {
+    // A folder keeps the `file:` ID prefix. Paths are unique across both kinds,
+    // so actions, pins, and usage do not change.
+    fn new(path: &Path, folder: bool) -> Option<Self> {
         // The opener accepts UTF-8 paths. Never use a lossy path for an action ID.
         let path = path.to_str()?;
         #[cfg(target_os = "windows")]
@@ -43,13 +46,18 @@ impl FileEntry {
             name: Path::new(&path).file_name()?.to_str()?.to_owned(),
             id: format!("file:{path}"),
             path,
+            folder,
         })
     }
 
     pub fn result(&self, score: u32) -> SearchResult {
         SearchResult {
             id: self.id.clone(),
-            kind: ResultKind::File,
+            kind: if self.folder {
+                ResultKind::Folder
+            } else {
+                ResultKind::File
+            },
             title: self.name.clone(),
             subtitle: self.path.clone(),
             path: Some(self.path.clone()),
@@ -71,7 +79,12 @@ impl FileEntry {
                 error.into()
             }
         })?;
-        if metadata.is_file() && !metadata.file_type().is_symlink() {
+        let kind_matches = if self.folder {
+            metadata.is_dir()
+        } else {
+            metadata.is_file()
+        };
+        if kind_matches && !metadata.file_type().is_symlink() {
             Ok(())
         } else {
             Err(Error::FileNotFound)
@@ -271,7 +284,7 @@ pub fn expand_root(path: &Path, home: Option<&Path>) -> Option<PathBuf> {
     }
 }
 
-/// Scan names and paths only. This function never reads file contents.
+/// Scan file and folder names and paths only. This function never reads file contents.
 pub fn scan(
     roots: Vec<PathBuf>,
     excluded: &[String],
@@ -347,18 +360,23 @@ pub fn scan(
                 }
                 continue;
             }
-            if entry.file_type().is_file() {
-                if let Some(file) = FileEntry::new(entry.path()) {
-                    if entries.len() >= limit {
-                        report.limited = true;
-                        break 'roots;
-                    }
-                    entries.push(file);
-                } else {
-                    report.issue(entry.path(), "Path is not valid UTF-8.");
-                }
-            } else if directory {
+            if !directory && !entry.file_type().is_file() {
+                continue;
+            }
+            if directory {
                 report.directory(entry.path());
+            }
+            if let Some(item) = FileEntry::new(entry.path(), directory) {
+                if entries.len() >= limit {
+                    report.limited = true;
+                    break 'roots;
+                }
+                entries.push(item);
+            } else {
+                report.issue(entry.path(), "Path is not valid UTF-8.");
+                if directory {
+                    walk.skip_current_dir();
+                }
             }
         }
     }
@@ -368,7 +386,7 @@ pub fn scan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::launcher::{query::SearchMode, search::SearchManager};
+    use crate::launcher::{actions::ResolvedAction, query::SearchMode, search::SearchManager};
     use std::fs;
 
     #[test]
@@ -376,10 +394,13 @@ mod tests {
     fn profile_search_50k_files() {
         let files = (0..50_000)
             .map(|index| {
-                FileEntry::new(Path::new(&format!(
-                    "/benchmark/Project-{}/Document-{index}.txt",
-                    index % 100
-                )))
+                FileEntry::new(
+                    Path::new(&format!(
+                        "/benchmark/Project-{}/Document-{index}.txt",
+                        index % 100
+                    )),
+                    false,
+                )
                 .expect("entry")
             })
             .collect();
@@ -406,7 +427,7 @@ mod tests {
     #[test]
     fn matches_composed_and_decomposed_unicode_without_changing_file_paths() {
         let path = Path::new("/Documents/cafe\u{301}.txt");
-        let entry = FileEntry::new(path).expect("entry");
+        let entry = FileEntry::new(path, false).expect("entry");
         let id = entry.id.clone();
         let provider = FileProvider::new(vec![entry]);
         let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
@@ -423,7 +444,7 @@ mod tests {
 
     #[test]
     fn ascii_matching_borrows_existing_entry_storage() {
-        let entry = FileEntry::new(Path::new("/Documents/Report.txt")).expect("entry");
+        let entry = FileEntry::new(Path::new("/Documents/Report.txt"), false).expect("entry");
         let provider = FileProvider::new(vec![entry]);
         let file = &provider.files[0];
         assert!(file.name.is_none());
@@ -461,6 +482,7 @@ mod tests {
             id: format!("file:{path}"),
             name: name.into(),
             path: path.into(),
+            folder: false,
         })
         .collect::<Vec<_>>();
         let provider = FileProvider::new(entries.clone());
@@ -551,7 +573,8 @@ mod tests {
             100,
             &mut report,
         );
-        assert_eq!(files.len(), 2);
+        // Two files and the Reports folder.
+        assert_eq!(files.len(), 3);
         assert_eq!(report.warning(), None);
         let mut search = SearchManager::default();
         search.replace_files(files);
@@ -614,7 +637,59 @@ mod tests {
                 .expect("search")
                 .results
                 .len(),
-            2
+            3
+        );
+    }
+
+    #[test]
+    fn folders_are_results_that_open_and_validate_as_folders() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write(dir.path(), "Invoices/2026/march.pdf", "");
+        write(dir.path(), "invoices.txt", "");
+        write(dir.path(), ".hidden/Invoices/april.pdf", "");
+        let files = scan(
+            vec![dir.path().into()],
+            &[],
+            100,
+            &mut ScanReport::default(),
+        );
+        let mut search = SearchManager::default();
+        search.replace_files(files);
+        let results = search
+            .search("Invoices", SearchMode::Files)
+            .expect("search")
+            .results;
+        let folder = results
+            .iter()
+            .find(|result| result.kind == ResultKind::Folder)
+            .expect("folder result");
+        assert_eq!(folder.title, "Invoices");
+        assert!(
+            results
+                .iter()
+                .all(|result| !result.subtitle.contains(".hidden")),
+            "Hidden folders stay out of the index"
+        );
+        assert!(results.iter().any(|result| result.kind == ResultKind::File));
+        assert_eq!(folder.primary_action, Action::Open);
+        assert_eq!(folder.secondary_actions, [Action::Reveal]);
+        let Ok(ResolvedAction::File(entry, Action::Open)) =
+            search.resolve_action(&folder.id, Action::Open)
+        else {
+            panic!("folders open like files");
+        };
+        assert!(entry.validate().is_ok());
+        let path = dir.path().join("Invoices");
+        fs::remove_dir_all(&path).expect("delete");
+        fs::write(&path, "").expect("replace with a file");
+        assert!(matches!(entry.validate(), Err(Error::FileNotFound)));
+        assert_eq!(
+            search
+                .search("2026", SearchMode::Files)
+                .expect("search")
+                .results[0]
+                .kind,
+            ResultKind::Folder
         );
     }
 
@@ -758,7 +833,7 @@ mod tests {
     fn rejects_non_utf8_paths_without_lossy_action_ids() {
         use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
         let path = Path::new(OsStr::from_bytes(b"/bad\xff.txt"));
-        assert!(FileEntry::new(path).is_none());
+        assert!(FileEntry::new(path, false).is_none());
     }
 
     #[cfg(target_os = "linux")]
@@ -791,7 +866,16 @@ mod tests {
         fs::set_permissions(&denied, fs::Permissions::from_mode(0o700))
             .expect("restore permissions");
         if cannot_read {
-            assert_eq!(files.len(), 1);
+            // The unreadable folder is listed. Its contents are not.
+            assert_eq!(files.len(), 2);
+            assert!(
+                files
+                    .get(&format!(
+                        "file:{}",
+                        denied.canonicalize().expect("path").display()
+                    ))
+                    .is_some_and(|entry| entry.folder)
+            );
             assert!(report.issue_count > 0);
         }
     }

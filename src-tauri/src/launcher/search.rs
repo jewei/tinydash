@@ -689,6 +689,7 @@ mod tests {
                                 id: format!("file:{path}"),
                                 name,
                                 path,
+                                folder: false,
                             })
                             .collect(),
                     ));
@@ -739,6 +740,7 @@ mod tests {
                     id: format!("file:/fixture/sleep-{i}.txt"),
                     name: format!("sleep-{i}.txt"),
                     path: format!("/fixture/sleep-{i}.txt"),
+                    folder: false,
                 })
                 .collect(),
         ));
