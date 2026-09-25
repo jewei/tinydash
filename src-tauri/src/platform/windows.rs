@@ -458,18 +458,25 @@ impl Drop for ShutdownPrivilege {
 }
 
 // Read only after the native counter changes. No window or frequent text polling.
-pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, Option<String>)>> {
-    use crate::providers::clipboard::{MAX_TEXT_BYTES, valid_text};
+pub fn clipboard_snapshot(
+    previous: Option<u64>,
+) -> anyhow::Result<Option<(u64, crate::providers::clipboard::Observed)>> {
+    use crate::providers::clipboard::{MAX_TEXT_BYTES, Observed, SECRET_FORMATS};
     use windows_sys::Win32::System::{
         DataExchange::{
-            CloseClipboard, GetClipboardData, GetClipboardSequenceNumber,
-            IsClipboardFormatAvailable, OpenClipboard,
+            CloseClipboard, CountClipboardFormats, GetClipboardData, GetClipboardSequenceNumber,
+            IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW,
         },
         Memory::{GlobalLock, GlobalSize, GlobalUnlock},
     };
     const UNICODE_TEXT: u32 = 13; // CF_UNICODETEXT, defined by Win32.
+    let format = |name: &str| {
+        let name = name.encode_utf16().chain([0]).collect::<Vec<_>>();
+        // Registration returns the existing ID for a known name, or 0.
+        unsafe { RegisterClipboardFormatW(name.as_ptr()) }
+    };
     // All pointers come from Win32. Clipboard ownership and the global memory
-    // lock remain held until the bounded UTF-16 slice has been copied.
+    // lock remain held until the bounded data has been copied.
     unsafe {
         let counter = u64::from(GetClipboardSequenceNumber());
         if previous == Some(counter) {
@@ -488,8 +495,33 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         }
         let _close = Close;
         let counter = u64::from(GetClipboardSequenceNumber());
+        if CountClipboardFormats() == 0 {
+            return Ok(Some((counter, Observed::Cleared)));
+        }
+        let available = |id: u32| id != 0 && IsClipboardFormatAvailable(id) != 0;
+        // Windows documents a DWORD 0 in this format as "exclude from history".
+        let history_excluded = || {
+            let id = format("CanIncludeInClipboardHistory");
+            if !available(id) {
+                return false;
+            }
+            let handle = GetClipboardData(id);
+            if handle.is_null() || GlobalSize(handle) < 4 {
+                return false;
+            }
+            let pointer = GlobalLock(handle);
+            if pointer.is_null() {
+                return false;
+            }
+            let value = pointer.cast::<u32>().read_unaligned();
+            GlobalUnlock(handle);
+            value == 0
+        };
+        if SECRET_FORMATS.iter().any(|name| available(format(name))) || history_excluded() {
+            return Ok(Some((counter, Observed::Secret)));
+        }
         if IsClipboardFormatAvailable(UNICODE_TEXT) == 0 {
-            return Ok(Some((counter, None)));
+            return Ok(Some((counter, Observed::Other)));
         }
         let handle = GetClipboardData(UNICODE_TEXT);
         if handle.is_null() {
@@ -497,7 +529,7 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         }
         let bytes = GlobalSize(handle);
         if bytes == 0 || bytes > (MAX_TEXT_BYTES + 1) * 2 || !bytes.is_multiple_of(2) {
-            return Ok(Some((counter, None)));
+            return Ok(Some((counter, Observed::Other)));
         }
         let pointer = GlobalLock(handle);
         if pointer.is_null() {
@@ -507,10 +539,12 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         let text = data
             .iter()
             .position(|value| *value == 0)
-            .and_then(|end| String::from_utf16(&data[..end]).ok())
-            .filter(|text| valid_text(text));
+            .and_then(|end| String::from_utf16(&data[..end]).ok());
         GlobalUnlock(handle);
-        Ok(Some((u64::from(GetClipboardSequenceNumber()), text)))
+        Ok(Some((
+            u64::from(GetClipboardSequenceNumber()),
+            Observed::from_text(text),
+        )))
     }
 }
 

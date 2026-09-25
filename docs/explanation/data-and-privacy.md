@@ -1,6 +1,6 @@
 # Data storage and privacy
 
-TinyDash keeps settings in a JSON file and saved state in a local SQLite database. Clipboard history can contain private text. It is not encrypted. Capture starts only after the user enables it on a fresh installation. Turning capture off keeps saved entries until they are cleared.
+TinyDash keeps settings in a JSON file and saved state in a local SQLite database. Clipboard history can contain private text. It is not encrypted. Content that its source marks as secret is not saved; see [Clipboard history](../reference/features/clipboard.md#secrets). Capture starts only after the user enables it on a fresh installation. Turning capture off keeps saved entries until they are cleared.
 
 Currency refresh downloads a shared rate table. Search text, amounts, clipboard text, and file paths are not part of that request. Web search opens a URL only when the user chooses the action. URL cleaning and the other local tools work offline.
 

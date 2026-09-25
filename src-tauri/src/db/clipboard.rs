@@ -80,6 +80,14 @@ impl Database {
         Ok(())
     }
 
+    /// Deletes an entry unless a pin keeps it. Returns whether it was deleted.
+    pub fn delete_unpinned_clipboard(&self, id: i64) -> Result<bool> {
+        Ok(self.connection.execute(
+            "DELETE FROM clipboard_history WHERE id = ?1 AND pinned = 0",
+            [id],
+        )? > 0)
+    }
+
     pub fn clear_clipboard(&self) -> Result<()> {
         self.connection
             .execute("DELETE FROM clipboard_history", [])?;
@@ -199,6 +207,44 @@ mod tests {
                 .is_err()
         );
         assert_eq!(database.load_clipboard().expect("load").len(), 1);
+    }
+
+    #[test]
+    fn deleting_a_cleared_capture_keeps_a_pinned_entry() {
+        let directory = tempfile::tempdir().expect("directory");
+        let mut database = Database::open(&directory.path().join("state.sqlite3")).expect("open");
+        let pinned = database
+            .capture_clipboard("pinned", 1, 100)
+            .expect("pinned")
+            .0;
+        let cleared = database
+            .capture_clipboard("cleared", 2, 100)
+            .expect("cleared")
+            .0;
+        database
+            .set_pinned(&format!("clipboard:{}", pinned.id), SearchMode::All, true)
+            .expect("pin");
+
+        assert!(!database.delete_unpinned_clipboard(pinned.id).expect("keep"));
+        assert!(
+            database
+                .delete_unpinned_clipboard(cleared.id)
+                .expect("delete")
+        );
+        assert!(
+            !database
+                .delete_unpinned_clipboard(cleared.id)
+                .expect("missing")
+        );
+        assert_eq!(
+            database
+                .load_clipboard()
+                .expect("load")
+                .into_iter()
+                .map(|entry| entry.id)
+                .collect::<Vec<_>>(),
+            [pinned.id]
+        );
     }
 
     #[test]

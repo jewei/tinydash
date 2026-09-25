@@ -9,7 +9,7 @@ use crate::{
     db::Database,
     error::Error,
     providers::clipboard::{
-        ClipboardProvider, MAX_SELECTION_ENTRIES, combine_entries, entry_id, valid_text,
+        ClipboardProvider, MAX_SELECTION_ENTRIES, Observed, combine_entries, entry_id, valid_text,
     },
     ranking,
 };
@@ -20,8 +20,16 @@ struct Session {
     observed: Observation,
 }
 
+/// Seconds after a capture in which an upstream clear still deletes it. Apple
+/// Passwords sets no secret marker and empties the clipboard after about 90 s.
+const CLEARED_CAPTURE_SECONDS: i64 = 120;
+
 #[derive(Default)]
-struct Observation(Option<String>);
+struct Observation {
+    text: Option<String>,
+    // The entry that the monitor saved for `text`, and when.
+    captured: Option<(i64, i64)>,
+}
 
 impl Observation {
     fn copied(&mut self, text: String, sensitive: bool) -> bool {
@@ -31,11 +39,22 @@ impl Observation {
     }
     fn changed(&mut self, text: Option<String>) -> Option<String> {
         let text = text.filter(|text| valid_text(text));
-        if self.0 == text {
+        if self.text == text {
             return None;
         }
-        self.0.clone_from(&text);
+        self.text.clone_from(&text);
+        self.captured = None;
         text
+    }
+    // A source that empties the clipboard considered its content sensitive.
+    // Return only the entry saved for that content. Older history, copies
+    // from TinyDash, and captures outside the window stay.
+    fn cleared(&mut self, now: i64) -> Option<i64> {
+        self.text = None;
+        self.captured
+            .take()
+            .filter(|(_, at)| now.saturating_sub(*at) <= CLEARED_CAPTURE_SECONDS)
+            .map(|(id, _)| id)
     }
 }
 
@@ -209,35 +228,47 @@ impl Storage {
         }
     }
 
-    pub fn capture(&self, app: &AppHandle, text: Option<String>, generation: u64) {
+    pub fn capture(&self, app: &AppHandle, observed: Observed, generation: u64) {
         let state = app.state::<LauncherState>();
         let Ok(mut session) = self.session(app, &state.search).lock() else {
             return;
         };
         // A delete, clear, or copy invalidates reads that were already in flight.
-        if generation != state.clipboard.generation() || !state.settings().clipboard_history_enabled
-        {
+        if generation != state.clipboard.generation() {
+            return;
+        }
+        let text = match observed {
+            Observed::Cleared => {
+                if let Some(id) = session.observed.cleared(ranking::now()) {
+                    self.forget_cleared(app, &mut session, id);
+                }
+                return;
+            }
+            Observed::Text(text) => Some(text),
+            // A marked secret is never read, and it replaces the previous value.
+            Observed::Secret | Observed::Other => None,
+        };
+        if !state.settings().clipboard_history_enabled {
             return;
         }
         let Some(text) = session.observed.changed(text) else {
             return;
         };
-        self.save_clipboard(app, &mut session, &text);
+        if let Some(id) = self.save_clipboard(app, &mut session, &text) {
+            session.observed.captured = Some((id, ranking::now()));
+        }
     }
 
-    fn save_clipboard(&self, app: &AppHandle, session: &mut Session, text: &str) {
+    fn forget_cleared(&self, app: &AppHandle, session: &mut Session, id: i64) {
         let state = app.state::<LauncherState>();
-        if !state.settings().clipboard_history_enabled || !valid_text(text) {
-            return;
-        }
-        let Some(database) = session.database.as_mut() else {
+        let Some(database) = session.database.as_ref() else {
             return;
         };
-        match database.capture_clipboard(text, ranking::now(), state.settings().clipboard_limit()) {
-            Ok((entry, removed)) => {
-                let indexed = entry.into();
+        match database.delete_unpinned_clipboard(id) {
+            Ok(false) => {}
+            Ok(true) => {
                 if let Ok(mut search) = state.search.lock() {
-                    search.clipboard.update(indexed, &removed);
+                    search.clipboard.remove(id);
                 }
                 super::clipboard::changed(app);
             }
@@ -245,6 +276,31 @@ impl Storage {
                 self.failed(&error);
                 session.database = None;
                 super::clipboard::changed(app);
+            }
+        }
+    }
+
+    fn save_clipboard(&self, app: &AppHandle, session: &mut Session, text: &str) -> Option<i64> {
+        let state = app.state::<LauncherState>();
+        if !state.settings().clipboard_history_enabled || !valid_text(text) {
+            return None;
+        }
+        let database = session.database.as_mut()?;
+        match database.capture_clipboard(text, ranking::now(), state.settings().clipboard_limit()) {
+            Ok((entry, removed)) => {
+                let id = entry.id;
+                let indexed = entry.into();
+                if let Ok(mut search) = state.search.lock() {
+                    search.clipboard.update(indexed, &removed);
+                }
+                super::clipboard::changed(app);
+                Some(id)
+            }
+            Err(error) => {
+                self.failed(&error);
+                session.database = None;
+                super::clipboard::changed(app);
+                None
             }
         }
     }
@@ -273,13 +329,17 @@ impl Storage {
         } else {
             None
         };
-        app.clipboard()
-            .write_text(text.clone())
-            .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;
+        let secret = id.starts_with("password:");
+        if secret {
+            super::clipboard::write_secret(&text).map_err(|error| error.to_string())
+        } else {
+            app.clipboard()
+                .write_text(text.clone())
+                .map_err(|error| error.to_string())
+        }
+        .map_err(|error| format!("Could not copy to the clipboard: {error}"))?;
         state.clipboard.invalidate();
-        let changed = session
-            .observed
-            .copied(text.clone(), id.starts_with("password:"));
+        let changed = session.observed.copied(text.clone(), secret);
         if let Some(id) = clipboard_id {
             if let Some(database) = session.database.as_mut() {
                 match database.touch_clipboard(id, ranking::now()) {
@@ -472,6 +532,44 @@ mod tests {
             Some("ordinary text".into())
         );
         assert!(observed.copied("https://example.com".into(), false));
+    }
+
+    #[test]
+    fn upstream_clear_deletes_only_the_recent_capture_of_the_cleared_value() {
+        let mut observed = Observation::default();
+        observed.changed(Some("copied from a password manager".into()));
+        observed.captured = Some((7, 1_000));
+        assert_eq!(observed.cleared(1_000 + CLEARED_CAPTURE_SECONDS), Some(7));
+        // The clear also forgets the value, so a new copy is captured again.
+        assert_eq!(observed.cleared(1_001), None);
+        assert_eq!(
+            observed.changed(Some("copied from a password manager".into())),
+            Some("copied from a password manager".into())
+        );
+
+        observed.captured = Some((8, 1_000));
+        assert_eq!(observed.cleared(1_001 + CLEARED_CAPTURE_SECONDS), None);
+
+        // A later value replaces the capture. Clearing it keeps entry 9.
+        observed.changed(Some("A".into()));
+        observed.captured = Some((9, 1_000));
+        observed.changed(Some("B".into()));
+        assert_eq!(observed.cleared(1_001), None);
+
+        // Copies from TinyDash are never recorded as captures.
+        assert!(observed.copied("C".into(), false));
+        assert_eq!(observed.cleared(1_001), None);
+    }
+
+    #[test]
+    fn a_secret_forgets_the_previous_value() {
+        let mut observed = Observation::default();
+        assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
+        observed.captured = Some((1, 1_000));
+        // capture() maps Observed::Secret to no text.
+        assert_eq!(observed.changed(None), None);
+        assert_eq!(observed.cleared(1_001), None);
+        assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
     }
 
     #[test]

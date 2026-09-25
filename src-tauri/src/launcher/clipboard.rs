@@ -7,6 +7,8 @@ use std::sync::{
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::LauncherState;
+#[cfg(target_os = "linux")]
+use crate::providers::clipboard::Observed;
 use crate::{error::Error, providers::clipboard::ClipboardEntry};
 
 #[derive(Default)]
@@ -18,7 +20,7 @@ pub struct Monitor {
     #[cfg(target_os = "linux")]
     read_sequence: AtomicU64,
     #[cfg(target_os = "linux")]
-    pending: Mutex<Option<(Option<String>, u64)>>,
+    pending: Mutex<Option<(Observed, u64)>>,
 }
 
 impl Monitor {
@@ -53,6 +55,26 @@ impl Monitor {
     }
 }
 
+/// Copies a generated secret with the platform markers that tell TinyDash and
+/// other clipboard managers not to record it. The markers stay with the
+/// clipboard, so the value is also skipped after TinyDash restarts.
+pub fn write_secret(text: &str) -> Result<(), arboard::Error> {
+    let mut clipboard = arboard::Clipboard::new()?;
+    let set = clipboard.set();
+    #[cfg(target_os = "macos")]
+    let set = arboard::SetExtApple::exclude_from_history(set);
+    #[cfg(target_os = "windows")]
+    let set = {
+        use arboard::SetExtWindows;
+        set.exclude_from_monitoring()
+            .exclude_from_history()
+            .exclude_from_cloud()
+    };
+    #[cfg(target_os = "linux")]
+    let set = arboard::SetExtLinux::exclude_from_history(set);
+    set.text(text)
+}
+
 pub fn changed(app: &AppHandle) {
     if let Err(error) = app.emit("clipboard-changed", ()) {
         tracing::debug!(%error, "No clipboard listener");
@@ -83,12 +105,12 @@ pub fn start(app: &AppHandle) {
                     let generation = state.clipboard.generation();
                     if state.settings().clipboard_history_enabled {
                         match crate::platform::clipboard_snapshot(previous) {
-                            Ok(Some((counter, text))) => {
+                            Ok(Some((counter, observed))) => {
                                 previous = Some(counter);
                                 if let Ok(mut warning) = state.clipboard.warning.lock() {
                                     *warning = None;
                                 }
-                                state.storage.capture(&worker_app, text, generation);
+                                state.storage.capture(&worker_app, observed, generation);
                             }
                             Ok(None) => {}
                             Err(_) => state.clipboard.failed(), // Never log clipboard contents.
@@ -115,8 +137,8 @@ pub fn start(app: &AppHandle) {
                     .lock()
                     .ok()
                     .and_then(|mut pending| pending.take());
-                if let Some((text, generation)) = pending {
-                    state.storage.capture(&worker_app, text, generation);
+                if let Some((observed, generation)) = pending {
+                    state.storage.capture(&worker_app, observed, generation);
                 }
             }
         });
@@ -173,7 +195,7 @@ fn request_linux(app: &AppHandle) {
         .fetch_add(1, Ordering::AcqRel)
         .wrapping_add(1);
     let app = app.clone();
-    crate::platform::read_clipboard(move |text| {
+    crate::platform::read_clipboard(move |observed| {
         let state = app.state::<LauncherState>();
         if sequence != state.clipboard.read_sequence.load(Ordering::Acquire) {
             return;
@@ -181,7 +203,7 @@ fn request_linux(app: &AppHandle) {
         // Keep only the latest pending text. A burst of owner changes cannot
         // allocate an unbounded queue while SQLite is busy.
         if let Ok(mut pending) = state.clipboard.pending.lock() {
-            *pending = Some((text, generation));
+            *pending = Some((observed, generation));
         }
         state.clipboard.wake();
     });

@@ -341,32 +341,83 @@ fn power_event(command: crate::providers::system::SystemCommand) -> Result<Apple
     Ok(event)
 }
 
+// These apps copy passwords with no secret marker. The frontmost app during
+// the one-second check is usually the app that copied.
+const SECRET_SOURCES: [&str; 2] = ["com.apple.Passwords", "com.apple.keychainaccess"];
+
 // Called on the clipboard worker. The counter check does not fetch text.
-pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, Option<String>)>> {
-    use crate::providers::clipboard::{MAX_TEXT_BYTES, valid_text};
-    use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
+pub fn clipboard_snapshot(
+    previous: Option<u64>,
+) -> anyhow::Result<Option<(u64, crate::providers::clipboard::Observed)>> {
+    use crate::providers::clipboard::{MAX_TEXT_BYTES, Observed, is_secret_format};
+    use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString, NSWorkspace};
     objc2::rc::autoreleasepool(|_| {
         let clipboard = NSPasteboard::generalPasteboard();
         let counter = clipboard.changeCount() as u64;
         if previous == Some(counter) {
             return Ok(None);
         }
-        // NSPasteboardTypeString is an immutable AppKit constant.
-        let text = clipboard
-            .stringForType(unsafe { NSPasteboardTypeString })
-            .filter(|value| value.length() <= MAX_TEXT_BYTES)
-            .map(|value| value.to_string())
-            .filter(|value| valid_text(value));
+        let types = clipboard
+            .types()
+            .map(|types| {
+                types
+                    .iter()
+                    .map(|kind| kind.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let from_secret_source = || {
+            NSWorkspace::sharedWorkspace()
+                .frontmostApplication()
+                .and_then(|app| app.bundleIdentifier())
+                .is_some_and(|id| SECRET_SOURCES.contains(&id.to_string().as_str()))
+        };
+        let observed = if types.is_empty() {
+            Observed::Cleared
+        } else if types.iter().any(|kind| is_secret_format(kind)) || from_secret_source() {
+            Observed::Secret
+        } else {
+            // NSPasteboardTypeString is an immutable AppKit constant.
+            Observed::from_text(
+                clipboard
+                    .stringForType(unsafe { NSPasteboardTypeString })
+                    .filter(|value| value.length() <= MAX_TEXT_BYTES)
+                    .map(|value| value.to_string()),
+            )
+        };
         if clipboard.changeCount() as u64 != counter {
             anyhow::bail!("Clipboard changed during read");
         }
-        Ok(Some((counter, text)))
+        Ok(Some((counter, observed)))
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "Replaces the user's clipboard. Run with --ignored."]
+    fn generated_secret_is_skipped_by_a_fresh_monitor() {
+        use crate::providers::clipboard::Observed;
+        let mut clipboard = arboard::Clipboard::new().expect("clipboard");
+        let saved = clipboard.get_text().ok();
+        let read = || {
+            clipboard_snapshot(None)
+                .expect("read")
+                .map(|(_, observed)| observed)
+        };
+        clipboard.set_text("tinydash-test-plain").expect("plain");
+        let plain = read();
+        crate::launcher::clipboard::write_secret("tinydash-test-secret").expect("write");
+        // A restarted monitor has no previous counter and no observation.
+        let observed = read();
+        if let Some(saved) = saved {
+            clipboard.set_text(saved).expect("restore");
+        }
+        assert_eq!(plain, Some(Observed::Text("tinydash-test-plain".into())));
+        assert_eq!(observed, Some(Observed::Secret));
+    }
 
     #[test]
     fn apple_script_cancellation_does_not_claim_permission_failure() {

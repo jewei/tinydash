@@ -17,6 +17,52 @@ pub fn valid_text(text: &str) -> bool {
     text.len() <= MAX_TEXT_BYTES && !text.trim().is_empty() && !text.contains('\0')
 }
 
+/// Formats that a source adds when it copies a password, one-time code, or
+/// other secret. History never reads or saves such content. The presence of
+/// the format is the signal; its payload varies between sources.
+///
+/// - macOS: the nspasteboard.org concealed and transient types, and Apple's
+///   marker for autofill and browser password fields.
+/// - Windows: the documented clipboard monitor exclusion, and the older
+///   format that KeePass and similar tools set.
+/// - Linux: the KDE password manager hint, also set by KeePassXC.
+pub const SECRET_FORMATS: [&str; 6] = [
+    "org.nspasteboard.ConcealedType",
+    "org.nspasteboard.TransientType",
+    "com.apple.is-sensitive",
+    "ExcludeClipboardContentFromMonitorProcessing",
+    "Clipboard Viewer Ignore",
+    "x-kde-passwordManagerHint",
+];
+
+// Windows registers each name instead. Its reader uses the list directly.
+#[cfg_attr(windows, allow(dead_code))]
+pub fn is_secret_format(format: &str) -> bool {
+    SECRET_FORMATS.contains(&format)
+}
+
+/// The result of one read after the native clipboard changes.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Observed {
+    /// Text that history can save.
+    Text(String),
+    /// Content that its source marked as secret. The text is never read.
+    Secret,
+    /// A source emptied the clipboard. Password managers do this after a copy.
+    /// Linux cannot tell a clear from an application exit, so it never reports one.
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
+    Cleared,
+    /// Non-text content, or text that history does not accept.
+    Other,
+}
+
+impl Observed {
+    pub fn from_text(text: Option<String>) -> Self {
+        text.filter(|text| valid_text(text))
+            .map_or(Self::Other, Self::Text)
+    }
+}
+
 pub fn combine_entries(entries: &[&ClipboardEntry], separator: &str) -> Result<String, String> {
     if entries.is_empty() {
         return Err("Select at least one clipboard entry.".into());
@@ -200,6 +246,34 @@ impl ClipboardProvider {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn secret_formats_cover_each_platform_convention() {
+        for format in [
+            "org.nspasteboard.ConcealedType",
+            "org.nspasteboard.TransientType",
+            "com.apple.is-sensitive",
+            "ExcludeClipboardContentFromMonitorProcessing",
+            "Clipboard Viewer Ignore",
+            "x-kde-passwordManagerHint",
+        ] {
+            assert!(is_secret_format(format), "{format}");
+        }
+        for format in [
+            "public.utf8-plain-text",
+            "UTF8_STRING",
+            "CF_UNICODETEXT",
+            "",
+        ] {
+            assert!(!is_secret_format(format), "{format}");
+        }
+        assert_eq!(
+            Observed::from_text(Some("A".into())),
+            Observed::Text("A".into())
+        );
+        assert_eq!(Observed::from_text(Some(" \n".into())), Observed::Other);
+        assert_eq!(Observed::from_text(None), Observed::Other);
+    }
+
     use super::*;
 
     fn entry(id: i64, content: &str) -> ClipboardEntry {

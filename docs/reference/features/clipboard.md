@@ -8,7 +8,21 @@ Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. *
 
 The actions menu can edit a copy, combine selected entries in a chosen order with a separator, or save the full text as a file. Edited and combined copies leave history unchanged. Editing and combining leave the original entries unchanged. Combining accepts up to 100 entries and 16,384 output bytes. Saving uses the native Save dialog.
 
-History is local plain text in the same SQLite database as usage. It can contain sensitive text that you copy; there is no general password detection or encryption. Copies from TinyDash's password generator skip capture during that session. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
+History is local plain text in the same SQLite database as usage. It is not encrypted. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
+
+## Secrets
+
+TinyDash does not read or save clipboard content that its source marks as secret. Each platform has its own convention:
+
+- macOS: the [nspasteboard.org](http://nspasteboard.org/) concealed and transient types, and Apple's `com.apple.is-sensitive` type.
+- Windows: the documented [`ExcludeClipboardContentFromMonitorProcessing`](https://learn.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats#cloud-clipboard-and-clipboard-history-formats) format, `CanIncludeInClipboardHistory` set to 0, and the older `Clipboard Viewer Ignore` format.
+- Linux: the `x-kde-passwordManagerHint` target.
+
+Most password managers set one of these markers. TinyDash's password generator sets them too, so other clipboard managers also skip its copies. The markers stay on the clipboard, so a generated password is also skipped after TinyDash restarts. There is no detection of unmarked passwords.
+
+On macOS, Apple Passwords and Keychain Access copy passwords without a marker. TinyDash skips a copy while one of these apps is frontmost. The one-second check can attribute a copy to the wrong app when you switch apps quickly.
+
+On macOS and Windows, a source that empties the clipboard shows that the content was sensitive. Password managers do this some time after a copy. If TinyDash saved the cleared value in the previous 120 seconds, it deletes that entry. Pinned entries, copies from TinyDash, and older history stay. Linux cannot tell a clear from an application exit, so it skips this step.
 
 macOS checks the [pasteboard change counter](https://developer.apple.com/documentation/appkit/nspasteboard/changecount). Windows checks the [clipboard sequence number](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber). Each check runs once per second and when the launcher opens. Text is read only when the counter changes. Rapid copies within one interval can be missed. Linux uses GTK [owner-change events](https://docs.gtk.org/gtk3/signal.Clipboard.owner-change.html) and asynchronous text requests, with no polling timer. Wayland can restrict background access; opening TinyDash requests the current clipboard again. Desktop session checks remain necessary for Wayland.
 
