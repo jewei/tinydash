@@ -43,25 +43,45 @@ pub fn score_with_usage(score: u32, id: &str, usage: &HashMap<String, Usage>, no
     score.saturating_add(usage.get(id).map_or(0, |stats| usage_bonus(*stats, now)))
 }
 
-/// Group by category, then rank matches before limiting the response.
+const EXACT_BONUS: u32 = 10_000;
+const PREFIX_BONUS: u32 = 2_000;
+/// An alias match scores this much lower than the same name match.
+pub const ALIAS_PENALTY: u32 = 100;
+/// The lowest score of a name or alias that equals the query.
+pub const EXACT_MATCH: u32 = EXACT_BONUS - ALIAS_PENALTY;
+/// The lowest score of a name or alias that starts with the query. Fuzzy
+/// points stay below it; heavy usage can lift a close fuzzy match to it.
+pub const STRONG_MATCH: u32 = PREFIX_BONUS - ALIAS_PENALTY;
+
+/// Tools and calculations come first, then names that equal or start with
+/// the query, then fuzzy matches. Category order applies inside each tier.
+pub fn tier(result: &SearchResult) -> u8 {
+    match result.kind {
+        ResultKind::Calculation
+        | ResultKind::Password
+        | ResultKind::Timezone
+        | ResultKind::CleanedUrl
+        | ResultKind::WebSearch => 0,
+        _ if result.score >= STRONG_MATCH => 1,
+        _ => 2,
+    }
+}
+
+/// Rank by tier, then category, then score, before limiting the response.
 pub fn top_results(mut results: Vec<SearchResult>, limit: usize) -> Vec<SearchResult> {
     // An exact emoji shortcode must not displace an app prefix such as "sa".
-    // Explicit tools return separately; calculations can mix with text matches.
+    // An exact filename must not wait behind fuzzy app matches.
     // Stable sorting keeps provider order for equal scores within a category.
     results.sort_by_key(|result| {
-        let priority = match result.kind {
-            ResultKind::Calculation
-            | ResultKind::Password
-            | ResultKind::Timezone
-            | ResultKind::CleanedUrl
-            | ResultKind::WebSearch => 0,
+        let category = match result.kind {
             ResultKind::App => 1,
             ResultKind::File | ResultKind::Folder => 2,
             ResultKind::SystemCommand => 3,
             ResultKind::Clipboard => 4,
             ResultKind::Emoji => 5,
+            _ => 0,
         };
-        (priority, std::cmp::Reverse(result.score))
+        (tier(result), category, std::cmp::Reverse(result.score))
     });
     results.truncate(limit);
     results
@@ -79,9 +99,9 @@ pub fn normalize(value: &str) -> String {
 /// Providers supply fuzzy scores; ranking policy lives here.
 pub fn name_score(fuzzy: u32, normalized_name: &str, normalized_query: &str) -> u32 {
     let bonus = if normalized_name == normalized_query {
-        10_000
+        EXACT_BONUS
     } else if normalized_name.starts_with(normalized_query) {
-        2_000
+        PREFIX_BONUS
     } else {
         0
     };

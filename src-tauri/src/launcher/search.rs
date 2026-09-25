@@ -400,16 +400,7 @@ impl SearchManager {
             };
         }
         if let Some(outcome) = self.tools.search(query) {
-            return match outcome {
-                Ok(results) => SearchOutcome {
-                    results: results.into_iter().take(RESULT_LIMIT).collect(),
-                    notice: None,
-                },
-                Err(notice) => SearchOutcome {
-                    results: vec![],
-                    notice: Some(notice),
-                },
-            };
+            return self.tool_outcome(query, outcome);
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -454,6 +445,10 @@ impl SearchManager {
                 SearchMode::Emoji,
             ]
         };
+        // Strong name matches from every category come before fuzzy matches.
+        // Each category gets only the slots that earlier strong matches leave,
+        // so later categories are skipped once strong matches fill the response.
+        let mut fuzzy = Vec::new();
         for category in categories {
             let remaining = RESULT_LIMIT - results.len();
             if remaining == 0 {
@@ -463,16 +458,7 @@ impl SearchManager {
                 continue;
             }
             let mut matches = match category {
-                SearchMode::Apps => {
-                    let normalized = ranking::normalize(query.text);
-                    let pattern = Pattern::new(
-                        &normalized,
-                        CaseMatching::Ignore,
-                        Normalization::Smart,
-                        AtomKind::Fuzzy,
-                    );
-                    self.apps.search(&normalized, &pattern, &mut self.matcher)
-                }
+                SearchMode::Apps => self.search_apps(query.text),
                 SearchMode::Files => {
                     self.files
                         .search(query.text, &mut self.matcher, &self.usage, now, remaining)
@@ -494,8 +480,59 @@ impl SearchManager {
                 ranking::apply_usage(&mut matches, &self.usage, now);
                 matches = ranking::top_results(matches, remaining);
             }
-            results.extend(matches);
+            let (strong, weak): (Vec<_>, Vec<_>) = matches
+                .into_iter()
+                .partition(|result| ranking::tier(result) < 2);
+            results.extend(strong);
+            fuzzy.extend(weak);
         }
+        results.extend(fuzzy);
+        results.truncate(RESULT_LIMIT);
+        SearchOutcome { results, notice }
+    }
+
+    fn search_apps(&mut self, text: &str) -> Vec<SearchResult> {
+        let normalized = ranking::normalize(text);
+        // App punctuation remains literal. Calculator input retains its case.
+        let pattern = Pattern::new(
+            &normalized,
+            CaseMatching::Ignore,
+            Normalization::Smart,
+            AtomKind::Fuzzy,
+        );
+        self.apps.search(&normalized, &pattern, &mut self.matcher)
+    }
+
+    // A tool keyword such as "google" or "time" keeps its scope in All, except
+    // for an app with that exact name. Apps whose names start with the query
+    // follow the tool results, so "Time Machine" is still found by "time".
+    fn tool_outcome(
+        &mut self,
+        query: &Query<'_>,
+        outcome: std::result::Result<Vec<SearchResult>, String>,
+    ) -> SearchOutcome {
+        let (tools, notice) = match outcome {
+            Ok(results) => (results, None),
+            Err(notice) => (Vec::new(), Some(notice)),
+        };
+        let apps = if query.mode == SearchMode::All {
+            self.search_apps(query.text)
+        } else {
+            Vec::new()
+        };
+        let (mut exact, mut prefix): (Vec<_>, Vec<_>) = apps
+            .into_iter()
+            .filter(|app| app.score >= ranking::STRONG_MATCH)
+            .partition(|app| app.score >= ranking::EXACT_MATCH);
+        let now = ranking::now();
+        ranking::apply_usage(&mut exact, &self.usage, now);
+        ranking::apply_usage(&mut prefix, &self.usage, now);
+        let results = ranking::top_results(exact, RESULT_LIMIT)
+            .into_iter()
+            .chain(tools)
+            .chain(ranking::top_results(prefix, RESULT_LIMIT))
+            .take(RESULT_LIMIT)
+            .collect();
         SearchOutcome { results, notice }
     }
 }
@@ -553,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn all_search_keeps_categories_together_in_launcher_order() {
+    fn all_search_puts_strong_matches_first_then_keeps_category_order() {
         let mut manager = SearchManager::default();
         manager.replace_apps(AppProvider::new(vec![
             AppEntry::new("Clock".into(), "/apps/Clock.app".into(), vec![]),
@@ -576,20 +613,33 @@ mod tests {
         manager.system = Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec()));
 
         let results = manager.search("oc", SearchMode::All).unwrap().results;
+        let position = |kind, title: &str| {
+            results
+                .iter()
+                .position(|result| result.kind == kind && result.title == title)
+                .unwrap()
+        };
+        // The exact file and clipboard text rank above the fuzzy app match.
         assert_eq!(results[0].title, "Octave");
-        assert_eq!(results[1].title, "Clock");
-        let mut groups: Vec<_> = results.iter().map(|result| result.kind).collect();
-        groups.dedup();
-        assert_eq!(
-            groups,
-            [
-                ResultKind::App,
-                ResultKind::File,
-                ResultKind::SystemCommand,
-                ResultKind::Clipboard,
-                ResultKind::Emoji,
-            ]
-        );
+        assert_eq!(position(ResultKind::File, "oc"), 1);
+        assert!(position(ResultKind::Clipboard, "oc") < position(ResultKind::App, "Clock"));
+        let order = [
+            ResultKind::App,
+            ResultKind::File,
+            ResultKind::SystemCommand,
+            ResultKind::Clipboard,
+            ResultKind::Emoji,
+        ];
+        for tier in [1, 2] {
+            let mut groups: Vec<_> = results
+                .iter()
+                .filter(|result| ranking::tier(result) == tier)
+                .map(|result| order.iter().position(|kind| *kind == result.kind))
+                .collect();
+            groups.dedup();
+            assert!(groups.is_sorted(), "Tier {tier} keeps category order");
+        }
+        assert!(results.iter().map(ranking::tier).is_sorted());
     }
 
     #[test]
@@ -663,8 +713,14 @@ mod tests {
             assert!(results.iter().any(|result| result.id == "system:sleep"));
             assert_eq!(results[0].id, "system:sleep");
             assert_eq!(results.len(), RESULT_LIMIT);
+            // Emoji names that start with "sleep" are strong matches. Weak app
+            // path matches fill the rest.
+            let strong = results
+                .iter()
+                .take_while(|result| ranking::tier(result) < 2)
+                .count();
             assert!(
-                results[1..]
+                results[strong..]
                     .iter()
                     .all(|result| result.kind == ResultKind::App)
             );
@@ -838,6 +894,75 @@ mod tests {
         assert_eq!(
             manager.search("", SearchMode::Apps).unwrap().results[0].title,
             "App 000"
+        );
+    }
+
+    #[test]
+    fn exact_app_names_win_over_tool_keywords_in_all() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(vec![
+            AppEntry::new("Google Chrome".into(), "/apps/Chrome.app".into(), vec![]),
+            AppEntry::new("Time Machine".into(), "/apps/Time.app".into(), vec![]),
+            AppEntry::new("Passwords".into(), "/apps/Passwords.app".into(), vec![]),
+            AppEntry::new("Timer".into(), "/apps/Timer.app".into(), vec![]),
+        ]));
+
+        let chrome = manager.search("google chrome", SearchMode::All).unwrap();
+        assert_eq!(chrome.results[0].title, "Google Chrome");
+        assert_eq!(chrome.results[1].kind, ResultKind::WebSearch);
+
+        // Partial tool input keeps its hint, and apps that start with it appear.
+        let time = manager.search("time", SearchMode::All).unwrap();
+        assert!(time.notice.is_some());
+        let titles: Vec<_> = time
+            .results
+            .iter()
+            .map(|result| result.title.as_str())
+            .collect();
+        assert_eq!(titles, ["Time Machine", "Timer"]);
+
+        // A prefix match follows the tool results.
+        let passwords = manager.search("password", SearchMode::All).unwrap();
+        assert_eq!(passwords.results[0].kind, ResultKind::Password);
+        assert_eq!(passwords.results.last().unwrap().title, "Passwords");
+
+        // Explicit tool modes do not add apps.
+        let web = manager.search("google chrome", SearchMode::Web).unwrap();
+        assert!(
+            web.results
+                .iter()
+                .all(|result| result.kind == ResultKind::WebSearch)
+        );
+    }
+
+    #[test]
+    fn an_exact_file_is_not_hidden_behind_a_full_page_of_fuzzy_apps() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(
+            (0..RESULT_LIMIT)
+                .map(|i| {
+                    AppEntry::new(
+                        format!("Budget Viewer {i:02}"),
+                        format!("/apps/b-v.t-x-t/Viewer {i:02}.app").into(),
+                        vec![],
+                    )
+                })
+                .collect(),
+        ));
+        manager.replace_files(FileProvider::new(vec![FileEntry {
+            id: "file:/Documents/bv.txt".into(),
+            name: "bv.txt".into(),
+            path: "/Documents/bv.txt".into(),
+            folder: false,
+        }]));
+        let results = manager.search("bv.txt", SearchMode::All).unwrap().results;
+        assert_eq!(results[0].id, "file:/Documents/bv.txt");
+        // Every app is a fuzzy path match. They fill the remaining slots.
+        assert_eq!(results.len(), RESULT_LIMIT);
+        assert!(
+            results[1..]
+                .iter()
+                .all(|result| result.kind == ResultKind::App)
         );
     }
 
@@ -1625,5 +1750,79 @@ mod tests {
                 .results
                 .is_empty()
         );
+    }
+}
+
+// Measures All mode on this computer's apps and default file folders. It
+// prints totals only, never names. Use it to compare ranking changes.
+#[cfg(test)]
+mod ranking_survey {
+    use super::*;
+    use crate::providers::files::{ScanReport, scan};
+
+    #[test]
+    #[ignore = "Reads installed apps and default file folders. Run with --ignored --nocapture."]
+    fn all_mode_finds_what_its_category_finds() {
+        let home = std::path::PathBuf::from(std::env::var_os("HOME").expect("home"));
+        let mut manager = SearchManager::default();
+        let apps = crate::platform::discover_apps().expect("apps");
+        let app_queries: Vec<_> = apps
+            .iter()
+            .flat_map(|app| {
+                [2, 4, usize::MAX]
+                    .map(|length| (app.id.clone(), app.name.chars().take(length).collect()))
+            })
+            .collect::<Vec<(String, String)>>();
+        manager.replace_apps(AppProvider::new(apps));
+        let roots = ["Desktop", "Documents", "Downloads"].map(|name| home.join(name));
+        manager.replace_files(scan(
+            roots.to_vec(),
+            &["node_modules".into(), "target".into()],
+            50_000,
+            &mut ScanReport::default(),
+        ));
+        let mut matcher = Matcher::new(Config::DEFAULT);
+        let catalog = manager
+            .files
+            .search("", &mut matcher, &HashMap::new(), 0, usize::MAX);
+        let step = (catalog.len() / 200).max(1);
+        let file_queries: Vec<(String, String)> = catalog
+            .iter()
+            .step_by(step)
+            .flat_map(|file| {
+                let stem = std::path::Path::new(&file.title)
+                    .file_stem()
+                    .map(|stem| stem.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                [file.title.clone(), stem.chars().take(3).collect(), stem]
+                    .map(|query| (file.id.clone(), query))
+            })
+            .collect();
+        for (label, queries, mode) in [
+            ("apps", app_queries, SearchMode::Apps),
+            ("files", file_queries, SearchMode::Files),
+        ] {
+            let (mut found, mut all, mut first_page) = (0, 0, 0);
+            for (id, query) in queries.iter().filter(|(_, query)| !query.trim().is_empty()) {
+                let mut position = |mode| {
+                    manager
+                        .search(query, mode)
+                        .map(|outcome| outcome.results.iter().position(|result| &result.id == id))
+                        .ok()
+                        .flatten()
+                };
+                if position(mode).is_none() {
+                    continue;
+                }
+                found += 1;
+                if let Some(position) = position(SearchMode::All) {
+                    all += 1;
+                    first_page += usize::from(position < 8);
+                }
+            }
+            println!(
+                "{label}: {found} queries find the item in its category; All finds {all}, {first_page} in the first 8"
+            );
+        }
     }
 }

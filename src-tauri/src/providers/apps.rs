@@ -164,7 +164,8 @@ impl AppProvider {
                     .iter()
                     .filter_map(|(alias, normalized)| {
                         pattern.score(alias.slice(..), matcher).map(|score| {
-                            ranking::name_score(score, normalized, query).saturating_sub(100)
+                            ranking::name_score(score, normalized, query)
+                                .saturating_sub(ranking::ALIAS_PENALTY)
                         })
                     })
                     .max();
