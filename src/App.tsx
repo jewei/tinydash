@@ -43,6 +43,7 @@ import {
   normalizeCategories,
   resultCategories,
 } from "./categories";
+import { chooseSelection, createSearchQueue } from "./search";
 
 const groupLabels: Record<SearchResult["kind"], string> = {
   app: "Applications",
@@ -122,19 +123,9 @@ export default function App(
   let menuInput: HTMLInputElement | undefined;
   let list!: HTMLUListElement;
   let categoryBar!: HTMLDivElement;
-  let sequence = 0;
   let disposed = false;
-  let searchTask: Promise<void> | undefined;
   let displayedQuery: { value: string; mode: SearchMode } | undefined;
   let selectionChangedByUser = false;
-  let queuedSearch:
-    | {
-        value: string;
-        mode: SearchMode;
-        preserveSelection: boolean;
-        request: number;
-      }
-    | undefined;
   const unlisteners: UnlistenFn[] = [];
 
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
@@ -147,7 +138,6 @@ export default function App(
   const current = () => results()[selected()];
   const welcome = () =>
     mode() === "all" && !query().trim() && results().length === 0;
-  const resultKey = (result?: SearchResult) => result?.pin?.key ?? result?.id;
   const isPinned = (result?: SearchResult, category = mode()) =>
     result?.pin?.categories.includes(category) ?? false;
   const pinOptions = createMemo(() => {
@@ -514,15 +504,41 @@ export default function App(
     }
   }
 
+  const searches = createSearchQueue({
+    send: ({ value, mode }) => backend.search(value, mode),
+    apply(request, response) {
+      const index = chooseSelection({
+        request,
+        results: response.results,
+        preferredSelectionId: response.preferredSelectionId,
+        displayed: displayedQuery,
+        current: current(),
+        selected: selected(),
+        selectionChangedByUser,
+      });
+      displayedQuery = { value: request.value, mode: request.mode };
+      batch(() => {
+        setResults(response.results);
+        setSelected(index);
+        setTotal(response.total);
+        setIndexing(response.indexing);
+        setFiles(response.files);
+        setCurrency(response.currency);
+        setIndexError(response.indexError ?? undefined);
+        setStorageError(response.storageError ?? undefined);
+        setNotice(response.notice ?? undefined);
+      });
+    },
+    fail(_request, reason) {
+      setResults([]);
+      setError(String(reason));
+    },
+    settled: () => setPending(false),
+  });
+
   function search(value = query(), preserveSelection = false) {
     if (!desktop || !visible() || disposed) return Promise.resolve();
     if (!preserveSelection) selectionChangedByUser = false;
-    queuedSearch = {
-      value,
-      mode: mode(),
-      preserveSelection,
-      request: ++sequence,
-    };
     setPending(true);
     if (
       mode() === "all" &&
@@ -532,80 +548,7 @@ export default function App(
       setResults([]);
     }
     setNotice(undefined);
-    // Native IPC calls can arrive out of order. Keep one call in flight and
-    // replace waiting input with the newest query, without a debounce timer.
-    return (searchTask ??= drainSearch());
-  }
-
-  async function drainSearch() {
-    try {
-      while (queuedSearch && !disposed) {
-        const {
-          value,
-          mode: searchMode,
-          preserveSelection,
-          request,
-        } = queuedSearch;
-        queuedSearch = undefined;
-        try {
-          const response = await backend.search(value, searchMode);
-          if (disposed || request !== sequence) continue;
-          // Read selection after the response. The user can navigate while a
-          // refresh runs, but a different query must select its first result.
-          const followNewestClipboard =
-            searchMode === "clipboard" &&
-            !value.trim() &&
-            !selectionChangedByUser &&
-            response.preferredSelectionId != null;
-          const selectedId =
-            preserveSelection &&
-            !followNewestClipboard &&
-            displayedQuery?.value === value &&
-            displayedQuery.mode === searchMode
-              ? resultKey(current())
-              : undefined;
-          const stableToolIndex =
-            selectedId &&
-            ["timezone", "webSearch"].includes(current()?.kind ?? "")
-              ? Math.min(selected(), response.results.length - 1)
-              : 0;
-          const matchedIndex = response.results.findIndex(
-            (result) => resultKey(result) === selectedId,
-          );
-          const preferredIndex = response.results.findIndex(
-            (result) => result.id === response.preferredSelectionId,
-          );
-          displayedQuery = { value, mode: searchMode };
-          batch(() => {
-            setResults(response.results);
-            setSelected(
-              Math.max(
-                0,
-                matchedIndex >= 0
-                  ? matchedIndex
-                  : selectedId
-                    ? stableToolIndex
-                    : preferredIndex,
-              ),
-            );
-            setTotal(response.total);
-            setIndexing(response.indexing);
-            setFiles(response.files);
-            setCurrency(response.currency);
-            setIndexError(response.indexError ?? undefined);
-            setStorageError(response.storageError ?? undefined);
-            setNotice(response.notice ?? undefined);
-          });
-        } catch (reason) {
-          if (disposed || request !== sequence) continue;
-          setResults([]);
-          setError(String(reason));
-        }
-      }
-    } finally {
-      searchTask = undefined;
-      if (!disposed) setPending(false);
-    }
+    return searches.submit({ value, mode: mode(), preserveSelection });
   }
 
   function changeQuery(value: string) {
@@ -1128,8 +1071,7 @@ export default function App(
             setVisible(false);
             // One running Rust search may finish. Ignore its reply and drop
             // waiting input. Opening the window always requests current data.
-            queuedSearch = undefined;
-            sequence += 1;
+            searches.cancel();
             setPending(false);
           }),
         ]);
@@ -1150,7 +1092,7 @@ export default function App(
 
   onCleanup(() => {
     disposed = true;
-    sequence += 1;
+    searches.dispose();
     unlisteners.forEach((stop) => stop());
     document.removeEventListener("keydown", onKey);
     document.removeEventListener("compositionstart", startComposition);
