@@ -435,72 +435,48 @@ impl Storage {
     }
 
     pub fn delete_clipboard(&self, app: &AppHandle, id: Option<i64>) -> Result<(), String> {
-        let state = app.state::<LauncherState>();
-        let mut session = self
-            .session(app, &state.search)
-            .lock()
-            .map_err(|_| "Clipboard storage is unavailable.")?;
-        let mut search = state
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?;
-        let database = session
-            .database
-            .as_ref()
-            .ok_or("Clipboard storage is unavailable. Restart TinyDash to try again.")?;
-        let result = match id {
-            Some(id) => database.delete_clipboard(id),
-            None => database.clear_clipboard(),
-        };
-        if let Err(error) = result {
-            self.failed(&error);
-            session.database = None;
-            return Err(
-                "Could not delete clipboard history. Restart TinyDash to try again.".into(),
-            );
-        }
-        state.clipboard.invalidate();
-        match id {
-            Some(id) => search.clipboard.remove(id),
-            None => search.clipboard = ClipboardProvider::default(),
-        }
-        search.forget_clipboard_pins(id);
-        drop(search);
-        super::clipboard::changed(app);
-        Ok(())
+        self.delete_entries(
+            app,
+            id.map_or(Deletion::All, Deletion::Entry),
+            "Could not delete clipboard history. Restart TinyDash to try again.",
+        )
     }
 
     pub fn clear_unpinned_clipboard(&self, app: &AppHandle) -> Result<(), String> {
+        self.delete_entries(
+            app,
+            Deletion::Unpinned,
+            "Could not clear unpinned clipboard history. Restart TinyDash to try again.",
+        )
+    }
+
+    fn delete_entries(
+        &self,
+        app: &AppHandle,
+        deletion: Deletion,
+        failure: &str,
+    ) -> Result<(), String> {
         let state = app.state::<LauncherState>();
+        // The storage lock orders this with copies, captures, and pins.
         let mut session = self
             .session(app, &state.search)
             .lock()
             .map_err(|_| "Clipboard storage is unavailable.")?;
-        let mut search = state
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?;
         let database = session
             .database
             .as_ref()
             .ok_or("Clipboard storage is unavailable. Restart TinyDash to try again.")?;
-        let removed = match database.clear_unpinned_clipboard() {
-            Ok(removed) => removed,
-            Err(error) => {
+        match delete_and_publish(database, &state.search, deletion) {
+            Ok(()) => {}
+            Err(DeleteError::Storage(error)) => {
                 self.failed(&error);
                 session.database = None;
-                return Err(
-                    "Could not clear unpinned clipboard history. Restart TinyDash to try again."
-                        .into(),
-                );
+                return Err(failure.into());
             }
-        };
-        state.clipboard.invalidate();
-        search.clipboard.remove_many(&removed);
-        for id in removed {
-            search.forget_clipboard_pins(Some(id));
+            Err(DeleteError::Index) => return Err(Error::IndexUnavailable.to_string()),
         }
-        drop(search);
+        state.clipboard.invalidate();
+        drop(session);
         super::clipboard::changed(app);
         Ok(())
     }
@@ -515,6 +491,44 @@ impl Storage {
             *warning = Some("Storage is unavailable. Clipboard capture is paused. Ranking changes will be lost when TinyDash quits.".into());
         }
     }
+}
+
+#[derive(Clone, Copy)]
+enum Deletion {
+    Entry(i64),
+    All,
+    Unpinned,
+}
+
+enum DeleteError {
+    Storage(crate::db::Error),
+    Index,
+}
+
+// Persist first, then publish. Search does not wait while SQLite writes or
+// waits for its lock. A failed write leaves the visible entries unchanged.
+fn delete_and_publish(
+    database: &Database,
+    search: &Mutex<SearchManager>,
+    deletion: Deletion,
+) -> Result<(), DeleteError> {
+    let removed = match deletion {
+        Deletion::Entry(id) => database.delete_clipboard(id).map(|()| vec![id]),
+        Deletion::All => database.clear_clipboard().map(|()| Vec::new()),
+        Deletion::Unpinned => database.clear_unpinned_clipboard(),
+    }
+    .map_err(DeleteError::Storage)?;
+    let mut search = search.lock().map_err(|_| DeleteError::Index)?;
+    if let Deletion::All = deletion {
+        search.clipboard = ClipboardProvider::default();
+        search.forget_clipboard_pins(None);
+    } else {
+        search.clipboard.remove_many(&removed);
+        for id in removed {
+            search.forget_clipboard_pins(Some(id));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -570,6 +584,53 @@ mod tests {
         assert_eq!(observed.changed(None), None);
         assert_eq!(observed.cleared(1_001), None);
         assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
+    }
+
+    #[test]
+    fn search_stays_available_while_a_delete_waits_for_sqlite() {
+        let directory = tempfile::tempdir().expect("directory");
+        let path = directory.path().join("state.sqlite3");
+        let mut database = Database::open(&path).expect("open");
+        let id = database
+            .capture_clipboard("kept", 1, 100)
+            .expect("capture")
+            .0
+            .id;
+        let key = format!("clipboard:{id}");
+        let search = Mutex::new(SearchManager::default());
+        search.lock().expect("search").clipboard =
+            ClipboardProvider::new(database.load_clipboard().expect("load"));
+        let other = rusqlite::Connection::open(&path).expect("other connection");
+        other.execute_batch("BEGIN IMMEDIATE").expect("lock");
+
+        let search = &search;
+        let database = std::thread::scope(|scope| {
+            let deleting = scope.spawn(move || {
+                let result = delete_and_publish(&database, search, Deletion::Entry(id));
+                (result, database)
+            });
+            // SQLite waits for its busy timeout. Search must not wait too.
+            while !deleting.is_finished() {
+                drop(search.try_lock().expect("search is free during the write"));
+                std::thread::yield_now();
+            }
+            let (result, database) = deleting.join().expect("delete");
+            assert!(matches!(result, Err(DeleteError::Storage(_))));
+            database
+        });
+        // A failed write keeps the entry visible.
+        assert!(search.lock().expect("search").clipboard_entry(&key).is_ok());
+
+        other.execute_batch("ROLLBACK").expect("unlock");
+        assert!(delete_and_publish(&database, search, Deletion::Entry(id)).is_ok());
+        assert!(
+            search
+                .lock()
+                .expect("search")
+                .clipboard_entry(&key)
+                .is_err()
+        );
+        assert!(database.load_clipboard().expect("load").is_empty());
     }
 
     #[test]
