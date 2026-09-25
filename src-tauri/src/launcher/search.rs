@@ -240,6 +240,11 @@ impl SearchManager {
         self.apps = apps;
     }
 
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn has_app(&self, id: &str) -> bool {
+        self.apps.contains(id)
+    }
+
     pub fn app_count(&self) -> usize {
         self.apps.len()
     }

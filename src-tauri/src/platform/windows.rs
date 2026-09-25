@@ -41,10 +41,12 @@ fn known_folder(id: &GUID) -> Option<PathBuf> {
     }
 }
 
-pub fn discover_apps() -> Result<Vec<AppEntry>> {
-    let mut apps = Vec::new();
-    let mut skipped = 0;
-    for root in [
+// Discovery finds shortcuts up to this many levels below a folder.
+const APP_DEPTH: usize = 8;
+
+/// Start menu and desktop folders that contain application shortcuts.
+pub fn app_folders() -> Vec<PathBuf> {
+    [
         FOLDERID_Programs,
         FOLDERID_CommonPrograms,
         FOLDERID_Desktop,
@@ -52,10 +54,16 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
     ]
     .iter()
     .filter_map(known_folder)
-    {
+    .collect()
+}
+
+pub fn discover_apps() -> Result<Vec<AppEntry>> {
+    let mut apps = Vec::new();
+    let mut skipped = 0;
+    for root in app_folders() {
         let walker = walkdir::WalkDir::new(root)
             .follow_links(false)
-            .max_depth(8)
+            .max_depth(APP_DEPTH)
             .into_iter()
             .filter_entry(|entry| !entry.file_name().to_string_lossy().starts_with('.'));
         for entry in walker {
@@ -85,6 +93,29 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
         tracing::warn!(skipped, "Some application shortcuts could not be read");
     }
     Ok(apps)
+}
+
+/// Maps a changed path to the shortcut that discovery would index.
+pub fn app_change(path: &std::path::Path, roots: &[PathBuf]) -> Option<crate::platform::AppChange> {
+    use crate::platform::AppChange;
+    let root = roots.iter().find(|root| path.starts_with(root))?;
+    let relative = path.strip_prefix(root).ok()?;
+    let depth = relative.components().count();
+    if depth == 0
+        || depth > APP_DEPTH
+        || relative
+            .components()
+            .any(|component| component.as_os_str().to_string_lossy().starts_with('.'))
+    {
+        return None;
+    }
+    let extension = path.extension().and_then(|ext| ext.to_str());
+    if is_app_extension(extension) {
+        Some(AppChange::App(path.to_owned()))
+    } else {
+        // A named folder can hold shortcuts. Documents on the desktop cannot.
+        (extension.is_none() && depth < APP_DEPTH).then_some(AppChange::Folder)
+    }
 }
 
 fn is_app_extension(extension: Option<&str>) -> bool {
@@ -550,6 +581,38 @@ pub fn clipboard_snapshot(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn maps_changes_to_shortcuts_or_folders() {
+        use crate::platform::AppChange;
+        use std::path::{Path, PathBuf};
+        let roots = [
+            PathBuf::from(r"C:\Start\Programs"),
+            PathBuf::from(r"C:\Users\a\Desktop"),
+        ];
+        let app = |path: &str| Some(AppChange::App(PathBuf::from(path)));
+        for (path, expected) in [
+            (
+                r"C:\Start\Programs\Editor.lnk",
+                app(r"C:\Start\Programs\Editor.lnk"),
+            ),
+            (
+                r"C:\Users\a\Desktop\Tool.EXE",
+                app(r"C:\Users\a\Desktop\Tool.EXE"),
+            ),
+            (r"C:\Start\Programs\Suite", Some(AppChange::Folder)),
+            (r"C:\Users\a\Desktop\report.docx", None),
+            (r"C:\Users\a\Desktop\.hidden\Tool.lnk", None),
+            (r"C:\Start\Programs", None),
+            (r"C:\Other\Editor.lnk", None),
+        ] {
+            assert_eq!(
+                super::app_change(Path::new(path), &roots),
+                expected,
+                "{path}"
+            );
+        }
+    }
+
     #[test]
     fn shutdown_requests_never_force_apps_to_close() {
         use crate::providers::system::SystemCommand;

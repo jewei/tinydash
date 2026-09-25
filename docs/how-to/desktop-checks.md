@@ -22,7 +22,7 @@ CI checks installation, same-version replacement, and removal. On a physical des
 4. Press Control + Shift + Space while another app has focus. Confirm that TinyDash appears and immediately accepts text. Confirm that Siri, Spotlight, or another system panel does not open. Repeat ten times.
 5. Type in a browser or terminal, then open TinyDash with the shortcut. Press Escape without entering a query. Confirm that the palette hides and you can continue typing in the same window without a click. Repeat after copying a calculation result and after closing the palette with the shortcut. Alternate between two apps to check that each opening remembers the current app.
 6. Click another app. Confirm that TinyDash hides with the default `hideOnBlur` setting.
-7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash.
+7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash. Install a small test application, or copy one into the user application folder. Confirm that it appears in Apps within ten seconds without a refresh. Remove it and confirm that it disappears.
 8. Start TinyDash again while it is running. Confirm that the existing window appears and a second launcher process does not remain running.
 9. Use Command/Ctrl + Enter on an app result. Confirm that the OS file manager shows its location.
 10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and selects the first visible category (All by default).

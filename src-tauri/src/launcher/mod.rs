@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod app_watch;
 pub mod clipboard;
 pub mod currency;
 mod file_watch;

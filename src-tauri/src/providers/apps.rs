@@ -112,6 +112,12 @@ impl AppProvider {
             .map(|app| &app.entry)
     }
 
+    /// Includes applications that the user hides from results.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn contains(&self, id: &str) -> bool {
+        self.apps.iter().any(|app| app.entry.id == id)
+    }
+
     pub fn catalog(&self) -> Vec<SearchResult> {
         self.apps.iter().map(|app| app.entry.result(0)).collect()
     }

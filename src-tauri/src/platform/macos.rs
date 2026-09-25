@@ -13,16 +13,55 @@ use crate::{
     providers::apps::AppEntry,
 };
 
-pub fn discover_apps() -> Result<Vec<AppEntry>> {
+// The scanner finds bundles up to this many levels below a folder.
+const APP_DEPTH: usize = 4;
+
+/// Folders that contain application bundles.
+pub fn app_folders() -> Vec<PathBuf> {
     let mut roots = vec![
         PathBuf::from("/Applications"),
         PathBuf::from("/System/Applications"),
-        PathBuf::from("/System/Library/CoreServices/Finder.app"),
     ];
     if let Some(home) = std::env::var_os("HOME") {
         roots.push(PathBuf::from(home).join("Applications"));
     }
+    roots
+}
+
+pub fn discover_apps() -> Result<Vec<AppEntry>> {
+    let mut roots = app_folders();
+    roots.push(PathBuf::from("/System/Library/CoreServices/Finder.app"));
     Ok(scan_roots(&roots))
+}
+
+/// Maps a changed path to the bundle that contains it, as the scanner sees it.
+/// Changes inside a bundle belong to its outermost `.app`.
+pub fn app_change(path: &Path, roots: &[PathBuf]) -> Option<crate::platform::AppChange> {
+    use crate::platform::AppChange;
+    // FSEvents can report a firmlinked folder by its data volume path.
+    let path = path.strip_prefix("/System/Volumes/Data").map_or_else(
+        |_| path.to_owned(),
+        |relative| Path::new("/").join(relative),
+    );
+    let root = roots.iter().find(|root| path.starts_with(root))?;
+    let mut bundle = root.clone();
+    let mut depth = 0;
+    for component in path.strip_prefix(root).ok()?.components() {
+        depth += 1;
+        let name = component.as_os_str().to_string_lossy();
+        if depth > APP_DEPTH || name.starts_with('.') {
+            return None;
+        }
+        bundle.push(component);
+        if Path::new(name.as_ref())
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("app"))
+        {
+            return Some(AppChange::App(bundle));
+        }
+    }
+    // A named folder can hold bundles. Files beside bundles cannot.
+    (depth > 0 && depth < APP_DEPTH && bundle.extension().is_none()).then_some(AppChange::Folder)
 }
 
 fn scan_roots(roots: &[PathBuf]) -> Vec<AppEntry> {
@@ -31,7 +70,7 @@ fn scan_roots(roots: &[PathBuf]) -> Vec<AppEntry> {
     for root in roots.iter().filter(|path| path.exists()) {
         let mut walker = walkdir::WalkDir::new(root)
             .follow_links(false)
-            .max_depth(4)
+            .max_depth(APP_DEPTH)
             .into_iter();
         while let Some(entry) = walker.next() {
             let entry = match entry {
@@ -395,6 +434,50 @@ pub fn clipboard_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn maps_changes_to_the_outermost_bundle_or_a_folder() {
+        use crate::platform::AppChange;
+        let roots = [
+            PathBuf::from("/Applications"),
+            PathBuf::from("/Users/a/Applications"),
+        ];
+        let app = |path: &str| Some(AppChange::App(PathBuf::from(path)));
+        for (path, expected) in [
+            ("/Applications/Editor.app", app("/Applications/Editor.app")),
+            (
+                "/Applications/Editor.app/Contents/Info.plist",
+                app("/Applications/Editor.app"),
+            ),
+            (
+                "/Applications/Editor.app/Contents/Frameworks/Helper.app",
+                app("/Applications/Editor.app"),
+            ),
+            (
+                "/System/Volumes/Data/Applications/Editor.APP",
+                app("/Applications/Editor.APP"),
+            ),
+            (
+                "/Users/a/Applications/Suite/Tools/Viewer.app/Contents",
+                app("/Users/a/Applications/Suite/Tools/Viewer.app"),
+            ),
+            ("/Applications/Suite", Some(AppChange::Folder)),
+            (
+                "/Applications/a/b/c/Deep.app",
+                app("/Applications/a/b/c/Deep.app"),
+            ),
+            ("/Applications/a/b/c/d/Deeper.app", None),
+            ("/Applications/a/b/c", Some(AppChange::Folder)),
+            ("/Applications/a/b/c/d", None),
+            ("/Applications/.Trash/Editor.app", None),
+            ("/Applications/.DS_Store", None),
+            ("/Applications/readme.txt", None),
+            ("/Applications", None),
+            ("/Library/Editor.app", None),
+        ] {
+            assert_eq!(app_change(Path::new(path), &roots), expected, "{path}");
+        }
+    }
 
     #[test]
     #[ignore = "Replaces the user's clipboard. Run with --ignored."]
