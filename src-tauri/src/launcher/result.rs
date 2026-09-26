@@ -52,6 +52,7 @@ pub enum Action {
     Open,
     Reveal,
     Copy,
+    Paste,
     Delete,
     Run,
     Regenerate,

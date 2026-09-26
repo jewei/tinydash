@@ -2,7 +2,7 @@
 
 Open Settings from Actions, the tray, Command/Ctrl + comma, or `tinydash --settings`. Save changes to apply the form. Discard restores saved values. Closing the window retains the unfinished form. Appearance applies immediately.
 
-Settings covers shortcuts, start at login, appearance, categories, application aliases, custom web searches, clipboard capture, file roots, currency requests, and privacy. See the [settings reference](../settings.md).
+Settings covers shortcuts, start at login, appearance, categories, application aliases, custom web searches, clipboard capture, file roots, currency requests, and privacy. **Search settings** filters sections by labels and related terms; Enter opens the first match without discarding drafts. Search also configures item aliases, global shortcuts, and separate Hide/Disable controls for apps, built-in commands, and library entries. Hidden items retain shortcuts; disabled items reject execution. Shortcut conflicts are validated in Rust before saving. Clipboard adds age retention, app exclusions, and independent image/file opt-ins; File search adds hidden-file inclusion and bounded ignore patterns. See the [settings reference](../settings.md).
 
 Appearance has five themes: Light, Dark, Sage, Rose, and Ink. Compact is a separate layout switch. Both choices apply immediately and are included in settings exports. On macOS, Follow macOS Liquid Glass also saves immediately and is included in exports. Turn it off for a solid theme background. Import previews keep them unsaved until Save changes. The macOS launcher uses system-controlled Liquid Glass where supported. See [appearance](appearance.md) for the OS limits and desktop checks.
 
@@ -19,7 +19,7 @@ About has an explicit update check. Mac and Windows release builds need an updat
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
 
 ```sh
-bun run verify:browser tests/settings.spec.ts tests/tinycast-features.spec.ts tests/release-config.spec.ts
+bun run verify:browser tests/settings.spec.ts tests/tinycast-features.spec.ts tests/release-config.spec.ts tests/roadmap.spec.ts
 ```
 
 For affected backend behavior:
@@ -31,6 +31,8 @@ bun run test:rust -- db::migrations
 ```
 
 Open Settings through Actions, tray, Ctrl/Command + comma, and `tinydash --settings` when those paths change. Save and reopen; also check Discard and an unsaved close. Export, preview an import, cancel, and confirm saved state is unchanged. An invalid import must preserve saved state.
+
+Check settings search with “retention”, “patterns”, and “hotkey”. Save aliases and a unique item shortcut; verify hidden versus disabled behavior and conflict rollback. Use a disruptive system-command shortcut and cancel its confirmation without executing it.
 
 Use desktop Settings checks on each affected OS for shortcut registration, login behavior, native file dialogs, and persistence. Recovery requires a disposable database and the recovery procedure. Updates require an installed release candidate, test feed, signature checks, and installation evidence. These are explicit gaps in the mocked tests and current native smoke suite.
 

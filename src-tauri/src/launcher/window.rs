@@ -58,6 +58,7 @@ fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> 
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
+    super::paste::remember(app);
     #[cfg(target_os = "macos")]
     if let Some(state) = app.try_state::<LauncherState>() {
         state.focus.remember();

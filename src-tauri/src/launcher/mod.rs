@@ -1,18 +1,25 @@
 pub mod actions;
 pub mod app_watch;
 pub mod clipboard;
+pub mod commands;
 pub mod currency;
+pub mod file_actions;
 mod file_watch;
 pub mod files;
+pub mod library;
+pub mod paste;
 pub mod pins;
 pub mod portability;
 pub mod preferences;
 pub mod query;
 pub mod result;
+#[cfg(test)]
+mod roadmap_tests;
 pub mod search;
 pub mod startup;
 mod storage;
 pub mod updates;
+pub mod utilities;
 pub mod window;
 
 use std::sync::{
@@ -168,13 +175,48 @@ pub async fn search(
 ) -> Result<SearchResponse, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<LauncherState>();
+        let settings = state.settings();
+        let library_items =
+            if mode == SearchMode::All && !query.trim().is_empty() && query.len() <= 512 {
+                let text = query.trim().to_lowercase();
+                app.state::<library::LibraryState>()
+                    .search_items("")
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|item| {
+                        let preference = settings.item_preferences.get(&item.id);
+                        !preference.is_some_and(|p| p.hidden || p.disabled)
+                            && (format!("{} {}", item.name, item.keywords)
+                                .to_lowercase()
+                                .contains(&text)
+                                || preference.is_some_and(|p| {
+                                    p.aliases
+                                        .iter()
+                                        .any(|alias| alias.to_lowercase().starts_with(&text))
+                                }))
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
         let mut search = state
             .search
             .lock()
             .map_err(|_| Error::IndexUnavailable.to_string())?;
-        let outcome = search
+        let mut outcome = search
             .search(&query, mode)
             .map_err(|error| error.to_string())?;
+        let insert_at = outcome
+            .results
+            .iter()
+            .take_while(|result| result.score >= crate::ranking::EXACT_MATCH)
+            .count();
+        for (offset, item) in library_items.into_iter().take(5).enumerate() {
+            outcome
+                .results
+                .insert(insert_at + offset, commands::library_result(item));
+        }
+        outcome.results.truncate(search::RESULT_LIMIT);
         Ok(SearchResponse {
             preferred_selection_id: if mode == SearchMode::Clipboard && query.trim().is_empty() {
                 search.clipboard.newest_id()

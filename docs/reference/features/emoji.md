@@ -2,7 +2,7 @@
 
 Select Emoji, enter a matching term in All, or use the `:` prefix. Search uses local names, shortcodes, and categories. For example, `:coffee` finds coffee emoji.
 
-Use arrow keys to navigate the grid. Enter copies the selected emoji and hides the launcher. Paste with the target application's paste command. TinyDash does not paste automatically.
+Use arrow keys to navigate the grid. Enter copies the selected emoji and hides the launcher. Paste with the target application's paste command, or explicitly choose **Paste to previous app** / Command/Ctrl + Shift + Enter. Enter still copies. See [direct paste](workflows.md#direct-paste) for focus verification, permissions, and unsupported desktops.
 
 The dataset uses default skin tones. Glyph appearance depends on operating system fonts.
 

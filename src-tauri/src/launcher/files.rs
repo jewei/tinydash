@@ -183,6 +183,7 @@ fn run_worker(
                         .map(|path| file_watch::resolve_root(path))
                         .collect(),
                     settings.file_search_excluded_dirs.clone(),
+                    settings.file_search_include_hidden,
                     callback_sender.clone(),
                 ) {
                     Ok(value) => watcher = Some(value),
@@ -206,10 +207,12 @@ fn run_worker(
             })
             .cloned()
             .collect();
-        let provider = files::scan(
+        let provider = files::scan_with_rules(
             scan_roots,
             &settings.file_search_excluded_dirs,
             settings.file_limit(),
+            settings.file_search_include_hidden,
+            &settings.file_search_ignore_patterns,
             &mut report,
         );
         let count = provider.len();

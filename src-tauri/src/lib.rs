@@ -96,6 +96,8 @@ pub fn run() -> anyhow::Result<()> {
     let app = tauri::Builder::default()
         .manage(launcher::startup::Startup(std::sync::Mutex::new(request)))
         .manage(launcher::updates::UpdateState::default())
+        .manage(launcher::paste::PasteState::default())
+        .manage(launcher::utilities::UtilitiesState::default())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             match launcher::startup::LaunchRequest::parse(args.into_iter().skip(1)) {
                 Ok(request) => launcher::startup::activate(app, request),
@@ -137,6 +139,17 @@ pub fn run() -> anyhow::Result<()> {
                             window::toggle(app)
                         } else if let Some(binding) = settings.category_shortcuts.iter().find(|binding| matches(&binding.shortcut)) {
                             window::show_category(app, binding.mode)
+                        } else if let Some((id, _)) = settings.item_preferences.iter().find(|(_, item)| !item.disabled && !item.shortcut.is_empty() && matches(&item.shortcut)) {
+                            let app = app.clone();
+                            let id = id.clone();
+                            tauri::async_runtime::spawn(async move {
+                                if let Err(error) = launcher::commands::activate_shortcut(app.clone(), id).await {
+                                    let _ = window::show(&app);
+                                    use tauri::Emitter;
+                                    let _ = app.emit("action-error", error);
+                                }
+                            });
+                            return;
                         } else { return; };
                         if let Err(error) = result { tracing::warn!(%error, "Could not open launcher"); }
                     }).build()
@@ -162,6 +175,12 @@ pub fn run() -> anyhow::Result<()> {
                 #[cfg(target_os = "macos")]
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
+            let library = launcher::library::LibraryState::open(app.path().app_data_dir()?)
+                .unwrap_or_else(|error| {
+                    warnings.push(error.clone());
+                    launcher::library::LibraryState::unavailable(error)
+                });
+            app.manage(library);
             app.manage(LauncherState::new(settings, warnings));
             launcher::scan_apps(app.handle());
             launcher::app_watch::start(app.handle());
@@ -196,6 +215,28 @@ pub fn run() -> anyhow::Result<()> {
             window::set_launcher_appearance,
             launcher::launcher_ready,
             launcher::preferences::get_settings,
+            launcher::commands::item_catalog,
+            launcher::paste::paste_result,
+            launcher::library::library_list,
+            launcher::library::library_get,
+            launcher::library::library_save,
+            launcher::library::library_delete,
+            launcher::library::library_execute,
+            launcher::file_actions::file_preview,
+            launcher::file_actions::execute_file_action,
+            launcher::utilities::utility_capabilities,
+            launcher::utilities::utility_processes,
+            launcher::utilities::utility_prepare_process,
+            launcher::utilities::utility_confirm_process,
+            launcher::utilities::utility_cancel_process,
+            launcher::utilities::utility_color,
+            launcher::utilities::utility_copy_color,
+            launcher::utilities::utility_eyedropper,
+            launcher::utilities::utility_awake_status,
+            launcher::utilities::utility_set_awake,
+            launcher::utilities::utility_media,
+            launcher::utilities::utility_capture_window,
+            launcher::utilities::utility_window,
             launcher::preferences::save_settings,
             launcher::preferences::choose_clipboard_history,
             launcher::preferences::app_catalog,
@@ -212,6 +253,10 @@ pub fn run() -> anyhow::Result<()> {
             launcher::quit_app,
             launcher::actions::execute_action,
             launcher::clipboard::clipboard_preview,
+            launcher::clipboard::formats::rich_clipboard_history,
+            launcher::clipboard::formats::rich_clipboard_preview,
+            launcher::clipboard::formats::copy_rich_clipboard,
+            launcher::clipboard::formats::delete_rich_clipboard,
             launcher::clipboard::clear_clipboard_history,
             launcher::clipboard::edit_clipboard_history,
             launcher::clipboard::copy_clipboard_selection,
@@ -228,6 +273,8 @@ pub fn run() -> anyhow::Result<()> {
         .context("Build the desktop launcher")?;
     app.run(|_app, _event| {
         if matches!(_event, tauri::RunEvent::Exit) {
+            _app.state::<launcher::utilities::UtilitiesState>()
+                .shutdown();
             _app.state::<LauncherState>().clipboard.stop();
             _app.state::<LauncherState>().files.stop();
         }

@@ -5,6 +5,7 @@ import ClipboardPreview from "./ClipboardPreview";
 import Icon from "./Icon";
 import ResultIcon from "./ResultIcon";
 import ToolDetails from "./ToolDetails";
+import FilePreview from "./FilePreview";
 
 export default function ResultPreview(props: {
   result?: SearchResult;
@@ -212,6 +213,14 @@ export default function ResultPreview(props: {
               </p>
             </Show>
           </div>
+          <Show
+            when={
+              props.previewReady &&
+              (props.result?.kind === "file" || props.result?.kind === "folder")
+            }
+          >
+            <FilePreview result={props.result!} enabled={props.enabled} />
+          </Show>
           <ToolDetails detail={props.result?.detail} />
           <Show when={props.result?.kind === "clipboard"}>
             <Show when={props.previewReady}>
@@ -234,6 +243,20 @@ export default function ResultPreview(props: {
             </span>
             <kbd>↵</kbd>
           </button>
+          <Show
+            when={
+              props.result?.primaryAction === "copy" ||
+              props.result?.secondaryActions.includes("copy")
+            }
+          >
+            <button
+              class="preview-action"
+              disabled={!props.enabled}
+              onClick={() => props.onAction("paste")}
+            >
+              Paste to previous app<kbd>{props.modifier} ⇧ ↵</kbd>
+            </button>
+          </Show>
           <Show when={props.result?.secondaryActions.includes("reveal")}>
             <button
               class="preview-action"

@@ -235,14 +235,20 @@ pub fn edit_settings(
         },
     )?;
     state.replace_settings(settings.clone());
-    if previous.clipboard_history_enabled != settings.clipboard_history_enabled {
+    if previous.clipboard_history_enabled != settings.clipboard_history_enabled
+        || previous.clipboard_excluded_apps != settings.clipboard_excluded_apps
+        || previous.clipboard_capture_images != settings.clipboard_capture_images
+        || previous.clipboard_capture_files != settings.clipboard_capture_files
+    {
         state.clipboard.invalidate();
     }
     if settings.clipboard_history_enabled {
         super::clipboard::start(app);
         super::clipboard::refresh(app);
     }
-    if previous.clipboard_history_limit != settings.clipboard_history_limit {
+    if previous.clipboard_history_limit != settings.clipboard_history_limit
+        || previous.clipboard_retention_days != settings.clipboard_retention_days
+    {
         state.storage.apply_clipboard_limit(app);
     }
     if !previous.same_file_settings(&settings) {

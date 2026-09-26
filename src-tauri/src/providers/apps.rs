@@ -112,6 +112,14 @@ impl AppProvider {
             .map(|app| &app.entry)
     }
 
+    /// Hidden results may still be opened by an explicitly configured shortcut.
+    pub fn get_any(&self, id: &str) -> Option<&AppEntry> {
+        self.apps
+            .iter()
+            .find(|app| app.entry.id == id)
+            .map(|app| &app.entry)
+    }
+
     /// Includes applications that the user hides from results.
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn contains(&self, id: &str) -> bool {

@@ -27,6 +27,12 @@ import ResultPreview from "./components/ResultPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
 import ClipboardCopyDialog from "./components/ClipboardCopyDialog";
 import WelcomeSuggestions from "./components/WelcomeSuggestions";
+import LibraryPanel from "./components/LibraryPanel";
+import RichClipboardHistory from "./components/RichClipboardHistory";
+import UtilitiesPanel, {
+  UtilitiesAwakeIndicator,
+} from "./components/UtilitiesPanel";
+import "./styles/native-views.css";
 import {
   appearances,
   readAppearance,
@@ -109,6 +115,26 @@ export default function App(
   const [storageError, setStorageError] = createSignal<string>();
   const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [panel, setPanel] = createSignal<string>();
+  const [panelNotice, setPanelNotice] = createSignal<string>();
+  function openPanel(name: string) {
+    if (panel()) {
+      if (panel() !== name)
+        setPanelNotice(
+          "Close the current view before opening another command.",
+        );
+      return;
+    }
+    setMenuOpen(false);
+    setPanelNotice(undefined);
+    setPanel(name);
+  }
+  function closePanel() {
+    setPanelNotice(undefined);
+    setPanel(undefined);
+    void search(query(), true);
+    queueMicrotask(() => input?.focus());
+  }
   const [menuFilter, setMenuFilter] = createSignal("");
   const [clipboardTool, setClipboardTool] = createSignal<{
     mode: "edit" | "combine";
@@ -240,6 +266,17 @@ export default function App(
         key: "↵",
       },
     ];
+    if (
+      current()?.primaryAction === "copy" ||
+      current()?.secondaryActions.includes("copy")
+    )
+      actions.push({
+        label: "Paste to previous app",
+        icon: "clipboard",
+        run: () => void run("paste"),
+        disabled: !canOpen(),
+        key: `${modifier()} ⇧ ↵`,
+      });
     if (current()?.secondaryActions.includes("reveal"))
       actions.push({
         label: "Show in folder",
@@ -319,6 +356,24 @@ export default function App(
   });
   const launcherActions = createMemo(() =>
     [
+      {
+        label: "Quicklinks and snippets",
+        icon: "file" as const,
+        run: () => openPanel("quicklinks"),
+        disabled: !desktop,
+      },
+      {
+        label: "Utilities",
+        icon: "system" as const,
+        run: () => openPanel("processes"),
+        disabled: !desktop,
+      },
+      {
+        label: "Images and files clipboard",
+        icon: "clipboard" as const,
+        run: () => openPanel("rich-clipboard"),
+        disabled: !desktop,
+      },
       {
         label: "Settings",
         icon: "system" as const,
@@ -749,6 +804,7 @@ export default function App(
 
   function onKey(event: KeyboardEvent) {
     if (composing || event.isComposing || event.keyCode === 229) return;
+    if (panel()) return;
     if (clipboardTool()) return;
     if (clearOpen() || pendingAction()) {
       if (event.key === "Escape") {
@@ -818,6 +874,17 @@ export default function App(
         setMenuOpen(false);
         focusInput();
       }
+      return;
+    }
+    if (
+      command &&
+      event.shiftKey &&
+      event.key === "Enter" &&
+      (current()?.primaryAction === "copy" ||
+        current()?.secondaryActions.includes("copy"))
+    ) {
+      event.preventDefault();
+      void run("paste");
       return;
     }
     if (command && /^[1-9]$/.test(event.key)) {
@@ -1019,6 +1086,21 @@ export default function App(
             keepVisibleCategory();
             void search(query(), true);
           }),
+          register("open-panel", (payload) => openPanel(String(payload))),
+          register("library-changed", () => {
+            if (!panel()) void search(query(), true);
+          }),
+          register("confirm-item", (payload) => {
+            if (panel()) {
+              setPanelNotice(
+                "Close the current view, then press the shortcut again to confirm this command.",
+              );
+              return;
+            }
+            setPendingAction(payload as SearchResult);
+            setError(undefined);
+          }),
+          register("action-error", (payload) => setError(String(payload))),
           register("apps-changed", () => {
             void search(query(), true);
           }),
@@ -1102,639 +1184,690 @@ export default function App(
   });
 
   return (
-    <main
-      class="launcher"
-      data-native-glass={nativeGlass() || undefined}
-      aria-label="TinyDash launcher"
-    >
-      <div
-        class="window-drag-handle"
-        title="Drag to move window"
-        aria-hidden="true"
-        onMouseDown={startDragging}
-      />
-      <header class="search-header">
-        <div class="search-field">
-          <span class="search-symbol">
-            <Icon name="search" size={22} />
-          </span>
-          <input
-            ref={input}
-            type="text"
-            role="combobox"
-            aria-label="Search TinyDash"
-            aria-autocomplete="list"
-            aria-expanded={results().length > 0}
-            aria-controls="search-results"
-            aria-activedescendant={
-              current() ? `result-${selected()}` : undefined
-            }
-            placeholder={placeholder()}
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck={false}
-            maxLength={8192}
-            value={query()}
-            onInput={(event) => changeQuery(event.currentTarget.value)}
-          />
-          <Show when={query() && results().length > 0}>
-            <button
-              class="clear-query"
-              aria-label="Clear search"
-              title="Clear search"
-              onClick={() => {
-                changeQuery("");
-                focusInput();
-              }}
-            >
-              <Icon name="close" size={16} />
-            </button>
-          </Show>
-          <button
-            class="escape-key"
-            aria-label="Hide launcher"
-            title="Hide launcher (Esc)"
-            onClick={() => void hide()}
-            disabled={!desktop}
+    <>
+      <Show when={panel()} keyed>
+        {(name) => (
+          <div
+            class="native-view"
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !event.defaultPrevented) {
+                event.preventDefault();
+                event.stopPropagation();
+                closePanel();
+              }
+            }}
           >
-            <kbd>esc</kbd>
-          </button>
-        </div>
-        <nav class="category-bar" aria-label="Search categories">
-          <div class="category-tabs" ref={categoryBar}>
-            <For each={visibleCategories()}>
-              {(category) => (
-                <button
-                  class="category-tab"
-                  aria-pressed={mode() === category.id}
-                  onClick={() => changeMode(category.id)}
-                >
-                  {category.label}
-                </button>
-              )}
-            </For>
-          </div>
-          <span
-            class="category-hint"
-            title="Tab: next category. Shift+Tab: previous category."
-          >
-            <kbd>Tab</kbd> to switch
-          </span>
-        </nav>
-      </header>
-      <Show
-        when={desktop && info()?.settings.clipboardHistoryDecided === false}
-      >
-        <aside class="first-use" aria-label="Clipboard history choice">
-          <div>
-            <strong>Save clipboard history?</strong>
-            <p>
-              TinyDash saves copied text on this device as plain text. It can
-              include passwords and other private text. Choose before capture
-              starts.
-            </p>
-            <p>
-              Launcher shortcut: <kbd>{info()?.settings.shortcut}</kbd>. You can
-              change this in Settings.
-            </p>
-            <Show when={info()?.platform === "linux"}>
-              <p>On Wayland, set a desktop shortcut to run tinydash.</p>
-            </Show>
-            <p>
-              Currency tools can download exchange rates. Turn off these
-              requests in Settings &gt; Currency.
-            </p>
-          </div>
-          <div class="first-use-actions">
-            <button
-              disabled={busy()}
-              onClick={() => void chooseClipboardHistory(false)}
-            >
-              Keep history off
-            </button>
-            <button
-              disabled={busy()}
-              onClick={() => void chooseClipboardHistory(true)}
-            >
-              Enable history
-            </button>
-          </div>
-        </aside>
-      </Show>
-      <Show
-        when={!message() && !welcome() && mode() === "all" && files().indexing}
-      >
-        <div class="status-line indexing-status">
-          <span class="query-hint" role="status">
-            Scanning files... You can search apps now.
-          </span>
-        </div>
-      </Show>
-      <Show when={message() && !pendingAction() && !clearOpen()}>
-        <div class="status-line">
-          <span class="error-message" role="alert">
-            {message()}
-          </span>
-          <Show when={mode() === "calculator" && currency().warning}>
-            <button
-              class="text-button"
-              disabled={!desktop || currency().refreshing}
-              onClick={() => void refresh("currency")}
-            >
-              Retry
-            </button>
-          </Show>
-        </div>
-      </Show>
-
-      <section
-        class="results-area"
-        classList={{
-          "welcome-results": welcome(),
-          "emoji-results": mode() === "emoji",
-          "clipboard-results": current()?.kind === "clipboard",
-        }}
-        aria-label="Search results"
-      >
-        <div class="result-column">
-          <Show when={welcome()}>
-            <WelcomeSuggestions
-              appsAvailable={enabledCategories().includes("apps")}
-              onBrowseApps={() => changeMode("apps")}
-              onQuery={(value) => {
-                changeQuery(value);
-                focusInput();
-              }}
-            />
-          </Show>
-          <Show when={mode() === "clipboard"}>
-            <div class="list-tools">
-              <span>Saved on this device</span>
-              <button
-                class="text-button clear-history"
-                disabled={!desktop || busy()}
-                onClick={() => confirmClear(true)}
-              >
-                Clear unpinned
-              </button>
-            </div>
-          </Show>
-          <ul
-            id="search-results"
-            ref={list}
-            class="result-list"
-            role="listbox"
-            aria-label="Search results"
-            aria-busy={pending()}
-          >
-            <For each={results()}>
-              {(result, index) => (
-                <li role="presentation" class="result-entry">
-                  <Show
-                    when={
-                      index() === 0 ||
-                      groupLabel(results()[index() - 1]) !== groupLabel(result)
-                    }
-                  >
-                    <div class="result-group" aria-hidden="true">
-                      {groupLabel(result)}
-                      <span class="group-count">
-                        {
-                          results().filter(
-                            (item) => groupLabel(item) === groupLabel(result),
-                          ).length
-                        }
-                      </span>
-                    </div>
-                  </Show>
-                  <div
-                    id={`result-${index()}`}
-                    role="option"
-                    aria-selected={index() === selected()}
-                    class="result-row"
-                    classList={{
-                      selected: index() === selected(),
-                      pending: pending(),
-                      "calculation-row": result.kind === "calculation",
-                      "password-row": result.kind === "password",
-                    }}
-                    onPointerMove={() => {
-                      if (!pending()) {
-                        selectionChangedByUser = true;
-                        setSelected(index());
-                      }
-                    }}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => void run(result.primaryAction, result)}
-                  >
-                    <ResultIcon result={result} />
-                    <span class="result-copy">
-                      <span class="result-title" title={result.title}>
-                        {result.title}
-                      </span>
-                      <span class="result-subtitle" title={result.subtitle}>
-                        {result.subtitle}
-                      </span>
-                    </span>
-                    <Show when={isPinned(result)}>
-                      <span
-                        class="result-pin"
-                        title={`Pinned to ${categories.find(({ id }) => id === mode())?.label}`}
-                        aria-label={`Pinned to ${categories.find(({ id }) => id === mode())?.label}`}
-                      >
-                        <Icon name="pin" size={13} />
-                      </span>
-                    </Show>
-                    <Show when={index() < 9}>
-                      <kbd class="result-shortcut">
-                        <span>{modifier()}</span>
-                        <span>{index() + 1}</span>
-                      </kbd>
-                    </Show>
-                  </div>
-                </li>
-              )}
-            </For>
-          </ul>
-          <Show when={results().length === 0 && !welcome()}>
-            <div class="empty-state">
-              <div class="empty-icon">
-                <Icon name={query() ? "search" : "apps"} size={28} />
-              </div>
-              <h1>
-                {!desktop
-                  ? "TinyDash, one shortcut away."
-                  : mode() === "password"
-                    ? "Generate a password"
-                    : mode() === "timezone"
-                      ? "Calculate a date or time"
-                      : mode() === "url"
-                        ? "Clean a URL"
-                        : mode() === "web"
-                          ? "Search the web"
-                          : mode() === "system"
-                            ? "No system commands found"
-                            : mode() === "calculator"
-                              ? "Calculate and convert"
-                              : mode() === "emoji"
-                                ? "No emoji found"
-                                : mode() === "clipboard"
-                                  ? query()
-                                    ? "No clipboard entries found"
-                                    : "No saved clipboard text"
-                                  : mode() === "files"
-                                    ? files().indexing
-                                      ? "Finding your files"
-                                      : query()
-                                        ? "No files found"
-                                        : "No files in the index"
-                                    : mode() === "all" &&
-                                        files().indexing &&
-                                        query()
-                                      ? "No results yet"
-                                      : indexing()
-                                        ? "Finding your applications"
-                                        : query()
-                                          ? "No results found"
-                                          : "No applications in the index"}
-              </h1>
-              <p>
-                {!desktop
-                  ? "Start the TinyDash desktop app to search this computer."
-                  : mode() === "password"
-                    ? "Try password 32, passphrase 6, or pin 6."
-                    : mode() === "timezone"
-                      ? "Try next Friday + 2 weeks, time in Tokyo, or 10am Pacific Time."
-                      : mode() === "url"
-                        ? "Paste a full http:// or https:// URL."
-                        : mode() === "web"
-                          ? "Type a search, then choose an engine."
-                          : mode() === "system"
-                            ? "Try sleep, restart, or settings."
-                            : mode() === "calculator"
-                              ? "Try 12 * 8, 5 ft to cm, or 100 USD MYR."
-                              : mode() === "emoji"
-                                ? "Try a name, shortcode, or category, such as coffee or food."
-                                : mode() === "clipboard"
-                                  ? info()?.settings.clipboardHistoryEnabled ===
-                                    false
-                                    ? "Clipboard capture is off in Settings."
-                                    : query()
-                                      ? "Try a word from the text you copied."
-                                      : "Copy text in any application. It will appear here."
-                                  : mode() === "files"
-                                    ? files().indexing
-                                      ? "You can search applications while the scan runs."
-                                      : query()
-                                        ? "Try a filename or part of a path."
-                                        : info()?.settings.fileSearchRoots
-                                              ?.length === 0
-                                          ? "File search is off. Choose folders in Settings, File search."
-                                          : "Check your folders in Settings, File search, then refresh the file list."
-                                    : mode() === "all" &&
-                                        files().indexing &&
-                                        query()
-                                      ? "The file scan is still running. You can search applications now."
-                                      : indexing()
-                                        ? "You can start typing while the list loads."
-                                        : query()
-                                          ? "Try a name, a file path, or a calculation."
-                                          : "Refresh the list after you install an application."}
+            <Show when={panelNotice()}>
+              <p class="native-view-notice" role="status">
+                {panelNotice()}
               </p>
+            </Show>
+            <Show
+              when={name !== "rich-clipboard"}
+              fallback={<RichClipboardHistory onClose={closePanel} />}
+            >
               <Show
                 when={
-                  desktop &&
-                  !(mode() === "files" ? files().indexing : indexing()) &&
-                  (query() ||
-                    mode() === "all" ||
-                    mode() === "apps" ||
-                    mode() === "files")
+                  name === "quicklinks" ||
+                  name === "snippets" ||
+                  name.startsWith("library:")
+                }
+                fallback={
+                  <UtilitiesPanel initialTab={name} onClose={closePanel} />
                 }
               >
-                <button
-                  class="text-button"
-                  onClick={() => {
-                    if (query()) {
-                      changeQuery("");
-                      focusInput();
-                    } else {
-                      void refresh();
-                    }
-                  }}
-                >
-                  {query()
-                    ? "Clear search"
-                    : mode() === "files"
-                      ? "Refresh files"
-                      : "Refresh applications"}
-                </button>
-              </Show>
-            </div>
-          </Show>
-        </div>
-        <Show when={mode() !== "emoji"}>
-          <ResultPreview
-            result={current()}
-            welcome={!current()}
-            previewReady={visible() && !pending()}
-            enabled={canOpen()}
-            modifier={modifier()}
-            pinOptions={pinOptions()}
-            pinBusy={pinBusy()}
-            onPin={(category) => void togglePin(category)}
-            onAction={(action) => void run(action)}
-          />
-        </Show>
-      </section>
-
-      <footer class="footer">
-        <div class="footer-actions">
-          <Show
-            when={!welcome()}
-            fallback={<span class="footer-prompt">Type to search</span>}
-          >
-            <button
-              class="open-button"
-              disabled={!canOpen()}
-              onClick={runPrimary}
-            >
-              {busy()
-                ? current()?.primaryAction === "run"
-                  ? "Running..."
-                  : current()?.primaryAction === "copy"
-                    ? "Copying..."
-                    : "Opening..."
-                : primaryLabel()}
-              <Icon name="return" size={17} />
-            </button>
-            <span class="footer-selection" title={current()?.title}>
-              {current()?.title ?? "TinyDash"}
-            </span>
-          </Show>
-          <span class="navigation-hint">
-            <kbd>↑</kbd>
-            <kbd>↓</kbd> navigate
-          </span>
-          <span class="list-count" role="status" aria-live="polite">
-            {welcome()
-              ? "0 results"
-              : mode() === "calculator"
-                ? currency().refreshing
-                  ? "Updating rates..."
-                  : currency().asOf
-                    ? `Rates ${currency().asOf}`
-                    : "Arithmetic and units offline"
-                : mode() === "files"
-                  ? files().indexing
-                    ? "Scanning files..."
-                    : `${files().total} ${files().total === 1 ? "item" : "items"} indexed`
-                  : mode() === "emoji" ||
-                      mode() === "clipboard" ||
-                      mode() === "system" ||
-                      ["password", "timezone", "url", "web"].includes(mode())
-                    ? `${results().length} shown`
-                    : indexing()
-                      ? "Finding applications..."
-                      : pending()
-                        ? "Searching..."
-                        : query().trim()
-                          ? `${results().length} ${results().length === 1 ? "result" : "results"}`
-                          : mode() === "all"
-                            ? `${results().length} pinned`
-                            : `${total()} installed`}
-          </span>
-
-          <div class="actions-area">
-            <button
-              class="actions-button"
-              aria-haspopup="menu"
-              aria-expanded={menuOpen()}
-              aria-controls="actions-menu"
-              onClick={toggleMenu}
-            >
-              Actions <kbd>{modifier()} K</kbd>
-            </button>
-            <Show when={menuOpen()}>
-              <button
-                class="menu-scrim"
-                aria-label="Close actions"
-                onClick={toggleMenu}
-              />
-              <div
-                id="actions-menu"
-                ref={menu}
-                class="actions-menu"
-                role="menu"
-                aria-label="Launcher actions"
-              >
-                <input
-                  ref={menuInput}
-                  class="actions-filter"
-                  type="search"
-                  aria-label="Search actions"
-                  placeholder="Search actions..."
-                  autocomplete="off"
-                  value={menuFilter()}
-                  onInput={(event) => setMenuFilter(event.currentTarget.value)}
+                <LibraryPanel
+                  initialId={name.startsWith("library:") ? name : undefined}
+                  onClose={closePanel}
                 />
-                <div class="menu-column">
-                  <Show when={resultActions().length > 0}>
-                    <div class="menu-heading">
-                      {current()?.title ?? "TinyDash"}
-                    </div>
-                  </Show>
-                  <For each={resultActions()}>
-                    {(action) => (
-                      <button
-                        role="menuitem"
-                        disabled={action.disabled}
-                        onClick={action.run}
-                      >
-                        <Icon name={action.icon} />
-                        {action.label}
-                        <Show when={action.key}>
-                          <kbd>{action.key}</kbd>
-                        </Show>
-                      </button>
-                    )}
-                  </For>
-                </div>
-                <div class="menu-column">
-                  <Show
-                    when={appearances.some((item) =>
-                      matchesMenu(`Appearance ${item.label}`),
-                    )}
+              </Show>
+            </Show>
+          </div>
+        )}
+      </Show>
+      <main
+        style={{ display: panel() ? "none" : undefined }}
+        class="launcher"
+        data-native-glass={nativeGlass() || undefined}
+        aria-label="TinyDash launcher"
+      >
+        <div
+          class="window-drag-handle"
+          title="Drag to move window"
+          aria-hidden="true"
+          onMouseDown={startDragging}
+        />
+        <header class="search-header">
+          <Show when={desktop}>
+            <UtilitiesAwakeIndicator />
+          </Show>
+          <div class="search-field">
+            <span class="search-symbol">
+              <Icon name="search" size={22} />
+            </span>
+            <input
+              ref={input}
+              type="text"
+              role="combobox"
+              aria-label="Search TinyDash"
+              aria-autocomplete="list"
+              aria-expanded={results().length > 0}
+              aria-controls="search-results"
+              aria-activedescendant={
+                current() ? `result-${selected()}` : undefined
+              }
+              placeholder={placeholder()}
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck={false}
+              maxLength={8192}
+              value={query()}
+              onInput={(event) => changeQuery(event.currentTarget.value)}
+            />
+            <Show when={query() && results().length > 0}>
+              <button
+                class="clear-query"
+                aria-label="Clear search"
+                title="Clear search"
+                onClick={() => {
+                  changeQuery("");
+                  focusInput();
+                }}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            </Show>
+            <button
+              class="escape-key"
+              aria-label="Hide launcher"
+              title="Hide launcher (Esc)"
+              onClick={() => void hide()}
+              disabled={!desktop}
+            >
+              <kbd>esc</kbd>
+            </button>
+          </div>
+          <nav class="category-bar" aria-label="Search categories">
+            <div class="category-tabs" ref={categoryBar}>
+              <For each={visibleCategories()}>
+                {(category) => (
+                  <button
+                    class="category-tab"
+                    aria-pressed={mode() === category.id}
+                    onClick={() => changeMode(category.id)}
                   >
-                    <div
-                      class="appearance-group"
-                      role="group"
-                      aria-label="Appearance"
+                    {category.label}
+                  </button>
+                )}
+              </For>
+            </div>
+            <span
+              class="category-hint"
+              title="Tab: next category. Shift+Tab: previous category."
+            >
+              <kbd>Tab</kbd> to switch
+            </span>
+          </nav>
+        </header>
+        <Show
+          when={desktop && info()?.settings.clipboardHistoryDecided === false}
+        >
+          <aside class="first-use" aria-label="Clipboard history choice">
+            <div>
+              <strong>Save clipboard history?</strong>
+              <p>
+                TinyDash saves copied text on this device as plain text. It can
+                include passwords and other private text. Choose before capture
+                starts.
+              </p>
+              <p>
+                Launcher shortcut: <kbd>{info()?.settings.shortcut}</kbd>. You
+                can change this in Settings.
+              </p>
+              <Show when={info()?.platform === "linux"}>
+                <p>On Wayland, set a desktop shortcut to run tinydash.</p>
+              </Show>
+              <p>
+                Currency tools can download exchange rates. Turn off these
+                requests in Settings &gt; Currency.
+              </p>
+            </div>
+            <div class="first-use-actions">
+              <button
+                disabled={busy()}
+                onClick={() => void chooseClipboardHistory(false)}
+              >
+                Keep history off
+              </button>
+              <button
+                disabled={busy()}
+                onClick={() => void chooseClipboardHistory(true)}
+              >
+                Enable history
+              </button>
+            </div>
+          </aside>
+        </Show>
+        <Show
+          when={
+            !message() && !welcome() && mode() === "all" && files().indexing
+          }
+        >
+          <div class="status-line indexing-status">
+            <span class="query-hint" role="status">
+              Scanning files... You can search apps now.
+            </span>
+          </div>
+        </Show>
+        <Show when={message() && !pendingAction() && !clearOpen()}>
+          <div class="status-line">
+            <span class="error-message" role="alert">
+              {message()}
+            </span>
+            <Show when={mode() === "calculator" && currency().warning}>
+              <button
+                class="text-button"
+                disabled={!desktop || currency().refreshing}
+                onClick={() => void refresh("currency")}
+              >
+                Retry
+              </button>
+            </Show>
+          </div>
+        </Show>
+
+        <section
+          class="results-area"
+          classList={{
+            "welcome-results": welcome(),
+            "emoji-results": mode() === "emoji",
+            "clipboard-results": current()?.kind === "clipboard",
+          }}
+          aria-label="Search results"
+        >
+          <div class="result-column">
+            <Show when={welcome()}>
+              <WelcomeSuggestions
+                appsAvailable={enabledCategories().includes("apps")}
+                onBrowseApps={() => changeMode("apps")}
+                onQuery={(value) => {
+                  changeQuery(value);
+                  focusInput();
+                }}
+              />
+            </Show>
+            <Show when={mode() === "clipboard"}>
+              <div class="list-tools">
+                <span>Saved on this device</span>
+                <button
+                  class="text-button clear-history"
+                  disabled={!desktop || busy()}
+                  onClick={() => confirmClear(true)}
+                >
+                  Clear unpinned
+                </button>
+              </div>
+            </Show>
+            <ul
+              id="search-results"
+              ref={list}
+              class="result-list"
+              role="listbox"
+              aria-label="Search results"
+              aria-busy={pending()}
+            >
+              <For each={results()}>
+                {(result, index) => (
+                  <li role="presentation" class="result-entry">
+                    <Show
+                      when={
+                        index() === 0 ||
+                        groupLabel(results()[index() - 1]) !==
+                          groupLabel(result)
+                      }
                     >
-                      <div class="menu-heading">Appearance</div>
-                      <div class="appearance-options">
-                        <For
-                          each={appearances.filter((item) =>
-                            matchesMenu(`Appearance ${item.label}`),
-                          )}
-                        >
-                          {(item) => (
-                            <button
-                              role="menuitemradio"
-                              aria-checked={appearance() === item.id}
-                              title={item.description}
-                              onClick={() => changeAppearance(item.id)}
-                            >
-                              <span
-                                class={`appearance-swatch swatch-${item.id}`}
-                                aria-hidden="true"
-                              />
-                              {item.label}
-                            </button>
-                          )}
-                        </For>
+                      <div class="result-group" aria-hidden="true">
+                        {groupLabel(result)}
+                        <span class="group-count">
+                          {
+                            results().filter(
+                              (item) => groupLabel(item) === groupLabel(result),
+                            ).length
+                          }
+                        </span>
                       </div>
-                    </div>
-                    <div class="menu-divider" />
-                  </Show>
-                  <Show when={matchesMenu("Compact layout")}>
-                    <button
-                      role="menuitemcheckbox"
-                      aria-checked={compact()}
-                      onClick={() => {
-                        const next = !compact();
-                        setCompact(next);
-                        saveCompact(next);
-                        setMenuOpen(false);
-                        focusInput();
+                    </Show>
+                    <div
+                      id={`result-${index()}`}
+                      role="option"
+                      aria-selected={index() === selected()}
+                      class="result-row"
+                      classList={{
+                        selected: index() === selected(),
+                        pending: pending(),
+                        "calculation-row": result.kind === "calculation",
+                        "password-row": result.kind === "password",
                       }}
+                      onPointerMove={() => {
+                        if (!pending()) {
+                          selectionChangedByUser = true;
+                          setSelected(index());
+                        }
+                      }}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => void run(result.primaryAction, result)}
                     >
-                      <span aria-hidden="true">{compact() ? "✓" : "○"}</span>
-                      Compact
-                    </button>
-                  </Show>
-                  <For each={launcherActions()}>
-                    {(action) => (
-                      <button
-                        role="menuitem"
-                        disabled={action.disabled}
-                        onClick={action.run}
-                      >
-                        <Icon name={action.icon} />
-                        {action.label}
-                        <Show when={action.key}>
-                          <kbd>{action.key}</kbd>
-                        </Show>
-                      </button>
-                    )}
-                  </For>
+                      <ResultIcon result={result} />
+                      <span class="result-copy">
+                        <span class="result-title" title={result.title}>
+                          {result.title}
+                        </span>
+                        <span class="result-subtitle" title={result.subtitle}>
+                          {result.subtitle}
+                        </span>
+                      </span>
+                      <Show when={isPinned(result)}>
+                        <span
+                          class="result-pin"
+                          title={`Pinned to ${categories.find(({ id }) => id === mode())?.label}`}
+                          aria-label={`Pinned to ${categories.find(({ id }) => id === mode())?.label}`}
+                        >
+                          <Icon name="pin" size={13} />
+                        </span>
+                      </Show>
+                      <Show when={index() < 9}>
+                        <kbd class="result-shortcut">
+                          <span>{modifier()}</span>
+                          <span>{index() + 1}</span>
+                        </kbd>
+                      </Show>
+                    </div>
+                  </li>
+                )}
+              </For>
+            </ul>
+            <Show when={results().length === 0 && !welcome()}>
+              <div class="empty-state">
+                <div class="empty-icon">
+                  <Icon name={query() ? "search" : "apps"} size={28} />
                 </div>
+                <h1>
+                  {!desktop
+                    ? "TinyDash, one shortcut away."
+                    : mode() === "password"
+                      ? "Generate a password"
+                      : mode() === "timezone"
+                        ? "Calculate a date or time"
+                        : mode() === "url"
+                          ? "Clean a URL"
+                          : mode() === "web"
+                            ? "Search the web"
+                            : mode() === "system"
+                              ? "No system commands found"
+                              : mode() === "calculator"
+                                ? "Calculate and convert"
+                                : mode() === "emoji"
+                                  ? "No emoji found"
+                                  : mode() === "clipboard"
+                                    ? query()
+                                      ? "No clipboard entries found"
+                                      : "No saved clipboard text"
+                                    : mode() === "files"
+                                      ? files().indexing
+                                        ? "Finding your files"
+                                        : query()
+                                          ? "No files found"
+                                          : "No files in the index"
+                                      : mode() === "all" &&
+                                          files().indexing &&
+                                          query()
+                                        ? "No results yet"
+                                        : indexing()
+                                          ? "Finding your applications"
+                                          : query()
+                                            ? "No results found"
+                                            : "No applications in the index"}
+                </h1>
+                <p>
+                  {!desktop
+                    ? "Start the TinyDash desktop app to search this computer."
+                    : mode() === "password"
+                      ? "Try password 32, passphrase 6, or pin 6."
+                      : mode() === "timezone"
+                        ? "Try next Friday + 2 weeks, time in Tokyo, or 10am Pacific Time."
+                        : mode() === "url"
+                          ? "Paste a full http:// or https:// URL."
+                          : mode() === "web"
+                            ? "Type a search, then choose an engine."
+                            : mode() === "system"
+                              ? "Try sleep, restart, or settings."
+                              : mode() === "calculator"
+                                ? "Try 12 * 8, 5 ft to cm, or 100 USD MYR."
+                                : mode() === "emoji"
+                                  ? "Try a name, shortcode, or category, such as coffee or food."
+                                  : mode() === "clipboard"
+                                    ? info()?.settings
+                                        .clipboardHistoryEnabled === false
+                                      ? "Clipboard capture is off in Settings."
+                                      : query()
+                                        ? "Try a word from the text you copied."
+                                        : "Copy text in any application. It will appear here."
+                                    : mode() === "files"
+                                      ? files().indexing
+                                        ? "You can search applications while the scan runs."
+                                        : query()
+                                          ? "Try a filename or part of a path."
+                                          : info()?.settings.fileSearchRoots
+                                                ?.length === 0
+                                            ? "File search is off. Choose folders in Settings, File search."
+                                            : "Check your folders in Settings, File search, then refresh the file list."
+                                      : mode() === "all" &&
+                                          files().indexing &&
+                                          query()
+                                        ? "The file scan is still running. You can search applications now."
+                                        : indexing()
+                                          ? "You can start typing while the list loads."
+                                          : query()
+                                            ? "Try a name, a file path, or a calculation."
+                                            : "Refresh the list after you install an application."}
+                </p>
                 <Show
                   when={
-                    !resultActions().length &&
-                    !launcherActions().length &&
-                    !matchesMenu("Compact layout") &&
-                    !appearances.some((item) =>
-                      matchesMenu(`Appearance ${item.label}`),
-                    )
+                    desktop &&
+                    !(mode() === "files" ? files().indexing : indexing()) &&
+                    (query() ||
+                      mode() === "all" ||
+                      mode() === "apps" ||
+                      mode() === "files")
                   }
                 >
-                  <p role="status" class="actions-empty">
-                    No matching actions
-                  </p>
+                  <button
+                    class="text-button"
+                    onClick={() => {
+                      if (query()) {
+                        changeQuery("");
+                        focusInput();
+                      } else {
+                        void refresh();
+                      }
+                    }}
+                  >
+                    {query()
+                      ? "Clear search"
+                      : mode() === "files"
+                        ? "Refresh files"
+                        : "Refresh applications"}
+                  </button>
                 </Show>
               </div>
             </Show>
           </div>
-        </div>
-      </footer>
-      <Show when={clearOpen()}>
-        <ConfirmDialog
-          title={
-            keepPins()
-              ? "Clear unpinned history?"
-              : "Clear all clipboard history?"
-          }
-          description={
-            keepPins()
-              ? "This deletes unpinned text. Entries pinned in All or Clipboard stay saved. The system clipboard does not change."
-              : "This deletes all saved text, including entries pinned in All and Clipboard. The system clipboard does not change."
-          }
-          confirmLabel={keepPins() ? "Clear unpinned" : "Clear all history"}
-          busyLabel="Clearing..."
-          busy={busy()}
-          error={error()}
-          onClose={closeClear}
-          onConfirm={() => void clearHistory()}
-        />
-      </Show>
-      <Show when={clipboardTool()} keyed>
-        {(tool) => (
-          <ClipboardCopyDialog
-            {...tool}
-            onClose={closeClipboardTool}
-            onCopied={() => {
-              closeClipboardTool();
-              void search(query(), true).then(() =>
-                setNotice("Text copied. Paste it in the target app."),
-              );
-            }}
-          />
-        )}
-      </Show>
-      <Show when={pendingAction()?.confirmation} keyed>
-        {(confirmation) => (
+          <Show when={mode() !== "emoji"}>
+            <ResultPreview
+              result={current()}
+              welcome={!current()}
+              previewReady={visible() && !pending()}
+              enabled={canOpen()}
+              modifier={modifier()}
+              pinOptions={pinOptions()}
+              pinBusy={pinBusy()}
+              onPin={(category) => void togglePin(category)}
+              onAction={(action) => void run(action)}
+            />
+          </Show>
+        </section>
+
+        <footer class="footer">
+          <div class="footer-actions">
+            <Show
+              when={!welcome()}
+              fallback={<span class="footer-prompt">Type to search</span>}
+            >
+              <button
+                class="open-button"
+                disabled={!canOpen()}
+                onClick={runPrimary}
+              >
+                {busy()
+                  ? current()?.primaryAction === "run"
+                    ? "Running..."
+                    : current()?.primaryAction === "copy"
+                      ? "Copying..."
+                      : "Opening..."
+                  : primaryLabel()}
+                <Icon name="return" size={17} />
+              </button>
+              <span class="footer-selection" title={current()?.title}>
+                {current()?.title ?? "TinyDash"}
+              </span>
+            </Show>
+            <span class="navigation-hint">
+              <kbd>↑</kbd>
+              <kbd>↓</kbd> navigate
+            </span>
+            <span class="list-count" role="status" aria-live="polite">
+              {welcome()
+                ? "0 results"
+                : mode() === "calculator"
+                  ? currency().refreshing
+                    ? "Updating rates..."
+                    : currency().asOf
+                      ? `Rates ${currency().asOf}`
+                      : "Arithmetic and units offline"
+                  : mode() === "files"
+                    ? files().indexing
+                      ? "Scanning files..."
+                      : `${files().total} ${files().total === 1 ? "item" : "items"} indexed`
+                    : mode() === "emoji" ||
+                        mode() === "clipboard" ||
+                        mode() === "system" ||
+                        ["password", "timezone", "url", "web"].includes(mode())
+                      ? `${results().length} shown`
+                      : indexing()
+                        ? "Finding applications..."
+                        : pending()
+                          ? "Searching..."
+                          : query().trim()
+                            ? `${results().length} ${results().length === 1 ? "result" : "results"}`
+                            : mode() === "all"
+                              ? `${results().length} pinned`
+                              : `${total()} installed`}
+            </span>
+
+            <div class="actions-area">
+              <button
+                class="actions-button"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen()}
+                aria-controls="actions-menu"
+                onClick={toggleMenu}
+              >
+                Actions <kbd>{modifier()} K</kbd>
+              </button>
+              <Show when={menuOpen()}>
+                <button
+                  class="menu-scrim"
+                  aria-label="Close actions"
+                  onClick={toggleMenu}
+                />
+                <div
+                  id="actions-menu"
+                  ref={menu}
+                  class="actions-menu"
+                  role="menu"
+                  aria-label="Launcher actions"
+                >
+                  <input
+                    ref={menuInput}
+                    class="actions-filter"
+                    type="search"
+                    aria-label="Search actions"
+                    placeholder="Search actions..."
+                    autocomplete="off"
+                    value={menuFilter()}
+                    onInput={(event) =>
+                      setMenuFilter(event.currentTarget.value)
+                    }
+                  />
+                  <div class="menu-column">
+                    <Show when={resultActions().length > 0}>
+                      <div class="menu-heading">
+                        {current()?.title ?? "TinyDash"}
+                      </div>
+                    </Show>
+                    <For each={resultActions()}>
+                      {(action) => (
+                        <button
+                          role="menuitem"
+                          disabled={action.disabled}
+                          onClick={action.run}
+                        >
+                          <Icon name={action.icon} />
+                          {action.label}
+                          <Show when={action.key}>
+                            <kbd>{action.key}</kbd>
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                  <div class="menu-column">
+                    <Show
+                      when={appearances.some((item) =>
+                        matchesMenu(`Appearance ${item.label}`),
+                      )}
+                    >
+                      <div
+                        class="appearance-group"
+                        role="group"
+                        aria-label="Appearance"
+                      >
+                        <div class="menu-heading">Appearance</div>
+                        <div class="appearance-options">
+                          <For
+                            each={appearances.filter((item) =>
+                              matchesMenu(`Appearance ${item.label}`),
+                            )}
+                          >
+                            {(item) => (
+                              <button
+                                role="menuitemradio"
+                                aria-checked={appearance() === item.id}
+                                title={item.description}
+                                onClick={() => changeAppearance(item.id)}
+                              >
+                                <span
+                                  class={`appearance-swatch swatch-${item.id}`}
+                                  aria-hidden="true"
+                                />
+                                {item.label}
+                              </button>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                      <div class="menu-divider" />
+                    </Show>
+                    <Show when={matchesMenu("Compact layout")}>
+                      <button
+                        role="menuitemcheckbox"
+                        aria-checked={compact()}
+                        onClick={() => {
+                          const next = !compact();
+                          setCompact(next);
+                          saveCompact(next);
+                          setMenuOpen(false);
+                          focusInput();
+                        }}
+                      >
+                        <span aria-hidden="true">{compact() ? "✓" : "○"}</span>
+                        Compact
+                      </button>
+                    </Show>
+                    <For each={launcherActions()}>
+                      {(action) => (
+                        <button
+                          role="menuitem"
+                          disabled={action.disabled}
+                          onClick={action.run}
+                        >
+                          <Icon name={action.icon} />
+                          {action.label}
+                          <Show when={action.key}>
+                            <kbd>{action.key}</kbd>
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                  <Show
+                    when={
+                      !resultActions().length &&
+                      !launcherActions().length &&
+                      !matchesMenu("Compact layout") &&
+                      !appearances.some((item) =>
+                        matchesMenu(`Appearance ${item.label}`),
+                      )
+                    }
+                  >
+                    <p role="status" class="actions-empty">
+                      No matching actions
+                    </p>
+                  </Show>
+                </div>
+              </Show>
+            </div>
+          </div>
+        </footer>
+        <Show when={clearOpen()}>
           <ConfirmDialog
-            title={confirmation.title}
-            description={confirmation.description}
-            confirmLabel={confirmation.confirmLabel}
-            busyLabel="Running..."
+            title={
+              keepPins()
+                ? "Clear unpinned history?"
+                : "Clear all clipboard history?"
+            }
+            description={
+              keepPins()
+                ? "This deletes unpinned text and all saved images and file references. Text pinned in All or Clipboard stays saved. The system clipboard does not change."
+                : "This deletes all saved text, images, and file references, including pinned text. The system clipboard does not change."
+            }
+            confirmLabel={keepPins() ? "Clear unpinned" : "Clear all history"}
+            busyLabel="Clearing..."
             busy={busy()}
             error={error()}
-            onClose={closeConfirmation}
-            onConfirm={confirmAction}
+            onClose={closeClear}
+            onConfirm={() => void clearHistory()}
           />
-        )}
-      </Show>
-    </main>
+        </Show>
+        <Show when={clipboardTool()} keyed>
+          {(tool) => (
+            <ClipboardCopyDialog
+              {...tool}
+              onClose={closeClipboardTool}
+              onCopied={() => {
+                closeClipboardTool();
+                void search(query(), true).then(() =>
+                  setNotice("Text copied. Paste it in the target app."),
+                );
+              }}
+            />
+          )}
+        </Show>
+        <Show when={pendingAction()?.confirmation} keyed>
+          {(confirmation) => (
+            <ConfirmDialog
+              title={confirmation.title}
+              description={confirmation.description}
+              confirmLabel={confirmation.confirmLabel}
+              busyLabel="Running..."
+              busy={busy()}
+              error={error()}
+              onClose={closeConfirmation}
+              onConfirm={confirmAction}
+            />
+          )}
+        </Show>
+      </main>
+    </>
   );
 }

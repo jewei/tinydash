@@ -74,13 +74,15 @@ impl Storage {
                 let settings = app.path().app_config_dir()?.join("settings.json");
                 let database = Database::open_with_settings(&path, &settings)?;
                 let usage = database.load_usage()?;
-                let pins = database.load_pins()?;
                 let settings = app.state::<LauncherState>().settings();
                 // An unreadable settings file uses undecided first-use values.
                 // Those fallback limits must not prune existing history.
                 if settings.clipboard_history_decided {
                     database.prune_clipboard(settings.clipboard_limit())?;
+                    database.prune_clipboard_retention(settings.clipboard_retention_days, ranking::now())?;
+                    if let Err(error) = super::clipboard::formats::apply_retention(app) { self.failed(&error); }
                 }
+                let pins = database.load_pins()?;
                 let clipboard = ClipboardProvider::new(database.load_clipboard()?);
                 let rates = match database.load_rates() {
                     Ok(rates) => rates,
@@ -171,7 +173,13 @@ impl Storage {
                 .database
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("Clipboard storage is unavailable"))?;
-            database.prune_clipboard(state.settings().clipboard_limit())?;
+            let settings = state.settings();
+            database.prune_clipboard(settings.clipboard_limit())?;
+            database
+                .prune_clipboard_retention(settings.clipboard_retention_days, ranking::now())?;
+            if let Err(error) = super::clipboard::formats::apply_retention(app) {
+                self.failed(&error);
+            }
             let entries = database.load_clipboard()?;
             state
                 .search
@@ -230,6 +238,11 @@ impl Storage {
 
     pub fn capture(&self, app: &AppHandle, observed: Observed, generation: u64) {
         let state = app.state::<LauncherState>();
+        // Serialize the final policy/generation check with settings commits.
+        // Keep the same order as edit_settings: policy before storage.
+        let Ok(_policy) = state.settings_update.lock() else {
+            return;
+        };
         let Ok(mut session) = self.session(app, &state.search).lock() else {
             return;
         };
@@ -286,7 +299,13 @@ impl Storage {
             return None;
         }
         let database = session.database.as_mut()?;
-        match database.capture_clipboard(text, ranking::now(), state.settings().clipboard_limit()) {
+        let settings = state.settings();
+        match database.capture_clipboard_with_retention(
+            text,
+            ranking::now(),
+            settings.clipboard_limit(),
+            settings.clipboard_retention_days,
+        ) {
             Ok((entry, removed)) => {
                 let id = entry.id;
                 let indexed = entry.into();

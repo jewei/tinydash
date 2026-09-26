@@ -34,6 +34,7 @@ pub const RESULT_LIMIT: usize = 30;
 pub struct SearchManager {
     app_preferences: std::collections::BTreeMap<String, crate::settings::AppPreference>,
     apps: AppProvider,
+    item_preferences: std::collections::BTreeMap<String, crate::settings::ItemPreference>,
     files: FileProvider,
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
@@ -58,6 +59,7 @@ impl Default for SearchManager {
         Self {
             app_preferences: Default::default(),
             apps: AppProvider::default(),
+            item_preferences: Default::default(),
             files: FileProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
@@ -77,6 +79,14 @@ impl Default for SearchManager {
 impl SearchManager {
     pub fn apply_settings(&mut self, settings: &crate::settings::Settings) {
         self.app_preferences = settings.app_preferences.clone();
+        self.item_preferences = settings.item_preferences.clone();
+        for (id, item) in &self.item_preferences {
+            if id.starts_with("app:") {
+                let preference = self.app_preferences.entry(id.clone()).or_default();
+                preference.aliases.extend(item.aliases.clone());
+                preference.hidden |= item.hidden || item.disabled;
+            }
+        }
         self.apps.apply_preferences(&self.app_preferences);
         self.tools.set_web_searches(&settings.web_searches);
     }
@@ -84,6 +94,17 @@ impl SearchManager {
     pub fn app_catalog(&self) -> Vec<SearchResult> {
         self.apps.catalog()
     }
+    pub fn item_catalog(&mut self) -> Vec<SearchResult> {
+        let mut items = self.apps.catalog();
+        items.extend(
+            self.system
+                .get_or_insert_with(SystemCommandProvider::default)
+                .search("", &mut self.matcher),
+        );
+        items.extend(super::commands::catalog());
+        items
+    }
+
     pub fn set_pins(&mut self, pins: Pins) {
         self.pins = pins;
     }
@@ -257,12 +278,12 @@ impl SearchManager {
         self.files.len()
     }
 
-    fn file(&self, id: &str) -> Result<FileEntry> {
+    pub fn file(&self, id: &str) -> Result<FileEntry> {
         self.files.get(id).cloned().ok_or(Error::FileNotFound)
     }
 
     pub fn app(&self, id: &str) -> Result<AppEntry> {
-        self.apps.get(id).cloned().ok_or(Error::AppNotFound)
+        self.apps.get_any(id).cloned().ok_or(Error::AppNotFound)
     }
 
     pub fn clipboard_entry(&self, id: &str) -> Result<&ClipboardEntry> {
@@ -270,6 +291,16 @@ impl SearchManager {
     }
 
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
+        if self
+            .item_preferences
+            .get(id)
+            .is_some_and(|item| item.disabled)
+        {
+            return Err(Error::InvalidAction);
+        }
+        if action == Action::Run && super::commands::panel(id).is_some() {
+            return Ok(ResolvedAction::Panel(id.to_owned()));
+        }
         if id.starts_with("password:") || id.starts_with("tool:") {
             return self.tools.resolve(id, action);
         }
@@ -308,6 +339,53 @@ impl SearchManager {
     pub fn search(&mut self, input: &str, mode: SearchMode) -> Result<SearchOutcome> {
         let query = Query::parse(input, mode)?;
         let mut outcome = self.search_unpinned(&query);
+        if matches!(query.mode, SearchMode::All | SearchMode::System)
+            && (query.mode == SearchMode::System || !query.text.is_empty())
+        {
+            let text = ranking::normalize(query.text);
+            let mut extras = super::commands::catalog();
+            if self
+                .item_preferences
+                .keys()
+                .any(|id| id.starts_with("system:"))
+            {
+                extras.extend(
+                    self.system
+                        .get_or_insert_with(SystemCommandProvider::default)
+                        .search("", &mut self.matcher)
+                        .into_iter()
+                        .filter(|result| self.item_preferences.contains_key(&result.id)),
+                );
+            }
+            extras.retain_mut(|result| {
+                let alias = self.item_preferences.get(&result.id).is_some_and(|item| {
+                    item.aliases
+                        .iter()
+                        .any(|alias| ranking::normalize(alias).starts_with(&text))
+                });
+                let title = ranking::normalize(&result.title);
+                let matches = text.is_empty() || title.starts_with(&text) || alias;
+                result.score = if text.is_empty() {
+                    0
+                } else if alias {
+                    ranking::EXACT_MATCH
+                } else {
+                    ranking::name_score(0, &title, &text)
+                };
+                matches
+                    && !self
+                        .item_preferences
+                        .get(&result.id)
+                        .is_some_and(|item| item.hidden || item.disabled)
+            });
+            if !extras.is_empty() {
+                ranking::apply_usage(&mut extras, &self.usage, ranking::now());
+                let ids: HashSet<_> = extras.iter().map(|result| result.id.clone()).collect();
+                outcome.results.retain(|result| !ids.contains(&result.id));
+                outcome.results.extend(extras);
+                outcome.results = ranking::top_results(outcome.results, RESULT_LIMIT);
+            }
+        }
         self.describe_results(&mut outcome.results, &query);
         if input.trim().is_empty() {
             let mut keys: Vec<_> = self
@@ -360,6 +438,12 @@ impl SearchManager {
             outcome.results.truncate(RESULT_LIMIT - 1);
             outcome.results.push(latest);
         }
+        outcome.results.retain(|result| {
+            !self
+                .item_preferences
+                .get(&result.id)
+                .is_some_and(|item| item.hidden || item.disabled)
+        });
         outcome.results.truncate(RESULT_LIMIT);
         // Pins, usage, category order, and all response limits have now been
         // applied. Only returned apps need an icon payload.
@@ -1182,7 +1266,7 @@ mod tests {
                 .expect("commands")
                 .results
                 .len(),
-            SystemCommand::ALL.len()
+            SystemCommand::ALL.len() + super::super::commands::catalog().len()
         );
         manager.record_usage("system:settings", ranking::now());
         assert_eq!(

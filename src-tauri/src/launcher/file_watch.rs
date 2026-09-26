@@ -56,6 +56,7 @@ impl FileWatcher {
     pub fn new(
         roots: Vec<PathBuf>,
         excluded: Vec<String>,
+        include_hidden: bool,
         sender: SyncSender<Request>,
     ) -> notify::Result<Self> {
         let changes = Arc::new(Changes::default());
@@ -64,7 +65,14 @@ impl FileWatcher {
         let watcher = RecommendedWatcher::new(
             move |event: notify::Result<Event>| {
                 match event {
-                    Ok(event) if relevant(&event, &filter_roots, &excluded) => {
+                    Ok(event)
+                        if relevant_with_hidden(
+                            &event,
+                            &filter_roots,
+                            &excluded,
+                            include_hidden,
+                        ) =>
+                    {
                         if event.need_rescan()
                             || matches!(
                                 event.kind,
@@ -183,7 +191,17 @@ impl FileWatcher {
     }
 }
 
+#[cfg(test)]
 fn relevant(event: &Event, roots: &[PathBuf], excluded: &[String]) -> bool {
+    relevant_with_hidden(event, roots, excluded, false)
+}
+
+fn relevant_with_hidden(
+    event: &Event,
+    roots: &[PathBuf],
+    excluded: &[String],
+    include_hidden: bool,
+) -> bool {
     if event.need_rescan() {
         return true;
     }
@@ -208,7 +226,9 @@ fn relevant(event: &Event, roots: &[PathBuf], excluded: &[String]) -> bool {
                     let name = component.as_os_str().to_string_lossy();
                     // A folder renamed to a hidden name changes the index. Work
                     // inside an already excluded tree does not need a rescan.
-                    if (name.starts_with('.') && (components.peek().is_some() || !renamed))
+                    if (!include_hidden
+                        && name.starts_with('.')
+                        && (components.peek().is_some() || !renamed))
                         || (components.peek().is_some()
                             && excluded.iter().any(|excluded| *excluded == name))
                     {
@@ -310,7 +330,8 @@ mod tests {
         let directory = tempfile::tempdir().expect("directory");
         let root = directory.path().canonicalize().expect("root");
         let (sender, receiver) = sync_channel(1);
-        let mut watcher = FileWatcher::new(vec![root.clone()], vec![], sender).expect("watcher");
+        let mut watcher =
+            FileWatcher::new(vec![root.clone()], vec![], false, sender).expect("watcher");
         let report = ScanReport {
             directories: vec![root.clone()],
             ..ScanReport::default()

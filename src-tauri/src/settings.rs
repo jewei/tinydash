@@ -22,6 +22,15 @@ pub struct CategoryShortcut {
     pub shortcut: String,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct ItemPreference {
+    pub aliases: Vec<String>,
+    pub shortcut: String,
+    pub hidden: bool,
+    pub disabled: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WebSearch {
@@ -96,13 +105,20 @@ pub struct Settings {
     pub start_at_login: bool,
     pub app_preferences: BTreeMap<String, AppPreference>,
     pub web_searches: Vec<WebSearch>,
+    pub item_preferences: BTreeMap<String, ItemPreference>,
     pub clipboard_history_enabled: bool,
     pub clipboard_history_decided: bool,
     pub clipboard_history_limit: u16,
+    pub clipboard_retention_days: u32,
+    pub clipboard_excluded_apps: Vec<String>,
+    pub clipboard_capture_images: bool,
+    pub clipboard_capture_files: bool,
     pub file_search_roots: Option<Vec<PathBuf>>,
     pub file_search_limit: u32,
     pub file_search_excluded_dirs: Vec<String>,
     pub file_watch_enabled: bool,
+    pub file_search_include_hidden: bool,
+    pub file_search_ignore_patterns: Vec<String>,
     pub currency_rates_enabled: bool,
     pub visible_categories: Vec<SearchMode>,
 }
@@ -117,13 +133,20 @@ impl Default for Settings {
             start_at_login: false,
             app_preferences: BTreeMap::new(),
             web_searches: Vec::new(),
+            item_preferences: BTreeMap::new(),
             clipboard_history_enabled: true,
             clipboard_history_decided: true,
             clipboard_history_limit: 100,
+            clipboard_retention_days: 0,
+            clipboard_excluded_apps: Vec::new(),
+            clipboard_capture_images: false,
+            clipboard_capture_files: false,
             file_search_roots: None,
             file_search_limit: 50_000,
             file_search_excluded_dirs: vec!["node_modules".into(), "target".into()],
             file_watch_enabled: true,
+            file_search_include_hidden: false,
+            file_search_ignore_patterns: Vec::new(),
             currency_rates_enabled: true,
             visible_categories: vec![
                 SearchMode::All,
@@ -157,6 +180,12 @@ impl Settings {
                 self.category_shortcuts
                     .iter()
                     .map(|binding| binding.shortcut.as_str()),
+            )
+            .chain(
+                self.item_preferences
+                    .values()
+                    .filter(|item| !item.disabled && !item.shortcut.is_empty())
+                    .map(|item| item.shortcut.as_str()),
             )
             .collect()
     }
@@ -209,6 +238,56 @@ impl Settings {
                 "Show a category before assigning its shortcut."
             );
         }
+        ensure!(
+            self.item_preferences.len() <= 512,
+            "Configure no more than 512 items."
+        );
+        for (id, item) in &self.item_preferences {
+            ensure!(
+                id.len() <= 4100
+                    && !id.contains('\0')
+                    && ["app:", "system:", "command:", "library:"]
+                        .iter()
+                        .any(|prefix| id.starts_with(prefix)),
+                "Invalid item ID."
+            );
+            ensure!(
+                item.aliases.len() <= 16
+                    && item.aliases.iter().all(|alias| !alias.trim().is_empty()
+                        && alias.len() <= 160
+                        && !alias.chars().any(char::is_control)),
+                "Use up to 16 single-line aliases of 1–160 bytes."
+            );
+            if !item.shortcut.is_empty() {
+                let key: Shortcut = item
+                    .shortcut
+                    .parse()
+                    .map_err(|_| anyhow::anyhow!("Invalid item shortcut."))?;
+                ensure!(allowed_shortcut(&key), "Item shortcuts need a modifier.");
+                ensure!(
+                    item.disabled || keys.insert(key.id()),
+                    "Each shortcut must be different."
+                );
+            }
+        }
+        ensure!(
+            self.clipboard_retention_days <= 3650,
+            "Clipboard retention must be 0–3650 days (0 keeps entries until the count limit)."
+        );
+        ensure!(
+            self.clipboard_excluded_apps.len() <= 128
+                && self
+                    .clipboard_excluded_apps
+                    .iter()
+                    .all(|app| !app.trim().is_empty()
+                        && app.len() <= 512
+                        && !app.chars().any(char::is_control)),
+            "Use up to 128 application names or IDs."
+        );
+        ensure!(
+            crate::providers::files::valid_ignore_patterns(&self.file_search_ignore_patterns),
+            "Use up to 64 ignore patterns of 1–256 bytes, with *, ? or ** wildcards and forward slashes. Negation and character classes are not supported."
+        );
         ensure!(
             self.clipboard_history_decided || !self.clipboard_history_enabled,
             "Choose whether to save clipboard history first."
@@ -313,6 +392,8 @@ impl Settings {
             && self.file_search_limit == other.file_search_limit
             && self.file_search_excluded_dirs == other.file_search_excluded_dirs
             && self.file_watch_enabled == other.file_watch_enabled
+            && self.file_search_include_hidden == other.file_search_include_hidden
+            && self.file_search_ignore_patterns == other.file_search_ignore_patterns
     }
 
     pub fn clipboard_limit(&self) -> usize {

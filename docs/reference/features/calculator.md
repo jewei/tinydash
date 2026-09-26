@@ -1,6 +1,6 @@
 # Calculator and currency
 
-Select Calculator or enter an expression in All. The `=` prefix selects calculator parsing. Examples include `12 * 8`, `sqrt(144)`, `5 ft to cm`, and `=32 C to F`. Enter copies the selected value and hides the launcher.
+Select Calculator or enter an expression in All. The `=` prefix selects calculator parsing. Examples include `12 * 8`, `sqrt(144)`, `5 ft to cm`, and `=32 C to F`. Enter copies the selected value and hides the launcher. **Paste to previous app** or Command/Ctrl + Shift + Enter explicitly inserts it into the captured application where supported; see [direct paste](workflows.md#direct-paste) for permissions and platform limits.
 
 Arithmetic and unit conversion work offline. Unit case is preserved. Calculator mode shows errors for invalid expressions. Each query is independent; variables and scripts are not supported.
 

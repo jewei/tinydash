@@ -1,7 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 
 export type Action =
-  "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
+  | "launch"
+  | "open"
+  | "reveal"
+  | "copy"
+  | "paste"
+  | "delete"
+  | "run"
+  | "regenerate";
 export type SearchMode =
   | "all"
   | "apps"
@@ -102,15 +109,29 @@ export interface SettingsValues {
   startAtLogin: boolean;
   appPreferences: Record<string, { aliases: string[]; hidden: boolean }>;
   webSearches: WebSearch[];
+  itemPreferences: Record<string, ItemPreference>;
   clipboardHistoryEnabled: boolean;
   clipboardHistoryDecided: boolean;
   clipboardHistoryLimit: number;
+  clipboardRetentionDays: number;
+  clipboardExcludedApps: string[];
+  clipboardCaptureImages: boolean;
+  clipboardCaptureFiles: boolean;
   fileSearchRoots: string[] | null;
   fileSearchLimit: number;
   fileSearchExcludedDirs: string[];
   fileWatchEnabled: boolean;
+  fileSearchIncludeHidden: boolean;
+  fileSearchIgnorePatterns: string[];
   currencyRatesEnabled: boolean;
   visibleCategories: SearchMode[];
+}
+
+export interface ItemPreference {
+  aliases: string[];
+  shortcut: string;
+  hidden: boolean;
+  disabled: boolean;
 }
 
 export interface WebSearch {
@@ -172,6 +193,8 @@ export const backend = {
   chooseClipboardHistory: (enabled: boolean) =>
     invoke<SettingsValues>("choose_clipboard_history", { enabled }),
   appCatalog: () => invoke<SearchResult[]>("app_catalog"),
+  itemCatalog: () => invoke<SearchResult[]>("item_catalog"),
+  paste: (id: string) => invoke<void>("paste_result", { id }),
   setAppPreference: (id: string, aliases: string[], hidden: boolean) =>
     invoke<SettingsValues>("set_app_preference", { id, aliases, hidden }),
   previewWebSearch: (search: WebSearch, query: string) =>

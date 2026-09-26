@@ -18,6 +18,7 @@ pub enum ResolvedAction {
     System(SystemCommand),
     OpenUrl(String),
     RegeneratePassword(String),
+    Panel(String),
 }
 
 impl ResolvedAction {
@@ -47,7 +48,27 @@ pub async fn execute_action(
     confirmed: Option<bool>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let keep_open = matches!(action, Action::Delete | Action::Regenerate);
+    if id.starts_with("library:") && action == Action::Run {
+        if app
+            .state::<LauncherState>()
+            .settings()
+            .item_preferences
+            .get(&id)
+            .is_some_and(|item| item.disabled)
+        {
+            return Err("This library item is disabled.".into());
+        }
+        app.state::<super::library::LibraryState>().get(&id)?;
+        window::show(&app).map_err(|error| error.to_string())?;
+        return app
+            .emit("open-panel", id)
+            .map_err(|error| error.to_string());
+    }
+    if action == Action::Paste {
+        return super::paste::paste_result(app, id).await;
+    }
+    let keep_open = matches!(action, Action::Delete | Action::Regenerate)
+        || (action == Action::Run && super::commands::panel(&id).is_some());
     let worker_app = app.clone();
     let (usage_id, restore_focus) = tauri::async_runtime::spawn_blocking(move || {
         // Resolve backend-owned IDs. The webview supplies neither executable
@@ -67,6 +88,7 @@ pub async fn execute_action(
             .check_confirmation(confirmed.unwrap_or(false))
             .map_err(|error| error.to_string())?;
         match action {
+            ResolvedAction::Panel(id) => super::commands::open(&worker_app, &id),
             ResolvedAction::System(command) => {
                 platform::run_system_command(command).map_err(|error| error.to_string())
             }

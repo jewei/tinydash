@@ -1,0 +1,86 @@
+.native-view {
+  height: 100vh;
+  overflow: auto;
+  padding: 16px;
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+
+.native-view-notice {
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-warning);
+  font-size: var(--text-body);
+}
+
+.native-view input,
+.native-view select,
+.native-view textarea {
+  max-width: 100%;
+}
+
+.rich-clipboard-panel {
+  padding: var(--space-md);
+  font-size: var(--text-body);
+}
+
+.rich-clipboard-panel header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.rich-clipboard-panel h2 {
+  flex: 1 0 100%;
+  margin: 0 0 var(--space-xs);
+}
+
+.rich-clipboard-panel p {
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.rich-clipboard-panel ul {
+  list-style: none;
+  padding: 0;
+  max-height: 28vh;
+  overflow: auto;
+}
+
+.rich-clipboard-panel li {
+  margin-block: var(--space-xs);
+  overflow-wrap: anywhere;
+}
+
+.rich-clipboard-panel button {
+  color: var(--color-ink);
+  background: var(--color-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  margin-right: var(--space-xs);
+  font: inherit;
+  cursor: pointer;
+}
+
+.rich-clipboard-panel button[aria-pressed="true"] {
+  background: var(--color-selected);
+  border-color: var(--color-selection-border);
+}
+
+.rich-clipboard-panel :focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.rich-clipboard-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-sidebar input[type="search"] {
+  width: 100%;
+  min-width: 0;
+}

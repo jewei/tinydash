@@ -318,6 +318,11 @@ fn ensure_output_path_safe(app: &AppHandle, path: &Path) -> Result<(), String> {
         data.join("tinydash.sqlite3-shm"),
         data.join("tinydash.sqlite3-journal"),
         data.join("recovery.tar"),
+        data.join("library.json"),
+        data.join("clipboard-rich.sqlite3"),
+        data.join("clipboard-rich.sqlite3-wal"),
+        data.join("clipboard-rich.sqlite3-shm"),
+        data.join("clipboard-rich.sqlite3-journal"),
     ];
     if protected
         .iter()

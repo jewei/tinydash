@@ -30,6 +30,7 @@ import {
   watchAppearance,
 } from "./appearance";
 import ConfirmDialog from "./components/ConfirmDialog";
+import ItemPreferences from "./components/ItemPreferences";
 import Icon from "./components/Icon";
 import {
   AppPreferences,
@@ -92,7 +93,19 @@ const sections = [
 ] as const;
 type Section = (typeof sections)[number]["id"];
 type FolderMode = "default" | "custom" | "off";
-type ShortcutTarget = "global" | SearchMode;
+type ShortcutTarget = "global" | SearchMode | `item:${string}`;
+const sectionKeywords: Record<Section, string> = {
+  shortcut: "keyboard hotkey startup login blur reset menu bar",
+  appearance: "theme dark light compact glass transparency",
+  search: "aliases applications hidden shortcuts commands web keywords",
+  categories: "tabs visible hide providers",
+  clipboard:
+    "history copy paste images files exclusions privacy retention days",
+  files: "index folders roots ignore patterns hidden watch preview",
+  currency: "exchange rates offline updates",
+  privacy: "backup import export recovery data storage",
+  about: "version update license",
+};
 const lines = (text: string) => [
   ...new Set(
     text
@@ -148,6 +161,21 @@ export default function Settings() {
   const [draft, setDraft] = createSignal<SettingsValues>();
   const [saved, setSaved] = createSignal<SettingsValues>();
   const [section, setSection] = createSignal<Section>("shortcut");
+  const [settingsQuery, setSettingsQuery] = createSignal("");
+  const matchingSections = createMemo(() => {
+    const words = settingsQuery()
+      .toLocaleLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    return sections.filter((item) =>
+      words.every((word) =>
+        `${item.label} ${item.description} ${sectionKeywords[item.id]}`
+          .toLocaleLowerCase()
+          .includes(word),
+      ),
+    );
+  });
   const [appearance, setAppearance] = createSignal(readAppearance());
   const [savedAppearance, setSavedAppearance] = createSignal(readAppearance());
   const [compact, setCompact] = createSignal(readCompact());
@@ -285,10 +313,27 @@ export default function Settings() {
       field("shortcut", shortcut);
       return;
     }
+    if (target.startsWith("item:")) {
+      const id = target.slice(5);
+      const item = value().itemPreferences[id] ?? {
+        aliases: [],
+        shortcut: "",
+        hidden: false,
+        disabled: false,
+      };
+      field("itemPreferences", {
+        ...value().itemPreferences,
+        [id]: { ...item, shortcut },
+      });
+      return;
+    }
     const bindings = value().categoryShortcuts.filter(
       (binding) => binding.mode !== target,
     );
-    field("categoryShortcuts", [...bindings, { mode: target, shortcut }]);
+    field("categoryShortcuts", [
+      ...bindings,
+      { mode: target as SearchMode, shortcut },
+    ]);
   }
   function field<K extends keyof SettingsValues>(
     key: K,
@@ -346,7 +391,7 @@ export default function Settings() {
       }
       setRecording(true);
       setRecordingTarget(target);
-      recorder.focus();
+      recorder?.focus();
     } catch (reason) {
       if (!disposed) setError(String(reason));
     } finally {
@@ -632,8 +677,26 @@ export default function Settings() {
           />
           TinyDash
         </div>
+        <label class="settings-field-label">
+          Search settings
+          <input
+            type="search"
+            aria-label="Search settings"
+            value={settingsQuery()}
+            onInput={(event) => setSettingsQuery(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && matchingSections()[0]) {
+                event.preventDefault();
+                navigate(matchingSections()[0].id);
+              }
+            }}
+          />
+        </label>
+        <Show when={!matchingSections().length}>
+          <p role="status">No matching settings.</p>
+        </Show>
         <nav aria-label="Settings sections">
-          <For each={sections}>
+          <For each={matchingSections()}>
             {(item) => (
               <button
                 type="button"
@@ -927,6 +990,12 @@ export default function Settings() {
                 </Show>
               </Show>
               <Show when={section() === "search"}>
+                <ItemPreferences
+                  value={value().itemPreferences}
+                  onChange={(next) => field("itemPreferences", next)}
+                  onRecord={(id) => void startRecording(`item:${id}`)}
+                  recording={recordingTarget()}
+                />
                 <div class="settings-group">
                   <h2>Application names</h2>
                   <AppPreferences
@@ -1055,7 +1124,60 @@ export default function Settings() {
                   />
                 </label>
                 <div class="settings-group settings-separated">
-                  <h2>Saved text</h2>
+                  <label class="settings-field-label">
+                    Retention in days
+                    <input
+                      type="number"
+                      min="0"
+                      max="3650"
+                      aria-label="Clipboard retention days"
+                      value={value().clipboardRetentionDays}
+                      onInput={(event) =>
+                        field(
+                          "clipboardRetentionDays",
+                          Number(event.currentTarget.value),
+                        )
+                      }
+                    />
+                  </label>
+                  <p>
+                    0 keeps entries until the count limit. Pinned text stays
+                    saved.
+                  </p>
+                  <label class="settings-field-label">
+                    Excluded applications
+                    <textarea
+                      aria-label="Excluded clipboard applications"
+                      rows={3}
+                      placeholder="Application name or bundle ID, one per line"
+                      value={value().clipboardExcludedApps.join("\n")}
+                      onInput={(event) =>
+                        field(
+                          "clipboardExcludedApps",
+                          lines(event.currentTarget.value),
+                        )
+                      }
+                    />
+                  </label>
+                  <p>
+                    Exclusions match exact application names or identifiers. If
+                    the source cannot be identified, capture stops while any
+                    exclusions are configured. Linux cannot attribute sources
+                    here. Secret-marked content is always skipped.
+                  </p>
+                  <Toggle
+                    label="Capture clipboard images"
+                    hint="Opt in to bounded local PNG history (currently macOS only). Requires clipboard history to be enabled."
+                    checked={value().clipboardCaptureImages}
+                    onChange={(next) => field("clipboardCaptureImages", next)}
+                  />
+                  <Toggle
+                    label="Capture copied files"
+                    hint="Keep references, not file backups (currently macOS only). Requires clipboard history to be enabled."
+                    checked={value().clipboardCaptureFiles}
+                    onChange={(next) => field("clipboardCaptureFiles", next)}
+                  />
+                  <h2>Saved history</h2>
                   <p>
                     Turning history off stops new entries. It keeps the entries
                     you already saved.
@@ -1135,6 +1257,27 @@ export default function Settings() {
                   </Show>
                 </div>
                 <Show when={folderMode() !== "off"}>
+                  <Toggle
+                    label="Include hidden files"
+                    hint="Search dotfiles and hidden folders. Symbolic links are still not followed."
+                    checked={value().fileSearchIncludeHidden}
+                    onChange={(next) => field("fileSearchIncludeHidden", next)}
+                  />
+                  <label class="settings-field-label">
+                    Ignore patterns
+                    <textarea
+                      aria-label="File ignore patterns"
+                      rows={3}
+                      placeholder={"*.log\nbuild/**"}
+                      value={value().fileSearchIgnorePatterns.join("\n")}
+                      onInput={(event) =>
+                        field(
+                          "fileSearchIgnorePatterns",
+                          lines(event.currentTarget.value),
+                        )
+                      }
+                    />
+                  </label>
                   <Toggle
                     label="Update files automatically"
                     hint="Watch these folders for changes."
@@ -1533,8 +1676,8 @@ export default function Settings() {
           }
           description={
             clearKeepPinned()
-              ? "This deletes saved text entries that are not pinned. Pinned entries stay available."
-              : "This deletes all saved text entries, including pinned entries. The current system clipboard stays available."
+              ? "This deletes unpinned text and all saved images and file references. Pinned text stays available. The system clipboard does not change."
+              : "This deletes all saved text, images, and file references, including pinned text. The system clipboard does not change."
           }
           confirmLabel={clearKeepPinned() ? "Clear unpinned" : "Clear history"}
           busyLabel="Clearing..."

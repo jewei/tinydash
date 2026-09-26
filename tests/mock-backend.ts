@@ -285,13 +285,20 @@ const defaultSettings: SettingsValues = {
   startAtLogin: false,
   appPreferences: {},
   webSearches: [],
+  itemPreferences: {},
   clipboardHistoryEnabled: true,
   clipboardHistoryDecided: true,
   clipboardHistoryLimit: 100,
+  clipboardRetentionDays: 0,
+  clipboardExcludedApps: [],
+  clipboardCaptureImages: false,
+  clipboardCaptureFiles: false,
   fileSearchRoots: null,
   fileSearchLimit: 50000,
   fileSearchExcludedDirs: ["node_modules", "target"],
   fileWatchEnabled: true,
+  fileSearchIncludeHidden: false,
+  fileSearchIgnorePatterns: [],
   currencyRatesEnabled: true,
   visibleCategories: [...defaultCategories],
 };
@@ -424,7 +431,26 @@ mockIPC(
       );
       return state.settings;
     }
+    if (command === "rich_clipboard_history")
+      return {
+        entries: [],
+        captureSupported: true,
+        supportNotice: "Native rich capture is supported on macOS.",
+      };
+    if (command === "utility_awake_status")
+      return { active: false, endsAt: null, remainingSeconds: 0 };
+    if (command === "utility_processes" || command === "library_list")
+      return [];
+    if (command === "utility_capabilities")
+      return {
+        processes: "Available",
+        eyedropper: "Unavailable",
+        awake: "Available",
+        media: "Available",
+        windows: "Available",
+      };
     if (command === "app_catalog") return apps;
+    if (command === "item_catalog") return [...apps, ...systemCommands];
     if (command === "set_app_preference") {
       const { id, aliases, hidden } = payload as {
         id: string;
