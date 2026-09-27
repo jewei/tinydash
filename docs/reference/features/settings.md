@@ -2,6 +2,8 @@
 
 Open Settings from Actions, the tray, Command/Ctrl + comma, or `tinydash --settings`. Save changes to apply the form. Discard restores saved values. Closing the window retains the unfinished form. Appearance applies immediately.
 
+On macOS, **Shortcut > Show menu bar icon** is off by default, including existing settings without an explicit choice. Save to show or hide it without restarting; Discard restores the saved choice. The choice is included in settings exports. TinyDash never shows a Dock icon. Windows and Linux retain their tray icon.
+
 Settings covers shortcuts, start at login, appearance, categories, application aliases, custom web searches, clipboard capture, file roots, currency requests, and privacy. **Search settings** filters sections by labels and related terms; Enter opens the first match without discarding drafts. Search also configures item aliases, global shortcuts, and separate Hide/Disable controls for apps, built-in commands, and library entries. Hidden items retain shortcuts; disabled items reject execution. Shortcut conflicts are validated in Rust before saving. Clipboard adds age retention, app exclusions, and independent image/file opt-ins; File search adds hidden-file inclusion and bounded ignore patterns. See the [settings reference](../settings.md).
 
 Appearance has five themes: Light, Dark, Sage, Rose, and Ink. Compact is a separate layout switch. Both choices apply immediately and are included in settings exports. On macOS, Follow macOS Liquid Glass also saves immediately and is included in exports. Turn it off for a solid theme background. Import previews keep them unsaved until Save changes. The macOS launcher uses system-controlled Liquid Glass where supported. See [appearance](appearance.md) for the OS limits and desktop checks.
@@ -37,6 +39,8 @@ Check settings search with “retention”, “patterns”, and “hotkey”. Sa
 Use desktop Settings checks on each affected OS for shortcut registration, login behavior, native file dialogs, and persistence. Recovery requires a disposable database and the recovery procedure. Updates require an installed release candidate, test feed, signature checks, and installation evidence. These are explicit gaps in the mocked tests and current native smoke suite.
 
 Record Shift + Space, save it, and reopen Settings. Use it while another app has focus, then test it as a category shortcut. Check that an occupied binding leaves the previous binding usable. Test the selected input method before choosing this shortcut for daily use. Restore the original binding after the check.
+
+On macOS, start with a fresh profile and an older settings file without `showMenuBarIcon`. Confirm no Dock or menu bar icon appears. Enable **Show menu bar icon**, save, and exercise its launcher, Settings, refresh, and quit actions. Restart and confirm the choice persists. Disable it, save, and confirm the icon disappears while the shortcut and second launch still work. Keep the Dock hidden with the launcher and Settings open. Browser tests prove only the form and mocked persistence; these OS effects require a controlled desktop session.
 
 Change a setting, save, and reopen. Export settings, preview a changed import, cancel it, then confirm saved state is unchanged. Check the unconfigured updater message in a development build.
 

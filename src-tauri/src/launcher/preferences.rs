@@ -217,8 +217,21 @@ pub fn edit_settings(
                 }
                 .map_err(|error| format!("Could not change start at login: {error}"))?;
             }
-            if let Err(error) = settings::save(&directory, &settings) {
-                let mut message = format!("{error:#}");
+            let menu_bar_changed = previous.show_menu_bar_icon != settings.show_menu_bar_icon;
+            let result = (|| {
+                if menu_bar_changed {
+                    crate::set_menu_bar_visible(app, settings.show_menu_bar_icon)
+                        .map_err(|error| format!("Could not change menu bar icon: {error}"))?;
+                }
+                settings::save(&directory, &settings).map_err(|error| format!("{error:#}"))
+            })();
+            if let Err(mut message) = result {
+                if menu_bar_changed
+                    && let Err(error) =
+                        crate::set_menu_bar_visible(app, previous.show_menu_bar_icon)
+                {
+                    message.push_str(&format!(" Could not restore menu bar icon: {error}"));
+                }
                 if changed {
                     let rollback = if was_enabled {
                         autostart.enable()

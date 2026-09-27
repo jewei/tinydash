@@ -420,6 +420,22 @@ mod tests {
     }
 
     #[test]
+    fn menu_bar_preference_round_trips_and_defaults_off_for_older_exports() {
+        for visible in [true, false] {
+            let settings = Settings {
+                show_menu_bar_icon: visible,
+                ..Settings::default()
+            };
+            let bytes = export(serde_json::to_value(&settings).unwrap());
+            let imported = parse_settings_import(&bytes).unwrap();
+            assert_eq!(imported.settings, settings);
+            assert!(imported.ignored_keys.is_empty());
+        }
+        let imported = parse_settings_import(&export(serde_json::json!({}))).unwrap();
+        assert!(!imported.settings.show_menu_bar_icon);
+    }
+
+    #[test]
     fn themes_and_compact_layout_round_trip_independently() {
         for appearance in ["light", "dark", "sage", "rose", "ink"] {
             for compact in [false, true] {

@@ -103,6 +103,7 @@ pub struct Settings {
     pub shortcut: String,
     pub category_shortcuts: Vec<CategoryShortcut>,
     pub start_at_login: bool,
+    pub show_menu_bar_icon: bool,
     pub app_preferences: BTreeMap<String, AppPreference>,
     pub web_searches: Vec<WebSearch>,
     pub item_preferences: BTreeMap<String, ItemPreference>,
@@ -131,6 +132,7 @@ impl Default for Settings {
             shortcut: DEFAULT_SHORTCUT.into(),
             category_shortcuts: Vec::new(),
             start_at_login: false,
+            show_menu_bar_icon: false,
             app_preferences: BTreeMap::new(),
             web_searches: Vec::new(),
             item_preferences: BTreeMap::new(),
@@ -488,6 +490,27 @@ mod tests {
         assert_eq!(settings.shortcut, "Alt+KeyJ");
         assert!(!settings.hide_on_blur);
         assert_eq!(std::fs::read_to_string(path).unwrap(), original);
+    }
+
+    #[test]
+    fn menu_bar_icon_is_opt_in_for_fresh_and_legacy_settings() {
+        let directory = tempfile::tempdir().unwrap();
+        assert!(!Settings::default().show_menu_bar_icon);
+        assert!(!load(directory.path()).unwrap().show_menu_bar_icon);
+        let path = directory.path().join("settings.json");
+        let legacy = r#"{"hideOnBlur":false}"#;
+        std::fs::write(&path, legacy).unwrap();
+        let mut settings = load(directory.path()).unwrap();
+        assert!(!settings.show_menu_bar_icon);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
+        for visible in [true, false] {
+            settings.show_menu_bar_icon = visible;
+            save(directory.path(), &settings).unwrap();
+            assert_eq!(load(directory.path()).unwrap(), settings);
+            let json: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            assert_eq!(json["showMenuBarIcon"], visible);
+        }
     }
 
     #[test]

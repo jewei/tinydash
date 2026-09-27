@@ -17,7 +17,19 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 use launcher::{LauncherState, window};
 
-fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+pub(crate) fn set_menu_bar_visible(app: &tauri::AppHandle, visible: bool) -> tauri::Result<()> {
+    // Other desktops retain their tray regardless of this macOS preference.
+    let visible = !cfg!(target_os = "macos") || visible;
+    if let Some(tray) = app.tray_by_id("launcher") {
+        tray.set_visible(visible)
+    } else if visible {
+        setup_tray(app)
+    } else {
+        Ok(())
+    }
+}
+
+fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Open TinyDash", true, None::<&str>)?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh applications", true, None::<&str>)?;
     let files = MenuItem::with_id(app, "files", "Refresh files", true, None::<&str>)?;
@@ -110,6 +122,9 @@ pub fn run() -> anyhow::Result<()> {
         .plugin(tauri_plugin_autostart::Builder::new().args(["--background"]).build())
         .plugin(tauri_plugin_updater::Builder::new().pubkey(option_env!("TAURI_UPDATER_PUBLIC_KEY").unwrap_or("")).build())
         .setup(|app| {
+            // Stay out of the Dock even when the menu bar icon is disabled or fails.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let mut warnings = Vec::new();
             let config = app.path().app_config_dir().map_err(anyhow::Error::from)
                 .and_then(|directory| settings::load(&directory));
@@ -156,24 +171,22 @@ pub fn run() -> anyhow::Result<()> {
                 );
                 if let Err(error) = shortcut_result {
                     tracing::warn!(%error, "Global shortcut is unavailable");
-                    warnings.push(format!("Could not register {}. Use the tray menu or change settings.json.", settings.shortcut));
+                    warnings.push(format!("Could not register {}. Start TinyDash again and open Settings to change the shortcut.", settings.shortcut));
                 } else {
                     for shortcut in settings.shortcuts() {
                         if let Err(error) = app.global_shortcut().register(shortcut) {
                             tracing::warn!(%error, shortcut, "Global shortcut is unavailable");
-                            warnings.push(format!("Could not register {shortcut}. Use the tray menu or change Settings."));
+                            warnings.push(format!("Could not register {shortcut}. Start TinyDash again and open Settings to change the shortcut."));
                         }
                     }
                 }
             }
 
-            if let Err(error) = setup_tray(app) {
+            if let Err(error) = set_menu_bar_visible(app.handle(), settings.show_menu_bar_icon) {
                 tracing::warn!(%error, "Tray icon is unavailable");
                 warnings.push("The tray icon is unavailable. Start TinyDash again to show the running launcher.".into());
+                #[cfg(not(target_os = "macos"))]
                 if let Some(window) = app.get_webview_window("main") { window.set_skip_taskbar(false)?; }
-            } else {
-                #[cfg(target_os = "macos")]
-                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             }
             let library = launcher::library::LibraryState::open(app.path().app_data_dir()?)
                 .unwrap_or_else(|error| {

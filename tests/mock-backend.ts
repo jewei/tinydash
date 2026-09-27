@@ -283,6 +283,7 @@ const defaultSettings: SettingsValues = {
   shortcut: "Control+Shift+Space",
   categoryShortcuts: [],
   startAtLogin: false,
+  showMenuBarIcon: false,
   appPreferences: {},
   webSearches: [],
   itemPreferences: {},

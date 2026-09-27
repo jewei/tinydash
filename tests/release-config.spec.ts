@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+test("Mac app bundle starts without a Dock icon", () => {
+  const plist = readFileSync("src-tauri/Info.plist", "utf8");
+  expect(plist).toMatch(/<key>LSUIElement<\/key>\s*<true\s*\/>/);
+});
 
 function releaseEnvironment(values: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const env = { ...process.env };

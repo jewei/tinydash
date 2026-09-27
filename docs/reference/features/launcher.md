@@ -1,6 +1,6 @@
 # Launcher and navigation
 
-Open TinyDash with Control + Shift + Space, the tray menu, or the command line. The window stays resident after it hides. Drag the handle above the search field to move it. Window position lasts until the process exits.
+Open TinyDash with Control + Shift + Space, the tray menu, or the command line. On macOS, TinyDash has no Dock icon and hides its menu bar icon by default. Enable **Shortcut > Show menu bar icon** in Settings to use that menu. The window stays resident after it hides. Drag the handle above the search field to move it. Window position lasts until the process exits.
 
 Use **Actions > Reset window position** to center the launcher in the current monitor's work area. The query, category, and selected result stay unchanged. On a display smaller than the window, the drag handle stays visible at the top left. Wayland controls placement through the compositor, so this action reports that limit there.
 

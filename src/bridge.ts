@@ -107,6 +107,7 @@ export interface SettingsValues {
   shortcut: string;
   categoryShortcuts: { mode: SearchMode; shortcut: string }[];
   startAtLogin: boolean;
+  showMenuBarIcon: boolean;
   appPreferences: Record<string, { aliases: string[]; hidden: boolean }>;
   webSearches: WebSearch[];
   itemPreferences: Record<string, ItemPreference>;

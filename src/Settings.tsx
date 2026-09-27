@@ -819,6 +819,14 @@ export default function Settings() {
                     onChange={(next) => field("clearQueryOnOpen", next)}
                   />
                 </div>
+                <Show when={info()?.platform === "macos"}>
+                  <Toggle
+                    label="Show menu bar icon"
+                    hint="The global shortcut remains available when the icon is hidden."
+                    checked={value().showMenuBarIcon}
+                    onChange={(next) => field("showMenuBarIcon", next)}
+                  />
+                </Show>
                 <div class="settings-group">
                   <h2>Category shortcuts</h2>
                   <p>
