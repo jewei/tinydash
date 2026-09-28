@@ -232,6 +232,7 @@ impl FileProvider {
 
 #[derive(Default)]
 pub struct ScanReport {
+    pub visited: usize,
     pub issue_count: usize,
     pub first_issue: Option<String>,
     pub limited: bool,
@@ -284,17 +285,36 @@ pub fn expand_root(path: &Path, home: Option<&Path>) -> Option<PathBuf> {
     }
 }
 
-/// Scan file and folder names and paths only. This function never reads file contents.
+#[cfg(test)]
 pub fn scan(
     roots: Vec<PathBuf>,
     excluded: &[String],
     limit: usize,
     report: &mut ScanReport,
 ) -> FileProvider {
+    scan_cancellable(roots, excluded, limit, report, || false).expect("uncancelled scan")
+}
+
+/// Scan names and paths only, checking cancellation between traversal steps.
+/// Cancellation discards partial results and skips index preparation. A blocking
+/// OS filesystem call cannot be interrupted; cancellation resumes when it returns.
+pub fn scan_cancellable(
+    roots: Vec<PathBuf>,
+    excluded: &[String],
+    limit: usize,
+    report: &mut ScanReport,
+    mut cancelled: impl FnMut() -> bool,
+) -> Option<FileProvider> {
     let mut resolved = Vec::new();
     for root in roots {
+        if cancelled() {
+            return None;
+        }
         match std::fs::symlink_metadata(&root) {
             Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+                if cancelled() {
+                    return None;
+                }
                 match root.canonicalize() {
                     Ok(path) => resolved.push(path),
                     Err(error) => report.issue(&root, error),
@@ -311,12 +331,14 @@ pub fn scan(
     resolved.sort();
     let mut unique: Vec<PathBuf> = Vec::new();
     for root in resolved {
+        if cancelled() {
+            return None;
+        }
         if !unique.iter().any(|parent| root.starts_with(parent)) {
             unique.push(root);
         }
     }
     let mut entries = Vec::new();
-    let mut visited = 0;
     for root in &unique {
         report.directory(root);
     }
@@ -326,9 +348,15 @@ pub fn scan(
             .follow_root_links(false)
             .max_open(16)
             .into_iter();
-        while let Some(item) = walk.next() {
-            visited += 1;
-            if visited > VISIT_LIMIT {
+        loop {
+            if cancelled() {
+                return None;
+            }
+            let Some(item) = walk.next() else {
+                break;
+            };
+            report.visited += 1;
+            if report.visited > VISIT_LIMIT {
                 report.limited = true;
                 break 'roots;
             }
@@ -347,6 +375,9 @@ pub fn scan(
                 && excluded
                     .iter()
                     .any(|name| entry.file_name() == name.as_str());
+            if cancelled() {
+                return None;
+            }
             let hidden = match platform::file_is_hidden(&entry) {
                 Ok(hidden) => hidden,
                 Err(error) => {
@@ -380,7 +411,13 @@ pub fn scan(
             }
         }
     }
-    FileProvider::new(entries)
+    if cancelled() {
+        return None;
+    }
+    let provider = FileProvider::new(entries);
+    // Index preparation is bounded by the result limit. Never publish it if
+    // settings changed while it was being prepared.
+    (!cancelled()).then_some(provider)
 }
 
 #[cfg(test)]

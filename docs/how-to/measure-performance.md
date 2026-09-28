@@ -28,6 +28,12 @@ Before collecting results, write down the decision threshold, scenario, percenti
 
 The harness times provider search and result construction after warmup. It excludes IPC, Solid rendering, WebView startup, filesystem scanning, SQLite, real clipboard access, and window/focus behavior. Its allocation mode counts requested Rust heap bytes, not process RSS or physical footprint. A native result-to-paint or startup claim needs separately identified installed-build measurements on the required desktop platform. Keep those separate from provider measurements and from mocked browser tests.
 
+## Native sample boundaries
+
+The installed-build smoke test records 25 samples per synthetic scenario after a warmup cycle. Its version-2 `performance.json` reports `readyWaitMs` separately: a background refresh may already be pending before the synthetic input is dispatched. Readiness and dispatch are coordinated inside one webview script, not across separate WebDriver calls. Every dispatched sample is retained; there is no retry or fastest-sample selection. A watchdog still fails stalled readiness, response, or frame callbacks.
+
+`domMs` starts at input dispatch; `readyWaitMs + domMs` includes preparation waiting. Double-rAF timing reports a rendering opportunity, not screen paint. Reopen timing includes WebDriver polling and now requires native window visibility as well as DOM readiness. Historical version-1 records used the earlier readiness procedure; do not treat cross-procedure differences as performance improvements.
+
 ## Privacy and evidence
 
 Performance instrumentation and published summaries should emit only counts and durations (including byte counts), plus non-personal build/environment identity. Never log user query strings, indexed paths, app names, clipboard contents, passwords, or URLs. Use fixed synthetic scenarios in an isolated profile. The existing harness's raw records contain synthetic result IDs for equivalence checks; retain them privately and publish only numeric summaries. Do not point it or a native profiling run at personal data.
