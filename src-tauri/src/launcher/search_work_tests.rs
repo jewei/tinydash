@@ -113,6 +113,12 @@ impl SearchManager {
 
 fn fixture(apps: usize, files: usize) -> SearchManager {
     let mut manager = SearchManager::default();
+    // These finite fixtures compare eager/selected results and work counts,
+    // not elapsed time. In debug CI the eager 50k-file reference can exceed
+    // the production budget; timing it out would compare an empty response
+    // with a valid optimized response. Deadline/cancellation tests construct
+    // their own default managers and keep the production limits enabled.
+    manager.calculator.deterministic_selection_test = true;
     manager.replace_apps(AppProvider::new(
         (0..apps)
             .map(|index| {
