@@ -43,6 +43,27 @@ The focused wrapper selects its own port and output directory. It accepts test-f
 
 Use focused tests during diagnosis. After the final relevant edit, repeat affected proofs and run `verify:full` for source changes. For each task, record expected behavior, required platforms, outcomes, and evidence paths under `.local/` or `test-results/`. A command pass does not establish behavior outside that command's coverage. Missing required evidence prevents a verified result.
 
+## Check the internal IPC contract
+
+`verify:full` compares actual Rust serialization with [canonical examples](../../tests/fixtures/ipc-contract.ts) and test-only `ts-rs` declarations with [checked wire types](../../tests/fixtures/ipc-wire.ts). Recursive TypeScript equality checks reject extra optional keys, missing keys, changed optionality, and narrowed or widened nullable/enum domains. Rust command signatures are parsed with test-only `syn`; the bridge's argument domains and success returns must match. Runtime probes independently check each wrapper's command binding, registration, argument names, and representative values.
+
+The bridge represents Rust `Option` arguments by omission instead of explicit null; `revealSettings` additionally supplies a default for Rust's required boolean. These are explicit test adaptations, not general assignability exceptions. Serialized response keys remain required unless serde omits them. Platform fields are strings because Rust currently declares strings, not a platform enum. Unsupported serialization rules and command types require review rather than silently generating a partial contract. Conditional `Option::is_none` serialization has a checked test-only `ts(optional)` annotation.
+
+These are internal contracts, not a public SDK or runtime validator. Command errors that are only displayed remain strings. [Drift tests](../../tests/ipc-drift.spec.ts) compile isolated mutations and require contract-specific failures; they do not modify the checkout.
+
+When intentionally changing the wire contract, regenerate its examples, review the diff, and run the normal checks:
+
+```sh
+TINYDASH_UPDATE_CONTRACTS=1 bun run test:rust -- ipc_
+bun run typecheck
+bun run verify:browser tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
+bun run verify:full
+```
+
+Do not set `TINYDASH_UPDATE_CONTRACTS` in CI. Normal Rust tests compare both generated files byte-for-byte without updating them; both are excluded from Prettier. Add representative samples for new optional fields or variants, including present and null cases. Examples complement, but do not replace, exact shape checks. Changes to a command signature may require a new wrapper binding, probe, or supported type in the command consistency tests. `ts-rs` and `syn` are dev-dependencies only; neither ships in the application.
+
+These checks prove serialization and bridge consistency, not native IPC authorization or OS effects. Use the desktop procedures for those.
+
 ## CI triggers
 
 The Checks workflow always starts for pull requests, merge queues, pushes to `main`, version-tag pushes, and manual requests. Feature-branch pushes do not duplicate the pull request's desktop builds. No workflow-level path filter can leave its required status pending on a documentation-only change.

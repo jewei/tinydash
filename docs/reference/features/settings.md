@@ -22,7 +22,10 @@ Run this browser recipe from the repository root. It retains successful traces i
 
 ```sh
 bun run verify:browser tests/settings.spec.ts tests/tinycast-features.spec.ts tests/release-config.spec.ts
+bun run verify:browser tests/settings-draft.spec.ts tests/native-subscriptions.spec.ts
 ```
+
+Standalone draft tests check local edits against incoming saved values, nested application preferences, remote deletion of default preferences while aliases are dirty, local deletions, category normalization, and incomplete folder input. Browser tests additionally exercise clean and dirty forms receiving changes from another window. A saved-settings event must not discard unrelated local edits.
 
 For affected backend behavior:
 

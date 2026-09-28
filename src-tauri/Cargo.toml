@@ -51,6 +51,8 @@ tauri-plugin-updater = { version = "2.11.0", default-features = false, features 
 [dev-dependencies]
 # Exercise the real IPC authorization path without opening native windows.
 tauri = { version = "2.11.5", features = ["test"] }
+ts-rs = { version = "12", features = ["no-serde-warnings"] }
+syn = { version = "2", features = ["full", "visit"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1.10.1"

@@ -6,6 +6,8 @@ use std::{
 
 use tauri::{AppHandle, Manager};
 
+use super::warning::{LauncherWarning, WarningCode};
+
 use super::LauncherState;
 use super::query::SearchMode;
 use super::search::SearchManager;
@@ -32,7 +34,7 @@ enum Health {
 struct Session {
     database: Option<Database>,
     health: Health,
-    warning: Arc<Mutex<Option<String>>>,
+    warning: Arc<Mutex<Option<LauncherWarning>>>,
     // Before loading these are session-only increments; afterwards they are
     // absolute counts. A successful initialization merges them exactly once.
     pending_usage: HashMap<String, ranking::Usage>,
@@ -69,7 +71,11 @@ impl Session {
             }
         };
         if let Ok(mut warning) = self.warning.lock() {
-            *warning = Some(message.into());
+            *warning = Some(LauncherWarning::new(
+                WarningCode::StorageUnavailable,
+                message,
+                health == Health::Busy,
+            ));
         }
     }
 
@@ -242,7 +248,7 @@ impl Observation {
 #[derive(Default)]
 pub struct Storage {
     database: OnceLock<Mutex<Session>>,
-    warning: Arc<Mutex<Option<String>>>,
+    warning: Arc<Mutex<Option<LauncherWarning>>>,
 }
 
 impl Storage {
@@ -587,7 +593,7 @@ impl Storage {
         Ok(())
     }
 
-    pub fn warning(&self) -> Option<String> {
+    pub fn warning(&self) -> Option<LauncherWarning> {
         self.warning.lock().ok().and_then(|warning| warning.clone())
     }
 }
@@ -716,15 +722,7 @@ mod tests {
             );
             assert_eq!(session.health, Health::Busy);
             assert!(session.database.is_some());
-            assert!(
-                session
-                    .warning
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .unwrap()
-                    .contains("busy")
-            );
+            assert!(session.warning.lock().unwrap().as_ref().unwrap().retryable);
             session
         });
         // A failed write keeps the entry visible.
@@ -993,7 +991,9 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert!(session.database.is_none());
-            assert!(session.warning.lock().unwrap().is_some());
+            let warning = session.warning.lock().unwrap().clone().unwrap();
+            assert_eq!(warning.code, WarningCode::StorageUnavailable);
+            assert!(!warning.retryable);
         }
     }
 
