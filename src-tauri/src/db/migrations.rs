@@ -177,7 +177,7 @@ mod tests {
         let snapshot = Connection::open(restored.path().join("tinydash.sqlite3")).unwrap();
         assert_eq!(
             snapshot
-                .pragma_query_value(None, "user_version", |row| row.get::<_, usize>(0))
+                .pragma_query_value(None, "user_version", |row| row.get::<_, u32>(0))
                 .unwrap(),
             5
         );
@@ -196,8 +196,8 @@ mod tests {
         let migrated = Connection::open(&path).unwrap();
         assert_eq!(
             migrated
-                .pragma_query_value(None, "user_version", |row| row.get::<_, usize>(0))
-                .unwrap(),
+                .pragma_query_value(None, "user_version", |row| row.get::<_, u32>(0))
+                .unwrap() as usize,
             VERSION
         );
     }

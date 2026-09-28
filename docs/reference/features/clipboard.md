@@ -38,7 +38,7 @@ Most password managers set one of these markers. TinyDash's password generator s
 
 On macOS, Apple Passwords and Keychain Access copy passwords without a marker. TinyDash skips a copy while one of these apps is frontmost. The one-second check can attribute a copy to the wrong app when you switch apps quickly.
 
-On macOS and Windows, a source that empties the clipboard shows that the content was sensitive. Password managers do this some time after a copy. If TinyDash saved the cleared value in the previous 120 seconds, it requests automatic cleanup of that capture. Only the matching, unpinned capture can be deleted. Older history is not targeted, and TinyDash's own copy actions do not create new cleanup obligations. A blocked cleanup is retained and warned about as described under [Storage contention](#storage-contention). Linux cannot tell a clear from an application exit, so it skips this step.
+On macOS and Windows, a source that empties the clipboard may be clearing sensitive content. Password managers do this some time after a copy. If TinyDash saved the cleared value in the previous 120 seconds, it requests automatic cleanup of that capture. Only the matching, unpinned capture can be deleted. Older history is not targeted, and TinyDash's own copy actions do not create new cleanup obligations. A blocked cleanup is retained and warned about as described under [Storage contention](#storage-contention). Linux cannot tell a clear from an application exit, so it skips this step.
 
 macOS checks the [pasteboard change counter](https://developer.apple.com/documentation/appkit/nspasteboard/changecount). Windows checks the [clipboard sequence number](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber). Each check runs once per second and when the launcher opens. Text is read only when the counter changes. Rapid copies within one interval can be missed. Linux uses GTK [owner-change events](https://docs.gtk.org/gtk3/signal.Clipboard.owner-change.html) and asynchronous text requests, with no polling timer. Wayland can restrict background access; opening TinyDash requests the current clipboard again. Desktop session checks remain necessary for Wayland.
 
@@ -54,7 +54,7 @@ For affected backend behavior:
 
 ```sh
 bun run test:rust -- clipboard
-bun run test:rust -- launcher::storage::tests
+bun run test:rust -- launcher::storage::
 bun run test:rust -- db::
 ```
 
@@ -64,7 +64,7 @@ Start with a fresh capture choice. Enable capture, copy known multiline text fro
 
 For the upstream-clear path, use Windows or macOS with synthetic text: capture it from another process, hold an external SQLite `BEGIN IMMEDIATE`, empty the system clipboard, and confirm the sensitive-cleanup warning and saved row remain. Release the lock without copying anything else; the quiet monitor must finish cleanup and clear the warning. Repeat with the row pinned, then unpin both categories; repeat with a later same-text capture and ensure the earlier obligation does not delete its new revision. Linux has no upstream-clear heuristic and cannot prove this path.
 
-Run `bun run verify:native` on Windows and Linux X11. The suite holds an external SQLite write transaction, copies and attempts deletion through the launcher, checks the failure remains visible, then releases the lock and retries without restarting. Fresh database connections verify durable deletion, the retained usage increment, and resumed capture. `tests/storage-contention.spec.ts` separately checks that the test fixture releases its lock on failure; it is not desktop proof. Use the clipboard desktop checks on macOS and Wayland, and for restart persistence or native Save dialogs. Use disposable history; a settings backup cannot restore deleted history.
+Run `bun run verify:native` on Windows and Linux X11. The suite holds an external SQLite write transaction, copies and attempts deletion through the launcher, checks the failure remains visible, then releases the lock and retries without restarting. Fresh database connections verify durable deletion, the retained usage increment, and resumed capture. On Windows, the suite also empties all OS clipboard formats while the database is locked, checks the pending privacy warning and retained row, then verifies automatic deletion and warning recovery after unlock without changing the empty clipboard or restarting. This Windows journey does not establish macOS integration or native pin/recapture race coverage; those policy cases have separate Rust tests. `tests/storage-contention.spec.ts` separately checks that the test fixture releases its lock on failure; it is not desktop proof. Use the clipboard desktop checks on macOS and Wayland, and for restart persistence or native Save dialogs. Use disposable history; a settings backup cannot restore deleted history.
 
 Enable history in an isolated profile, copy known text from another process, find it, copy an older entry, then delete it. Verify copied bytes and confirm deletion leaves the system clipboard unchanged.
 
