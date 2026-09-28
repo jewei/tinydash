@@ -1,4 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Appearance } from "./appearance";
+
+export type AppearanceChange =
+  | { kind: "appearance"; value: Appearance }
+  | { kind: "compact" | "systemGlass"; value: boolean };
 
 export type Action =
   "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
@@ -161,6 +166,8 @@ export interface ClipboardEntry {
 }
 
 export const backend = {
+  syncAppearance: (change: AppearanceChange) =>
+    invoke<void>("sync_appearance", { change }),
   setLauncherAppearance: (
     appearance: "light" | "dark" | "sage" | "rose" | "ink",
   ) => invoke<boolean>("set_launcher_appearance", { appearance }),
@@ -195,8 +202,10 @@ export const backend = {
     invoke<void>("set_shortcut_recording", { recording }),
   revealSettings: (data = false) =>
     invoke<void>("reveal_settings_path", { data }),
-  search: (query: string, mode: SearchMode) =>
-    invoke<SearchResponse>("search", { query, mode }),
+  search: (query: string, mode: SearchMode, requestId?: number) =>
+    invoke<SearchResponse>("search", { query, mode, requestId }),
+  cancelSearch: (requestId: number) =>
+    invoke<void>("cancel_search", { requestId }),
   setPinned: (id: string, category: SearchMode, pinned: boolean) =>
     invoke<void>("set_pinned", { id, category, pinned }),
   execute: (id: string, action: Action, confirmed = false) =>

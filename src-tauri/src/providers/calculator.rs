@@ -64,22 +64,22 @@ pub enum CalculationError {
     Currency(String),
 }
 
-struct Deadline {
+struct Deadline<F> {
     at: Instant,
+    stopped: F,
     #[cfg(test)]
     deterministic_selection_test: bool,
 }
 
-impl Interrupt for Deadline {
+impl<F: Fn() -> bool + Sync> Interrupt for Deadline<F> {
     fn should_interrupt(&self) -> bool {
-        // Selection equivalence compares two evaluations of a finite corpus.
-        // Host scheduling must not change just one side into a timeout. Timeout
-        // behavior is exercised separately with an explicit interrupt.
+        // Only the finite selection corpus disables wall-clock scheduling.
+        // Explicit cooperative cancellation remains enabled in that fixture.
         #[cfg(test)]
         if self.deterministic_selection_test {
-            return false;
+            return (self.stopped)();
         }
-        Instant::now() >= self.at
+        Instant::now() >= self.at || (self.stopped)()
     }
 }
 
@@ -102,16 +102,28 @@ impl CalculatorProvider {
             || matches!(query, "pi" | "π")
     }
 
+    #[cfg(test)]
     pub fn search(&mut self, query: &str) -> Result<SearchResult, CalculationError> {
-        let calculation = calculate(
-            query,
-            &Deadline {
-                at: Instant::now() + TIME_LIMIT,
-                #[cfg(test)]
-                deterministic_selection_test: self.deterministic_selection_test,
-            },
-            self.rates.clone(),
-        )?;
+        self.search_interruptible(query, || false)
+    }
+
+    pub fn search_interruptible(
+        &mut self,
+        query: &str,
+        stopped: impl Fn() -> bool + Sync,
+    ) -> Result<SearchResult, CalculationError> {
+        let deadline = Deadline {
+            at: Instant::now() + TIME_LIMIT,
+            stopped,
+            #[cfg(test)]
+            deterministic_selection_test: self.deterministic_selection_test,
+        };
+        let calculation = calculate(query, &deadline, self.rates.clone())?;
+        // fend may finish between its own interrupt checks. Never issue a copy
+        // value after the shared request budget has expired or been canceled.
+        if deadline.should_interrupt() {
+            return Err(CalculationError::Timeout);
+        }
         let value = calculation.value;
         self.next_id = self.next_id.wrapping_add(1);
         let id = format!("calculation:{}", self.next_id);
@@ -241,11 +253,29 @@ mod tests {
         assert!(!CalculatorProvider::default().deterministic_selection_test);
         let mut deadline = Deadline {
             at: Instant::now(),
+            stopped: || false,
             deterministic_selection_test: false,
         };
         assert!(deadline.should_interrupt());
         deadline.deterministic_selection_test = true;
         assert!(!deadline.should_interrupt());
+        let cancelled = Deadline {
+            at: Instant::now(),
+            stopped: || true,
+            deterministic_selection_test: true,
+        };
+        assert!(cancelled.should_interrupt());
+    }
+
+    #[test]
+    fn request_cancellation_interrupts_calculation_without_issuing_a_copy() {
+        let checks = AtomicUsize::new(0);
+        let mut provider = CalculatorProvider::default();
+        let result = provider
+            .search_interruptible("100000000!", || checks.fetch_add(1, Ordering::Relaxed) >= 4);
+        assert!(matches!(result, Err(CalculationError::Timeout)));
+        assert!(provider.copies.is_empty());
+        assert_eq!(provider.next_id, 0);
     }
 
     struct NoInterrupt;

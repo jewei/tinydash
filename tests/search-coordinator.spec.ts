@@ -1,10 +1,7 @@
 import { expect, test } from "@playwright/test";
 import type { SearchResult } from "../src/bridge";
-import {
-  chooseSelection,
-  createSearchQueue,
-  type SearchRequest,
-} from "../src/search";
+import type { SearchDispatch, SearchQueueTiming } from "../src/searchQueue";
+import { chooseSelection, createSearchQueue } from "../src/search";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -16,13 +13,16 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-function harness() {
+function harness(
+  cancelBackend: (id: number) => Promise<void> = async () => {},
+) {
   const replies: {
-    request: SearchRequest;
+    request: SearchDispatch;
     reply: ReturnType<typeof deferred<string>>;
   }[] = [];
   const events: string[] = [];
   const queue = createSearchQueue<string>({
+    cancelBackend,
     send(request) {
       const reply = deferred<string>();
       replies.push({ request, reply });
@@ -83,6 +83,110 @@ test("cancel ignores the running reply, and dispose stops all callbacks", async 
   expect(events).toEqual(["settled"]);
   await submit("after dispose");
   expect(replies).toHaveLength(2);
+});
+
+test("new input cancels the exact active request immediately, once, and drains its acknowledgement", async () => {
+  const acknowledgement = deferred<void>();
+  const cancellations: number[] = [];
+  const { replies, submit, events } = harness((id) => {
+    cancellations.push(id);
+    return acknowledgement.promise;
+  });
+  const done = submit("first");
+  void submit("second");
+  void submit("third");
+  expect(cancellations).toEqual([replies[0].request.requestId]);
+  expect(Number.isSafeInteger(cancellations[0])).toBe(true);
+  replies[0].reply.resolve("superseded");
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(replies).toHaveLength(1);
+  void submit("latest while cancel awaits");
+  acknowledgement.resolve();
+  await expect.poll(() => replies.length).toBe(2);
+  expect(replies[1].request.value).toBe("latest while cancel awaits");
+  expect(replies[1].request.requestId).not.toBe(cancellations[0]);
+  replies[1].reply.resolve("latest");
+  await done;
+  expect(events).toEqual([
+    "apply latest while cancel awaits=latest",
+    "settled",
+  ]);
+});
+
+test("a failed cancellation preserves single-flight and latest waiting semantics", async () => {
+  for (const synchronous of [false, true]) {
+    const { replies, submit, events } = harness(() => {
+      if (synchronous) throw new Error("transport unavailable");
+      return Promise.reject(new Error("transport unavailable"));
+    });
+    const done = submit("first");
+    void submit("discarded");
+    void submit("last");
+    expect(replies).toHaveLength(1);
+    replies[0].reply.reject("cancelled backend");
+    await expect.poll(() => replies.length).toBe(2);
+    expect(replies[1].request.value).toBe("last");
+    replies[1].reply.resolve("answer");
+    await done;
+    expect(events).toEqual(["apply last=answer", "settled"]);
+  }
+});
+
+test("hide and dispose cancel active work without dispatching waiting input", async () => {
+  for (const action of ["cancel", "dispose"] as const) {
+    const cancellations: number[] = [];
+    const { queue, replies, events, submit } = harness(async (id) => {
+      cancellations.push(id);
+    });
+    const done = submit("running");
+    queue[action]();
+    queue[action]();
+    expect(cancellations).toEqual([replies[0].request.requestId]);
+    replies[0].reply.reject("Search canceled.");
+    await done;
+    expect(replies).toHaveLength(1);
+    expect(events).toEqual(action === "dispose" ? [] : ["settled"]);
+  }
+});
+
+test("a synchronous transport error does not wedge later searches and timing stays aggregate-only", async () => {
+  const events: string[] = [];
+  const timings: SearchQueueTiming[] = [];
+  let calls = 0;
+  const queue = createSearchQueue<string>({
+    send() {
+      if (++calls === 1) throw new Error("transport");
+      return Promise.resolve("ok");
+    },
+    cancelBackend: async () => {},
+    apply: (_, response) => events.push(response),
+    fail: () => events.push("failed"),
+    settled: () => events.push("settled"),
+    timing: (timing) => timings.push(timing),
+  });
+  await queue.submit({
+    value: "private input",
+    mode: "all",
+    preserveSelection: false,
+  });
+  await queue.submit({
+    value: "second input",
+    mode: "all",
+    preserveSelection: false,
+  });
+  expect(events).toEqual(["failed", "settled", "ok", "settled"]);
+  expect(timings).toHaveLength(2);
+  for (const timing of timings) {
+    expect(Object.keys(timing).sort()).toEqual([
+      "responseMs",
+      "superseded",
+      "waitingMs",
+    ]);
+    expect(timing.responseMs).toBeGreaterThanOrEqual(0);
+    expect(timing.waitingMs).toBeGreaterThanOrEqual(0);
+    expect(timing.superseded).toBe(false);
+  }
 });
 
 const result = (

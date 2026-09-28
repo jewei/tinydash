@@ -4,11 +4,19 @@ On a fresh installation, TinyDash asks before it saves clipboard text. Existing 
 
 The default limit is 100 unpinned entries. Pins in Clipboard or All keep an entry outside this limit. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, images, and larger values are skipped. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
 
+An empty history search constructs at most 30 recent rows before pins are applied. Missing pins resolve their saved entry directly instead of constructing the entire history per pin. Direct clipboard lookup still scans numeric IDs in newest-first storage; it allocates only the requested result. Pins remain first and a full pinned page still leaves a slot for the newest entry.
+
 Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. **Clear unpinned** keeps entries pinned in All or Clipboard. The separate **Clear all clipboard history** action includes pins. Both ask for confirmation. Deleting an entry removes its pins from both categories. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again when capture is enabled.
 
 The actions menu can edit a copy, combine selected entries in a chosen order with a separator, or save the full text as a file. Edited and combined copies leave history unchanged. Editing and combining leave the original entries unchanged. Combining accepts up to 100 entries and 16,384 output bytes. Saving uses the native Save dialog.
 
 History is local plain text in the same SQLite database as usage. It is not encrypted. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
+
+## Storage contention
+
+If another process holds the SQLite write lock, TinyDash waits up to 250 ms per SQLite lock attempt, then shows a busy warning. It keeps the connection and retries on the next storage operation; no restart is needed after the other process releases its lock. Waiting happens on storage workers, never while holding the search lock.
+
+A failed delete or clear leaves history and pins visible. Repeat the action after contention ends; failed actions are not queued for later execution. Failed captures are not replayed either: copying a new value resumes capture. Consecutive unchanged clipboard values remain suppressed. Usage changes continue in memory and are saved together on the next successful storage operation. If TinyDash quits before that succeeds, those changes are lost. The busy warning clears after storage succeeds. Corruption, file-access failures, backup failures other than lock contention, and incompatible schemas instead require [data recovery](../../how-to/recover-data.md) or a compatible app version; TinyDash does not replace the database.
 
 ## Secrets
 
@@ -38,11 +46,15 @@ For affected backend behavior:
 
 ```sh
 bun run test:rust -- clipboard
+bun run test:rust -- launcher::storage::tests
+bun run test:rust -- db::
 ```
+
+The storage session tests use a second real SQLite connection holding `BEGIN IMMEDIATE`. They check that failed captures and deletes leave search available, failed clears preserve entries and pins, and capture, deletion, warnings, and pending usage recover after unlocking. They also cover a busy startup merging session-only usage exactly once. These are Rust session-layer checks, not proof of Tauri events or system clipboard integration.
 
 Start with a fresh capture choice. Enable capture, copy known multiline text from another process, find it in Clipboard and All, and copy it back. Compare exact bytes. Delete an entry and confirm the system clipboard stays unchanged. Check clear, pin, edit, and combine paths when affected.
 
-Run `bun run verify:native` on Windows and Linux X11. Use the clipboard desktop checks on macOS and Wayland, and for restart persistence or native Save dialogs. Use disposable history; a settings backup cannot restore deleted history.
+Run `bun run verify:native` on Windows and Linux X11. The suite holds an external SQLite write transaction, copies and attempts deletion through the launcher, checks the failure remains visible, then releases the lock and retries without restarting. Fresh database connections verify durable deletion, the retained usage increment, and resumed capture. `tests/storage-contention.spec.ts` separately checks that the test fixture releases its lock on failure; it is not desktop proof. Use the clipboard desktop checks on macOS and Wayland, and for restart persistence or native Save dialogs. Use disposable history; a settings backup cannot restore deleted history.
 
 Enable history in an isolated profile, copy known text from another process, find it, copy an older entry, then delete it. Verify copied bytes and confirm deletion leaves the system clipboard unchanged.
 

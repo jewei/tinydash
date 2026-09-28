@@ -1,7 +1,8 @@
 // Loaded only by the browser tests. Production always calls the Rust backend.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import { emit } from "@tauri-apps/api/event";
+import { emit, emitTo, type EventTarget } from "@tauri-apps/api/event";
 import type {
+  AppearanceChange,
   SearchResult,
   SearchMode,
   SettingsImport,
@@ -15,6 +16,7 @@ declare global {
     isTauri: boolean;
     __launcherTest: {
       calls: { command: string; payload: unknown }[];
+      eventDeliveries: { event: string; payload: unknown }[];
       settings: SettingsValues;
       platform: "macos" | "windows" | "linux";
       nativeGlass: boolean;
@@ -357,12 +359,97 @@ window.__launcherTest = {
   resultOverrides: {},
   holdAction: false,
   emit,
+  eventDeliveries: [],
 };
-mockWindows("main");
+
+// Tauri's built-in event mock ignores listen targets and does not support emitTo.
+// Match its callback plumbing, but preserve the target filtering used by Rust.
+const eventListeners = new Map<
+  number,
+  { event: string; target: EventTarget; handler: number }
+>();
+function mockEvent(command: string, args: Record<string, unknown>) {
+  if (command === "plugin:event|listen") {
+    const listener = args as unknown as {
+      event: string;
+      target: EventTarget;
+      handler: number;
+    };
+    eventListeners.set(listener.handler, listener);
+    return listener.handler;
+  }
+  if (command === "plugin:event|unlisten") {
+    eventListeners.delete(args.eventId as number);
+    return;
+  }
+  if (command !== "plugin:event|emit" && command !== "plugin:event|emit_to")
+    throw new Error(`Unsupported mock event command: ${command}`);
+  const target = (args.target as EventTarget | undefined) ?? { kind: "Any" };
+  for (const [id, listener] of eventListeners) {
+    const subscribed = listener.target;
+    const matches =
+      target.kind === "Any" ||
+      subscribed.kind === "Any" ||
+      ("label" in target && "label" in subscribed
+        ? target.label === subscribed.label &&
+          (target.kind === subscribed.kind ||
+            target.kind === "AnyLabel" ||
+            subscribed.kind === "AnyLabel")
+        : target.kind === subscribed.kind);
+    if (listener.event !== args.event || !matches) continue;
+    const message = { event: listener.event, payload: args.payload };
+    window.__launcherTest.eventDeliveries.push(message);
+    const internals = (
+      window as unknown as {
+        __TAURI_INTERNALS__: { runCallback(id: number, data: unknown): void };
+      }
+    ).__TAURI_INTERNALS__;
+    internals.runCallback(listener.handler, { ...message, id });
+  }
+}
+
+// Simulate the Rust appearance relay across browser pages. This is UI proof,
+// not ACL proof; acl_tests.rs exercises Tauri's actual IPC authorization.
+const appearanceChannel = new BroadcastChannel("tinydash.test.appearance");
+async function relayAppearance(change: AppearanceChange) {
+  const events = {
+    appearance: "appearance-changed",
+    compact: "compact-changed",
+    systemGlass: "system-glass-changed",
+  };
+  // The backend emits once per target. An Any subscription receives both.
+  for (const label of ["main", "settings"]) {
+    await emitTo(
+      { kind: "WebviewWindow", label },
+      events[change.kind],
+      change.value,
+    );
+  }
+}
+appearanceChannel.onmessage = (event: MessageEvent<AppearanceChange>) => {
+  void relayAppearance(event.data);
+};
+window.addEventListener("pagehide", () => appearanceChannel.close());
+mockWindows(
+  new URLSearchParams(location.search).get("view") === "settings"
+    ? "settings"
+    : "main",
+);
 mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
+    // Queue tests control delayed search replies independently. Native
+    // cancellation is covered by Rust, not simulated as desktop proof here.
+    if (command === "cancel_search") return;
+    if (command.startsWith("plugin:event|"))
+      return mockEvent(command, payload as Record<string, unknown>);
+    if (command === "sync_appearance") {
+      const { change } = payload as { change: AppearanceChange };
+      await relayAppearance(change);
+      appearanceChannel.postMessage(change);
+      return;
+    }
     if (command === "hide_launcher") {
       await emit("launcher-hidden");
       return;
@@ -694,7 +781,7 @@ mockIPC(
     }
     return undefined;
   },
-  { shouldMockEvents: true },
+  { shouldMockEvents: false },
 );
 
 // Fixed tool values verify UI behavior. Rust tests verify generation and parsing.
