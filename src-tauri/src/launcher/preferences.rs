@@ -22,6 +22,19 @@ pub struct SettingsInfo {
     shortcuts_available: bool,
 }
 
+#[cfg(test)]
+pub(super) fn contract_settings_info() -> SettingsInfo {
+    SettingsInfo {
+        settings: Settings::default(),
+        defaults: Settings::default(),
+        platform: "linux",
+        version: "0.1.3".into(),
+        config_path: "/example/settings.json".into(),
+        data_path: "/example/tinydash.sqlite3".into(),
+        shortcuts_available: true,
+    }
+}
+
 #[tauri::command]
 pub fn get_settings(app: AppHandle) -> Result<SettingsInfo, String> {
     Ok(SettingsInfo {

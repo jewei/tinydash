@@ -12,3 +12,5 @@ native-build
 designs
 .hallmark
 site-dist
+# Canonical serde output, compared byte-for-byte by Rust contract tests.
+tests/fixtures/ipc-contract.ts

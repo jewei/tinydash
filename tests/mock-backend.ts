@@ -4,6 +4,7 @@ import { emit } from "@tauri-apps/api/event";
 import type {
   SearchResult,
   SearchMode,
+  LauncherWarning,
   SettingsImport,
   SettingsValues,
   UpdateStatus,
@@ -29,6 +30,7 @@ declare global {
       toolRevision: number;
       rejectActions: boolean | string;
       storageError: string | null;
+      warnings: LauncherWarning[];
       usedAppFirst: boolean;
       clipboardDeleted: string[];
       clipboardCleared: boolean;
@@ -317,6 +319,7 @@ window.__launcherTest = {
   toolRevision: 0,
   rejectActions: false,
   storageError: null,
+  warnings: [],
   usedAppFirst: false,
   clipboardDeleted: [],
   clipboardCleared: false,
@@ -375,7 +378,7 @@ mockIPC(
       return {
         platform: state.platform,
         settings: state.settings,
-        warnings: [],
+        warnings: state.warnings,
         visible: state.initialVisible,
         initialMode: state.initialMode,
       };
@@ -616,7 +619,13 @@ mockIPC(
             : query === "=1 / 0"
               ? "Division by zero is not allowed."
               : null,
-        storageError: state.storageError,
+        storageError: state.storageError
+          ? {
+              code: "storageUnavailable",
+              message: state.storageError,
+              retryable: false,
+            }
+          : null,
         currency: {
           asOf: state.currencyDate,
           refreshing: state.currencyRefreshing,

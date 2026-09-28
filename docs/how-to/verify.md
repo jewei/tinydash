@@ -43,6 +43,23 @@ The focused wrapper selects its own port and output directory. It accepts test-f
 
 Use focused tests during diagnosis. After the final relevant edit, repeat affected proofs and run `verify:full` for source changes. For each task, record expected behavior, required platforms, outcomes, and evidence paths under `.local/` or `test-results/`. A command pass does not establish behavior outside that command's coverage. Missing required evidence prevents a verified result.
 
+## Check the internal IPC contract
+
+`verify:full` checks the actual Rust serialization against [canonical fixtures](../../tests/fixtures/ipc-contract.ts), type-checks those fixtures against the frontend bridge, and checks real bridge invocations against Rust command registration and argument names/types. Result kinds, actions, search modes, tool details, settings, and targeted structured warnings are covered. These are internal contracts, not a public SDK. Command errors that are only displayed can still be strings.
+
+When intentionally changing the wire contract, regenerate its examples, review the diff, and run the normal checks:
+
+```sh
+TINYDASH_UPDATE_CONTRACTS=1 bun run test:rust -- serialized_ipc_contracts_match_frontend_fixture
+bun run typecheck
+bun run verify:browser tests/ipc-contract.spec.ts
+bun run verify:full
+```
+
+Do not set `TINYDASH_UPDATE_CONTRACTS` in CI. The normal Rust test compares the fixture byte-for-byte and does not update it. The fixture is excluded from Prettier because serde owns its formatting. Add representative samples for new optional fields or variants; the contract tests require every result, detail, action, mode, and warning-code variant to have an example. Changes to a command signature may require a new probe or supported argument type in the command consistency test.
+
+These checks prove serialization and bridge consistency, not native IPC authorization or OS effects. Use the desktop procedures for those.
+
 ## CI triggers
 
 The Checks workflow skips branch pushes and pull requests when all changed files are Markdown files with the `.md` or `.markdown` extension, or files under `docs/`. This also skips the desktop builds and native app checks. If any other file changes, the workflow runs. The separate Verification tools workflow checks changes to the verification skill, procedures, feature map, and tools, including Markdown-only changes. It does not replace the agent exercises in [test the verification procedure](verify-verification.md).

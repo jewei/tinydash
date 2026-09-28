@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+#[path = "contract_tests.rs"]
+mod contract_tests;
+
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ResultKind {
@@ -131,7 +135,7 @@ pub struct SearchResponse {
     pub indexing: bool,
     pub index_error: Option<String>,
     pub notice: Option<String>,
-    pub storage_error: Option<String>,
+    pub storage_error: Option<super::warning::LauncherWarning>,
     pub files: super::files::FileStatus,
     pub currency: super::currency::CurrencyStatus,
 }

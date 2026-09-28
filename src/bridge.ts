@@ -82,6 +82,19 @@ export interface SearchResult {
   } | null;
 }
 
+export interface LauncherWarning {
+  code:
+    | "settingsRead"
+    | "shortcutRegistration"
+    | "shortcutsUnavailable"
+    | "clipboardLimited"
+    | "trayUnavailable"
+    | "storageUnavailable"
+    | "clipboardUnavailable";
+  message: string;
+  retryable: boolean;
+}
+
 export interface SearchResponse {
   preferredSelectionId?: string | null;
   results: SearchResult[];
@@ -89,7 +102,7 @@ export interface SearchResponse {
   indexing: boolean;
   indexError: string | null;
   notice: string | null;
-  storageError: string | null;
+  storageError: LauncherWarning | null;
   files: FileStatus;
   currency: CurrencyStatus;
 }
@@ -138,7 +151,7 @@ export interface UpdateStatus {
 export interface LauncherInfo {
   settings: SettingsValues;
   platform: "macos" | "windows" | "linux";
-  warnings: string[];
+  warnings: LauncherWarning[];
   visible?: boolean;
   initialMode?: SearchMode | null;
 }

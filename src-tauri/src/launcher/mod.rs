@@ -13,6 +13,7 @@ pub mod search;
 pub mod startup;
 mod storage;
 pub mod updates;
+pub mod warning;
 pub mod window;
 
 use std::sync::{
@@ -32,6 +33,7 @@ use crate::{
 use query::SearchMode;
 use result::SearchResponse;
 use search::SearchManager;
+use warning::{LauncherWarning, WarningCode};
 
 pub struct LauncherState {
     pub search: Mutex<SearchManager>,
@@ -42,7 +44,7 @@ pub struct LauncherState {
     settings: RwLock<Settings>,
     pub settings_update: Mutex<()>,
     pub shortcut_recording: AtomicBool,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<LauncherWarning>,
     pub index_error: Mutex<Option<String>>,
     pub storage: storage::Storage,
     pub clipboard: clipboard::Monitor,
@@ -51,7 +53,7 @@ pub struct LauncherState {
 }
 
 impl LauncherState {
-    pub fn new(settings: Settings, warnings: Vec<String>) -> Self {
+    pub fn new(settings: Settings, warnings: Vec<LauncherWarning>) -> Self {
         let mut search = SearchManager::default();
         search.apply_settings(&settings);
         Self {
@@ -124,9 +126,31 @@ impl LauncherState {
 pub struct LauncherInfo {
     settings: Settings,
     platform: &'static str,
-    warnings: Vec<String>,
+    warnings: Vec<LauncherWarning>,
     visible: bool,
     initial_mode: Option<SearchMode>,
+}
+
+#[cfg(test)]
+fn contract_launcher_info() -> LauncherInfo {
+    LauncherInfo {
+        settings: Settings::default(),
+        platform: "linux",
+        warnings: [
+            WarningCode::SettingsRead,
+            WarningCode::ShortcutRegistration,
+            WarningCode::ShortcutsUnavailable,
+            WarningCode::ClipboardLimited,
+            WarningCode::TrayUnavailable,
+            WarningCode::StorageUnavailable,
+            WarningCode::ClipboardUnavailable,
+        ]
+        .into_iter()
+        .map(|code| LauncherWarning::new(code, "Fixture warning", false))
+        .collect(),
+        visible: true,
+        initial_mode: Some(SearchMode::Apps),
+    }
 }
 
 #[tauri::command]
@@ -186,7 +210,16 @@ pub async fn search(
             storage_error: state
                 .storage
                 .warning()
-                .or_else(|| state.clipboard.warning()),
+                // Storage health is owned by Storage. Until it supplies typed
+                // retryability, do not guess from its human-readable message.
+                .map(|message| {
+                    LauncherWarning::new(WarningCode::StorageUnavailable, message, false)
+                })
+                .or_else(|| {
+                    state.clipboard.warning().map(|message| {
+                        LauncherWarning::new(WarningCode::ClipboardUnavailable, message, true)
+                    })
+                }),
             total: search.app_count(),
             files: state.files.status(search.file_count()),
             currency: state.currency.status(search.rates()),

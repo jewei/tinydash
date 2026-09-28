@@ -8,9 +8,14 @@ import {
   onMount,
   Show,
 } from "solid-js";
-import { createStore, reconcile, unwrap } from "solid-js/store";
+import { unwrap } from "solid-js/store";
+import {
+  createLauncherController,
+  receiveLauncherSettings,
+} from "./launcherController";
 import { isTauri } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import { createNativeSubscriptions } from "./nativeSubscriptions";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   backend,
@@ -18,8 +23,6 @@ import {
   type LauncherInfo,
   type SearchResult,
   type SearchMode,
-  type FileStatus,
-  type CurrencyStatus,
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
@@ -43,7 +46,6 @@ import {
   normalizeCategories,
   resultCategories,
 } from "./categories";
-import { chooseSelection, createSearchQueue } from "./search";
 
 const groupLabels: Record<SearchResult["kind"], string> = {
   app: "Applications",
@@ -78,36 +80,41 @@ export default function App(
     readFollowSystemGlass(),
   );
   const [compact, setCompact] = createSignal(readCompact());
-  const [visible, setVisible] = createSignal(true);
-  const [query, setQuery] = createSignal("");
-  const [mode, setMode] = createSignal<SearchMode>("all");
-  const [resultView, setResultView] = createStore<{ results: SearchResult[] }>({
-    results: [],
+  const controller = createLauncherController({
+    desktop,
+    send: backend.search,
   });
-  const results = () => resultView.results;
-  const setResults = (next: SearchResult[]) =>
-    setResultView("results", reconcile(next, { key: "id" }));
-  const [selected, setSelected] = createSignal(0);
+  const {
+    visible,
+    setVisible,
+    query,
+    setQuery,
+    mode,
+    setMode,
+    results,
+    selected,
+    setSelected,
+    current,
+    pending,
+    total,
+    indexing,
+    setIndexing,
+    files,
+    setFiles,
+    currency,
+    error,
+    setError,
+    indexError,
+    storageError,
+    notice,
+    setNotice,
+    search,
+    changeQuery,
+    markSelectionChanged,
+  } = controller;
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
-  const [total, setTotal] = createSignal(0);
-  const [indexing, setIndexing] = createSignal(desktop);
-  const [files, setFiles] = createSignal<FileStatus>({
-    total: 0,
-    indexing: desktop,
-    warning: null,
-  });
-  const [pending, setPending] = createSignal(false);
-  const [currency, setCurrency] = createSignal<CurrencyStatus>({
-    asOf: null,
-    refreshing: false,
-    warning: null,
-  });
   const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal<string>();
-  const [indexError, setIndexError] = createSignal<string>();
-  const [storageError, setStorageError] = createSignal<string>();
-  const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [menuFilter, setMenuFilter] = createSignal("");
   const [clipboardTool, setClipboardTool] = createSignal<{
@@ -124,9 +131,7 @@ export default function App(
   let list!: HTMLUListElement;
   let categoryBar!: HTMLDivElement;
   let disposed = false;
-  let displayedQuery: { value: string; mode: SearchMode } | undefined;
-  let selectionChangedByUser = false;
-  const unlisteners: UnlistenFn[] = [];
+  const subscriptions = createNativeSubscriptions(listen);
 
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
   const enabledCategories = createMemo(() =>
@@ -135,7 +140,6 @@ export default function App(
   const visibleCategories = createMemo(() =>
     categories.filter(({ id }) => enabledCategories().includes(id)),
   );
-  const current = () => results()[selected()];
   const welcome = () =>
     mode() === "all" && !query().trim() && results().length === 0;
   const isPinned = (result?: SearchResult, category = mode()) =>
@@ -166,10 +170,10 @@ export default function App(
     error() ??
     notice() ??
     indexError() ??
-    storageError() ??
+    storageError()?.message ??
     (mode() === "all" || mode() === "files" ? files().warning : undefined) ??
     (mode() === "calculator" ? currency().warning : undefined) ??
-    info()?.warnings[0];
+    info()?.warnings[0]?.message;
   const primaryLabel = () =>
     current()?.kind === "password"
       ? "Copy password"
@@ -502,59 +506,6 @@ export default function App(
       setError(String(reason));
       focusInput();
     }
-  }
-
-  const searches = createSearchQueue({
-    send: ({ value, mode }) => backend.search(value, mode),
-    apply(request, response) {
-      const index = chooseSelection({
-        request,
-        results: response.results,
-        preferredSelectionId: response.preferredSelectionId,
-        displayed: displayedQuery,
-        current: current(),
-        selected: selected(),
-        selectionChangedByUser,
-      });
-      displayedQuery = { value: request.value, mode: request.mode };
-      batch(() => {
-        setResults(response.results);
-        setSelected(index);
-        setTotal(response.total);
-        setIndexing(response.indexing);
-        setFiles(response.files);
-        setCurrency(response.currency);
-        setIndexError(response.indexError ?? undefined);
-        setStorageError(response.storageError ?? undefined);
-        setNotice(response.notice ?? undefined);
-      });
-    },
-    fail(_request, reason) {
-      setResults([]);
-      setError(String(reason));
-    },
-    settled: () => setPending(false),
-  });
-
-  function search(value = query(), preserveSelection = false) {
-    if (!desktop || !visible() || disposed) return Promise.resolve();
-    if (!preserveSelection) selectionChangedByUser = false;
-    setPending(true);
-    if (
-      mode() === "all" &&
-      !value.trim() &&
-      (displayedQuery?.mode !== "all" || displayedQuery.value.trim())
-    ) {
-      setResults([]);
-    }
-    setNotice(undefined);
-    return searches.submit({ value, mode: mode(), preserveSelection });
-  }
-
-  function changeQuery(value: string) {
-    setQuery(value);
-    setError(undefined);
-    void search(value);
   }
 
   async function togglePin(category: SearchMode) {
@@ -893,7 +844,7 @@ export default function App(
       event.preventDefault();
       if (results().length) {
         const count = results().length;
-        selectionChangedByUser = true;
+        markSelectionChanged();
         setSelected((index) => {
           if (
             emojiGrid &&
@@ -970,12 +921,17 @@ export default function App(
 
   onMount(() => {
     focusInput();
-    void watchAppearance(setAppearance, setCompact, setFollowSystemGlass).then(
-      (stop) => {
-        if (disposed) stop();
-        else unlisteners.push(stop);
-      },
-    );
+    void subscriptions
+      .own(
+        watchAppearance(
+          subscriptions.guard(setAppearance),
+          subscriptions.guard(setCompact),
+          subscriptions.guard(setFollowSystemGlass),
+        ),
+      )
+      .catch((reason) => {
+        if (!disposed) setError(String(reason));
+      });
     document.addEventListener("keydown", onKey);
     document.addEventListener("compositionstart", startComposition);
     document.addEventListener("compositionend", endComposition);
@@ -983,38 +939,11 @@ export default function App(
     if (!desktop) return;
     void (async () => {
       try {
-        const register = async (
-          name: string,
-          callback: (payload: unknown) => void,
-        ) => {
-          const stop = await listen(name, (event) => callback(event.payload));
-          if (disposed) stop();
-          else unlisteners.push(stop);
-        };
+        const { register } = subscriptions;
         await Promise.all([
-          register("settings-changed", (payload) => {
+          register<LauncherInfo["settings"]>("settings-changed", (settings) => {
             setInfo((current) =>
-              current
-                ? {
-                    ...current,
-                    settings: payload as LauncherInfo["settings"],
-                    warnings: current.warnings.filter(
-                      (warning) =>
-                        !(
-                          warning.startsWith("Could not register ") &&
-                          (current.settings.shortcut !==
-                            (payload as LauncherInfo["settings"]).shortcut ||
-                            JSON.stringify(
-                              current.settings.categoryShortcuts,
-                            ) !==
-                              JSON.stringify(
-                                (payload as LauncherInfo["settings"])
-                                  .categoryShortcuts,
-                              ))
-                        ) && !warning.startsWith("Could not read settings."),
-                    ),
-                  }
-                : current,
+              current ? receiveLauncherSettings(current, settings) : current,
             );
             keepVisibleCategory();
             void search(query(), true);
@@ -1068,22 +997,20 @@ export default function App(
           }),
           register("launcher-hidden", () => {
             clearComposition();
-            setVisible(false);
-            // One running Rust search may finish. Ignore its reply and drop
-            // waiting input. Opening the window always requests current data.
-            searches.cancel();
-            setPending(false);
+            controller.hidden();
           }),
         ]);
         if (disposed) return;
         const initial = await backend.ready();
+        if (disposed) return;
         setInfo(initial);
         setVisible(initial.visible ?? true);
         if (initial.initialMode) setMode(initial.initialMode);
         else keepVisibleCategory();
         await search();
-        focusInput();
+        if (!disposed) focusInput();
       } catch (reason) {
+        if (disposed) return;
         setIndexing(false);
         setError(`Could not connect to TinyDash. ${String(reason)}`);
       }
@@ -1092,8 +1019,8 @@ export default function App(
 
   onCleanup(() => {
     disposed = true;
-    searches.dispose();
-    unlisteners.forEach((stop) => stop());
+    controller.dispose();
+    subscriptions.dispose();
     document.removeEventListener("keydown", onKey);
     document.removeEventListener("compositionstart", startComposition);
     document.removeEventListener("compositionend", endComposition);
@@ -1320,7 +1247,7 @@ export default function App(
                     }}
                     onPointerMove={() => {
                       if (!pending()) {
-                        selectionChangedByUser = true;
+                        markSelectionChanged();
                         setSelected(index());
                       }
                     }}
