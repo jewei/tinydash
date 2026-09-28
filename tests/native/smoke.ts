@@ -27,6 +27,7 @@ import {
   stopProcessTree,
   waitForExit,
 } from "../../scripts/verify/lifecycle.ts";
+import { clearWindowsClipboard } from "./clipboard";
 import { installFixtures } from "./fixtures";
 import {
   measureQueryTiming,
@@ -197,23 +198,6 @@ function clipboardText(): string {
     encoding: "utf8",
     timeout: 5_000,
   });
-}
-
-// Empty all Windows clipboard formats, rather than writing an empty text
-// format. This drives the real upstream-clear observation in the native app.
-function clearWindowsClipboard() {
-  assert.equal(process.platform, "win32");
-  execFileSync(
-    "powershell.exe",
-    [
-      "-STA",
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
-      "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Clipboard]::Clear()",
-    ],
-    { timeout: 5_000, windowsHide: true },
-  );
 }
 
 function setClipboardText(text: string) {
@@ -828,7 +812,17 @@ try {
         storedClipboard(data, automaticClip).length === 1,
     );
     await withStorageLock(data, async () => {
-      clearWindowsClipboard();
+      const cleared = clearWindowsClipboard();
+      await writeFile(
+        resolve(output, "upstream-clear.json"),
+        JSON.stringify(cleared, null, 2),
+      );
+      // Helper processes may hide the launcher on blur. Native readiness must
+      // be restored before expecting its visibility-gated event subscriptions
+      // to refresh the warning; retained DOM focus alone is not readiness.
+      await reopen();
+      await selectMode("clipboard");
+      await keys(inputId, `automatic-cleanup ${fixtures.nonce}`);
       await until(
         "a blocked upstream clear exposes pending privacy cleanup",
         () =>
