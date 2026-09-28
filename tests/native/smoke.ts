@@ -703,12 +703,32 @@ try {
   const data = resolve(dataRoot, "dev.tinydash.launcher");
   const stored = storedClipboard(data, firstClip);
   assert.equal(stored.length, 1);
-  const usageId = `clipboard:${stored[0].id}`;
+  // Emoji copies record usage; clipboard copies deliberately record recency
+  // only. Exercise the real usage-producing action rather than changing that
+  // product distinction just to satisfy this recovery check.
+  const usageId = "emoji:🚀";
   const usageBeforeContention = storedUsage(data, usageId);
   await withStorageLock(data, async () => {
-    // Copy through the UI while persistence is blocked. The OS copy should
-    // succeed and its usage increment must survive the temporary outage.
-    setClipboardText(`TinyDash contention ${fixtures.nonce}`);
+    await reopen();
+    await keys(inputId, ":rocket");
+    await until(
+      "the usage-recording emoji remains searchable while locked",
+      async () => (await titles())[0] === "rocket",
+    );
+    await keys(inputId, "\uE007");
+    await until(
+      "emoji copying remains available during the outage",
+      async () => clipboardText() === "🚀",
+    );
+    await reopen();
+    await selectMode("clipboard");
+    await keys(inputId, `clipboard ${fixtures.nonce}`);
+    await until(
+      "the original clipboard entry remains available while locked",
+      async () => (await titles())[0] === firstClip.split("\n")[0],
+    );
+    // Restore the original OS clipboard value through the UI, also under
+    // contention, so the later deletion still tests unchanged-text suppression.
     await keys(inputId, "\uE007");
     await until(
       "copy remains available while SQLite is locked",
