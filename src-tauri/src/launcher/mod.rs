@@ -254,19 +254,11 @@ pub async fn search(
             },
             results: outcome.results,
             notice: outcome.notice,
-            storage_error: state
-                .storage
-                .warning()
-                // Storage health is owned by Storage. Until it supplies typed
-                // retryability, do not guess from its human-readable message.
-                .map(|message| {
-                    LauncherWarning::new(WarningCode::StorageUnavailable, message, false)
+            storage_error: state.storage.warning().or_else(|| {
+                state.clipboard.warning().map(|message| {
+                    LauncherWarning::new(WarningCode::ClipboardUnavailable, message, true)
                 })
-                .or_else(|| {
-                    state.clipboard.warning().map(|message| {
-                        LauncherWarning::new(WarningCode::ClipboardUnavailable, message, true)
-                    })
-                }),
+            }),
             total: search.app_count(),
             files: state.files.status(search.file_count()),
             currency: state.currency.status(search.rates()),

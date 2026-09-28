@@ -18,6 +18,8 @@ export async function probeCommands(settings: SettingsValues) {
   });
   const probes = {
     setLauncherAppearance: () => backend.setLauncherAppearance("dark"),
+    syncAppearance: () =>
+      backend.syncAppearance({ kind: "appearance", value: "dark" }),
     ready: backend.ready,
     openSettings: backend.openSettings,
     settings: backend.settings,
@@ -35,7 +37,8 @@ export async function probeCommands(settings: SettingsValues) {
     installUpdate: backend.installUpdate,
     recordShortcut: () => backend.recordShortcut(true),
     revealSettings: () => backend.revealSettings(true),
-    search: () => backend.search("fixture", "all"),
+    search: () => backend.search("fixture", "all", 1),
+    cancelSearch: () => backend.cancelSearch(1),
     setPinned: () => backend.setPinned("app:example", "apps", true),
     execute: () => backend.execute("app:example", "launch", true),
     clipboardPreview: () => backend.clipboardPreview("clipboard:1"),

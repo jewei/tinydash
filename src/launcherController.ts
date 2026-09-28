@@ -35,7 +35,12 @@ export function receiveLauncherSettings(
 /** Owns the launcher search session, not DOM focus or native command execution. */
 export function createLauncherController(options: {
   desktop: boolean;
-  send: (value: string, mode: SearchMode) => Promise<SearchResponse>;
+  send: (
+    value: string,
+    mode: SearchMode,
+    requestId?: number,
+  ) => Promise<SearchResponse>;
+  cancelBackend?: (requestId: number) => Promise<void>;
 }) {
   const [visible, setVisible] = createSignal(true);
   const [query, setQuery] = createSignal("");
@@ -70,7 +75,8 @@ export function createLauncherController(options: {
   let selectionChangedByUser = false;
 
   const searches = createSearchQueue({
-    send: ({ value, mode }) => options.send(value, mode),
+    send: ({ value, mode, requestId }) => options.send(value, mode, requestId),
+    cancelBackend: options.cancelBackend ?? (async () => {}),
     apply(request, response) {
       const index = chooseSelection({
         request,
@@ -152,7 +158,7 @@ export function createLauncherController(options: {
     },
     hidden() {
       setVisible(false);
-      // Cancellation invalidates replies; it does not abort Rust work.
+      // Invalidate delivery immediately and ask Rust to stop cooperatively.
       searches.cancel();
       setPending(false);
     },

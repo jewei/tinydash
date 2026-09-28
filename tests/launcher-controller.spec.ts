@@ -66,13 +66,19 @@ test("hidden and disposed controllers reject late replies and do not send hidden
     )) as typeof import("../src/launcherController");
     let complete!: (response: SearchResponse) => void;
     let calls = 0;
+    const requests: (number | undefined)[] = [];
+    const cancellations: number[] = [];
     const controller = createLauncherController({
       desktop: true,
-      send: () => {
+      send: (_value, _mode, requestId) => {
         calls++;
+        requests.push(requestId);
         return new Promise((resolve) => {
           complete = resolve;
         });
+      },
+      cancelBackend: async (requestId) => {
+        cancellations.push(requestId);
       },
     });
     const hidden = controller.search("hidden");
@@ -100,6 +106,13 @@ test("hidden and disposed controllers reject late replies and do not send hidden
       reopenedCount,
       finalCount: controller.results().length,
       calls,
+      cancellationMatches:
+        cancellations.length === 2 &&
+        cancellations[0] === requests[0] &&
+        cancellations[1] === requests[2],
+      validRequestIds: requests.every(
+        (id) => Number.isSafeInteger(id) && (id ?? 0) > 0,
+      ),
     };
   }, contracts.response);
   expect(result).toEqual({
@@ -107,6 +120,8 @@ test("hidden and disposed controllers reject late replies and do not send hidden
     reopenedCount: 11,
     finalCount: 11,
     calls: 3,
+    cancellationMatches: true,
+    validRequestIds: true,
   });
 });
 
