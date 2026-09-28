@@ -103,16 +103,29 @@ export default function App(
     files,
     setFiles,
     currency,
-    error,
-    setError,
+    searchError,
+    clearSearchError,
     indexError,
     storageError,
     notice,
     setNotice,
     search,
-    changeQuery,
+    changeQuery: changeSearchQuery,
     markSelectionChanged,
   } = controller;
+  // Actions and startup own their failures independently of search refreshes.
+  const [operationError, setOperationError] = createSignal<string>();
+  const error = () => operationError() ?? searchError();
+  function setError(reason: string | undefined) {
+    setOperationError(reason);
+    // Existing explicit dismissals (input, actions, reopen) clear both owners.
+    // Search delivery never uses this setter.
+    if (reason === undefined) clearSearchError();
+  }
+  function changeQuery(value: string) {
+    setOperationError(undefined);
+    changeSearchQuery(value);
+  }
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
   const [busy, setBusy] = createSignal(false);
