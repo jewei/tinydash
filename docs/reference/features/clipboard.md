@@ -52,7 +52,7 @@ The storage session tests use a second real SQLite connection holding `BEGIN IMM
 
 Start with a fresh capture choice. Enable capture, copy known multiline text from another process, find it in Clipboard and All, and copy it back. Compare exact bytes. Delete an entry and confirm the system clipboard stays unchanged. Check clear, pin, edit, and combine paths when affected.
 
-Run `bun run verify:native` on Windows and Linux X11. Use the clipboard desktop checks on macOS and Wayland, and for restart persistence or native Save dialogs. Use disposable history; a settings backup cannot restore deleted history.
+Run `bun run verify:native` on Windows and Linux X11. The suite holds an external SQLite write transaction, copies and attempts deletion through the launcher, checks the failure remains visible, then releases the lock and retries without restarting. Fresh database connections verify durable deletion, the retained usage increment, and resumed capture. `tests/storage-contention.spec.ts` separately checks that the test fixture releases its lock on failure; it is not desktop proof. Use the clipboard desktop checks on macOS and Wayland, and for restart persistence or native Save dialogs. Use disposable history; a settings backup cannot restore deleted history.
 
 Enable history in an isolated profile, copy known text from another process, find it, copy an older entry, then delete it. Verify copied bytes and confirm deletion leaves the system clipboard unchanged.
 
