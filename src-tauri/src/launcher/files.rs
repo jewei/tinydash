@@ -220,6 +220,13 @@ impl ScanMetrics {
     }
 }
 
+fn extend_rest_for_work(deadline: &mut Instant, started: Instant, finished: Instant) {
+    // Rest already owed at the start of disposal is not rest actually taken
+    // while disposal runs, even if the old deadline passes in the meantime.
+    let remaining = deadline.saturating_duration_since(started);
+    *deadline = finished + remaining + file_watch::scan_rest(finished.duration_since(started));
+}
+
 fn run_worker(worker: AppHandle, rx: Receiver<Request>, callback_sender: SyncSender<Request>) {
     let state = worker.state::<LauncherState>();
     run_worker_loop(
@@ -274,7 +281,7 @@ fn run_worker_loop(
                     metrics.duration += elapsed;
                     // Disposal is work too; it cannot consume the remaining
                     // rest or leave its own work without a matching rest.
-                    *deadline = (*deadline).max(finished) + file_watch::scan_rest(elapsed);
+                    extend_rest_for_work(deadline, started, finished);
                 }
                 active_settings = None;
                 watch_warning = None;
@@ -654,6 +661,29 @@ mod tests {
             assert!(publication_waiting, "publication did not start");
             assert!(!accepted);
         });
+    }
+
+    #[test]
+    fn disposal_preserves_owed_rest_before_and_after_the_old_deadline() {
+        let base = Instant::now();
+        // A one-second scan initially owes three seconds of rest, through t=4.
+        // Disposing from t=1..2 must retain all three and add three more.
+        let mut deadline = base + Duration::from_secs(4);
+        extend_rest_for_work(
+            &mut deadline,
+            base + Duration::from_secs(1),
+            base + Duration::from_secs(2),
+        );
+        assert_eq!(deadline, base + Duration::from_secs(8));
+        // A five-second disposal crosses the original deadline. None of those
+        // five seconds count as rest: retain three and add fifteen (t=24).
+        deadline = base + Duration::from_secs(4);
+        extend_rest_for_work(
+            &mut deadline,
+            base + Duration::from_secs(1),
+            base + Duration::from_secs(6),
+        );
+        assert_eq!(deadline, base + Duration::from_secs(24));
     }
 
     #[test]
