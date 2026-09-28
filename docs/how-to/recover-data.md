@@ -8,6 +8,10 @@ TinyDash keeps a recovery archive named `recovery.tar` in its application data d
 
 The archive is private to the current user. TinyDash replaces it only after the new archive passes its checks. A failed backup keeps the previous archive.
 
+A **storage is busy** warning normally does not require recovery or a restart. SQLite lock contention is temporary: close the other process's database transaction and try the storage action again. TinyDash retains its connection after a busy/locked error and retries on the next operation, with a 250 ms SQLite busy timeout and no immediate retry loop. A busy startup is also retried on the next storage operation. Session-only usage is merged with saved usage once initialization succeeds; later failed usage writes are retained until a successful storage operation. Failed clipboard deletes remain visible until explicitly retried, and missed clipboard captures are not replayed. See [clipboard storage contention](../reference/features/clipboard.md#storage-contention).
+
+A **storage needs recovery**, failed-backup, or incompatible-schema warning is different. TinyDash does not keep retrying those failures, remove a corrupt database, or downgrade a newer schema. Correct file-access or disk-space problems and restart, use a compatible app version, or follow the recovery steps below.
+
 Recovery is manual. TinyDash does not restore files automatically. Changes made after the backup are not in the archive. Use an app version that supports the archive's `sourceSchema` value in `manifest.json`. The `createdByVersion` value identifies the app that made the archive; it does not prove that an older app can read it.
 
 1. Quit TinyDash.
