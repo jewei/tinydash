@@ -208,6 +208,14 @@ try {
       await run(["bun", "run", "test:ui", ...selection]);
     } else {
       await run(["bun", "scripts/verify/repository.ts"]);
+      await run(["bun", "scripts/verify/docs.ts"]);
+      await run([
+        "bun",
+        "test",
+        "scripts/verify/checks.test.ts",
+        "scripts/verify/docs.test.ts",
+        "scripts/release/evidence.test.ts",
+      ]);
       await run(["bun", "run", "format:check"]);
       await run([
         "cargo",
@@ -256,6 +264,16 @@ try {
           "src-tauri/Cargo.toml",
           "--locked",
         ]);
+        for (const features of [[], ["--features", "track-allocations"]]) {
+          await run([
+            "cargo",
+            "check",
+            "--manifest-path",
+            "scripts/perf/file-index/Cargo.toml",
+            "--locked",
+            ...features,
+          ]);
+        }
         await run(["bun", "run", "test:ui"]);
       }
     }

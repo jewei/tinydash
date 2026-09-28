@@ -53,11 +53,11 @@ jobs:
             architecture: X64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
       - name: Install Linux libraries
@@ -69,7 +69,7 @@ jobs:
         run: |
           rustup update stable --no-self-update
           rustup component add rustfmt clippy
-      - uses: Swatinem/rust-cache@v2.9.2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
       - run: bun install --frozen-lockfile
@@ -176,7 +176,7 @@ jobs:
           fi
           bun scripts/ci/artifacts.ts verify artifacts/packages
           bun scripts/release/verify-artifacts.ts artifacts/packages "${{ matrix.platform }}" "${{ matrix.architecture }}"
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-${{ matrix.name }}
           path: artifacts/packages/
@@ -191,11 +191,11 @@ jobs:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.RELEASE_TAG }}
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
       - name: Refuse a development build draft
@@ -203,15 +203,15 @@ jobs:
         run: |
           echo 'stage_draft requires release_mode=true. Development builds stay in Actions artifacts.' >&2
           exit 1
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-macos
           path: staged/macos
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-windows
           path: staged/windows
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: release-linux
           path: staged/linux
@@ -224,6 +224,14 @@ jobs:
           bun scripts/release/generate-latest.ts staged/release "$RELEASE_TAG" "$RELEASE_REPOSITORY"
           bun scripts/ci/artifacts.ts checksums staged/release
           bun scripts/ci/artifacts.ts verify staged/release
+      - name: Create pending evidence template (not native proof)
+        run: bun scripts/release/evidence.ts init staged/release staged/release-evidence.json "$RELEASE_TAG" "$(git rev-parse HEAD)"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-evidence-template
+          path: staged/release-evidence.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
