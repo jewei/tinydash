@@ -107,6 +107,32 @@ test("typed appearance relay keeps both windows synchronized without storage eve
     settings.getByRole("button", { name: "Save changes" }),
   ).toBeDisabled();
 
+  // Count callback deliveries, not just final state: duplicate relay callbacks
+  // leave the UI looking correct.
+  const expected = [
+    { event: "appearance-changed", payload: "sage" },
+    { event: "compact-changed", payload: true },
+    { event: "appearance-changed", payload: "rose" },
+    { event: "compact-changed", payload: false },
+    { event: "system-glass-changed", payload: false },
+    { event: "system-glass-changed", payload: true },
+  ];
+  for (const view of [main, settings]) {
+    await expect
+      .poll(() =>
+        view.evaluate(() =>
+          window.__launcherTest.eventDeliveries.filter((message) =>
+            [
+              "appearance-changed",
+              "compact-changed",
+              "system-glass-changed",
+            ].includes(message.event),
+          ),
+        ),
+      )
+      .toEqual(expected);
+  }
+
   await main.screenshot({ path: test.info().outputPath("relay-main.png") });
   await settings.screenshot({
     path: test.info().outputPath("relay-settings.png"),

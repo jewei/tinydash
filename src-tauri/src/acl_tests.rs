@@ -10,6 +10,26 @@ use tauri::{
     webview::InvokeRequest,
 };
 
+// This is intentionally a test in the library harness, not a separate binary:
+// tauri-build's default resource linking already covers binary targets.
+#[cfg(all(target_os = "windows", target_env = "msvc"))]
+#[test]
+fn windows_ipc_test_executable_loads_common_controls_v6() {
+    use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+
+    let module_name = "comctl32.dll\0".encode_utf16().collect::<Vec<_>>();
+    // SAFETY: the module name is NUL-terminated; GetModuleHandleW does not
+    // transfer ownership, and GetProcAddress only inspects the loaded module.
+    unsafe {
+        let module = GetModuleHandleW(module_name.as_ptr());
+        assert!(!module.is_null(), "Tauri must load Common Controls");
+        assert!(
+            GetProcAddress(module, c"TaskDialogIndirect".as_ptr().cast()).is_some(),
+            "the test executable must select Common Controls v6, just like the app"
+        );
+    }
+}
+
 const MAIN_ONLY: &[&str] = &[
     "set_launcher_appearance",
     "launcher_ready",

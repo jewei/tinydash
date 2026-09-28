@@ -98,21 +98,42 @@ export async function watchAppearance(
   const stops: (() => void)[] = [];
   try {
     if (isTauri()) {
+      // Rust emits separately to main and settings. An Any listener would
+      // receive both emissions, even though it lives in just one webview.
+      const options = {
+        target: {
+          kind: "WebviewWindow" as const,
+          label: getCurrentWebviewWindow().label,
+        },
+      };
       stops.push(
-        await listen("appearance-changed", (event) => {
-          if (isAppearance(event.payload)) update(event.payload);
-        }),
+        await listen(
+          "appearance-changed",
+          (event) => {
+            if (isAppearance(event.payload)) update(event.payload);
+          },
+          options,
+        ),
       );
       stops.push(
-        await listen("compact-changed", (event) => {
-          if (typeof event.payload === "boolean") updateCompact(event.payload);
-        }),
+        await listen(
+          "compact-changed",
+          (event) => {
+            if (typeof event.payload === "boolean")
+              updateCompact(event.payload);
+          },
+          options,
+        ),
       );
       stops.push(
-        await listen("system-glass-changed", (event) => {
-          if (typeof event.payload === "boolean")
-            updateSystemGlass(event.payload);
-        }),
+        await listen(
+          "system-glass-changed",
+          (event) => {
+            if (typeof event.payload === "boolean")
+              updateSystemGlass(event.payload);
+          },
+          options,
+        ),
       );
     }
   } catch {
@@ -125,4 +146,5 @@ export async function watchAppearance(
 }
 import { isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { backend } from "./bridge";

@@ -34,6 +34,22 @@ fn main() {
         "hide_launcher",
         "reset_launcher_position",
     ]);
-    tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))
-        .expect("build Tauri app with command permissions");
+    let mut attributes = tauri_build::Attributes::new().app_manifest(manifest);
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+        && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
+    {
+        // tauri-winres/embed-resource attach Tauri's manifest only to bin
+        // targets. Our lib unit-test executable also links Tauri/Muda's v6
+        // imports (notably TaskDialogIndirect) through the real IPC tests.
+        // Without an embedded v6 dependency, Windows fails before the harness
+        // starts with STATUS_ENTRYPOINT_NOT_FOUND. Apply it to every linked
+        // target, and omit the resource manifest to avoid duplicate ID 1s.
+        attributes = attributes
+            .windows_attributes(tauri_build::WindowsAttributes::new_without_app_manifest());
+        println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
+        println!(
+            "cargo:rustc-link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
+        );
+    }
+    tauri_build::try_build(attributes).expect("build Tauri app with command permissions");
 }
