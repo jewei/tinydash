@@ -183,7 +183,9 @@ impl FileProvider {
             + self.by_id.capacity() * std::mem::size_of::<(Box<str>, usize)>()
     }
 
-    #[cfg(test)]
+    // Also used by the standalone synthetic profiling harness. Launcher
+    // requests use search_interruptible with their request-local budget.
+    #[allow(dead_code)]
     pub fn search(
         &self,
         query: &str,
