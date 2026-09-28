@@ -27,6 +27,7 @@ import {
   stopProcessTree,
   waitForExit,
 } from "../../scripts/verify/lifecycle.ts";
+import { clearWindowsClipboard } from "./clipboard";
 import { installFixtures } from "./fixtures";
 import {
   measureQueryTiming,
@@ -797,6 +798,60 @@ try {
   );
   assert.equal(storedClipboard(data, recoveredClip).length, 1);
   pass("Clipboard capture resumes and persists after transient contention");
+  // Linux does not promise the upstream-clear heuristic. Windows exercises the
+  // actual OS clear and quiet monitor retry, not a test-only backend command.
+  if (process.platform === "win32") {
+    const automaticClip = `TinyDash automatic-cleanup ${fixtures.nonce}`;
+    setClipboardText(automaticClip);
+    await keys(inputId, "\uE009a\uE000");
+    await keys(inputId, `automatic-cleanup ${fixtures.nonce}`);
+    await until(
+      "the automatic cleanup fixture is captured durably",
+      async () =>
+        (await titles())[0] === automaticClip &&
+        storedClipboard(data, automaticClip).length === 1,
+    );
+    await withStorageLock(data, async () => {
+      const cleared = clearWindowsClipboard();
+      await writeFile(
+        resolve(output, "upstream-clear.json"),
+        JSON.stringify(cleared, null, 2),
+      );
+      // Helper processes may hide the launcher on blur. Native readiness must
+      // be restored before expecting its visibility-gated event subscriptions
+      // to refresh the warning; retained DOM focus alone is not readiness.
+      await reopen();
+      await selectMode("clipboard");
+      await keys(inputId, `automatic-cleanup ${fixtures.nonce}`);
+      await until(
+        "a blocked upstream clear exposes pending privacy cleanup",
+        () =>
+          observe<boolean>(
+            "return document.querySelector('[role=alert]')?.textContent.includes('Sensitive clipboard cleanup is pending') ?? false",
+          ),
+      );
+      assert.equal(clipboardText(), "");
+      assert.equal(storedClipboard(data, automaticClip).length, 1);
+      assert.equal((await titles())[0], automaticClip);
+    });
+    // No new clipboard value, user deletion, or application restart follows.
+    // The quiet monitor must finish the retained obligation after unlock.
+    await until(
+      "automatic cleanup completes after unlock with an unchanged empty clipboard",
+      async () =>
+        storedClipboard(data, automaticClip).length === 0 &&
+        (await titles()).length === 0,
+    );
+    await until("completed automatic cleanup clears its privacy warning", () =>
+      observe<boolean>(
+        "return !document.querySelector('[role=alert]')?.textContent.includes('Sensitive clipboard cleanup is pending')",
+      ),
+    );
+    assert.equal(clipboardText(), "");
+    pass(
+      "Windows upstream clipboard clear retains its cleanup intent through SQLite contention and retries while the clipboard remains quiet",
+    );
+  }
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, `second ${fixtures.nonce}`);
   await until(

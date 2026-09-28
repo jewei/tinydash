@@ -102,6 +102,9 @@ pub fn start(app: &AppHandle) {
                     if state.clipboard.stopped.load(Ordering::Acquire) {
                         break;
                     }
+                    // Cleanup must progress even if the OS change counter is
+                    // quiet or the user has disabled new captures.
+                    state.storage.retry_cleanup(&worker_app);
                     let generation = state.clipboard.generation();
                     if state.settings().clipboard_history_enabled {
                         match crate::platform::clipboard_snapshot(previous) {
