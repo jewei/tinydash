@@ -630,10 +630,10 @@ mod tests {
     }
 
     #[test]
-    fn shutdown_while_publication_waits_for_search_rejects_the_scan() {
+    fn shutdown_while_publication_waits_for_settings_rejects_the_scan() {
         let state = LauncherState::new(Settings::default(), vec![]);
         let generation = state.files.generation();
-        let search = state.search.lock().unwrap();
+        let settings = state.settings.write().unwrap();
         std::thread::scope(|scope| {
             let state = &state;
             let publish = scope.spawn(move || {
@@ -643,11 +643,12 @@ mod tests {
                     files::FileProvider::default(),
                 )
             });
-            // Publication takes the settings read lock before it waits for
-            // search. Wait for that point without filesystem/timing assumptions.
+            // Publication now takes search before settings. Hold the second
+            // lock and observe the first lock acquired: this establishes the
+            // publication wait without assuming thread scheduling or FS speed.
             let deadline = Instant::now() + Duration::from_secs(5);
             let publication_waiting = loop {
-                if state.settings.try_write().is_err() {
+                if state.search.try_lock().is_err() {
                     break true;
                 }
                 if Instant::now() >= deadline {
@@ -656,7 +657,7 @@ mod tests {
                 std::thread::yield_now();
             };
             state.files.stop();
-            drop(search);
+            drop(settings);
             let accepted = publish.join().unwrap().unwrap();
             assert!(publication_waiting, "publication did not start");
             assert!(!accepted);
