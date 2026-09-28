@@ -35,6 +35,36 @@ fn settings_readers_are_not_held_behind_a_search_contender() {
 }
 
 #[test]
+fn publication_acquires_search_before_waiting_for_settings() {
+    let state = Arc::new(LauncherState::new(Settings::default(), vec![]));
+    // Hold the *second* lock. Once try_lock observes search held by the
+    // publisher, it must have reached the settings write wait. The old order
+    // can never satisfy this condition: it waits here before taking search.
+    let settings = state.settings.write().unwrap();
+    let publisher = state.clone();
+    let worker = std::thread::spawn(move || {
+        publisher.replace_settings(Settings::default());
+    });
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let acquired_search = loop {
+        if state.search.try_lock().is_err() {
+            break true;
+        }
+        if std::time::Instant::now() >= deadline {
+            break false;
+        }
+        std::thread::yield_now();
+    };
+    // Always release before joining/asserting, including a regression failure.
+    drop(settings);
+    worker.join().unwrap();
+    assert!(
+        acquired_search,
+        "publisher must acquire search before settings"
+    );
+}
+
+#[test]
 fn reordered_publication_still_rejects_scans_for_previous_settings() {
     let previous = Settings::default();
     let state = LauncherState::new(previous.clone(), vec![]);
