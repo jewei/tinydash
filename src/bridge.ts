@@ -3,7 +3,8 @@ import type { Appearance } from "./appearance";
 
 export type AppearanceChange =
   | { kind: "appearance"; value: Appearance }
-  | { kind: "compact" | "systemGlass"; value: boolean };
+  | { kind: "compact"; value: boolean }
+  | { kind: "systemGlass"; value: boolean };
 
 export type Action =
   "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";

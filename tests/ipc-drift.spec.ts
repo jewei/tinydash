@@ -117,6 +117,10 @@ test("exact Rust-derived contracts reject deliberate wire and bridge drift", asy
   const dir = mkdtempSync(resolve(root, "test-results/ipc-drift-"));
   mkdirSync(resolve(dir, "src"));
   mkdirSync(resolve(dir, "tests/fixtures"), { recursive: true });
+  writeFileSync(
+    resolve(dir, "src/appearance.ts"),
+    readFileSync(resolve(root, "src/appearance.ts"), "utf8"),
+  );
   writeFileSync(resolve(dir, "tests/ipc-types.ts"), checks);
   writeFileSync(
     resolve(dir, "tsconfig.json"),

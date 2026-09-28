@@ -110,9 +110,15 @@ fn check_attributes(attrs: &[syn::Attribute], field: bool) {
                         "Review serialization predicate"
                     );
                     skipped_none = true;
-                } else if ["rename", "rename_all", "rename_all_fields", "tag"]
-                    .iter()
-                    .any(|key| meta.path.is_ident(key))
+                } else if [
+                    "rename",
+                    "rename_all",
+                    "rename_all_fields",
+                    "tag",
+                    "content",
+                ]
+                .iter()
+                .any(|key| meta.path.is_ident(key))
                 {
                     let _: syn::LitStr = meta.value()?.parse()?;
                 } else if !field
@@ -183,7 +189,29 @@ fn check_shape(item: &syn::Item, types: &BTreeMap<String, String>) {
     }
 }
 
-fn commands(dir: &Path, types: &BTreeMap<String, String>, output: &mut BTreeMap<String, String>) {
+#[derive(Debug, PartialEq, Eq)]
+struct CommandSignature {
+    args: Vec<(String, String)>,
+    result: String,
+}
+
+impl CommandSignature {
+    fn declaration(&self) -> String {
+        let args = self
+            .args
+            .iter()
+            .map(|(name, ty)| format!("{name}: {ty}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{{ args: [{args}]; result: {} }}", self.result)
+    }
+}
+
+fn commands(
+    dir: &Path,
+    types: &BTreeMap<String, String>,
+    output: &mut BTreeMap<String, CommandSignature>,
+) {
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
         if path.is_dir() {
@@ -214,21 +242,51 @@ fn commands(dir: &Path, types: &BTreeMap<String, String>, output: &mut BTreeMap<
                 matches!(attr.meta, syn::Meta::Path(_)),
                 "Review command options"
             );
-            assert!(function.sig.generics.params.is_empty());
+            let generics = &function.sig.generics;
+            assert!(generics.where_clause.is_none(), "Review command bounds");
+            let runtime_generic = !generics.params.is_empty();
+            if runtime_generic {
+                assert_eq!(generics.params.len(), 1, "Review command generics");
+                let syn::GenericParam::Type(parameter) = &generics.params[0] else {
+                    panic!("Only the injected Tauri runtime may be generic")
+                };
+                assert!(parameter.ident == "R" && parameter.default.is_none());
+                assert!(parameter.attrs.is_empty());
+                assert_eq!(parameter.bounds.len(), 1);
+                assert!(
+                    matches!(&parameter.bounds[0], syn::TypeParamBound::Trait(bound)
+                    if bound.path.is_ident("Runtime") && bound.lifetimes.is_none()
+                        && matches!(bound.modifier, syn::TraitBoundModifier::None))
+                );
+            }
             let mut args = vec![];
             for arg in &function.sig.inputs {
                 let syn::FnArg::Typed(arg) = arg else {
                     panic!("Unexpected receiver")
                 };
                 if let Type::Path(path) = &*arg.ty
-                    && (path.path.is_ident("AppHandle") || path.path.is_ident("WebviewWindow"))
+                    && path.qself.is_none()
+                    && path.path.segments.len() == 1
+                    && let segment = &path.path.segments[0]
+                    && (segment.ident == "AppHandle" || segment.ident == "WebviewWindow")
                 {
+                    match &segment.arguments {
+                        PathArguments::None => {}
+                        PathArguments::AngleBracketed(arguments) => {
+                            assert!(runtime_generic && arguments.args.len() == 1);
+                            assert!(
+                                matches!(&arguments.args[0], GenericArgument::Type(Type::Path(path))
+                                if path.path.is_ident("R"))
+                            );
+                        }
+                        _ => panic!("Review injected handle type"),
+                    }
                     continue;
                 }
                 let syn::Pat::Ident(id) = &*arg.pat else {
                     panic!("Unsupported parameter pattern")
                 };
-                args.push(format!("{}: {}", id.ident, wire_type(&arg.ty, types)));
+                args.push((id.ident.to_string(), wire_type(&arg.ty, types)));
             }
             let result = match &function.sig.output {
                 syn::ReturnType::Default => "void".into(),
@@ -237,10 +295,7 @@ fn commands(dir: &Path, types: &BTreeMap<String, String>, output: &mut BTreeMap<
             let name = function.sig.ident.to_string();
             assert!(
                 output
-                    .insert(
-                        name,
-                        format!("{{ args: [{}]; result: {result} }}", args.join(", "))
-                    )
+                    .insert(name, CommandSignature { args, result })
                     .is_none()
             );
         }
@@ -254,7 +309,10 @@ fn command_signature_parser_tracks_success_and_argument_domains() {
     let mut baseline = BTreeMap::new();
     std::fs::write(dir.path().join("commands.rs"), source).unwrap();
     commands(dir.path(), &BTreeMap::new(), &mut baseline);
-    assert_eq!(baseline["hide_launcher"], "{ args: []; result: void }");
+    assert_eq!(
+        baseline["hide_launcher"].declaration(),
+        "{ args: []; result: void }"
+    );
     for changed in [
         source.replace("Result<(), String>", "Result<u32, String>"),
         source.replace("app: AppHandle", "app: AppHandle, value: bool"),
@@ -277,6 +335,35 @@ fn command_signature_parser_tracks_success_and_argument_domains() {
         std::panic::catch_unwind(|| commands(dir.path(), &BTreeMap::new(), &mut BTreeMap::new()))
             .is_err()
     );
+}
+
+#[test]
+fn ipc_generic_commands_only_ignore_the_injected_runtime() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "#[tauri::command] pub fn sync_appearance<R: Runtime>(app: AppHandle<R>, change: bool) -> Result<(), String> {}";
+    std::fs::write(dir.path().join("commands.rs"), source).unwrap();
+    let mut signatures = BTreeMap::new();
+    commands(dir.path(), &BTreeMap::new(), &mut signatures);
+    assert_eq!(
+        signatures["sync_appearance"].declaration(),
+        "{ args: [change: boolean]; result: void }"
+    );
+    for changed in [
+        source.replace("R: Runtime", "R: Clone"),
+        source.replace("AppHandle<R>", "AppHandle<String>"),
+        source.replace("change: bool", "change: R"),
+        source.replace("R: Runtime", "R: Runtime, T"),
+    ] {
+        std::fs::write(dir.path().join("commands.rs"), changed).unwrap();
+        assert!(
+            std::panic::catch_unwind(|| commands(
+                dir.path(),
+                &BTreeMap::new(),
+                &mut BTreeMap::new()
+            ))
+            .is_err()
+        );
+    }
 }
 
 #[test]
@@ -314,6 +401,7 @@ fn generated_ipc_wire_types_match_frontend() {
     macro_rules! register { ($($ty:ty),+ $(,)?) => { $(declaration::<$ty>(&mut types, &config);)+ }; }
     register!(
         Action,
+        crate::appearance::AppearanceChange,
         ActionConfirmation,
         ResultKind,
         SearchResult,
@@ -351,10 +439,20 @@ fn generated_ipc_wire_types_match_frontend() {
         source.push_str(&format!("export {declaration}\n"));
     }
     source.push_str("export type Commands = {\n");
-    for (name, shape) in signatures {
-        source.push_str(&format!("  {name}: {shape};\n"));
+    for (name, shape) in &signatures {
+        source.push_str(&format!("  {name}: {};\n", shape.declaration()));
     }
     source.push_str("};\n");
+    // Runtime wrapper probes consume the same parsed argument metadata, not a
+    // second regex parser which could mistake Rust test strings for handlers.
+    let arguments: BTreeMap<_, _> = signatures
+        .iter()
+        .map(|(name, signature)| (name, &signature.args))
+        .collect();
+    source.push_str(&format!(
+        "export const commandArguments = {} as const;\n",
+        serde_json::to_string(&arguments).unwrap()
+    ));
     let path = root.join("../tests/fixtures/ipc-wire.ts");
     if std::env::var_os("TINYDASH_UPDATE_CONTRACTS").is_some() {
         std::fs::write(&path, &source).unwrap();

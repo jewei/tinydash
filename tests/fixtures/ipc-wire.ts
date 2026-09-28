@@ -2,6 +2,7 @@
 export type Action = "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
 export type ActionConfirmation = { title: string, description: string, confirmLabel: string, };
 export type AppPreference = { aliases: Array<string>, hidden: boolean, };
+export type AppearanceChange = { "kind": "appearance", "value": LauncherAppearance } | { "kind": "compact", "value": boolean } | { "kind": "systemGlass", "value": boolean };
 export type CategoryShortcut = { mode: SearchMode, shortcut: string, };
 export type ClipboardEntry = { id: number, content: string, createdAt: number, lastUsedAt: number | null, };
 export type CurrencyStatus = { asOf: string | null, refreshing: boolean, warning: string | null, };
@@ -28,6 +29,7 @@ export type WarningCode = "settingsRead" | "shortcutRegistration" | "shortcutsUn
 export type WebSearch = { name: string, keyword: string, template: string, enabled: boolean, };
 export type Commands = {
   app_catalog: { args: []; result: Array<SearchResult> };
+  cancel_search: { args: [request_id: number]; result: void };
   check_update: { args: []; result: UpdateStatus };
   choose_clipboard_history: { args: [enabled: boolean]; result: Settings };
   clear_clipboard_history: { args: [keep_pinned: boolean | null]; result: void };
@@ -52,9 +54,11 @@ export type Commands = {
   reveal_settings_path: { args: [data: boolean]; result: void };
   save_clipboard_file: { args: [id: string]; result: boolean };
   save_settings: { args: [settings: Settings]; result: Settings };
-  search: { args: [query: string, mode: SearchMode]; result: SearchResponse };
+  search: { args: [query: string, mode: SearchMode, request_id: number | null]; result: SearchResponse };
   set_app_preference: { args: [id: string, aliases: Array<string>, hidden: boolean]; result: Settings };
   set_launcher_appearance: { args: [appearance: LauncherAppearance]; result: boolean };
   set_pinned: { args: [id: string, category: SearchMode, pinned: boolean]; result: void };
   set_shortcut_recording: { args: [recording: boolean]; result: void };
+  sync_appearance: { args: [change: AppearanceChange]; result: void };
 };
+export const commandArguments = {"app_catalog":[],"cancel_search":[["request_id","number"]],"check_update":[],"choose_clipboard_history":[["enabled","boolean"]],"clear_clipboard_history":[["keep_pinned","boolean | null"]],"clipboard_preview":[["id","string"]],"copy_clipboard_selection":[["ids","Array<string>"],["separator","string"]],"edit_clipboard_history":[["id","string"],["text","string"]],"execute_action":[["id","string"],["action","Action"],["confirmed","boolean | null"]],"export_settings":[["appearance","string"],["compact","boolean"],["follow_system_glass","boolean"]],"get_settings":[],"hide_launcher":[],"install_update":[],"launcher_ready":[],"open_settings":[],"preview_settings_import":[],"preview_web_search":[["search","WebSearch"],["query","string"]],"quit_app":[],"refresh_apps":[],"refresh_currency":[],"refresh_files":[],"reset_launcher_position":[],"reveal_backup":[],"reveal_settings_path":[["data","boolean"]],"save_clipboard_file":[["id","string"]],"save_settings":[["settings","Settings"]],"search":[["query","string"],["mode","SearchMode"],["request_id","number | null"]],"set_app_preference":[["id","string"],["aliases","Array<string>"],["hidden","boolean"]],"set_launcher_appearance":[["appearance","LauncherAppearance"]],"set_pinned":[["id","string"],["category","SearchMode"],["pinned","boolean"]],"set_shortcut_recording":[["recording","boolean"]],"sync_appearance":[["change","AppearanceChange"]]} as const;

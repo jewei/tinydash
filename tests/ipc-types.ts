@@ -33,6 +33,8 @@ export type WireTypesMatch = [
 // from parsed Rust signatures, and the runtime probe verifies these bindings.
 export const commandWrappers = {
   set_launcher_appearance: "setLauncherAppearance",
+  sync_appearance: "syncAppearance",
+  cancel_search: "cancelSearch",
   launcher_ready: "ready",
   open_settings: "openSettings",
   get_settings: "settings",

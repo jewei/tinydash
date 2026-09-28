@@ -3,6 +3,7 @@ use tauri::{AppHandle, Emitter, EventTarget, Runtime};
 use crate::launcher::window::LauncherAppearance;
 
 #[derive(serde::Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 #[serde(tag = "kind", content = "value", rename_all = "camelCase")]
 pub enum AppearanceChange {
     Appearance(LauncherAppearance),

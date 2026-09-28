@@ -121,11 +121,18 @@ test("hide then reopen before the old reply settles keeps the new search pending
     )) as typeof import("../src/launcherController");
     const calls: string[] = [];
     const replies: ((response: SearchResponse) => void)[] = [];
+    let started!: () => void;
+    const newStarted = new Promise<void>((resolve) => {
+      started = resolve;
+    });
     const controller = createLauncherController({
       desktop: true,
       send: (value) => {
         calls.push(value);
-        return new Promise((resolve) => replies.push(resolve));
+        return new Promise((resolve) => {
+          replies.push(resolve);
+          if (value === "new session") started();
+        });
       },
     });
     const old = controller.search("old session");
@@ -142,7 +149,9 @@ test("hide then reopen before the old reply settles keeps the new search pending
         retryable: false,
       },
     });
-    await Promise.resolve();
+    // Cancellation acknowledgement adds microtasks. Observe actual submission,
+    // not an assumed number of Promise ticks, before resolving the new reply.
+    await newStarted;
     const afterOldReply = {
       calls: [...calls],
       pending: controller.pending(),

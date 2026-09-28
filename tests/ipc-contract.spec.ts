@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { commandArguments } from "./fixtures/ipc-wire";
 import { resolve } from "node:path";
 import type {
   Action,
@@ -82,42 +83,15 @@ test("canonical serde fixtures cover variants and representative omitted/nullabl
 });
 
 function commands() {
-  const registrations = rust("lib.rs")
-    .split("tauri::generate_handler![")[1]
-    ?.split("]")[0];
-  expect(registrations).toBeDefined();
-  const names = registrations
-    .split(",")
-    .map((name) => name.trim().split("::").at(-1)!)
-    .filter(Boolean)
-    .sort();
-  const signatures = new Map<string, { name: string; type: string }[]>();
-  const paths = readdirSync(resolve(root, "src-tauri/src/launcher"), {
-    recursive: true,
-  }).filter((path) => typeof path === "string" && path.endsWith(".rs"));
-  for (const path of paths) {
-    const source = rust(`launcher/${path}`);
-    // These internal commands use simple owned parameters. Fail closed when a
-    // new signature is not understood instead of silently skipping the command.
-    for (const match of source.matchAll(
-      /#\[tauri::command\]\s*pub (?:async )?fn (\w+)\(([^)]*)\)/g,
-    )) {
-      const args = match[2]
-        .split(",")
-        .map((arg) => arg.trim())
-        .filter(Boolean)
-        .map((arg) => {
-          const parameter = /^(\w+):\s*(.+)$/.exec(arg);
-          if (!parameter)
-            throw new Error(`Unrecognized command parameter: ${arg}`);
-          return { name: camelCase(parameter[1]), type: parameter[2] };
-        })
-        .filter((arg) => !["AppHandle", "WebviewWindow"].includes(arg.type));
-      signatures.set(match[1], args);
-    }
-  }
-  expect([...signatures.keys()].sort()).toEqual(names);
-  return { names, signatures };
+  // Rust's syn-based generator checks this metadata against registered handlers.
+  // Do not parse Rust again here: test strings are not command declarations.
+  const signatures = new Map<string, { name: string; type: string }[]>(
+    Object.entries(commandArguments).map(([command, args]) => [
+      command,
+      args.map(([name, type]) => ({ name: camelCase(name), type })),
+    ]),
+  );
+  return { names: [...signatures.keys()].sort(), signatures };
 }
 
 test("every bridge wrapper invokes a registered Rust command with matching argument names and types", async ({
@@ -138,7 +112,7 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
       commandWrappers[command as keyof typeof commandWrappers],
     );
     const signature = signatures.get(command)!;
-    const required = signature.filter((arg) => !arg.type.startsWith("Option<"));
+    const required = signature.filter((arg) => !arg.type.endsWith(" | null"));
     expect(
       Object.keys(args).filter(
         (name) => !signature.some((arg) => arg.name === name),
@@ -149,15 +123,15 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
     for (const [name, value] of Object.entries(args)) {
       const type = signature
         .find((arg) => arg.name === name)!
-        .type.replace(/^Option<(.+)>$/, "$1");
+        .type.replace(/ \| null$/, "");
       switch (type) {
-        case "String":
+        case "string":
           expect(typeof value, `${command}.${name}`).toBe("string");
           break;
-        case "bool":
+        case "boolean":
           expect(typeof value, `${command}.${name}`).toBe("boolean");
           break;
-        case "Vec<String>":
+        case "Array<string>":
           expect(
             Array.isArray(value) &&
               value.every((item) => typeof item === "string"),
@@ -172,11 +146,17 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
         case "Settings":
           expect(value).toEqual(contracts.settings);
           break;
-        case "settings::WebSearch":
+        case "WebSearch":
           expect(value).toEqual(contracts.settings.webSearches[0]);
           break;
         case "LauncherAppearance":
           expect(value).toBe("dark");
+          break;
+        case "AppearanceChange":
+          expect(value).toEqual({ kind: "appearance", value: "dark" });
+          break;
+        case "number":
+          expect(Number.isSafeInteger(value) && Number(value) > 0).toBe(true);
           break;
         default:
           throw new Error(`Add coverage for ${command}.${name}: ${type}`);
