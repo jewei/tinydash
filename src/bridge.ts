@@ -1,4 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Appearance } from "./appearance";
+
+export type AppearanceChange =
+  | { kind: "appearance"; value: Appearance }
+  | { kind: "compact" | "systemGlass"; value: boolean };
 
 export type Action =
   "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
@@ -161,6 +166,8 @@ export interface ClipboardEntry {
 }
 
 export const backend = {
+  syncAppearance: (change: AppearanceChange) =>
+    invoke<void>("sync_appearance", { change }),
   setLauncherAppearance: (
     appearance: "light" | "dark" | "sage" | "rose" | "ink",
   ) => invoke<boolean>("set_launcher_appearance", { appearance }),

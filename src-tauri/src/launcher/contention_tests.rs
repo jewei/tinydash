@@ -76,15 +76,15 @@ fn reordered_publication_still_rejects_scans_for_previous_settings() {
             folder: false,
         }])
     };
-    assert!(state.accept_file_scan(&previous, files()).unwrap());
+    assert!(state.accept_file_scan(&previous, 0, files()).unwrap());
     let current = Settings {
         file_search_roots: Some(vec!["/different".into()]),
         ..previous.clone()
     };
     state.replace_settings(current.clone());
     assert_eq!(state.search.lock().unwrap().file_count(), 0);
-    assert!(!state.accept_file_scan(&previous, files()).unwrap());
+    assert!(!state.accept_file_scan(&previous, 0, files()).unwrap());
     assert_eq!(state.search.lock().unwrap().file_count(), 0);
-    assert!(state.accept_file_scan(&current, files()).unwrap());
+    assert!(state.accept_file_scan(&current, 1, files()).unwrap());
     assert_eq!(state.search.lock().unwrap().file_count(), 1);
 }
