@@ -16,6 +16,7 @@ fn main() {
         ("result", "src-tauri/src/launcher/result.rs"),
         ("query", "src-tauri/src/launcher/query.rs"),
         ("pins", "src-tauri/src/launcher/pins.rs"),
+        ("warning", "src-tauri/src/launcher/warning.rs"),
     ];
     let mut modules = String::new();
     for (name, relative) in files {

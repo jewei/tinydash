@@ -45,6 +45,7 @@ pub struct Currency(Mutex<Refresh>);
 
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CurrencyStatus {
     pub as_of: Option<String>,
     pub refreshing: bool,

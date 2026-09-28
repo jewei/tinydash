@@ -10,6 +10,7 @@ pub const DEFAULT_SHORTCUT: &str = "Control+Shift+Space";
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct AppPreference {
     pub aliases: Vec<String>,
     pub hidden: bool,
@@ -17,6 +18,7 @@ pub struct AppPreference {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct CategoryShortcut {
     pub mode: SearchMode,
     pub shortcut: String,
@@ -24,6 +26,7 @@ pub struct CategoryShortcut {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct WebSearch {
     pub name: String,
     pub keyword: String,
@@ -88,6 +91,7 @@ impl WebSearch {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Settings {
     pub clear_query_on_open: bool,
     pub hide_on_blur: bool,

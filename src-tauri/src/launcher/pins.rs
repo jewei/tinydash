@@ -8,6 +8,7 @@ pub type Pins = HashMap<SearchMode, HashSet<String>>;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ResultPin {
     pub key: String,
     pub categories: Vec<SearchMode>,

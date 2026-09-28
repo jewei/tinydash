@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SettingsInfo {
     settings: Settings,
     defaults: Settings,
@@ -20,6 +21,19 @@ pub struct SettingsInfo {
     config_path: String,
     data_path: String,
     shortcuts_available: bool,
+}
+
+#[cfg(test)]
+pub(super) fn contract_settings_info() -> SettingsInfo {
+    SettingsInfo {
+        settings: Settings::default(),
+        defaults: Settings::default(),
+        platform: "linux",
+        version: "0.1.3".into(),
+        config_path: "/example/settings.json".into(),
+        data_path: "/example/tinydash.sqlite3".into(),
+        shortcuts_available: true,
+    }
 }
 
 #[tauri::command]

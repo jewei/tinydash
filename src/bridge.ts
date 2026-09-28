@@ -3,7 +3,8 @@ import type { Appearance } from "./appearance";
 
 export type AppearanceChange =
   | { kind: "appearance"; value: Appearance }
-  | { kind: "compact" | "systemGlass"; value: boolean };
+  | { kind: "compact"; value: boolean }
+  | { kind: "systemGlass"; value: boolean };
 
 export type Action =
   "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
@@ -84,17 +85,30 @@ export interface SearchResult {
     title: string;
     description: string;
     confirmLabel: string;
-  } | null;
+  };
+}
+
+export interface LauncherWarning {
+  code:
+    | "settingsRead"
+    | "shortcutRegistration"
+    | "shortcutsUnavailable"
+    | "clipboardLimited"
+    | "trayUnavailable"
+    | "storageUnavailable"
+    | "clipboardUnavailable";
+  message: string;
+  retryable: boolean;
 }
 
 export interface SearchResponse {
-  preferredSelectionId?: string | null;
+  preferredSelectionId: string | null;
   results: SearchResult[];
   total: number;
   indexing: boolean;
   indexError: string | null;
   notice: string | null;
-  storageError: string | null;
+  storageError: LauncherWarning | null;
   files: FileStatus;
   currency: CurrencyStatus;
 }
@@ -128,9 +142,9 @@ export interface WebSearch {
 export interface SettingsImport {
   settings: SettingsValues;
   ignoredKeys: string[];
-  appearance?: string | null;
-  compact?: boolean | null;
-  followSystemGlass?: boolean | null;
+  appearance: string | null;
+  compact: boolean | null;
+  followSystemGlass: boolean | null;
 }
 
 export interface UpdateStatus {
@@ -142,10 +156,10 @@ export interface UpdateStatus {
 
 export interface LauncherInfo {
   settings: SettingsValues;
-  platform: "macos" | "windows" | "linux";
-  warnings: string[];
-  visible?: boolean;
-  initialMode?: SearchMode | null;
+  platform: string;
+  warnings: LauncherWarning[];
+  visible: boolean;
+  initialMode: SearchMode | null;
 }
 
 export interface SettingsInfo {

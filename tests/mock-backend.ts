@@ -5,6 +5,7 @@ import type {
   AppearanceChange,
   SearchResult,
   SearchMode,
+  LauncherWarning,
   SettingsImport,
   SettingsValues,
   UpdateStatus,
@@ -31,6 +32,7 @@ declare global {
       toolRevision: number;
       rejectActions: boolean | string;
       storageError: string | null;
+      warnings: LauncherWarning[];
       usedAppFirst: boolean;
       clipboardDeleted: string[];
       clipboardCleared: boolean;
@@ -137,7 +139,7 @@ const systemCommands: SearchResult[] = [
             : "Save your work before you continue.",
         confirmLabel: title,
       }
-    : null,
+    : undefined,
 }));
 const commandQueries = new Map([
   ["sleep", systemCommands[2]],
@@ -319,6 +321,7 @@ window.__launcherTest = {
   toolRevision: 0,
   rejectActions: false,
   storageError: null,
+  warnings: [],
   usedAppFirst: false,
   clipboardDeleted: [],
   clipboardCleared: false,
@@ -439,9 +442,6 @@ mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
-    // Queue tests control delayed search replies independently. Native
-    // cancellation is covered by Rust, not simulated as desktop proof here.
-    if (command === "cancel_search") return;
     if (command.startsWith("plugin:event|"))
       return mockEvent(command, payload as Record<string, unknown>);
     if (command === "sync_appearance") {
@@ -450,6 +450,9 @@ mockIPC(
       appearanceChannel.postMessage(change);
       return;
     }
+    // Queue tests control delayed search replies independently. Native
+    // cancellation is covered by Rust, not simulated as desktop proof here.
+    if (command === "cancel_search") return;
     if (command === "hide_launcher") {
       await emit("launcher-hidden");
       return;
@@ -462,7 +465,7 @@ mockIPC(
       return {
         platform: state.platform,
         settings: state.settings,
-        warnings: [],
+        warnings: state.warnings,
         visible: state.initialVisible,
         initialMode: state.initialMode,
       };
@@ -703,7 +706,13 @@ mockIPC(
             : query === "=1 / 0"
               ? "Division by zero is not allowed."
               : null,
-        storageError: state.storageError,
+        storageError: state.storageError
+          ? {
+              code: "storageUnavailable",
+              message: state.storageError,
+              retryable: false,
+            }
+          : null,
         currency: {
           asOf: state.currencyDate,
           refreshing: state.currencyRefreshing,
