@@ -51,7 +51,8 @@ export function saveCompact(value: boolean) {
   } catch {
     // Keep the selection for this session if storage is unavailable.
   }
-  if (isTauri()) void emit("compact-changed", value).catch(() => {});
+  if (isTauri())
+    void backend.syncAppearance({ kind: "compact", value }).catch(() => {});
 }
 
 export function readFollowSystemGlass(): boolean {
@@ -68,7 +69,8 @@ export function saveFollowSystemGlass(value: boolean) {
   } catch {
     // Keep the selection for this session if storage is unavailable.
   }
-  if (isTauri()) void emit("system-glass-changed", value).catch(() => {});
+  if (isTauri())
+    void backend.syncAppearance({ kind: "systemGlass", value }).catch(() => {});
 }
 
 export function saveAppearance(value: Appearance) {
@@ -77,7 +79,8 @@ export function saveAppearance(value: Appearance) {
   } catch {
     // Keep the selection for this session if storage is unavailable.
   }
-  if (isTauri()) void emit("appearance-changed", value).catch(() => {});
+  if (isTauri())
+    void backend.syncAppearance({ kind: "appearance", value }).catch(() => {});
 }
 
 export async function watchAppearance(
@@ -121,4 +124,5 @@ export async function watchAppearance(
   };
 }
 import { isTauri } from "@tauri-apps/api/core";
-import { emit, listen } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import { backend } from "./bridge";

@@ -2,6 +2,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
 import type {
+  AppearanceChange,
   SearchResult,
   SearchMode,
   SettingsImport,
@@ -358,11 +359,32 @@ window.__launcherTest = {
   holdAction: false,
   emit,
 };
+// Simulate the Rust appearance relay across browser pages. This is UI proof,
+// not ACL proof; acl_tests.rs exercises Tauri's actual IPC authorization.
+const appearanceChannel = new BroadcastChannel("tinydash.test.appearance");
+async function relayAppearance(change: AppearanceChange) {
+  const events = {
+    appearance: "appearance-changed",
+    compact: "compact-changed",
+    systemGlass: "system-glass-changed",
+  };
+  await emit(events[change.kind], change.value);
+}
+appearanceChannel.onmessage = (event: MessageEvent<AppearanceChange>) => {
+  void relayAppearance(event.data);
+};
+window.addEventListener("pagehide", () => appearanceChannel.close());
 mockWindows("main");
 mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
+    if (command === "sync_appearance") {
+      const { change } = payload as { change: AppearanceChange };
+      await relayAppearance(change);
+      appearanceChannel.postMessage(change);
+      return;
+    }
     if (command === "hide_launcher") {
       await emit("launcher-hidden");
       return;

@@ -5,7 +5,7 @@ use tauri::{
 use super::LauncherState;
 use crate::error::{Error, Result};
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LauncherAppearance {
     Light,
