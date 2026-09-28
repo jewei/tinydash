@@ -29,6 +29,7 @@ import {
 } from "../../scripts/verify/lifecycle.ts";
 import { installFixtures } from "./fixtures";
 import { summarizeTimings, type QueryTiming } from "./performance";
+import { nativeResponseError } from "./protocol";
 import { storedClipboard, storedUsage, withStorageLock } from "./storage";
 
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
@@ -111,11 +112,12 @@ async function request<T>(
   const result = (await response.json()) as {
     value: T & { error?: string; message?: string };
   };
-  if (!response.ok || result.value?.error) {
-    throw new Error(
-      `${method} ${path}: ${result.value?.message ?? response.statusText}`,
-    );
-  }
+  const error = nativeResponseError(
+    response.ok,
+    response.statusText,
+    result.value,
+  );
+  if (error !== null) throw new Error(`${method} ${path}: ${error}`);
   return result.value;
 }
 
@@ -306,14 +308,21 @@ async function reopen() {
     secondInstances.delete(child);
   }
   await until("the existing window reopens on the welcome screen", () =>
-    observe<boolean>(
-      `return document.querySelector('input[role=combobox]')?.value === ''
-      && document.activeElement?.getAttribute('role') === 'combobox'
-      && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
-      && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
-      && document.querySelector('.welcome-suggestions') !== null
-      && document.querySelectorAll('[role=option]').length === 0`,
-    ),
+    request<boolean>(`/session/${session}/execute/async`, "POST", {
+      // Hidden webviews retain DOM state and activeElement. Those alone cannot
+      // prove that the resident native window has actually reopened.
+      script: `const done = arguments[arguments.length - 1];
+        window.__TAURI_INTERNALS__.invoke('launcher_ready').then(info => done(
+          info.visible
+          && document.querySelector('input[role=combobox]')?.value === ''
+          && document.activeElement?.getAttribute('role') === 'combobox'
+          && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
+          && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
+          && document.querySelector('.welcome-suggestions') !== null
+          && document.querySelectorAll('[role=option]').length === 0
+        ), error => done({ error: String(error) }));`,
+      args: [],
+    }),
   );
   reopenCheckMs.push(performance.now() - started);
 }
@@ -1127,7 +1136,7 @@ try {
               });
             });
             const timer = setTimeout(() => {
-              finish({ error: 'Search timing timed out' });
+              finish({ error: 'Search timing timed out (document visibility: ' + document.visibilityState + ')' });
             }, 4000);
             observer.observe(list, { attributes: true, attributeFilter: ['aria-busy'] });
             input.value = arguments[0];
