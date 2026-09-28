@@ -411,13 +411,16 @@ fn run_worker_loop(
         // be included by settings() or invalidate this scan before publication.
         let generation = state.files.generation();
         let settings = state.settings();
-        active_generation = generation;
         if !state.files.begin(generation, &rx) {
-            if stop.load(Ordering::Acquire) {
+            // Invalidation can land after the final budget callback. Reconcile
+            // old watch ownership (and its rest) before rejecting this cycle;
+            // a disabled worker may receive no further requests.
+            if !keep_running(&mut not_before) {
                 break;
             }
             continue;
         }
+        active_generation = generation;
         notify();
         // Account for the entire cycle, not only traversal: root lookup,
         // watcher creation/registration and obsolete-watcher disposal can block.
@@ -546,6 +549,7 @@ mod tests {
 
     struct TestClock<'a> {
         now: Cell<Instant>,
+        reading: RefCell<Box<dyn FnMut(&Cell<Instant>) + 'a>>,
         waiting: RefCell<Box<dyn FnMut() + 'a>>,
     }
 
@@ -553,6 +557,7 @@ mod tests {
         fn new() -> Self {
             Self {
                 now: Cell::new(Instant::now()),
+                reading: RefCell::new(Box::new(|_| {})),
                 waiting: RefCell::new(Box::new(|| {})),
             }
         }
@@ -564,6 +569,7 @@ mod tests {
 
     impl WorkerClock for TestClock<'_> {
         fn now(&self) -> Instant {
+            (self.reading.borrow_mut())(&self.now);
             self.now.get()
         }
 
@@ -1092,6 +1098,128 @@ mod tests {
         assert_eq!(metrics.duration, Duration::from_secs(2));
         assert_eq!(state.files.status(0).phase, FilePhase::Disabled);
         assert_eq!(state.search.lock().unwrap().file_count(), 0);
+    }
+
+    #[test]
+    fn disable_in_final_budget_gap_drops_old_watch_and_reenable_rests() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("example.txt"), "").unwrap();
+        let settings = Settings {
+            file_search_roots: Some(vec![directory.path().into()]),
+            ..Settings::default()
+        };
+        let state = LauncherState::new(settings.clone(), vec![]);
+        let (sender, receiver) = sync_channel(1);
+        *state.files.sender.lock().unwrap() = Some(sender.clone());
+        sender.try_send(Request::Refresh).unwrap();
+        let registered = Cell::new(0);
+        let budget_exits = Cell::new(0);
+        let disabled = Cell::new(false);
+        let disposal_started = Cell::new(false);
+        let disposal_finished = Cell::new(false);
+        let reenabled = Cell::new(false);
+        let dropped = Arc::new(AtomicBool::new(false));
+        let base = Instant::now();
+        let work = Duration::from_secs(1);
+        let disposal = Duration::from_secs(2);
+        let clock = TestClock::new();
+        clock.now.set(base);
+        *clock.reading.borrow_mut() = Box::new(|now| {
+            if !disabled.get() {
+                if registered.get() == 1 && now.get() == base + work * 4 {
+                    budget_exits.set(budget_exits.get() + 1);
+                    if budget_exits.get() == 2 {
+                        // wait_for_budget calls now AFTER keep_running. This
+                        // is the final wait's successful exit, before the
+                        // worker reads generation/settings or calls begin.
+                        assert!(!dropped.load(Ordering::Acquire));
+                        state.replace_settings(Settings {
+                            file_search_roots: Some(vec![]),
+                            ..settings.clone()
+                        });
+                        // Only the disable's own settings refresh is queued.
+                        // No later request/change rescues obsolete ownership.
+                        sender.try_send(Request::Refresh).unwrap();
+                        disabled.set(true);
+                    }
+                }
+            } else if !disposal_finished.get() {
+                if !disposal_started.replace(true) {
+                    assert_eq!(state.files.status(0).phase, FilePhase::Disabled);
+                    assert_eq!(state.files.generation(), 1);
+                    assert_eq!(state.search.lock().unwrap().file_count(), 0);
+                } else {
+                    // Original code reaches this on the next final budget
+                    // check with the old watcher still alive. Fail BEFORE it
+                    // can block on recv: the negative regression cannot hang.
+                    assert!(
+                        dropped.load(Ordering::Acquire),
+                        "obsolete watcher retained after late begin rejection"
+                    );
+                    assert!(!reenabled.get());
+                    assert_eq!(now.get(), base + work * 4);
+                    now.set(now.get() + disposal);
+                    disposal_finished.set(true);
+                }
+            }
+        });
+        *clock.waiting.borrow_mut() = Box::new(|| {
+            if disabled.get() && !reenabled.replace(true) {
+                assert!(disposal_finished.get());
+                assert!(dropped.load(Ordering::Acquire));
+                assert_eq!(state.files.status(0).phase, FilePhase::Disabled);
+                state.replace_settings(settings.clone());
+                sender.try_send(Request::Refresh).unwrap();
+            }
+        });
+        let metrics = run_worker_loop(
+            &clock,
+            &state,
+            receiver,
+            sender.clone(),
+            |settings, _| {
+                if reenabled.get() {
+                    assert_eq!(registered.get(), 1);
+                    assert_eq!(
+                        clock.now(),
+                        base + work * 4 + disposal * 4,
+                        "re-enable bypassed disposal rest"
+                    );
+                }
+                Some((settings.file_search_roots.clone().unwrap(), None))
+            },
+            || {
+                if registered.get() == 2 {
+                    state.files.stop();
+                }
+            },
+            |watcher, report, cancelled| {
+                if registered.get() == 0 {
+                    // Queue Refresh before registration can emit Changed, so
+                    // the next cycle deterministically skips burst settling.
+                    sender.try_send(Request::Refresh).unwrap();
+                }
+                // Real OS registration is exercised, not replaced by a stub.
+                let result = watcher.update(report, cancelled);
+                assert!(matches!(result, Some((true, None))), "{result:?}");
+                registered.set(registered.get() + 1);
+                if registered.get() == 1 {
+                    watcher.drop_observer =
+                        Some(file_watch::WatchDropObserver(Arc::clone(&dropped)));
+                    clock.advance(work);
+                }
+                result
+            },
+        );
+        assert!(disabled.get() && disposal_finished.get() && reenabled.get());
+        assert_eq!(registered.get(), 2);
+        assert_eq!(metrics.scans, 2);
+        assert_eq!(metrics.cancelled, 0);
+        assert_eq!(
+            metrics.duration,
+            work + disposal,
+            "disposal was unaccounted"
+        );
     }
 
     #[test]

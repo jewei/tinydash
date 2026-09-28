@@ -126,6 +126,19 @@ pub struct FileWatcher<W = RecommendedWatcher> {
     watched: BTreeMap<PathBuf, RecursiveMode>,
     roots: Vec<PathBuf>,
     changes: Arc<Changes>,
+    // Last field: observe only after the real OS watcher has been dropped.
+    #[cfg(test)]
+    pub(super) drop_observer: Option<WatchDropObserver>,
+}
+
+#[cfg(test)]
+pub(super) struct WatchDropObserver(pub(super) Arc<AtomicBool>);
+
+#[cfg(test)]
+impl Drop for WatchDropObserver {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
+    }
 }
 
 impl FileWatcher {
@@ -169,6 +182,8 @@ impl FileWatcher {
             watched: BTreeMap::new(),
             roots,
             changes,
+            #[cfg(test)]
+            drop_observer: None,
         })
     }
 }
@@ -546,6 +561,7 @@ mod tests {
                     .into(),
                 roots: roots.clone(),
                 changes: Arc::default(),
+                drop_observer: None,
             };
             assert!(
                 watcher
