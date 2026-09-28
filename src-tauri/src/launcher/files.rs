@@ -898,16 +898,17 @@ mod tests {
                         state.files.stop();
                     }
                 },
-                |_, _, cancelled| {
+                |watcher, report, cancelled| {
                     assert_ne!(phase, "cancelled preparation");
                     clock.advance(delay);
                     if phase == "cancelled registration" {
                         state.files.invalidate(&state.settings());
                     }
-                    // Manual refresh during registration coalesces with the
-                    // new watch's follow-up. It still owes the entire rest.
+                    // Manual refresh coalesces with any new watch follow-up.
+                    // Keep real watcher registration in this worker regression;
+                    // only its elapsed time is controlled by the test clock.
                     let _ = sender.try_send(Request::Refresh);
-                    (!cancelled()).then_some((true, None))
+                    watcher.update(report, cancelled)
                 },
             );
             assert_eq!(
