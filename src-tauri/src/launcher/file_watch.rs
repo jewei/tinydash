@@ -22,18 +22,65 @@ pub enum Request {
     Stop,
 }
 
-// Capacity one retains a change that arrives during a scan without retaining
-// thousands of filesystem paths. The worker only scans after a burst settles.
-pub fn settle(receiver: &Receiver<Request>, quiet: Duration, maximum: Duration) -> bool {
-    let deadline = Instant::now() + maximum;
+/// Rest time is at least one second and three times the preceding scan's wall
+/// time (including cancelled work). Thus sustained churn spends at most 25% of
+/// scan + rest time scanning, without a cap that defeats long-scan backpressure.
+pub fn scan_rest(elapsed: Duration) -> Duration {
+    Duration::from_secs(1).max(elapsed.saturating_mul(3))
+}
+
+/// Coalesce requests without letting manual refresh or settings churn bypass
+/// the work budget. The callback also drops obsolete watches during long rests.
+/// Polling here checks only in-memory control state, never the filesystem.
+pub fn wait_for_budget(
+    receiver: &Receiver<Request>,
+    deadline: Instant,
+    mut keep_running: impl FnMut() -> bool,
+) -> bool {
     loop {
+        if !keep_running() {
+            return false;
+        }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return true;
         }
-        match receiver.recv_timeout(quiet.min(remaining)) {
-            Ok(Request::Changed) => {}
-            Ok(Request::Refresh) | Err(RecvTimeoutError::Timeout) => return true,
+        match receiver.recv_timeout(remaining.min(Duration::from_millis(50))) {
+            Ok(Request::Changed | Request::Refresh) | Err(RecvTimeoutError::Timeout) => {}
+            Ok(Request::Stop) | Err(RecvTimeoutError::Disconnected) => return false,
+        }
+    }
+}
+
+// Capacity one retains a change that arrives during a scan without retaining
+// thousands of filesystem paths. Settling combines bursts; scan_rest separately
+// bounds the scan workload under sustained events.
+pub fn settle(receiver: &Receiver<Request>, quiet: Duration, maximum: Duration) -> bool {
+    settle_cancellable(receiver, quiet, maximum, || true)
+}
+
+pub fn settle_cancellable(
+    receiver: &Receiver<Request>,
+    quiet: Duration,
+    maximum: Duration,
+    mut keep_running: impl FnMut() -> bool,
+) -> bool {
+    let deadline = Instant::now() + maximum;
+    let mut quiet_until = Instant::now() + quiet;
+    loop {
+        if !keep_running() {
+            return false;
+        }
+        let remaining = deadline
+            .min(quiet_until)
+            .saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return true;
+        }
+        match receiver.recv_timeout(remaining.min(Duration::from_millis(50))) {
+            Ok(Request::Changed) => quiet_until = Instant::now() + quiet,
+            Ok(Request::Refresh) => return true,
+            Err(RecvTimeoutError::Timeout) => {}
             Ok(Request::Stop) | Err(RecvTimeoutError::Disconnected) => return false,
         }
     }
@@ -302,6 +349,48 @@ mod tests {
             &receiver,
             Duration::from_millis(1),
             Duration::from_millis(10)
+        ));
+    }
+
+    #[test]
+    fn sustained_churn_has_a_bounded_scan_duty_and_frequency() {
+        let mut work = Duration::ZERO;
+        let mut rest = Duration::ZERO;
+        // Include long scans and short cancelled scans. No upper cooldown cap
+        // may turn a slow tree into a near-100%-duty scan loop.
+        for millis in [0, 1, 20, 300, 2000, 60_000].into_iter().cycle().take(120) {
+            let elapsed = Duration::from_millis(millis);
+            let pause = scan_rest(elapsed);
+            assert!(pause >= Duration::from_secs(1));
+            work += elapsed;
+            rest += pause;
+        }
+        assert!(rest >= work * 3);
+        assert!(work + rest >= Duration::from_secs(120));
+    }
+
+    #[test]
+    fn refresh_flood_cannot_bypass_budget_and_stop_is_not_lost_to_a_full_queue() {
+        let (sender, receiver) = sync_channel(1);
+        let started = Instant::now();
+        let deadline = started + Duration::from_millis(80);
+        std::thread::scope(|scope| {
+            let sender = &sender;
+            scope.spawn(move || {
+                while Instant::now() < deadline {
+                    let _ = sender.try_send(Request::Refresh);
+                    let _ = sender.try_send(Request::Changed);
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            });
+            assert!(wait_for_budget(&receiver, deadline, || true));
+        });
+        assert!(started.elapsed() >= Duration::from_millis(80));
+        let _ = sender.try_send(Request::Changed);
+        assert!(!wait_for_budget(
+            &receiver,
+            Instant::now() + Duration::from_secs(60),
+            || false
         ));
     }
 

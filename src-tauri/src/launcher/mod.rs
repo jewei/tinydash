@@ -86,10 +86,14 @@ impl LauncherState {
             .settings
             .write()
             .unwrap_or_else(|error| error.into_inner());
+        let files_changed = !current.same_file_settings(&settings);
+        if files_changed {
+            // Advance under the publication lock, even for A -> B -> A changes.
+            self.files.invalidate();
+        }
         let previous_files = self.search.lock().ok().and_then(|mut search| {
             search.apply_settings(&settings);
-            (!current.same_file_settings(&settings))
-                .then(|| search.replace_files(FileProvider::default()))
+            files_changed.then(|| search.replace_files(FileProvider::default()))
         });
         *current = settings;
         drop(current);
@@ -99,20 +103,27 @@ impl LauncherState {
     pub fn accept_file_scan(
         &self,
         settings: &Settings,
+        generation: u64,
         files: FileProvider,
     ) -> Result<bool, String> {
         let current = self
             .settings
             .read()
             .unwrap_or_else(|error| error.into_inner());
-        if !current.same_file_settings(settings) {
+        if self.files.cancelled(generation) || !current.same_file_settings(settings) {
             return Ok(false);
         }
-        let previous = self
+        let mut search = self
             .search
             .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?
-            .replace_files(files);
+            .map_err(|_| Error::IndexUnavailable.to_string())?;
+        // Shutdown can arrive while waiting for an in-flight search. Settings
+        // changes remain serialized by `current`, but stop is an atomic signal.
+        if self.files.cancelled(generation) {
+            return Ok(false);
+        }
+        let previous = search.replace_files(files);
+        drop(search);
         drop(current);
         drop(previous);
         Ok(true)
