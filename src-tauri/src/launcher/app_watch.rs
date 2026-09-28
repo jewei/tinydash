@@ -112,7 +112,7 @@ mod folders {
                         Ok(_) => true,
                         Err(error) if error.kind() == io::ErrorKind::NotFound => false,
                         Err(error) => {
-                            tracing::debug!(%error, path = %path.display(), "Cannot observe application change");
+                            tracing::debug!(%error, "Cannot observe application change");
                             continue;
                         }
                     };
