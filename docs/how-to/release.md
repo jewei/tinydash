@@ -104,4 +104,49 @@ Mac updates use `.app.tar.gz` with its `.sig` file. Windows updates use `-setup.
 
 ## Publish the tested files
 
-Check the final asset list and release notes. Draft releases can require repository access. Use a public prerelease for anonymous testing when needed. Publish the exact tested files without rebuilding them. Confirm that the stable feed and download links resolve after publication.
+Publication is gated by a machine-readable evidence record, separate from draft staging. A successful build, a package checksum, or a browser test is not native desktop proof. Drafts can remain incomplete while testing; a public prerelease is publication too and needs the same gate.
+
+### Prepare the evidence record
+
+The draft-staging job retains a `release-evidence-template` Actions artifact. Download it and the exact draft assets to an ignored local folder. Alternatively, initialize a record from the downloaded draft:
+
+```sh
+mkdir -p .local/release/assets .local/release/evidence
+gh release download v0.1.3 --dir .local/release/assets
+bun scripts/release/evidence.ts init .local/release/assets \
+  .local/release/evidence/release-evidence.json v0.1.3 \
+  "$(git rev-parse 'v0.1.3^{commit}')"
+```
+
+Replace the example tag throughout. The initializer refuses to overwrite an existing record. It verifies every file against `SHA256SUMS`, requires the complete installer/updater/build-record set, and creates **pending**, never passed, checks. Keep evidence outside the asset folder: adding evidence after checksums would change the tested release set.
+
+The versioned record contains the tag, source commit, every asset's SHA-256, and these required checks:
+
+| IDs                                                                                  | Required evidence                                                                                                                                |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `automated/source-macos`, `source-windows`, `source-linux` (each under `automated/`) | Successful selected-tag source checks and job/run identity; retain logs before Actions artifacts expire.                                         |
+| `automated/native-windows`, `native-linux-x11`                                       | Native wrapper `result.json` for the installed candidate, supporting logs, and installer/removal evidence.                                       |
+| `automated/upgrade-windows`, `upgrade-linux`                                         | Installed-version upgrade results, candidate package identity, negative signature/download cases where supported, retention and cleanup results. |
+| `signing/macos-developer-id-notarization-stapling`                                   | Developer ID, notarization, app/DMG stapling and Gatekeeper results for the exact candidate.                                                     |
+| `signing/windows-unsigned-preview`                                                   | Confirmation of unsigned-preview status and the updater pair; do not claim a trusted Windows publisher.                                          |
+| `signing/updater-signatures`                                                         | Verification of Mac and Windows updater signatures and rejection of changed bytes using the intended public key.                                 |
+| `manual/PLATFORM/SECTION`                                                            | Completed desktop checklist evidence for each section and platform below.                                                                        |
+
+Manual platforms are `macos`, `windows`, `linux-x11`, and `linux-wayland`. Sections are `installation`, `launcher`, `settings`, `tools`, `calculations-emoji`, `ranking`, `clipboard`, `files`, `system`, and `update-recovery-removal`. They map to [desktop checks](desktop-checks.md); the last section also covers the update, cancellation, network failure, data-retention, and recovery steps above. Record OS/version/architecture and desktop session. Record each numbered observation, including actual external effects. Explain genuinely inapplicable platform-specific steps; an unavailable required platform or an unrun applicable step stays pending, not passed. Do not perform destructive power checks on a working machine or hosted runner.
+
+For each completed check, set `status` to `passed`, record the reviewer/operator, UTC `recordedAt`, and the precise `procedure` (command, workflow run URL, or numbered manual steps). Attach one or more retained files as `{ "path": "relative/file.txt", "sha256": "64 lowercase hex characters" }`. Calculate attachment hashes with `shasum -a 256 FILE` or PowerShell `Get-FileHash FILE -Algorithm SHA256`; store the digest in lowercase. Paths resolve within the evidence directory. Do not change `assetSetSha256` to reuse old proof after replacing packages: repeat the affected checks and regenerate the record for the new set.
+
+The validator rejects missing/duplicate checks, pending/failed results, missing hashes, changed assets or attachments, wrong build source/platform, and stale asset-set bindings. Native checks additionally require the real wrapper's `result.json`, successful native suite execution and cleanup, and matching installed-package and executable hashes. Build-only or browser records cannot satisfy them. Automated source/upgrade logs, signing results, and manual observations remain reviewer attestations: the gate verifies completeness and byte identity, not their truth or the trustworthiness of an operator. Inspect those attachments rather than treating a `passed` string as independent proof. Test-code source can differ from build source; record and review both.
+
+### Validate and publish
+
+```sh
+bun scripts/release/evidence.ts validate .local/release/assets \
+  .local/release/evidence/release-evidence.json v0.1.3 \
+  "$(git rev-parse 'v0.1.3^{commit}')"
+bun scripts/release/publish.ts v0.1.3 .local/release/evidence/release-evidence.json
+```
+
+Use the publication script, not a direct `gh release edit` or the web Publish button. It requires an existing draft, checks local and remote tag identity, downloads the draft's current files into a new temporary folder, revalidates all hashes and evidence, checks for concurrent asset/tag changes, and only then publishes. It never rebuilds. Temporary downloads are removed on success or failure; the reviewed evidence remains in its original folder. Freeze edits to the draft/tag while running it: GitHub does not provide an atomic compare-and-publish API.
+
+This is the supported maintainer publication gate, not a claim that repository administrators cannot bypass it. Restrict release-write permissions and review the evidence with another maintainer; administrators with direct GitHub release access can still publish outside the script. The build workflow itself creates drafts only. Keep a durable private copy of the evidence and signing results, since Actions retention is short. Never put keys, personal clipboard contents, or personal file paths in it. Check the final asset list and release notes before publication, then confirm that the stable feed and download links resolve.
