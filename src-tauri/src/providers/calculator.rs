@@ -64,11 +64,22 @@ pub enum CalculationError {
     Currency(String),
 }
 
-struct Deadline(Instant);
+struct Deadline {
+    at: Instant,
+    #[cfg(test)]
+    deterministic_selection_test: bool,
+}
 
 impl Interrupt for Deadline {
     fn should_interrupt(&self) -> bool {
-        Instant::now() >= self.0
+        // Selection equivalence compares two evaluations of a finite corpus.
+        // Host scheduling must not change just one side into a timeout. Timeout
+        // behavior is exercised separately with an explicit interrupt.
+        #[cfg(test)]
+        if self.deterministic_selection_test {
+            return false;
+        }
+        Instant::now() >= self.at
     }
 }
 
@@ -79,6 +90,8 @@ pub struct CalculatorProvider {
     copies: VecDeque<(String, String)>,
     next_id: u64,
     pub rates: Option<Arc<Rates>>,
+    #[cfg(test)]
+    pub(crate) deterministic_selection_test: bool,
 }
 
 impl CalculatorProvider {
@@ -92,7 +105,11 @@ impl CalculatorProvider {
     pub fn search(&mut self, query: &str) -> Result<SearchResult, CalculationError> {
         let calculation = calculate(
             query,
-            &Deadline(Instant::now() + TIME_LIMIT),
+            &Deadline {
+                at: Instant::now() + TIME_LIMIT,
+                #[cfg(test)]
+                deterministic_selection_test: self.deterministic_selection_test,
+            },
             self.rates.clone(),
         )?;
         let value = calculation.value;
@@ -218,6 +235,18 @@ fn calculate(
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn production_deadline_remains_enabled_outside_selection_fixture() {
+        assert!(!CalculatorProvider::default().deterministic_selection_test);
+        let mut deadline = Deadline {
+            at: Instant::now(),
+            deterministic_selection_test: false,
+        };
+        assert!(deadline.should_interrupt());
+        deadline.deterministic_selection_test = true;
+        assert!(!deadline.should_interrupt());
+    }
 
     struct NoInterrupt;
     impl Interrupt for NoInterrupt {
