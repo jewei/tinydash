@@ -120,6 +120,9 @@ impl IndexedFile {
 #[derive(Default)]
 pub struct FileProvider {
     files: Vec<IndexedFile>,
+    // One owned ID plus a position per file: deliberate O(n) retained memory
+    // in exchange for expected O(1) pin/action lookup. No paths/results cached.
+    by_id: HashMap<Box<str>, usize>,
 }
 
 impl FileProvider {
@@ -155,7 +158,13 @@ impl FileProvider {
                 .cmp(&b.normalized_name)
                 .then_with(|| a.entry.path.cmp(&b.entry.path))
         });
-        Self { files }
+        let mut by_id = HashMap::with_capacity(files.len());
+        for (index, file) in files.iter().enumerate() {
+            by_id
+                .entry(file.entry.id.clone().into_boxed_str())
+                .or_insert(index);
+        }
+        Self { files, by_id }
     }
 
     pub fn len(&self) -> usize {
@@ -163,12 +172,18 @@ impl FileProvider {
     }
 
     pub fn get(&self, id: &str) -> Option<&FileEntry> {
-        self.files
-            .iter()
-            .find(|file| file.entry.id == id)
-            .map(|file| &file.entry)
+        self.by_id.get(id).map(|&index| &self.files[index].entry)
     }
 
+    #[cfg(test)]
+    pub(crate) fn lookup_memory_lower_bound(&self) -> usize {
+        // Excludes hash-table control bytes/load-factor slack and allocator
+        // overhead; this is not RSS or a claimed exact allocation measurement.
+        self.by_id.keys().map(|id| id.len()).sum::<usize>()
+            + self.by_id.capacity() * std::mem::size_of::<(Box<str>, usize)>()
+    }
+
+    #[cfg(test)]
     pub fn search(
         &self,
         query: &str,
@@ -176,6 +191,19 @@ impl FileProvider {
         usage: &HashMap<String, ranking::Usage>,
         now: i64,
         limit: usize,
+    ) -> Vec<SearchResult> {
+        self.search_interruptible(query, matcher, usage, now, limit, || false)
+    }
+
+    #[allow(clippy::too_many_arguments)] // Prepared ranking inputs plus the request-local interrupt.
+    pub fn search_interruptible(
+        &self,
+        query: &str,
+        matcher: &mut Matcher,
+        usage: &HashMap<String, ranking::Usage>,
+        now: i64,
+        limit: usize,
+        mut stopped: impl FnMut() -> bool,
     ) -> Vec<SearchResult> {
         #[cfg(test)]
         super::search_work::record(super::search_work::Provider::Files, self.files.len());
@@ -198,6 +226,8 @@ impl FileProvider {
             .files
             .iter()
             .enumerate()
+            // Amortize the clock/atomic reads over small matching batches.
+            .take_while(|(index, _)| index % 64 != 0 || !stopped())
             .filter_map(|(index, file)| {
                 let score = if normalized.is_empty() {
                     Some(0)
@@ -388,6 +418,71 @@ mod tests {
     use super::*;
     use crate::launcher::{actions::ResolvedAction, query::SearchMode, search::SearchManager};
     use std::fs;
+
+    #[test]
+    fn direct_id_lookup_tracks_sorted_positions_and_replacements() {
+        let entries: Vec<_> = (0..1000)
+            .rev()
+            .map(|index| {
+                FileEntry::new(
+                    Path::new(&format!("/fixture/Document-{index:04}.txt")),
+                    false,
+                )
+                .unwrap()
+            })
+            .collect();
+        let mut provider = FileProvider::new(entries);
+        for index in [0, 40, 500, 999] {
+            let id = format!("file:/fixture/Document-{index:04}.txt");
+            let file = provider.get(&id).unwrap();
+            assert_eq!(file.name, format!("Document-{index:04}.txt"));
+            assert!(std::ptr::eq(
+                file,
+                &provider.files[*provider.by_id.get(id.as_str()).unwrap()].entry
+            ));
+        }
+        assert!(provider.get("file:/fixture/missing").is_none());
+        assert!(provider.get("/fixture/Document-0000.txt").is_none());
+        assert_eq!(provider.by_id.len(), 1000);
+        assert!(provider.lookup_memory_lower_bound() > 1000 * 24);
+        provider = FileProvider::default();
+        assert!(provider.get("file:/fixture/Document-0000.txt").is_none());
+        assert_eq!(provider.lookup_memory_lower_bound(), 0);
+    }
+
+    #[test]
+    fn file_matching_checks_cancellation_between_small_batches() {
+        let provider = FileProvider::new(
+            (0..1000)
+                .map(|index| {
+                    FileEntry::new(
+                        Path::new(&format!("/fixture/Document-{index:04}.txt")),
+                        false,
+                    )
+                    .unwrap()
+                })
+                .collect(),
+        );
+        let mut checks = 0;
+        let results = provider.search_interruptible(
+            "document",
+            &mut Matcher::new(nucleo_matcher::Config::DEFAULT),
+            &HashMap::new(),
+            0,
+            1000,
+            || {
+                checks += 1;
+                checks > 1
+            },
+        );
+        assert_eq!(checks, 2);
+        assert_eq!(results.len(), 64);
+        assert!(
+            results
+                .iter()
+                .all(|result| result.title.as_str() < "Document-0064.txt")
+        );
+    }
 
     #[test]
     #[ignore = "Measures search on 50,000 synthetic paths. Run in release mode with --ignored --nocapture."]

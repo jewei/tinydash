@@ -195,8 +195,10 @@ export const backend = {
     invoke<void>("set_shortcut_recording", { recording }),
   revealSettings: (data = false) =>
     invoke<void>("reveal_settings_path", { data }),
-  search: (query: string, mode: SearchMode) =>
-    invoke<SearchResponse>("search", { query, mode }),
+  search: (query: string, mode: SearchMode, requestId?: number) =>
+    invoke<SearchResponse>("search", { query, mode, requestId }),
+  cancelSearch: (requestId: number) =>
+    invoke<void>("cancel_search", { requestId }),
   setPinned: (id: string, category: SearchMode, pinned: boolean) =>
     invoke<void>("set_pinned", { id, category, pinned }),
   execute: (id: string, action: Action, confirmed = false) =>

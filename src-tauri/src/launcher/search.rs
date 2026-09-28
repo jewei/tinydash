@@ -1,6 +1,10 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    sync::Arc,
+    sync::{
+        Arc, Mutex, MutexGuard, TryLockError,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::{Duration, Instant},
 };
 
 use nucleo_matcher::{
@@ -30,6 +34,91 @@ use crate::{
 };
 
 pub const RESULT_LIMIT: usize = 30;
+pub const SEARCH_TIME_LIMIT: Duration = Duration::from_millis(250);
+
+/// One budget for the entire request, including worker queueing, lock wait,
+/// provider matching and all pins. Cancellation never takes the search lock.
+pub struct SearchBudget {
+    started: Instant,
+    deadline: Instant,
+    #[cfg(test)]
+    deterministic_selection_test: bool,
+    request_id: Option<u64>,
+    cancelled: Arc<AtomicU64>,
+}
+
+impl SearchBudget {
+    pub fn new(request_id: Option<u64>, cancelled: Arc<AtomicU64>) -> Self {
+        let started = Instant::now();
+        Self {
+            started,
+            deadline: started + SEARCH_TIME_LIMIT,
+            request_id,
+            cancelled,
+            #[cfg(test)]
+            deterministic_selection_test: false,
+        }
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.request_id
+            .is_some_and(|id| self.cancelled.load(Ordering::Acquire) == id)
+    }
+
+    pub fn stopped(&self) -> bool {
+        #[cfg(test)]
+        if self.deterministic_selection_test {
+            return self.is_cancelled();
+        }
+        self.is_cancelled() || Instant::now() >= self.deadline
+    }
+
+    pub fn check(&self) -> std::result::Result<(), String> {
+        if self.is_cancelled() {
+            Err("Search canceled.".into())
+        } else if self.stopped() {
+            Err("Search took too long. Try a more specific query.".into())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.started.elapsed()
+    }
+
+    /// Called only on a blocking worker. A superseded request must not wait
+    /// indefinitely behind publication, preferences, or another search.
+    pub fn lock<'a, T>(
+        &self,
+        mutex: &'a Mutex<T>,
+    ) -> std::result::Result<MutexGuard<'a, T>, String> {
+        loop {
+            self.check()?;
+            match mutex.try_lock() {
+                Ok(guard) => return Ok(guard),
+                Err(TryLockError::Poisoned(_)) => return Err(Error::IndexUnavailable.to_string()),
+                Err(TryLockError::WouldBlock) => std::thread::sleep(Duration::from_millis(1)),
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+struct SearchTimings {
+    // Fixed order: apps, files, clipboard, system, emoji, calculator, tools.
+    provider_us: [u64; 7],
+    calls: [usize; 7],
+    pin_us: u64,
+    pin_attempts: usize,
+}
+
+impl SearchTimings {
+    fn record(&mut self, provider: usize, started: Instant) {
+        self.provider_us[provider] += started.elapsed().as_micros() as u64;
+        self.calls[provider] += 1;
+    }
+}
 
 pub struct SearchManager {
     app_preferences: std::collections::BTreeMap<String, crate::settings::AppPreference>,
@@ -44,6 +133,7 @@ pub struct SearchManager {
     usage: HashMap<String, ranking::Usage>,
     pins: Pins,
     issued_pins: VecDeque<(String, String, SearchMode)>,
+    timings: SearchTimings,
     #[cfg(test)]
     eager_search: bool,
 }
@@ -68,6 +158,7 @@ impl Default for SearchManager {
             usage: HashMap::new(),
             pins: Pins::new(),
             issued_pins: VecDeque::new(),
+            timings: SearchTimings::default(),
             #[cfg(test)]
             eager_search: false,
         }
@@ -164,7 +255,7 @@ impl SearchManager {
         }
     }
 
-    fn pinned_result(&mut self, key: &str) -> Option<SearchResult> {
+    fn pinned_result(&mut self, key: &str, budget: &SearchBudget) -> Option<SearchResult> {
         let result = if let Some(saved) = QueryPin::from_key(key) {
             if let Some(keyword) = &saved.web_keyword {
                 if saved.mode != SearchMode::Web {
@@ -174,7 +265,13 @@ impl SearchManager {
             } else {
                 let query = Query::parse(&saved.text, saved.mode).ok()?;
                 if query.mode == SearchMode::Calculator {
-                    self.calculator.search(query.text).ok()
+                    let started = Instant::now();
+                    let result = self
+                        .calculator
+                        .search_interruptible(query.text, || budget.stopped())
+                        .ok();
+                    self.timings.record(5, started);
+                    result
                 } else {
                     self.tools.search_pinned(&query, saved.index)
                 }
@@ -190,10 +287,7 @@ impl SearchManager {
                 .into_iter()
                 .find(|result| result.id == key)
         } else if key.starts_with("clipboard:") {
-            self.clipboard
-                .search("", &mut self.matcher)
-                .into_iter()
-                .find(|result| result.id == key)
+            self.clipboard.result(key)
         } else if key.starts_with("system:") {
             self.system
                 .get_or_insert_with(SystemCommandProvider::default)
@@ -305,11 +399,66 @@ impl SearchManager {
         }
     }
 
+    #[cfg(test)]
     pub fn search(&mut self, input: &str, mode: SearchMode) -> Result<SearchOutcome> {
+        let mut budget = SearchBudget::new(None, Arc::default());
+        budget.deterministic_selection_test = self.calculator.deterministic_selection_test;
+        self.search_with_budget(input, mode, &budget)
+    }
+
+    pub fn search_with_budget(
+        &mut self,
+        input: &str,
+        mode: SearchMode,
+        budget: &SearchBudget,
+    ) -> Result<SearchOutcome> {
+        self.timings = SearchTimings::default();
+        let started = Instant::now();
+        let mut outcome = self.search_inner(input, mode, budget);
+        if budget.stopped() {
+            // Never publish a partially ranked or superseded result list.
+            outcome = Ok(SearchOutcome {
+                results: Vec::new(),
+                notice: budget.check().err(),
+            });
+        }
+        tracing::debug!(
+            search_us = started.elapsed().as_micros() as u64,
+            request_us = budget.elapsed().as_micros() as u64,
+            provider_us = ?self.timings.provider_us,
+            provider_calls = ?self.timings.calls,
+            indexed_apps = self.apps.len(),
+            indexed_files = self.files.len(),
+            indexed_clipboard = self.clipboard.len(),
+            pin_us = self.timings.pin_us,
+            pin_attempts = self.timings.pin_attempts,
+            returned = outcome.as_ref().map_or(0, |outcome| outcome.results.len()),
+            stopped = budget.stopped(),
+            "Search work (apps/files/clipboard/system/emoji/calculator/tools)"
+        );
+        outcome
+    }
+
+    fn search_inner(
+        &mut self,
+        input: &str,
+        mode: SearchMode,
+        budget: &SearchBudget,
+    ) -> Result<SearchOutcome> {
         let query = Query::parse(input, mode)?;
-        let mut outcome = self.search_unpinned(&query);
+        if budget.stopped() {
+            return Ok(SearchOutcome {
+                results: Vec::new(),
+                notice: None,
+            });
+        }
+        let mut outcome = self.search_unpinned(&query, budget);
+        if budget.stopped() {
+            return Ok(outcome);
+        }
         self.describe_results(&mut outcome.results, &query);
         if input.trim().is_empty() {
+            let pin_started = Instant::now();
             let mut keys: Vec<_> = self
                 .pins
                 .get(&mode)
@@ -327,14 +476,16 @@ impl SearchManager {
             // Keep issued tool values bounded, even when a category has many pins.
             let mut added = 0;
             for key in keys.iter().filter(|key| !present.contains(*key)) {
-                if added == RESULT_LIMIT {
+                if added == RESULT_LIMIT || budget.stopped() {
                     break;
                 }
-                if let Some(result) = self.pinned_result(key) {
+                self.timings.pin_attempts += 1;
+                if let Some(result) = self.pinned_result(key, budget) {
                     outcome.results.push(result);
                     added += 1;
                 }
             }
+            self.timings.pin_us = pin_started.elapsed().as_micros() as u64;
             outcome.results.sort_by_key(|result| {
                 !result
                     .pin
@@ -344,6 +495,9 @@ impl SearchManager {
             if !outcome.results.is_empty() {
                 outcome.notice = None;
             }
+        }
+        if budget.stopped() {
+            return Ok(outcome);
         }
         // Pins remain first, but leave a place for the most recent clipboard
         // item even when pinned items fill the result limit.
@@ -383,24 +537,31 @@ impl SearchManager {
         Ok(outcome)
     }
 
-    fn search_unpinned(&mut self, query: &Query<'_>) -> SearchOutcome {
+    fn search_unpinned(&mut self, query: &Query<'_>, budget: &SearchBudget) -> SearchOutcome {
         #[cfg(test)]
         if self.eager_search {
             return self.search_unpinned_eager(query);
         }
         if query.mode == SearchMode::Clipboard && query.text.is_empty() {
+            let started = Instant::now();
+            let results = self.clipboard.recent(RESULT_LIMIT);
+            self.timings.record(2, started);
             return SearchOutcome {
-                results: self
-                    .clipboard
-                    .search("", &mut self.matcher)
-                    .into_iter()
-                    .take(RESULT_LIMIT)
-                    .collect(),
+                results,
                 notice: None,
             };
         }
-        if let Some(outcome) = self.tools.search(query) {
-            return self.tool_outcome(query, outcome);
+        let started = Instant::now();
+        let tools = self.tools.search(query);
+        self.timings.record(6, started);
+        if budget.stopped() {
+            return SearchOutcome {
+                results: Vec::new(),
+                notice: None,
+            };
+        }
+        if let Some(outcome) = tools {
+            return self.tool_outcome(query, outcome, budget);
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -411,7 +572,11 @@ impl SearchManager {
             && (query.mode == SearchMode::Calculator
                 || (mixed && CalculatorProvider::is_candidate(query.text)))
         {
-            match self.calculator.search(query.text) {
+            let started = Instant::now();
+            match self
+                .calculator
+                .search_interruptible(query.text, || budget.stopped())
+            {
                 Ok(result) => results.push(result),
                 Err(error)
                     if query.mode == SearchMode::Calculator
@@ -424,6 +589,7 @@ impl SearchManager {
                 }
                 Err(_) => {} // Ordinary app names and partial input are not calculator errors.
             }
+            self.timings.record(5, started);
         }
         let now = ranking::now();
         // Command prefixes must survive a full page of fuzzy app or file
@@ -451,19 +617,27 @@ impl SearchManager {
         let mut fuzzy = Vec::new();
         for category in categories {
             let remaining = RESULT_LIMIT - results.len();
-            if remaining == 0 {
+            if remaining == 0 || budget.stopped() {
                 break;
             }
             if query.mode != category && !mixed {
                 continue;
             }
+            let started = Instant::now();
             let mut matches = match category {
-                SearchMode::Apps => self.search_apps(query.text),
-                SearchMode::Files => {
-                    self.files
-                        .search(query.text, &mut self.matcher, &self.usage, now, remaining)
+                SearchMode::Apps => self.search_apps(query.text, budget),
+                SearchMode::Files => self.files.search_interruptible(
+                    query.text,
+                    &mut self.matcher,
+                    &self.usage,
+                    now,
+                    remaining,
+                    || budget.stopped(),
+                ),
+                SearchMode::Clipboard => {
+                    self.clipboard
+                        .search_interruptible(query.text, &mut self.matcher, || budget.stopped())
                 }
-                SearchMode::Clipboard => self.clipboard.search(query.text, &mut self.matcher),
                 SearchMode::System => self
                     .system
                     .get_or_insert_with(SystemCommandProvider::default)
@@ -474,6 +648,18 @@ impl SearchManager {
                     .search(query.text, &mut self.matcher),
                 _ => unreachable!("ordinary search category"),
             };
+            let provider = match category {
+                SearchMode::Apps => 0,
+                SearchMode::Files => 1,
+                SearchMode::Clipboard => 2,
+                SearchMode::System => 3,
+                SearchMode::Emoji => 4,
+                _ => unreachable!(),
+            };
+            // search_apps also serves explicit tools; it records itself.
+            if category != SearchMode::Apps {
+                self.timings.record(provider, started);
+            }
             // FileProvider already applies usage and its top-N limit. Other
             // providers must receive usage bonuses before selection too.
             if category != SearchMode::Files {
@@ -491,7 +677,8 @@ impl SearchManager {
         SearchOutcome { results, notice }
     }
 
-    fn search_apps(&mut self, text: &str) -> Vec<SearchResult> {
+    fn search_apps(&mut self, text: &str, budget: &SearchBudget) -> Vec<SearchResult> {
+        let started = Instant::now();
         let normalized = ranking::normalize(text);
         // App punctuation remains literal. Calculator input retains its case.
         let pattern = Pattern::new(
@@ -500,7 +687,13 @@ impl SearchManager {
             Normalization::Smart,
             AtomKind::Fuzzy,
         );
-        self.apps.search(&normalized, &pattern, &mut self.matcher)
+        let results =
+            self.apps
+                .search_interruptible(&normalized, &pattern, &mut self.matcher, || {
+                    budget.stopped()
+                });
+        self.timings.record(0, started);
+        results
     }
 
     // A tool keyword such as "google" or "time" keeps its scope in All, except
@@ -510,13 +703,14 @@ impl SearchManager {
         &mut self,
         query: &Query<'_>,
         outcome: std::result::Result<Vec<SearchResult>, String>,
+        budget: &SearchBudget,
     ) -> SearchOutcome {
         let (tools, notice) = match outcome {
             Ok(results) => (results, None),
             Err(notice) => (Vec::new(), Some(notice)),
         };
         let apps = if query.mode == SearchMode::All {
-            self.search_apps(query.text)
+            self.search_apps(query.text, budget)
         } else {
             Vec::new()
         };
@@ -536,6 +730,14 @@ impl SearchManager {
         SearchOutcome { results, notice }
     }
 }
+
+#[cfg(test)]
+#[path = "search_benchmark_tests.rs"]
+mod benchmark_tests;
+
+#[cfg(test)]
+#[path = "search_budget_tests.rs"]
+mod budget_tests;
 
 #[cfg(test)]
 #[path = "search_work_tests.rs"]

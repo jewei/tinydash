@@ -363,6 +363,9 @@ mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
+    // Queue tests control delayed search replies independently. Native
+    // cancellation is covered by Rust, not simulated as desktop proof here.
+    if (command === "cancel_search") return;
     if (command === "hide_launcher") {
       await emit("launcher-hidden");
       return;

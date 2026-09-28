@@ -4,6 +4,8 @@ On a fresh installation, TinyDash asks before it saves clipboard text. Existing 
 
 The default limit is 100 unpinned entries. Pins in Clipboard or All keep an entry outside this limit. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, images, and larger values are skipped. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
 
+An empty history search constructs at most 30 recent rows before pins are applied. Missing pins resolve their saved entry directly instead of constructing the entire history per pin. Direct clipboard lookup still scans numeric IDs in newest-first storage; it allocates only the requested result. Pins remain first and a full pinned page still leaves a slot for the newest entry.
+
 Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. **Clear unpinned** keeps entries pinned in All or Clipboard. The separate **Clear all clipboard history** action includes pins. Both ask for confirmation. Deleting an entry removes its pins from both categories. These actions leave the system clipboard unchanged. An unchanged clipboard is not captured again during the same session. Restarting TinyDash captures the current clipboard again when capture is enabled.
 
 The actions menu can edit a copy, combine selected entries in a chosen order with a separator, or save the full text as a file. Edited and combined copies leave history unchanged. Editing and combining leave the original entries unchanged. Combining accepts up to 100 entries and 16,384 output bytes. Saving uses the native Save dialog.

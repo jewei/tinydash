@@ -205,6 +205,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::preferences::set_shortcut_recording,
             launcher::preferences::reveal_settings_path,
             launcher::search,
+            launcher::cancel_search,
             launcher::set_pinned,
             launcher::refresh_apps,
             launcher::files::refresh_files,

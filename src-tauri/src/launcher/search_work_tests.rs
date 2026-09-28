@@ -21,7 +21,9 @@ impl SearchManager {
             };
         }
         if let Some(outcome) = self.tools.search(query) {
-            return self.tool_outcome(query, outcome);
+            let mut budget = SearchBudget::new(None, Arc::default());
+            budget.deterministic_selection_test = self.calculator.deterministic_selection_test;
+            return self.tool_outcome(query, outcome, &budget);
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -281,6 +283,10 @@ fn bounded_search_matches_eager_selection_across_seeded_corpora() {
         };
         let mut actual = prepare(false);
         let mut expected = prepare(true);
+        // This finite corpus compares selection, not wall-clock scheduling.
+        // Disable both request/calculator clocks; keep exact result assertions.
+        actual.calculator.deterministic_selection_test = true;
+        expected.calculator.deterministic_selection_test = true;
         for mode in [
             SearchMode::All,
             SearchMode::Apps,

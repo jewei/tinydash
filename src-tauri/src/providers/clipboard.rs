@@ -126,6 +126,30 @@ pub struct IndexedEntry {
     subtitle: String,
 }
 
+#[cfg(test)]
+thread_local! { static RESULT_ROWS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
+impl IndexedEntry {
+    fn result(&self, score: u32) -> SearchResult {
+        #[cfg(test)]
+        RESULT_ROWS.with(|count| count.set(count.get() + 1));
+        SearchResult {
+            id: format!("clipboard:{}", self.entry.id),
+            kind: ResultKind::Clipboard,
+            path: None,
+            title: self.title.clone(),
+            subtitle: self.subtitle.clone(),
+            score,
+            icon: None,
+            primary_action: Action::Copy,
+            secondary_actions: vec![Action::Delete],
+            pin: None,
+            confirmation: None,
+            detail: None,
+        }
+    }
+}
+
 impl From<ClipboardEntry> for IndexedEntry {
     fn from(entry: ClipboardEntry) -> Self {
         let title = entry
@@ -203,7 +227,44 @@ impl ClipboardProvider {
             .map(|entry| &entry.entry)
     }
 
+    /// Resolve a pin without constructing every history row. History remains
+    /// newest-first; this lookup scans IDs but allocates only the selected row.
+    pub fn result(&self, id: &str) -> Option<SearchResult> {
+        let id = entry_id(id)?;
+        self.entries
+            .iter()
+            .find(|entry| entry.entry.id == id)
+            .map(|entry| entry.result(0))
+    }
+
+    pub fn recent(&self, limit: usize) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(
+            super::search_work::Provider::Clipboard,
+            self.entries.len().min(limit),
+        );
+        self.entries
+            .iter()
+            .take(limit)
+            .map(|entry| entry.result(0))
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    #[cfg(test)]
     pub fn search(&self, input: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
+        self.search_interruptible(input, matcher, || false)
+    }
+
+    pub fn search_interruptible(
+        &self,
+        input: &str,
+        matcher: &mut Matcher,
+        mut stopped: impl FnMut() -> bool,
+    ) -> Vec<SearchResult> {
         #[cfg(test)]
         super::search_work::record(super::search_work::Provider::Clipboard, self.entries.len());
         let query = ranking::normalize(input);
@@ -215,7 +276,9 @@ impl ClipboardProvider {
         );
         self.entries
             .iter()
-            .filter_map(|entry| {
+            .enumerate()
+            .take_while(|(index, _)| index % 16 != 0 || !stopped())
+            .filter_map(|(_, entry)| {
                 let score = if query.is_empty() {
                     0
                 } else {
@@ -225,20 +288,7 @@ impl ClipboardProvider {
                         &query,
                     )
                 };
-                Some(SearchResult {
-                    id: format!("clipboard:{}", entry.entry.id),
-                    kind: ResultKind::Clipboard,
-                    path: None,
-                    title: entry.title.clone(),
-                    subtitle: entry.subtitle.clone(),
-                    score,
-                    icon: None,
-                    primary_action: Action::Copy,
-                    secondary_actions: vec![Action::Delete],
-                    pin: None,
-                    confirmation: None,
-                    detail: None,
-                })
+                Some(entry.result(score))
             })
             .collect()
     }
@@ -283,6 +333,39 @@ mod tests {
             created_at: 1,
             last_used_at: None,
         }
+    }
+
+    #[test]
+    fn recent_history_and_direct_pins_materialize_only_requested_rows() {
+        let provider = ClipboardProvider::new(
+            (1..=1000)
+                .rev()
+                .map(|id| entry(id, &format!("History {id}")))
+                .collect(),
+        );
+        RESULT_ROWS.with(|count| count.set(0));
+        let recent = provider.recent(30);
+        assert_eq!(recent.len(), 30);
+        assert_eq!(recent[0].id, "clipboard:1000");
+        assert_eq!(RESULT_ROWS.with(|count| count.get()), 30);
+        assert_eq!(provider.result("clipboard:1").unwrap().title, "History 1");
+        assert_eq!(RESULT_ROWS.with(|count| count.get()), 31);
+        assert!(provider.result("clipboard:1001").is_none());
+        assert!(provider.recent(0).is_empty());
+        assert_eq!(RESULT_ROWS.with(|count| count.get()), 31);
+    }
+
+    #[test]
+    fn clipboard_matching_checks_cancellation_between_small_batches() {
+        let provider = ClipboardProvider::new((1..=1000).map(|id| entry(id, "History")).collect());
+        let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+        let mut checks = 0;
+        let results = provider.search_interruptible("history", &mut matcher, || {
+            checks += 1;
+            checks > 1
+        });
+        assert_eq!(checks, 2);
+        assert_eq!(results.len(), 16);
     }
 
     #[test]
