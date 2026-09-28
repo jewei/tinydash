@@ -547,9 +547,11 @@ mod tests {
         sync::mpsc::RecvTimeoutError,
     };
 
+    type ClockReadHook<'a> = Box<dyn FnMut(&Cell<Instant>) + 'a>;
+
     struct TestClock<'a> {
         now: Cell<Instant>,
-        reading: RefCell<Box<dyn FnMut(&Cell<Instant>) + 'a>>,
+        reading: RefCell<ClockReadHook<'a>>,
         waiting: RefCell<Box<dyn FnMut() + 'a>>,
     }
 
