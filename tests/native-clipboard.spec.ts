@@ -5,11 +5,16 @@ test("native upstream clear requires a zero-format Win32 acknowledgement", () =>
   let calls = 0;
   const result = clearWindowsClipboard((script) => {
     calls += 1;
-    expect(script).toContain("::OpenClipboard([IntPtr]::Zero)");
-    expect(script).toContain("::EmptyClipboard()");
-    expect(script).toContain("::CountClipboardFormats()");
+    expect(script).toContain("public static string Clear()");
+    expect(script).toContain("OpenClipboard(IntPtr.Zero)");
+    expect(script).toContain("EmptyClipboard()");
+    expect(script).toContain("SetLastError(0);");
+    expect(script).toContain("CountClipboardFormats()");
+    expect(script).toContain("formats == 0 && error != 0");
     expect(script).toContain("} finally {");
-    expect(script).toContain("::CloseClipboard()");
+    expect(script).toContain("CloseClipboard()");
+    expect(script).toContain("[TinyDashNativeClipboard]::Clear()");
+    expect(script).not.toContain("ConvertTo-Json");
     expect(script).not.toContain("System.Windows.Forms");
     return '{"formats":0,"sequence":123}';
   });
