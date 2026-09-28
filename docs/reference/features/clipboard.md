@@ -10,6 +10,12 @@ The actions menu can edit a copy, combine selected entries in a chosen order wit
 
 History is local plain text in the same SQLite database as usage. It is not encrypted. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
 
+## Storage contention
+
+If another process holds the SQLite write lock, TinyDash waits up to 250 ms per SQLite lock attempt, then shows a busy warning. It keeps the connection and retries on the next storage operation; no restart is needed after the other process releases its lock. Waiting happens on storage workers, never while holding the search lock.
+
+A failed delete or clear leaves history and pins visible. Repeat the action after contention ends; failed actions are not queued for later execution. Failed captures are not replayed either: copying a new value resumes capture. Consecutive unchanged clipboard values remain suppressed. Usage changes continue in memory and are saved together on the next successful storage operation. If TinyDash quits before that succeeds, those changes are lost. The busy warning clears after storage succeeds. Corruption, file-access failures, backup failures other than lock contention, and incompatible schemas instead require [data recovery](../../how-to/recover-data.md) or a compatible app version; TinyDash does not replace the database.
+
 ## Secrets
 
 TinyDash does not read or save clipboard content that its source marks as secret. Each platform has its own convention:
@@ -38,7 +44,11 @@ For affected backend behavior:
 
 ```sh
 bun run test:rust -- clipboard
+bun run test:rust -- launcher::storage::tests
+bun run test:rust -- db::
 ```
+
+The storage session tests use a second real SQLite connection holding `BEGIN IMMEDIATE`. They check that failed captures and deletes leave search available, failed clears preserve entries and pins, and capture, deletion, warnings, and pending usage recover after unlocking. They also cover a busy startup merging session-only usage exactly once. These are Rust session-layer checks, not proof of Tauri events or system clipboard integration.
 
 Start with a fresh capture choice. Enable capture, copy known multiline text from another process, find it in Clipboard and All, and copy it back. Compare exact bytes. Delete an entry and confirm the system clipboard stays unchanged. Check clear, pin, edit, and combine paths when affected.
 
