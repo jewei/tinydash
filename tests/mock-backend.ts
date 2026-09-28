@@ -24,6 +24,8 @@ declare global {
       rejectNativeGlass: boolean;
       holdNativeGlass: boolean;
       releaseNativeGlass?: () => void;
+      rejectReady: string | null;
+      rejectSearch: string | null;
       rejectSettings: string | null;
       rejectResetPosition: string | null;
       pins: Partial<Record<SearchMode, string[]>>;
@@ -311,6 +313,8 @@ window.__launcherTest = {
     (localStorage.getItem("tinydash.test.platform") as
       "macos" | "windows" | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
+  rejectReady: localStorage.getItem("tinydash.test.rejectReady"),
+  rejectSearch: null,
   rejectSettings: null,
   rejectResetPosition: null,
   pins: Array.isArray(savedPins)
@@ -462,6 +466,7 @@ mockIPC(
       return;
     }
     if (command === "launcher_ready") {
+      if (state.rejectReady) throw new Error(state.rejectReady);
       return {
         platform: state.platform,
         settings: state.settings,
@@ -567,6 +572,9 @@ mockIPC(
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
+      // Capture the outcome at dispatch so a held old success can race a
+      // newer failure without changing the old request's result.
+      const rejection = state.rejectSearch;
       if (state.holdNextSearch) {
         state.holdNextSearch = false;
         await new Promise<void>((resolve) => {
@@ -580,6 +588,7 @@ mockIPC(
           });
         else await new Promise((resolve) => setTimeout(resolve, 250));
       }
+      if (rejection) throw new Error(rejection);
       if (query === "error")
         throw new Error(
           "The application index is unavailable. Restart TinyDash.",
