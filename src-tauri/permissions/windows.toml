@@ -11,6 +11,7 @@ permissions = [
   "allow-set-app-preference",
   "allow-open-settings",
   "allow-search",
+  "allow-cancel-search",
   "allow-set-pinned",
   "allow-refresh-apps",
   "allow-refresh-files",

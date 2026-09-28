@@ -10,7 +10,7 @@ The grants follow actual frontend callers, not the module that implements a comm
 
 | Window   | Commands                                                                                         | Entry points                                                                            |
 | -------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| Main     | `launcher_ready`, `search`, `execute_action`, `set_pinned`                                       | Startup, search, result actions, pins                                                   |
+| Main     | `launcher_ready`, `search`, `cancel_search`, `execute_action`, `set_pinned`                      | Startup, search, result actions, pins                                                   |
 | Main     | `open_settings`, `hide_launcher`, `reset_launcher_position`, `quit_app`                          | Launcher navigation and Actions                                                         |
 | Main     | `refresh_apps`, `refresh_files`, `refresh_currency`                                              | Launcher refresh controls                                                               |
 | Main     | `clipboard_preview`, `edit_clipboard_history`, `copy_clipboard_selection`, `save_clipboard_file` | Clipboard previews and copy/file dialogs                                                |

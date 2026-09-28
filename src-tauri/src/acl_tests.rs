@@ -37,6 +37,7 @@ const MAIN_ONLY: &[&str] = &[
     "set_app_preference",
     "open_settings",
     "search",
+    "cancel_search",
     "set_pinned",
     "refresh_apps",
     "refresh_files",
