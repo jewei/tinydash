@@ -6,6 +6,8 @@ Settings, Search adds aliases and hides applications. App icons and descriptions
 
 On macOS and Windows, TinyDash watches the application folders. It compares each changed bundle or shortcut with the index and scans again only when an application was added, removed, or renamed. An app update or launch does not start a scan. A new or removed folder in these locations also starts a scan. On Linux, GIO reports changes to desktop entries in all XDG data folders, including Flatpak and Snap exports.
 
+Settings loads the app catalog on a blocking worker, so a competing search does not block the event thread. Settings publication waits for search before taking its brief settings write lock; launcher shortcuts, blur handling, and clipboard callbacks can still read the previous settings while publication waits. Rust contention regressions cover these lock paths; they are not native responsiveness measurements.
+
 See [platform support](../platform-support.md) for the directories and application formats that each operating system discovers.
 
 ## Verification

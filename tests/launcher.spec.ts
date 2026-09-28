@@ -1039,6 +1039,30 @@ test("keeps only the latest waiting query when input and index events overlap", 
   await input.fill("intermediate");
   await input.fill("sa");
   await page.evaluate(() => window.__launcherTest.emit("files-changed", null));
+  // Cancellation is a separate immediate IPC, not another expensive search.
+  // The held mock reply proves the latest-waiting behavior independently of
+  // whether native work has already observed the cancellation signal.
+  const pending = await page.evaluate(() => {
+    const calls = window.__launcherTest.calls;
+    const request = calls.find(
+      (call) =>
+        call.command === "search" &&
+        (call.payload as { query: string }).query === "slow",
+    );
+    const requestId = (request?.payload as { requestId: number }).requestId;
+    return {
+      requestId,
+      cancellations: calls.filter(
+        (call) =>
+          call.command === "cancel_search" &&
+          (call.payload as { requestId: number }).requestId === requestId,
+      ),
+    };
+  });
+  expect(Number.isSafeInteger(pending.requestId)).toBe(true);
+  expect(pending.cancellations).toEqual([
+    { command: "cancel_search", payload: { requestId: pending.requestId } },
+  ]);
   await expect(
     page.getByRole("button", { name: "Open", exact: true }),
   ).toBeDisabled();

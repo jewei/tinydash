@@ -25,7 +25,7 @@ No plugin language, package format, public interface version, or delivery date i
 
 Keep command logic independent of Tauri handles and window state where possible. The launcher modules can connect that logic to the application. Do not refactor existing modules only to satisfy a hypothetical SDK interface.
 
-The frontend currently keeps one search request in flight, replaces waiting input, and rejects stale replies. This does not cancel backend work that has already started. Preserve that distinction when adding asynchronous work.
+The frontend keeps one search request in flight, replaces waiting input, and rejects stale replies. It also sends lightweight targeted cancellation for superseded requests and waits for cancellation acknowledgement before dispatching the newest waiting input. The backend checks cancellation cooperatively within a shared request deadline. Neither stale-reply rejection nor cooperative cancellation is preemption: preserve the documented checkpoint and scheduling limits when adding asynchronous work.
 
 During review, check whether a change couples search to external work, moves command logic into the UI, exposes internal storage, or retains data without a bound. Repair that coupling within the implemented feature. Add an abstraction only when actual callers need it.
 

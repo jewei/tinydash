@@ -505,7 +505,9 @@ export default function App(
   }
 
   const searches = createSearchQueue({
-    send: ({ value, mode }) => backend.search(value, mode),
+    send: ({ value, mode, requestId }) =>
+      backend.search(value, mode, requestId),
+    cancelBackend: backend.cancelSearch,
     apply(request, response) {
       const index = chooseSelection({
         request,

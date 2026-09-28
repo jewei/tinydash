@@ -15,6 +15,7 @@ fn main() {
         "set_shortcut_recording",
         "reveal_settings_path",
         "search",
+        "cancel_search",
         "set_pinned",
         "refresh_apps",
         "refresh_files",

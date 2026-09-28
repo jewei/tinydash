@@ -439,6 +439,9 @@ mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
+    // Queue tests control delayed search replies independently. Native
+    // cancellation is covered by Rust, not simulated as desktop proof here.
+    if (command === "cancel_search") return;
     if (command.startsWith("plugin:event|"))
       return mockEvent(command, payload as Record<string, unknown>);
     if (command === "sync_appearance") {
