@@ -18,7 +18,7 @@ mod launcher {
         #[derive(Debug, serde::Serialize)]
         pub struct FileStatus {
             pub total: usize,
-            pub indexing: bool,
+            pub phase: &'static str,
             pub warning: Option<String>,
         }
     }

@@ -3,6 +3,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { emit, emitTo, type EventTarget } from "@tauri-apps/api/event";
 import type {
   AppearanceChange,
+  FilePhase,
   SearchResult,
   SearchMode,
   LauncherWarning,
@@ -24,6 +25,8 @@ declare global {
       rejectNativeGlass: boolean;
       holdNativeGlass: boolean;
       releaseNativeGlass?: () => void;
+      rejectReady: string | null;
+      rejectSearch: string | null;
       rejectSettings: string | null;
       rejectResetPosition: string | null;
       pins: Partial<Record<SearchMode, string[]>>;
@@ -38,7 +41,8 @@ declare global {
       clipboardCleared: boolean;
       rejectClear: boolean;
       slowPreview: boolean;
-      fileIndexing: boolean;
+      filePhase: FilePhase;
+      fileTotal: number;
       fileWarning: string | null;
       currencyDate: string | null;
       currencyRefreshing: boolean;
@@ -311,6 +315,8 @@ window.__launcherTest = {
     (localStorage.getItem("tinydash.test.platform") as
       "macos" | "windows" | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
+  rejectReady: localStorage.getItem("tinydash.test.rejectReady"),
+  rejectSearch: null,
   rejectSettings: null,
   rejectResetPosition: null,
   pins: Array.isArray(savedPins)
@@ -327,7 +333,8 @@ window.__launcherTest = {
   clipboardCleared: false,
   rejectClear: false,
   slowPreview: false,
-  fileIndexing: false,
+  filePhase: "idle",
+  fileTotal: 1,
   fileWarning: null,
   currencyDate: null,
   currencyRefreshing: false,
@@ -462,6 +469,7 @@ mockIPC(
       return;
     }
     if (command === "launcher_ready") {
+      if (state.rejectReady) throw new Error(state.rejectReady);
       return {
         platform: state.platform,
         settings: state.settings,
@@ -493,7 +501,25 @@ mockIPC(
     }
     if (command === "save_settings") {
       if (state.rejectSettings) throw new Error(state.rejectSettings);
-      state.settings = (payload as { settings: SettingsValues }).settings;
+      const next = (payload as { settings: SettingsValues }).settings;
+      if (
+        [
+          "fileSearchRoots",
+          "fileSearchExcludedDirs",
+          "fileSearchLimit",
+          "fileWatchEnabled",
+        ].some(
+          (key) =>
+            JSON.stringify(state.settings[key as keyof SettingsValues]) !==
+            JSON.stringify(next[key as keyof SettingsValues]),
+        )
+      ) {
+        state.filePhase =
+          next.fileSearchRoots?.length === 0 ? "disabled" : "queued";
+        state.fileTotal = 0;
+        state.fileWarning = null;
+      }
+      state.settings = next;
       localStorage.setItem(
         "tinydash.test.settings",
         JSON.stringify(state.settings),
@@ -513,6 +539,12 @@ mockIPC(
         JSON.stringify(state.settings),
       );
       return state.settings;
+    }
+    if (command === "refresh_files") {
+      if (state.filePhase !== "disabled" && state.filePhase !== "scanning")
+        state.filePhase = "queued";
+      await emit("files-changed");
+      return;
     }
     if (command === "app_catalog") return apps;
     if (command === "set_app_preference") {
@@ -567,6 +599,9 @@ mockIPC(
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
+      // Capture the outcome at dispatch so a held old success can race a
+      // newer failure without changing the old request's result.
+      const rejection = state.rejectSearch;
       if (state.holdNextSearch) {
         state.holdNextSearch = false;
         await new Promise<void>((resolve) => {
@@ -580,6 +615,7 @@ mockIPC(
           });
         else await new Promise((resolve) => setTimeout(resolve, 250));
       }
+      if (rejection) throw new Error(rejection);
       if (query === "error")
         throw new Error(
           "The application index is unavailable. Restart TinyDash.",
@@ -602,7 +638,9 @@ mockIPC(
               ? [...systemCommands].reverse()
               : systemCommands
           : mode === "files" || query === "Launch notes.md"
-            ? query === "missing"
+            ? query === "missing" ||
+              state.fileTotal === 0 ||
+              state.settings.fileSearchRoots?.length === 0
               ? []
               : query === "Projects"
                 ? [folder]
@@ -719,8 +757,12 @@ mockIPC(
           warning: state.currencyWarning,
         },
         files: {
-          total: 1,
-          indexing: state.fileIndexing,
+          total:
+            state.settings.fileSearchRoots?.length === 0 ? 0 : state.fileTotal,
+          phase:
+            state.settings.fileSearchRoots?.length === 0
+              ? "disabled"
+              : state.filePhase,
           warning: state.fileWarning,
         },
       };

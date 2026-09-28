@@ -1,5 +1,6 @@
 import type {
   Action,
+  FileStatus,
   ClipboardEntry,
   LauncherInfo,
   SearchMode,
@@ -14,6 +15,7 @@ import type {
 /** Compile-time consumer of the Rust-serialized examples; no runtime validator/SDK. */
 export interface ContractFixture {
   actions: Action[];
+  fileStatuses: FileStatus[];
   modes: SearchMode[];
   response: SearchResponse;
   warningResponse: SearchResponse;

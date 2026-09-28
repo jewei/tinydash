@@ -1330,7 +1330,7 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
   await openLauncher(page);
   await page.getByRole("combobox", { name: "Search TinyDash" }).fill("any");
   await page.evaluate(() => {
-    window.__launcherTest.fileIndexing = true;
+    window.__launcherTest.filePhase = "scanning";
     return window.__launcherTest.emit("files-changed", null);
   });
   await expect(page.locator(".query-hint")).toContainText("Scanning files...");
@@ -1345,7 +1345,7 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
     page.getByRole("button", { name: "Open", exact: true }),
   ).toBeEnabled();
   await page.evaluate(() => {
-    window.__launcherTest.fileIndexing = false;
+    window.__launcherTest.filePhase = "idle";
     window.__launcherTest.fileWarning =
       "File scan skipped 1 item. Permission denied.";
     return window.__launcherTest.emit("files-changed", null);
@@ -1360,6 +1360,156 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
   ).toBeDisabled();
   await selectCategory(page, "Apps");
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("file refresh distinguishes queued cooldown, active scan, and finished empty results", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await expect(page.locator(".result-title")).toHaveText("Launch notes.md");
+  await input.press("Meta+r");
+  await expect(page.locator(".list-count")).toHaveText(
+    "Waiting to refresh files...",
+  );
+  await expect(
+    page.getByRole("button", { name: "Open", exact: true }),
+  ).toBeEnabled();
+  await input.fill("missing");
+  await expect(
+    page.getByRole("heading", { name: "Waiting to refresh files" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "No files found" }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("files-queued.png") });
+  await selectCategory(page, "All");
+  await expect(page.locator(".query-hint")).toContainText(
+    "Waiting to refresh files...",
+  );
+  await expect(
+    page.getByRole("heading", { name: "No results yet" }),
+  ).toBeVisible();
+  await selectCategory(page, "Files");
+  await page.evaluate(() => {
+    window.__launcherTest.filePhase = "scanning";
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(page.locator(".list-count")).toHaveText("Scanning files...");
+  await expect(
+    page.getByRole("heading", { name: "Finding your files" }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    window.__launcherTest.filePhase = "idle";
+    window.__launcherTest.fileTotal = 0;
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "No files found" }),
+  ).toBeVisible();
+  await input.fill("");
+  await expect(
+    page.getByRole("heading", { name: "No files in the index" }),
+  ).toBeVisible();
+  await expect(page.locator(".list-count")).toHaveText("0 items indexed");
+});
+
+test("file status follows root-change and disable notifications without showing a finished empty scan", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  await expect(page.locator(".result-title")).toHaveText("Launch notes.md");
+  // Model notifications from the separate Settings window. Settings form/save
+  // journeys are covered in settings.spec.ts; this proves their launcher UI.
+  for (const root of ["/Downloads", "/Documents"]) {
+    await page.evaluate(async (root) => {
+      const state = window.__launcherTest;
+      state.settings = { ...state.settings, fileSearchRoots: [root] };
+      state.fileTotal = 0;
+      state.filePhase = "queued";
+      await state.emit("settings-changed", state.settings);
+    }, root);
+    await expect(page.locator(".result-title")).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Waiting to refresh files" }),
+    ).toBeVisible();
+    await expect(page.locator(".list-count")).toHaveText(
+      "Waiting to refresh files...",
+    );
+  }
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = { ...state.settings, fileSearchRoots: [] };
+    state.filePhase = "disabled";
+    await state.emit("settings-changed", state.settings);
+    // A queued files notification carries no stale status payload.
+    await state.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "File search is off" }),
+  ).toBeVisible();
+  await expect(page.locator(".list-count")).toHaveText("File search is off");
+  await expect(
+    page.getByText(
+      "File search is off. Choose folders in Settings, File search.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "No files in the index" }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("files-disabled.png") });
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("missing");
+  await expect(
+    page.getByRole("heading", { name: "File search is off" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "File search is off. Choose folders in Settings, File search.",
+    ),
+  ).toBeVisible();
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = { ...state.settings, fileSearchRoots: null };
+    state.filePhase = "queued";
+    await state.emit("settings-changed", state.settings);
+  });
+  await expect(
+    page.getByRole("heading", { name: "Waiting to refresh files" }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    window.__launcherTest.filePhase = "scanning";
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "Finding your files" }),
+  ).toBeVisible();
+});
+
+test("file scanner startup failure is distinct from a finished empty scan and can retry", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  await page.evaluate(() => {
+    window.__launcherTest.fileTotal = 0;
+    window.__launcherTest.filePhase = "failed";
+    window.__launcherTest.fileWarning =
+      "Cannot start the file scanner: unavailable";
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "File scan unavailable" }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(
+    "Cannot start the file scanner",
+  );
+  await expect(page.getByText("Use Refresh files to try again.")).toBeVisible();
+  await page.getByRole("combobox", { name: "Search TinyDash" }).press("Meta+r");
+  await expect(
+    page.getByRole("heading", { name: "Waiting to refresh files" }),
+  ).toBeVisible();
 });
 
 test("previews plain text, copies by ID, and deletes without hiding the launcher", async ({

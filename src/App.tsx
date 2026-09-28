@@ -101,18 +101,30 @@ export default function App(
     indexing,
     setIndexing,
     files,
-    setFiles,
     currency,
-    error,
-    setError,
+    searchError,
+    clearSearchError,
     indexError,
     storageError,
     notice,
     setNotice,
     search,
-    changeQuery,
+    changeQuery: changeSearchQuery,
     markSelectionChanged,
   } = controller;
+  // Actions and startup own their failures independently of search refreshes.
+  const [operationError, setOperationError] = createSignal<string>();
+  const error = () => operationError() ?? searchError();
+  function setError(reason: string | undefined) {
+    setOperationError(reason);
+    // Existing explicit dismissals (input, actions, reopen) clear both owners.
+    // Search delivery never uses this setter.
+    if (reason === undefined) clearSearchError();
+  }
+  function changeQuery(value: string) {
+    setOperationError(undefined);
+    changeSearchQuery(value);
+  }
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
   const [busy, setBusy] = createSignal(false);
@@ -167,6 +179,12 @@ export default function App(
     !clearOpen() &&
     !clipboardTool() &&
     !pendingAction();
+  const filePending = () =>
+    files().phase === "queued" || files().phase === "scanning";
+  const fileActivity = () =>
+    files().phase === "queued"
+      ? "Waiting to refresh files..."
+      : "Scanning files...";
   const message = () =>
     error() ??
     notice() ??
@@ -358,7 +376,7 @@ export default function App(
         label: "Refresh files",
         icon: "refresh" as const,
         run: () => void refresh("files"),
-        disabled: !desktop || files().indexing,
+        disabled: !desktop || filePending() || files().phase === "disabled",
         key: mode() === "files" ? `${modifier()} R` : undefined,
       },
       {
@@ -655,8 +673,7 @@ export default function App(
   ) {
     setMenuOpen(false);
     setError(undefined);
-    if (target === "files") setFiles((state) => ({ ...state, indexing: true }));
-    else if (target === "apps") setIndexing(true);
+    if (target === "apps") setIndexing(true);
     focusInput();
     try {
       if (target === "files") await backend.refreshFiles();
@@ -664,9 +681,7 @@ export default function App(
       else await backend.refresh();
       await search();
     } catch (reason) {
-      if (target === "files")
-        setFiles((state) => ({ ...state, indexing: false }));
-      else if (target === "apps") setIndexing(false);
+      if (target === "apps") setIndexing(false);
       setError(String(reason));
     }
   }
@@ -1150,11 +1165,11 @@ export default function App(
         </aside>
       </Show>
       <Show
-        when={!message() && !welcome() && mode() === "all" && files().indexing}
+        when={!message() && !welcome() && mode() === "all" && filePending()}
       >
         <div class="status-line indexing-status">
           <span class="query-hint" role="status">
-            Scanning files... You can search apps now.
+            {fileActivity()} You can search apps now.
           </span>
         </div>
       </Show>
@@ -1311,13 +1326,19 @@ export default function App(
                                     ? "No clipboard entries found"
                                     : "No saved clipboard text"
                                   : mode() === "files"
-                                    ? files().indexing
-                                      ? "Finding your files"
-                                      : query()
-                                        ? "No files found"
-                                        : "No files in the index"
+                                    ? files().phase === "queued"
+                                      ? "Waiting to refresh files"
+                                      : files().phase === "scanning"
+                                        ? "Finding your files"
+                                        : files().phase === "disabled"
+                                          ? "File search is off"
+                                          : files().phase === "failed"
+                                            ? "File scan unavailable"
+                                            : query()
+                                              ? "No files found"
+                                              : "No files in the index"
                                     : mode() === "all" &&
-                                        files().indexing &&
+                                        filePending() &&
                                         query()
                                       ? "No results yet"
                                       : indexing()
@@ -1351,18 +1372,21 @@ export default function App(
                                       ? "Try a word from the text you copied."
                                       : "Copy text in any application. It will appear here."
                                   : mode() === "files"
-                                    ? files().indexing
-                                      ? "You can search applications while the scan runs."
-                                      : query()
-                                        ? "Try a filename or part of a path."
-                                        : info()?.settings.fileSearchRoots
-                                              ?.length === 0
-                                          ? "File search is off. Choose folders in Settings, File search."
-                                          : "Check your folders in Settings, File search, then refresh the file list."
+                                    ? filePending()
+                                      ? files().phase === "queued"
+                                        ? "The refresh is queued. You can search applications while waiting."
+                                        : "You can search applications while the scan runs."
+                                      : files().phase === "disabled"
+                                        ? "File search is off. Choose folders in Settings, File search."
+                                        : files().phase === "failed"
+                                          ? "Use Refresh files to try again."
+                                          : query()
+                                            ? "Try a filename or part of a path."
+                                            : "Check your folders in Settings, File search, then refresh the file list."
                                     : mode() === "all" &&
-                                        files().indexing &&
+                                        filePending() &&
                                         query()
-                                      ? "The file scan is still running. You can search applications now."
+                                      ? `${fileActivity()} You can search applications now.`
                                       : indexing()
                                         ? "You can start typing while the list loads."
                                         : query()
@@ -1372,7 +1396,9 @@ export default function App(
               <Show
                 when={
                   desktop &&
-                  !(mode() === "files" ? files().indexing : indexing()) &&
+                  !(mode() === "files"
+                    ? filePending() || files().phase === "disabled"
+                    : indexing()) &&
                   (query() ||
                     mode() === "all" ||
                     mode() === "apps" ||
@@ -1453,9 +1479,13 @@ export default function App(
                     ? `Rates ${currency().asOf}`
                     : "Arithmetic and units offline"
                 : mode() === "files"
-                  ? files().indexing
-                    ? "Scanning files..."
-                    : `${files().total} ${files().total === 1 ? "item" : "items"} indexed`
+                  ? filePending()
+                    ? fileActivity()
+                    : files().phase === "disabled"
+                      ? "File search is off"
+                      : files().phase === "failed"
+                        ? "File scan unavailable"
+                        : `${files().total} ${files().total === 1 ? "item" : "items"} indexed`
                   : mode() === "emoji" ||
                       mode() === "clipboard" ||
                       mode() === "system" ||

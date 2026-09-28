@@ -4,6 +4,7 @@ import { commandArguments } from "./fixtures/ipc-wire";
 import { resolve } from "node:path";
 import type {
   Action,
+  FilePhase,
   LauncherWarning,
   SearchMode,
   SearchResult,
@@ -14,6 +15,7 @@ import { commandWrappers } from "./ipc-types";
 // A new TS variant also needs a serialized Rust example, not just a widened union.
 type MissingExamples =
   | Exclude<Action, (typeof contracts.actions)[number]>
+  | Exclude<FilePhase, (typeof contracts.fileStatuses)[number]["phase"]>
   | Exclude<SearchMode, (typeof contracts.modes)[number]>
   | Exclude<
       SearchResult["kind"],
@@ -44,6 +46,9 @@ function variants(path: string, name: string) {
 
 test("canonical serde fixtures cover variants and representative omitted/nullable values", () => {
   expect(complete).toBe(true);
+  expect(contracts.fileStatuses.map((status) => status.phase).sort()).toEqual(
+    variants("launcher/files.rs", "FilePhase"),
+  );
   expect([...contracts.actions].sort()).toEqual(
     variants("launcher/result.rs", "Action"),
   );

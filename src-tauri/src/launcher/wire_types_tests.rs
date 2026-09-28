@@ -412,6 +412,7 @@ fn generated_ipc_wire_types_match_frontend() {
         warning::LauncherWarning,
         warning::WarningCode,
         files::FileStatus,
+        files::FilePhase,
         currency::CurrencyStatus,
         window::LauncherAppearance,
         Settings,

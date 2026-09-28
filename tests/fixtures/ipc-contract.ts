@@ -90,6 +90,33 @@ export const contracts = {
       "url": "https://example.com/?q=hello%20world"
     }
   ],
+  "fileStatuses": [
+    {
+      "phase": "disabled",
+      "total": 0,
+      "warning": null
+    },
+    {
+      "phase": "idle",
+      "total": 0,
+      "warning": null
+    },
+    {
+      "phase": "queued",
+      "total": 0,
+      "warning": null
+    },
+    {
+      "phase": "scanning",
+      "total": 0,
+      "warning": null
+    },
+    {
+      "phase": "failed",
+      "total": 0,
+      "warning": "Cannot start the file scanner"
+    }
+  ],
   "fullResult": {
     "confirmation": {
       "confirmLabel": "Restart",
@@ -317,7 +344,7 @@ export const contracts = {
       "warning": null
     },
     "files": {
-      "indexing": false,
+      "phase": "idle",
       "total": 3,
       "warning": null
     },
@@ -586,7 +613,7 @@ export const contracts = {
       "warning": "Rates are old"
     },
     "files": {
-      "indexing": true,
+      "phase": "scanning",
       "total": 1,
       "warning": "Scan incomplete"
     },

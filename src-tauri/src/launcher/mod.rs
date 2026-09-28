@@ -63,6 +63,7 @@ impl LauncherState {
     pub fn new(settings: Settings, warnings: Vec<LauncherWarning>) -> Self {
         let mut search = SearchManager::default();
         search.apply_settings(&settings);
+        let files = files::FileScan::new(&settings);
         Self {
             search: Mutex::new(search),
             cancelled_search: Arc::default(),
@@ -77,7 +78,7 @@ impl LauncherState {
             index_error: Mutex::new(None),
             storage: storage::Storage::default(),
             clipboard: clipboard::Monitor::default(),
-            files: files::FileScan::default(),
+            files,
             currency: currency::Currency::default(),
         }
     }
@@ -104,7 +105,7 @@ impl LauncherState {
         let files_changed = !current.same_file_settings(&settings);
         if files_changed {
             // Advance under the publication lock, even for A -> B -> A changes.
-            self.files.invalidate();
+            self.files.invalidate(&settings);
         }
         let previous_files = search.as_mut().and_then(|search| {
             files_changed.then(|| search.replace_files(FileProvider::default()))

@@ -8,6 +8,8 @@ All searches applications, files, clipboard text, emoji, calculations, system co
 
 Search keeps one expensive request in flight and replaces waiting input with the latest query. New input, hiding, or disposal sends a separate lightweight cancellation for the active request. Stale replies are still ignored. A cancellation failure does not dispatch overlapping searches; the latest waiting query follows the old response. Cancellation acknowledgements finish before the next dispatch.
 
+A successful current search clears a previous search failure, including a background retry of the same query after a data-change event. It does not dismiss an action or startup failure. Those errors take precedence while present and keep the existing explicit dismissal paths, such as editing the query or reopening the launcher. Obsolete successes and failures cannot change the current search error.
+
 A request has one 250 ms cooperative budget, starting in the backend command before blocking-worker queueing and including search-lock wait, providers, and pins. App/file matching checks every 64 entries, clipboard matching every 16 entries, and calculator evaluation uses its interrupt callback. The backend also checks between providers and pins and before returning a response. Expired requests report a notice/error rather than a partially ranked list. This is not a hard input-to-paint guarantee: runtime scheduling, individual matcher calls, sorting, fixed-size providers, serialization, IPC, and WebView rendering can overrun the cooperative checkpoint interval.
 
 Tab and Shift + Tab change categories while preserving the query and search focus. Arrow keys select results. Enter runs the selected action. Escape closes a dialog or menu before hiding the launcher. [Keyboard reference](../keyboard-shortcuts.md) lists the remaining controls.
@@ -22,10 +24,10 @@ Run this browser recipe from the repository root. It retains successful traces i
 
 ```sh
 bun run verify:browser tests/welcome.spec.ts tests/categories.spec.ts tests/launcher.spec.ts
-bun run verify:browser tests/launcher-controller.spec.ts tests/native-subscriptions.spec.ts tests/launcher-warnings.spec.ts tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
+bun run verify:browser tests/launcher-controller.spec.ts tests/search-errors.spec.ts tests/native-subscriptions.spec.ts tests/launcher-warnings.spec.ts tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
 ```
 
-The standalone controller checks cover result reconciliation, refresh selection, hidden/disposed replies, reopening before an old reply settles (the original single-flight queue must ignore the old result and keep the new search pending), failure state, and browser-preview gating. Subscription checks cover late registrations and teardown. Warning tests use changed display text to prove that settings repair follows structured codes rather than English prefixes; unrelated platform warnings remain visible. A storage warning must leave search results usable.
+The standalone controller checks cover result reconciliation, refresh selection, hidden/disposed replies, reopening before an old reply settles (the original single-flight queue must ignore the old result and keep the new search pending), failure state, same-query error recovery, superseded-success isolation, and browser-preview gating. Mocked-IPC browser regressions drive input and actions, then emit background events to check search-error recovery without an input edit, action/startup error survival, and stale success isolation while the latest retry is pending. These tests prove frontend ownership, not native event delivery or OS action outcomes. Subscription checks cover late registrations and teardown. Warning tests use changed display text to prove that settings repair follows structured codes rather than English prefixes; unrelated platform warnings remain visible. A storage warning must leave search results usable.
 
 For affected backend behavior:
 

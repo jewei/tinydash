@@ -29,10 +29,38 @@ pub fn scan_rest(elapsed: Duration) -> Duration {
     Duration::from_secs(1).max(elapsed.saturating_mul(3))
 }
 
+// One clock covers work, rest, and settling. Tests advance it at phase
+// boundaries without sleeps or assumptions about filesystem speed.
+pub(super) trait WorkerClock {
+    fn now(&self) -> Instant;
+    fn recv_timeout(
+        &self,
+        receiver: &Receiver<Request>,
+        timeout: Duration,
+    ) -> Result<Request, RecvTimeoutError>;
+}
+
+pub(super) struct RealClock;
+
+impl WorkerClock for RealClock {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
+    fn recv_timeout(
+        &self,
+        receiver: &Receiver<Request>,
+        timeout: Duration,
+    ) -> Result<Request, RecvTimeoutError> {
+        receiver.recv_timeout(timeout)
+    }
+}
+
 /// Coalesce requests without letting manual refresh or settings churn bypass
 /// the work budget. The callback also drops obsolete watches during long rests.
 /// Polling here checks only in-memory control state, never the filesystem.
-pub fn wait_for_budget(
+pub(super) fn wait_for_budget(
+    clock: &impl WorkerClock,
     receiver: &Receiver<Request>,
     deadline: &mut Instant,
     mut keep_running: impl FnMut(&mut Instant) -> bool,
@@ -41,11 +69,11 @@ pub fn wait_for_budget(
         if !keep_running(deadline) {
             return false;
         }
-        let remaining = deadline.saturating_duration_since(Instant::now());
+        let remaining = deadline.saturating_duration_since(clock.now());
         if remaining.is_zero() {
             return true;
         }
-        match receiver.recv_timeout(remaining.min(Duration::from_millis(50))) {
+        match clock.recv_timeout(receiver, remaining.min(Duration::from_millis(50))) {
             Ok(Request::Changed | Request::Refresh) | Err(RecvTimeoutError::Timeout) => {}
             Ok(Request::Stop) | Err(RecvTimeoutError::Disconnected) => return false,
         }
@@ -56,29 +84,30 @@ pub fn wait_for_budget(
 // thousands of filesystem paths. Settling combines bursts; scan_rest separately
 // bounds the scan workload under sustained events.
 pub fn settle(receiver: &Receiver<Request>, quiet: Duration, maximum: Duration) -> bool {
-    settle_cancellable(receiver, quiet, maximum, || true)
+    settle_cancellable(&RealClock, receiver, quiet, maximum, || true)
 }
 
-pub fn settle_cancellable(
+pub(super) fn settle_cancellable(
+    clock: &impl WorkerClock,
     receiver: &Receiver<Request>,
     quiet: Duration,
     maximum: Duration,
     mut keep_running: impl FnMut() -> bool,
 ) -> bool {
-    let deadline = Instant::now() + maximum;
-    let mut quiet_until = Instant::now() + quiet;
+    let deadline = clock.now() + maximum;
+    let mut quiet_until = clock.now() + quiet;
     loop {
         if !keep_running() {
             return false;
         }
         let remaining = deadline
             .min(quiet_until)
-            .saturating_duration_since(Instant::now());
+            .saturating_duration_since(clock.now());
         if remaining.is_zero() {
             return true;
         }
-        match receiver.recv_timeout(remaining.min(Duration::from_millis(50))) {
-            Ok(Request::Changed) => quiet_until = Instant::now() + quiet,
+        match clock.recv_timeout(receiver, remaining.min(Duration::from_millis(50))) {
+            Ok(Request::Changed) => quiet_until = clock.now() + quiet,
             Ok(Request::Refresh) => return true,
             Err(RecvTimeoutError::Timeout) => {}
             Ok(Request::Stop) | Err(RecvTimeoutError::Disconnected) => return false,
@@ -97,6 +126,19 @@ pub struct FileWatcher<W = RecommendedWatcher> {
     watched: BTreeMap<PathBuf, RecursiveMode>,
     roots: Vec<PathBuf>,
     changes: Arc<Changes>,
+    // Last field: observe only after the real OS watcher has been dropped.
+    #[cfg(test)]
+    pub(super) drop_observer: Option<WatchDropObserver>,
+}
+
+#[cfg(test)]
+pub(super) struct WatchDropObserver(pub(super) Arc<AtomicBool>);
+
+#[cfg(test)]
+impl Drop for WatchDropObserver {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
+    }
 }
 
 impl FileWatcher {
@@ -140,6 +182,8 @@ impl FileWatcher {
             watched: BTreeMap::new(),
             roots,
             changes,
+            #[cfg(test)]
+            drop_observer: None,
         })
     }
 }
@@ -423,11 +467,17 @@ mod tests {
                     std::thread::sleep(Duration::from_millis(1));
                 }
             });
-            assert!(wait_for_budget(&receiver, &mut { deadline }, |_| true));
+            assert!(wait_for_budget(
+                &RealClock,
+                &receiver,
+                &mut { deadline },
+                |_| true
+            ));
         });
         assert!(started.elapsed() >= Duration::from_millis(80));
         let _ = sender.try_send(Request::Changed);
         assert!(!wait_for_budget(
+            &RealClock,
             &receiver,
             &mut (Instant::now() + Duration::from_secs(60)),
             |_| false
@@ -511,6 +561,7 @@ mod tests {
                     .into(),
                 roots: roots.clone(),
                 changes: Arc::default(),
+                drop_observer: None,
             };
             assert!(
                 watcher
