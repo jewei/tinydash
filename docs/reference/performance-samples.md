@@ -21,6 +21,28 @@ The existing test builds 50,000 synthetic paths in 100 synthetic project folders
 
 The test uses its existing sorted sample indices (50, 95, 99), not the nearest-rank convention used by the native summary below. These results exclude queueing, IPC, serialization, frontend updates and paint. They do not measure allocations, peak memory, idle CPU, clipboard histories, calculation pins or filesystem churn. Repeat the command on the source being evaluated; do not attribute this baseline to later changes.
 
+## Retained native baseline
+
+[Checks run 36375876881](https://github.com/jewei/tinydash/actions/runs/36375876881) tested merge source `5fde5b949d630f294c6af9ea315730c644f8845b` on 28 September 2026. Its tree equals PR head `245c84e060881258832be2dc7b9669784a764323`; it predates the search-budget, storage and ACL follow-ups. Both installed release-package checks passed and recorded complete cleanup. [PR #10](https://github.com/jewei/tinydash/pull/10) retains the sanitized verification summary and package hashes even after CI artifacts expire.
+
+Each scenario had one warm-up and 25 measured observations. Values below are milliseconds, rounded to one decimal. These are input-event-to-DOM and rendering-opportunity observations, **not actual paint measurements** or a performance guarantee.
+
+| Scenario    | Windows DOM p95 | Windows frame opportunity p95 | Linux DOM p95 | Linux frame opportunity p95 |
+| ----------- | --------------- | ----------------------------- | ------------- | --------------------------- |
+| Application | 5.3             | 28.4                          | 8.0           | 22.0                        |
+| Calculation | 5.0             | 27.9                          | 9.0           | 22.0                        |
+| Conversion  | 5.4             | 28.0                          | 8.0           | 22.0                        |
+| Emoji       | 5.1             | 27.9                          | 8.0           | 15.0                        |
+
+Both virtualized CI runners reported AMD EPYC 7763 processors, four logical CPUs and approximately 16 GiB RAM. Windows reported build `10.0.26100`, x64 and WebView2 Edge 153. Linux X11 reported kernel `6.17.0-1022-azure`, x64 and WebKitGTK user-agent AppleWebKit `605.1.15`. User-agent versions identify the reported environment, not an independently audited webview package version.
+
+Package SHA-256:
+
+- `TinyDash_0.1.3_x64-setup.exe`: `d8f8d4ad9351965c4234ea6695339eb2e3899257fa81078dbb5e29ccc05f275c`
+- `TinyDash_0.1.3_amd64.deb`: `ea52ac3d7fbe1ec1118346a3aeba87ad2ca9d88a34128df6fc8c7998bef0d3c6`
+
+Small-sample p99 is the maximum here; the native artifact retains all three percentiles. CI hardware contention is uncontrolled. Do not compare these values as proof of an improvement over another machine or source.
+
 ## Native evidence
 
 The [native verification procedure](../how-to/verify.md#drive-the-real-desktop-app) records the executable/package hash, build source and test source. Its `native/performance.json` contains only synthetic scenario names, durations, counts and non-identifying platform configuration. Keep it with the wrapper's build and result records; a detached timing file does not establish build identity.
