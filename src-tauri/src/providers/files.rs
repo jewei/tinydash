@@ -312,6 +312,9 @@ pub fn scan_cancellable(
         }
         match std::fs::symlink_metadata(&root) {
             Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+                if cancelled() {
+                    return None;
+                }
                 match root.canonicalize() {
                     Ok(path) => resolved.push(path),
                     Err(error) => report.issue(&root, error),
@@ -372,6 +375,9 @@ pub fn scan_cancellable(
                 && excluded
                     .iter()
                     .any(|name| entry.file_name() == name.as_str());
+            if cancelled() {
+                return None;
+            }
             let hidden = match platform::file_is_hidden(&entry) {
                 Ok(hidden) => hidden,
                 Err(error) => {
