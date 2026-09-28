@@ -4,6 +4,7 @@ use serde::Serialize;
 /// that are only displayed remain strings; do not classify their English text.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum WarningCode {
     SettingsRead,
     ShortcutRegistration,
@@ -16,6 +17,7 @@ pub enum WarningCode {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LauncherWarning {
     pub code: WarningCode,
     pub message: String,

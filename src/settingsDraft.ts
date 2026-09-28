@@ -47,11 +47,16 @@ export function mergeSettingsDraft(
       next.appPreferences,
     );
     for (const [id, preference] of Object.entries(current.appPreferences)) {
-      if (next.appPreferences[id]) {
+      // Rust omits default preferences. A remote deletion is therefore an
+      // incoming { aliases: [], hidden: false }, not an absent update.
+      if (
+        next.appPreferences[id] ||
+        !equal(preference, previous.appPreferences[id])
+      ) {
         merged.appPreferences[id] = mergeDraft(
           previous.appPreferences[id] ?? { aliases: [], hidden: false },
           preference,
-          next.appPreferences[id],
+          next.appPreferences[id] ?? { aliases: [], hidden: false },
         );
       }
     }

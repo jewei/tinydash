@@ -104,6 +104,7 @@ pub fn combine_entries(entries: &[&ClipboardEntry], separator: &str) -> Result<S
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ClipboardEntry {
     pub id: i64,
     pub content: String,

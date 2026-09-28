@@ -177,6 +177,45 @@ export const contracts = {
       "webSearches": []
     }
   },
+  "importedDefaults": {
+    "appearance": null,
+    "compact": null,
+    "followSystemGlass": true,
+    "ignoredKeys": [],
+    "settings": {
+      "appPreferences": {},
+      "categoryShortcuts": [],
+      "clearQueryOnOpen": true,
+      "clipboardHistoryDecided": true,
+      "clipboardHistoryEnabled": true,
+      "clipboardHistoryLimit": 100,
+      "currencyRatesEnabled": true,
+      "fileSearchExcludedDirs": [
+        "node_modules",
+        "target"
+      ],
+      "fileSearchLimit": 50000,
+      "fileSearchRoots": null,
+      "fileWatchEnabled": true,
+      "hideOnBlur": true,
+      "shortcut": "Control+Shift+Space",
+      "startAtLogin": false,
+      "visibleCategories": [
+        "all",
+        "apps",
+        "files",
+        "clipboard",
+        "calculator",
+        "system",
+        "emoji",
+        "password",
+        "timezone",
+        "url",
+        "web"
+      ],
+      "webSearches": []
+    }
+  },
   "launcher": {
     "initialMode": "apps",
     "platform": "linux",
@@ -265,6 +304,12 @@ export const contracts = {
     "url",
     "web"
   ],
+  "noUpdate": {
+    "available": false,
+    "message": "Up to date",
+    "notes": null,
+    "version": null
+  },
   "response": {
     "currency": {
       "asOf": null,
@@ -525,8 +570,14 @@ export const contracts = {
   "update": {
     "available": true,
     "message": "Update available",
-    "notes": null,
+    "notes": "Release notes",
     "version": "0.2.0"
+  },
+  "usedClipboard": {
+    "content": "Used",
+    "createdAt": 1,
+    "id": 42,
+    "lastUsedAt": 2
   },
   "warningResponse": {
     "currency": {

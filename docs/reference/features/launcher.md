@@ -18,10 +18,10 @@ Run this browser recipe from the repository root. It retains successful traces i
 
 ```sh
 bun run verify:browser tests/welcome.spec.ts tests/categories.spec.ts tests/launcher.spec.ts
-bun run verify:browser tests/launcher-controller.spec.ts tests/native-subscriptions.spec.ts tests/launcher-warnings.spec.ts tests/ipc-contract.spec.ts
+bun run verify:browser tests/launcher-controller.spec.ts tests/native-subscriptions.spec.ts tests/launcher-warnings.spec.ts tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
 ```
 
-The standalone controller checks cover result reconciliation, refresh selection, hidden/disposed replies, failure state, and browser-preview gating. Subscription checks cover late registrations and teardown. Warning tests use changed display text to prove that settings repair follows structured codes rather than English prefixes; unrelated platform warnings remain visible. A storage warning must leave search results usable.
+The standalone controller checks cover result reconciliation, refresh selection, hidden/disposed replies, reopening before an old reply settles (the original single-flight queue must ignore the old result and keep the new search pending), failure state, and browser-preview gating. Subscription checks cover late registrations and teardown. Warning tests use changed display text to prove that settings repair follows structured codes rather than English prefixes; unrelated platform warnings remain visible. A storage warning must leave search results usable.
 
 For affected backend behavior:
 

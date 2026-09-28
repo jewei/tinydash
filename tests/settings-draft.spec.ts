@@ -44,6 +44,23 @@ test("merges local deletions and additions while accepting remote deletions", ()
   ).toEqual({});
 });
 
+test("remote unhide removes the saved preference but preserves dirty aliases", () => {
+  const saved = settings();
+  saved.appPreferences["app:example"] = { aliases: [], hidden: true };
+  const draft = structuredClone(saved);
+  draft.appPreferences["app:example"].aliases = ["local"];
+  const incoming = structuredClone(saved);
+  delete incoming.appPreferences["app:example"];
+  const before = structuredClone({ saved, draft, incoming });
+  const result = mergeSettingsDraft(saved, draft, incoming, "custom");
+  expect(result.draft.appPreferences["app:example"]).toEqual({
+    aliases: ["local"],
+    hidden: false,
+  });
+  expect(result.saved.appPreferences).toEqual({});
+  expect({ saved, draft, incoming }).toEqual(before);
+});
+
 test("preserves incomplete folder mode and locally edited exclusion text", () => {
   const saved = settings();
   saved.fileSearchRoots = null;

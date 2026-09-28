@@ -35,6 +35,9 @@ use result::SearchResponse;
 use search::SearchManager;
 use warning::{LauncherWarning, WarningCode};
 
+#[cfg(test)]
+mod wire_types_tests;
+
 pub struct LauncherState {
     pub search: Mutex<SearchManager>,
     pub scanning: AtomicBool,
@@ -123,6 +126,7 @@ impl LauncherState {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LauncherInfo {
     settings: Settings,
     platform: &'static str,

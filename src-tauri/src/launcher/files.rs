@@ -30,6 +30,7 @@ pub struct FileScan {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FileStatus {
     pub total: usize,
     pub indexing: bool,

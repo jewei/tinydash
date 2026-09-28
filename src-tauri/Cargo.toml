@@ -67,6 +67,10 @@ gio-unix = "0.22.8"
 # Tauri requires GTK 0.18. GTK 0.19 conflicts over the native `gtk-3` link.
 gtk = "0.18.2"
 
+[dev-dependencies]
+ts-rs = { version = "12", features = ["no-serde-warnings"] }
+syn = { version = "2", features = ["full", "visit"] }
+
 [profile.release]
 strip = true
 lto = "thin"

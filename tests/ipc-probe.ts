@@ -3,9 +3,18 @@ import { backend, type SettingsValues } from "../src/bridge";
 
 /** Exercise the real bridge wrappers without starting the native application. */
 export async function probeCommands(settings: SettingsValues) {
-  const calls: { command: string; args: Record<string, unknown> }[] = [];
+  let wrapper: keyof typeof backend;
+  const calls: {
+    wrapper: keyof typeof backend;
+    command: string;
+    args: Record<string, unknown>;
+  }[] = [];
   mockIPC((command, args) => {
-    calls.push({ command, args: (args ?? {}) as Record<string, unknown> });
+    calls.push({
+      wrapper,
+      command,
+      args: (args ?? {}) as Record<string, unknown>,
+    });
   });
   const probes = {
     setLauncherAppearance: () => backend.setLauncherAppearance("dark"),
@@ -43,7 +52,11 @@ export async function probeCommands(settings: SettingsValues) {
     quit: backend.quit,
   } satisfies Record<keyof typeof backend, () => Promise<unknown>>;
   try {
-    for (const probe of Object.values(probes)) await probe();
+    for (const [name, probe] of Object.entries(probes)) {
+      wrapper = name as keyof typeof backend;
+      await probe();
+    }
+    wrapper = "execute";
     await backend.execute("app:example", "launch");
     return calls;
   } finally {

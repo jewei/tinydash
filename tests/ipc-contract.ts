@@ -22,8 +22,11 @@ export interface ContractFixture {
   settings: SettingsValues;
   defaults: SettingsValues;
   clipboard: ClipboardEntry;
+  usedClipboard: ClipboardEntry;
   imported: SettingsImport;
+  importedDefaults: SettingsImport;
   update: UpdateStatus;
+  noUpdate: UpdateStatus;
   launcher: LauncherInfo;
   settingsInfo: SettingsInfo;
 }

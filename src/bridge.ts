@@ -79,7 +79,7 @@ export interface SearchResult {
     title: string;
     description: string;
     confirmLabel: string;
-  } | null;
+  };
 }
 
 export interface LauncherWarning {
@@ -96,7 +96,7 @@ export interface LauncherWarning {
 }
 
 export interface SearchResponse {
-  preferredSelectionId?: string | null;
+  preferredSelectionId: string | null;
   results: SearchResult[];
   total: number;
   indexing: boolean;
@@ -136,9 +136,9 @@ export interface WebSearch {
 export interface SettingsImport {
   settings: SettingsValues;
   ignoredKeys: string[];
-  appearance?: string | null;
-  compact?: boolean | null;
-  followSystemGlass?: boolean | null;
+  appearance: string | null;
+  compact: boolean | null;
+  followSystemGlass: boolean | null;
 }
 
 export interface UpdateStatus {
@@ -150,10 +150,10 @@ export interface UpdateStatus {
 
 export interface LauncherInfo {
   settings: SettingsValues;
-  platform: "macos" | "windows" | "linux";
+  platform: string;
   warnings: LauncherWarning[];
-  visible?: boolean;
-  initialMode?: SearchMode | null;
+  visible: boolean;
+  initialMode: SearchMode | null;
 }
 
 export interface SettingsInfo {

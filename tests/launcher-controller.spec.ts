@@ -110,6 +110,69 @@ test("hidden and disposed controllers reject late replies and do not send hidden
   });
 });
 
+test("hide then reopen before the old reply settles keeps the new search pending", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const result = await page.evaluate(async (response: SearchResponse) => {
+    const path = "/src/launcherController.ts";
+    const { createLauncherController } = (await import(
+      path
+    )) as typeof import("../src/launcherController");
+    const calls: string[] = [];
+    const replies: ((response: SearchResponse) => void)[] = [];
+    const controller = createLauncherController({
+      desktop: true,
+      send: (value) => {
+        calls.push(value);
+        return new Promise((resolve) => replies.push(resolve));
+      },
+    });
+    const old = controller.search("old session");
+    controller.hidden();
+    controller.setVisible(true);
+    const reopened = controller.search("new session");
+    const beforeOldReply = { calls: [...calls], pending: controller.pending() };
+    replies[0]({
+      ...response,
+      notice: "stale",
+      storageError: {
+        code: "storageUnavailable",
+        message: "stale",
+        retryable: false,
+      },
+    });
+    await Promise.resolve();
+    const afterOldReply = {
+      calls: [...calls],
+      pending: controller.pending(),
+      count: controller.results().length,
+      notice: controller.notice() ?? null,
+      warning: controller.storageError() ?? null,
+    };
+    replies[1]({ ...response, notice: "current" });
+    await Promise.all([old, reopened]);
+    const settled = {
+      pending: controller.pending(),
+      count: controller.results().length,
+      notice: controller.notice(),
+    };
+    controller.dispose();
+    return { beforeOldReply, afterOldReply, settled };
+  }, contracts.response);
+  expect(result).toEqual({
+    beforeOldReply: { calls: ["old session"], pending: true },
+    afterOldReply: {
+      calls: ["old session", "new session"],
+      pending: true,
+      count: 0,
+      notice: null,
+      warning: null,
+    },
+    settled: { pending: false, count: 11, notice: "current" },
+  });
+});
+
 test("controller clears stale welcome rows, reports failures, and gates non-desktop search", async ({
   page,
 }) => {

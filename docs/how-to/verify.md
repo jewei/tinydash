@@ -45,18 +45,22 @@ Use focused tests during diagnosis. After the final relevant edit, repeat affect
 
 ## Check the internal IPC contract
 
-`verify:full` checks the actual Rust serialization against [canonical fixtures](../../tests/fixtures/ipc-contract.ts), type-checks those fixtures against the frontend bridge, and checks real bridge invocations against Rust command registration and argument names/types. Result kinds, actions, search modes, tool details, settings, and targeted structured warnings are covered. These are internal contracts, not a public SDK. Command errors that are only displayed can still be strings.
+`verify:full` compares actual Rust serialization with [canonical examples](../../tests/fixtures/ipc-contract.ts) and test-only `ts-rs` declarations with [checked wire types](../../tests/fixtures/ipc-wire.ts). Recursive TypeScript equality checks reject extra optional keys, missing keys, changed optionality, and narrowed or widened nullable/enum domains. Rust command signatures are parsed with test-only `syn`; the bridge's argument domains and success returns must match. Runtime probes independently check each wrapper's command binding, registration, argument names, and representative values.
+
+The bridge represents Rust `Option` arguments by omission instead of explicit null; `revealSettings` additionally supplies a default for Rust's required boolean. These are explicit test adaptations, not general assignability exceptions. Serialized response keys remain required unless serde omits them. Platform fields are strings because Rust currently declares strings, not a platform enum. Unsupported serialization rules and command types require review rather than silently generating a partial contract. Conditional `Option::is_none` serialization has a checked test-only `ts(optional)` annotation.
+
+These are internal contracts, not a public SDK or runtime validator. Command errors that are only displayed remain strings. [Drift tests](../../tests/ipc-drift.spec.ts) compile isolated mutations and require contract-specific failures; they do not modify the checkout.
 
 When intentionally changing the wire contract, regenerate its examples, review the diff, and run the normal checks:
 
 ```sh
-TINYDASH_UPDATE_CONTRACTS=1 bun run test:rust -- serialized_ipc_contracts_match_frontend_fixture
+TINYDASH_UPDATE_CONTRACTS=1 bun run test:rust -- ipc_
 bun run typecheck
-bun run verify:browser tests/ipc-contract.spec.ts
+bun run verify:browser tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
 bun run verify:full
 ```
 
-Do not set `TINYDASH_UPDATE_CONTRACTS` in CI. The normal Rust test compares the fixture byte-for-byte and does not update it. The fixture is excluded from Prettier because serde owns its formatting. Add representative samples for new optional fields or variants; the contract tests require every result, detail, action, mode, and warning-code variant to have an example. Changes to a command signature may require a new probe or supported argument type in the command consistency test.
+Do not set `TINYDASH_UPDATE_CONTRACTS` in CI. Normal Rust tests compare both generated files byte-for-byte without updating them; both are excluded from Prettier. Add representative samples for new optional fields or variants, including present and null cases. Examples complement, but do not replace, exact shape checks. Changes to a command signature may require a new wrapper binding, probe, or supported type in the command consistency tests. `ts-rs` and `syn` are dev-dependencies only; neither ships in the application.
 
 These checks prove serialization and bridge consistency, not native IPC authorization or OS effects. Use the desktop procedures for those.
 

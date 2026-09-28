@@ -137,7 +137,7 @@ const systemCommands: SearchResult[] = [
             : "Save your work before you continue.",
         confirmLabel: title,
       }
-    : null,
+    : undefined,
 }));
 const commandQueries = new Map([
   ["sleep", systemCommands[2]],

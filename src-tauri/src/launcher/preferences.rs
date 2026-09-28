@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SettingsInfo {
     settings: Settings,
     defaults: Settings,

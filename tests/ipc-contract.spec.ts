@@ -8,6 +8,7 @@ import type {
   SearchResult,
 } from "../src/bridge";
 import { contracts } from "./fixtures/ipc-contract";
+import { commandWrappers } from "./ipc-types";
 
 // A new TS variant also needs a serialized Rust example, not just a widened union.
 type MissingExamples =
@@ -40,7 +41,7 @@ function variants(path: string, name: string) {
     .sort();
 }
 
-test("canonical serde fixtures cover every variant and optional wire shape", () => {
+test("canonical serde fixtures cover variants and representative omitted/nullable values", () => {
   expect(complete).toBe(true);
   expect([...contracts.actions].sort()).toEqual(
     variants("launcher/result.rs", "Action"),
@@ -65,6 +66,12 @@ test("canonical serde fixtures cover every variant and optional wire shape", () 
     "Restart",
   );
   expect(contracts.fullResult.pin.categories).toEqual(contracts.modes);
+  expect(contracts.clipboard.lastUsedAt).toBeNull();
+  expect(contracts.usedClipboard.lastUsedAt).toBe(2);
+  expect(contracts.update.notes).toBe("Release notes");
+  expect(contracts.noUpdate.notes).toBeNull();
+  expect(contracts.imported.followSystemGlass).toBeNull();
+  expect(contracts.importedDefaults.followSystemGlass).toBe(true);
   expect(contracts.defaults.fileSearchRoots).toBeNull();
   expect(contracts.settings.fileSearchRoots).toEqual(["/example"]);
   expect(contracts.warningResponse.storageError).toEqual({
@@ -126,7 +133,10 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
     return probeCommands(settings);
   }, contracts.settings);
   expect([...new Set(calls.map((call) => call.command))].sort()).toEqual(names);
-  for (const { command, args } of calls) {
+  for (const { command, args, wrapper } of calls) {
+    expect(wrapper).toBe(
+      commandWrappers[command as keyof typeof commandWrappers],
+    );
     const signature = signatures.get(command)!;
     const required = signature.filter((arg) => !arg.type.startsWith("Option<"));
     expect(
