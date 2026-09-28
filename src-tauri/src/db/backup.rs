@@ -11,8 +11,17 @@ use rusqlite::Connection;
 use super::{Error, Result, migrations};
 
 pub(super) fn create(connection: &Connection, database: &Path, settings: &Path) -> Result<()> {
-    create_archive(connection, database, settings)
-        .map_err(|error| Error::Backup(format!("{error:#}")))
+    create_archive(connection, database, settings).map_err(|error| {
+        let message = format!("{error:#}");
+        // Do not turn a temporary snapshot lock into a permanent backup failure.
+        if let Ok(sqlite) = error.downcast::<rusqlite::Error>() {
+            let error = Error::Sqlite(sqlite);
+            if error.is_transient() {
+                return error;
+            }
+        }
+        Error::Backup(message)
+    })
 }
 
 fn create_archive(connection: &Connection, database: &Path, settings: &Path) -> anyhow::Result<()> {
@@ -104,6 +113,33 @@ mod tests {
     fn old_database(path: &Path) {
         let connection = Connection::open(path).unwrap();
         connection.execute_batch("CREATE TABLE usage_history (result_id TEXT PRIMARY KEY, use_count INTEGER, last_used_at INTEGER); INSERT INTO usage_history VALUES ('app:kept', 4, 123); PRAGMA user_version=1;").unwrap();
+    }
+
+    #[test]
+    fn locked_snapshot_remains_retryable_and_keeps_the_previous_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tinydash.sqlite3");
+        let settings = dir.path().join("settings.json");
+        old_database(&path);
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .busy_timeout(std::time::Duration::from_millis(10))
+            .unwrap();
+        create(&connection, &path, &settings).unwrap();
+        let original = std::fs::read(dir.path().join("recovery.tar")).unwrap();
+        let other = Connection::open(&path).unwrap();
+        other.execute_batch("BEGIN EXCLUSIVE").unwrap();
+        assert!(
+            create(&connection, &path, &settings)
+                .unwrap_err()
+                .is_transient()
+        );
+        assert_eq!(
+            std::fs::read(dir.path().join("recovery.tar")).unwrap(),
+            original
+        );
+        other.execute_batch("ROLLBACK").unwrap();
+        create(&connection, &path, &settings).unwrap();
     }
 
     #[test]
