@@ -40,7 +40,7 @@ Open All with no pins. The welcome controls appear and the search field has focu
 
 Tests: [tests/welcome.spec.ts](../../../tests/welcome.spec.ts), [tests/categories.spec.ts](../../../tests/categories.spec.ts), [tests/launcher.spec.ts](../../../tests/launcher.spec.ts).
 
-Native tests check launch and reopen on Windows and Linux. Global shortcuts, focus, tray behavior, and Wayland need desktop checks.
+Native tests check launch and reopen on Windows and Linux. They also retain synthetic query-to-DOM and rendering-opportunity timings; see [performance samples and limits](../performance-samples.md). Global shortcuts, focus, tray behavior, and Wayland need desktop checks.
 
 ### Synthetic search measurements
 

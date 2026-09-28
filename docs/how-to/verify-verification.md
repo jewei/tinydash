@@ -4,6 +4,15 @@ Use this procedure after changing the verification skill or its tools. Keep exer
 
 ## Check the tools
 
+The lightweight CI and release gates have synthetic regression fixtures; they do not publish a release or drive a desktop:
+
+```sh
+bun scripts/verify/docs.ts
+bun test scripts/verify/checks.test.ts scripts/verify/docs.test.ts scripts/release/evidence.test.ts
+```
+
+These reject documentation drift, missing required statuses, unintended skips, unverified action pins, changed packages/evidence, and incomplete release checklists. Publication tests substitute the GitHub command boundary and confirm that failures cannot reach the publish command. After workflow edits, also run `actionlint` when available and inspect an actual CI run after pushing; local tests cannot establish GitHub scheduling or branch protection.
+
 ```sh
 bun run verify:browser tests/verification.spec.ts tests/native-cancellation.spec.ts
 ```
