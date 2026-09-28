@@ -12,6 +12,8 @@ Privacy exports a versioned settings file and previews imports before applicatio
 
 The app creates a recovery archive before database migrations. Recovery is manual. Follow [data recovery](../../how-to/recover-data.md).
 
+Settings-only IPC permissions restrict settings replacement, import/export, shortcut recording, recovery access, and updates to this window. Main retains its narrow app-preference and clipboard-consent actions; both windows can clear history and synchronize appearance. See the [IPC permission boundary](../ipc-permissions.md).
+
 About has an explicit update check. Mac and Windows release builds need an updater public key and HTTPS feed. The user chooses whether to install an available update. Development builds can report that updates are not configured. Ubuntu uses manual Debian package replacement.
 
 ## Verification
@@ -25,6 +27,7 @@ bun run verify:browser tests/settings.spec.ts tests/tinycast-features.spec.ts te
 For affected backend behavior:
 
 ```sh
+bun run test:rust -- acl_tests
 bun run test:rust -- settings
 bun run test:rust -- db::backup
 bun run test:rust -- db::migrations

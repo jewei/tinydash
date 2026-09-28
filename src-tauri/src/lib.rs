@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod acl_tests;
+mod appearance;
 mod currency;
 mod db;
 mod error;
@@ -76,6 +79,12 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         })
         .build(app)?;
     Ok(())
+}
+
+// Share the production ACL context with MockRuntime authorization tests.
+// A single macro expansion also avoids duplicate macOS embedded plist symbols.
+fn app_context<R: tauri::Runtime>() -> tauri::Context<R> {
+    tauri::generate_context!()
 }
 
 pub fn run() -> anyhow::Result<()> {
@@ -194,6 +203,7 @@ pub fn run() -> anyhow::Result<()> {
         }})
         .invoke_handler(tauri::generate_handler![
             window::set_launcher_appearance,
+            appearance::sync_appearance,
             launcher::launcher_ready,
             launcher::preferences::get_settings,
             launcher::preferences::save_settings,
@@ -224,7 +234,7 @@ pub fn run() -> anyhow::Result<()> {
             window::hide_launcher,
             window::reset_launcher_position,
         ])
-        .build(tauri::generate_context!())
+        .build(app_context())
         .context("Build the desktop launcher")?;
     app.run(|_app, _event| {
         if matches!(_event, tauri::RunEvent::Exit) {
