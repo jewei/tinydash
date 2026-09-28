@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     path::Path,
     sync::{Arc, Mutex, OnceLock},
 };
@@ -12,7 +12,7 @@ use super::LauncherState;
 use super::query::SearchMode;
 use super::search::SearchManager;
 use crate::{
-    db::Database,
+    db::{CaptureRevision, CleanupOutcome, Database},
     error::Error,
     providers::clipboard::{
         ClipboardProvider, MAX_SELECTION_ENTRIES, Observed, combine_entries, entry_id, valid_text,
@@ -39,6 +39,11 @@ struct Session {
     // absolute counts. A successful initialization merges them exactly once.
     pending_usage: HashMap<String, ranking::Usage>,
     observed: Observation,
+    // Automatic privacy obligations only. Never queue a failed user action or
+    // retain clipboard text here. At capacity, stop creating new captures.
+    cleanup: VecDeque<CaptureRevision>,
+    cleanup_overflow: bool,
+    storage_warning: Option<LauncherWarning>,
 }
 
 impl Session {
@@ -70,19 +75,105 @@ impl Session {
                 "Storage needs recovery. Clipboard capture is paused. Ranking changes are session-only. Your database was kept; check disk space and folder access or follow data recovery, then restart TinyDash."
             }
         };
-        if let Ok(mut warning) = self.warning.lock() {
-            *warning = Some(LauncherWarning::new(
-                WarningCode::StorageUnavailable,
-                message,
-                health == Health::Busy,
-            ));
-        }
+        self.storage_warning = Some(LauncherWarning::new(
+            WarningCode::StorageUnavailable,
+            message,
+            health == Health::Busy,
+        ));
+        self.publish_warning();
     }
 
     fn healthy(&mut self) {
         self.health = Health::Healthy;
-        if let Ok(mut warning) = self.warning.lock() {
-            *warning = None;
+        self.storage_warning = None;
+        self.publish_warning();
+    }
+
+    fn capture_paused(&self) -> bool {
+        self.cleanup_overflow || self.cleanup.len() >= MAX_CLEANUP_INTENTS
+    }
+
+    fn publish_warning(&self) {
+        let mut warning = self.storage_warning.clone();
+        if !self.cleanup.is_empty() || self.cleanup_overflow {
+            let mut message = String::from(
+                "Sensitive clipboard cleanup is pending. Saved text may remain. Pinned entries are kept; unpin or delete them to finish cleanup. Automatic retries last only for this session; quitting loses pending cleanup. ",
+            );
+            if self.cleanup_overflow {
+                message.push_str("Cleanup capacity was exceeded. Capture is paused. Clear all clipboard history successfully to resolve the untracked obligation. ");
+            } else if self.capture_paused() {
+                message.push_str(
+                    "Cleanup capacity is full. Capture is paused until cleanup makes room. ",
+                );
+            }
+            if let Some(storage) = &self.storage_warning {
+                message.push_str(&storage.message);
+            } else {
+                message.push_str("TinyDash retries cleanup while running, even if the clipboard stays unchanged.");
+            }
+            warning = Some(LauncherWarning::new(
+                WarningCode::StorageUnavailable,
+                message,
+                !self.cleanup_overflow && matches!(self.health, Health::Healthy | Health::Busy),
+            ));
+        }
+        if let Ok(mut current) = self.warning.lock() {
+            *current = warning;
+        }
+    }
+
+    fn enqueue_cleanup(&mut self, capture: CaptureRevision) {
+        if self.cleanup.contains(&capture) {
+            return;
+        }
+        if self.cleanup.len() == MAX_CLEANUP_INTENTS {
+            // Defensive fail-closed policy. Normal capture admission reserves a
+            // slot for the one current observation, so this is not reachable
+            // through the monitor. Never silently forget a privacy obligation.
+            self.cleanup_overflow = true;
+        } else {
+            self.cleanup.push_back(capture);
+        }
+        self.publish_warning();
+    }
+
+    fn cleared(&mut self, search: &Mutex<SearchManager>, now: i64) {
+        if let Some(capture) = self.observed.cleared(now) {
+            self.enqueue_cleanup(capture);
+        }
+        self.retry_cleanup(search);
+    }
+
+    // At most one intent per attempt (a monitor wake or upstream clear).
+    // Rotate pins so one retained entry cannot
+    // starve other cleanup. Permanent storage failures retain the obligation
+    // and warning but are not reopened/retried in this session.
+    fn retry_cleanup(&mut self, search: &Mutex<SearchManager>) -> bool {
+        if !matches!(self.health, Health::Healthy | Health::Busy) || self.database.is_none() {
+            return false;
+        }
+        let Some(capture) = self.cleanup.front().copied() else {
+            return false;
+        };
+        let previous_health = self.health;
+        match self.with_database(|database| database.cleanup_clipboard(capture)) {
+            Ok(CleanupOutcome::Pinned) => {
+                self.cleanup.rotate_left(1);
+                previous_health != self.health
+            }
+            Ok(outcome) => {
+                if matches!(outcome, CleanupOutcome::Removed | CleanupOutcome::Missing) {
+                    let Ok(mut search) = search.lock() else {
+                        return false;
+                    };
+                    search.clipboard.remove(capture.id);
+                    search.forget_clipboard_pins(Some(capture.id));
+                }
+                self.cleanup.pop_front();
+                self.publish_warning();
+                true
+            }
+            Err(_) => previous_health != self.health,
         }
     }
 
@@ -185,7 +276,15 @@ impl Session {
             Deletion::All => database.clear_clipboard().map(|()| Vec::new()),
             Deletion::Unpinned => database.clear_unpinned_clipboard(),
         })?;
-        publish_deletion(search, deletion, removed).map_err(Into::into)
+        publish_deletion(search, deletion, removed)?;
+        // Only a successful explicit full clear can discharge an overflow.
+        // Failed manual operations are never put in the automatic queue.
+        if matches!(deletion, Deletion::All) {
+            self.cleanup.clear();
+            self.cleanup_overflow = false;
+            self.publish_warning();
+        }
+        Ok(())
     }
 
     fn capture(
@@ -194,18 +293,39 @@ impl Session {
         text: &str,
         now: i64,
         limit: usize,
-    ) -> anyhow::Result<i64> {
-        let (entry, removed) =
-            self.with_database(|database| database.capture_clipboard(text, now, limit))?;
-        let id = entry.id;
+    ) -> anyhow::Result<CaptureRevision> {
+        anyhow::ensure!(
+            !self.capture_paused(),
+            "Clipboard capture is paused for pending sensitive cleanup."
+        );
+        let (entry, removed, capture) =
+            self.with_database(|database| database.capture_clipboard_revision(text, now, limit))?;
         search
             .lock()
             .map_err(|_| Error::IndexUnavailable)?
             .clipboard
             .update(entry.into(), &removed);
-        Ok(id)
+        Ok(capture)
+    }
+
+    fn observe_text(
+        &mut self,
+        search: &Mutex<SearchManager>,
+        text: Option<String>,
+        now: i64,
+        limit: usize,
+    ) -> bool {
+        let Some(text) = self.observed.changed(text) else {
+            return false;
+        };
+        if let Ok(capture) = self.capture(search, &text, now, limit) {
+            self.observed.captured = Some((capture, now));
+        }
+        true
     }
 }
+
+const MAX_CLEANUP_INTENTS: usize = 64;
 
 /// Seconds after a capture in which an upstream clear still deletes it. Apple
 /// Passwords sets no secret marker and empties the clipboard after about 90 s.
@@ -214,8 +334,8 @@ const CLEARED_CAPTURE_SECONDS: i64 = 120;
 #[derive(Default)]
 struct Observation {
     text: Option<String>,
-    // The entry that the monitor saved for `text`, and when.
-    captured: Option<(i64, i64)>,
+    // The exact capture that the monitor saved for `text`, and when.
+    captured: Option<(CaptureRevision, i64)>,
 }
 
 impl Observation {
@@ -236,12 +356,12 @@ impl Observation {
     // A source that empties the clipboard considered its content sensitive.
     // Return only the entry saved for that content. Older history, copies
     // from TinyDash, and captures outside the window stay.
-    fn cleared(&mut self, now: i64) -> Option<i64> {
+    fn cleared(&mut self, now: i64) -> Option<CaptureRevision> {
         self.text = None;
         self.captured
             .take()
             .filter(|(_, at)| now.saturating_sub(*at) <= CLEARED_CAPTURE_SECONDS)
-            .map(|(id, _)| id)
+            .map(|(capture, _)| capture)
     }
 }
 
@@ -384,9 +504,8 @@ impl Storage {
         }
         let text = match observed {
             Observed::Cleared => {
-                if let Some(id) = session.observed.cleared(ranking::now()) {
-                    self.forget_cleared(app, &mut session, id);
-                }
+                session.cleared(&state.search, ranking::now());
+                super::clipboard::changed(app);
                 return;
             }
             Observed::Text(text) => Some(text),
@@ -396,29 +515,38 @@ impl Storage {
         if !state.settings().clipboard_history_enabled {
             return;
         }
-        let Some(text) = session.observed.changed(text) else {
+        if session.observe_text(
+            &state.search,
+            text,
+            ranking::now(),
+            state.settings().clipboard_limit(),
+        ) {
+            super::clipboard::changed(app);
+        }
+    }
+
+    // Called on the existing monitor worker even when there is no new OS
+    // clipboard value or capture has since been disabled. No shutdown drain:
+    // pending intentions and their warnings are explicitly session-only.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn retry_cleanup(&self, app: &AppHandle) {
+        let Some(mutex) = self.database.get() else {
             return;
         };
-        if let Some(id) = self.save_clipboard(app, &mut session, &text) {
-            session.observed.captured = Some((id, ranking::now()));
+        let Ok(mut session) = mutex.lock() else {
+            return;
+        };
+        if session.retry_cleanup(&app.state::<LauncherState>().search) {
+            super::clipboard::changed(app);
         }
     }
 
-    fn forget_cleared(&self, app: &AppHandle, session: &mut Session, id: i64) {
-        let state = app.state::<LauncherState>();
-        match session.with_database(|database| database.delete_unpinned_clipboard(id)) {
-            Ok(false) => {}
-            Ok(true) => {
-                if let Ok(mut search) = state.search.lock() {
-                    search.clipboard.remove(id);
-                }
-                super::clipboard::changed(app);
-            }
-            Err(_) => super::clipboard::changed(app),
-        }
-    }
-
-    fn save_clipboard(&self, app: &AppHandle, session: &mut Session, text: &str) -> Option<i64> {
+    fn save_clipboard(
+        &self,
+        app: &AppHandle,
+        session: &mut Session,
+        text: &str,
+    ) -> Option<CaptureRevision> {
         let state = app.state::<LauncherState>();
         if !state.settings().clipboard_history_enabled || !valid_text(text) {
             return None;
@@ -625,6 +753,10 @@ fn publish_deletion(
 }
 
 #[cfg(test)]
+#[path = "storage_cleanup_tests.rs"]
+mod cleanup_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -645,8 +777,12 @@ mod tests {
     fn upstream_clear_deletes_only_the_recent_capture_of_the_cleared_value() {
         let mut observed = Observation::default();
         observed.changed(Some("copied from a password manager".into()));
-        observed.captured = Some((7, 1_000));
-        assert_eq!(observed.cleared(1_000 + CLEARED_CAPTURE_SECONDS), Some(7));
+        let capture = CaptureRevision { id: 7, revision: 3 };
+        observed.captured = Some((capture, 1_000));
+        assert_eq!(
+            observed.cleared(1_000 + CLEARED_CAPTURE_SECONDS),
+            Some(capture)
+        );
         // The clear also forgets the value, so a new copy is captured again.
         assert_eq!(observed.cleared(1_001), None);
         assert_eq!(
@@ -654,12 +790,12 @@ mod tests {
             Some("copied from a password manager".into())
         );
 
-        observed.captured = Some((8, 1_000));
+        observed.captured = Some((CaptureRevision { id: 8, revision: 1 }, 1_000));
         assert_eq!(observed.cleared(1_001 + CLEARED_CAPTURE_SECONDS), None);
 
         // A later value replaces the capture. Clearing it keeps entry 9.
         observed.changed(Some("A".into()));
-        observed.captured = Some((9, 1_000));
+        observed.captured = Some((CaptureRevision { id: 9, revision: 1 }, 1_000));
         observed.changed(Some("B".into()));
         assert_eq!(observed.cleared(1_001), None);
 
@@ -672,7 +808,7 @@ mod tests {
     fn a_secret_forgets_the_previous_value() {
         let mut observed = Observation::default();
         assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
-        observed.captured = Some((1, 1_000));
+        observed.captured = Some((CaptureRevision { id: 1, revision: 1 }, 1_000));
         // capture() maps Observed::Secret to no text.
         assert_eq!(observed.changed(None), None);
         assert_eq!(observed.cleared(1_001), None);
@@ -762,7 +898,7 @@ mod tests {
             .unwrap()
             .unwrap();
         session.record(&search, "app:one", 100);
-        let kept = session.capture(&search, "kept", 100, 100).unwrap();
+        let kept = session.capture(&search, "kept", 100, 100).unwrap().id;
         let other = rusqlite::Connection::open(&path).unwrap();
         other.execute_batch("BEGIN IMMEDIATE").unwrap();
         // Exercise capture's own write failure, before a pending usage flush can fail.
@@ -807,7 +943,7 @@ mod tests {
         other.execute_batch("ROLLBACK").unwrap();
 
         // An unrelated capture retries storage and persists every pending count.
-        let captured = session.capture(&search, "recovered", 105, 100).unwrap();
+        let captured = session.capture(&search, "recovered", 105, 100).unwrap().id;
         assert_eq!(session.health, Health::Healthy);
         assert!(session.pending_usage.is_empty());
         assert!(session.warning.lock().unwrap().is_none());

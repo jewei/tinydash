@@ -66,7 +66,7 @@ export function createLauncherController(options: {
     refreshing: false,
     warning: null,
   });
-  const [error, setError] = createSignal<string>();
+  const [searchError, setSearchError] = createSignal<string>();
   const [indexError, setIndexError] = createSignal<string>();
   const [storageError, setStorageError] = createSignal<LauncherWarning>();
   const [notice, setNotice] = createSignal<string>();
@@ -89,6 +89,9 @@ export function createLauncherController(options: {
       });
       displayedQuery = { value: request.value, mode: request.mode };
       batch(() => {
+        // The queue delivers only current replies. A background retry can
+        // repair search without dismissing App-owned action/startup errors.
+        setSearchError(undefined);
         setResults(response.results);
         setSelected(index);
         setTotal(response.total);
@@ -102,7 +105,7 @@ export function createLauncherController(options: {
     },
     fail(_request, reason) {
       setResults([]);
-      setError(String(reason));
+      setSearchError(String(reason));
     },
     settled: () => setPending(false),
   });
@@ -123,7 +126,7 @@ export function createLauncherController(options: {
 
   function changeQuery(value: string) {
     setQuery(value);
-    setError(undefined);
+    setSearchError(undefined);
     void search(value);
   }
 
@@ -145,8 +148,8 @@ export function createLauncherController(options: {
     files,
     setFiles,
     currency,
-    error,
-    setError,
+    searchError,
+    clearSearchError: () => setSearchError(undefined),
     indexError,
     storageError,
     notice,

@@ -4,6 +4,8 @@ mod currency;
 mod migrations;
 mod pins;
 
+pub use clipboard::{CaptureRevision, CleanupOutcome};
+
 use std::{collections::HashMap, path::Path, time::Duration};
 
 use rusqlite::{Connection, params};

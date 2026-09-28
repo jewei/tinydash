@@ -197,6 +197,103 @@ test("hide then reopen before the old reply settles keeps the new search pending
   });
 });
 
+test("controller clears only a current search failure on a same-query refresh", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const result = await page.evaluate(async (response: SearchResponse) => {
+    const path = "/src/launcherController.ts";
+    const { createLauncherController } = (await import(
+      path
+    )) as typeof import("../src/launcherController");
+    let fail = true;
+    const controller = createLauncherController({
+      desktop: true,
+      send: async () => {
+        if (fail) throw new Error("Search failed");
+        return response;
+      },
+    });
+    controller.setQuery("fixture");
+    await controller.search();
+    const failure = controller.searchError();
+    fail = false;
+    await controller.search(controller.query(), true);
+    const recovered = {
+      query: controller.query(),
+      error: controller.searchError() ?? null,
+      count: controller.results().length,
+      pending: controller.pending(),
+    };
+    controller.dispose();
+    return { failure, recovered };
+  }, contracts.response);
+  expect(result).toEqual({
+    failure: "Error: Search failed",
+    recovered: { query: "fixture", error: null, count: 11, pending: false },
+  });
+});
+
+test("a superseded controller success leaves the failure intact until the current retry settles", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const result = await page.evaluate(async (response: SearchResponse) => {
+    const path = "/src/launcherController.ts";
+    const { createLauncherController } = (await import(
+      path
+    )) as typeof import("../src/launcherController");
+    const replies: {
+      resolve: (response: SearchResponse) => void;
+      reject: (reason: Error) => void;
+    }[] = [];
+    let nextStarted!: () => void;
+    const latestStarted = new Promise<void>((resolve) => {
+      nextStarted = resolve;
+    });
+    const controller = createLauncherController({
+      desktop: true,
+      send: () =>
+        new Promise((resolve, reject) => {
+          replies.push({ resolve, reject });
+          if (replies.length === 3) nextStarted();
+        }),
+    });
+    controller.setQuery("fixture");
+    const initial = controller.search();
+    replies[0].reject(new Error("First failure"));
+    await initial;
+    const old = controller.search(controller.query(), true);
+    const latest = controller.search(controller.query(), true);
+    const beforeOld = replies.length;
+    replies[1].resolve(response);
+    await latestStarted;
+    const afterOld = {
+      error: controller.searchError(),
+      pending: controller.pending(),
+      count: controller.results().length,
+    };
+    replies[2].reject(new Error("Latest failure"));
+    await Promise.all([old, latest]);
+    const afterLatest = {
+      error: controller.searchError(),
+      pending: controller.pending(),
+    };
+    const recovery = controller.search(controller.query(), true);
+    replies[3].resolve(response);
+    await recovery;
+    const recovered = controller.searchError() ?? null;
+    controller.dispose();
+    return { beforeOld, afterOld, afterLatest, recovered };
+  }, contracts.response);
+  expect(result).toEqual({
+    beforeOld: 2,
+    afterOld: { error: "Error: First failure", pending: true, count: 0 },
+    afterLatest: { error: "Error: Latest failure", pending: false },
+    recovered: null,
+  });
+});
+
 test("controller clears stale welcome rows, reports failures, and gates non-desktop search", async ({
   page,
 }) => {
@@ -220,7 +317,7 @@ test("controller clears stale welcome rows, reports failures, and gates non-desk
     const clearedImmediately = controller.results().length;
     await pending;
     const failed = {
-      message: controller.error(),
+      message: controller.searchError(),
       pending: controller.pending(),
     };
     const preview = createLauncherController({
