@@ -24,6 +24,15 @@ pub enum Error {
     Backup(String),
 }
 
+impl Error {
+    /// Only SQLite lock contention is safe to retry without manual recovery.
+    /// Match primary codes, including extended BUSY/LOCKED variants.
+    pub fn is_transient(&self) -> bool {
+        matches!(self, Self::Sqlite(rusqlite::Error::SqliteFailure(error, _))
+            if matches!(error.code, rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked))
+    }
+}
+
 type Result<T> = std::result::Result<T, Error>;
 
 pub struct Database {
@@ -85,6 +94,19 @@ impl Database {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    pub fn save_usage_batch(&mut self, usage: &HashMap<String, Usage>) -> Result<()> {
+        if usage.is_empty() {
+            return Ok(());
+        }
+        // This method owns the transaction; save_usage does not start one.
+        let transaction = self.connection.unchecked_transaction()?;
+        for (id, usage) in usage {
+            self.save_usage(id, *usage)?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
     pub fn save_usage(&self, id: &str, usage: Usage) -> Result<()> {
         self.connection.execute(
             "INSERT INTO usage_history (result_id, use_count, last_used_at)
@@ -100,6 +122,71 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_busy_and_locked_errors_are_transient() {
+        for code in [
+            rusqlite::ffi::SQLITE_BUSY,
+            rusqlite::ffi::SQLITE_BUSY_SNAPSHOT,
+            rusqlite::ffi::SQLITE_LOCKED,
+            rusqlite::ffi::SQLITE_LOCKED_SHAREDCACHE,
+        ] {
+            assert!(
+                Error::Sqlite(rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(code),
+                    None
+                ))
+                .is_transient()
+            );
+        }
+        for code in [
+            rusqlite::ffi::SQLITE_CORRUPT,
+            rusqlite::ffi::SQLITE_NOTADB,
+            rusqlite::ffi::SQLITE_READONLY,
+            rusqlite::ffi::SQLITE_FULL,
+            rusqlite::ffi::SQLITE_CONSTRAINT,
+        ] {
+            assert!(
+                !Error::Sqlite(rusqlite::Error::SqliteFailure(
+                    rusqlite::ffi::Error::new(code),
+                    None
+                ))
+                .is_transient()
+            );
+        }
+        assert!(!Error::Backup("database is locked".into()).is_transient());
+        assert!(
+            !Error::NewerSchema {
+                found: 999,
+                supported: 5
+            }
+            .is_transient()
+        );
+    }
+
+    #[test]
+    fn usage_batch_is_atomic_on_failure() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut database = Database::open(&directory.path().join("state.sqlite3")).unwrap();
+        let entries = HashMap::from([
+            (
+                "app:good".into(),
+                Usage {
+                    count: 1,
+                    last_used_at: 100,
+                },
+            ),
+            (
+                "app:invalid".into(),
+                Usage {
+                    count: 0,
+                    last_used_at: -1,
+                },
+            ),
+        ]);
+        assert!(database.save_usage_batch(&entries).is_err());
+        assert!(database.load_usage().unwrap().is_empty());
+    }
 
     #[test]
     fn usage_survives_reopen_and_upserts_without_duplicate_rows() {

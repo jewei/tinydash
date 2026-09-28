@@ -83,6 +83,7 @@ export default function App(
   const controller = createLauncherController({
     desktop,
     send: backend.search,
+    cancelBackend: backend.cancelSearch,
   });
   const {
     visible,
