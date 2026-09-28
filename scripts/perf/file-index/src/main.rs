@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use nucleo_matcher::Matcher;
+#[cfg(feature = "track-allocations")]
 use serde::Serialize;
 #[cfg(not(feature = "track-allocations"))]
 use std::time::Instant;
@@ -165,6 +166,7 @@ fn fixture(corpus: &str, count: usize) -> Vec<file_provider::FileEntry> {
                 id: format!("file:{path}"),
                 name,
                 path,
+                folder: false,
             }
         })
         .collect()
@@ -321,6 +323,7 @@ fn equivalence_run() -> serde_json::Value {
             id: format!("file:{path}"),
             path: (*path).into(),
             name: path.rsplit(['/', '\\']).next().expect("name").into(),
+            folder: false,
         })
         .collect();
     let provider = file_provider::FileProvider::new(entries);

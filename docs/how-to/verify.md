@@ -8,7 +8,7 @@ Run commands from the repository root. Install dependencies with `bun install --
 bun run verify
 ```
 
-This checks public file paths, local Markdown links and anchors, Prettier and Rust formatting, and TypeScript. It then runs the browser tests tagged `@smoke`. These cover welcome search, category navigation, password actions, and the repository guards.
+This checks public file paths, local Markdown links and anchors, focused documentation contracts, CI/release-checker regressions, Prettier and Rust formatting, and TypeScript. It then runs the browser tests tagged `@smoke`. These cover welcome search, category navigation, password actions, and the repository guards.
 
 The command selects a free loopback port. Playwright starts its own Vite process and refuses to reuse another server. Each run uses a separate browser context and output directory. The app backend is mocked in browser tests.
 
@@ -30,7 +30,7 @@ This checks all commits reachable from the supplied commit, including merge chan
 bun run verify:full
 ```
 
-This adds the frontend build, Clippy, Rust tests, and all browser tests. A warm Rust cache reduces the time. Compilation is part of the first run. The fast check does not replace these checks before a merge.
+This adds the frontend build, Clippy, Rust tests, compilation of both synthetic performance-harness modes, and all browser tests. A warm Rust cache reduces the time. Compilation is part of the first run. The fast check does not replace these checks before a merge.
 
 For a focused browser check with retained successful traces, use a recipe from the [feature map](../reference/features/README.md):
 
@@ -45,9 +45,28 @@ Use focused tests during diagnosis. After the final relevant edit, repeat affect
 
 ## CI triggers
 
-The Checks workflow skips branch pushes and pull requests when all changed files are Markdown files with the `.md` or `.markdown` extension, or files under `docs/`. This also skips the desktop builds and native app checks. If any other file changes, the workflow runs. The separate Verification tools workflow checks changes to the verification skill, procedures, feature map, and tools, including Markdown-only changes. It does not replace the agent exercises in [test the verification procedure](verify-verification.md).
+The Checks workflow always starts for pull requests, merge queues, pushes to `main`, version-tag pushes, and manual requests. Feature-branch pushes do not duplicate the pull request's desktop builds. No workflow-level path filter can leave its required status pending on a documentation-only change.
 
-Manual runs and tag pushes still run the checks. The Release candidate workflow also runs for version tags or manual requests. See [GitHub path filters](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore) for the trigger rules.
+The stable required status is **`Required checks`** (workflow: Checks, job ID: `required`). Configure branch protection or a ruleset to require this GitHub Actions check, not a matrix job name. Repository administrators must configure that rule separately; a workflow file cannot enable branch protection.
+
+Every run executes the existing repository/link checker, formatting, focused documentation contracts, and checker regression tests in the lightweight `repository` job. For documentation-only changes (`docs/**`, `.md`, or `.markdown`), `quick`, `desktop`, and `native` deliberately skip. Other paths, mixed changes, and deleted or renamed source files require all three jobs. The three-platform builds, Clippy/Rust tests, browser tests, installer checks, and Windows/Linux X11 native suite remain required for source changes. Manual, tag, and new-branch runs conservatively use the full pipeline.
+
+The final job uses `always()` and checks every dependency. It accepts only a successful detector and repository check, plus either three successful source jobs or three explicitly classified documentation skips. Missing outputs, failed/cancelled jobs, and unexpected skips fail closed. A cancelled workflow is not a merge pass. The separate Verification tools workflow still tests its skill, procedures, feature map, and tools; it does not replace the final status or the agent exercises in [test the verification procedure](verify-verification.md).
+
+### Maintain the lightweight checks
+
+```sh
+bun run check:repo
+bun scripts/verify/docs.ts
+bun test scripts/verify/checks.test.ts scripts/verify/docs.test.ts scripts/release/evidence.test.ts
+bun run format:check
+```
+
+The documentation checker reads current Rust defaults, settings ranges, CLI options/categories, result limits, ranking bonuses, and category order, then compares their duplicated reference text. It is a focused drift guard, not a documentation generator or a proof of all prose. Its regression tests deliberately mutate both source facts and documentation. Intentional non-default examples, such as disabling clipboard capture, stay explicit rather than being rewritten to match legacy deserialization defaults.
+
+All third-party workflow actions use full commit SHAs. `checks.test.ts` verifies every workflow against the reviewed action/version pins. To update one, resolve `gh api repos/OWNER/REPO/git/ref/tags/TAG`; if its object is an annotated tag, follow `git/tags/SHA` until reaching a commit. Review upstream changes, record the version comment, and update the workflow and test mapping together. The current pins were resolved through that API; the rust-cache pin uses the peeled commit, not its signed tag-object SHA.
+
+For repeatable performance work and measurement limits, see [measure performance](measure-performance.md).
 
 ## Drive the real desktop app
 
