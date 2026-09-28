@@ -2,6 +2,7 @@ name: Verification tools
 
 on:
   push:
+    branches: [main]
     paths:
       - ".agents/skills/verify-tinydash/**"
       - "docs/how-to/verify*.md"
@@ -31,18 +32,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: oven-sh/setup-bun@v2.2.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - run: bun run check:repo
       - run: bun run format:check
       - run: bun run typecheck
+      - run: bunx --bun --no-install playwright install --with-deps chromium
       - run: bun run verify:browser tests/verification.spec.ts tests/native-cancellation.spec.ts
       - name: Retain verification evidence
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: verification-tools
           path: test-results/verification/
