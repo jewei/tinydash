@@ -46,6 +46,11 @@ const MIGRATIONS: &[&str] = &[
     BEGIN
         DELETE FROM pinned_items WHERE result_id = 'clipboard:' || OLD.id;
     END;",
+    // IDs never repeat (AUTOINCREMENT). A revision advances only on capture,
+    // not touches/pins/order changes. STRICT rejects integer overflow rather
+    // than letting a revision wrap or become a reused floating-point value.
+    "ALTER TABLE clipboard_history ADD COLUMN capture_revision INTEGER NOT NULL DEFAULT 1
+        CHECK (capture_revision >= 1);",
 ];
 
 pub const VERSION: usize = MIGRATIONS.len();
@@ -127,6 +132,73 @@ mod tests {
                     .get::<_, u32>(0))
                 .expect("clipboard"),
             0
+        );
+    }
+
+    #[test]
+    fn capture_revision_upgrade_preserves_existing_identity_timestamps_and_pins() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        migrate(&mut connection, &MIGRATIONS[..5]).unwrap();
+        connection.execute("INSERT INTO clipboard_history (content, created_at, sort_order) VALUES ('synthetic existing', 100, 7)", []).unwrap();
+        connection
+            .execute(
+                "INSERT INTO pinned_items VALUES ('clipboard', 'clipboard:1')",
+                [],
+            )
+            .unwrap();
+        apply(&mut connection).unwrap();
+        apply(&mut connection).unwrap();
+        let row: (i64, i64, i64, i64, i64) = connection.query_row("SELECT id, created_at, sort_order, pinned, capture_revision FROM clipboard_history", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))).unwrap();
+        assert_eq!(row, (1, 100, 7, 1, 1));
+    }
+
+    #[test]
+    fn revision_upgrade_backs_up_schema_five_before_changing_saved_history() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("state.sqlite3");
+        let mut connection = Connection::open(&path).unwrap();
+        migrate(&mut connection, &MIGRATIONS[..5]).unwrap();
+        connection.execute("INSERT INTO clipboard_history (content, created_at, sort_order) VALUES ('synthetic pre-migration', 100, 1)", []).unwrap();
+        drop(connection);
+        let database = crate::db::Database::open(&path).unwrap();
+        assert_eq!(
+            database.load_clipboard().unwrap()[0].content,
+            "synthetic pre-migration"
+        );
+        let restored = tempfile::tempdir().unwrap();
+        tar::Archive::new(std::fs::File::open(directory.path().join("recovery.tar")).unwrap())
+            .unpack(restored.path())
+            .unwrap();
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(restored.path().join("manifest.json")).unwrap())
+                .unwrap();
+        assert_eq!(manifest["sourceSchema"], 5);
+        assert_eq!(manifest["targetSchema"], VERSION);
+        let snapshot = Connection::open(restored.path().join("tinydash.sqlite3")).unwrap();
+        assert_eq!(
+            snapshot
+                .pragma_query_value(None, "user_version", |row| row.get::<_, usize>(0))
+                .unwrap(),
+            5
+        );
+        assert!(
+            snapshot
+                .prepare("SELECT capture_revision FROM clipboard_history")
+                .is_err()
+        );
+        assert_eq!(
+            snapshot
+                .query_row("SELECT content FROM clipboard_history", [], |row| row
+                    .get::<_, String>(0))
+                .unwrap(),
+            "synthetic pre-migration"
+        );
+        let migrated = Connection::open(&path).unwrap();
+        assert_eq!(
+            migrated
+                .pragma_query_value(None, "user_version", |row| row.get::<_, usize>(0))
+                .unwrap(),
+            VERSION
         );
     }
 

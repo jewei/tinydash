@@ -1497,6 +1497,40 @@ test("shows a storage warning while search and launch remain available", async (
     ]);
 });
 
+test("keeps a pending sensitive-cleanup warning visible across successful search and launch", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Clipboard");
+  // Mocked IPC proves rendering only. Real SQLite session tests prove that
+  // unrelated successful writes preserve this warning until cleanup resolves.
+  await page.evaluate(() => {
+    window.__launcherTest.storageError =
+      "Sensitive clipboard cleanup is pending. Saved text may remain. Pinned entries are kept; unpin or delete them to finish cleanup. Automatic retries last only for this session; quitting loses pending cleanup. Cleanup capacity is full. Capture is paused until cleanup makes room. TinyDash retries cleanup while running, even if the clipboard stays unchanged.";
+    return window.__launcherTest.emit("clipboard-changed", null);
+  });
+  const warning = page.getByRole("alert");
+  await expect(warning).toContainText("Sensitive clipboard cleanup is pending");
+  await expect(warning).toContainText("Capture is paused");
+  await selectCategory(page, "Apps");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("sa");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await input.press("Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      { command: "execute_action", payload: { id: "app-1", action: "launch" } },
+    ]);
+  await expect(warning).toContainText("quitting loses pending cleanup");
+  await selectCategory(page, "Clipboard");
+  await page.evaluate(() => {
+    window.__launcherTest.storageError = null;
+    return window.__launcherTest.emit("clipboard-changed", null);
+  });
+  await expect(warning).toHaveCount(0);
+});
+
 test("refreshes Rust ranking when the launcher preserves the query", async ({
   page,
 }) => {
