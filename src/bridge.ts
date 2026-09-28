@@ -21,9 +21,11 @@ export type SearchMode =
   | "url"
   | "web";
 
+export type FilePhase = "disabled" | "idle" | "queued" | "scanning" | "failed";
+
 export interface FileStatus {
   total: number;
-  indexing: boolean;
+  phase: FilePhase;
   warning: string | null;
 }
 

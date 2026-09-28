@@ -22,11 +22,28 @@ use crate::{
 
 #[derive(Default)]
 pub struct FileScan {
-    running: AtomicBool,
     generation: AtomicU64,
-    warning: Mutex<Option<String>>,
+    lifecycle: Mutex<Lifecycle>,
     sender: Mutex<Option<SyncSender<Request>>>,
     stopped: Arc<AtomicBool>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub enum FilePhase {
+    Disabled,
+    #[default]
+    Idle,
+    Queued,
+    Scanning,
+    Failed,
+}
+
+#[derive(Default)]
+struct Lifecycle {
+    phase: FilePhase,
+    warning: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -34,14 +51,39 @@ pub struct FileScan {
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FileStatus {
     pub total: usize,
-    pub indexing: bool,
+    pub phase: FilePhase,
     pub warning: Option<String>,
 }
 
 impl FileScan {
-    pub(super) fn invalidate(&self) {
+    pub(super) fn new(settings: &Settings) -> Self {
+        let scan = Self::default();
+        scan.lifecycle.lock().unwrap().phase = if Self::enabled(settings) {
+            FilePhase::Queued
+        } else {
+            FilePhase::Disabled
+        };
+        scan
+    }
+
+    fn enabled(settings: &Settings) -> bool {
+        settings
+            .file_search_roots
+            .as_ref()
+            .is_none_or(|roots| !roots.is_empty())
+    }
+
+    pub(super) fn invalidate(&self, settings: &Settings) {
+        // Generation and status publication share this lock. A late old cycle
+        // cannot restore its warning or phase after settings invalidation.
+        let mut lifecycle = self.lifecycle.lock().unwrap();
         self.generation.fetch_add(1, Ordering::AcqRel);
-        self.warning(None);
+        lifecycle.warning = None;
+        lifecycle.phase = if Self::enabled(settings) {
+            FilePhase::Queued
+        } else {
+            FilePhase::Disabled
+        };
     }
 
     fn generation(&self) -> u64 {
@@ -53,10 +95,11 @@ impl FileScan {
     }
 
     pub fn status(&self, total: usize) -> FileStatus {
+        let lifecycle = self.lifecycle.lock().unwrap();
         FileStatus {
             total,
-            indexing: self.running.load(Ordering::Acquire),
-            warning: self.warning.lock().ok().and_then(|warning| warning.clone()),
+            phase: lifecycle.phase,
+            warning: lifecycle.warning.clone(),
         }
     }
 
@@ -69,34 +112,84 @@ impl FileScan {
         }
     }
 
-    fn warning(&self, warning: Option<String>) {
-        if let Ok(mut stored) = self.warning.lock() {
-            *stored = warning;
+    fn warning_for(&self, generation: u64, warning: Option<String>) {
+        let mut lifecycle = self.lifecycle.lock().unwrap();
+        if !self.cancelled(generation) {
+            lifecycle.warning = warning;
         }
     }
 
-    fn warning_for(&self, generation: u64, warning: Option<String>) {
-        if let Ok(mut stored) = self.warning.lock()
-            && !self.cancelled(generation)
-        {
-            *stored = warning;
+    fn queued(&self) -> bool {
+        let mut lifecycle = self.lifecycle.lock().unwrap();
+        if matches!(lifecycle.phase, FilePhase::Idle | FilePhase::Failed) {
+            lifecycle.phase = FilePhase::Queued;
+            true
+        } else {
+            false
         }
+    }
+
+    fn begin(&self, generation: u64, rx: &Receiver<Request>) -> bool {
+        let mut lifecycle = self.lifecycle.lock().unwrap();
+        if self.cancelled(generation) || lifecycle.phase == FilePhase::Disabled {
+            return false;
+        }
+        // Any signal already waiting is covered by the scan about to start.
+        // Manual enqueue uses this lock, so later refreshes remain pending.
+        if matches!(rx.try_recv(), Ok(Request::Stop)) {
+            self.stopped.store(true, Ordering::Release);
+            return false;
+        }
+        lifecycle.phase = FilePhase::Scanning;
+        true
+    }
+
+    fn finish_stopped(&self) -> bool {
+        let mut lifecycle = self.lifecycle.lock().unwrap();
+        if matches!(lifecycle.phase, FilePhase::Queued | FilePhase::Scanning) {
+            lifecycle.phase = FilePhase::Idle;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn finish(&self, generation: u64, rx: &Receiver<Request>, retry: bool) -> Option<Request> {
+        let mut lifecycle = self.lifecycle.lock().unwrap();
+        // Own the pending request across cooldown even though the bounded
+        // channel is now empty. Further signals coalesce into this same cycle.
+        let pending = rx.try_recv().ok().or(retry.then_some(Request::Refresh));
+        if self.generation() == generation && lifecycle.phase != FilePhase::Disabled {
+            lifecycle.phase = if pending.is_some() && !self.stopped.load(Ordering::Acquire) {
+                FilePhase::Queued
+            } else {
+                FilePhase::Idle
+            };
+        }
+        pending
     }
 
     fn request(
         &self,
         spawn: impl FnOnce(Receiver<Request>, SyncSender<Request>) -> std::io::Result<()>,
-    ) -> std::io::Result<()> {
+    ) -> std::io::Result<bool> {
         let mut sender = self
             .sender
             .lock()
             .map_err(|_| std::io::Error::other("File scanner is unavailable"))?;
         if self.stopped.load(Ordering::Acquire) {
-            return Ok(());
+            return Ok(false);
+        }
+        // Serialize manual enqueue with completion's pending-request check.
+        let mut lifecycle = self.lifecycle.lock().unwrap();
+        let generation = self.generation();
+        let changed = matches!(lifecycle.phase, FilePhase::Idle | FilePhase::Failed);
+        if changed {
+            lifecycle.phase = FilePhase::Queued;
         }
         if let Some(active) = sender.as_ref() {
             match active.try_send(Request::Refresh) {
-                Ok(()) | Err(TrySendError::Full(_)) => return Ok(()),
+                Ok(()) | Err(TrySendError::Full(_)) => return Ok(changed),
                 // An exited worker drops its receiver. Discard the dead sender
                 // so settings changes and manual refresh can start a new worker.
                 Err(TrySendError::Disconnected(_)) => *sender = None,
@@ -104,9 +197,11 @@ impl FileScan {
         }
         if sender.is_none() {
             let (tx, rx) = sync_channel(1);
-            self.running.store(true, Ordering::Release);
             if let Err(error) = spawn(rx, tx.clone()) {
-                self.running.store(false, Ordering::Release);
+                if self.generation() == generation && lifecycle.phase != FilePhase::Disabled {
+                    lifecycle.phase = FilePhase::Failed;
+                    lifecycle.warning = Some(format!("Cannot start the file scanner: {error}"));
+                }
                 return Err(error);
             }
             *sender = Some(tx);
@@ -114,7 +209,7 @@ impl FileScan {
         if let Some(sender) = sender.as_ref() {
             let _ = sender.try_send(Request::Refresh);
         }
-        Ok(())
+        Ok(changed)
     }
 }
 
@@ -125,16 +220,14 @@ pub fn refresh_files(app: AppHandle) {
 
 pub fn scan_files(app: &AppHandle) {
     let state = app.state::<LauncherState>();
-    if let Err(error) = state.files.request(|rx, callback_sender| {
+    let transition = state.files.request(|rx, callback_sender| {
         let worker = app.clone();
         std::thread::Builder::new()
             .name("file-index".into())
             .spawn(move || run_worker(worker, rx, callback_sender))
             .map(|_| ())
-    }) {
-        state
-            .files
-            .warning(Some(format!("Cannot start the file scanner: {error}")));
+    });
+    if !matches!(transition, Ok(false)) {
         let _ = app.emit("files-changed", ());
     }
 }
@@ -231,6 +324,7 @@ fn extend_rest_for_work(deadline: &mut Instant, started: Instant, finished: Inst
 fn run_worker(worker: AppHandle, rx: Receiver<Request>, callback_sender: SyncSender<Request>) {
     let state = worker.state::<LauncherState>();
     run_worker_loop(
+        &file_watch::RealClock,
         &state,
         rx,
         callback_sender,
@@ -245,6 +339,7 @@ fn run_worker(worker: AppHandle, rx: Receiver<Request>, callback_sender: SyncSen
 // Keep the real worker loop independent of Tauri so phase boundaries, status
 // events and workload accounting can be tested with controlled slow OS calls.
 fn run_worker_loop(
+    clock: &impl file_watch::WorkerClock,
     state: &LauncherState,
     rx: Receiver<Request>,
     callback_sender: SyncSender<Request>,
@@ -264,20 +359,24 @@ fn run_worker_loop(
     let mut watcher: Option<FileWatcher> = None;
     let mut active_settings: Option<Settings> = None;
     let mut active_generation = state.files.generation();
-    let mut not_before = Instant::now();
+    let mut not_before = clock.now();
     let mut metrics = ScanMetrics::new();
-    while let Ok(request) = rx.recv() {
+    let mut pending = None;
+    while let Some(request) = pending.take().or_else(|| rx.recv().ok()) {
         if stop.load(Ordering::Acquire) || matches!(request, Request::Stop) {
             break;
+        }
+        if state.files.queued() {
+            notify();
         }
         let mut keep_running = |deadline: &mut Instant| {
             if state.files.generation() != active_generation {
                 // Settings/disable must remove old watches even during a long
                 // cooldown, not just when the replacement scan finally starts.
                 if let Some(obsolete) = watcher.take() {
-                    let started = Instant::now();
+                    let started = clock.now();
                     drop(obsolete);
-                    let finished = Instant::now();
+                    let finished = clock.now();
                     let elapsed = finished.duration_since(started);
                     metrics.duration += elapsed;
                     // Disposal is work too; it cannot consume the remaining
@@ -289,11 +388,12 @@ fn run_worker_loop(
             }
             !stop.load(Ordering::Acquire)
         };
-        if !file_watch::wait_for_budget(&rx, &mut not_before, &mut keep_running) {
+        if !file_watch::wait_for_budget(clock, &rx, &mut not_before, &mut keep_running) {
             break;
         }
         if matches!(request, Request::Changed)
             && !file_watch::settle_cancellable(
+                clock,
                 &rx,
                 Duration::from_millis(300),
                 Duration::from_secs(2),
@@ -304,7 +404,7 @@ fn run_worker_loop(
         }
         // A settings change during settling may have disposed watches and
         // extended the deadline. Do not start new work on that cleanup's rest.
-        if !file_watch::wait_for_budget(&rx, &mut not_before, &mut keep_running) {
+        if !file_watch::wait_for_budget(clock, &rx, &mut not_before, &mut keep_running) {
             break;
         }
         // Read the generation first: a concurrent settings write will either
@@ -312,11 +412,16 @@ fn run_worker_loop(
         let generation = state.files.generation();
         let settings = state.settings();
         active_generation = generation;
-        state.files.running.store(true, Ordering::Release);
+        if !state.files.begin(generation, &rx) {
+            if stop.load(Ordering::Acquire) {
+                break;
+            }
+            continue;
+        }
         notify();
         // Account for the entire cycle, not only traversal: root lookup,
         // watcher creation/registration and obsolete-watcher disposal can block.
-        let started = Instant::now();
+        let started = clock.now();
         let mut report = ScanReport::default();
         let cancelled = || state.files.cancelled(generation);
         let completed = (|| {
@@ -413,20 +518,19 @@ fn run_worker_loop(
             active_settings = None;
             watch_warning = None;
         }
-        let finished = Instant::now();
+        let finished = clock.now();
         let elapsed = finished.duration_since(started);
         not_before = finished + file_watch::scan_rest(elapsed);
         metrics.record(elapsed, report.visited, obsolete);
-        state.files.running.store(false, Ordering::Release);
-        notify(); // Also notify on cancellation, before entering cooldown.
+        pending = state.files.finish(generation, &rx, obsolete);
+        notify(); // Includes queued replacement work, never a false idle gap.
         if stop.load(Ordering::Acquire) {
             break;
         }
-        if obsolete {
-            let _ = callback_sender.try_send(Request::Refresh);
-        }
     }
-    state.files.running.store(false, Ordering::Release);
+    if state.files.finish_stopped() {
+        notify();
+    }
     metrics
 }
 
@@ -434,6 +538,48 @@ fn run_worker_loop(
 mod tests {
     use super::*;
     use crate::launcher::query::SearchMode;
+    use file_watch::WorkerClock;
+    use std::{
+        cell::{Cell, RefCell},
+        sync::mpsc::RecvTimeoutError,
+    };
+
+    struct TestClock<'a> {
+        now: Cell<Instant>,
+        waiting: RefCell<Box<dyn FnMut() + 'a>>,
+    }
+
+    impl TestClock<'_> {
+        fn new() -> Self {
+            Self {
+                now: Cell::new(Instant::now()),
+                waiting: RefCell::new(Box::new(|| {})),
+            }
+        }
+
+        fn advance(&self, elapsed: Duration) {
+            self.now.set(self.now.get() + elapsed);
+        }
+    }
+
+    impl WorkerClock for TestClock<'_> {
+        fn now(&self) -> Instant {
+            self.now.get()
+        }
+
+        fn recv_timeout(
+            &self,
+            rx: &Receiver<Request>,
+            timeout: Duration,
+        ) -> Result<Request, RecvTimeoutError> {
+            (self.waiting.borrow_mut())();
+            self.advance(timeout);
+            rx.try_recv().map_err(|error| match error {
+                std::sync::mpsc::TryRecvError::Empty => RecvTimeoutError::Timeout,
+                std::sync::mpsc::TryRecvError::Disconnected => RecvTimeoutError::Disconnected,
+            })
+        }
+    }
 
     #[test]
     fn changing_roots_removes_old_results_and_rejects_an_unfinished_old_scan() {
@@ -693,7 +839,7 @@ mod tests {
         let files = FileScan::default();
         let old = files.generation();
         files.warning_for(old, Some("old warning".into()));
-        files.invalidate();
+        files.invalidate(&Settings::default());
         files.warning_for(old, Some("late old warning".into()));
         assert!(files.status(0).warning.is_none());
         files.warning_for(files.generation(), Some("current warning".into()));
@@ -702,9 +848,8 @@ mod tests {
 
     #[test]
     fn worker_accounts_preparation_and_registration_before_rest_and_notifies_cancellation() {
-        // Exercise the production loop, including real scans and registration.
-        // A slow OS call is represented by a delayed phase callback, not by
-        // feeding synthetic durations directly into the budget formula.
+        // The production loop uses a controlled clock at OS phase boundaries.
+        // No sleep or assertion depends on real filesystem speed.
         for phase in [
             "cancelled preparation",
             "registration",
@@ -718,10 +863,21 @@ mod tests {
             };
             let state = LauncherState::new(settings, vec![]);
             let (sender, receiver) = sync_channel(1);
+            *state.files.sender.lock().unwrap() = Some(sender.clone());
             sender.try_send(Request::Refresh).unwrap();
             let mut events = Vec::new();
             let delay = Duration::from_millis(400);
+            let clock = TestClock::new();
+            let started = clock.now();
+            *clock.waiting.borrow_mut() = Box::new(|| {
+                assert_eq!(state.files.status(0).phase, FilePhase::Queued);
+                // Flood both request kinds throughout rest; none may bypass it
+                // or cause an idle status after wait_for_budget consumes them.
+                assert!(!state.files.request(|_, _| panic!("second worker")).unwrap());
+                let _ = sender.try_send(Request::Changed);
+            });
             let metrics = run_worker_loop(
+                &clock,
                 &state,
                 receiver,
                 sender.clone(),
@@ -730,43 +886,51 @@ mod tests {
                         return None;
                     }
                     if phase == "cancelled preparation" {
-                        std::thread::sleep(delay);
-                        state.files.invalidate();
+                        clock.advance(delay);
+                        state.files.invalidate(&state.settings());
                         return None;
                     }
                     Some((settings.file_search_roots.clone().unwrap(), None))
                 },
                 || {
-                    events.push((state.files.status(0).indexing, Instant::now()));
-                    if events.len() == 2 {
-                        // Refresh must not bypass the post-work rest.
-                        let _ = sender.try_send(Request::Refresh);
-                    } else if events.len() == 3 {
+                    events.push((state.files.status(0).phase, clock.now()));
+                    if events.len() == 3 {
                         state.files.stop();
                     }
                 },
-                |watcher, report, cancelled| {
+                |_, _, cancelled| {
                     assert_ne!(phase, "cancelled preparation");
-                    std::thread::sleep(delay);
+                    clock.advance(delay);
                     if phase == "cancelled registration" {
-                        state.files.invalidate();
+                        state.files.invalidate(&state.settings());
                     }
-                    watcher.update(report, cancelled)
+                    // Manual refresh during registration coalesces with the
+                    // new watch's follow-up. It still owes the entire rest.
+                    let _ = sender.try_send(Request::Refresh);
+                    (!cancelled()).then_some((true, None))
                 },
             );
             assert_eq!(
                 events.iter().map(|event| event.0).collect::<Vec<_>>(),
-                [true, false, true, false],
+                [
+                    FilePhase::Scanning,
+                    FilePhase::Queued,
+                    FilePhase::Scanning,
+                    FilePhase::Idle
+                ],
                 "{phase}"
             );
-            assert!(metrics.duration >= delay, "Unaccounted {phase}");
+            assert_eq!(metrics.duration, delay, "Unaccounted {phase}");
+            assert_eq!(events[0].1, started);
+            assert_eq!(events[1].1, started + delay);
             assert_eq!(metrics.scans, 2);
             assert_eq!(
                 metrics.cancelled,
                 if phase == "registration" { 1 } else { 2 }
             );
-            assert!(
-                events[2].1.duration_since(events[1].1) >= delay * 3,
+            assert_eq!(
+                events[2].1.duration_since(events[1].1),
+                delay * 3,
                 "Rest was consumed by {phase}"
             );
             if phase == "cancelled preparation" {
@@ -784,24 +948,229 @@ mod tests {
         sender.try_send(Request::Refresh).unwrap();
         let mut events = Vec::new();
         let delay = Duration::from_millis(20);
+        let clock = TestClock::new();
         let metrics = run_worker_loop(
+            &clock,
             &state,
             receiver,
             sender,
             |_, _| {
-                std::thread::sleep(delay);
+                clock.advance(delay);
                 state.files.stop();
                 // Even a resolver returning stale roots must not start watches.
                 Some((vec![PathBuf::from("/obsolete")], None))
             },
-            || events.push(state.files.status(0).indexing),
+            || events.push(state.files.status(0).phase),
             |_, _, _| panic!("registration after shutdown"),
         );
-        assert_eq!(events, [true, false]);
+        assert_eq!(events, [FilePhase::Scanning, FilePhase::Idle]);
         assert_eq!(metrics.scans, 1);
         assert_eq!(metrics.cancelled, 1);
         assert_eq!(metrics.visited, 0);
-        assert!(metrics.duration >= delay);
+        assert_eq!(metrics.duration, delay);
+    }
+
+    #[test]
+    fn lifecycle_coalesces_requests_and_rejects_stale_publication() {
+        let settings = Settings::default();
+        let files = FileScan::new(&settings);
+        let mut receiver = None;
+        files
+            .request(|rx, _| {
+                receiver = Some(rx);
+                Ok(())
+            })
+            .unwrap();
+        let rx = receiver.unwrap();
+        let generation = files.generation();
+        assert_eq!(files.status(0).phase, FilePhase::Queued);
+        assert!(files.begin(generation, &rx));
+        assert!(
+            rx.try_recv().is_err(),
+            "pre-scan signal is covered by this scan"
+        );
+        for _ in 0..100 {
+            assert!(!files.request(|_, _| panic!("second worker")).unwrap());
+        }
+        assert_eq!(files.status(0).phase, FilePhase::Scanning);
+        let pending = files.finish(generation, &rx, false);
+        assert!(matches!(pending, Some(Request::Refresh)));
+        assert_eq!(files.status(0).phase, FilePhase::Queued);
+        assert!(
+            rx.try_recv().is_err(),
+            "queued status must outlive consumed signals"
+        );
+        assert!(files.begin(generation, &rx));
+        assert!(files.finish(generation, &rx, false).is_none());
+        assert_eq!(files.status(0).phase, FilePhase::Idle);
+        assert!(files.request(|_, _| panic!("second worker")).unwrap());
+        assert_eq!(files.status(0).phase, FilePhase::Queued);
+        assert!(files.begin(generation, &rx));
+        files.invalidate(&settings);
+        files.warning_for(generation, Some("obsolete".into()));
+        files.finish(generation, &rx, false);
+        assert_eq!(files.status(0).phase, FilePhase::Queued);
+        assert!(files.status(0).warning.is_none());
+        let disabled = Settings {
+            file_search_roots: Some(vec![]),
+            ..settings
+        };
+        files.invalidate(&disabled);
+        files.finish(generation, &rx, true);
+        assert!(!files.begin(files.generation(), &rx));
+        assert_eq!(files.status(0).phase, FilePhase::Disabled);
+    }
+
+    #[test]
+    fn cooldown_root_changes_use_latest_settings_and_disable_stays_disabled() {
+        let state = LauncherState::new(
+            Settings {
+                file_watch_enabled: false,
+                ..Settings::default()
+            },
+            vec![],
+        );
+        let (sender, receiver) = sync_channel(1);
+        sender.try_send(Request::Refresh).unwrap();
+        let cycle = Cell::new(0);
+        let changed = Cell::new(false);
+        let clock = TestClock::new();
+        let base = clock.now();
+        let mut events = Vec::new();
+        *clock.waiting.borrow_mut() = Box::new(|| {
+            assert_eq!(state.files.status(0).phase, FilePhase::Queued);
+            if cycle.get() == 1 && !changed.replace(true) {
+                for root in ["/old", "/newest"] {
+                    state.replace_settings(Settings {
+                        file_search_roots: Some(vec![root.into()]),
+                        file_watch_enabled: false,
+                        ..Settings::default()
+                    });
+                    let _ = sender.try_send(Request::Refresh);
+                }
+            } else if cycle.get() == 2 {
+                state.replace_settings(Settings {
+                    file_search_roots: Some(vec![]),
+                    ..state.settings()
+                });
+                assert_eq!(state.files.status(0).phase, FilePhase::Disabled);
+                state.files.stop();
+            }
+        });
+        let metrics = run_worker_loop(
+            &clock,
+            &state,
+            receiver,
+            sender.clone(),
+            |settings, _| {
+                cycle.set(cycle.get() + 1);
+                if cycle.get() == 2 {
+                    assert_eq!(
+                        settings.file_search_roots,
+                        Some(vec![PathBuf::from("/newest")])
+                    );
+                    assert_eq!(clock.now(), base + Duration::from_secs(4));
+                }
+                clock.advance(Duration::from_secs(1));
+                let _ = sender.try_send(Request::Refresh);
+                Some((vec![], None))
+            },
+            || events.push(state.files.status(0).phase),
+            |_, _, _| panic!("watching is off"),
+        );
+        assert_eq!(
+            events,
+            [
+                FilePhase::Scanning,
+                FilePhase::Queued,
+                FilePhase::Scanning,
+                FilePhase::Queued
+            ]
+        );
+        assert_eq!(metrics.scans, 2);
+        assert_eq!(metrics.duration, Duration::from_secs(2));
+        assert_eq!(state.files.status(0).phase, FilePhase::Disabled);
+        assert_eq!(state.search.lock().unwrap().file_count(), 0);
+    }
+
+    #[test]
+    fn automatic_followup_remains_queued_through_rest_and_settling() {
+        let state = LauncherState::new(
+            Settings {
+                file_watch_enabled: false,
+                ..Settings::default()
+            },
+            vec![],
+        );
+        let (sender, receiver) = sync_channel(1);
+        sender.try_send(Request::Refresh).unwrap();
+        let clock = TestClock::new();
+        let base = clock.now();
+        let mut events = Vec::new();
+        *clock.waiting.borrow_mut() = Box::new(|| {
+            assert_eq!(state.files.status(0).phase, FilePhase::Queued);
+        });
+        let metrics = run_worker_loop(
+            &clock,
+            &state,
+            receiver,
+            sender.clone(),
+            |_, cancelled| {
+                if cancelled() {
+                    return None;
+                }
+                clock.advance(Duration::from_secs(1));
+                sender.try_send(Request::Changed).unwrap();
+                Some((vec![], None))
+            },
+            || {
+                events.push((state.files.status(0).phase, clock.now()));
+                if events.len() == 3 {
+                    state.files.stop();
+                }
+            },
+            |_, _, _| panic!("watching is off"),
+        );
+        assert_eq!(
+            events.iter().map(|event| event.0).collect::<Vec<_>>(),
+            [
+                FilePhase::Scanning,
+                FilePhase::Queued,
+                FilePhase::Scanning,
+                FilePhase::Idle
+            ]
+        );
+        assert_eq!(events[2].1, base + Duration::from_millis(4300));
+        assert_eq!(metrics.duration, Duration::from_secs(1));
+        assert_eq!(metrics.scans, 2);
+    }
+
+    #[test]
+    fn scanner_spawn_failure_is_retryable() {
+        let files = FileScan::default();
+        assert!(
+            files
+                .request(|_, _| Err(std::io::Error::other("test failure")))
+                .is_err()
+        );
+        assert_eq!(files.status(0).phase, FilePhase::Failed);
+        assert!(files.status(0).warning.unwrap().contains("test failure"));
+        let mut receiver = None;
+        assert!(
+            files
+                .request(|rx, _| {
+                    receiver = Some(rx);
+                    Ok(())
+                })
+                .unwrap()
+        );
+        assert_eq!(files.status(0).phase, FilePhase::Queued);
+        let rx = receiver.unwrap();
+        assert!(files.begin(files.generation(), &rx));
+        files.warning_for(files.generation(), None);
+        files.finish(files.generation(), &rx, false);
+        assert_eq!(files.status(0).phase, FilePhase::Idle);
+        assert!(files.status(0).warning.is_none());
     }
 
     #[test]

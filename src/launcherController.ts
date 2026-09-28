@@ -58,7 +58,7 @@ export function createLauncherController(options: {
   const [indexing, setIndexing] = createSignal(options.desktop);
   const [files, setFiles] = createSignal<FileStatus>({
     total: 0,
-    indexing: options.desktop,
+    phase: options.desktop ? "queued" : "idle",
     warning: null,
   });
   const [currency, setCurrency] = createSignal<CurrencyStatus>({

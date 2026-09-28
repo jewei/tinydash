@@ -1,7 +1,12 @@
 //! Canonical wire examples are produced by serde, then type-checked by TypeScript.
 use super::{Action, ActionConfirmation, ResultKind, SearchResponse, SearchResult, ToolDetail};
 use crate::{
-    launcher::{currency::CurrencyStatus, files::FileStatus, pins::ResultPin, query::SearchMode},
+    launcher::{
+        currency::CurrencyStatus,
+        files::{FilePhase, FileStatus},
+        pins::ResultPin,
+        query::SearchMode,
+    },
     settings::{AppPreference, CategoryShortcut, Settings, WebSearch},
 };
 use serde_json::json;
@@ -155,7 +160,7 @@ fn serialized_ipc_contracts_match_frontend_fixture() {
         storage_error: None,
         files: FileStatus {
             total: 3,
-            indexing: false,
+            phase: FilePhase::Idle,
             warning: None,
         },
         currency: CurrencyStatus {
@@ -178,7 +183,7 @@ fn serialized_ipc_contracts_match_frontend_fixture() {
         )),
         files: FileStatus {
             total: 1,
-            indexing: true,
+            phase: FilePhase::Scanning,
             warning: Some("Scan incomplete".into()),
         },
         currency: CurrencyStatus {
@@ -187,7 +192,22 @@ fn serialized_ipc_contracts_match_frontend_fixture() {
             warning: Some("Rates are old".into()),
         },
     };
+    let file_statuses: Vec<_> = [
+        FilePhase::Disabled,
+        FilePhase::Idle,
+        FilePhase::Queued,
+        FilePhase::Scanning,
+        FilePhase::Failed,
+    ]
+    .into_iter()
+    .map(|phase| FileStatus {
+        total: 0,
+        phase,
+        warning: (phase == FilePhase::Failed).then(|| "Cannot start the file scanner".into()),
+    })
+    .collect();
     let value = json!({
+        "fileStatuses": file_statuses,
         "modes": modes, "actions": actions, "response": response, "warningResponse": warning_response,
         "fullResult": full_result, "details": details, "settings": settings,
         "defaults": Settings::default(),
