@@ -96,9 +96,13 @@ impl LauncherState {
             .settings
             .write()
             .unwrap_or_else(|error| error.into_inner());
+        let files_changed = !current.same_file_settings(&settings);
+        if files_changed {
+            // Advance under the publication lock, even for A -> B -> A changes.
+            self.files.invalidate();
+        }
         let previous_files = search.as_mut().and_then(|search| {
-            (!current.same_file_settings(&settings))
-                .then(|| search.replace_files(FileProvider::default()))
+            files_changed.then(|| search.replace_files(FileProvider::default()))
         });
         let previous_settings = std::mem::replace(&mut *current, settings);
         drop(current);
@@ -110,6 +114,7 @@ impl LauncherState {
     pub fn accept_file_scan(
         &self,
         settings: &Settings,
+        generation: u64,
         files: FileProvider,
     ) -> Result<bool, String> {
         let mut search = self
@@ -120,7 +125,9 @@ impl LauncherState {
             .settings
             .read()
             .unwrap_or_else(|error| error.into_inner());
-        if !current.same_file_settings(settings) {
+        // Check generation and shutdown after acquiring search: both can
+        // change while this worker waits behind a running query.
+        if self.files.cancelled(generation) || !current.same_file_settings(settings) {
             // A rejected large index must also be dropped outside the lock.
             drop(current);
             drop(search);
