@@ -281,6 +281,10 @@ fn bounded_search_matches_eager_selection_across_seeded_corpora() {
         };
         let mut actual = prepare(false);
         let mut expected = prepare(true);
+        // This finite corpus compares selection, not wall-clock scheduling.
+        // Keep exact result/notice assertions deterministic under loaded CI.
+        actual.calculator.deterministic_selection_test = true;
+        expected.calculator.deterministic_selection_test = true;
         for mode in [
             SearchMode::All,
             SearchMode::Apps,

@@ -16,6 +16,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createServer } from "node:net";
+import { cpus, release, totalmem } from "node:os";
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { nativeTestBinary } from "../../scripts/verify/native.ts";
@@ -27,6 +28,7 @@ import {
   waitForExit,
 } from "../../scripts/verify/lifecycle.ts";
 import { installFixtures } from "./fixtures";
+import { summarizeTimings, type QueryTiming } from "./performance";
 
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
@@ -999,21 +1001,27 @@ try {
     "Rust rejects power, logout, and empty-trash IPC requests without explicit confirmation",
   );
   await reopen();
-  const queryTimings: { query: string; elapsedMs: number }[] = [];
-  for (let sample = 0; sample < 5; sample += 1) {
-    for (const [query, expected] of [
-      [expectedNames[0], expectedNames[0]],
-      ["12 * 8", "96"],
-      ["5 ft to cm", "152.4 cm"],
-      [":rocket", "rocket"],
-    ]) {
+  const queryTimings: QueryTiming[] = [];
+  const environment = await observe<{ userAgent: string; pixelRatio: number }>(
+    "return { userAgent: navigator.userAgent, pixelRatio: devicePixelRatio };",
+  );
+  // One untimed warm-up cycle; 25 samples per scenario. These are descriptive
+  // CI observations, not a statistically established product latency target.
+  for (let sample = -1; sample < 25; sample += 1) {
+    for (const [scenario, query, expected] of [
+      ["app", expectedNames[0], expectedNames[0]],
+      ["calculation", "12 * 8", "96"],
+      ["conversion", "5 ft to cm", "152.4 cm"],
+      ["emoji", ":rocket", "rocket"],
+    ] as const) {
       const result: {
-        elapsedMs: number;
+        domMs: number;
+        frameOpportunityMs: number;
         title: string;
         error?: string;
       } = await request(`/session/${session}/execute/async`, "POST", {
-        // Measure inside the webview. This includes IPC, Rust search, and
-        // Solid's DOM update, but not WebDriver transport or a screen paint.
+        // Measure inside the webview, excluding WebDriver transport. Two rAF
+        // callbacks give a rendering opportunity, NOT proof of screen paint.
         script: `const done = arguments[arguments.length - 1];
             const input = document.querySelector('input[role=combobox]');
             const list = document.querySelector('[role=listbox]');
@@ -1021,15 +1029,28 @@ try {
               done({ error: 'Search was not ready for the timing sample' }); return;
             }
             const started = performance.now();
+            let completed = false;
+            let frame;
+            const finish = (result) => {
+              if (completed) return;
+              completed = true;
+              observer.disconnect();
+              cancelAnimationFrame(frame);
+              clearTimeout(timer);
+              done(result);
+            };
             const observer = new MutationObserver(() => {
               if (list.getAttribute('aria-busy') !== 'false') return;
               observer.disconnect();
-              clearTimeout(timer);
-              done({ elapsedMs: performance.now() - started,
-                title: list.querySelector('.result-title')?.textContent ?? '' });
+              const domMs = performance.now() - started;
+              const title = list.querySelector('.result-title')?.textContent ?? '';
+              frame = requestAnimationFrame(() => {
+                frame = requestAnimationFrame(() => finish({ domMs,
+                  frameOpportunityMs: performance.now() - started, title }));
+              });
             });
             const timer = setTimeout(() => {
-              observer.disconnect(); done({ error: 'Search timing timed out' });
+              finish({ error: 'Search timing timed out' });
             }, 4000);
             observer.observe(list, { attributes: true, attributeFilter: ['aria-busy'] });
             input.value = arguments[0];
@@ -1038,20 +1059,38 @@ try {
       });
       assert(!result.error, result.error);
       assert.equal(result.title, expected);
-      assert(Number.isFinite(result.elapsedMs) && result.elapsedMs >= 0);
-      queryTimings.push({ query, elapsedMs: result.elapsedMs });
+      assert(Number.isFinite(result.domMs) && result.domMs >= 0);
+      assert(
+        Number.isFinite(result.frameOpportunityMs) &&
+          result.frameOpportunityMs >= result.domMs,
+      );
+      if (sample >= 0) {
+        queryTimings.push({
+          scenario,
+          domMs: result.domMs,
+          frameOpportunityMs: result.frameOpportunityMs,
+        });
+      }
     }
   }
   await writeFile(
     resolve(output, "performance.json"),
     JSON.stringify(
       {
+        schemaVersion: 1,
         platform: process.platform,
+        architecture: process.arch,
+        osRelease: release(),
+        cpuModel: cpus()[0]?.model ?? "unknown",
+        logicalCpus: cpus().length,
+        memoryBytes: totalmem(),
+        webview: environment,
         startupCheckMs,
         reopenCheckMs,
+        summary: summarizeTimings(queryTimings),
         queryTimings,
         method:
-          "Startup and reopen include WebDriver and readiness polling. Query samples measure input-event dispatch through IPC and Rust search to settled DOM. None measures screen paint or physical shortcut latency. CI timings have no pass/fail threshold.",
+          "Identified release package and test source are recorded by the native verification wrapper. Startup and reopen include WebDriver and readiness polling. After one warm-up cycle, 25 samples per synthetic scenario measure input-event dispatch through IPC and Rust search to settled DOM, then a double-requestAnimationFrame rendering opportunity. This is NOT proof of screen paint or physical shortcut latency. Percentiles use nearest rank; with 25 samples per scenario p99 is the maximum. No queries, clipboard contents, titles or paths are recorded here. CI timings have no pass/fail threshold and do not establish the proposed native p95 target.",
       },
       null,
       2,
