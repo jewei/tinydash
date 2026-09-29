@@ -25,9 +25,11 @@ pub async fn set_launcher_appearance(
     }
     #[cfg(target_os = "macos")]
     {
+        use tauri_runtime_wry::WebviewWryExt;
+
         let (sender, mut receiver) = tauri::async_runtime::channel(1);
         window
-            .with_webview(move |webview| {
+            .with_wry_webview(move |webview| {
                 let _ = sender.try_send(crate::platform::set_launcher_appearance(
                     webview, appearance,
                 ));

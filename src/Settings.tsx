@@ -1,11 +1,10 @@
 import {
-  batch,
   createEffect,
   createMemo,
   createSignal,
   For,
   onCleanup,
-  onMount,
+  onSettled,
   Show,
 } from "solid-js";
 import { isTauri } from "@tauri-apps/api/core";
@@ -244,8 +243,8 @@ export default function Settings() {
       });
   }
 
-  createEffect(() => {
-    document.documentElement.dataset.appearance = appearance();
+  createEffect(appearance, (value) => {
+    document.documentElement.dataset.appearance = value;
   });
 
   function resetDraft(settings: SettingsValues) {
@@ -283,30 +282,28 @@ export default function Settings() {
         }
       }
     }
-    batch(() => {
-      setInfo((info) => (info ? { ...info, settings: next } : info));
-      setSaved(next);
-      if (!previous || !current) {
-        resetDraft(merged);
-        return;
-      }
-      setDraft(merged);
-      // Keep incomplete folder input while another window changes settings.
-      if (
-        JSON.stringify(current.fileSearchRoots) ===
-          JSON.stringify(previous.fileSearchRoots) &&
-        folderMode() === folderModeFor(previous)
-      ) {
-        setFolderMode(folderModeFor(merged));
-        setFoldersText(merged.fileSearchRoots?.join("\n") ?? "");
-      }
-      if (
-        JSON.stringify(current.fileSearchExcludedDirs) ===
-        JSON.stringify(previous.fileSearchExcludedDirs)
-      ) {
-        setExcludedText(merged.fileSearchExcludedDirs.join("\n"));
-      }
-    });
+    setInfo((info) => (info ? { ...info, settings: next } : info));
+    setSaved(next);
+    if (!previous || !current) {
+      resetDraft(merged);
+      return;
+    }
+    setDraft(merged);
+    // Keep incomplete folder input while another window changes settings.
+    if (
+      JSON.stringify(current.fileSearchRoots) ===
+        JSON.stringify(previous.fileSearchRoots) &&
+      folderMode() === folderModeFor(previous)
+    ) {
+      setFolderMode(folderModeFor(merged));
+      setFoldersText(merged.fileSearchRoots?.join("\n") ?? "");
+    }
+    if (
+      JSON.stringify(current.fileSearchExcludedDirs) ===
+      JSON.stringify(previous.fileSearchExcludedDirs)
+    ) {
+      setExcludedText(merged.fileSearchExcludedDirs.join("\n"));
+    }
   }
   function setShortcut(target: ShortcutTarget, shortcut: string) {
     if (target === "global") {
@@ -618,7 +615,7 @@ export default function Settings() {
   const onBlur = () => {
     void stopRecording();
   };
-  onMount(() => {
+  onSettled(() => {
     document.title = "TinyDash Settings";
     document.addEventListener("keydown", onKey, true);
     window.addEventListener("blur", onBlur);
@@ -723,7 +720,7 @@ export default function Settings() {
       </aside>
       <form
         class="settings-main"
-        noValidate
+        novalidate
         onSubmit={(event) => {
           event.preventDefault();
           void save();
@@ -757,8 +754,10 @@ export default function Settings() {
                 <div class="settings-group">
                   <h2>Launch shortcut</h2>
                   <div
-                    class="shortcut-recorder"
-                    classList={{ "is-recording": recording() }}
+                    class={{
+                      "shortcut-recorder": true,
+                      "is-recording": recording(),
+                    }}
                   >
                     <div class="shortcut-keys" aria-live="polite">
                       <Show
@@ -918,8 +917,8 @@ export default function Settings() {
                     <For each={appearances}>
                       {(item) => (
                         <label
-                          class="style-option"
-                          classList={{
+                          class={{
+                            "style-option": true,
                             "is-selected": appearance() === item.id,
                           }}
                         >
@@ -1034,8 +1033,8 @@ export default function Settings() {
                       <For each={categories}>
                         {(category) => (
                           <label
-                            class="category-choice"
-                            classList={{
+                            class={{
+                              "category-choice": true,
                               "is-selected": value().visibleCategories.includes(
                                 category.id,
                               ),
@@ -1639,7 +1638,7 @@ export default function Settings() {
             </p>
           </Show>
           <div class="settings-save-row">
-            <p role="status" classList={{ "has-changes": dirty() }}>
+            <p role="status" class={{ "has-changes": dirty() }}>
               {saving()
                 ? "Saving changes..."
                 : dirty()

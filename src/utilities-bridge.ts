@@ -31,7 +31,12 @@ export interface UtilityCapabilities {
   windows: string;
 }
 export type MediaAction =
-  "playPause" | "next" | "previous" | "volumeUp" | "volumeDown" | "mute";
+  | "playPause"
+  | "next"
+  | "previous"
+  | "volumeUp"
+  | "volumeDown"
+  | "mute";
 export type WindowAction = "left" | "right" | "maximize" | "center" | "restore";
 
 type Dropper = {

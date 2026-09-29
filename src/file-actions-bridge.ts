@@ -2,7 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import type { SearchResult } from "./bridge";
 
 export type FileAction =
-  "copyPath" | "copyFile" | "openWith" | "openTerminal" | "quickLook" | "trash";
+  | "copyPath"
+  | "copyFile"
+  | "openWith"
+  | "openTerminal"
+  | "quickLook"
+  | "trash";
 
 export interface FilePreviewData {
   name: string;

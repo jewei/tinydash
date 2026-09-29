@@ -3,7 +3,7 @@ import {
   createSignal,
   For,
   onCleanup,
-  onMount,
+  onSettled,
   Show,
 } from "solid-js";
 import { listen } from "@tauri-apps/api/event";
@@ -76,7 +76,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     }
   }
 
-  onMount(() => {
+  onSettled(() => {
     back.focus();
     void refresh();
     void listen("clipboard-changed", () => void refresh()).then(
@@ -93,26 +93,27 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     unlisten?.();
   });
 
-  createEffect(() => {
-    const id = selected();
+  createEffect(selected, (id) => {
     const request = ++previewSequence;
     setPreview(undefined);
     setMessage(undefined);
     pendingPreview = id === undefined ? undefined : { id, sequence: request };
     void loadPreview();
   });
-  createEffect(() => {
-    const png = preview()?.png;
-    if (!png) {
-      setImageUrl(undefined);
-      return;
-    }
-    const url = URL.createObjectURL(
-      new Blob([new Uint8Array(png)], { type: "image/png" }),
-    );
-    setImageUrl(url);
-    onCleanup(() => URL.revokeObjectURL(url));
-  });
+  createEffect(
+    () => preview()?.png,
+    (png) => {
+      if (!png) {
+        setImageUrl(undefined);
+        return;
+      }
+      const url = URL.createObjectURL(
+        new Blob([new Uint8Array(png)], { type: "image/png" }),
+      );
+      setImageUrl(url);
+      return () => URL.revokeObjectURL(url);
+    },
+  );
 
   async function action(kind: "copy" | "delete") {
     const id = selected();
@@ -177,7 +178,9 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
                     <li>
                       <button
                         type="button"
-                        aria-pressed={selected() === entry.id}
+                        aria-pressed={
+                          selected() === entry.id ? "true" : "false"
+                        }
                         disabled={busy()}
                         onClick={() => setSelected(entry.id)}
                       >

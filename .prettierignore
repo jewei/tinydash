@@ -12,3 +12,4 @@ native-build
 designs
 .hallmark
 site-dist
+src-tauri/vendor

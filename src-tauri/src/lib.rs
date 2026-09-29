@@ -106,6 +106,7 @@ pub fn run() -> anyhow::Result<()> {
         )
         .try_init();
     let app = tauri::Builder::default()
+        .runtime(tauri_runtime_wry::Wry::default())
         .manage(launcher::startup::Startup(std::sync::Mutex::new(request)))
         .manage(launcher::updates::UpdateState::default())
         .manage(launcher::paste::PasteState::default())

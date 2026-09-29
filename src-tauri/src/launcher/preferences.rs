@@ -45,7 +45,7 @@ pub fn get_settings(app: AppHandle) -> Result<SettingsInfo, String> {
             .into_owned(),
         shortcuts_available: !platform::is_wayland()
             && app
-                .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+                .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
                 .is_some(),
     })
 }
@@ -85,12 +85,12 @@ struct NativeShortcuts<'a>(&'a AppHandle);
 impl ShortcutRegistry for NativeShortcuts<'_> {
     fn contains(&self, shortcut: &str) -> bool {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .is_some_and(|registry| registry.is_registered(shortcut))
     }
     fn register(&self, shortcut: &str) -> Result<(), String> {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .ok_or("Global shortcuts are unavailable. Restart TinyDash and try again.")?
             .register(shortcut)
             .map_err(|error| {
@@ -99,7 +99,7 @@ impl ShortcutRegistry for NativeShortcuts<'_> {
     }
     fn unregister(&self, shortcut: &str) -> Result<(), String> {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .ok_or("Global shortcuts are unavailable. Restart TinyDash and try again.")?
             .unregister(shortcut)
             .map_err(|error| error.to_string())

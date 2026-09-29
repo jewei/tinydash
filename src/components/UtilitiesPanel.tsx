@@ -4,7 +4,7 @@ import {
   createEffect,
   createSignal,
   onCleanup,
-  onMount,
+  onSettled,
 } from "solid-js";
 import {
   awakeChangedEvent,
@@ -58,7 +58,7 @@ export function UtilitiesAwakeIndicator() {
   };
   const listener = (event: Event) =>
     update((event as CustomEvent<AwakeStatus>).detail);
-  onMount(() => {
+  onSettled(() => {
     window.addEventListener(awakeChangedEvent, listener);
     void utilities
       .awakeStatus()
@@ -157,7 +157,7 @@ export default function UtilitiesPanel(props: {
     dismiss();
     props.onClose();
   };
-  onMount(() => {
+  onSettled(() => {
     panel?.focus();
     void utilities
       .capabilities()
@@ -176,12 +176,12 @@ export default function UtilitiesPanel(props: {
         if (alive) setError(String(e));
       });
   });
-  createEffect(() => {
-    if (tab() === "processes" && !loadedProcesses) {
+  createEffect(tab, (tab) => {
+    if (tab === "processes" && !loadedProcesses) {
       loadedProcesses = true;
       void work(refresh);
     }
-    if (tab() === "windows" && !loadedWindow) {
+    if (tab === "windows" && !loadedWindow) {
       loadedWindow = true;
       void work(async () => {
         const name = await utilities.captureWindow(false);
@@ -189,25 +189,31 @@ export default function UtilitiesPanel(props: {
       });
     }
   });
-  createEffect(() => {
-    if (confirmation() && !busy()) queueMicrotask(() => cancel?.focus());
-  });
-  createEffect(() => {
-    if (!awake().active) return;
-    const timer = setInterval(() => {
-      setNow(Date.now());
-      if (Date.now() >= (awake().endsAt ?? 0))
-        void utilities
-          .awakeStatus()
-          .then((v) => {
-            if (alive) setAwake(v);
-          })
-          .catch((e: unknown) => {
-            if (alive) setError(String(e));
-          });
-    }, 1000);
-    onCleanup(() => clearInterval(timer));
-  });
+  createEffect(
+    () => !!confirmation() && !busy(),
+    (ready) => {
+      if (ready) queueMicrotask(() => cancel?.focus());
+    },
+  );
+  createEffect(
+    () => awake().active,
+    (active) => {
+      if (!active) return;
+      const timer = setInterval(() => {
+        setNow(Date.now());
+        if (Date.now() >= (awake().endsAt ?? 0))
+          void utilities
+            .awakeStatus()
+            .then((v) => {
+              if (alive) setAwake(v);
+            })
+            .catch((e: unknown) => {
+              if (alive) setError(String(e));
+            });
+      }, 1000);
+      return () => clearInterval(timer);
+    },
+  );
   onCleanup(() => {
     alive = false;
     abort.abort();
@@ -242,7 +248,7 @@ export default function UtilitiesPanel(props: {
     <section
       class="utilities-panel"
       ref={panel}
-      tabIndex={-1}
+      tabindex={-1}
       aria-label="Native utilities"
       onKeyDown={(event) => {
         event.stopPropagation();
@@ -280,7 +286,7 @@ export default function UtilitiesPanel(props: {
           <For each={tabs}>
             {(item) => (
               <button
-                aria-pressed={tab() === item.id}
+                aria-pressed={tab() === item.id ? "true" : "false"}
                 disabled={busy()}
                 onClick={() => chooseTab(item.id)}
               >
@@ -289,7 +295,7 @@ export default function UtilitiesPanel(props: {
             )}
           </For>
         </nav>
-        <div class="utility-content" aria-busy={busy()}>
+        <div class="utility-content" aria-busy={busy() ? "true" : "false"}>
           <Show when={tab() === "processes"}>
             <p>{capabilities()?.processes}</p>
             <div class="utility-toolbar">
@@ -316,7 +322,7 @@ export default function UtilitiesPanel(props: {
                       {(force) => (
                         <button
                           disabled={busy()}
-                          classList={{ "utility-danger": force }}
+                          class={{ "utility-danger": force }}
                           onClick={(e) => {
                             lastAction = e.currentTarget;
                             void work(async () => {

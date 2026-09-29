@@ -1,5 +1,5 @@
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import { createSignal, Show } from "solid-js";
 import UtilitiesPanel, {
   UtilitiesAwakeIndicator,

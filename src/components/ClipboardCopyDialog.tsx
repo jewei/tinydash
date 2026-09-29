@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { backend, type SearchResult } from "../bridge";
 
 export default function ClipboardCopyDialog(props: {
@@ -16,7 +16,7 @@ export default function ClipboardCopyDialog(props: {
   const [error, setError] = createSignal<string>();
   let dialog!: HTMLDialogElement;
   let disposed = false;
-  onMount(() => {
+  onSettled(() => {
     dialog.showModal();
     if (props.mode === "edit") {
       void backend
@@ -125,7 +125,7 @@ export default function ClipboardCopyDialog(props: {
         <textarea
           aria-label="Edited clipboard text"
           value={text()}
-          maxLength={16384}
+          maxlength={16384}
           disabled={loading() || busy()}
           spellcheck={false}
           onInput={(event) => setText(event.currentTarget.value)}

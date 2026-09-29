@@ -3,6 +3,7 @@ use std::{
     ffi::{CString, c_void},
     sync::{Arc, Mutex},
 };
+use tauri::Manager;
 
 type Ref = *const c_void;
 #[link(name = "CoreFoundation", kind = "framework")]

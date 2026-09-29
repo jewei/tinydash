@@ -1,14 +1,16 @@
 import {
-  batch,
   createEffect,
   createMemo,
   createSignal,
+  createStore,
   For,
+  flush,
   onCleanup,
-  onMount,
+  onSettled,
+  reconcile,
+  snapshot,
   Show,
 } from "solid-js";
-import { createStore, reconcile, unwrap } from "solid-js/store";
 import { isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -66,7 +68,7 @@ const groupLabels: Record<SearchResult["kind"], string> = {
 };
 
 function snapshotResult(result: SearchResult): SearchResult {
-  return structuredClone(unwrap(result));
+  return structuredClone(snapshot(result));
 }
 
 export default function App(
@@ -92,7 +94,9 @@ export default function App(
   });
   const results = () => resultView.results;
   const setResults = (next: SearchResult[]) =>
-    setResultView("results", reconcile(next, { key: "id" }));
+    setResultView((draft) => {
+      reconcile(next, "id")(draft.results);
+    });
   const [selected, setSelected] = createSignal(0);
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
@@ -238,7 +242,8 @@ export default function App(
                       : mode() === "clipboard"
                         ? "Search clipboard history..."
                         : "What are you looking for?";
-  const focusInput = () => input.focus({ preventScroll: true });
+  const focusInput = () =>
+    queueMicrotask(() => input.focus({ preventScroll: true }));
 
   const matchesMenu = (label: string) =>
     label.toLocaleLowerCase().includes(menuFilter().trim().toLocaleLowerCase());
@@ -508,29 +513,35 @@ export default function App(
     }
   }
 
-  createEffect(() => {
-    document.documentElement.dataset.appearance = appearance();
-    if (!desktop || !followSystemGlass()) {
-      setNativeGlass(false);
-      return;
-    }
-    let current = true;
-    onCleanup(() => {
-      current = false;
-    });
-    void backend.setLauncherAppearance(appearance()).then(
-      (enabled) => {
-        if (current) setNativeGlass(enabled);
-      },
-      (reason: unknown) => {
-        if (current) setNativeGlass(false);
-        console.warn("Could not apply the native launcher background.", reason);
-      },
-    );
-  });
+  createEffect(
+    () => ({ appearance: appearance(), glass: followSystemGlass() }),
+    ({ appearance, glass }) => {
+      document.documentElement.dataset.appearance = appearance;
+      if (!desktop || !glass) {
+        setNativeGlass(false);
+        return;
+      }
+      let current = true;
+      void backend.setLauncherAppearance(appearance).then(
+        (enabled) => {
+          if (current) setNativeGlass(enabled);
+        },
+        (reason: unknown) => {
+          if (current) setNativeGlass(false);
+          console.warn(
+            "Could not apply the native launcher background.",
+            reason,
+          );
+        },
+      );
+      return () => {
+        current = false;
+      };
+    },
+  );
 
-  createEffect(() => {
-    document.documentElement.dataset.compact = String(compact());
+  createEffect(compact, (value) => {
+    document.documentElement.dataset.compact = String(value);
   });
 
   function changeAppearance(value: Appearance) {
@@ -572,17 +583,15 @@ export default function App(
         selectionChangedByUser,
       });
       displayedQuery = { value: request.value, mode: request.mode };
-      batch(() => {
-        setResults(response.results);
-        setSelected(index);
-        setTotal(response.total);
-        setIndexing(response.indexing);
-        setFiles(response.files);
-        setCurrency(response.currency);
-        setIndexError(response.indexError ?? undefined);
-        setStorageError(response.storageError ?? undefined);
-        setNotice(response.notice ?? undefined);
-      });
+      setResults(response.results);
+      setSelected(index);
+      setTotal(response.total);
+      setIndexing(response.indexing);
+      setFiles(response.files);
+      setCurrency(response.currency);
+      setIndexError(response.indexError ?? undefined);
+      setStorageError(response.storageError ?? undefined);
+      setNotice(response.notice ?? undefined);
     },
     fail(_request, reason) {
       setResults([]);
@@ -591,10 +600,17 @@ export default function App(
     settled: () => setPending(false),
   });
 
-  function search(value = query(), preserveSelection = false) {
-    if (!desktop || !visible() || disposed) return Promise.resolve();
-    if (!preserveSelection) selectionChangedByUser = false;
+  function search(value?: string, preserveSelection = false) {
+    // IPC events can change the category and visibility in the same turn.
+    // Keep previews hidden while that state is committed for the next request.
     setPending(true);
+    flush();
+    value ??= query();
+    if (!desktop || !visible() || disposed) {
+      setPending(false);
+      return Promise.resolve();
+    }
+    if (!preserveSelection) selectionChangedByUser = false;
     if (
       mode() === "all" &&
       !value.trim() &&
@@ -646,6 +662,7 @@ export default function App(
   }
 
   function keepVisibleCategory() {
+    flush();
     if (!enabledCategories().includes(mode())) setMode(enabledCategories()[0]);
   }
 
@@ -775,9 +792,10 @@ export default function App(
   }
 
   function toggleMenu() {
+    const opening = !menuOpen();
     setMenuFilter("");
-    setMenuOpen(!menuOpen());
-    if (menuOpen()) {
+    setMenuOpen(opening);
+    if (opening) {
       queueMicrotask(() => menuInput?.focus());
     } else {
       focusInput();
@@ -996,38 +1014,42 @@ export default function App(
     }
   }
 
-  createEffect(() => {
-    mode();
-    visibleCategories();
-    queueMicrotask(() =>
-      categoryBar
-        ?.querySelector('[aria-pressed="true"]')
-        ?.scrollIntoView({ block: "nearest", inline: "nearest" }),
-    );
-  });
+  createEffect(
+    () => [mode(), visibleCategories()],
+    () => {
+      queueMicrotask(() =>
+        categoryBar
+          ?.querySelector('[aria-pressed="true"]')
+          ?.scrollIntoView({ block: "nearest", inline: "nearest" }),
+      );
+    },
+  );
 
-  createEffect(() => {
-    const index = selected();
-    results();
-    appearance();
-    queueMicrotask(() =>
-      list
-        ?.querySelector(`#result-${index}`)
-        ?.scrollIntoView({ block: "nearest" }),
-    );
-  });
+  createEffect(
+    () => ({ index: selected(), results: results(), appearance: appearance() }),
+    ({ index }) => {
+      queueMicrotask(() =>
+        list
+          ?.querySelector(`#result-${index}`)
+          ?.scrollIntoView({ block: "nearest" }),
+      );
+    },
+  );
 
-  createEffect(() => {
-    if (!visible() || busy() || current()?.kind !== "timezone") return;
-    // Refresh the displayed clock at the next minute without polling other tools.
-    const timer = window.setTimeout(
-      () => {
-        if (!busy()) void search(query(), true);
-      },
-      60000 - (Date.now() % 60000) + 50,
-    );
-    onCleanup(() => window.clearTimeout(timer));
-  });
+  createEffect(
+    () => visible() && !busy() && current()?.kind === "timezone",
+    (active) => {
+      if (!active) return;
+      // Refresh the displayed clock at the next minute without polling other tools.
+      const timer = window.setTimeout(
+        () => {
+          if (!busy()) void search(query(), true);
+        },
+        60000 - (Date.now() % 60000) + 50,
+      );
+      return () => window.clearTimeout(timer);
+    },
+  );
 
   function outsideClick(event: PointerEvent) {
     if (menuOpen() && !(event.target as Element).closest(".actions-area")) {
@@ -1035,7 +1057,7 @@ export default function App(
     }
   }
 
-  onMount(() => {
+  onSettled(() => {
     focusInput();
     void watchAppearance(setAppearance, setCompact, setFollowSystemGlass).then(
       (stop) => {
@@ -1124,20 +1146,18 @@ export default function App(
           register("launcher-opened", (clear) => {
             // Show the preview only after the new search settles. Publishing
             // visibility first would briefly request the previous preview.
-            batch(() => {
-              setVisible(true);
-              setMenuOpen(false);
-              setClearOpen(false);
-              setPendingAction(undefined);
-              setClipboardTool(undefined);
-              setError(undefined);
-              if (clear === true) {
-                setMode(enabledCategories()[0]);
-                changeQuery("");
-              } else {
-                void search();
-              }
-            });
+            setVisible(true);
+            setMenuOpen(false);
+            setClearOpen(false);
+            setPendingAction(undefined);
+            setClipboardTool(undefined);
+            setError(undefined);
+            if (clear === true) {
+              setMode(enabledCategories()[0]);
+              changeQuery("");
+            } else {
+              void search();
+            }
             focusInput();
             if (clear !== true) input.select();
           }),
@@ -1228,7 +1248,7 @@ export default function App(
       <main
         style={{ display: panel() ? "none" : undefined }}
         class="launcher"
-        data-native-glass={nativeGlass() || undefined}
+        data-native-glass={nativeGlass() ? "true" : undefined}
         aria-label="TinyDash launcher"
       >
         <div
@@ -1251,7 +1271,7 @@ export default function App(
               role="combobox"
               aria-label="Search TinyDash"
               aria-autocomplete="list"
-              aria-expanded={results().length > 0}
+              aria-expanded={results().length > 0 ? "true" : "false"}
               aria-controls="search-results"
               aria-activedescendant={
                 current() ? `result-${selected()}` : undefined
@@ -1260,7 +1280,7 @@ export default function App(
               autocomplete="off"
               autocapitalize="off"
               spellcheck={false}
-              maxLength={8192}
+              maxlength={8192}
               value={query()}
               onInput={(event) => changeQuery(event.currentTarget.value)}
             />
@@ -1293,7 +1313,7 @@ export default function App(
                 {(category) => (
                   <button
                     class="category-tab"
-                    aria-pressed={mode() === category.id}
+                    aria-pressed={mode() === category.id ? "true" : "false"}
                     onClick={() => changeMode(category.id)}
                   >
                     {category.label}
@@ -1377,8 +1397,8 @@ export default function App(
         </Show>
 
         <section
-          class="results-area"
-          classList={{
+          class={{
+            "results-area": true,
             "welcome-results": welcome(),
             "emoji-results": mode() === "emoji",
             "clipboard-results": current()?.kind === "clipboard",
@@ -1414,7 +1434,7 @@ export default function App(
               class="result-list"
               role="listbox"
               aria-label="Search results"
-              aria-busy={pending()}
+              aria-busy={pending() ? "true" : "false"}
             >
               <For each={results()}>
                 {(result, index) => (
@@ -1440,9 +1460,9 @@ export default function App(
                     <div
                       id={`result-${index()}`}
                       role="option"
-                      aria-selected={index() === selected()}
-                      class="result-row"
-                      classList={{
+                      aria-selected={index() === selected() ? "true" : "false"}
+                      class={{
+                        "result-row": true,
                         selected: index() === selected(),
                         pending: pending(),
                         "calculation-row": result.kind === "calculation",
@@ -1678,7 +1698,7 @@ export default function App(
               <button
                 class="actions-button"
                 aria-haspopup="menu"
-                aria-expanded={menuOpen()}
+                aria-expanded={menuOpen() ? "true" : "false"}
                 aria-controls="actions-menu"
                 onClick={toggleMenu}
               >
@@ -1752,7 +1772,9 @@ export default function App(
                             {(item) => (
                               <button
                                 role="menuitemradio"
-                                aria-checked={appearance() === item.id}
+                                aria-checked={
+                                  appearance() === item.id ? "true" : "false"
+                                }
                                 title={item.description}
                                 onClick={() => changeAppearance(item.id)}
                               >
@@ -1771,7 +1793,7 @@ export default function App(
                     <Show when={matchesMenu("Compact layout")}>
                       <button
                         role="menuitemcheckbox"
-                        aria-checked={compact()}
+                        aria-checked={compact() ? "true" : "false"}
                         onClick={() => {
                           const next = !compact();
                           setCompact(next);

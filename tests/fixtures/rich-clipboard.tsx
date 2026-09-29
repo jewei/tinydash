@@ -1,4 +1,4 @@
-import { render } from "solid-js/web";
+import { render } from "@solidjs/web";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import RichClipboardHistory from "../../src/components/RichClipboardHistory";
 import type { RichClipboardEntry } from "../../src/clipboardBridge";

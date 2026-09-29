@@ -156,14 +156,12 @@ impl FileWatcher {
             return (false, warning);
         }
         let mut registered = false;
-        // FSEvents can apply the entire batch with one stream restart.
-        let mut paths = self.watcher.paths_mut();
         for path in removed {
-            let _ = paths.remove(&path); // The OS may have removed its watch already.
+            let _ = self.watcher.unwatch(&path); // The OS may have removed its watch already.
             self.watched.remove(&path);
         }
         for (path, mode) in added {
-            match paths.add(&path, mode) {
+            match self.watcher.watch(&path, mode) {
                 Ok(()) => {
                     self.watched.insert(path, mode);
                     registered = true;
@@ -177,15 +175,6 @@ impl FileWatcher {
                     });
                 }
             };
-        }
-        if let Err(error) = paths.commit() {
-            self.watched.clear();
-            // A failed registration must wait for a later event or manual retry.
-            // Retrying through the follow-up scan would create a busy loop.
-            registered = false;
-            warning = Some(format!(
-                "Cannot start automatic file updates: {error}. Use Refresh files."
-            ));
         }
         (registered, warning)
     }

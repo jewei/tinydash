@@ -83,8 +83,7 @@ export default function ResultPreview(props: {
 
   return (
     <aside
-      class="result-preview"
-      classList={{ "tool-preview": !!props.result?.detail }}
+      class={{ "result-preview": true, "tool-preview": !!props.result?.detail }}
       aria-label="Selected item details"
     >
       <Show
@@ -128,8 +127,8 @@ export default function ResultPreview(props: {
       >
         <div class="preview-content">
           <div
-            class="preview-summary"
-            classList={{
+            class={{
+              "preview-summary": true,
               "calculation-summary": props.result?.kind === "calculation",
               "password-summary": props.result?.kind === "password",
               "url-summary": props.result?.kind === "cleanedUrl",
@@ -145,8 +144,8 @@ export default function ResultPreview(props: {
                     <button
                       class="pin-button"
                       aria-label={option.label}
-                      aria-pressed={option.pinned}
-                      aria-busy={props.pinBusy}
+                      aria-pressed={option.pinned ? "true" : "false"}
+                      aria-busy={props.pinBusy ? "true" : "false"}
                       disabled={!props.enabled || props.pinBusy}
                       onClick={() => props.onPin(option.category)}
                       title={option.label}

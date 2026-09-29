@@ -1,4 +1,4 @@
-import { onMount, Show } from "solid-js";
+import { onSettled, Show } from "solid-js";
 
 export default function ConfirmDialog(props: {
   title: string;
@@ -12,7 +12,7 @@ export default function ConfirmDialog(props: {
 }) {
   let dialog!: HTMLDialogElement;
   let cancel!: HTMLButtonElement;
-  onMount(() => {
+  onSettled(() => {
     dialog.showModal();
     cancel.focus();
   });

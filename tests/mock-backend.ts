@@ -313,7 +313,9 @@ window.__launcherTest = {
   holdNativeGlass: false,
   platform:
     (localStorage.getItem("tinydash.test.platform") as
-      "macos" | "windows" | "linux") ?? "macos",
+      | "macos"
+      | "windows"
+      | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
   rejectSettings: null,
   rejectResetPosition: null,

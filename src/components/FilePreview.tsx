@@ -42,19 +42,21 @@ export default function FilePreview(props: {
       loading = false;
     }
   }
-  createEffect(() => {
-    const id = props.result.id;
-    generation += 1;
-    setPreview(undefined);
-    setError(undefined);
-    setStatus(undefined);
-    setConfirmTrash(false);
-    setApps(undefined);
-    setAppId("");
-    setBusy(false);
-    pending = { id, generation };
-    void load();
-  });
+  createEffect(
+    () => props.result.id,
+    (id) => {
+      generation += 1;
+      setPreview(undefined);
+      setError(undefined);
+      setStatus(undefined);
+      setConfirmTrash(false);
+      setApps(undefined);
+      setAppId("");
+      setBusy(false);
+      pending = { id, generation };
+      void load();
+    },
+  );
   onCleanup(() => {
     disposed = true;
     generation += 1;
@@ -124,7 +126,7 @@ export default function FilePreview(props: {
     <section
       class="file-preview"
       aria-label="File preview"
-      on:keydown={(event) => {
+      onKeyDown={(event) => {
         // The launcher must not interpret Enter on these controls as Open File.
         event.stopPropagation();
         if (event.key === "Escape") {
@@ -168,7 +170,7 @@ export default function FilePreview(props: {
             <Show when={textContent()}>
               {(content) => (
                 <>
-                  <pre tabIndex={0} aria-label="File text preview">
+                  <pre tabindex={0} aria-label="File text preview">
                     {content().text}
                   </pre>
                   <Show when={content().truncated}>

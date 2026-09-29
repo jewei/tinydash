@@ -1036,7 +1036,7 @@ try {
             input.dispatchEvent(new Event('input', { bubbles: true }));`,
         args: [query],
       });
-      assert(!result.error, result.error);
+      assert(!result.error, result.error ?? "Search timing failed");
       assert.equal(result.title, expected);
       assert(Number.isFinite(result.elapsedMs) && result.elapsedMs >= 0);
       queryTimings.push({ query, elapsedMs: result.elapsedMs });

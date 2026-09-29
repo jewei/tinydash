@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onMount, Show } from "solid-js";
+import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { backend, type ItemPreference, type SearchResult } from "../bridge";
 
 export default function ItemPreferences(props: {
@@ -28,7 +28,7 @@ export default function ItemPreferences(props: {
       ...props.value,
       [selected()]: { ...current(), ...patch },
     });
-  onMount(
+  onSettled(
     () =>
       void backend.itemCatalog().then(
         (items) => {

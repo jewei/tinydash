@@ -3,7 +3,7 @@ import {
   createSignal,
   For,
   onCleanup,
-  onMount,
+  onSettled,
   Show,
 } from "solid-js";
 import {
@@ -70,10 +70,9 @@ export default function LibraryPanel(props: {
     }
   }
 
-  createEffect(() => {
-    const search = query();
+  createEffect(query, (search) => {
     const timer = setTimeout(() => void refresh(search), 100);
-    onCleanup(() => clearTimeout(timer));
+    return () => clearTimeout(timer);
   });
 
   async function run(task: () => Promise<void>) {
@@ -115,7 +114,7 @@ export default function LibraryPanel(props: {
     });
   }
 
-  onMount(() => {
+  onSettled(() => {
     filter.focus();
     if (props.initialId) void select(props.initialId);
   });
@@ -250,7 +249,7 @@ export default function LibraryPanel(props: {
               ref={filter}
               type="search"
               value={query()}
-              maxLength={512}
+              maxlength={512}
               onInput={(event) => setQuery(event.currentTarget.value)}
             />
           </label>
@@ -296,7 +295,7 @@ export default function LibraryPanel(props: {
             </p>
           </Show>
         </aside>
-        <main class="library-editor" aria-busy={busy()}>
+        <main class="library-editor" aria-busy={busy() ? "true" : "false"}>
           <Show
             when={editing()}
             fallback={
@@ -317,7 +316,7 @@ export default function LibraryPanel(props: {
                           Argument: {name}
                           <input
                             value={values()[name] ?? ""}
-                            maxLength={4096}
+                            maxlength={4096}
                             onInput={(event) =>
                               setValues((previous) => ({
                                 ...previous,
@@ -469,7 +468,7 @@ export default function LibraryPanel(props: {
                   Name
                   <input
                     required
-                    maxLength={120}
+                    maxlength={120}
                     value={draft().name}
                     onInput={(event) =>
                       update("name", event.currentTarget.value)
@@ -479,7 +478,7 @@ export default function LibraryPanel(props: {
                 <label>
                   Keywords
                   <input
-                    maxLength={512}
+                    maxlength={512}
                     value={draft().keywords}
                     onInput={(event) =>
                       update("keywords", event.currentTarget.value)
@@ -493,7 +492,7 @@ export default function LibraryPanel(props: {
                   <textarea
                     required
                     rows={7}
-                    maxLength={32768}
+                    maxlength={32768}
                     value={draft().content}
                     onInput={(event) =>
                       update("content", event.currentTarget.value)
