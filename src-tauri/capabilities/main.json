@@ -1,12 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The launcher can receive backend events and start a native window drag. Actions stay in Rust.",
-  "windows": ["main", "settings"],
+  "description": "Local launcher commands, typed appearance synchronization, backend event subscriptions, and native dragging.",
+  "windows": ["main"],
   "permissions": [
+    "launcher",
+    "shared",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
-    "core:event:allow-emit",
     "core:window:allow-start-dragging"
   ]
 }

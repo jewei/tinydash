@@ -23,6 +23,7 @@ impl Drop for BusyGuard<'_> {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct UpdateStatus {
     pub available: bool,
     pub version: Option<String>,

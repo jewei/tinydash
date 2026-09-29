@@ -16,6 +16,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createServer } from "node:net";
+import { cpus, release, totalmem } from "node:os";
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { nativeTestBinary } from "../../scripts/verify/native.ts";
@@ -26,7 +27,16 @@ import {
   stopProcessTree,
   waitForExit,
 } from "../../scripts/verify/lifecycle.ts";
+import { clearWindowsClipboard } from "./clipboard";
 import { installFixtures } from "./fixtures";
+import {
+  measureQueryTiming,
+  summarizeTimings,
+  type QueryMeasurement,
+  type QueryTiming,
+} from "./performance";
+import { nativeResponseError } from "./protocol";
+import { storedClipboard, storedUsage, withStorageLock } from "./storage";
 
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
@@ -108,11 +118,12 @@ async function request<T>(
   const result = (await response.json()) as {
     value: T & { error?: string; message?: string };
   };
-  if (!response.ok || result.value?.error) {
-    throw new Error(
-      `${method} ${path}: ${result.value?.message ?? response.statusText}`,
-    );
-  }
+  const error = nativeResponseError(
+    response.ok,
+    response.statusText,
+    result.value,
+  );
+  if (error !== null) throw new Error(`${method} ${path}: ${error}`);
   return result.value;
 }
 
@@ -303,14 +314,21 @@ async function reopen() {
     secondInstances.delete(child);
   }
   await until("the existing window reopens on the welcome screen", () =>
-    observe<boolean>(
-      `return document.querySelector('input[role=combobox]')?.value === ''
-      && document.activeElement?.getAttribute('role') === 'combobox'
-      && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
-      && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
-      && document.querySelector('.welcome-suggestions') !== null
-      && document.querySelectorAll('[role=option]').length === 0`,
-    ),
+    request<boolean>(`/session/${session}/execute/async`, "POST", {
+      // Hidden webviews retain DOM state and activeElement. Those alone cannot
+      // prove that the resident native window has actually reopened.
+      script: `const done = arguments[arguments.length - 1];
+        window.__TAURI_INTERNALS__.invoke('launcher_ready').then(info => done(
+          info.visible
+          && document.querySelector('input[role=combobox]')?.value === ''
+          && document.activeElement?.getAttribute('role') === 'combobox'
+          && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
+          && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
+          && document.querySelector('.welcome-suggestions') !== null
+          && document.querySelectorAll('[role=option]').length === 0
+        ), error => done({ error: String(error) }));`,
+      args: [],
+    }),
   );
   reopenCheckMs.push(performance.now() - started);
 }
@@ -691,10 +709,76 @@ try {
     "the copied history entry remains available",
     async () => (await titles())[0] === firstClip.split("\n")[0],
   );
+  const dataRoot =
+    process.platform === "win32"
+      ? process.env.APPDATA
+      : fixtures.env.XDG_DATA_HOME;
+  assert(
+    dataRoot,
+    "The native fixture has an isolated or disposable data directory",
+  );
+  const data = resolve(dataRoot, "dev.tinydash.launcher");
+  const stored = storedClipboard(data, firstClip);
+  assert.equal(stored.length, 1);
+  // Emoji copies record usage; clipboard copies deliberately record recency
+  // only. Exercise the real usage-producing action rather than changing that
+  // product distinction just to satisfy this recovery check.
+  const usageId = "emoji:🚀";
+  const usageBeforeContention = storedUsage(data, usageId);
+  await withStorageLock(data, async () => {
+    await reopen();
+    await keys(inputId, ":rocket");
+    await until(
+      "the usage-recording emoji remains searchable while locked",
+      async () => (await titles())[0] === "rocket",
+    );
+    await keys(inputId, "\uE007");
+    await until(
+      "emoji copying remains available during the outage",
+      async () => clipboardText() === "🚀",
+    );
+    await reopen();
+    await selectMode("clipboard");
+    await keys(inputId, `clipboard ${fixtures.nonce}`);
+    await until(
+      "the original clipboard entry remains available while locked",
+      async () => (await titles())[0] === firstClip.split("\n")[0],
+    );
+    // Restore the original OS clipboard value through the UI, also under
+    // contention, so the later deletion still tests unchanged-text suppression.
+    await keys(inputId, "\uE007");
+    await until(
+      "copy remains available while SQLite is locked",
+      async () => clipboardText() === firstClip,
+    );
+    await reopen();
+    await selectMode("clipboard");
+    await keys(inputId, `clipboard ${fixtures.nonce}`);
+    await until(
+      "search remains responsive during storage contention",
+      async () => (await titles())[0] === firstClip.split("\n")[0],
+    );
+    await keys(inputId, "\uE009\uE003\uE000");
+    await until("a failed durable delete reports its error", () =>
+      observe<boolean>(
+        "return document.querySelector('[role=alert]')?.textContent.includes('Could not delete clipboard history') ?? false",
+      ),
+    );
+    assert.equal((await titles())[0], firstClip.split("\n")[0]);
+    assert.equal(storedClipboard(data, firstClip).length, 1);
+    assert.equal(storedUsage(data, usageId), usageBeforeContention);
+  });
+  // Retry the same user action without restarting the application. A fresh
+  // SQLite connection checks the durable state, not just the renderer cache.
   await keys(inputId, "\uE009\uE003\uE000");
   await until(
-    "the delete shortcut removes the entry",
+    "the delete shortcut removes the entry after storage unlocks",
     async () => (await titles()).length === 0,
+  );
+  assert.deepEqual(storedClipboard(data, firstClip), []);
+  assert.equal(storedUsage(data, usageId), usageBeforeContention + 1);
+  pass(
+    "External SQLite contention preserves visible history and session usage; deletion and persistence recover without restart",
   );
   await reopen();
   await selectMode("clipboard");
@@ -704,6 +788,70 @@ try {
   pass(
     "Deleting an entry keeps the window open and does not recapture unchanged clipboard text",
   );
+  const recoveredClip = `TinyDash recovered ${fixtures.nonce}`;
+  setClipboardText(recoveredClip);
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, `recovered ${fixtures.nonce}`);
+  await until(
+    "clipboard capture resumes after storage unlocks",
+    async () => (await titles())[0] === recoveredClip,
+  );
+  assert.equal(storedClipboard(data, recoveredClip).length, 1);
+  pass("Clipboard capture resumes and persists after transient contention");
+  // Linux does not promise the upstream-clear heuristic. Windows exercises the
+  // actual OS clear and quiet monitor retry, not a test-only backend command.
+  if (process.platform === "win32") {
+    const automaticClip = `TinyDash automatic-cleanup ${fixtures.nonce}`;
+    setClipboardText(automaticClip);
+    await keys(inputId, "\uE009a\uE000");
+    await keys(inputId, `automatic-cleanup ${fixtures.nonce}`);
+    await until(
+      "the automatic cleanup fixture is captured durably",
+      async () =>
+        (await titles())[0] === automaticClip &&
+        storedClipboard(data, automaticClip).length === 1,
+    );
+    await withStorageLock(data, async () => {
+      const cleared = clearWindowsClipboard();
+      await writeFile(
+        resolve(output, "upstream-clear.json"),
+        JSON.stringify(cleared, null, 2),
+      );
+      // Helper processes may hide the launcher on blur. Native readiness must
+      // be restored before expecting its visibility-gated event subscriptions
+      // to refresh the warning; retained DOM focus alone is not readiness.
+      await reopen();
+      await selectMode("clipboard");
+      await keys(inputId, `automatic-cleanup ${fixtures.nonce}`);
+      await until(
+        "a blocked upstream clear exposes pending privacy cleanup",
+        () =>
+          observe<boolean>(
+            "return document.querySelector('[role=alert]')?.textContent.includes('Sensitive clipboard cleanup is pending') ?? false",
+          ),
+      );
+      assert.equal(clipboardText(), "");
+      assert.equal(storedClipboard(data, automaticClip).length, 1);
+      assert.equal((await titles())[0], automaticClip);
+    });
+    // No new clipboard value, user deletion, or application restart follows.
+    // The quiet monitor must finish the retained obligation after unlock.
+    await until(
+      "automatic cleanup completes after unlock with an unchanged empty clipboard",
+      async () =>
+        storedClipboard(data, automaticClip).length === 0 &&
+        (await titles()).length === 0,
+    );
+    await until("completed automatic cleanup clears its privacy warning", () =>
+      observe<boolean>(
+        "return !document.querySelector('[role=alert]')?.textContent.includes('Sensitive clipboard cleanup is pending')",
+      ),
+    );
+    assert.equal(clipboardText(), "");
+    pass(
+      "Windows upstream clipboard clear retains its cleanup intent through SQLite contention and retries while the clipboard remains quiet",
+    );
+  }
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, `second ${fixtures.nonce}`);
   await until(
@@ -999,59 +1147,66 @@ try {
     "Rust rejects power, logout, and empty-trash IPC requests without explicit confirmation",
   );
   await reopen();
-  const queryTimings: { query: string; elapsedMs: number }[] = [];
-  for (let sample = 0; sample < 5; sample += 1) {
-    for (const [query, expected] of [
-      [expectedNames[0], expectedNames[0]],
-      ["12 * 8", "96"],
-      ["5 ft to cm", "152.4 cm"],
-      [":rocket", "rocket"],
-    ]) {
-      const result: {
-        elapsedMs: number;
-        title: string;
-        error?: string;
-      } = await request(`/session/${session}/execute/async`, "POST", {
-        // Measure inside the webview. This includes IPC, Rust search, and
-        // Solid's DOM update, but not WebDriver transport or a screen paint.
-        script: `const done = arguments[arguments.length - 1];
-            const input = document.querySelector('input[role=combobox]');
-            const list = document.querySelector('[role=listbox]');
-            if (!input || !list || list.getAttribute('aria-busy') !== 'false') {
-              done({ error: 'Search was not ready for the timing sample' }); return;
-            }
-            const started = performance.now();
-            const observer = new MutationObserver(() => {
-              if (list.getAttribute('aria-busy') !== 'false') return;
-              observer.disconnect();
-              clearTimeout(timer);
-              done({ elapsedMs: performance.now() - started,
-                title: list.querySelector('.result-title')?.textContent ?? '' });
-            });
-            const timer = setTimeout(() => {
-              observer.disconnect(); done({ error: 'Search timing timed out' });
-            }, 4000);
-            observer.observe(list, { attributes: true, attributeFilter: ['aria-busy'] });
-            input.value = arguments[0];
-            input.dispatchEvent(new Event('input', { bubbles: true }));`,
-        args: [query],
-      });
-      assert(!result.error, result.error);
+  const queryTimings: QueryTiming[] = [];
+  const environment = await observe<{ userAgent: string; pixelRatio: number }>(
+    "return { userAgent: navigator.userAgent, pixelRatio: devicePixelRatio };",
+  );
+  // One untimed warm-up cycle; 25 samples per scenario. These are descriptive
+  // CI observations, not a statistically established product latency target.
+  for (let sample = -1; sample < 25; sample += 1) {
+    for (const [scenario, query, expected] of [
+      ["app", expectedNames[0], expectedNames[0]],
+      ["calculation", "12 * 8", "96"],
+      ["conversion", "5 ft to cm", "152.4 cm"],
+      ["emoji", ":rocket", "rocket"],
+    ] as const) {
+      const result: QueryMeasurement = await request<QueryMeasurement>(
+        `/session/${session}/execute/async`,
+        "POST",
+        {
+          // Measure inside the webview, excluding WebDriver transport. Readiness
+          // wait is recorded separately; two rAF callbacks are NOT paint proof.
+          script: `const done = arguments[arguments.length - 1];
+          (${measureQueryTiming.toString()})(arguments[0]).then(done,
+            error => done({ error: String(error) }));`,
+          args: [query],
+        },
+      );
+      assert(Number.isFinite(result.readyWaitMs) && result.readyWaitMs >= 0);
       assert.equal(result.title, expected);
-      assert(Number.isFinite(result.elapsedMs) && result.elapsedMs >= 0);
-      queryTimings.push({ query, elapsedMs: result.elapsedMs });
+      assert(Number.isFinite(result.domMs) && result.domMs >= 0);
+      assert(
+        Number.isFinite(result.frameOpportunityMs) &&
+          result.frameOpportunityMs >= result.domMs,
+      );
+      if (sample >= 0) {
+        queryTimings.push({
+          scenario,
+          readyWaitMs: result.readyWaitMs,
+          domMs: result.domMs,
+          frameOpportunityMs: result.frameOpportunityMs,
+        });
+      }
     }
   }
   await writeFile(
     resolve(output, "performance.json"),
     JSON.stringify(
       {
+        schemaVersion: 2,
         platform: process.platform,
+        architecture: process.arch,
+        osRelease: release(),
+        cpuModel: cpus()[0]?.model ?? "unknown",
+        logicalCpus: cpus().length,
+        memoryBytes: totalmem(),
+        webview: environment,
         startupCheckMs,
         reopenCheckMs,
+        summary: summarizeTimings(queryTimings),
         queryTimings,
         method:
-          "Startup and reopen include WebDriver and readiness polling. Query samples measure input-event dispatch through IPC and Rust search to settled DOM. None measures screen paint or physical shortcut latency. CI timings have no pass/fail threshold.",
+          "Identified release package and test source are recorded by the native verification wrapper. Startup and reopen include WebDriver and readiness polling; reopen requires native visibility as well as DOM readiness. Before dispatch, background-refresh readiness waiting is retained as readyWaitMs, not discarded or retried; adding it to domMs gives preparation-through-DOM time. After one warm-up cycle, 25 samples per synthetic scenario measure input-event dispatch through IPC and Rust search to settled DOM, then a double-requestAnimationFrame rendering opportunity. This is NOT proof of screen paint or physical shortcut latency. Percentiles use nearest rank; with 25 samples per scenario p99 is the maximum. No queries, clipboard contents, titles or paths are recorded here. CI timings have no pass/fail threshold and do not establish the proposed native p95 target.",
       },
       null,
       2,

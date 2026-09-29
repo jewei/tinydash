@@ -19,17 +19,20 @@ Settings, Categories controls visible categories. Keep at least one selected. Th
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
 
 ```sh
-bun run verify:browser tests/launcher.spec.ts tests/categories.spec.ts tests/settings.spec.ts tests/tools.spec.ts tests/welcome.spec.ts tests/tinycast-features.spec.ts
+bun run verify:browser tests/appearance-sync.spec.ts tests/launcher.spec.ts tests/categories.spec.ts tests/settings.spec.ts tests/tools.spec.ts tests/welcome.spec.ts tests/tinycast-features.spec.ts
 ```
 
 For affected backend behavior:
 
 ```sh
+bun run test:rust -- acl_tests
 bun run test:rust -- settings
 bun run test:rust -- launcher::portability
 ```
 
 Change all five themes through Actions and Settings. Toggle Compact without changing the theme. Inspect 320, 375, 414, 768, and 980-pixel widths. Reload and confirm both choices persist. Import and export both values, and check the older Compact appearance migration. Save visible categories, reopen, and check Tab and Shift + Tab use only those categories. Verify the selected fallback when hiding the active category.
+
+The [cross-window browser tests](../../../tests/appearance-sync.spec.ts) drive both views with storage notifications suppressed and a mocked typed appearance relay. They check both synchronization directions, exactly one callback per change in each window, the glass preference, and import preview versus save. The mock preserves the backend's separate window-targeted emissions and filters subscriptions by target, so an accidental global subscription fails the callback-count assertion. Rust ACL tests exercise the real relay and IPC authorization with Tauri MockRuntime. See the [IPC permission boundary](../ipc-permissions.md) for grants and test limits.
 
 Use desktop launcher and Settings checks on each affected OS for transparent corners, multiple windows, persistence after process restart, scaling, and placement. Browser viewport checks cannot establish native window behavior.
 

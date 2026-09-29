@@ -1,9 +1,12 @@
 // Loaded only by the browser tests. Production always calls the Rust backend.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import { emit } from "@tauri-apps/api/event";
+import { emit, emitTo, type EventTarget } from "@tauri-apps/api/event";
 import type {
+  AppearanceChange,
+  FilePhase,
   SearchResult,
   SearchMode,
+  LauncherWarning,
   SettingsImport,
   SettingsValues,
   UpdateStatus,
@@ -15,12 +18,15 @@ declare global {
     isTauri: boolean;
     __launcherTest: {
       calls: { command: string; payload: unknown }[];
+      eventDeliveries: { event: string; payload: unknown }[];
       settings: SettingsValues;
       platform: "macos" | "windows" | "linux";
       nativeGlass: boolean;
       rejectNativeGlass: boolean;
       holdNativeGlass: boolean;
       releaseNativeGlass?: () => void;
+      rejectReady: string | null;
+      rejectSearch: string | null;
       rejectSettings: string | null;
       rejectResetPosition: string | null;
       pins: Partial<Record<SearchMode, string[]>>;
@@ -29,12 +35,14 @@ declare global {
       toolRevision: number;
       rejectActions: boolean | string;
       storageError: string | null;
+      warnings: LauncherWarning[];
       usedAppFirst: boolean;
       clipboardDeleted: string[];
       clipboardCleared: boolean;
       rejectClear: boolean;
       slowPreview: boolean;
-      fileIndexing: boolean;
+      filePhase: FilePhase;
+      fileTotal: number;
       fileWarning: string | null;
       currencyDate: string | null;
       currencyRefreshing: boolean;
@@ -135,7 +143,7 @@ const systemCommands: SearchResult[] = [
             : "Save your work before you continue.",
         confirmLabel: title,
       }
-    : null,
+    : undefined,
 }));
 const commandQueries = new Map([
   ["sleep", systemCommands[2]],
@@ -307,6 +315,8 @@ window.__launcherTest = {
     (localStorage.getItem("tinydash.test.platform") as
       "macos" | "windows" | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
+  rejectReady: localStorage.getItem("tinydash.test.rejectReady"),
+  rejectSearch: null,
   rejectSettings: null,
   rejectResetPosition: null,
   pins: Array.isArray(savedPins)
@@ -317,12 +327,14 @@ window.__launcherTest = {
   toolRevision: 0,
   rejectActions: false,
   storageError: null,
+  warnings: [],
   usedAppFirst: false,
   clipboardDeleted: [],
   clipboardCleared: false,
   rejectClear: false,
   slowPreview: false,
-  fileIndexing: false,
+  filePhase: "idle",
+  fileTotal: 1,
   fileWarning: null,
   currencyDate: null,
   currencyRefreshing: false,
@@ -357,12 +369,97 @@ window.__launcherTest = {
   resultOverrides: {},
   holdAction: false,
   emit,
+  eventDeliveries: [],
 };
-mockWindows("main");
+
+// Tauri's built-in event mock ignores listen targets and does not support emitTo.
+// Match its callback plumbing, but preserve the target filtering used by Rust.
+const eventListeners = new Map<
+  number,
+  { event: string; target: EventTarget; handler: number }
+>();
+function mockEvent(command: string, args: Record<string, unknown>) {
+  if (command === "plugin:event|listen") {
+    const listener = args as unknown as {
+      event: string;
+      target: EventTarget;
+      handler: number;
+    };
+    eventListeners.set(listener.handler, listener);
+    return listener.handler;
+  }
+  if (command === "plugin:event|unlisten") {
+    eventListeners.delete(args.eventId as number);
+    return;
+  }
+  if (command !== "plugin:event|emit" && command !== "plugin:event|emit_to")
+    throw new Error(`Unsupported mock event command: ${command}`);
+  const target = (args.target as EventTarget | undefined) ?? { kind: "Any" };
+  for (const [id, listener] of eventListeners) {
+    const subscribed = listener.target;
+    const matches =
+      target.kind === "Any" ||
+      subscribed.kind === "Any" ||
+      ("label" in target && "label" in subscribed
+        ? target.label === subscribed.label &&
+          (target.kind === subscribed.kind ||
+            target.kind === "AnyLabel" ||
+            subscribed.kind === "AnyLabel")
+        : target.kind === subscribed.kind);
+    if (listener.event !== args.event || !matches) continue;
+    const message = { event: listener.event, payload: args.payload };
+    window.__launcherTest.eventDeliveries.push(message);
+    const internals = (
+      window as unknown as {
+        __TAURI_INTERNALS__: { runCallback(id: number, data: unknown): void };
+      }
+    ).__TAURI_INTERNALS__;
+    internals.runCallback(listener.handler, { ...message, id });
+  }
+}
+
+// Simulate the Rust appearance relay across browser pages. This is UI proof,
+// not ACL proof; acl_tests.rs exercises Tauri's actual IPC authorization.
+const appearanceChannel = new BroadcastChannel("tinydash.test.appearance");
+async function relayAppearance(change: AppearanceChange) {
+  const events = {
+    appearance: "appearance-changed",
+    compact: "compact-changed",
+    systemGlass: "system-glass-changed",
+  };
+  // The backend emits once per target. An Any subscription receives both.
+  for (const label of ["main", "settings"]) {
+    await emitTo(
+      { kind: "WebviewWindow", label },
+      events[change.kind],
+      change.value,
+    );
+  }
+}
+appearanceChannel.onmessage = (event: MessageEvent<AppearanceChange>) => {
+  void relayAppearance(event.data);
+};
+window.addEventListener("pagehide", () => appearanceChannel.close());
+mockWindows(
+  new URLSearchParams(location.search).get("view") === "settings"
+    ? "settings"
+    : "main",
+);
 mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
+    if (command.startsWith("plugin:event|"))
+      return mockEvent(command, payload as Record<string, unknown>);
+    if (command === "sync_appearance") {
+      const { change } = payload as { change: AppearanceChange };
+      await relayAppearance(change);
+      appearanceChannel.postMessage(change);
+      return;
+    }
+    // Queue tests control delayed search replies independently. Native
+    // cancellation is covered by Rust, not simulated as desktop proof here.
+    if (command === "cancel_search") return;
     if (command === "hide_launcher") {
       await emit("launcher-hidden");
       return;
@@ -372,10 +469,11 @@ mockIPC(
       return;
     }
     if (command === "launcher_ready") {
+      if (state.rejectReady) throw new Error(state.rejectReady);
       return {
         platform: state.platform,
         settings: state.settings,
-        warnings: [],
+        warnings: state.warnings,
         visible: state.initialVisible,
         initialMode: state.initialMode,
       };
@@ -403,7 +501,25 @@ mockIPC(
     }
     if (command === "save_settings") {
       if (state.rejectSettings) throw new Error(state.rejectSettings);
-      state.settings = (payload as { settings: SettingsValues }).settings;
+      const next = (payload as { settings: SettingsValues }).settings;
+      if (
+        [
+          "fileSearchRoots",
+          "fileSearchExcludedDirs",
+          "fileSearchLimit",
+          "fileWatchEnabled",
+        ].some(
+          (key) =>
+            JSON.stringify(state.settings[key as keyof SettingsValues]) !==
+            JSON.stringify(next[key as keyof SettingsValues]),
+        )
+      ) {
+        state.filePhase =
+          next.fileSearchRoots?.length === 0 ? "disabled" : "queued";
+        state.fileTotal = 0;
+        state.fileWarning = null;
+      }
+      state.settings = next;
       localStorage.setItem(
         "tinydash.test.settings",
         JSON.stringify(state.settings),
@@ -423,6 +539,12 @@ mockIPC(
         JSON.stringify(state.settings),
       );
       return state.settings;
+    }
+    if (command === "refresh_files") {
+      if (state.filePhase !== "disabled" && state.filePhase !== "scanning")
+        state.filePhase = "queued";
+      await emit("files-changed");
+      return;
     }
     if (command === "app_catalog") return apps;
     if (command === "set_app_preference") {
@@ -477,6 +599,9 @@ mockIPC(
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
+      // Capture the outcome at dispatch so a held old success can race a
+      // newer failure without changing the old request's result.
+      const rejection = state.rejectSearch;
       if (state.holdNextSearch) {
         state.holdNextSearch = false;
         await new Promise<void>((resolve) => {
@@ -490,6 +615,7 @@ mockIPC(
           });
         else await new Promise((resolve) => setTimeout(resolve, 250));
       }
+      if (rejection) throw new Error(rejection);
       if (query === "error")
         throw new Error(
           "The application index is unavailable. Restart TinyDash.",
@@ -512,7 +638,9 @@ mockIPC(
               ? [...systemCommands].reverse()
               : systemCommands
           : mode === "files" || query === "Launch notes.md"
-            ? query === "missing"
+            ? query === "missing" ||
+              state.fileTotal === 0 ||
+              state.settings.fileSearchRoots?.length === 0
               ? []
               : query === "Projects"
                 ? [folder]
@@ -616,15 +744,25 @@ mockIPC(
             : query === "=1 / 0"
               ? "Division by zero is not allowed."
               : null,
-        storageError: state.storageError,
+        storageError: state.storageError
+          ? {
+              code: "storageUnavailable",
+              message: state.storageError,
+              retryable: false,
+            }
+          : null,
         currency: {
           asOf: state.currencyDate,
           refreshing: state.currencyRefreshing,
           warning: state.currencyWarning,
         },
         files: {
-          total: 1,
-          indexing: state.fileIndexing,
+          total:
+            state.settings.fileSearchRoots?.length === 0 ? 0 : state.fileTotal,
+          phase:
+            state.settings.fileSearchRoots?.length === 0
+              ? "disabled"
+              : state.filePhase,
           warning: state.fileWarning,
         },
       };
@@ -694,7 +832,7 @@ mockIPC(
     }
     return undefined;
   },
-  { shouldMockEvents: true },
+  { shouldMockEvents: false },
 );
 
 // Fixed tool values verify UI behavior. Rust tests verify generation and parsing.

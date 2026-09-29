@@ -19,6 +19,7 @@ const MAX_APPEARANCE_BYTES: usize = 32;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SettingsImport {
     pub settings: Settings,
     pub ignored_keys: Vec<String>,

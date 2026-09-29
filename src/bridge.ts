@@ -1,4 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Appearance } from "./appearance";
+
+export type AppearanceChange =
+  | { kind: "appearance"; value: Appearance }
+  | { kind: "compact"; value: boolean }
+  | { kind: "systemGlass"; value: boolean };
 
 export type Action =
   "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
@@ -15,9 +21,11 @@ export type SearchMode =
   | "url"
   | "web";
 
+export type FilePhase = "disabled" | "idle" | "queued" | "scanning" | "failed";
+
 export interface FileStatus {
   total: number;
-  indexing: boolean;
+  phase: FilePhase;
   warning: string | null;
 }
 
@@ -79,17 +87,30 @@ export interface SearchResult {
     title: string;
     description: string;
     confirmLabel: string;
-  } | null;
+  };
+}
+
+export interface LauncherWarning {
+  code:
+    | "settingsRead"
+    | "shortcutRegistration"
+    | "shortcutsUnavailable"
+    | "clipboardLimited"
+    | "trayUnavailable"
+    | "storageUnavailable"
+    | "clipboardUnavailable";
+  message: string;
+  retryable: boolean;
 }
 
 export interface SearchResponse {
-  preferredSelectionId?: string | null;
+  preferredSelectionId: string | null;
   results: SearchResult[];
   total: number;
   indexing: boolean;
   indexError: string | null;
   notice: string | null;
-  storageError: string | null;
+  storageError: LauncherWarning | null;
   files: FileStatus;
   currency: CurrencyStatus;
 }
@@ -123,9 +144,9 @@ export interface WebSearch {
 export interface SettingsImport {
   settings: SettingsValues;
   ignoredKeys: string[];
-  appearance?: string | null;
-  compact?: boolean | null;
-  followSystemGlass?: boolean | null;
+  appearance: string | null;
+  compact: boolean | null;
+  followSystemGlass: boolean | null;
 }
 
 export interface UpdateStatus {
@@ -137,10 +158,10 @@ export interface UpdateStatus {
 
 export interface LauncherInfo {
   settings: SettingsValues;
-  platform: "macos" | "windows" | "linux";
-  warnings: string[];
-  visible?: boolean;
-  initialMode?: SearchMode | null;
+  platform: string;
+  warnings: LauncherWarning[];
+  visible: boolean;
+  initialMode: SearchMode | null;
 }
 
 export interface SettingsInfo {
@@ -161,6 +182,8 @@ export interface ClipboardEntry {
 }
 
 export const backend = {
+  syncAppearance: (change: AppearanceChange) =>
+    invoke<void>("sync_appearance", { change }),
   setLauncherAppearance: (
     appearance: "light" | "dark" | "sage" | "rose" | "ink",
   ) => invoke<boolean>("set_launcher_appearance", { appearance }),
@@ -195,8 +218,10 @@ export const backend = {
     invoke<void>("set_shortcut_recording", { recording }),
   revealSettings: (data = false) =>
     invoke<void>("reveal_settings_path", { data }),
-  search: (query: string, mode: SearchMode) =>
-    invoke<SearchResponse>("search", { query, mode }),
+  search: (query: string, mode: SearchMode, requestId?: number) =>
+    invoke<SearchResponse>("search", { query, mode, requestId }),
+  cancelSearch: (requestId: number) =>
+    invoke<void>("cancel_search", { requestId }),
   setPinned: (id: string, category: SearchMode, pinned: boolean) =>
     invoke<void>("set_pinned", { id, category, pinned }),
   execute: (id: string, action: Action, confirmed = false) =>

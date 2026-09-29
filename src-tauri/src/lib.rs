@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod acl_tests;
+mod appearance;
 mod currency;
 mod db;
 mod error;
@@ -15,7 +18,11 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
-use launcher::{LauncherState, window};
+use launcher::{
+    LauncherState,
+    warning::{LauncherWarning, WarningCode},
+    window,
+};
 
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let show = MenuItem::with_id(app, "show", "Open TinyDash", true, None::<&str>)?;
@@ -78,6 +85,12 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+// Share the production ACL context with MockRuntime authorization tests.
+// A single macro expansion also avoids duplicate macOS embedded plist symbols.
+fn app_context<R: tauri::Runtime>() -> tauri::Context<R> {
+    tauri::generate_context!()
+}
+
 pub fn run() -> anyhow::Result<()> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--help"] || args.as_slice() == ["-h"] {
@@ -115,15 +128,15 @@ pub fn run() -> anyhow::Result<()> {
                 Ok(settings) => settings,
                 Err(error) => {
                     tracing::warn!(%error, "Using default settings");
-                    warnings.push("Could not read settings. TinyDash is using the default settings.".into());
+                    warnings.push(LauncherWarning::new(WarningCode::SettingsRead, "Could not read settings. TinyDash is using the default settings.", false));
                     settings::Settings::fresh_install()
                 }
             };
 
             if platform::is_wayland() {
-                warnings.push("Global shortcuts need X11. On Wayland, assign a desktop shortcut to start TinyDash.".into());
+                warnings.push(LauncherWarning::new(WarningCode::ShortcutsUnavailable, "Global shortcuts need X11. On Wayland, assign a desktop shortcut to start TinyDash.", false));
                 if settings.clipboard_history_enabled {
-                    warnings.push("Wayland can limit background clipboard access. Open TinyDash after copying text if an entry is missing.".into());
+                    warnings.push(LauncherWarning::new(WarningCode::ClipboardLimited, "Wayland can limit background clipboard access. Open TinyDash after copying text if an entry is missing.", false));
                 }
             } else {
                 let shortcut_result = app.handle().plugin(
@@ -143,12 +156,12 @@ pub fn run() -> anyhow::Result<()> {
                 );
                 if let Err(error) = shortcut_result {
                     tracing::warn!(%error, "Global shortcut is unavailable");
-                    warnings.push(format!("Could not register {}. Use the tray menu or change settings.json.", settings.shortcut));
+                    warnings.push(LauncherWarning::new(WarningCode::ShortcutsUnavailable, format!("Could not register {}. Use the tray menu or change settings.json.", settings.shortcut), false));
                 } else {
                     for shortcut in settings.shortcuts() {
                         if let Err(error) = app.global_shortcut().register(shortcut) {
                             tracing::warn!(%error, shortcut, "Global shortcut is unavailable");
-                            warnings.push(format!("Could not register {shortcut}. Use the tray menu or change Settings."));
+                            warnings.push(LauncherWarning::new(WarningCode::ShortcutRegistration, format!("Could not register {shortcut}. Use the tray menu or change Settings."), true));
                         }
                     }
                 }
@@ -156,7 +169,7 @@ pub fn run() -> anyhow::Result<()> {
 
             if let Err(error) = setup_tray(app) {
                 tracing::warn!(%error, "Tray icon is unavailable");
-                warnings.push("The tray icon is unavailable. Start TinyDash again to show the running launcher.".into());
+                warnings.push(LauncherWarning::new(WarningCode::TrayUnavailable, "The tray icon is unavailable. Start TinyDash again to show the running launcher.", false));
                 if let Some(window) = app.get_webview_window("main") { window.set_skip_taskbar(false)?; }
             } else {
                 #[cfg(target_os = "macos")]
@@ -194,6 +207,7 @@ pub fn run() -> anyhow::Result<()> {
         }})
         .invoke_handler(tauri::generate_handler![
             window::set_launcher_appearance,
+            appearance::sync_appearance,
             launcher::launcher_ready,
             launcher::preferences::get_settings,
             launcher::preferences::save_settings,
@@ -205,6 +219,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::preferences::set_shortcut_recording,
             launcher::preferences::reveal_settings_path,
             launcher::search,
+            launcher::cancel_search,
             launcher::set_pinned,
             launcher::refresh_apps,
             launcher::files::refresh_files,
@@ -224,7 +239,7 @@ pub fn run() -> anyhow::Result<()> {
             window::hide_launcher,
             window::reset_launcher_position,
         ])
-        .build(tauri::generate_context!())
+        .build(app_context())
         .context("Build the desktop launcher")?;
     app.run(|_app, _event| {
         if matches!(_event, tauri::RunEvent::Exit) {

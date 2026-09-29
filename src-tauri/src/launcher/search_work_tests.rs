@@ -21,7 +21,9 @@ impl SearchManager {
             };
         }
         if let Some(outcome) = self.tools.search(query) {
-            return self.tool_outcome(query, outcome);
+            let mut budget = SearchBudget::new(None, Arc::default());
+            budget.deterministic_selection_test = self.calculator.deterministic_selection_test;
+            return self.tool_outcome(query, outcome, &budget);
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -111,6 +113,12 @@ impl SearchManager {
 
 fn fixture(apps: usize, files: usize) -> SearchManager {
     let mut manager = SearchManager::default();
+    // These finite fixtures compare eager/selected results and work counts,
+    // not elapsed time. In debug CI the eager 50k-file reference can exceed
+    // the production budget; timing it out would compare an empty response
+    // with a valid optimized response. Deadline/cancellation tests construct
+    // their own default managers and keep the production limits enabled.
+    manager.calculator.deterministic_selection_test = true;
     manager.replace_apps(AppProvider::new(
         (0..apps)
             .map(|index| {
@@ -281,6 +289,10 @@ fn bounded_search_matches_eager_selection_across_seeded_corpora() {
         };
         let mut actual = prepare(false);
         let mut expected = prepare(true);
+        // This finite corpus compares selection, not wall-clock scheduling.
+        // Disable both request/calculator clocks; keep exact result assertions.
+        actual.calculator.deterministic_selection_test = true;
+        expected.calculator.deterministic_selection_test = true;
         for mode in [
             SearchMode::All,
             SearchMode::Apps,
