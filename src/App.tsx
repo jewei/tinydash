@@ -1278,7 +1278,9 @@ export default function App(
               }
               placeholder={placeholder()}
               autocomplete="off"
+              autocorrect="off"
               autocapitalize="off"
+              writingsuggestions="false"
               spellcheck={false}
               maxlength={8192}
               value={query()}

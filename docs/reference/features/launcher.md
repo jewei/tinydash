@@ -10,6 +10,8 @@ Tab and Shift + Tab change categories while preserving the query and search focu
 
 While an input method composes text, its keys do not run launcher actions. Enter that commits composition leaves the launcher open. A later Enter can run the selected result.
 
+The search field disables automatic text correction, capitalization, spelling checks, and inline writing suggestions. This keeps application names and commands as entered. These field settings do not control system Siri activation or its keyboard shortcuts.
+
 The actions menu uses Command/Ctrl + K. The tray can open the launcher, open Settings, refresh data, and quit. A second app launch shows the existing process.
 
 ## Verification
@@ -37,5 +39,7 @@ Open All with no pins. The welcome controls appear and the search field has focu
 Tests: [tests/welcome.spec.ts](../../../tests/welcome.spec.ts), [tests/categories.spec.ts](../../../tests/categories.spec.ts), [tests/launcher.spec.ts](../../../tests/launcher.spec.ts).
 
 Native tests check launch and reopen on Windows and Linux. Global shortcuts, focus, tray behavior, and Wayland need desktop checks.
+
+On macOS, type a misspelled word or application name in the search field. Confirm that no automatic correction popup or inline prediction appears and that the query remains as entered after a space. Browser tests cannot prove the absence of native text correction popups.
 
 Use the [verification procedure](../../how-to/verify.md) and [desktop checks](../../how-to/desktop-checks.md).
