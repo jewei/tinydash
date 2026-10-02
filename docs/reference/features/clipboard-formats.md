@@ -43,6 +43,8 @@ bun run verify:browser tests/rich-clipboard.spec.ts
 
 Rust tests cover age retention, pin preservation, expired-text recapture, rollback, exclusion matching, rich persistence, format validation, byte/count bounds, missing references, and newer-schema refusal. Browser tests mount the real rich-history component with mocked IPC and exercise preview, copy failures, deletion, and return navigation. They do not establish native clipboard effects or launcher command routing.
 
+Session tests combine age retention with storage contention and pending sensitive cleanup. An unsuccessful capture keeps the previous entry and cleanup identity. A later successful capture can replace expired text with a new entry; retrying cleanup for the old identity cannot remove the new capture.
+
 Native proof requires an isolated macOS desktop session and an identified build. Enable capture and each rich opt-in separately; copy a small native PNG and files from another application, inspect previews, copy back, and verify the target receives an image or file references rather than text. Test a missing file, excluded source, secret markers, oversized image, restart persistence, retention, and clear. Do not use a personal clipboard for this check. Windows/Linux exclusion behavior needs separate platform checks; rich formats remain unsupported there.
 
 Follow the [verification procedure](../../how-to/verify.md). No live clipboard changes are made by the focused unit or component tests.

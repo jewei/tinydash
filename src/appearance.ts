@@ -51,7 +51,8 @@ export function saveCompact(value: boolean) {
   } catch {
     // Keep the selection for this session if storage is unavailable.
   }
-  if (isTauri()) void emit("compact-changed", value).catch(() => {});
+  if (isTauri())
+    void backend.syncAppearance({ kind: "compact", value }).catch(() => {});
 }
 
 export function readFollowSystemGlass(): boolean {
@@ -68,7 +69,8 @@ export function saveFollowSystemGlass(value: boolean) {
   } catch {
     // Keep the selection for this session if storage is unavailable.
   }
-  if (isTauri()) void emit("system-glass-changed", value).catch(() => {});
+  if (isTauri())
+    void backend.syncAppearance({ kind: "systemGlass", value }).catch(() => {});
 }
 
 export function saveAppearance(value: Appearance) {
@@ -77,7 +79,8 @@ export function saveAppearance(value: Appearance) {
   } catch {
     // Keep the selection for this session if storage is unavailable.
   }
-  if (isTauri()) void emit("appearance-changed", value).catch(() => {});
+  if (isTauri())
+    void backend.syncAppearance({ kind: "appearance", value }).catch(() => {});
 }
 
 export async function watchAppearance(
@@ -95,21 +98,42 @@ export async function watchAppearance(
   const stops: (() => void)[] = [];
   try {
     if (isTauri()) {
+      // Rust emits separately to main and settings. An Any listener would
+      // receive both emissions, even though it lives in just one webview.
+      const options = {
+        target: {
+          kind: "WebviewWindow" as const,
+          label: getCurrentWebviewWindow().label,
+        },
+      };
       stops.push(
-        await listen("appearance-changed", (event) => {
-          if (isAppearance(event.payload)) update(event.payload);
-        }),
+        await listen(
+          "appearance-changed",
+          (event) => {
+            if (isAppearance(event.payload)) update(event.payload);
+          },
+          options,
+        ),
       );
       stops.push(
-        await listen("compact-changed", (event) => {
-          if (typeof event.payload === "boolean") updateCompact(event.payload);
-        }),
+        await listen(
+          "compact-changed",
+          (event) => {
+            if (typeof event.payload === "boolean")
+              updateCompact(event.payload);
+          },
+          options,
+        ),
       );
       stops.push(
-        await listen("system-glass-changed", (event) => {
-          if (typeof event.payload === "boolean")
-            updateSystemGlass(event.payload);
-        }),
+        await listen(
+          "system-glass-changed",
+          (event) => {
+            if (typeof event.payload === "boolean")
+              updateSystemGlass(event.payload);
+          },
+          options,
+        ),
       );
     }
   } catch {
@@ -121,4 +145,6 @@ export async function watchAppearance(
   };
 }
 import { isTauri } from "@tauri-apps/api/core";
-import { emit, listen } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { backend } from "./bridge";

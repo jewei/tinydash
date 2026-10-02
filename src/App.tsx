@@ -2,17 +2,20 @@ import {
   createEffect,
   createMemo,
   createSignal,
-  createStore,
   For,
   flush,
   onCleanup,
   onSettled,
-  reconcile,
   snapshot,
   Show,
 } from "solid-js";
+import {
+  createLauncherController,
+  receiveLauncherSettings,
+} from "./launcherController";
 import { isTauri } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import { createNativeSubscriptions } from "./nativeSubscriptions";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   backend,
@@ -20,8 +23,6 @@ import {
   type LauncherInfo,
   type SearchResult,
   type SearchMode,
-  type FileStatus,
-  type CurrencyStatus,
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
@@ -51,7 +52,6 @@ import {
   normalizeCategories,
   resultCategories,
 } from "./categories";
-import { chooseSelection, createSearchQueue } from "./search";
 
 const groupLabels: Record<SearchResult["kind"], string> = {
   app: "Applications",
@@ -86,38 +86,54 @@ export default function App(
     readFollowSystemGlass(),
   );
   const [compact, setCompact] = createSignal(readCompact());
-  const [visible, setVisible] = createSignal(true);
-  const [query, setQuery] = createSignal("");
-  const [mode, setMode] = createSignal<SearchMode>("all");
-  const [resultView, setResultView] = createStore<{ results: SearchResult[] }>({
-    results: [],
+  const controller = createLauncherController({
+    desktop,
+    send: backend.search,
+    cancelBackend: backend.cancelSearch,
   });
-  const results = () => resultView.results;
-  const setResults = (next: SearchResult[]) =>
-    setResultView((draft) => {
-      reconcile(next, "id")(draft.results);
-    });
-  const [selected, setSelected] = createSignal(0);
+  const {
+    visible,
+    setVisible,
+    query,
+    setQuery,
+    mode,
+    setMode,
+    results,
+    selected,
+    setSelected,
+    current,
+    pending,
+    total,
+    indexing,
+    setIndexing,
+    files,
+    currency,
+    searchError,
+    clearSearchError,
+    indexError,
+    storageError,
+    notice,
+    setNotice,
+    search,
+    changeQuery: changeSearchQuery,
+    markSelectionChanged,
+  } = controller;
+  // Actions and startup own their failures independently of search refreshes.
+  const [operationError, setOperationError] = createSignal<string>();
+  const error = () => operationError() ?? searchError();
+  function setError(reason: string | undefined) {
+    setOperationError(reason);
+    // Existing explicit dismissals (input, actions, reopen) clear both owners.
+    // Search delivery never uses this setter.
+    if (reason === undefined) clearSearchError();
+  }
+  function changeQuery(value: string) {
+    setOperationError(undefined);
+    changeSearchQuery(value);
+  }
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
-  const [total, setTotal] = createSignal(0);
-  const [indexing, setIndexing] = createSignal(desktop);
-  const [files, setFiles] = createSignal<FileStatus>({
-    total: 0,
-    indexing: desktop,
-    warning: null,
-  });
-  const [pending, setPending] = createSignal(false);
-  const [currency, setCurrency] = createSignal<CurrencyStatus>({
-    asOf: null,
-    refreshing: false,
-    warning: null,
-  });
   const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal<string>();
-  const [indexError, setIndexError] = createSignal<string>();
-  const [storageError, setStorageError] = createSignal<string>();
-  const [notice, setNotice] = createSignal<string>();
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [panel, setPanel] = createSignal<string>();
   const [panelNotice, setPanelNotice] = createSignal<string>();
@@ -154,9 +170,7 @@ export default function App(
   let list!: HTMLUListElement;
   let categoryBar!: HTMLDivElement;
   let disposed = false;
-  let displayedQuery: { value: string; mode: SearchMode } | undefined;
-  let selectionChangedByUser = false;
-  const unlisteners: UnlistenFn[] = [];
+  const subscriptions = createNativeSubscriptions(listen);
 
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
   const enabledCategories = createMemo(() =>
@@ -165,7 +179,6 @@ export default function App(
   const visibleCategories = createMemo(() =>
     categories.filter(({ id }) => enabledCategories().includes(id)),
   );
-  const current = () => results()[selected()];
   const welcome = () =>
     mode() === "all" && !query().trim() && results().length === 0;
   const isPinned = (result?: SearchResult, category = mode()) =>
@@ -192,14 +205,20 @@ export default function App(
     !clearOpen() &&
     !clipboardTool() &&
     !pendingAction();
+  const filePending = () =>
+    files().phase === "queued" || files().phase === "scanning";
+  const fileActivity = () =>
+    files().phase === "queued"
+      ? "Waiting to refresh files..."
+      : "Scanning files...";
   const message = () =>
     error() ??
     notice() ??
     indexError() ??
-    storageError() ??
+    storageError()?.message ??
     (mode() === "all" || mode() === "files" ? files().warning : undefined) ??
     (mode() === "calculator" ? currency().warning : undefined) ??
-    info()?.warnings[0];
+    info()?.warnings[0]?.message;
   const primaryLabel = () =>
     current()?.kind === "password"
       ? "Copy password"
@@ -413,7 +432,7 @@ export default function App(
         label: "Refresh files",
         icon: "refresh" as const,
         run: () => void refresh("files"),
-        disabled: !desktop || files().indexing,
+        disabled: !desktop || filePending() || files().phase === "disabled",
         key: mode() === "files" ? `${modifier()} R` : undefined,
       },
       {
@@ -570,64 +589,6 @@ export default function App(
     }
   }
 
-  const searches = createSearchQueue({
-    send: ({ value, mode }) => backend.search(value, mode),
-    apply(request, response) {
-      const index = chooseSelection({
-        request,
-        results: response.results,
-        preferredSelectionId: response.preferredSelectionId,
-        displayed: displayedQuery,
-        current: current(),
-        selected: selected(),
-        selectionChangedByUser,
-      });
-      displayedQuery = { value: request.value, mode: request.mode };
-      setResults(response.results);
-      setSelected(index);
-      setTotal(response.total);
-      setIndexing(response.indexing);
-      setFiles(response.files);
-      setCurrency(response.currency);
-      setIndexError(response.indexError ?? undefined);
-      setStorageError(response.storageError ?? undefined);
-      setNotice(response.notice ?? undefined);
-    },
-    fail(_request, reason) {
-      setResults([]);
-      setError(String(reason));
-    },
-    settled: () => setPending(false),
-  });
-
-  function search(value?: string, preserveSelection = false) {
-    // IPC events can change the category and visibility in the same turn.
-    // Keep previews hidden while that state is committed for the next request.
-    setPending(true);
-    flush();
-    value ??= query();
-    if (!desktop || !visible() || disposed) {
-      setPending(false);
-      return Promise.resolve();
-    }
-    if (!preserveSelection) selectionChangedByUser = false;
-    if (
-      mode() === "all" &&
-      !value.trim() &&
-      (displayedQuery?.mode !== "all" || displayedQuery.value.trim())
-    ) {
-      setResults([]);
-    }
-    setNotice(undefined);
-    return searches.submit({ value, mode: mode(), preserveSelection });
-  }
-
-  function changeQuery(value: string) {
-    setQuery(value);
-    setError(undefined);
-    void search(value);
-  }
-
   async function togglePin(category: SearchMode) {
     const result = current();
     if (!canOpen() || pinBusy() || !result?.pin) return;
@@ -775,8 +736,7 @@ export default function App(
   ) {
     setMenuOpen(false);
     setError(undefined);
-    if (target === "files") setFiles((state) => ({ ...state, indexing: true }));
-    else if (target === "apps") setIndexing(true);
+    if (target === "apps") setIndexing(true);
     focusInput();
     try {
       if (target === "files") await backend.refreshFiles();
@@ -784,9 +744,7 @@ export default function App(
       else await backend.refresh();
       await search();
     } catch (reason) {
-      if (target === "files")
-        setFiles((state) => ({ ...state, indexing: false }));
-      else if (target === "apps") setIndexing(false);
+      if (target === "apps") setIndexing(false);
       setError(String(reason));
     }
   }
@@ -978,7 +936,7 @@ export default function App(
       event.preventDefault();
       if (results().length) {
         const count = results().length;
-        selectionChangedByUser = true;
+        markSelectionChanged();
         setSelected((index) => {
           if (
             emojiGrid &&
@@ -1059,12 +1017,17 @@ export default function App(
 
   onSettled(() => {
     focusInput();
-    void watchAppearance(setAppearance, setCompact, setFollowSystemGlass).then(
-      (stop) => {
-        if (disposed) stop();
-        else unlisteners.push(stop);
-      },
-    );
+    void subscriptions
+      .own(
+        watchAppearance(
+          subscriptions.guard(setAppearance),
+          subscriptions.guard(setCompact),
+          subscriptions.guard(setFollowSystemGlass),
+        ),
+      )
+      .catch((reason) => {
+        if (!disposed) setError(String(reason));
+      });
     document.addEventListener("keydown", onKey);
     document.addEventListener("compositionstart", startComposition);
     document.addEventListener("compositionend", endComposition);
@@ -1072,38 +1035,11 @@ export default function App(
     if (!desktop) return;
     void (async () => {
       try {
-        const register = async (
-          name: string,
-          callback: (payload: unknown) => void,
-        ) => {
-          const stop = await listen(name, (event) => callback(event.payload));
-          if (disposed) stop();
-          else unlisteners.push(stop);
-        };
+        const { register } = subscriptions;
         await Promise.all([
-          register("settings-changed", (payload) => {
+          register<LauncherInfo["settings"]>("settings-changed", (settings) => {
             setInfo((current) =>
-              current
-                ? {
-                    ...current,
-                    settings: payload as LauncherInfo["settings"],
-                    warnings: current.warnings.filter(
-                      (warning) =>
-                        !(
-                          warning.startsWith("Could not register ") &&
-                          (current.settings.shortcut !==
-                            (payload as LauncherInfo["settings"]).shortcut ||
-                            JSON.stringify(
-                              current.settings.categoryShortcuts,
-                            ) !==
-                              JSON.stringify(
-                                (payload as LauncherInfo["settings"])
-                                  .categoryShortcuts,
-                              ))
-                        ) && !warning.startsWith("Could not read settings."),
-                    ),
-                  }
-                : current,
+              current ? receiveLauncherSettings(current, settings) : current,
             );
             keepVisibleCategory();
             void search(query(), true);
@@ -1170,22 +1106,20 @@ export default function App(
           }),
           register("launcher-hidden", () => {
             clearComposition();
-            setVisible(false);
-            // One running Rust search may finish. Ignore its reply and drop
-            // waiting input. Opening the window always requests current data.
-            searches.cancel();
-            setPending(false);
+            controller.hidden();
           }),
         ]);
         if (disposed) return;
         const initial = await backend.ready();
+        if (disposed) return;
         setInfo(initial);
         setVisible(initial.visible ?? true);
         if (initial.initialMode) setMode(initial.initialMode);
         else keepVisibleCategory();
         await search();
-        focusInput();
+        if (!disposed) focusInput();
       } catch (reason) {
+        if (disposed) return;
         setIndexing(false);
         setError(`Could not connect to TinyDash. ${String(reason)}`);
       }
@@ -1194,8 +1128,8 @@ export default function App(
 
   onCleanup(() => {
     disposed = true;
-    searches.dispose();
-    unlisteners.forEach((stop) => stop());
+    controller.dispose();
+    subscriptions.dispose();
     document.removeEventListener("keydown", onKey);
     document.removeEventListener("compositionstart", startComposition);
     document.removeEventListener("compositionend", endComposition);
@@ -1371,13 +1305,11 @@ export default function App(
           </aside>
         </Show>
         <Show
-          when={
-            !message() && !welcome() && mode() === "all" && files().indexing
-          }
+          when={!message() && !welcome() && mode() === "all" && filePending()}
         >
           <div class="status-line indexing-status">
             <span class="query-hint" role="status">
-              Scanning files... You can search apps now.
+              {fileActivity()} You can search apps now.
             </span>
           </div>
         </Show>
@@ -1472,7 +1404,7 @@ export default function App(
                       }}
                       onPointerMove={() => {
                         if (!pending()) {
-                          selectionChangedByUser = true;
+                          markSelectionChanged();
                           setSelected(index());
                         }
                       }}
@@ -1535,13 +1467,19 @@ export default function App(
                                       ? "No clipboard entries found"
                                       : "No saved clipboard text"
                                     : mode() === "files"
-                                      ? files().indexing
-                                        ? "Finding your files"
-                                        : query()
-                                          ? "No files found"
-                                          : "No files in the index"
+                                      ? files().phase === "queued"
+                                        ? "Waiting to refresh files"
+                                        : files().phase === "scanning"
+                                          ? "Finding your files"
+                                          : files().phase === "disabled"
+                                            ? "File search is off"
+                                            : files().phase === "failed"
+                                              ? "File scan unavailable"
+                                              : query()
+                                                ? "No files found"
+                                                : "No files in the index"
                                       : mode() === "all" &&
-                                          files().indexing &&
+                                          filePending() &&
                                           query()
                                         ? "No results yet"
                                         : indexing()
@@ -1575,18 +1513,21 @@ export default function App(
                                         ? "Try a word from the text you copied."
                                         : "Copy text in any application. It will appear here."
                                     : mode() === "files"
-                                      ? files().indexing
-                                        ? "You can search applications while the scan runs."
-                                        : query()
-                                          ? "Try a filename or part of a path."
-                                          : info()?.settings.fileSearchRoots
-                                                ?.length === 0
-                                            ? "File search is off. Choose folders in Settings, File search."
-                                            : "Check your folders in Settings, File search, then refresh the file list."
+                                      ? filePending()
+                                        ? files().phase === "queued"
+                                          ? "The refresh is queued. You can search applications while waiting."
+                                          : "You can search applications while the scan runs."
+                                        : files().phase === "disabled"
+                                          ? "File search is off. Choose folders in Settings, File search."
+                                          : files().phase === "failed"
+                                            ? "Use Refresh files to try again."
+                                            : query()
+                                              ? "Try a filename or part of a path."
+                                              : "Check your folders in Settings, File search, then refresh the file list."
                                       : mode() === "all" &&
-                                          files().indexing &&
+                                          filePending() &&
                                           query()
-                                        ? "The file scan is still running. You can search applications now."
+                                        ? `${fileActivity()} You can search applications now.`
                                         : indexing()
                                           ? "You can start typing while the list loads."
                                           : query()
@@ -1596,7 +1537,9 @@ export default function App(
                 <Show
                   when={
                     desktop &&
-                    !(mode() === "files" ? files().indexing : indexing()) &&
+                    !(mode() === "files"
+                      ? filePending() || files().phase === "disabled"
+                      : indexing()) &&
                     (query() ||
                       mode() === "all" ||
                       mode() === "apps" ||
@@ -1677,9 +1620,13 @@ export default function App(
                       ? `Rates ${currency().asOf}`
                       : "Arithmetic and units offline"
                   : mode() === "files"
-                    ? files().indexing
-                      ? "Scanning files..."
-                      : `${files().total} ${files().total === 1 ? "item" : "items"} indexed`
+                    ? filePending()
+                      ? fileActivity()
+                      : files().phase === "disabled"
+                        ? "File search is off"
+                        : files().phase === "failed"
+                          ? "File scan unavailable"
+                          : `${files().total} ${files().total === 1 ? "item" : "items"} indexed`
                     : mode() === "emoji" ||
                         mode() === "clipboard" ||
                         mode() === "system" ||

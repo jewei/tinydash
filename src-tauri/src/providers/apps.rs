@@ -148,17 +148,31 @@ impl AppProvider {
         }
     }
 
+    #[cfg(test)]
     pub fn search(
         &self,
         query: &str,
         pattern: &Pattern,
         matcher: &mut Matcher,
     ) -> Vec<SearchResult> {
+        self.search_interruptible(query, pattern, matcher, || false)
+    }
+
+    pub fn search_interruptible(
+        &self,
+        query: &str,
+        pattern: &Pattern,
+        matcher: &mut Matcher,
+        mut stopped: impl FnMut() -> bool,
+    ) -> Vec<SearchResult> {
         #[cfg(test)]
         super::search_work::record(super::search_work::Provider::Apps, self.apps.len());
         let matches: Vec<_> = self
             .apps
             .iter()
+            .enumerate()
+            .take_while(|(index, _)| index % 64 != 0 || !stopped())
+            .map(|(_, app)| app)
             .filter(|app| !app.hidden)
             .filter_map(|app| {
                 if query.is_empty() {
@@ -211,6 +225,35 @@ mod tests {
             AtomKind::Fuzzy,
         );
         provider.search(query, &pattern, &mut matcher)
+    }
+
+    #[test]
+    fn app_matching_checks_cancellation_between_small_batches() {
+        let provider = AppProvider::new(
+            (0..1000)
+                .map(|index| {
+                    AppEntry::new(
+                        format!("App {index:04}"),
+                        format!("/apps/{index}").into(),
+                        vec![],
+                    )
+                })
+                .collect(),
+        );
+        let mut matcher = Matcher::new(Config::DEFAULT);
+        let pattern = Pattern::new(
+            "app",
+            CaseMatching::Ignore,
+            Normalization::Smart,
+            AtomKind::Fuzzy,
+        );
+        let mut checks = 0;
+        let results = provider.search_interruptible("app", &pattern, &mut matcher, || {
+            checks += 1;
+            checks > 1
+        });
+        assert_eq!(checks, 2);
+        assert_eq!(results.len(), 64);
     }
 
     #[test]

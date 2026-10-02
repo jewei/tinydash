@@ -4,6 +4,8 @@ Select Calculator or enter an expression in All. The `=` prefix selects calculat
 
 Arithmetic and unit conversion work offline. Unit case is preserved. Calculator mode shows errors for invalid expressions. Each query is independent; variables and scripts are not supported.
 
+Each evaluation has a 50 ms cooperative limit and also observes the shared [whole-search budget](launcher.md). Calculator pins share that budget instead of each extending the request by another 50 ms. Superseded requests interrupt evaluation. No calculation-result cache was added: issued copy values remain bounded independently, and no new cache retains secrets or time-sensitive tool results.
+
 Data rates distinguish bytes from bits. `Bps` means bytes per second, and `bps` means bits per second. For example, `8 Mbps to MBps` gives `1 MBps`. Decimal and binary prefixes work with these rates.
 
 Currency input can omit `to`: `100 USD MYR` means `100 USD to MYR`. This shorthand needs a simple number and two uppercase currency codes.

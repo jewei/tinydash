@@ -470,6 +470,44 @@ test("keeps an edited alias when another window hides apps", async ({
   });
 });
 
+test("keeps dirty aliases but accepts another window unhiding a default preference", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = {
+      ...state.settings,
+      appPreferences: { "app-0": { aliases: [], hidden: true } },
+    };
+    await state.emit("settings-changed", state.settings);
+  });
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.locator('select[size="6"]').selectOption("app-0");
+  const hidden = page.getByRole("checkbox", {
+    name: "Hide this app from search",
+  });
+  await expect(hidden).toBeChecked();
+  await page.getByLabel("Aliases, one per line").fill("local alias");
+  await page.getByLabel("Aliases, one per line").blur();
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = { ...state.settings, appPreferences: {} };
+    await state.emit("settings-changed", state.settings);
+  });
+  await expect(hidden).not.toBeChecked();
+  await expect(page.getByLabel("Aliases, one per line")).toHaveValue(
+    "local alias",
+  );
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.appPreferences),
+  ).toEqual({
+    "app-0": { aliases: ["local alias"], hidden: false },
+  });
+});
+
 test("records, saves, and reloads the launch shortcut and window preferences", async ({
   page,
 }) => {
@@ -849,6 +887,8 @@ test("previews imports without replacing saved settings and preserves failed imp
       settings: { ...window.__launcherTest.settings, hideOnBlur: false },
       ignoredKeys: ["futureField"],
       appearance: "dark",
+      compact: null,
+      followSystemGlass: null,
     };
   });
   await page.getByRole("button", { name: "Privacy", exact: true }).click();

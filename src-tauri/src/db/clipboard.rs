@@ -3,6 +3,22 @@ use rusqlite::{OptionalExtension, params};
 use super::{Database, Result};
 use crate::providers::clipboard::ClipboardEntry;
 
+/// Identity of one capture, not of its text, creation time, or display order.
+/// Both fields are durable; recapturing deduplicated content advances revision.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CaptureRevision {
+    pub id: i64,
+    pub revision: i64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CleanupOutcome {
+    Removed,
+    Missing,
+    Recaptured,
+    Pinned,
+}
+
 fn entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<ClipboardEntry> {
     Ok(ClipboardEntry {
         id: row.get(0)?,
@@ -57,6 +73,7 @@ impl Database {
         self.capture_clipboard_with_retention(content, now, limit, 0)
     }
 
+    #[cfg(test)]
     pub fn capture_clipboard_with_retention(
         &mut self,
         content: &str,
@@ -64,6 +81,27 @@ impl Database {
         limit: usize,
         retention_days: u32,
     ) -> Result<(ClipboardEntry, Vec<i64>)> {
+        self.capture_clipboard_revision_with_retention(content, now, limit, retention_days)
+            .map(|(entry, removed, _)| (entry, removed))
+    }
+
+    #[cfg(test)]
+    pub fn capture_clipboard_revision(
+        &mut self,
+        content: &str,
+        now: i64,
+        limit: usize,
+    ) -> Result<(ClipboardEntry, Vec<i64>, CaptureRevision)> {
+        self.capture_clipboard_revision_with_retention(content, now, limit, 0)
+    }
+
+    pub fn capture_clipboard_revision_with_retention(
+        &mut self,
+        content: &str,
+        now: i64,
+        limit: usize,
+        retention_days: u32,
+    ) -> Result<(ClipboardEntry, Vec<i64>, CaptureRevision)> {
         let transaction = self.connection.transaction()?;
         // Prune before the upsert: re-copying expired text creates a fresh entry
         // rather than immediately removing the entry returned to the index.
@@ -80,13 +118,14 @@ impl Database {
                 )?
                 .collect::<rusqlite::Result<Vec<i64>>>()?
         };
-        let entry = transaction.query_row(
+        let (entry, revision) = transaction.query_row(
             "INSERT INTO clipboard_history (content, created_at, sort_order)
              VALUES (?1, ?2, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM clipboard_history))
-             ON CONFLICT(content) DO UPDATE SET sort_order = excluded.sort_order
-             RETURNING id, content, created_at, last_used_at",
+             ON CONFLICT(content) DO UPDATE SET sort_order = excluded.sort_order,
+                 capture_revision = clipboard_history.capture_revision + 1
+             RETURNING id, content, created_at, last_used_at, capture_revision",
             params![content, now],
-            entry,
+            |row| Ok((entry(row)?, row.get(4)?)),
         )?;
         removed.extend({
             let mut statement = transaction.prepare(
@@ -99,7 +138,11 @@ impl Database {
                 .collect::<rusqlite::Result<Vec<i64>>>()?
         });
         transaction.commit()?;
-        Ok((entry, removed))
+        let capture = CaptureRevision {
+            id: entry.id,
+            revision,
+        };
+        Ok((entry, removed, capture))
     }
 
     pub fn touch_clipboard(&mut self, id: i64, now: i64) -> Result<Option<ClipboardEntry>> {
@@ -121,12 +164,34 @@ impl Database {
         Ok(())
     }
 
-    /// Deletes an entry unless a pin keeps it. Returns whether it was deleted.
-    pub fn delete_unpinned_clipboard(&self, id: i64) -> Result<bool> {
-        Ok(self.connection.execute(
-            "DELETE FROM clipboard_history WHERE id = ?1 AND pinned = 0",
-            [id],
-        )? > 0)
+    /// Recheck capture identity and pins under the same write transaction as
+    /// deletion. A recapture, including on another connection, wins over a stale
+    /// intent. Pinned captures remain pending so unpinning can finish cleanup.
+    pub fn cleanup_clipboard(&mut self, capture: CaptureRevision) -> Result<CleanupOutcome> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let current: Option<(i64, bool)> = transaction
+            .query_row(
+                "SELECT capture_revision, pinned FROM clipboard_history WHERE id = ?1",
+                [capture.id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let outcome = match current {
+            None => CleanupOutcome::Missing,
+            Some((revision, _)) if revision != capture.revision => CleanupOutcome::Recaptured,
+            Some((_, true)) => CleanupOutcome::Pinned,
+            Some((_, false)) => {
+                transaction.execute(
+                    "DELETE FROM clipboard_history WHERE id = ?1 AND capture_revision = ?2 AND pinned = 0",
+                    params![capture.id, capture.revision],
+                )?;
+                CleanupOutcome::Removed
+            }
+        };
+        transaction.commit()?;
+        Ok(outcome)
     }
 
     pub fn clear_clipboard(&self) -> Result<()> {
@@ -247,6 +312,105 @@ mod tests {
     }
 
     #[test]
+    fn capture_revision_ignores_touches_and_survives_reopen_order_reuse_and_clock_reversal() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("state.sqlite3");
+        let mut database = Database::open(&path).unwrap();
+        let (entry, _, first) = database
+            .capture_clipboard_revision("synthetic", 100, 100)
+            .unwrap();
+        database.touch_clipboard(first.id, 101).unwrap();
+        database
+            .set_pinned(
+                &format!("clipboard:{}", first.id),
+                SearchMode::Clipboard,
+                true,
+            )
+            .unwrap();
+        let revision: i64 = database
+            .connection
+            .query_row(
+                "SELECT capture_revision FROM clipboard_history WHERE id = ?1",
+                [first.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(revision, first.revision);
+        drop(database);
+        let mut database = Database::open(&path).unwrap();
+        // sort_order can be reused and wall clocks can go backwards; neither
+        // defines identity. Use the production capture write after both changes.
+        database
+            .connection
+            .execute("UPDATE clipboard_history SET sort_order = 0", [])
+            .unwrap();
+        let (recaptured, _, second) = database
+            .capture_clipboard_revision("synthetic", 90, 100)
+            .unwrap();
+        assert_eq!(recaptured.id, entry.id);
+        assert_eq!(recaptured.created_at, entry.created_at);
+        assert_eq!(second.revision, first.revision + 1);
+        assert_eq!(
+            database.cleanup_clipboard(first).unwrap(),
+            CleanupOutcome::Recaptured
+        );
+        assert_eq!(
+            database.cleanup_clipboard(second).unwrap(),
+            CleanupOutcome::Pinned
+        );
+        database
+            .set_pinned(
+                &format!("clipboard:{}", first.id),
+                SearchMode::Clipboard,
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            database.cleanup_clipboard(second).unwrap(),
+            CleanupOutcome::Removed
+        );
+        let (_, _, recreated) = database
+            .capture_clipboard_revision("synthetic", 100, 100)
+            .unwrap();
+        assert!(recreated.id > first.id);
+        assert_eq!(
+            database.cleanup_clipboard(second).unwrap(),
+            CleanupOutcome::Missing
+        );
+    }
+
+    #[test]
+    fn exhausted_revision_fails_capture_without_wrapping_or_changing_saved_text() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut database = Database::open(&directory.path().join("state.sqlite3")).unwrap();
+        let (_, _, capture) = database
+            .capture_clipboard_revision("synthetic", 100, 100)
+            .unwrap();
+        database
+            .connection
+            .execute(
+                "UPDATE clipboard_history SET capture_revision = ?1 WHERE id = ?2",
+                params![i64::MAX, capture.id],
+            )
+            .unwrap();
+        assert!(
+            database
+                .capture_clipboard_revision("synthetic", 101, 100)
+                .is_err()
+        );
+        let revision: i64 = database
+            .connection
+            .query_row(
+                "SELECT capture_revision FROM clipboard_history WHERE id = ?1",
+                [capture.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(revision, i64::MAX);
+        assert_eq!(database.load_clipboard().unwrap()[0].content, "synthetic");
+    }
+
+    #[test]
     fn locked_delete_and_clear_preserve_entries() {
         let directory = tempfile::tempdir().expect("directory");
         let path = directory.path().join("state.sqlite3");
@@ -309,27 +473,28 @@ mod tests {
         let directory = tempfile::tempdir().expect("directory");
         let mut database = Database::open(&directory.path().join("state.sqlite3")).expect("open");
         let pinned = database
-            .capture_clipboard("pinned", 1, 100)
+            .capture_clipboard_revision("pinned", 1, 100)
             .expect("pinned")
-            .0;
+            .2;
         let cleared = database
-            .capture_clipboard("cleared", 2, 100)
+            .capture_clipboard_revision("cleared", 2, 100)
             .expect("cleared")
-            .0;
+            .2;
         database
             .set_pinned(&format!("clipboard:{}", pinned.id), SearchMode::All, true)
             .expect("pin");
 
-        assert!(!database.delete_unpinned_clipboard(pinned.id).expect("keep"));
-        assert!(
-            database
-                .delete_unpinned_clipboard(cleared.id)
-                .expect("delete")
+        assert_eq!(
+            database.cleanup_clipboard(pinned).unwrap(),
+            CleanupOutcome::Pinned
         );
-        assert!(
-            !database
-                .delete_unpinned_clipboard(cleared.id)
-                .expect("missing")
+        assert_eq!(
+            database.cleanup_clipboard(cleared).unwrap(),
+            CleanupOutcome::Removed
+        );
+        assert_eq!(
+            database.cleanup_clipboard(cleared).unwrap(),
+            CleanupOutcome::Missing
         );
         assert_eq!(
             database

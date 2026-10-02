@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ProcessInfo {
     pub pid: u32,
     pub identity: String,

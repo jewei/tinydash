@@ -3,6 +3,7 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Color {
     pub hex: String,
     pub rgb: String,

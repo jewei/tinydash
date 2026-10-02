@@ -165,11 +165,29 @@ impl Payload {
     }
 }
 
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub enum RichKind {
+    Image,
+    Files,
+}
+
+impl RichKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Image => "image",
+            Self::Files => "files",
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RichEntry {
     pub id: i64,
-    pub kind: String,
+    pub kind: RichKind,
     pub title: String,
     pub created_at: i64,
     pub source_app: Option<String>,
@@ -178,6 +196,7 @@ pub struct RichEntry {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RichPreview {
     pub entry: RichEntry,
     pub png: Option<Vec<u8>>,
@@ -186,6 +205,7 @@ pub struct RichPreview {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RichHistory {
     pub entries: Vec<RichEntry>,
     pub capture_supported: bool,
@@ -299,7 +319,7 @@ impl Store {
     fn preview(&self, id: i64) -> anyhow::Result<RichPreview> {
         ensure!(id > 0, "Invalid clipboard entry.");
         let (entry, bytes): (RichEntry, Vec<u8>) = self.connection.query_row("SELECT id,kind,title,created_at,source_app,length(payload),payload FROM rich_clipboard WHERE id = ?1", [id], |row| Ok((entry(row)?, row.get(6)?))).context("This clipboard entry is no longer available.")?;
-        let (png, files) = match Payload::decode(&entry.kind, bytes)? {
+        let (png, files) = match Payload::decode(entry.kind.as_str(), bytes)? {
             Payload::Png(bytes) => (Some(bytes), None),
             Payload::Files(paths) => {
                 valid_files(&paths)?;
@@ -332,7 +352,21 @@ impl Store {
 fn entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<RichEntry> {
     Ok(RichEntry {
         id: row.get(0)?,
-        kind: row.get(1)?,
+        kind: match row.get::<_, String>(1)?.as_str() {
+            "image" => RichKind::Image,
+            "files" => RichKind::Files,
+            _ => {
+                return Err(rusqlite::Error::FromSqlConversionFailure(
+                    1,
+                    rusqlite::types::Type::Text,
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Unknown rich clipboard format",
+                    )
+                    .into(),
+                ));
+            }
+        },
         title: row.get(2)?,
         created_at: row.get(3)?,
         source_app: row.get(4)?,

@@ -12,6 +12,7 @@ use std::{
 
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Status {
     active: bool,
     ends_at: Option<u64>,

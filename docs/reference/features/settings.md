@@ -14,6 +14,8 @@ Privacy exports a versioned settings file and previews imports before applicatio
 
 The app creates a recovery archive before database migrations. Recovery is manual. Follow [data recovery](../../how-to/recover-data.md).
 
+Settings-only IPC permissions restrict settings replacement, import/export, shortcut recording, recovery access, and updates to this window. Main retains its narrow app-preference and clipboard-consent actions; both windows can clear history and synchronize appearance. See the [IPC permission boundary](../ipc-permissions.md).
+
 About has an explicit update check. Mac and Windows release builds need an updater public key and HTTPS feed. The user chooses whether to install an available update. Development builds can report that updates are not configured. Ubuntu uses manual Debian package replacement.
 
 ## Verification
@@ -22,11 +24,17 @@ Run this browser recipe from the repository root. It retains successful traces i
 
 ```sh
 bun run verify:browser tests/settings.spec.ts tests/tinycast-features.spec.ts tests/release-config.spec.ts tests/roadmap.spec.ts
+bun run verify:browser tests/settings-draft.spec.ts tests/native-subscriptions.spec.ts
 ```
+
+Draft merging preserves local app and item aliases while accepting remote changes to unchanged fields. A remote removal restores default visibility, disabled state, and shortcuts without discarding edited aliases. Shortcut warnings clear when the affected bindings change; unrelated preference changes keep those warnings.
+
+Standalone draft tests check local edits against incoming saved values, nested application preferences, remote deletion of default preferences while aliases are dirty, local deletions, category normalization, and incomplete folder input. Browser tests additionally exercise clean and dirty forms receiving changes from another window. A saved-settings event must not discard unrelated local edits.
 
 For affected backend behavior:
 
 ```sh
+bun run test:rust -- acl_tests
 bun run test:rust -- settings
 bun run test:rust -- db::backup
 bun run test:rust -- db::migrations

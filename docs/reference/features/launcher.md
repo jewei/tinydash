@@ -6,6 +6,12 @@ Use **Actions > Reset window position** to center the launcher in the current mo
 
 All searches applications, files, clipboard text, emoji, calculations, system commands, and explicit tool commands. Empty All shows welcome examples or pinned items. Text categories have a fixed priority before the 30-result limit. See [ranking](../../explanation/data-and-privacy.md).
 
+Search keeps one expensive request in flight and replaces waiting input with the latest query. New input, hiding, or disposal sends a separate lightweight cancellation for the active request. Stale replies are still ignored. A cancellation failure does not dispatch overlapping searches; the latest waiting query follows the old response. Cancellation acknowledgements finish before the next dispatch.
+
+A successful current search clears a previous search failure, including a background retry of the same query after a data-change event. It does not dismiss an action or startup failure. Those errors take precedence while present and keep the existing explicit dismissal paths, such as editing the query or reopening the launcher. Obsolete successes and failures cannot change the current search error.
+
+A request has one 250 ms cooperative budget, starting in the backend command before blocking-worker queueing and including search-lock wait, providers, and pins. App/file matching checks every 64 entries, clipboard matching every 16 entries, and calculator evaluation uses its interrupt callback. The backend also checks between providers and pins and before returning a response. Expired requests report a notice/error rather than a partially ranked list. This is not a hard input-to-paint guarantee: runtime scheduling, individual matcher calls, sorting, fixed-size providers, serialization, IPC, and WebView rendering can overrun the cooperative checkpoint interval.
+
 Tab and Shift + Tab change categories while preserving the query and search focus. Arrow keys select results. Enter runs the selected action. Escape closes a dialog or menu before hiding the launcher. [Keyboard reference](../keyboard-shortcuts.md) lists the remaining controls.
 
 While an input method composes text, its keys do not run launcher actions. Enter that commits composition leaves the launcher open. A later Enter can run the selected result.
@@ -20,7 +26,10 @@ Run this browser recipe from the repository root. It retains successful traces i
 
 ```sh
 bun run verify:browser tests/welcome.spec.ts tests/categories.spec.ts tests/launcher.spec.ts
+bun run verify:browser tests/launcher-controller.spec.ts tests/search-errors.spec.ts tests/native-subscriptions.spec.ts tests/launcher-warnings.spec.ts tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
 ```
+
+The standalone controller checks cover result reconciliation, refresh selection, hidden/disposed replies, reopening before an old reply settles (the original single-flight queue must ignore the old result and keep the new search pending), failure state, same-query error recovery, superseded-success isolation, and browser-preview gating. Mocked-IPC browser regressions drive input and actions, then emit background events to check search-error recovery without an input edit, action/startup error survival, and stale success isolation while the latest retry is pending. These tests prove frontend ownership, not native event delivery or OS action outcomes. Subscription checks cover late registrations and teardown. Warning tests use changed display text to prove that settings repair follows structured codes rather than English prefixes; unrelated platform warnings remain visible. A storage warning must leave search results usable.
 
 For affected backend behavior:
 
@@ -38,7 +47,21 @@ Open All with no pins. The welcome controls appear and the search field has focu
 
 Tests: [tests/welcome.spec.ts](../../../tests/welcome.spec.ts), [tests/categories.spec.ts](../../../tests/categories.spec.ts), [tests/launcher.spec.ts](../../../tests/launcher.spec.ts).
 
-Native tests check launch and reopen on Windows and Linux. Global shortcuts, focus, tray behavior, and Wayland need desktop checks.
+Native tests check launch and reopen on Windows and Linux. They also retain synthetic query-to-DOM and rendering-opportunity timings; see [performance samples and limits](../performance-samples.md). Global shortcuts, focus, tray behavior, and Wayland need desktop checks.
+
+### Synthetic search measurements
+
+Run the ignored in-process benchmark separately from desktop checks:
+
+```sh
+cargo test --manifest-path src-tauri/Cargo.toml --release synthetic_search_percentiles -- --ignored --nocapture --test-threads=1
+```
+
+It reports p50/p95/p99 and maximum microseconds for whole search, providers, and pins at 1k, 50k, and 100k synthetic files, old file pins, 1,000 near-16-KiB clipboard entries with old pins, and 30 expensive calculator pins. The default is 40 measured requests per case after three warmups; `TINYDASH_BENCH_SAMPLES` selects 20–500 samples. Timeout counts are reported, not silently excluded. The file-ID table estimate is a lower bound, not RSS. Fixture construction is reported separately. This harness does not measure IPC, contended worker queues, or native input-to-paint.
+
+Backend debug events contain only aggregate durations and counts: blocking-worker queue wait, search-lock wait, provider calls/time, pin attempts/time, indexed item counts, response rows, and total request/search time. Provider order is apps/files/clipboard/system/emoji/calculator/tools; calculator time inside pins is included in both phases. No query text, paths, clipboard contents, result IDs, passwords, or tool values are logged. The frontend queue has an optional duration-only instrumentation callback; it does not log by default.
+
+The finite seeded selection-equivalence test disables request/calculator wall clocks only in its test fixture so host scheduling cannot change one side into a timeout. Separate regressions exercise normal deadlines and cancellation. No production deadline is disabled.
 
 On macOS, type a misspelled word or application name in the search field. Confirm that no automatic correction popup or inline prediction appears and that the query remains as entered after a space. Browser tests cannot prove the absence of native text correction popups.
 

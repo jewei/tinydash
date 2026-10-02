@@ -13,3 +13,7 @@ designs
 .hallmark
 site-dist
 src-tauri/vendor
+# Canonical serde output, compared byte-for-byte by Rust contract tests.
+tests/fixtures/ipc-contract.ts
+# Test-only ts-rs declarations and parsed Rust command signatures.
+tests/fixtures/ipc-wire.ts

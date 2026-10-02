@@ -8,7 +8,7 @@ Run commands from the repository root. Install dependencies with `bun install --
 bun run verify
 ```
 
-This checks public file paths, local Markdown links and anchors, Prettier and Rust formatting, and TypeScript. It then runs the browser tests tagged `@smoke`. These cover welcome search, category navigation, password actions, and the repository guards.
+This checks public file paths, local Markdown links and anchors, focused documentation contracts, CI/release-checker regressions, Prettier and Rust formatting, and TypeScript. It then runs the browser tests tagged `@smoke`. These cover welcome search, category navigation, password actions, and the repository guards.
 
 The command selects a free loopback port. Playwright starts its own Vite process and refuses to reuse another server. Each run uses a separate browser context and output directory. The app backend is mocked in browser tests.
 
@@ -30,7 +30,7 @@ This checks all commits reachable from the supplied commit, including merge chan
 bun run verify:full
 ```
 
-This adds the frontend build, Clippy, Rust tests, and all browser tests. A warm Rust cache reduces the time. Compilation is part of the first run. The fast check does not replace these checks before a merge.
+This adds the frontend build, Clippy, Rust tests, compilation of both synthetic performance-harness modes, and all browser tests. A warm Rust cache reduces the time. Compilation is part of the first run. The fast check does not replace these checks before a merge.
 
 For a focused browser check with retained successful traces, use a recipe from the [feature map](../reference/features/README.md):
 
@@ -43,11 +43,51 @@ The focused wrapper selects its own port and output directory. It accepts test-f
 
 Use focused tests during diagnosis. After the final relevant edit, repeat affected proofs and run `verify:full` for source changes. For each task, record expected behavior, required platforms, outcomes, and evidence paths under `.local/` or `test-results/`. A command pass does not establish behavior outside that command's coverage. Missing required evidence prevents a verified result.
 
+## Check the internal IPC contract
+
+`verify:full` compares actual Rust serialization with [canonical examples](../../tests/fixtures/ipc-contract.ts) and test-only `ts-rs` declarations with [checked wire types](../../tests/fixtures/ipc-wire.ts). Recursive TypeScript equality checks reject extra optional keys, missing keys, changed optionality, and narrowed or widened nullable/enum domains. Rust command signatures are parsed with test-only `syn`; the bridge's argument domains and success returns must match. Runtime probes independently check each wrapper's command binding, registration, argument names, and representative values.
+
+The bridge represents Rust `Option` arguments by omission instead of explicit null; `revealSettings` additionally supplies a default for Rust's required boolean. These are explicit test adaptations, not general assignability exceptions. Serialized response keys remain required unless serde omits them. Platform fields are strings because Rust currently declares strings, not a platform enum. Unsupported serialization rules and command types require review rather than silently generating a partial contract. Conditional `Option::is_none` serialization has a checked test-only `ts(optional)` annotation.
+
+These are internal contracts, not a public SDK or runtime validator. Command errors that are only displayed remain strings. [Drift tests](../../tests/ipc-drift.spec.ts) compile isolated mutations and require contract-specific failures; they do not modify the checkout.
+
+When intentionally changing the wire contract, regenerate its examples, review the diff, and run the normal checks:
+
+```sh
+TINYDASH_UPDATE_CONTRACTS=1 bun run test:rust -- ipc_
+bun run typecheck
+bun run verify:browser tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
+bun run verify:full
+```
+
+Do not set `TINYDASH_UPDATE_CONTRACTS` in CI. Normal Rust tests compare both generated files byte-for-byte without updating them; both are excluded from Prettier. Add representative samples for new optional fields or variants, including present and null cases. Examples complement, but do not replace, exact shape checks. Changes to a command signature may require a new wrapper binding, probe, or supported type in the command consistency tests. `ts-rs` and `syn` are dev-dependencies only; neither ships in the application.
+
+These checks prove serialization and bridge consistency, not native IPC authorization or OS effects. Use the desktop procedures for those.
+
 ## CI triggers
 
-The Checks workflow skips branch pushes and pull requests when all changed files are Markdown files with the `.md` or `.markdown` extension, or files under `docs/`. This also skips the desktop builds and native app checks. If any other file changes, the workflow runs. The separate Verification tools workflow checks changes to the verification skill, procedures, feature map, and tools, including Markdown-only changes. It does not replace the agent exercises in [test the verification procedure](verify-verification.md).
+The Checks workflow always starts for pull requests, merge queues, pushes to `main`, version-tag pushes, and manual requests. Feature-branch pushes do not duplicate the pull request's desktop builds. No workflow-level path filter can leave its required status pending on a documentation-only change.
 
-Manual runs and tag pushes still run the checks. The Release candidate workflow also runs for version tags or manual requests. See [GitHub path filters](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#onpushpull_requestpull_request_targetpathspaths-ignore) for the trigger rules.
+The stable required status is **`Required checks`** (workflow: Checks, job ID: `required`). Configure branch protection or a ruleset to require this GitHub Actions check, not a matrix job name. Repository administrators must configure that rule separately; a workflow file cannot enable branch protection.
+
+Every run executes the existing repository/link checker, formatting, focused documentation contracts, and checker regression tests in the lightweight `repository` job. For documentation-only changes (`docs/**`, `.md`, or `.markdown`), `quick`, `desktop`, and `native` deliberately skip. Other paths, mixed changes, and deleted or renamed source files require all three jobs. The three-platform builds, Clippy/Rust tests, browser tests, installer checks, and Windows/Linux X11 native suite remain required for source changes. Manual, tag, and new-branch runs conservatively use the full pipeline.
+
+The final job uses `always()` and checks every dependency. It accepts only a successful detector and repository check, plus either three successful source jobs or three explicitly classified documentation skips. Missing outputs, failed/cancelled jobs, and unexpected skips fail closed. A cancelled workflow is not a merge pass. The separate Verification tools workflow still tests its skill, procedures, feature map, and tools; it does not replace the final status or the agent exercises in [test the verification procedure](verify-verification.md).
+
+### Maintain the lightweight checks
+
+```sh
+bun run check:repo
+bun scripts/verify/docs.ts
+bun test scripts/verify/checks.test.ts scripts/verify/docs.test.ts scripts/release/evidence.test.ts
+bun run format:check
+```
+
+The documentation checker reads current Rust defaults, settings ranges, CLI options/categories, result limits, ranking bonuses, and category order, then compares their duplicated reference text. It is a focused drift guard, not a documentation generator or a proof of all prose. Its regression tests deliberately mutate both source facts and documentation. Intentional non-default examples, such as disabling clipboard capture, stay explicit rather than being rewritten to match legacy deserialization defaults.
+
+All third-party workflow actions use full commit SHAs. `checks.test.ts` verifies every workflow against the reviewed action/version pins. To update one, resolve `gh api repos/OWNER/REPO/git/ref/tags/TAG`; if its object is an annotated tag, follow `git/tags/SHA` until reaching a commit. Review upstream changes, record the version comment, and update the workflow and test mapping together. The current pins were resolved through that API; the rust-cache pin uses the peeled commit, not its signed tag-object SHA.
+
+For repeatable performance work and measurement limits, see [measure performance](measure-performance.md).
 
 ## Drive the real desktop app
 

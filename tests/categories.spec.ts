@@ -75,7 +75,11 @@ test(
               .at(-1)?.payload,
         ),
       )
-      .toEqual({ query: "safari", mode: "files" });
+      .toEqual({
+        query: "safari",
+        mode: "files",
+        requestId: expect.any(Number),
+      });
     await input(page).press("Shift+Tab");
     await expect(active(page)).toHaveAccessibleName("Apps");
     await expect(input(page)).toHaveAttribute(
@@ -199,7 +203,7 @@ test("settings select a visible fallback and reopening keeps the saved category 
             .at(-1)?.payload,
       ),
     )
-    .toEqual({ query: "sa", mode: "apps" });
+    .toEqual({ query: "sa", mode: "apps", requestId: expect.any(Number) });
   await input(page).press("Tab");
   await page.evaluate(() =>
     window.__launcherTest.emit("launcher-opened", false),

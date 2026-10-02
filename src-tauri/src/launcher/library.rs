@@ -28,6 +28,7 @@ type Result<T> = std::result::Result<T, String>;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum LibraryKind {
     Quicklink,
     Snippet,
@@ -35,6 +36,7 @@ pub enum LibraryKind {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LibraryDraft {
     pub kind: LibraryKind,
     pub name: String,
@@ -44,6 +46,7 @@ pub struct LibraryDraft {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LibraryEntry {
     pub id: String,
     #[serde(flatten)]
@@ -52,6 +55,7 @@ pub struct LibraryEntry {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LibraryItem {
     pub id: String,
     pub kind: LibraryKind,
@@ -471,6 +475,7 @@ fn render_snippet(
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum LibraryAction {
     Open,
     Copy,
@@ -481,12 +486,15 @@ pub enum LibraryAction {
 pub fn library_list(
     query: String,
     state: tauri::State<'_, LibraryState>,
-) -> Result<Vec<LibraryItem>> {
+) -> std::result::Result<Vec<LibraryItem>, String> {
     state.search_items(&query)
 }
 
 #[tauri::command]
-pub fn library_get(id: String, state: tauri::State<'_, LibraryState>) -> Result<LibraryEntry> {
+pub fn library_get(
+    id: String,
+    state: tauri::State<'_, LibraryState>,
+) -> std::result::Result<LibraryEntry, String> {
     state.get(&id)
 }
 
@@ -495,7 +503,7 @@ pub async fn library_save(
     id: Option<String>,
     draft: LibraryDraft,
     app: AppHandle,
-) -> Result<LibraryEntry> {
+) -> std::result::Result<LibraryEntry, String> {
     tauri::async_runtime::spawn_blocking(move || -> Result<LibraryEntry> {
         let entry = app.state::<LibraryState>().save(id.as_deref(), draft)?;
         // The write has committed. A missing event listener must not turn a
@@ -508,7 +516,11 @@ pub async fn library_save(
 }
 
 #[tauri::command]
-pub async fn library_delete(id: String, confirmed: bool, app: AppHandle) -> Result<()> {
+pub async fn library_delete(
+    id: String,
+    confirmed: bool,
+    app: AppHandle,
+) -> std::result::Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || -> Result<()> {
         app.state::<LibraryState>().delete(&id, confirmed)?;
         let _ = app.emit("library-changed", ());
@@ -536,7 +548,7 @@ pub async fn library_execute(
     arguments: BTreeMap<String, String>,
     allow_clipboard: bool,
     app: AppHandle,
-) -> Result<()> {
+) -> std::result::Result<(), String> {
     let worker_app = app.clone();
     let paste = tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>> {
         let app = worker_app;
@@ -763,7 +775,6 @@ mod tests {
         }
         for value in [
             "https://example.com",
-            "file:///tmp/example",
             "spotify:track:123",
             "mailto:hello@example.com",
         ] {
@@ -772,6 +783,12 @@ mod tests {
                 "{value}"
             );
         }
+        let path = std::env::temp_dir().join("TinyDash local café example");
+        let file_url = url::Url::from_file_path(&path).unwrap();
+        assert!(validate_draft(&draft(LibraryKind::Quicklink, file_url.as_str())).is_ok());
+        assert!(
+            matches!(validate_target(file_url.as_str()).unwrap(), Target::File(found) if found == path)
+        );
     }
 
     #[test]

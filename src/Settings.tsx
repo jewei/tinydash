@@ -8,7 +8,13 @@ import {
   Show,
 } from "solid-js";
 import { isTauri } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
+import { createNativeSubscriptions } from "./nativeSubscriptions";
+import {
+  folderModeFor,
+  mergeSettingsDraft,
+  type FolderMode,
+} from "./settingsDraft";
 import {
   backend,
   type SearchMode,
@@ -91,7 +97,6 @@ const sections = [
   },
 ] as const;
 type Section = (typeof sections)[number]["id"];
-type FolderMode = "default" | "custom" | "off";
 type ShortcutTarget = "global" | SearchMode | `item:${string}`;
 const sectionKeywords: Record<Section, string> = {
   shortcut: "keyboard hotkey startup login blur reset menu bar",
@@ -113,24 +118,6 @@ const lines = (text: string) => [
       .filter(Boolean),
   ),
 ];
-const folderModeFor = (value: SettingsValues): FolderMode =>
-  value.fileSearchRoots === null
-    ? "default"
-    : value.fileSearchRoots.length
-      ? "custom"
-      : "off";
-
-function mergeDraft<T extends object>(previous: T, draft: T, incoming: T): T {
-  const merged = { ...incoming };
-  const keys = new Set([...Object.keys(previous), ...Object.keys(draft)]);
-  for (const key of keys as Set<keyof T>) {
-    if (JSON.stringify(draft[key]) === JSON.stringify(previous[key])) continue;
-    if (Object.hasOwn(draft, key)) merged[key] = draft[key];
-    else delete merged[key];
-  }
-  return merged;
-}
-
 function Toggle(props: {
   label: string;
   hint: string;
@@ -207,7 +194,7 @@ export default function Settings() {
   let recordingSequence = 0;
   let recorder!: HTMLButtonElement;
   let content!: HTMLDivElement;
-  const stops: UnlistenFn[] = [];
+  const subscriptions = createNativeSubscriptions(listen);
   const value = () => draft()!;
   const currentSection = () => sections.find((item) => item.id === section())!;
   const dirty = createMemo(
@@ -258,51 +245,16 @@ export default function Settings() {
   }
 
   function receiveSettings(settings: SettingsValues) {
-    const next = {
-      ...settings,
-      visibleCategories: normalizeCategories(settings.visibleCategories),
-    };
-    const previous = saved();
-    const current = draft();
-    const merged =
-      previous && current ? mergeDraft(previous, current, next) : next;
-    if (previous && current) {
-      merged.appPreferences = mergeDraft(
-        previous.appPreferences,
-        current.appPreferences,
-        next.appPreferences,
-      );
-      for (const [id, preference] of Object.entries(current.appPreferences)) {
-        if (next.appPreferences[id]) {
-          merged.appPreferences[id] = mergeDraft(
-            previous.appPreferences[id] ?? { aliases: [], hidden: false },
-            preference,
-            next.appPreferences[id],
-          );
-        }
-      }
+    const merged = mergeSettingsDraft(saved(), draft(), settings, folderMode());
+    setInfo((info) => (info ? { ...info, settings: merged.saved } : info));
+    setSaved(merged.saved);
+    setDraft(merged.draft);
+    if (merged.updateFolders) {
+      setFolderMode(folderModeFor(merged.draft));
+      setFoldersText(merged.draft.fileSearchRoots?.join("\n") ?? "");
     }
-    setInfo((info) => (info ? { ...info, settings: next } : info));
-    setSaved(next);
-    if (!previous || !current) {
-      resetDraft(merged);
-      return;
-    }
-    setDraft(merged);
-    // Keep incomplete folder input while another window changes settings.
-    if (
-      JSON.stringify(current.fileSearchRoots) ===
-        JSON.stringify(previous.fileSearchRoots) &&
-      folderMode() === folderModeFor(previous)
-    ) {
-      setFolderMode(folderModeFor(merged));
-      setFoldersText(merged.fileSearchRoots?.join("\n") ?? "");
-    }
-    if (
-      JSON.stringify(current.fileSearchExcludedDirs) ===
-      JSON.stringify(previous.fileSearchExcludedDirs)
-    ) {
-      setExcludedText(merged.fileSearchExcludedDirs.join("\n"));
+    if (merged.updateExcluded) {
+      setExcludedText(merged.draft.fileSearchExcludedDirs.join("\n"));
     }
   }
   function setShortcut(target: ShortcutTarget, shortcut: string) {
@@ -620,13 +572,10 @@ export default function Settings() {
     document.addEventListener("keydown", onKey, true);
     window.addEventListener("blur", onBlur);
     if (desktop) {
-      void listen<SettingsValues>("settings-changed", (event) =>
-        receiveSettings(event.payload),
-      )
-        .then((stop) => {
-          if (disposed) return stop();
-          stops.push(stop);
-          return load();
+      void subscriptions
+        .register<SettingsValues>("settings-changed", receiveSettings)
+        .then((active) => {
+          if (active) return load();
         })
         .catch((reason) => {
           if (!disposed) setError(String(reason));
@@ -634,29 +583,37 @@ export default function Settings() {
     } else {
       void load();
     }
-    void watchAppearance(
-      (value) => {
-        setAppearance(value);
-        setSavedAppearance(value);
-      },
-      (value) => {
-        setCompact(value);
-        setSavedCompact(value);
-      },
-      (value) => {
-        setFollowSystemGlass(value);
-        setSavedSystemGlass(value);
-      },
-    ).then((stop) => (disposed ? stop() : stops.push(stop)));
+    void subscriptions
+      .own(
+        watchAppearance(
+          subscriptions.guard((value) => {
+            setAppearance(value);
+            setSavedAppearance(value);
+          }),
+          subscriptions.guard((value) => {
+            setCompact(value);
+            setSavedCompact(value);
+          }),
+          subscriptions.guard((value) => {
+            setFollowSystemGlass(value);
+            setSavedSystemGlass(value);
+          }),
+        ),
+      )
+      .catch((reason) => {
+        if (!disposed) setError(String(reason));
+      });
     if (desktop)
-      void listen<string>("shortcut-error", (event) =>
-        setError(event.payload),
-      ).then((stop) => (disposed ? stop() : stops.push(stop)));
+      void subscriptions
+        .register<string>("shortcut-error", setError)
+        .catch((reason) => {
+          if (!disposed) setError(String(reason));
+        });
   });
   onCleanup(() => {
     void stopRecording();
     disposed = true;
-    stops.forEach((stop) => stop());
+    subscriptions.dispose();
     document.removeEventListener("keydown", onKey, true);
     window.removeEventListener("blur", onBlur);
   });

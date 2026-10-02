@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "Local preferences, portability, and update commands, typed appearance synchronization, and backend event subscriptions.",
+  "windows": ["settings"],
+  "permissions": [
+    "settings",
+    "shared",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

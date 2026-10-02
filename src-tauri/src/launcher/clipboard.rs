@@ -46,7 +46,7 @@ impl Monitor {
     pub fn warning(&self) -> Option<String> {
         self.warning.lock().ok().and_then(|warning| warning.clone())
     }
-    fn failed(&self) {
+    pub(super) fn failed(&self) {
         if let Ok(mut warning) = self.warning.lock()
             && warning.is_none()
         {
@@ -110,12 +110,12 @@ pub fn start(app: &AppHandle) {
                     if retention_check.elapsed() >= std::time::Duration::from_secs(60) {
                         if state.settings().clipboard_retention_days > 0 {
                             state.storage.apply_clipboard_limit(&worker_app);
-                            if formats::apply_retention(&worker_app).is_err() {
-                                state.clipboard.failed();
-                            }
                         }
                         retention_check = std::time::Instant::now();
                     }
+                    // Cleanup must progress even if the OS change counter is
+                    // quiet or the user has disabled new captures.
+                    state.storage.retry_cleanup(&worker_app);
                     let generation = state.clipboard.generation();
                     let settings = state.settings();
                     if settings.clipboard_history_enabled {

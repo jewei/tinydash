@@ -1,12 +1,12 @@
 //! Built-in utilities. Integration and lifecycle requirements: docs/reference/features/utilities.md.
 #[path = "utilities/awake.rs"]
-mod awake;
+pub(super) mod awake;
 #[path = "utilities/color.rs"]
-mod color;
+pub(super) mod color;
 #[path = "utilities/desktop.rs"]
 mod desktop;
 #[path = "utilities/process.rs"]
-mod process;
+pub(super) mod process;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -44,6 +44,7 @@ impl UtilitiesState {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Capabilities {
     processes: String,
     eyedropper: String,
@@ -68,12 +69,13 @@ async fn blocking<T: Send + 'static>(
 }
 
 #[tauri::command]
-pub async fn utility_processes() -> UtilityResult<Vec<process::ProcessInfo>> {
+pub async fn utility_processes() -> std::result::Result<Vec<process::ProcessInfo>, String> {
     blocking(process::list).await
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ProcessConfirmation {
     token: String,
     process: process::ProcessInfo,
@@ -85,7 +87,7 @@ pub async fn utility_prepare_process(
     state: tauri::State<'_, UtilitiesState>,
     process: process::ProcessInfo,
     force: bool,
-) -> UtilityResult<ProcessConfirmation> {
+) -> std::result::Result<ProcessConfirmation, String> {
     let current = blocking(move || process::validate(&process)).await?;
     let mut bytes = [0u8; 24];
     getrandom::fill(&mut bytes).map_err(|e| e.to_string())?;
@@ -126,7 +128,7 @@ pub async fn utility_confirm_process(
     state: tauri::State<'_, UtilitiesState>,
     token: String,
     confirmed: bool,
-) -> UtilityResult<()> {
+) -> std::result::Result<(), String> {
     let request = take_confirmation(
         &mut *state
             .confirmation
@@ -146,12 +148,13 @@ pub fn utility_cancel_process(state: tauri::State<'_, UtilitiesState>) {
 }
 
 #[tauri::command]
-pub fn utility_color(input: String) -> UtilityResult<color::Color> {
+pub fn utility_color(input: String) -> std::result::Result<color::Color, String> {
     color::parse(&input)
 }
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum ColorFormat {
     Hex,
     Rgb,
@@ -159,7 +162,10 @@ pub enum ColorFormat {
 }
 
 #[tauri::command]
-pub async fn utility_copy_color(input: String, format: ColorFormat) -> UtilityResult<()> {
+pub async fn utility_copy_color(
+    input: String,
+    format: ColorFormat,
+) -> std::result::Result<(), String> {
     blocking(move || {
         effects_allowed()?;
         let value = color::parse(&input)?;
@@ -174,7 +180,9 @@ pub async fn utility_copy_color(input: String, format: ColorFormat) -> UtilityRe
 }
 
 #[tauri::command]
-pub async fn utility_eyedropper(app: tauri::AppHandle) -> UtilityResult<Option<color::Color>> {
+pub async fn utility_eyedropper(
+    app: tauri::AppHandle,
+) -> std::result::Result<Option<color::Color>, String> {
     effects_allowed()?;
     #[cfg(target_os = "macos")]
     {
@@ -193,7 +201,7 @@ pub async fn utility_eyedropper(app: tauri::AppHandle) -> UtilityResult<Option<c
 #[tauri::command]
 pub fn utility_awake_status(
     state: tauri::State<'_, UtilitiesState>,
-) -> UtilityResult<awake::Status> {
+) -> std::result::Result<awake::Status, String> {
     let mut session = state
         .awake
         .lock()
@@ -210,7 +218,7 @@ pub fn utility_awake_status(
 pub async fn utility_set_awake(
     state: tauri::State<'_, UtilitiesState>,
     minutes: u32,
-) -> UtilityResult<awake::Status> {
+) -> std::result::Result<awake::Status, String> {
     if minutes > 480 {
         return Err("Choose 1–480 minutes, or 0 to stop".into());
     }
@@ -230,6 +238,7 @@ pub async fn utility_set_awake(
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum MediaAction {
     PlayPause,
     Next,
@@ -240,12 +249,13 @@ pub enum MediaAction {
 }
 
 #[tauri::command]
-pub async fn utility_media(action: MediaAction) -> UtilityResult<()> {
+pub async fn utility_media(action: MediaAction) -> std::result::Result<(), String> {
     blocking(move || desktop::media(action)).await
 }
 
 #[derive(Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum WindowAction {
     Left,
     Right,
@@ -259,7 +269,7 @@ pub async fn utility_capture_window(
     app: tauri::AppHandle,
     state: tauri::State<'_, UtilitiesState>,
     delayed: bool,
-) -> UtilityResult<String> {
+) -> std::result::Result<String, String> {
     // Resolve the parent's pre-activation target on demand, never the focused launcher.
     let saved = if delayed {
         None
@@ -287,7 +297,7 @@ pub async fn utility_window(
     app: tauri::AppHandle,
     state: tauri::State<'_, UtilitiesState>,
     action: WindowAction,
-) -> UtilityResult<()> {
+) -> std::result::Result<(), String> {
     let target = state
         .window
         .lock()

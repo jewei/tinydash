@@ -17,6 +17,7 @@ const IMAGE_PIXEL_LIMIT: u64 = 16_000_000;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct FilePreview {
     name: String,
     path: String,
@@ -29,7 +30,8 @@ pub struct FilePreview {
 
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
-enum PreviewContent {
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub(super) enum PreviewContent {
     Text {
         text: String,
         truncated: bool,
@@ -45,6 +47,7 @@ enum PreviewContent {
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum FileAction {
     CopyPath,
     CopyFile,
@@ -504,7 +507,14 @@ mod tests {
             100,
             &mut ScanReport::default(),
         ));
-        let id = format!("file:{}", root.canonicalize().unwrap().join(name).display());
+        let id = search
+            .search(name, super::super::query::SearchMode::Files)
+            .unwrap()
+            .results
+            .into_iter()
+            .find(|result| result.title == name)
+            .expect("indexed fixture")
+            .id;
         let entry = resolve_file(&search, &id).unwrap();
         (search, entry)
     }
