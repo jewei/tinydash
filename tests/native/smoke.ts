@@ -1191,7 +1191,13 @@ try {
       value: '[aria-label="Native utilities"] form input',
     },
   );
-  await keys(colorInput[elementKey], "\uE009a\uE000#f00");
+  await keys(colorInput[elementKey], "\uE009a\uE000");
+  await keys(colorInput[elementKey], "#f00");
+  await until("the color input contains the typed value", () =>
+    observe<boolean>(
+      "return document.querySelector('[aria-label=\"Native utilities\"] form input')?.value === '#f00'",
+    ),
+  );
   await clickButtonText("Convert color");
   await until("Rust converts the entered color", () =>
     observe<boolean>(
