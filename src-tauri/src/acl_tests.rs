@@ -120,9 +120,9 @@ fn invoke(
             error: CallbackFn(1),
             url: if remote {
                 "https://untrusted.example/"
-            } else if cfg!(windows) {
-                "http://tauri.localhost"
             } else {
+                // Tauri 3's MockRuntime uses this scheme on every OS. Wry's
+                // Windows HTTP mapping belongs to the real desktop checks.
                 "tauri://localhost"
             }
             .parse()
