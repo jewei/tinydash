@@ -116,6 +116,32 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     },
   );
 
+  const selectedEntry = () =>
+    history()?.entries.find((entry) => entry.id === selected());
+
+  async function togglePin() {
+    const entry = selectedEntry();
+    if (!entry || busy()) return;
+    const pinned = !entry.pinned;
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await richClipboardBackend.setPinned(entry.id, pinned);
+      if (!disposed) {
+        setMessage(
+          pinned
+            ? "Pinned. Automatic cleanup will keep this entry."
+            : "Unpinned. Current retention and storage limits now apply.",
+        );
+        await refresh();
+      }
+    } catch (error) {
+      if (!disposed) setMessage(String(error));
+    } finally {
+      if (!disposed) setBusy(false);
+    }
+  }
+
   async function action(kind: "copy" | "delete") {
     const id = selected();
     if (id === undefined || busy()) return;
@@ -169,6 +195,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
         {(value) => (
           <>
             <p>{value().supportNotice}</p>
+            <p>{value().storageNotice}</p>
             <Show
               when={value().entries.length > 0}
               fallback={<p>No saved images or file references.</p>}
@@ -185,6 +212,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
                         disabled={busy()}
                         onClick={() => setSelected(entry.id)}
                       >
+                        {entry.pinned ? "Pinned · " : ""}
                         {entry.title} ·{" "}
                         {new Date(entry.createdAt * 1000).toLocaleString()}
                       </button>
@@ -229,6 +257,15 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
               onClick={() => void action("copy")}
             >
               Copy original format
+            </button>
+            <button
+              type="button"
+              disabled={busy() || !selectedEntry()}
+              onClick={() => void togglePin()}
+            >
+              {selectedEntry()?.pinned
+                ? "Unpin saved entry"
+                : "Pin saved entry"}
             </button>
             <button
               class="panel-danger"

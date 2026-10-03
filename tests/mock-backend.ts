@@ -566,6 +566,8 @@ mockIPC(
         entries: [],
         captureSupported: true,
         supportNotice: "Native rich capture is supported on macOS.",
+        storageNotice:
+          "0 entries (maximum 32) · 0 of 16777216 bytes · 0 pinned.",
       };
     if (command === "utility_awake_status")
       return { active: false, endsAt: null, remainingSeconds: 0 };

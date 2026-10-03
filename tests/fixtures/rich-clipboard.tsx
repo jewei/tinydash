@@ -11,6 +11,7 @@ declare global {
       closed: boolean;
       entries: RichClipboardEntry[];
       previewError: boolean;
+      pinError: boolean;
     };
   }
 }
@@ -23,6 +24,7 @@ const entries: RichClipboardEntry[] = [
     createdAt: 100,
     sourceApp: "com.apple.finder",
     bytes: 64,
+    pinned: false,
   },
 ];
 window.__richClipboardTest = {
@@ -31,6 +33,7 @@ window.__richClipboardTest = {
   closed: false,
   entries,
   previewError: false,
+  pinError: false,
 };
 mockWindows("main");
 mockIPC(
@@ -40,9 +43,13 @@ mockIPC(
     window.__richClipboardTest.calls.push(command);
     if (command === "rich_clipboard_history")
       return {
-        entries: state.entries,
+        entries: [...state.entries].sort(
+          (a, b) => Number(b.pinned) - Number(a.pinned),
+        ),
         captureSupported: true,
-        supportNotice: "Rich history: up to 32 entries and 16 MiB; no pins.",
+        supportNotice:
+          "Pinned entries survive automatic cleanup and Clear unpinned.",
+        storageNotice: "Capture limit: 32 entries and 16 MiB, including pins.",
       };
     if (command === "rich_clipboard_preview") {
       if (state.previewError)
@@ -56,6 +63,22 @@ mockIPC(
     if (command === "copy_rich_clipboard") {
       if (window.__richClipboardTest.missing)
         throw new Error("A referenced file is no longer available.");
+      return;
+    }
+    if (command === "set_rich_clipboard_pinned") {
+      if (state.pinError)
+        throw new Error("Clipboard storage is busy. Try again.");
+      const entry = state.entries.find((entry) => entry.id === id);
+      if (!entry)
+        throw new Error("This clipboard entry is no longer available.");
+      state.entries = state.entries.map((entry) =>
+        entry.id === id
+          ? {
+              ...entry,
+              pinned: Boolean(args && "pinned" in args && args.pinned),
+            }
+          : entry,
+      );
       return;
     }
     if (command === "delete_rich_clipboard") {

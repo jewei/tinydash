@@ -319,8 +319,7 @@ pub async fn clear_clipboard_history(
         } else {
             storage.delete_clipboard(&app, None)?;
         }
-        // Rich entries currently have no pins; both clear actions include them.
-        formats::clear(&app).map_err(|error| error.to_string())?;
+        formats::clear(&app, keep_pinned.unwrap_or(false)).map_err(|error| error.to_string())?;
         changed(&app);
         Ok(())
     })

@@ -11,6 +11,7 @@ export const ipcBridges = {
   richClipboardPreview: richClipboardBackend.preview,
   copyRichClipboard: richClipboardBackend.copy,
   deleteRichClipboard: richClipboardBackend.delete,
+  setRichClipboardPinned: richClipboardBackend.setPinned,
   filePreview: fileBackend.preview,
   executeFileAction: fileBackend.execute,
   libraryList: libraryBackend.list,
@@ -103,6 +104,7 @@ export async function probeCommands(settings: SettingsValues) {
     richClipboardPreview: () => richClipboardBackend.preview(1),
     copyRichClipboard: () => richClipboardBackend.copy(1),
     deleteRichClipboard: () => richClipboardBackend.delete(1),
+    setRichClipboardPinned: () => richClipboardBackend.setPinned(1, true),
     filePreview: () => fileBackend.preview("file:fixture"),
     executeFileAction: () =>
       fileBackend.execute("file:fixture", "openWith", {

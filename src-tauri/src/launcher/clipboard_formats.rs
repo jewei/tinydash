@@ -192,6 +192,7 @@ pub struct RichEntry {
     pub created_at: i64,
     pub source_app: Option<String>,
     pub bytes: u32,
+    pub pinned: bool,
 }
 
 #[derive(Serialize)]
@@ -210,6 +211,7 @@ pub struct RichHistory {
     pub entries: Vec<RichEntry>,
     pub capture_supported: bool,
     pub support_notice: String,
+    pub storage_notice: String,
 }
 
 pub struct Store {
@@ -235,37 +237,45 @@ impl Store {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
         }
-        let connection = Connection::open(path)?;
+        let mut connection = Connection::open(path)?;
         connection.busy_timeout(Duration::from_millis(250))?;
         let version: u32 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
         ensure!(
-            version <= 1,
+            version <= 2,
             "Rich clipboard history requires a newer TinyDash version."
         );
-        connection.execute_batch(
-            "PRAGMA secure_delete = ON; PRAGMA max_page_count = 12288;
-            CREATE TABLE IF NOT EXISTS rich_clipboard (
+        connection.execute_batch("PRAGMA secure_delete = ON; PRAGMA max_page_count = 12288;")?;
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            "CREATE TABLE IF NOT EXISTS rich_clipboard (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 kind TEXT NOT NULL CHECK(kind IN ('image','files')),
                 payload BLOB NOT NULL CHECK(length(payload) <= 4194304),
                 title TEXT NOT NULL,
                 created_at INTEGER NOT NULL,
                 source_app TEXT,
-                sort_order INTEGER NOT NULL);
-            PRAGMA user_version = 1;",
+                sort_order INTEGER NOT NULL);",
         )?;
+        if version < 2 {
+            transaction.execute_batch("ALTER TABLE rich_clipboard ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0,1));")?;
+        }
+        transaction.pragma_update(None, "user_version", 2)?;
+        transaction.commit()?;
         Ok(Self { connection })
     }
 
     fn list(&self) -> anyhow::Result<Vec<RichEntry>> {
-        let mut statement = self.connection.prepare("SELECT id,kind,title,created_at,source_app,length(payload) FROM rich_clipboard ORDER BY sort_order DESC")?;
+        let mut statement = self.connection.prepare("SELECT id,kind,title,created_at,source_app,length(payload),pinned FROM rich_clipboard ORDER BY pinned DESC,sort_order DESC")?;
         Ok(statement
             .query_map([], entry)?
             .collect::<rusqlite::Result<_>>()?)
     }
 
     fn prune(&self, days: u32, now: i64, limit: usize) -> anyhow::Result<()> {
-        Self::prune_connection(&self.connection, days, now, limit)
+        let transaction = self.connection.unchecked_transaction()?;
+        Self::prune_connection(&transaction, days, now, limit)?;
+        transaction.commit()?;
+        Ok(())
     }
 
     fn prune_connection(
@@ -276,13 +286,83 @@ impl Store {
     ) -> anyhow::Result<()> {
         if days > 0 {
             connection.execute(
-                "DELETE FROM rich_clipboard WHERE created_at <= ?1",
+                "DELETE FROM rich_clipboard WHERE pinned = 0 AND created_at <= ?1",
                 [now.saturating_sub(i64::from(days) * 86_400)],
             )?;
         }
-        connection.execute("DELETE FROM rich_clipboard WHERE id IN (SELECT id FROM rich_clipboard ORDER BY sort_order DESC LIMIT -1 OFFSET ?1)", [limit.min(MAX_ENTRIES) as i64])?;
-        // The window sum avoids reading image blobs while enforcing total bytes.
-        connection.execute("DELETE FROM rich_clipboard WHERE id IN (SELECT id FROM (SELECT id, SUM(length(payload)) OVER (ORDER BY sort_order DESC) AS bytes FROM rich_clipboard) WHERE bytes > ?1)", [MAX_TOTAL_BYTES as i64])?;
+        let (pinned_count, pinned_bytes) = Self::pinned_usage(connection)?;
+        let available_count = limit.min(MAX_ENTRIES).saturating_sub(pinned_count);
+        let available_bytes = MAX_TOTAL_BYTES.saturating_sub(pinned_bytes);
+        connection.execute("DELETE FROM rich_clipboard WHERE id IN (SELECT id FROM rich_clipboard WHERE pinned = 0 ORDER BY sort_order DESC LIMIT -1 OFFSET ?1)", [available_count as i64])?;
+        // Pinned blobs consume the same fixed budget but are never evicted.
+        connection.execute("DELETE FROM rich_clipboard WHERE id IN (SELECT id FROM (SELECT id, SUM(length(payload)) OVER (ORDER BY sort_order DESC) AS bytes FROM rich_clipboard WHERE pinned = 0) WHERE bytes > ?1)", [available_bytes as i64])?;
+        Ok(())
+    }
+
+    fn pinned_usage(connection: &Connection) -> anyhow::Result<(usize, usize)> {
+        Ok(connection.query_row(
+            "SELECT COUNT(*),COALESCE(SUM(length(payload)),0) FROM rich_clipboard WHERE pinned = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, u32>(0)? as usize,
+                    row.get::<_, u32>(1)? as usize,
+                ))
+            },
+        )?)
+    }
+
+    fn storage_notice(&self, limit: usize) -> anyhow::Result<String> {
+        let (count, bytes): (usize, usize) = self.connection.query_row(
+            "SELECT COUNT(*),COALESCE(SUM(length(payload)),0) FROM rich_clipboard",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, u32>(0)? as usize,
+                    row.get::<_, u32>(1)? as usize,
+                ))
+            },
+        )?;
+        let (pins, pinned_bytes) = Self::pinned_usage(&self.connection)?;
+        let limit = limit.min(MAX_ENTRIES);
+        let policy = if pins >= limit || pinned_bytes >= MAX_TOTAL_BYTES {
+            "Pins fill the capture limit. Unpin or delete an entry to save new content."
+        } else {
+            "New content replaces the oldest unpinned entries. Captures that cannot fit beside pins are skipped."
+        };
+        Ok(format!(
+            "{count} entries · {:.2} of 16 MiB · {pins} pinned. Capture limit: {limit} entries (maximum {MAX_ENTRIES}). {policy}",
+            bytes as f64 / (1024.0 * 1024.0)
+        ))
+    }
+
+    fn set_pinned(
+        &mut self,
+        id: i64,
+        pinned: bool,
+        days: u32,
+        now: i64,
+        limit: usize,
+    ) -> anyhow::Result<()> {
+        ensure!(id > 0, "Invalid clipboard entry.");
+        let transaction = self.connection.transaction()?;
+        ensure!(
+            transaction.execute(
+                "UPDATE rich_clipboard SET pinned = ?1 WHERE id = ?2",
+                rusqlite::params![pinned, id]
+            )? == 1,
+            "This clipboard entry is no longer available."
+        );
+        Self::prune_connection(&transaction, days, now, limit)?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    fn clear(&self, keep_pinned: bool) -> anyhow::Result<()> {
+        self.connection.execute(
+            "DELETE FROM rich_clipboard WHERE ?1 = 0 OR pinned = 0",
+            [keep_pinned],
+        )?;
         Ok(())
     }
 
@@ -309,6 +389,12 @@ impl Store {
         if let Some(id) = existing {
             transaction.execute("UPDATE rich_clipboard SET sort_order = (SELECT COALESCE(MAX(sort_order),0)+1 FROM rich_clipboard) WHERE id = ?1", [id])?;
         } else {
+            let (pins, pinned_bytes) = Self::pinned_usage(&transaction)?;
+            ensure!(
+                pins < limit.min(MAX_ENTRIES)
+                    && data.len() <= MAX_TOTAL_BYTES.saturating_sub(pinned_bytes),
+                "Pinned history leaves too little space for this capture. Unpin or delete an entry."
+            );
             transaction.execute("INSERT INTO rich_clipboard(kind,payload,title,created_at,source_app,sort_order) VALUES(?1,?2,?3,?4,?5,(SELECT COALESCE(MAX(sort_order),0)+1 FROM rich_clipboard))", params![kind,data,title,now,source.map(|s| &s.id)])?;
         }
         Self::prune_connection(&transaction, days, now, limit)?;
@@ -318,7 +404,7 @@ impl Store {
 
     fn preview(&self, id: i64) -> anyhow::Result<RichPreview> {
         ensure!(id > 0, "Invalid clipboard entry.");
-        let (entry, bytes): (RichEntry, Vec<u8>) = self.connection.query_row("SELECT id,kind,title,created_at,source_app,length(payload),payload FROM rich_clipboard WHERE id = ?1", [id], |row| Ok((entry(row)?, row.get(6)?))).context("This clipboard entry is no longer available.")?;
+        let (entry, bytes): (RichEntry, Vec<u8>) = self.connection.query_row("SELECT id,kind,title,created_at,source_app,length(payload),pinned,payload FROM rich_clipboard WHERE id = ?1", [id], |row| Ok((entry(row)?, row.get(7)?))).context("This clipboard entry is no longer available.")?;
         let (png, files) = match Payload::decode(entry.kind.as_str(), bytes)? {
             Payload::Png(bytes) => (Some(bytes), None),
             Payload::Files(paths) => {
@@ -371,6 +457,7 @@ fn entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<RichEntry> {
         created_at: row.get(3)?,
         source_app: row.get(4)?,
         bytes: row.get(5)?,
+        pinned: row.get(6)?,
     })
 }
 
@@ -471,14 +558,14 @@ pub fn apply_retention(app: &AppHandle) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn clear(app: &AppHandle) -> anyhow::Result<()> {
+pub fn clear(app: &AppHandle, keep_pinned: bool) -> anyhow::Result<()> {
     if app
         .path()
         .app_data_dir()?
         .join("clipboard-rich.sqlite3")
         .exists()
     {
-        with_store(app, |store| store.delete(None))?;
+        with_store(app, |store| store.clear(keep_pinned))?;
     }
     Ok(())
 }
@@ -487,9 +574,10 @@ pub fn clear(app: &AppHandle) -> anyhow::Result<()> {
 pub async fn rich_clipboard_history(app: AppHandle) -> Result<RichHistory, String> {
     tauri::async_runtime::spawn_blocking(move || with_store(&app, |store| Ok(RichHistory {
         entries: store.list()?,
+        storage_notice: store.storage_notice(app.state::<LauncherState>().settings().clipboard_limit())?,
         capture_supported: cfg!(target_os = "macos"),
         support_notice: if cfg!(target_os = "macos") {
-            "Captures native PNG images and Finder file lists on macOS. TIFF-only images and URL-only file sources are skipped. Images: up to 4 MiB and 4 megapixels. Files: up to 64 existing paths, not file contents. Rich history: up to 32 entries and 16 MiB; no pins.".into()
+            "Captures native PNG images and Finder file lists on macOS. TIFF-only images and URL-only file sources are skipped. Images: up to 4 MiB and 4 megapixels. Files: up to 64 existing paths, not file contents. Pinned entries survive retention and Clear unpinned. Unpinning applies the current retention and count limits immediately.".into()
         } else { "Image and file capture/copy is currently supported only on macOS. Text history remains available.".into() },
     })).map_err(|error| error.to_string())).await.map_err(|error| error.to_string())?
 }
@@ -526,6 +614,31 @@ pub async fn copy_rich_clipboard(id: i64, app: AppHandle) -> Result<(), String> 
             Ok(())
         })
         .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn set_rich_clipboard_pinned(
+    id: i64,
+    pinned: bool,
+    app: AppHandle,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        with_store(&app, |store| {
+            let settings = app.state::<LauncherState>().settings();
+            store.set_pinned(
+                id,
+                pinned,
+                settings.clipboard_retention_days,
+                crate::ranking::now(),
+                settings.clipboard_limit(),
+            )
+        })
+        .map_err(|error| error.to_string())?;
+        super::changed(&app);
+        Ok(())
     })
     .await
     .map_err(|error| error.to_string())?
@@ -675,11 +788,170 @@ mod tests {
     }
 
     #[test]
+    fn clipboard_rich_migrates_v1_without_changing_payloads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rich.sqlite3");
+        let connection = Connection::open(&path).unwrap();
+        connection.execute_batch("CREATE TABLE rich_clipboard (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload BLOB NOT NULL,
+            title TEXT NOT NULL, created_at INTEGER NOT NULL, source_app TEXT, sort_order INTEGER NOT NULL);
+            PRAGMA user_version = 1;").unwrap();
+        let png = include_bytes!("../../icons/32x32.png").to_vec();
+        connection
+            .execute(
+                "INSERT INTO rich_clipboard VALUES (7,'image',?1,'Saved image',100,'fixture',4)",
+                [&png],
+            )
+            .unwrap();
+        drop(connection);
+        let mut store = Store::open(&path).unwrap();
+        assert!(!store.list().unwrap()[0].pinned);
+        assert_eq!(store.preview(7).unwrap().png, Some(png.clone()));
+        store.set_pinned(7, true, 0, 101, 32).unwrap();
+        drop(store);
+        let store = Store::open(&path).unwrap();
+        assert!(store.list().unwrap()[0].pinned);
+        assert_eq!(store.preview(7).unwrap().png, Some(png));
+    }
+
+    #[test]
+    fn clipboard_rich_pins_survive_retention_recapture_and_clear_unpinned() {
+        let (dir, mut store) = store();
+        let file = dir.path().join("keep.txt");
+        std::fs::write(&file, "fixture").unwrap();
+        let files = Payload::Files(vec![file.clone()]);
+        let image = Payload::Png(include_bytes!("../../icons/32x32.png").to_vec());
+        store.capture(&files, None, 1, 0, 32).unwrap();
+        let file_id = store.list().unwrap()[0].id;
+        store.set_pinned(file_id, true, 0, 1, 32).unwrap();
+        store.capture(&image, None, 2, 0, 32).unwrap();
+        let image_id = store
+            .list()
+            .unwrap()
+            .iter()
+            .find(|entry| entry.kind == RichKind::Image)
+            .unwrap()
+            .id;
+        store.set_pinned(image_id, true, 0, 2, 32).unwrap();
+        store.prune(1, 90_000, 1).unwrap();
+        assert_eq!(store.list().unwrap().len(), 2);
+        store.capture(&files, None, 90_001, 1, 1).unwrap();
+        assert_eq!(store.list().unwrap()[0].id, file_id);
+        assert!(store.list().unwrap().iter().all(|entry| entry.pinned));
+        store.clear(true).unwrap();
+        assert_eq!(store.list().unwrap().len(), 2);
+        std::fs::remove_file(file).unwrap();
+        assert!(store.preview(file_id).is_err());
+        // Missing references can still be unpinned; expired entries are removed.
+        store.set_pinned(file_id, false, 1, 90_002, 32).unwrap();
+        assert_eq!(store.list().unwrap().len(), 1);
+        assert_eq!(store.list().unwrap()[0].id, image_id);
+        store.clear(false).unwrap();
+        assert!(store.list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn clipboard_rich_pin_count_limit_rejects_new_capture_without_eviction() {
+        let (dir, mut store) = store();
+        for index in 0..MAX_ENTRIES {
+            let file = dir.path().join(index.to_string());
+            std::fs::write(&file, "fixture").unwrap();
+            store
+                .capture(&Payload::Files(vec![file]), None, index as i64, 0, 32)
+                .unwrap();
+            let id = store
+                .list()
+                .unwrap()
+                .iter()
+                .find(|entry| !entry.pinned)
+                .unwrap()
+                .id;
+            store.set_pinned(id, true, 0, 100, 32).unwrap();
+        }
+        let before: Vec<_> = store.list().unwrap().iter().map(|entry| entry.id).collect();
+        let image = Payload::Png(include_bytes!("../../icons/32x32.png").to_vec());
+        assert!(store.capture(&image, None, 101, 0, 32).is_err());
+        assert_eq!(
+            store
+                .list()
+                .unwrap()
+                .iter()
+                .map(|entry| entry.id)
+                .collect::<Vec<_>>(),
+            before
+        );
+        assert!(
+            store
+                .storage_notice(32)
+                .unwrap()
+                .contains("Pins fill the capture limit")
+        );
+        store.set_pinned(before[0], false, 0, 102, 32).unwrap();
+        store.capture(&image, None, 103, 0, 32).unwrap();
+        let entries = store.list().unwrap();
+        assert_eq!(entries.len(), MAX_ENTRIES);
+        assert_eq!(
+            entries.iter().filter(|entry| entry.pinned).count(),
+            MAX_ENTRIES - 1
+        );
+        assert!(!entries.iter().any(|entry| entry.id == before[0]));
+    }
+
+    #[test]
+    fn clipboard_rich_pinned_blobs_share_the_hard_byte_budget() {
+        let (_dir, mut store) = store();
+        for order in 0..4 {
+            store.connection.execute("INSERT INTO rich_clipboard(kind,payload,title,created_at,sort_order,pinned) VALUES('image',zeroblob(?1),'budget fixture',1,?2,1)", params![MAX_IMAGE_BYTES as i64, order]).unwrap();
+        }
+        let png = Payload::Png(include_bytes!("../../icons/32x32.png").to_vec());
+        assert!(store.capture(&png, None, 100, 0, 32).is_err());
+        assert_eq!(store.list().unwrap().len(), 4);
+        store.prune(1, 90_000, 1).unwrap();
+        assert_eq!(store.list().unwrap().len(), 4);
+        let id = store.list().unwrap()[0].id;
+        store.set_pinned(id, false, 0, 101, 32).unwrap();
+        store.capture(&png, None, 102, 0, 32).unwrap();
+        let entries = store.list().unwrap();
+        assert_eq!(entries.iter().filter(|entry| entry.pinned).count(), 3);
+        assert!(
+            entries
+                .iter()
+                .map(|entry| entry.bytes as usize)
+                .sum::<usize>()
+                <= MAX_TOTAL_BYTES
+        );
+    }
+
+    #[test]
+    fn clipboard_rich_failed_pin_update_keeps_saved_state() {
+        let (dir, mut store) = store();
+        store
+            .capture(
+                &Payload::Png(include_bytes!("../../icons/32x32.png").to_vec()),
+                None,
+                1,
+                0,
+                32,
+            )
+            .unwrap();
+        let id = store.list().unwrap()[0].id;
+        assert!(store.set_pinned(-1, true, 0, 2, 32).is_err());
+        assert!(store.set_pinned(id + 1, true, 0, 2, 32).is_err());
+        let blocker = Connection::open(dir.path().join("rich.sqlite3")).unwrap();
+        blocker.execute_batch("BEGIN IMMEDIATE").unwrap();
+        assert!(store.set_pinned(id, true, 0, 2, 32).is_err());
+        assert!(!store.list().unwrap()[0].pinned);
+        blocker.execute_batch("ROLLBACK").unwrap();
+        store.set_pinned(id, true, 0, 2, 32).unwrap();
+        assert!(store.list().unwrap()[0].pinned);
+    }
+
+    #[test]
     fn clipboard_rich_newer_database_is_not_replaced() {
         let (dir, store) = store();
         store
             .connection
-            .pragma_update(None, "user_version", 2)
+            .pragma_update(None, "user_version", 3)
             .unwrap();
         drop(store);
         assert!(Store::open(&dir.path().join("rich.sqlite3")).is_err());
@@ -688,7 +960,7 @@ mod tests {
             connection
                 .pragma_query_value::<u32, _>(None, "user_version", |row| row.get(0))
                 .unwrap(),
-            2
+            3
         );
     }
 }

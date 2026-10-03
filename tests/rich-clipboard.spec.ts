@@ -121,3 +121,93 @@ test("a failed next preview preserves the deletion confirmation and its error", 
     page.getByRole("button", { name: "Delete saved entry" }),
   ).toBeEnabled();
 });
+
+test("rich pins persist through refresh and retain selection when sorted first", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const state = window.__richClipboardTest;
+    state.entries.push({ ...state.entries[0], id: 2, title: "Other file" });
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.getByRole("button", { name: /Other file/ }).click();
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Pinned.");
+  const list = page.getByRole("list", { name: "Saved images and files" });
+  await expect(list.getByRole("button").first()).toContainText(
+    "Pinned · Other file",
+  );
+  await expect(list.getByRole("button").first()).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Unpin saved entry", exact: true }),
+  ).toBeEnabled();
+  await page
+    .getByRole("button", { name: "Unpin saved entry", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Unpinned.");
+  await expect(
+    page.getByRole("button", { name: "Pin saved entry", exact: true }),
+  ).toBeEnabled();
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.calls),
+  ).not.toContain("copy_rich_clipboard");
+});
+
+test("failed pin update leaves the entry unpinned and supports retry", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    window.__richClipboardTest.pinError = true;
+  });
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("storage is busy");
+  await expect(
+    page.getByRole("button", { name: "Pin saved entry", exact: true }),
+  ).toBeEnabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.pinError = false;
+  });
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Unpin saved entry", exact: true }),
+  ).toBeEnabled();
+});
+
+test("unreadable pinned entries can still be unpinned and deleted", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const state = window.__richClipboardTest;
+    state.entries.push({
+      ...state.entries[0],
+      id: 2,
+      title: "Missing reference",
+      pinned: true,
+    });
+    state.previewError = true;
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.getByRole("button", { name: /Missing reference/ }).click();
+  await expect(page.getByRole("alert")).toContainText("Preview unavailable");
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Unpin saved entry", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Unpinned.");
+  await page.getByRole("button", { name: "Delete saved entry" }).click();
+  await expect(
+    page.getByRole("button", { name: /Missing reference/ }),
+  ).toHaveCount(0);
+});

@@ -16,7 +16,7 @@ Retention days defaults to zero, meaning no age expiry. A positive value expires
 
 ## Image and file history
 
-The **Clipboard images and files** command opens a separate history view. Select an entry to preview it. **Copy original format** writes the saved image or file references to the native clipboard; paste them in the target application. **Delete saved entry** removes history without changing the system clipboard. The existing clear-history actions also clear rich entries.
+The **Clipboard images and files** command opens a separate history view. Select an entry to preview it. **Copy original format** writes the saved image or file references to the native clipboard; paste them in the target application. **Delete saved entry** removes history without changing the system clipboard. **Pin saved entry** keeps an image or file reference during automatic cleanup and **Clear unpinned**. Pins appear first and persist across restart. **Unpin saved entry** applies the current retention and count policy immediately; an expired entry can disappear. **Clear all clipboard history** removes rich entries including pins. Pinning does not change the system clipboard.
 
 Native rich capture and copy currently support **macOS only**. Windows and Linux display an explicit unsupported notice; their text history remains available.
 
@@ -26,13 +26,13 @@ Limits:
 
 - PNG: 4 MiB encoded, at most 4,194,304 pixels, and at most 4,096 pixels per edge.
 - Files: up to 64 existing absolute paths, 32 KiB of path text, and 64 KiB encoded metadata.
-- Rich history: up to 32 entries and 16 MiB of payloads. A lower text-history count setting also lowers this count.
+- Rich history: up to 32 entries and 16 MiB of payloads. A lower text-history count setting lowers the capture limit. Cleanup never removes existing pins, even if they exceed that lower limit. Pins still count toward the hard 32-entry and 16 MiB bounds.
 
-Rich entries do not support pins, text editing, or text combining. They use the same age-retention setting.
+New captures replace the oldest unpinned entries. When pins leave too little room, the new capture is skipped and pinned payloads remain intact. The panel shows storage use, pin count, and whether pins fill the capture limit. Unpin or delete entries to make room. Unpinned rich entries use the same age-retention setting as text. Rich entries do not support text editing or text combining.
 
 ## Local storage
 
-Rich history is stored in `clipboard-rich.sqlite3`, separately from the existing text database. No existing text rows are converted or removed by a rich-format migration. Payloads are SQLite blobs, so pruning removes payloads along with metadata rather than leaving orphan files. SQLite secure deletion is enabled, and Unix permissions restrict the file to its owner. History is not encrypted. Backups and filesystem snapshots may retain earlier data.
+Rich history is stored in `clipboard-rich.sqlite3`, separately from the existing text database. Rich schema 2 adds a saved pin flag. Upgrading from schema 1 preserves each payload and starts each entry unpinned. The upgrade runs in one transaction. No existing text rows are converted or removed by a rich-format migration. Payloads are SQLite blobs, so pruning removes payloads along with metadata rather than leaving orphan files. SQLite secure deletion is enabled, and Unix permissions restrict the file to its owner. History is not encrypted. Backups and filesystem snapshots may retain earlier data.
 
 ## Verification
 
@@ -41,7 +41,7 @@ bun run test:rust -- clipboard
 bun run verify:browser tests/rich-clipboard.spec.ts
 ```
 
-Rust tests cover age retention, pin preservation, expired-text recapture, rollback, exclusion matching, rich persistence, format validation, byte/count bounds, missing references, and newer-schema refusal. Browser tests mount the real rich-history component with mocked IPC and exercise preview, copy failures, deletion, and return navigation. They do not establish native clipboard effects or launcher command routing.
+Rust tests cover age retention, pin preservation, expired-text recapture, rollback, exclusion matching, rich persistence and schema upgrade, pinned count/byte budgets, failed pin writes, format validation, byte/count bounds, missing references, and newer-schema refusal. Browser tests mount the real rich-history component with mocked IPC and exercise preview, copy failures, pin/unpin, stable selection after sorting, pin-write retry, unavailable previews, deletion, and return navigation. They do not establish native clipboard effects or launcher command routing.
 
 Session tests combine age retention with storage contention and pending sensitive cleanup. An unsuccessful capture keeps the previous entry and cleanup identity. A later successful capture can replace expired text with a new entry; retrying cleanup for the old identity cannot remove the new capture.
 

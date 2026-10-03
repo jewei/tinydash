@@ -31,6 +31,7 @@ fn main() {
         "rich_clipboard_preview",
         "copy_rich_clipboard",
         "delete_rich_clipboard",
+        "set_rich_clipboard_pinned",
         "item_catalog",
         "set_launcher_appearance",
         "sync_appearance",

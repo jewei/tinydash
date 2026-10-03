@@ -2003,8 +2003,8 @@ export default function App(
             }
             description={
               keepPins()
-                ? "This deletes unpinned text and all saved images and file references. Text pinned in All or Clipboard stays saved. The system clipboard does not change."
-                : "This deletes all saved text, images, and file references, including pinned text. The system clipboard does not change."
+                ? "This deletes unpinned text, images, and file references. Pinned entries stay saved. The system clipboard does not change."
+                : "This deletes all saved text, images, and file references, including pinned entries. The system clipboard does not change."
             }
             confirmLabel={keepPins() ? "Clear unpinned" : "Clear all history"}
             busyLabel="Clearing..."
