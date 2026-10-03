@@ -1,7 +1,12 @@
 .file-preview {
-  padding: 0 20px 16px;
+  padding: 14px 0 4px;
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.file-preview > [role="status"] {
+  margin: 0;
+  color: var(--color-muted);
 }
 
 .file-preview-metadata {
@@ -12,6 +17,11 @@
   display: flex;
   gap: 12px;
   margin: 4px 0;
+}
+
+.file-preview-metadata dt {
+  min-width: 62px;
+  color: var(--color-muted);
 }
 
 .file-preview-metadata dd {
@@ -44,12 +54,23 @@
 
 .file-preview button,
 .file-preview select {
+  min-height: 28px;
   font: inherit;
-  color: inherit;
+  font-size: 11px;
+  color: var(--color-ink);
   background: transparent;
-  border: 1px solid currentColor;
-  border-radius: 5px;
-  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 4px 10px;
+}
+
+.file-preview select {
+  border-radius: var(--radius-sm);
+}
+
+.file-preview button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .file-preview button:disabled {
@@ -58,7 +79,7 @@
 
 .file-preview button:focus-visible,
 .file-preview select:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -82,5 +103,5 @@
 }
 
 .file-preview [role="alert"] {
-  color: var(--text-danger, #c33939);
+  color: var(--color-error);
 }

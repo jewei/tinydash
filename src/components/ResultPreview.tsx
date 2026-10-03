@@ -47,7 +47,7 @@ export default function ResultPreview(props: {
   const actionLabel = () => {
     switch (props.result?.kind) {
       case "app":
-        return "Launch application";
+        return "Open application";
       case "file":
         return "Open file";
       case "folder":
@@ -55,7 +55,7 @@ export default function ResultPreview(props: {
       case "clipboard":
         return "Copy saved text";
       case "calculation":
-        return "Copy answer";
+        return "Copy result";
       case "systemCommand":
         return "Run selected command";
       case "password":
@@ -208,6 +208,7 @@ export default function ResultPreview(props: {
             </Show>
             <Show when={props.result!.confirmation}>
               <p class="preview-notice">
+                <Icon name="lock" size={14} />
                 You will be asked to confirm this command.
               </p>
             </Show>
@@ -253,7 +254,11 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("paste")}
             >
-              Paste to previous app<kbd>{props.modifier} ⇧ ↵</kbd>
+              <span class="action-label">
+                <Icon name="clipboard" size={15} />
+                Paste to previous app
+              </span>
+              <kbd>{props.modifier} ⇧ ↵</kbd>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("reveal")}>
@@ -275,7 +280,11 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("delete")}
             >
-              Delete saved text<kbd>{props.modifier} ⌫</kbd>
+              <span class="action-label">
+                <Icon name="delete" size={15} />
+                Delete saved text
+              </span>
+              <kbd>{props.modifier} ⌫</kbd>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("copy")}>
@@ -284,7 +293,10 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("copy")}
             >
-              Copy search URL
+              <span class="action-label">
+                <Icon name="copy" size={15} />
+                Copy search URL
+              </span>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("open")}>
@@ -293,7 +305,10 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("open")}
             >
-              Open cleaned URL
+              <span class="action-label">
+                <Icon name="link" size={15} />
+                Open cleaned URL
+              </span>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("regenerate")}>
@@ -302,7 +317,10 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("regenerate")}
             >
-              Generate another
+              <span class="action-label">
+                <Icon name="refresh" size={15} />
+                Generate another
+              </span>
             </button>
           </Show>
         </div>

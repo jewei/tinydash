@@ -298,6 +298,52 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--color-rule) var(--color-transparent);
 }
+/* Scroll edges fade only while content overflows in that direction. The
+ * timeline is inactive without overflow, so both fade lengths stay 0. */
+@property --fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade {
+  0% {
+    --fade-start: 0px;
+    --fade-end: 32px;
+  }
+  12%,
+  88% {
+    --fade-start: 32px;
+    --fade-end: 32px;
+  }
+  100% {
+    --fade-start: 32px;
+    --fade-end: 0px;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  :is(.preview-content, .category-tabs) {
+    --fade-direction: to bottom;
+    mask-image: linear-gradient(
+      var(--fade-direction),
+      transparent,
+      #000 var(--fade-start),
+      #000 calc(100% - var(--fade-end)),
+      transparent
+    );
+    animation: scroll-fade linear both;
+    animation-timeline: scroll(self block);
+  }
+  .category-tabs {
+    --fade-direction: to right;
+    animation-timeline: scroll(self inline);
+  }
+}
+
 .preview-topline {
   display: flex;
   align-items: flex-start;
@@ -320,9 +366,10 @@ body {
 }
 .pin-controls {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
 }
 .pin-button {
   display: inline-flex;
@@ -432,6 +479,22 @@ body {
 .preview-action.primary kbd {
   background: var(--color-transparent);
   border-color: var(--color-transparent);
+}
+.preview-action:not(.primary) .action-label > svg {
+  color: var(--color-muted);
+}
+/* A planned confirmation is guidance, not an error. */
+.preview-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-color: var(--color-rule);
+  color: var(--color-ink);
+  background: var(--color-paper);
+}
+.preview-notice > svg {
+  flex-shrink: 0;
+  color: var(--color-accent);
 }
 .tool-preview .preview-summary {
   padding-left: 0;
@@ -616,14 +679,14 @@ body {
   gap: 3px;
   margin-left: auto;
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .navigation-hint kbd:last-of-type {
   margin-right: 3px;
 }
 .list-count {
-  font-size: 10px;
+  font-size: 11px;
   margin-left: 6px;
 }
 .actions-button {
@@ -643,6 +706,33 @@ body {
 }
 .actions-menu button {
   border-radius: 7px;
+}
+.actions-filter:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+  border-color: var(--color-transparent);
+}
+.appearance-options button {
+  justify-content: flex-start;
+  gap: 8px;
+  padding-inline: 12px;
+}
+.menu-check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-inline: 1px;
+  border: 1px solid var(--color-grip);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1;
+}
+[aria-checked="true"] > .menu-check {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
 }
 .confirm-dialog {
   border-radius: 18px;

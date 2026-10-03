@@ -1751,7 +1751,9 @@ export default function App(
                           focusInput();
                         }}
                       >
-                        <span aria-hidden="true">{compact() ? "✓" : "○"}</span>
+                        <span class="menu-check" aria-hidden="true">
+                          {compact() ? "✓" : ""}
+                        </span>
                         Compact
                       </button>
                     </Show>

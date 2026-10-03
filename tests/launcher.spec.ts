@@ -260,7 +260,7 @@ test("Canvas detail actions follow the selection and keep system confirmation", 
     details.getByText("/Applications", { exact: true }),
   ).toBeVisible();
   await expect(details.getByText("Safari.app", { exact: true })).toBeVisible();
-  await details.getByRole("button", { name: "Launch application" }).click();
+  await details.getByRole("button", { name: "Open application" }).click();
   await details
     .getByRole("button", { name: "Show in enclosing folder" })
     .click();

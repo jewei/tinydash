@@ -167,7 +167,8 @@
   opacity: 0.5;
   cursor: default;
 }
-.settings-shell :is(textarea, select, .settings-number) {
+.settings-shell :is(textarea, select, .settings-number),
+.settings-sidebar input[type="search"] {
   max-width: 100%;
   border: 1px solid var(--color-grip);
   border-radius: 10px;
@@ -187,8 +188,21 @@
   width: 100%;
   min-height: 44px;
 }
-.settings-shell select + .settings-field-label {
+.settings-shell select + .settings-field-label,
+.settings-row + .settings-field-label {
   margin-top: 18px;
+}
+.settings-sidebar .settings-field-label {
+  margin: 0 0 18px;
+}
+.settings-sidebar input[type="search"] {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .settings-number {
   width: 110px;
