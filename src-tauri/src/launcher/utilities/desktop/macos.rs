@@ -10,6 +10,7 @@ type Ref = *const c_void;
 unsafe extern "C" {
     fn CFStringCreateWithCString(allocator: Ref, text: *const i8, encoding: u32) -> Ref;
     fn CFRelease(value: Ref);
+    fn CFEqual(a: Ref, b: Ref) -> u8;
 }
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
@@ -91,6 +92,41 @@ impl WindowTarget {
     pub fn label(&self) -> String {
         format!("{} (PID {})", self.identity.name, self.identity.pid)
     }
+
+    pub fn same_window(&self, other: &Self) -> bool {
+        if self.identity != other.identity {
+            return false;
+        }
+        if Arc::ptr_eq(&self.element, &other.element) {
+            return true;
+        }
+        let (Ok(a), Ok(b)) = (self.element.lock(), other.element.lock()) else {
+            return false;
+        };
+        unsafe { CFEqual(a.0, b.0) != 0 }
+    }
+
+    pub fn is_focused(&self) -> UtilityResult<bool> {
+        if !objc2_app_kit::NSWorkspace::sharedWorkspace()
+            .frontmostApplication()
+            .is_some_and(|app| app.processIdentifier() == self.identity.pid as i32)
+        {
+            return Ok(false);
+        }
+        let app = Cf(unsafe { AXUIElementCreateApplication(self.identity.pid as i32) });
+        if app.0.is_null() {
+            return Err("Accessibility unavailable".into());
+        }
+        unsafe {
+            AXUIElementSetMessagingTimeout(app.0, 1.0);
+        }
+        let focused = app.attribute("AXFocusedWindow")?;
+        let element = self
+            .element
+            .lock()
+            .map_err(|_| "Window target unavailable")?;
+        Ok(unsafe { CFEqual(focused.0, element.0) != 0 })
+    }
 }
 
 pub fn capture_window() -> UtilityResult<WindowTarget> {
@@ -114,10 +150,6 @@ pub fn capture_target(id: u64) -> UtilityResult<WindowTarget> {
     if app.0.is_null() {
         return Err("Accessibility unavailable".into());
     }
-    let identity = super::super::process::list()?
-        .into_iter()
-        .find(|p| p.pid == pid as u32)
-        .ok_or("Focus a non-system application other than TinyDash, then capture it")?;
     unsafe {
         AXUIElementSetMessagingTimeout(app.0, 1.0);
     }
@@ -127,6 +159,11 @@ pub fn capture_target(id: u64) -> UtilityResult<WindowTarget> {
     unsafe {
         AXUIElementSetMessagingTimeout(element.0, 1.0);
     }
+    // Retain the focused window before process enumeration can outlive a focus change.
+    let identity = super::super::process::list()?
+        .into_iter()
+        .find(|p| p.pid == pid as u32)
+        .ok_or("Focus a non-system application other than TinyDash, then capture it")?;
     let position = element.attribute("AXPosition")?;
     let size = element.attribute("AXSize")?;
     let mut point = Point::default();
@@ -203,6 +240,7 @@ pub fn window(
     app: &tauri::AppHandle,
     target: &WindowTarget,
     action: WindowAction,
+    require_focus: bool,
 ) -> UtilityResult<()> {
     effects_allowed()?;
     super::super::process::validate(&target.identity)?;
@@ -227,6 +265,9 @@ pub fn window(
     let dimensions = Cf(unsafe { AXValueCreate(2, (&size as *const Size).cast()) });
     if position.0.is_null() || dimensions.0.is_null() {
         return Err("Cannot create window bounds".into());
+    }
+    if require_focus && !target.is_focused()? {
+        return Err("Focus changed. No window placement was requested.".into());
     }
     let element = target
         .element

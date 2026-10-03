@@ -1,5 +1,7 @@
 import type {
   Action,
+  PasteQueueAction,
+  PasteQueueStatus,
   FileStatus,
   ClipboardEntry,
   LauncherInfo,
@@ -14,6 +16,9 @@ import type {
 
 /** Compile-time consumer of the Rust-serialized examples; no runtime validator/SDK. */
 export interface ContractFixture {
+  pasteQueueActions: PasteQueueAction[];
+  pasteQueueEmpty: PasteQueueStatus;
+  pasteQueueActive: PasteQueueStatus;
   actions: Action[];
   fileStatuses: FileStatus[];
   modes: SearchMode[];

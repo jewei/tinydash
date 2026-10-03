@@ -2,7 +2,7 @@ import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { backend, type SearchResult } from "../bridge";
 
 export default function ClipboardCopyDialog(props: {
-  mode: "edit" | "combine";
+  mode: "edit" | "combine" | "queue";
   entry: SearchResult;
   entries: SearchResult[];
   onClose: () => void;
@@ -49,6 +49,8 @@ export default function ClipboardCopyDialog(props: {
     try {
       if (props.mode === "edit")
         await backend.editClipboardCopy(props.entry.id, text());
+      else if (props.mode === "queue")
+        await backend.pasteQueue("start", selected());
       else await backend.copyClipboardSelection(selected(), separator());
       if (!disposed) props.onCopied();
     } catch (reason) {
@@ -69,15 +71,20 @@ export default function ClipboardCopyDialog(props: {
       }}
     >
       <h2 id="clipboard-copy-title">
-        {props.mode === "edit" ? "Edit a copy" : "Copy selected entries"}
+        {props.mode === "edit"
+          ? "Edit a copy"
+          : props.mode === "queue"
+            ? "Create paste queue"
+            : "Copy selected entries"}
       </h2>
       <Show
         when={props.mode === "edit"}
         fallback={
           <>
             <p>
-              Select entries in the order to copy them. The number shows each
-              entry's position.
+              Select entries in the order to{" "}
+              {props.mode === "queue" ? "paste" : "copy"} them. The number shows
+              each entry's position.
             </p>
             <div class="clipboard-choices">
               <For each={props.entries}>
@@ -101,20 +108,29 @@ export default function ClipboardCopyDialog(props: {
                 )}
               </For>
             </div>
-            <label class="copy-separator">
-              Separate entries with
-              <select
-                value={separator()}
-                disabled={busy()}
-                onChange={(event) => setSeparator(event.currentTarget.value)}
-              >
-                <option value={"\n"}>New line</option>
-                <option value={"\n\n"}>Blank line</option>
-                <option value=" ">Space</option>
-                <option value={"\t"}>Tab</option>
-                <option value=", ">Comma and space</option>
-              </select>
-            </label>
+            <Show when={props.mode !== "queue"}>
+              <label class="copy-separator">
+                Separate entries with
+                <select
+                  value={separator()}
+                  disabled={busy()}
+                  onChange={(event) => setSeparator(event.currentTarget.value)}
+                >
+                  <option value={"\n"}>New line</option>
+                  <option value={"\n\n"}>Blank line</option>
+                  <option value=" ">Space</option>
+                  <option value={"\t"}>Tab</option>
+                  <option value=", ">Comma and space</option>
+                </select>
+              </label>
+            </Show>
+            <Show when={props.mode === "queue"}>
+              <p>
+                Each Next action pastes one entry. In Settings → Search, assign
+                a shortcut to Paste next queued entry to use it from another
+                app.
+              </p>
+            </Show>
           </>
         }
       >
@@ -153,10 +169,14 @@ export default function ClipboardCopyDialog(props: {
           onClick={() => void copy()}
         >
           {busy()
-            ? "Copying..."
+            ? props.mode === "queue"
+              ? "Creating..."
+              : "Copying..."
             : props.mode === "edit"
               ? "Copy edited text"
-              : `Copy ${selected().length} entries`}
+              : props.mode === "queue"
+                ? `Queue ${selected().length} entries`
+                : `Copy ${selected().length} entries`}
         </button>
       </div>
     </dialog>

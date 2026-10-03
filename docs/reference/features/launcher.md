@@ -4,7 +4,9 @@ Open TinyDash with Control + Shift + Space, the tray menu, or the command line. 
 
 Use **Actions > Reset window position** to center the launcher in the current monitor's work area. The query, category, and selected result stay unchanged. On a display smaller than the window, the drag handle stays visible at the top left. Wayland controls placement through the compositor, so this action reports that limit there.
 
-All searches applications, files, clipboard text, emoji, calculations, system commands, and explicit tool commands. Empty All shows welcome examples or pinned items. Text categories have a fixed priority before the 30-result limit. See [ranking](../../explanation/data-and-privacy.md).
+All searches applications, files, clipboard text, emoji, calculations, system commands, and explicit tool commands. Empty All shows pins first, followed by up to six usage-based suggestions for apps, files, and emoji. It shows welcome examples when neither list has entries. Hidden, disabled, missing, and already pinned items are excluded from suggestions. Clipboard text, power commands, and generated values are never suggested. Settings → Search can turn suggestions off without deleting usage or pins. Text categories have a fixed priority before the 30-result limit. See [ranking](../../explanation/data-and-privacy.md).
+
+Suggestions use the existing local frequency and recency scores. Ties use last-use time, then item ID, so repeated searches keep their order. Selecting a suggestion uses the same actions and keyboard controls as a search result. No network request or additional usage record is needed.
 
 Search keeps one expensive request in flight and replaces waiting input with the latest query. New input, hiding, or disposal sends a separate lightweight cancellation for the active request. Stale replies are still ignored. A cancellation failure does not dispatch overlapping searches; the latest waiting query follows the old response. Cancellation acknowledgements finish before the next dispatch.
 
@@ -20,11 +22,19 @@ The search field disables automatic text correction, capitalization, spelling ch
 
 The actions menu uses Command/Ctrl + K. When no result is selected, it shows appearance options and launcher commands without an empty result-action column. Use Search actions to filter commands. The search field's Clear search button stays available while the query has text, including after an empty result or a search error. Clearing the query returns focus to the search field.
 
+Select an app result, including a pin or suggestion, then choose **Actions > Quit** or **Force Quit**. Both require confirmation, with Cancel focused when the app check completes. Force Quit can lose unsaved work. The launcher stays open after the request and does not count it as a launch. A successful request does not mean that the app has exited.
+
+Rust resolves the app's catalog ID to its bundle or executable path on demand. Search does not enumerate processes. A single-use confirmation expires after 30 seconds and is bound to the process identity and action. An app that has exited, a protected process, or an ambiguous match is not terminated. Use **Actions > Utilities > Processes** when direct app matching is unavailable. See [app process limits](utilities.md#quit-from-app-results).
+
 Empty search results suggest another search. A search failure shows **Search unavailable** and the error message, so users can distinguish a failed search from a search with no matches.
 
 The tray can open the launcher, open Settings, refresh data, and quit. A second app launch shows the existing process.
 
 ## Verification
+
+For app Quit and Force Quit, check menu filtering, Cancel and Escape, initial Cancel focus after preparation, preparation errors, expired confirmation, repeated clicks, background search updates, and launcher hide/reopen. Use a disposable app with unsaved text on each desktop. Confirm that Quit requests normal closure on macOS/Windows, Force Quit stops only the selected app, and another app with the same display name remains open. On Linux, check SIGTERM/SIGKILL and the pidfd kernel requirement. Check stopped apps, multiple matching processes, protected processes, and unsupported launchers. Static compilation does not prove process effects.
+
+Run `bun run verify:browser tests/daily-workflows.spec.ts` for suggestions, pin order, keyboard activation, and the persisted settings choice. Run `bun run test:rust -- suggestions` for ranking, exclusions, limits, and restored usage. On each desktop, launch a disposable app fixture, reopen All, activate its suggestion, and check its output marker. Mocked results do not establish native launch or restart persistence.
 
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
 

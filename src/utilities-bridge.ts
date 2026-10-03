@@ -51,6 +51,8 @@ export const utilities = {
   processes: () => invoke<UtilityProcess[]>("utility_processes"),
   prepareProcess: (process: UtilityProcess, force: boolean) =>
     invoke<ProcessConfirmation>("utility_prepare_process", { process, force }),
+  prepareApp: (id: string, force: boolean) =>
+    invoke<ProcessConfirmation>("utility_prepare_app", { id, force }),
   confirmProcess: (token: string) =>
     invoke<void>("utility_confirm_process", { token, confirmed: true }),
   cancelProcess: () => invoke<void>("utility_cancel_process"),

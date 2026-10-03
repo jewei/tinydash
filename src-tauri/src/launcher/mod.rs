@@ -8,6 +8,7 @@ mod file_watch;
 pub mod files;
 pub mod library;
 pub mod paste;
+pub mod paste_queue;
 pub mod pins;
 pub mod portability;
 pub mod preferences;

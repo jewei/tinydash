@@ -7,6 +7,21 @@ use tauri::{AppHandle, Emitter, Manager};
 
 const COMMANDS: &[(&str, &str, &str)] = &[
     (
+        "paste-next",
+        "Paste next queued entry",
+        "Paste one text entry without opening the launcher",
+    ),
+    (
+        "paste-skip",
+        "Skip queued entry",
+        "Skip the next entry in the paste queue",
+    ),
+    (
+        "paste-cancel",
+        "Cancel paste queue",
+        "Release the current text paste queue",
+    ),
+    (
         "quicklinks",
         "Quicklinks",
         "Saved websites, files, folders and app links",
@@ -26,11 +41,48 @@ const COMMANDS: &[(&str, &str, &str)] = &[
         "Arrange the previous application's window",
     ),
     (
+        "window-left",
+        "Move window left",
+        "Place the active window in the left half",
+    ),
+    (
+        "window-right",
+        "Move window right",
+        "Place the active window in the right half",
+    ),
+    (
+        "window-maximize",
+        "Maximize window",
+        "Fill the available work area",
+    ),
+    (
+        "window-center",
+        "Center window",
+        "Center the window at its current size",
+    ),
+    (
+        "window-restore",
+        "Restore window",
+        "Restore the window's saved position and size",
+    ),
+    (
         "rich-clipboard",
         "Images and files clipboard",
         "Opt-in image and file history",
     ),
 ];
+
+pub fn window_action(id: &str) -> Option<super::utilities::WindowAction> {
+    use super::utilities::WindowAction;
+    Some(match id {
+        "command:window-left" => WindowAction::Left,
+        "command:window-right" => WindowAction::Right,
+        "command:window-maximize" => WindowAction::Maximize,
+        "command:window-center" => WindowAction::Center,
+        "command:window-restore" => WindowAction::Restore,
+        _ => return None,
+    })
+}
 
 pub fn catalog() -> Vec<SearchResult> {
     COMMANDS

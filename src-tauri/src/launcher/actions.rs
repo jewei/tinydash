@@ -58,7 +58,17 @@ pub async fn execute_action(
         {
             return Err("This library item is disabled.".into());
         }
-        app.state::<super::library::LibraryState>().get(&id)?;
+        let entry = app.state::<super::library::LibraryState>().get(&id)?;
+        if entry.inserts_directly() {
+            return super::library::library_execute(
+                id,
+                super::library::LibraryAction::Paste,
+                Default::default(),
+                false,
+                app,
+            )
+            .await;
+        }
         window::show(&app).map_err(|error| error.to_string())?;
         return app
             .emit("open-panel", id)
@@ -66,6 +76,37 @@ pub async fn execute_action(
     }
     if action == Action::Paste {
         return super::paste::paste_result(app, id).await;
+    }
+    if action == Action::Run
+        && let Some(placement) = super::commands::window_action(&id)
+    {
+        {
+            let state = app.state::<LauncherState>();
+            state
+                .search
+                .lock()
+                .map_err(|_| "Search is unavailable.")?
+                .resolve_action(&id, action)
+                .map_err(|error| error.to_string())?;
+        }
+        super::utilities::window_placement::previous(&app, placement).await?;
+        return window::dismiss(&app).map_err(|error| error.to_string());
+    }
+    if action == Action::Run
+        && let Some(queue_action) = super::paste_queue::command_action(&id)
+    {
+        {
+            let state = app.state::<LauncherState>();
+            state
+                .search
+                .lock()
+                .map_err(|_| "Search is unavailable.")?
+                .resolve_action(&id, action)
+                .map_err(|error| error.to_string())?;
+        }
+        return super::paste_queue::paste_queue(app, queue_action, Vec::new())
+            .await
+            .map(|_| ());
     }
     let keep_open = matches!(action, Action::Delete | Action::Regenerate)
         || (action == Action::Run && super::commands::panel(&id).is_some());

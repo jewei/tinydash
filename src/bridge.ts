@@ -123,6 +123,7 @@ export interface SearchResponse {
 }
 
 export interface SettingsValues {
+  showSuggestions: boolean;
   clearQueryOnOpen: boolean;
   hideOnBlur: boolean;
   shortcut: string;
@@ -203,6 +204,13 @@ export interface ClipboardEntry {
   lastUsedAt: number | null;
 }
 
+export type PasteQueueAction = "status" | "start" | "next" | "skip" | "cancel";
+export interface PasteQueueStatus {
+  total: number;
+  position: number;
+  next: ClipboardEntry | null;
+}
+
 export const backend = {
   syncAppearance: (change: AppearanceChange) =>
     invoke<void>("sync_appearance", { change }),
@@ -219,6 +227,8 @@ export const backend = {
   appCatalog: () => invoke<SearchResult[]>("app_catalog"),
   itemCatalog: () => invoke<SearchResult[]>("item_catalog"),
   paste: (id: string) => invoke<void>("paste_result", { id }),
+  pasteQueue: (action: PasteQueueAction, ids: string[]) =>
+    invoke<PasteQueueStatus>("paste_queue", { action, ids }),
   setAppPreference: (id: string, aliases: string[], hidden: boolean) =>
     invoke<SettingsValues>("set_app_preference", { id, aliases, hidden }),
   previewWebSearch: (search: WebSearch, query: string) =>

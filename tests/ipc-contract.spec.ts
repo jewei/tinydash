@@ -4,6 +4,7 @@ import { commandArguments } from "./fixtures/ipc-wire";
 import { resolve } from "node:path";
 import type {
   Action,
+  PasteQueueAction,
   FilePhase,
   LauncherWarning,
   SearchMode,
@@ -14,6 +15,7 @@ import { commandWrappers } from "./ipc-types";
 
 // A new TS variant also needs a serialized Rust example, not just a widened union.
 type MissingExamples =
+  | Exclude<PasteQueueAction, (typeof contracts.pasteQueueActions)[number]>
   | Exclude<Action, (typeof contracts.actions)[number]>
   | Exclude<FilePhase, (typeof contracts.fileStatuses)[number]["phase"]>
   | Exclude<SearchMode, (typeof contracts.modes)[number]>
@@ -46,6 +48,11 @@ function variants(path: string, name: string) {
 
 test("canonical serde fixtures cover variants and representative omitted/nullable values", () => {
   expect(complete).toBe(true);
+  expect([...contracts.pasteQueueActions].sort()).toEqual(
+    variants("launcher/paste_queue.rs", "PasteQueueAction"),
+  );
+  expect(contracts.pasteQueueEmpty.next).toBeNull();
+  expect(contracts.pasteQueueActive.next?.content).toBe("Next text");
   expect(contracts.fileStatuses.map((status) => status.phase).sort()).toEqual(
     variants("launcher/files.rs", "FilePhase"),
   );
@@ -175,6 +182,9 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
           break;
         case "LibraryAction":
           expect(value).toBe("copy");
+          break;
+        case "PasteQueueAction":
+          expect(value).toBe("start");
           break;
         case "LibraryDraft":
           expect(value).toEqual({

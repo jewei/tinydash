@@ -32,6 +32,7 @@ fn windows_ipc_test_executable_loads_common_controls_v6() {
 
 const MAIN_ONLY: &[&str] = &[
     "paste_result",
+    "paste_queue",
     "library_list",
     "library_get",
     "library_save",
@@ -42,6 +43,7 @@ const MAIN_ONLY: &[&str] = &[
     "utility_capabilities",
     "utility_processes",
     "utility_prepare_process",
+    "utility_prepare_app",
     "utility_confirm_process",
     "utility_cancel_process",
     "utility_color",

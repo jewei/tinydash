@@ -103,6 +103,7 @@ impl WebSearch {
 #[serde(default, rename_all = "camelCase")]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Settings {
+    pub show_suggestions: bool,
     pub clear_query_on_open: bool,
     pub hide_on_blur: bool,
     pub shortcut: String,
@@ -132,6 +133,7 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            show_suggestions: true,
             clear_query_on_open: true,
             hide_on_blur: true,
             shortcut: DEFAULT_SHORTCUT.into(),

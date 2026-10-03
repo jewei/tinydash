@@ -8,6 +8,7 @@ import {
   Show,
 } from "solid-js";
 import { isTauri } from "@tauri-apps/api/core";
+import WindowShortcutPreferences from "./components/WindowShortcutPreferences";
 import { listen } from "@tauri-apps/api/event";
 import { createNativeSubscriptions } from "./nativeSubscriptions";
 import {
@@ -63,7 +64,7 @@ const sections = [
   {
     id: "search",
     label: "Search",
-    description: "Choose app names and web searches.",
+    description: "Choose suggestions, app names, shortcuts, and web searches.",
   },
   {
     id: "categories",
@@ -110,9 +111,11 @@ const sectionIcons: Record<Section, IconName> = {
 };
 type ShortcutTarget = "global" | SearchMode | `item:${string}`;
 const sectionKeywords: Record<Section, string> = {
-  shortcut: "keyboard hotkey startup login blur reset menu bar",
+  shortcut:
+    "keyboard hotkey startup login blur reset menu bar window placement presets restore maximize center",
   appearance: "theme dark light compact glass transparency",
-  search: "aliases applications hidden shortcuts commands web keywords",
+  search:
+    "aliases applications hidden shortcuts commands web keywords suggestions usage paste queue",
   categories: "tabs visible hide providers",
   clipboard:
     "history copy paste images files exclusions privacy retention days",
@@ -221,6 +224,8 @@ export default function Settings() {
   const shortcutKeys = () => shortcutKeysFor("global");
   function shortcutValue(target: ShortcutTarget): string {
     if (target === "global") return draft()?.shortcut ?? "";
+    if (target.startsWith("item:"))
+      return draft()?.itemPreferences[target.slice(5)]?.shortcut ?? "";
     return (
       draft()?.categoryShortcuts.find((binding) => binding.mode === target)
         ?.shortcut ?? ""
@@ -283,7 +288,11 @@ export default function Settings() {
       };
       field("itemPreferences", {
         ...value().itemPreferences,
-        [id]: { ...item, shortcut },
+        [id]: {
+          ...item,
+          shortcut,
+          ...(id.startsWith("command:window-") ? { disabled: false } : {}),
+        },
       });
       return;
     }
@@ -876,6 +885,16 @@ export default function Settings() {
                     }}
                   </For>
                 </div>
+                <WindowShortcutPreferences
+                  value={value().itemPreferences}
+                  available={info()?.shortcutsAvailable ?? false}
+                  platform={info()?.platform ?? ""}
+                  preparing={preparing()}
+                  recording={recordingTarget()}
+                  shortcutKeys={(id) => shortcutKeysFor(`item:${id}`)}
+                  onRecord={(id) => void startRecording(`item:${id}`)}
+                  onChange={(next) => field("itemPreferences", next)}
+                />
                 <Toggle
                   label="Start TinyDash when you sign in"
                   hint="Open one launcher process after you sign in."
@@ -978,6 +997,12 @@ export default function Settings() {
                 </Show>
               </Show>
               <Show when={section() === "search"}>
+                <Toggle
+                  label="Show usage-based suggestions"
+                  hint="Show up to six used apps, files, and emoji below pins in All. Usage stays on this device."
+                  checked={value().showSuggestions}
+                  onChange={(next) => field("showSuggestions", next)}
+                />
                 <ItemPreferences
                   value={value().itemPreferences}
                   onChange={(next) => field("itemPreferences", next)}

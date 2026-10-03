@@ -3,6 +3,7 @@ fn main() {
     // Keep this inventory in sync with generate_handler!; acl_tests checks it.
     let manifest = tauri_build::AppManifest::new().commands(&[
         "paste_result",
+        "paste_queue",
         "library_list",
         "library_get",
         "library_save",
@@ -13,6 +14,7 @@ fn main() {
         "utility_capabilities",
         "utility_processes",
         "utility_prepare_process",
+        "utility_prepare_app",
         "utility_confirm_process",
         "utility_cancel_process",
         "utility_color",

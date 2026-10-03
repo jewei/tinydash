@@ -66,6 +66,10 @@ pub struct LibraryItem {
 }
 
 impl LibraryEntry {
+    pub fn inserts_directly(&self) -> bool {
+        self.draft.kind == LibraryKind::Snippet && !self.draft.content.contains("{clipboard}")
+    }
+
     fn item(&self) -> LibraryItem {
         LibraryItem {
             id: self.id.clone(),
@@ -549,6 +553,11 @@ pub async fn library_execute(
     allow_clipboard: bool,
     app: AppHandle,
 ) -> std::result::Result<(), String> {
+    let paste_target = if matches!(action, LibraryAction::Paste) {
+        Some(super::paste::prepare(&app)?)
+    } else {
+        None
+    };
     let worker_app = app.clone();
     let paste = tauri::async_runtime::spawn_blocking(move || -> Result<Option<String>> {
         let app = worker_app;
@@ -611,7 +620,12 @@ pub async fn library_execute(
     .await
     .map_err(|_| "Library task failed".to_owned())??;
     if let Some(text) = paste {
-        super::paste::paste_text(&app, text).await?;
+        super::paste::paste_text(
+            &app,
+            text,
+            paste_target.ok_or("No paste target was captured.")?,
+        )
+        .await?;
     }
     Ok(())
 }
@@ -646,6 +660,19 @@ mod tests {
         settings.item_preferences.get_mut(id).unwrap().disabled = true;
         assert!(check_enabled(&settings, id).is_err());
         assert!(check_enabled(&settings, "library:another").is_ok());
+    }
+
+    #[test]
+    fn direct_insertion_keeps_clipboard_consent_and_quicklink_input_explicit() {
+        let mut entry = LibraryEntry {
+            id: "library:fixture".into(),
+            draft: draft(LibraryKind::Snippet, "Hello {date} at {time}"),
+        };
+        assert!(entry.inserts_directly());
+        entry.draft.content = "Hello {clipboard}".into();
+        assert!(!entry.inserts_directly());
+        entry.draft = draft(LibraryKind::Quicklink, "https://example.com/{query}");
+        assert!(!entry.inserts_directly());
     }
 
     #[test]

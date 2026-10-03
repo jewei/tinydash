@@ -424,6 +424,8 @@ fn generated_ipc_wire_types_match_frontend() {
     macro_rules! register { ($($ty:ty),+ $(,)?) => { $(declaration::<$ty>(&mut types, &config);)+ }; }
     register!(
         Action,
+        paste_queue::PasteQueueAction,
+        paste_queue::PasteQueueStatus,
         crate::appearance::AppearanceChange,
         ActionConfirmation,
         ResultKind,

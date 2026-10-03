@@ -1,4 +1,4 @@
-import { onCleanup, onSettled, Show } from "solid-js";
+import { createEffect, onCleanup, onSettled, Show } from "solid-js";
 
 export default function ConfirmDialog(props: {
   title: string;
@@ -19,6 +19,12 @@ export default function ConfirmDialog(props: {
     dialog.showModal();
     cancel.focus();
   });
+  createEffect(
+    () => props.busy,
+    (busy) => {
+      if (!busy) queueMicrotask(() => cancel?.focus());
+    },
+  );
   onCleanup(() => {
     dialog.close();
     if (previousFocus instanceof HTMLElement && previousFocus.isConnected)

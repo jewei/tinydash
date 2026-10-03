@@ -12,6 +12,18 @@ The actions menu can edit a copy, combine selected entries in a chosen order wit
 
 History is local plain text in the same SQLite database as usage. It is not encrypted. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
 
+## Text paste queue
+
+Select a text history result, open Actions, and choose **Create paste queue**. Select entries in the required order, then choose **Queue entries**. Selection is limited to the current result list. The backend accepts at most 100 distinct text entry IDs. Starting a queue does not paste anything and does not replace an active queue.
+
+The queue bar shows the next position and an optional text preview. **Paste next** inserts one entry into the previous app. **Skip entry** advances without copying or pasting. **Cancel queue** releases the queue. After the last entry, the queue shows complete and never wraps. Dismiss it or create another queue.
+
+In Settings → Search → Item shortcuts and aliases, assign global shortcuts to **Paste next queued entry**, **Skip queued entry**, and **Cancel paste queue**. A Next shortcut pastes into the app active at that press without opening the launcher. Direct-paste permissions and platform limits apply. Native Wayland has neither these global shortcuts nor direct paste.
+
+The queue keeps only IDs in memory and ends when TinyDash quits. It reads text from live history before dispatch. Deleted or expired entries are skipped; new copies do not change the selected order. Pasting does not promote history entries. A failed dispatch keeps the current entry for an explicit retry. The copied content can remain on the system clipboard after a failure. Successful dispatch does not prove that a destination field accepted the paste. Repeated presses are rejected while a paste is in progress.
+
+Run `bun run verify:browser tests/daily-workflows.spec.ts` for selection order, preview, error recovery, skip, cancellation, completion, and narrow layouts. Run `bun run test:rust -- paste_queue` for ID validation, deletion, limits, and dispatch state. Desktop checks must compare exact inserted bytes in disposable fields, including two rapid shortcut presses, changed focus, a deleted entry, missing permission, and app restart. Browser tests mock these OS effects.
+
 ## Retention, exclusions, and rich history
 
 Settings adds **Retention in days** (0 means no age limit, maximum 3650). Text entries expire by original capture time; copying an old entry does not reset its age. Pins remain exempt. Retention is checked at startup, capture, policy changes, and while the monitor runs. Count limits still apply.

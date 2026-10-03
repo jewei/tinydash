@@ -4,6 +4,10 @@ Open **Actions → Settings**, press **Command+,** on macOS or **Ctrl+,** on Win
 
 Shift + Space is supported for the launcher and category shortcuts. Other shortcuts need Control, Option/Alt, or Command/Windows. An input method or another app can already use the combination. Choose another binding if it interferes with typing. Native Wayland uses a desktop shortcut instead.
 
+**Shortcut → Window placement shortcuts** provides two optional presets: Control + Option/Alt, and Control + Option/Alt + Shift. Each uses Left/Right for half-screen placement, Up for maximize, C for center, and Down for restore. No window shortcuts are assigned by default. Apply a preset, or record individual bindings, then save. Clear window shortcuts removes only these five bindings. Presets replace their bindings and enable their commands while keeping aliases and search visibility.
+
+Window bindings use the existing `itemPreferences` entries for `command:window-left`, `command:window-right`, `command:window-maximize`, `command:window-center`, and `command:window-restore`. They are included in settings exports and also appear under **Search → Item shortcuts and aliases**. Recording a window shortcut enables its command. Rust checks duplicates against launch, category, and other active item shortcuts before saving. If OS registration fails, the previous bindings and saved settings are retained. Some desktop-reserved keys cannot be detected by registration; change the binding if the desktop intercepts it.
+
 Settings includes Shortcut, Appearance, Categories, Search, Clipboard history, File search, Currency, Privacy, and About. Save changes to apply visible categories, window behaviour, clipboard limits, file folders, file watching, and currency updates while TinyDash runs. Appearance applies immediately and stays in sync between windows. Closing Settings keeps an unfinished form. Use Discard to restore saved values.
 
 Appearance provides Light, Dark, Sage, Rose, and Ink themes. Use Compact layout with any theme. These choices persist between sessions and are included in settings exports. An older Compact appearance becomes Light with Compact enabled. On macOS, Follow macOS Liquid Glass is on by default. Turn it off in Appearance for a solid theme background. The choice saves immediately and is included in settings exports. When it is on, macOS 26 or later uses native Liquid Glass. macOS controls the glass blur and transparency. On macOS 27, adjust the Liquid Glass slider in System Settings, Appearance. Reduce transparency also applies. Other platforms and earlier macOS versions use solid theme backgrounds.
@@ -38,6 +42,8 @@ This partial example leaves clipboard capture off. Fresh installations ask for c
 ```
 
 Set `clearQueryOnOpen` to `false` to keep the previous query and search mode. TinyDash selects that text when the window opens. With the default setting, it clears the query and selects the first visible category, which is All by default. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Use the settings screen to apply shortcut changes at once. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
+
+`showSuggestions` defaults to `true`. Turn off **Show usage-based suggestions** in Search settings to remove the six-item usage list from empty All. Pins and ordinary search ranking remain available. This choice is included in settings exports.
 
 On macOS, a saved `CommandOrControl+Shift+Space` value from earlier TinyDash versions now uses `Control+Shift+Space`. This compatibility rule keeps the settings file intact, including other user settings. Other custom shortcuts remain unchanged. New settings files contain `Control+Shift+Space`.
 

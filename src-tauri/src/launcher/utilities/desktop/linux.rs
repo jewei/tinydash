@@ -10,6 +10,17 @@ impl WindowTarget {
     pub fn label(&self) -> String {
         format!("{} (window {})", self.identity.name, self.id)
     }
+    pub fn same_window(&self, other: &Self) -> bool {
+        self.id == other.id && self.identity == other.identity
+    }
+    pub fn is_focused(&self) -> UtilityResult<bool> {
+        x11()?;
+        let id: u64 = run("xdotool", &["getactivewindow"])?
+            .trim()
+            .parse()
+            .map_err(|_| "Invalid active window")?;
+        Ok(id == self.id)
+    }
 }
 fn x11() -> UtilityResult<()> {
     effects_allowed()?;
@@ -66,7 +77,11 @@ pub fn capture_target(id: u64) -> UtilityResult<WindowTarget> {
         },
     })
 }
-pub fn window(target: &WindowTarget, action: WindowAction) -> UtilityResult<()> {
+pub fn window(
+    target: &WindowTarget,
+    action: WindowAction,
+    require_focus: bool,
+) -> UtilityResult<()> {
     x11()?;
     super::super::process::validate(&target.identity)?;
     let id = target.id.to_string();
@@ -106,6 +121,9 @@ pub fn window(target: &WindowTarget, action: WindowAction) -> UtilityResult<()> 
         action,
     );
     let hex = format!("0x{:x}", target.id);
+    if require_focus && !target.is_focused()? {
+        return Err("Focus changed. No window placement was requested.".into());
+    }
     run(
         "wmctrl",
         &["-ir", &hex, "-b", "remove,maximized_vert,maximized_horz"],

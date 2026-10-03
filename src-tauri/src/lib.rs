@@ -123,6 +123,7 @@ pub fn run() -> anyhow::Result<()> {
         .manage(launcher::startup::Startup(std::sync::Mutex::new(request)))
         .manage(launcher::updates::UpdateState::default())
         .manage(launcher::paste::PasteState::default())
+        .manage(launcher::paste_queue::PasteQueueState::default())
         .manage(launcher::utilities::UtilitiesState::default())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             match launcher::startup::LaunchRequest::parse(args.into_iter().skip(1)) {
@@ -169,6 +170,15 @@ pub fn run() -> anyhow::Result<()> {
                         } else if let Some(binding) = settings.category_shortcuts.iter().find(|binding| matches(&binding.shortcut)) {
                             window::show_category(app, binding.mode)
                         } else if let Some((id, _)) = settings.item_preferences.iter().find(|(_, item)| !item.disabled && !item.shortcut.is_empty() && matches(&item.shortcut)) {
+                            if let Some(action) = launcher::commands::window_action(id) {
+                                launcher::utilities::window_placement::shortcut(app, action);
+                                return;
+                            }
+                            // Capture at the key press, before any asynchronous
+                            // metadata or template work can outlive the foreground app.
+                            if id.starts_with("library:") || id == "command:paste-next" {
+                                launcher::paste::remember(app);
+                            }
                             let app = app.clone();
                             let id = id.clone();
                             tauri::async_runtime::spawn(async move {
@@ -245,6 +255,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::preferences::get_settings,
             launcher::commands::item_catalog,
             launcher::paste::paste_result,
+            launcher::paste_queue::paste_queue,
             launcher::library::library_list,
             launcher::library::library_get,
             launcher::library::library_save,
@@ -255,6 +266,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::utilities::utility_capabilities,
             launcher::utilities::utility_processes,
             launcher::utilities::utility_prepare_process,
+            launcher::utilities::utility_prepare_app,
             launcher::utilities::utility_confirm_process,
             launcher::utilities::utility_cancel_process,
             launcher::utilities::utility_color,

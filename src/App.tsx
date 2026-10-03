@@ -28,7 +28,9 @@ import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
 import ResultPreview from "./components/ResultPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
+import AppQuitDialog from "./components/AppQuitDialog";
 import ClipboardCopyDialog from "./components/ClipboardCopyDialog";
+import PasteQueueIndicator from "./components/PasteQueueIndicator";
 import WelcomeSuggestions from "./components/WelcomeSuggestions";
 import LibraryPanel from "./components/LibraryPanel";
 import RichClipboardHistory from "./components/RichClipboardHistory";
@@ -157,13 +159,18 @@ export default function App(
   }
   const [menuFilter, setMenuFilter] = createSignal("");
   const [clipboardTool, setClipboardTool] = createSignal<{
-    mode: "edit" | "combine";
+    mode: "edit" | "combine" | "queue";
     entry: SearchResult;
     entries: SearchResult[];
   }>();
   const [clearOpen, setClearOpen] = createSignal(false);
   const [keepPins, setKeepPins] = createSignal(true);
   const [pendingAction, setPendingAction] = createSignal<SearchResult>();
+  const [appQuit, setAppQuit] = createSignal<{
+    id: string;
+    title: string;
+    force: boolean;
+  }>();
   let input!: HTMLInputElement;
   let menu: HTMLDivElement | undefined;
   let menuInput: HTMLInputElement | undefined;
@@ -198,7 +205,21 @@ export default function App(
       }));
   });
   const groupLabel = (result: SearchResult) =>
-    !query().trim() && isPinned(result) ? "Pinned" : groupLabels[result.kind];
+    !query().trim() && isPinned(result)
+      ? "Pinned"
+      : !query().trim() && mode() === "all"
+        ? "Suggestions"
+        : groupLabels[result.kind];
+  const homeCount = () => {
+    const pins = results().filter((result) => isPinned(result)).length;
+    const suggested = results().length - pins;
+    return [
+      pins ? `${pins} pinned` : "",
+      suggested ? `${suggested} suggestion${suggested === 1 ? "" : "s"}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
   const canOpen = () =>
     desktop &&
     visible() &&
@@ -207,7 +228,8 @@ export default function App(
     !pending() &&
     !clearOpen() &&
     !clipboardTool() &&
-    !pendingAction();
+    !pendingAction() &&
+    !appQuit();
   const filePending = () =>
     files().phase === "queued" || files().phase === "scanning";
   const fileActivity = () =>
@@ -223,25 +245,27 @@ export default function App(
     (mode() === "calculator" ? currency().warning : undefined) ??
     info()?.warnings[0]?.message;
   const primaryLabel = () =>
-    current()?.kind === "password"
-      ? "Copy password"
-      : current()?.kind === "timezone"
-        ? current()?.detail?.type === "dateCalculation"
-          ? "Copy date"
-          : "Copy time"
-        : current()?.kind === "cleanedUrl"
-          ? "Copy URL"
-          : current()?.kind === "webSearch"
-            ? "Search web"
-            : current()?.kind === "systemCommand" || mode() === "system"
-              ? "Run command"
-              : current()?.kind === "emoji" || mode() === "emoji"
-                ? "Copy emoji"
-                : current()?.kind === "calculation" || mode() === "calculator"
-                  ? "Copy result"
-                  : current()?.kind === "clipboard" || mode() === "clipboard"
-                    ? "Copy text"
-                    : "Open";
+    current()?.id.startsWith("library:") && current()?.subtitle === "Snippet"
+      ? "Insert snippet"
+      : current()?.kind === "password"
+        ? "Copy password"
+        : current()?.kind === "timezone"
+          ? current()?.detail?.type === "dateCalculation"
+            ? "Copy date"
+            : "Copy time"
+          : current()?.kind === "cleanedUrl"
+            ? "Copy URL"
+            : current()?.kind === "webSearch"
+              ? "Search web"
+              : current()?.kind === "systemCommand" || mode() === "system"
+                ? "Run command"
+                : current()?.kind === "emoji" || mode() === "emoji"
+                  ? "Copy emoji"
+                  : current()?.kind === "calculation" || mode() === "calculator"
+                    ? "Copy result"
+                    : current()?.kind === "clipboard" || mode() === "clipboard"
+                      ? "Copy text"
+                      : "Open";
   const placeholder = () =>
     mode() === "password"
       ? "password 32, passphrase 6, pin 6..."
@@ -321,13 +345,27 @@ export default function App(
         run: () => void togglePin(option.category),
         disabled: !canOpen() || pinBusy(),
       });
-    if (current()?.kind === "app")
+    if (current()?.kind === "app") {
+      for (const force of [false, true])
+        actions.push({
+          label: force ? "Force Quit" : "Quit",
+          icon: "quit",
+          run: () => {
+            const result = current();
+            if (!result || !canOpen()) return;
+            setMenuOpen(false);
+            setError(undefined);
+            setAppQuit({ id: result.id, title: result.title, force });
+          },
+          disabled: !canOpen(),
+        });
       actions.push({
         label: "Hide application",
         icon: "apps",
         run: () => void hideApplication(),
         disabled: !canOpen(),
       });
+    }
     if (current()?.kind === "clipboard") {
       actions.push(
         {
@@ -340,6 +378,12 @@ export default function App(
           label: "Copy selected entries",
           icon: "copy",
           run: () => openClipboardTool("combine"),
+          disabled: !canOpen(),
+        },
+        {
+          label: "Create paste queue",
+          icon: "clipboard",
+          run: () => openClipboardTool("queue"),
           disabled: !canOpen(),
         },
         {
@@ -463,7 +507,7 @@ export default function App(
     }
   }
 
-  function openClipboardTool(tool: "edit" | "combine") {
+  function openClipboardTool(tool: "edit" | "combine" | "queue") {
     const entry = current();
     if (!entry || entry.kind !== "clipboard" || !canOpen()) return;
     setMenuOpen(false);
@@ -787,6 +831,7 @@ export default function App(
     if (composing || event.isComposing || event.keyCode === 229) return;
     if (panel()) return;
     if (clipboardTool()) return;
+    if (appQuit()) return;
     if (clearOpen() || pendingAction()) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -1091,6 +1136,7 @@ export default function App(
             setMenuOpen(false);
             setClearOpen(false);
             setPendingAction(undefined);
+            setAppQuit(undefined);
             setClipboardTool(undefined);
             setError(undefined);
             if (clear === true) {
@@ -1110,6 +1156,7 @@ export default function App(
             }
           }),
           register("launcher-hidden", () => {
+            setAppQuit(undefined);
             clearComposition();
             controller.hidden();
           }),
@@ -1270,6 +1317,7 @@ export default function App(
             </span>
           </nav>
         </header>
+        <PasteQueueIndicator desktop={desktop} onDismiss={focusInput} />
         <Show
           when={desktop && info()?.settings.clipboardHistoryDecided === false}
         >
@@ -1318,7 +1366,9 @@ export default function App(
             </span>
           </div>
         </Show>
-        <Show when={message() && !pendingAction() && !clearOpen()}>
+        <Show
+          when={message() && !pendingAction() && !clearOpen() && !appQuit()}
+        >
           <div class="status-line">
             <span class="error-message" role="alert">
               {message()}
@@ -1650,7 +1700,7 @@ export default function App(
                           : query().trim()
                             ? `${results().length} ${results().length === 1 ? "result" : "results"}`
                             : mode() === "all"
-                              ? `${results().length} pinned`
+                              ? homeCount()
                               : `${total()} installed`}
             </span>
 
@@ -1846,8 +1896,31 @@ export default function App(
               onCopied={() => {
                 closeClipboardTool();
                 void search(query(), true).then(() =>
-                  setNotice("Text copied. Paste it in the target app."),
+                  setNotice(
+                    tool.mode === "queue"
+                      ? "Paste queue ready. Use Next or your assigned shortcut."
+                      : "Text copied. Paste it in the target app.",
+                  ),
                 );
+              }}
+            />
+          )}
+        </Show>
+        <Show when={appQuit()} keyed>
+          {(request) => (
+            <AppQuitDialog
+              {...request}
+              platform={info()?.platform ?? ""}
+              onClose={() => {
+                setAppQuit(undefined);
+                focusInput();
+              }}
+              onRequested={() => {
+                setAppQuit(undefined);
+                setNotice(
+                  `Quit requested for ${request.title}. The app may take time to close.`,
+                );
+                focusInput();
               }}
             />
           )}

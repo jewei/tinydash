@@ -10,6 +10,8 @@ import type {
   SettingsImport,
   SettingsValues,
   UpdateStatus,
+  PasteQueueAction,
+  PasteQueueStatus,
 } from "../src/bridge";
 import { defaultCategories, resultCategories } from "../src/categories";
 
@@ -37,6 +39,10 @@ declare global {
       storageError: string | null;
       warnings: LauncherWarning[];
       usedAppFirst: boolean;
+      suggestions: SearchResult[];
+      pasteQueueIds: string[];
+      pasteQueuePosition: number;
+      rejectPasteQueue: string | null;
       clipboardDeleted: string[];
       clipboardCleared: boolean;
       rejectClear: boolean;
@@ -288,6 +294,7 @@ window.isTauri = true;
 const defaultSettings: SettingsValues = {
   clearQueryOnOpen: true,
   hideOnBlur: true,
+  showSuggestions: true,
   shortcut: "Control+Shift+Space",
   categoryShortcuts: [],
   startAtLogin: false,
@@ -339,6 +346,10 @@ window.__launcherTest = {
   storageError: null,
   warnings: [],
   usedAppFirst: false,
+  suggestions: [],
+  pasteQueueIds: [],
+  pasteQueuePosition: 0,
+  rejectPasteQueue: null,
   clipboardDeleted: [],
   clipboardCleared: false,
   rejectClear: false,
@@ -626,6 +637,47 @@ mockIPC(
       state.copiedSelection = payload as { ids: string[]; separator: string };
       return;
     }
+    if (command === "paste_queue") {
+      const { action, ids } = payload as {
+        action: PasteQueueAction;
+        ids: string[];
+      };
+      if (action !== "status" && state.rejectPasteQueue)
+        throw new Error(state.rejectPasteQueue);
+      if (action === "start") {
+        state.pasteQueueIds = ids;
+        state.pasteQueuePosition = 0;
+      }
+      if (action === "cancel") {
+        state.pasteQueueIds = [];
+        state.pasteQueuePosition = 0;
+      }
+      if (action === "next" || action === "skip") state.pasteQueuePosition++;
+      while (
+        state.pasteQueuePosition < state.pasteQueueIds.length &&
+        (state.clipboardDeleted.includes(
+          state.pasteQueueIds[state.pasteQueuePosition],
+        ) ||
+          state.clipboardCleared)
+      )
+        state.pasteQueuePosition++;
+      const id = state.pasteQueueIds[state.pasteQueuePosition];
+      const status: PasteQueueStatus = {
+        total: state.pasteQueueIds.length,
+        position: state.pasteQueuePosition,
+        next: id
+          ? {
+              id: Number(id.split(":")[1]),
+              content:
+                clips.find((entry) => entry.id === id)?.title ?? "Fixture text",
+              createdAt: 1,
+              lastUsedAt: null,
+            }
+          : null,
+      };
+      if (action !== "status") await emit("paste-queue-changed", status);
+      return status;
+    }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
       // Capture the outcome at dispatch so a held old success can race a
@@ -727,7 +779,11 @@ mockIPC(
                               ? [apps[1], apps[0], ...apps.slice(2)]
                               : apps);
       const described = describePins(
-        mode === "all" && !query.trim() ? [] : results,
+        mode === "all" && !query.trim()
+          ? state.settings.showSuggestions
+            ? state.suggestions
+            : []
+          : results,
         query,
       );
       if (!query.trim()) {

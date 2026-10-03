@@ -3,10 +3,10 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
 #[derive(Default)]
-pub struct PasteState(Mutex<Option<SavedTarget>>);
+pub struct PasteState(Mutex<Option<SavedTarget>>, tauri::async_runtime::Mutex<()>);
 
 #[derive(Clone)]
-struct SavedTarget {
+pub(super) struct SavedTarget {
     id: u64,
     #[cfg(target_os = "macos")]
     application: objc2::rc::Retained<objc2_app_kit::NSRunningApplication>,
@@ -49,13 +49,20 @@ pub fn remember(app: &AppHandle) {
     }
 }
 
-fn target(app: &AppHandle) -> Result<u64, String> {
+pub(super) fn prepare(app: &AppHandle) -> Result<SavedTarget, String> {
     native::available()?;
-    previous_target(app)
+    saved_target(app)
 }
 
 pub fn previous_target(app: &AppHandle) -> Result<u64, String> {
     Ok(saved_target(app)?.id)
+}
+
+/// Capture a foreground identity without changing the saved paste target.
+pub(super) fn foreground_target() -> Result<u64, String> {
+    native::foreground()?
+        .filter(|id| !native::is_self(*id))
+        .ok_or_else(|| "Focus an application other than TinyDash first.".into())
 }
 
 fn saved_target(app: &AppHandle) -> Result<SavedTarget, String> {
@@ -84,8 +91,18 @@ fn validate_target(target: &SavedTarget) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn paste_text(app: &AppHandle, text: String) -> Result<(), String> {
-    target(app)?;
+pub(super) async fn paste_text(
+    app: &AppHandle,
+    text: String,
+    saved: SavedTarget,
+) -> Result<(), String> {
+    let state = app.state::<PasteState>();
+    let _operation = state
+        .1
+        .try_lock()
+        .map_err(|_| "A paste is already in progress. Try again.")?;
+    native::available()?;
+    validate_target(&saved)?;
     if text.len() > 65_536 {
         return Err("Paste text exceeds 64 KiB.".into());
     }
@@ -94,12 +111,11 @@ pub async fn paste_text(app: &AppHandle, text: String) -> Result<(), String> {
     })
     .await
     .map_err(|error| error.to_string())??;
-    paste_current(app).await
+    paste_current(app, saved).await
 }
 
-pub async fn paste_current(app: &AppHandle) -> Result<(), String> {
+async fn paste_current(app: &AppHandle, saved: SavedTarget) -> Result<(), String> {
     native::available()?;
-    let saved = saved_target(app)?;
     let previous = saved.id;
     // A click elsewhere must not send clipboard contents into an unrelated app.
     let active = native::foreground()?;
@@ -131,8 +147,14 @@ pub async fn paste_current(app: &AppHandle) -> Result<(), String> {
             }
             std::thread::sleep(std::time::Duration::from_millis(15));
         }
+        #[cfg(target_os = "windows")]
+        native::wait_for_modifiers()?;
         validate_target(&saved)?;
-        native::send(previous)
+        native::send(previous)?;
+        // Keep another direct paste from replacing the clipboard before the
+        // target handles its key event. Dispatch is not receipt confirmation.
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        Ok(())
     })
     .await
     .map_err(|error| error.to_string())?;
@@ -145,7 +167,7 @@ pub async fn paste_current(app: &AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn paste_result(app: AppHandle, id: String) -> Result<(), String> {
-    target(&app)?;
+    let target = prepare(&app)?;
     let text = {
         let state = app.state::<super::LauncherState>();
         let search = state.search.lock().map_err(|_| "Search is unavailable.")?;
@@ -157,7 +179,7 @@ pub async fn paste_result(app: AppHandle, id: String) -> Result<(), String> {
             _ => return Err("This result cannot be pasted.".into()),
         }
     };
-    paste_text(&app, text).await
+    paste_text(&app, text, target).await
 }
 
 #[cfg(target_os = "macos")]
@@ -270,6 +292,23 @@ mod native {
                 "Windows prevented focus restoration. The content is copied; paste manually."
                     .into(),
             );
+        }
+        Ok(())
+    }
+    pub fn wait_for_modifiers() -> Result<(), String> {
+        // An item hotkey can still be held when insertion reaches this worker.
+        // Windows combines synthetic input with the physical modifier state.
+        let started = std::time::Instant::now();
+        while [VK_CONTROL, VK_SHIFT, VK_MENU, VK_LWIN, VK_RWIN]
+            .iter()
+            .any(|key| unsafe { GetAsyncKeyState(i32::from(*key)) } < 0)
+        {
+            if started.elapsed() >= std::time::Duration::from_millis(750) {
+                return Err(
+                    "Release the shortcut keys, then try again. The content is copied.".into(),
+                );
+            }
+            std::thread::sleep(std::time::Duration::from_millis(15));
         }
         Ok(())
     }

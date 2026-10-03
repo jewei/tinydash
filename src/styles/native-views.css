@@ -6,6 +6,42 @@
   background: var(--color-paper);
 }
 
+.paste-queue {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-body);
+  flex-shrink: 0;
+}
+
+.paste-queue-summary,
+.paste-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.paste-queue-summary {
+  justify-content: space-between;
+}
+
+.paste-queue button {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.paste-queue details {
+  margin-top: var(--space-xs);
+}
+
+.paste-queue pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 96px;
+  overflow: auto;
+}
+
 .native-view-notice {
   padding: var(--space-sm);
   border: 1px solid var(--color-border);

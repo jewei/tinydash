@@ -43,6 +43,7 @@ export const contracts = {
     "itemPreferences": {},
     "shortcut": "Control+Shift+Space",
     "showMenuBarIcon": false,
+    "showSuggestions": true,
     "startAtLogin": false,
     "visibleCategories": [
       "all",
@@ -205,6 +206,7 @@ export const contracts = {
       "itemPreferences": {},
       "shortcut": "Control+Shift+Space",
       "showMenuBarIcon": false,
+      "showSuggestions": true,
       "startAtLogin": false,
       "visibleCategories": [
         "all",
@@ -252,6 +254,7 @@ export const contracts = {
       "itemPreferences": {},
       "shortcut": "Control+Shift+Space",
       "showMenuBarIcon": false,
+      "showSuggestions": true,
       "startAtLogin": false,
       "visibleCategories": [
         "all",
@@ -297,6 +300,7 @@ export const contracts = {
       "itemPreferences": {},
       "shortcut": "Control+Shift+Space",
       "showMenuBarIcon": false,
+      "showSuggestions": true,
       "startAtLogin": false,
       "visibleCategories": [
         "all",
@@ -370,6 +374,28 @@ export const contracts = {
     "message": "Up to date",
     "notes": null,
     "version": null
+  },
+  "pasteQueueActions": [
+    "status",
+    "start",
+    "next",
+    "skip",
+    "cancel"
+  ],
+  "pasteQueueActive": {
+    "next": {
+      "content": "Next text",
+      "createdAt": 1,
+      "id": 42,
+      "lastUsedAt": null
+    },
+    "position": 1,
+    "total": 2
+  },
+  "pasteQueueEmpty": {
+    "next": null,
+    "position": 0,
+    "total": 0
   },
   "response": {
     "currency": {
@@ -540,6 +566,7 @@ export const contracts = {
     "itemPreferences": {},
     "shortcut": "Control+Shift+Space",
     "showMenuBarIcon": false,
+    "showSuggestions": true,
     "startAtLogin": false,
     "visibleCategories": [
       "all",
@@ -591,6 +618,7 @@ export const contracts = {
       "itemPreferences": {},
       "shortcut": "Control+Shift+Space",
       "showMenuBarIcon": false,
+      "showSuggestions": true,
       "startAtLogin": false,
       "visibleCategories": [
         "all",
@@ -633,6 +661,7 @@ export const contracts = {
       "itemPreferences": {},
       "shortcut": "Control+Shift+Space",
       "showMenuBarIcon": false,
+      "showSuggestions": true,
       "startAtLogin": false,
       "visibleCategories": [
         "all",

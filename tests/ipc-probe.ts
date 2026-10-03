@@ -21,6 +21,7 @@ export const ipcBridges = {
   utilityCapabilities: utilities.capabilities,
   utilityProcesses: utilities.processes,
   utilityPrepareProcess: utilities.prepareProcess,
+  utilityPrepareApp: utilities.prepareApp,
   utilityConfirmProcess: utilities.confirmProcess,
   utilityCancelProcess: utilities.cancelProcess,
   utilityColor: utilities.color,
@@ -68,6 +69,7 @@ export async function probeCommands(settings: SettingsValues) {
     appCatalog: backend.appCatalog,
     itemCatalog: backend.itemCatalog,
     paste: () => backend.paste("clipboard:1"),
+    pasteQueue: () => backend.pasteQueue("start", ["clipboard:1"]),
     setAppPreference: () =>
       backend.setAppPreference("app:example", ["alias"], true),
     previewWebSearch: () =>
@@ -129,6 +131,7 @@ export async function probeCommands(settings: SettingsValues) {
         { pid: 123, identity: "fixture", name: "Fixture" },
         false,
       ),
+    utilityPrepareApp: () => utilities.prepareApp("app:example", false),
     utilityConfirmProcess: () => utilities.confirmProcess("fixture-token"),
     utilityCancelProcess: utilities.cancelProcess,
     utilityColor: () => utilities.color("#ffffff"),

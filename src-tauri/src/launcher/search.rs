@@ -121,6 +121,7 @@ impl SearchTimings {
 }
 
 pub struct SearchManager {
+    show_suggestions: bool,
     app_preferences: std::collections::BTreeMap<String, crate::settings::AppPreference>,
     apps: AppProvider,
     item_preferences: std::collections::BTreeMap<String, crate::settings::ItemPreference>,
@@ -147,6 +148,7 @@ pub struct SearchOutcome {
 impl Default for SearchManager {
     fn default() -> Self {
         Self {
+            show_suggestions: true,
             app_preferences: Default::default(),
             apps: AppProvider::default(),
             item_preferences: Default::default(),
@@ -169,6 +171,7 @@ impl Default for SearchManager {
 
 impl SearchManager {
     pub fn apply_settings(&mut self, settings: &crate::settings::Settings) {
+        self.show_suggestions = settings.show_suggestions;
         self.app_preferences = settings.app_preferences.clone();
         self.item_preferences = settings.item_preferences.clone();
         for (id, item) in &self.item_preferences {
@@ -484,6 +487,11 @@ impl SearchManager {
             });
         }
         let mut outcome = self.search_unpinned(&query, budget);
+        // Empty search still ends active tool queries (including password
+        // generation). Suggestions replace only its result list.
+        if query.mode == SearchMode::All && query.text.is_empty() {
+            outcome.results = self.suggestions(budget);
+        }
         if budget.stopped() {
             return Ok(outcome);
         }
@@ -619,6 +627,60 @@ impl SearchManager {
             self.issued_pins.pop_front();
         }
         Ok(outcome)
+    }
+
+    fn suggestions(&mut self, budget: &SearchBudget) -> Vec<SearchResult> {
+        if !self.show_suggestions {
+            return Vec::new();
+        }
+        let now = ranking::now();
+        let mut candidates = Vec::with_capacity(7);
+        for (id, usage) in &self.usage {
+            if budget.stopped() {
+                return Vec::new();
+            }
+            // Never suggest private clipboard content, generated values, or power actions.
+            if usage.count > 0
+                && ((id.starts_with("app:") && self.apps.get(id).is_some())
+                    || (id.starts_with("file:") && self.files.get(id).is_some())
+                    || (id.starts_with("emoji:") && EmojiProvider::copy_value(id).is_some()))
+                && !self
+                    .pins
+                    .get(&SearchMode::All)
+                    .is_some_and(|pins| pins.contains(id))
+                && !self
+                    .item_preferences
+                    .get(id)
+                    .is_some_and(|item| item.hidden || item.disabled)
+            {
+                candidates.push((
+                    id,
+                    ranking::score_with_usage(0, id, &self.usage, now),
+                    usage.last_used_at,
+                ));
+                candidates.sort_by(|a, b| {
+                    b.1.cmp(&a.1)
+                        .then_with(|| b.2.cmp(&a.2))
+                        .then_with(|| a.0.cmp(b.0))
+                });
+                candidates.truncate(6);
+            }
+        }
+        let candidates: Vec<_> = candidates
+            .into_iter()
+            .map(|(id, score, _)| (id.clone(), score))
+            .collect();
+        let mut results = Vec::new();
+        for (id, score) in candidates {
+            if budget.stopped() || results.len() == 6 {
+                break;
+            }
+            if let Some(mut result) = self.pinned_result(&id, budget) {
+                result.score = score;
+                results.push(result);
+            }
+        }
+        results
     }
 
     fn search_unpinned(&mut self, query: &Query<'_>, budget: &SearchBudget) -> SearchOutcome {
@@ -1439,6 +1501,105 @@ mod tests {
             AppEntry::new("Notes!".into(), "/apps/notes.app".into(), vec![]),
         ]));
         manager
+    }
+
+    #[test]
+    fn suggestions_use_usage_keep_pins_first_and_reject_private_or_hidden_items() {
+        let mut manager = manager();
+        let now = ranking::now();
+        for id in [
+            "app:/apps/Code.app",
+            "app:/apps/cafe.app",
+            "app:/apps/vscode.app",
+            "clipboard:1",
+            "system:restart",
+            "app:/gone",
+        ] {
+            manager.record_usage(id, now);
+        }
+        manager.record_usage("emoji:🚀", now);
+        manager.record_usage("emoji:🚀", now);
+        manager.set_pinned("app:/apps/Code.app", SearchMode::All, true);
+        let mut settings = crate::settings::Settings::default();
+        settings.app_preferences.insert(
+            "app:/apps/cafe.app".into(),
+            crate::settings::AppPreference {
+                hidden: true,
+                ..Default::default()
+            },
+        );
+        manager.apply_settings(&settings);
+        let results = manager.search("", SearchMode::All).unwrap().results;
+        let ids: Vec<_> = results.iter().map(|result| result.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            ["app:/apps/Code.app", "emoji:🚀", "app:/apps/vscode.app"]
+        );
+        assert!(manager.resolve_action(&results[1].id, Action::Copy).is_ok());
+        settings.show_suggestions = false;
+        manager.apply_settings(&settings);
+        assert_eq!(
+            manager.search("", SearchMode::All).unwrap().results.len(),
+            1
+        );
+        assert!(
+            !manager
+                .search("rocket", SearchMode::All)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn suggestions_are_bounded_deterministic_and_restore_from_saved_usage() {
+        let mut manager = SearchManager::default();
+        let entries: Vec<_> = (0..20)
+            .map(|i| {
+                AppEntry::new(
+                    format!("App {i:02}"),
+                    format!("/apps/{i:02}").into(),
+                    vec![],
+                )
+            })
+            .collect();
+        manager.replace_apps(AppProvider::new(entries.clone()));
+        let now = ranking::now();
+        let usage: HashMap<_, _> = entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry.id.clone(),
+                    ranking::Usage {
+                        count: 1,
+                        last_used_at: now,
+                    },
+                )
+            })
+            .collect();
+        manager.set_usage(usage.clone());
+        let first: Vec<_> = manager
+            .search("", SearchMode::All)
+            .unwrap()
+            .results
+            .into_iter()
+            .map(|result| result.id)
+            .collect();
+        assert_eq!(first.len(), 6);
+        assert_eq!(first[0], "app:/apps/00");
+        let mut restored = SearchManager::default();
+        restored.replace_apps(AppProvider::new(entries));
+        restored.set_usage(usage);
+        assert_eq!(
+            first,
+            restored
+                .search("", SearchMode::All)
+                .unwrap()
+                .results
+                .into_iter()
+                .map(|result| result.id)
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]

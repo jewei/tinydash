@@ -1,4 +1,6 @@
 //! Built-in utilities. Integration and lifecycle requirements: docs/reference/features/utilities.md.
+#[path = "utilities/app_process.rs"]
+mod app_process;
 #[path = "utilities/awake.rs"]
 pub(super) mod awake;
 #[path = "utilities/color.rs"]
@@ -7,6 +9,8 @@ pub(super) mod color;
 mod desktop;
 #[path = "utilities/process.rs"]
 pub(super) mod process;
+#[path = "utilities/window_placement.rs"]
+pub(crate) mod window_placement;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -21,6 +25,7 @@ pub struct UtilitiesState {
     confirmation: Mutex<Option<PendingProcess>>,
     awake: Mutex<Option<awake::Session>>,
     window: Mutex<Option<desktop::WindowTarget>>,
+    placements: window_placement::State,
 }
 
 struct PendingProcess {
@@ -28,6 +33,7 @@ struct PendingProcess {
     process: process::ProcessInfo,
     force: bool,
     expires: Instant,
+    app_target: Option<app_process::Target>,
 }
 
 impl UtilitiesState {
@@ -39,6 +45,7 @@ impl UtilitiesState {
         if let Ok(mut confirmation) = self.confirmation.lock() {
             confirmation.take();
         }
+        self.placements.clear();
     }
 }
 
@@ -89,6 +96,35 @@ pub async fn utility_prepare_process(
     force: bool,
 ) -> std::result::Result<ProcessConfirmation, String> {
     let current = blocking(move || process::validate(&process)).await?;
+    prepare_confirmation(&state, current, force, None)
+}
+
+#[tauri::command]
+pub async fn utility_prepare_app(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, UtilitiesState>,
+    id: String,
+    force: bool,
+) -> std::result::Result<ProcessConfirmation, String> {
+    use tauri::Manager;
+    // Resolve only catalog IDs. No paths or process IDs come from the WebView.
+    let entry = app
+        .state::<super::LauncherState>()
+        .search
+        .lock()
+        .map_err(|_| "Search is unavailable")?
+        .app(&id)
+        .map_err(|error| error.to_string())?;
+    let (current, target) = blocking(move || app_process::resolve(&entry)).await?;
+    prepare_confirmation(&state, current, force, Some(target))
+}
+
+fn prepare_confirmation(
+    state: &UtilitiesState,
+    current: process::ProcessInfo,
+    force: bool,
+    app_target: Option<app_process::Target>,
+) -> UtilityResult<ProcessConfirmation> {
     let mut bytes = [0u8; 24];
     getrandom::fill(&mut bytes).map_err(|e| e.to_string())?;
     let token: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
@@ -100,6 +136,7 @@ pub async fn utility_prepare_process(
         process: current.clone(),
         force,
         expires: Instant::now() + Duration::from_secs(30),
+        app_target,
     });
     Ok(ProcessConfirmation {
         token,
@@ -137,7 +174,11 @@ pub async fn utility_confirm_process(
         &token,
         confirmed,
     )?;
-    blocking(move || process::terminate(&request.process, request.force)).await
+    blocking(move || match request.app_target {
+        Some(target) => app_process::terminate(&target, &request.process, request.force),
+        None => process::terminate(&request.process, request.force),
+    })
+    .await
 }
 
 #[tauri::command]
@@ -305,11 +346,11 @@ pub async fn utility_window(
         .clone()
         .ok_or("Capture a target window first")?;
     #[cfg(target_os = "macos")]
-    return blocking(move || desktop::window(&app, &target, action)).await;
+    return blocking(move || desktop::window(&app, &target, action, false)).await;
     #[cfg(not(target_os = "macos"))]
     {
         let _ = app;
-        blocking(move || desktop::window(&target, action)).await
+        blocking(move || desktop::window(&target, action, false)).await
     }
 }
 
@@ -400,6 +441,7 @@ mod tests {
             },
             force: true,
             expires: Instant::now() + Duration::from_secs(30),
+            app_target: None,
         })
     }
     #[test]

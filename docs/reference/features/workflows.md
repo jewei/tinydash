@@ -1,6 +1,6 @@
 # Quicklinks, snippets, and direct paste
 
-Open **Actions → Quicklinks and snippets**, or search for **Quicklinks** or **Snippets** in All or System. Saved item names and keywords also appear in All. Library results open the item, so arguments and clipboard use remain explicit.
+Open **Actions → Quicklinks and snippets**, or search for **Quicklinks** or **Snippets** in All or System. Saved item names and keywords also appear in All. Selecting a snippet without `{clipboard}` inserts it into the previous app. Its assigned item shortcut inserts it into the active app without opening the launcher. Snippets with `{clipboard}` open the item for consent. Quicklinks open the item so arguments remain explicit. Use the library to preview, edit, or copy a snippet without inserting it.
 
 Create, edit, search, or delete quicklinks and snippets in the library. Unsaved edits require confirmation before navigation; deleting an item also requires confirmation. While a native view is open, shortcuts that open another view or request a system-action confirmation ask you to close it first, preserving drafts. Data is stored locally in `library.json` in the application data directory. It is plaintext, not a credential vault, and is not included in settings exports. Writes replace the file atomically. A damaged library is preserved and reported without preventing the rest of TinyDash from starting.
 
@@ -19,12 +19,14 @@ The library is limited to 256 items, 32 KiB per template, 16 arguments, 64 KiB r
 For a copyable result, choose **Paste to previous app** in the detail pane or Actions, or press **Command/Ctrl + Shift + Enter**. Enter retains the existing Copy behavior. The backend resolves the result ID, writes secret-marked clipboard text, dismisses the launcher, restores the captured target, verifies focus, and sends a paste chord. It never accepts frontend-supplied executable paths or clipboard content through the result action.
 
 - macOS requires Accessibility permission. A closed previous application is rejected.
-- Windows foreground restrictions and elevated applications may block insertion.
+- Windows waits up to 750 ms for shortcut modifiers to be released before insertion. Foreground restrictions and elevated applications may block insertion.
 - Linux X11 requires `xdotool`; native Wayland reports unsupported. Use Copy and paste manually there.
 
 Failures explain whether to grant permission or paste manually. Once clipboard writing succeeds, failed insertion can leave the copied content on the clipboard. TinyDash does not restore old clipboard contents before the target consumes the new value. Direct paste is an explicit action, not a guarantee that every third-party text field accepts simulated keys.
 
 ## Verification
+
+Run `bun run test:rust -- direct_insertion` for shortcut eligibility and clipboard-consent rules. The existing library tests cover explicit clipboard consent and paste errors. Desktop proof must also bind an item shortcut to a disposable snippet containing `{date}` and `{time}`, insert it into an editable fixture, and compare the exact bytes. Repeat from an All result. A clipboard-dependent snippet must show consent on each invocation; a disabled snippet must not insert. Check missing Accessibility permission, a closed target, changed focus, and Wayland rejection. Native global shortcuts and insertion require separate desktop evidence.
 
 ```sh
 bun run verify:browser tests/library.spec.ts tests/roadmap.spec.ts

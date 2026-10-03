@@ -45,6 +45,12 @@ impl WindowTarget {
     pub fn label(&self) -> String {
         format!("{} (PID {})", self.identity.name, self.identity.pid)
     }
+    pub fn same_window(&self, other: &Self) -> bool {
+        self.id == other.id && self.identity == other.identity
+    }
+    pub fn is_focused(&self) -> UtilityResult<bool> {
+        Ok(unsafe { GetForegroundWindow() } as usize == self.id)
+    }
 }
 pub fn capture_window() -> UtilityResult<WindowTarget> {
     effects_allowed()?;
@@ -76,7 +82,11 @@ pub fn capture_target(id: u64) -> UtilityResult<WindowTarget> {
         },
     })
 }
-pub fn window(target: &WindowTarget, action: WindowAction) -> UtilityResult<()> {
+pub fn window(
+    target: &WindowTarget,
+    action: WindowAction,
+    require_focus: bool,
+) -> UtilityResult<()> {
     effects_allowed()?;
     super::super::process::validate(&target.identity)?;
     let hwnd = target.id as Hwnd;
@@ -107,6 +117,9 @@ pub fn window(target: &WindowTarget, action: WindowAction) -> UtilityResult<()> 
         },
         action,
     );
+    if require_focus && !target.is_focused()? {
+        return Err("Focus changed. No window placement was requested.".into());
+    }
     unsafe {
         ShowWindow(hwnd, 9);
     }

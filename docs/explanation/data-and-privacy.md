@@ -12,6 +12,8 @@ Successful app launches, file opens, emoji copies, and accepted system commands 
 
 The frequency bonus is 25 points per use, up to 500 points. The recency bonus starts at 500 points and decreases with the number of days since the last use. Their combined limit is 1,000 points, compared with 10,000 for an exact match and 2,000 for a prefix match. Results with equal scores in the same category retain their existing order.
 
+Empty All uses these same usage records to suggest at most six apps, files, and emoji below pins. Suggestions are ordered by usage bonus, then last-use time, then item ID. Hidden, disabled, missing, and All-pinned items are excluded. Clipboard entries and system commands are not suggested. Turn off **Show usage-based suggestions** in Search settings to hide this list; saved usage still affects ordinary search.
+
 TinyDash stores `result_id`, `use_count`, and `last_used_at` in `tinydash.sqlite3`:
 
 | Platform | Default database location                                                                                           |

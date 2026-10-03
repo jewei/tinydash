@@ -6,6 +6,7 @@ identifier = "launcher"
 description = "Search, result actions, launcher controls, and the launcher's narrow preference actions."
 permissions = [
   "allow-paste-result",
+  "allow-paste-queue",
   "allow-library-list",
   "allow-library-get",
   "allow-library-save",
@@ -16,6 +17,7 @@ permissions = [
   "allow-utility-capabilities",
   "allow-utility-processes",
   "allow-utility-prepare-process",
+  "allow-utility-prepare-app",
   "allow-utility-confirm-process",
   "allow-utility-cancel-process",
   "allow-utility-color",
