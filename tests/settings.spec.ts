@@ -20,6 +20,114 @@ async function openSettings(page: Page) {
   await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
 }
 
+test("menu bar icon defaults off and saves both choices across reloads", async ({
+  page,
+}) => {
+  await openSettings(page);
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(toggle).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await expect(
+    page.getByText(
+      "The global shortcut remains available when the icon is hidden.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await toggle.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: test.info().outputPath("settings-menu-bar-icon.png"),
+  });
+
+  await toggle.check();
+  await expect(save).toBeEnabled();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(false);
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "save_settings",
+      ),
+    ),
+  ).toHaveLength(0);
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(true);
+  await page.reload();
+  await expect(toggle).toBeChecked();
+  await expect(save).toBeDisabled();
+
+  await toggle.uncheck();
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(toggle).not.toBeChecked();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(false);
+});
+
+test("menu bar icon supports discard and preserves the draft after a failed save", async ({
+  page,
+}) => {
+  await openSettings(page);
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  const save = page.getByRole("button", { name: "Save changes" });
+  const discard = page.getByRole("button", { name: "Discard", exact: true });
+  await toggle.check();
+  await discard.click();
+  await expect(toggle).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "save_settings",
+      ),
+    ),
+  ).toHaveLength(0);
+
+  await toggle.check();
+  await page.evaluate(() => {
+    window.__launcherTest.rejectSettings = "Could not save settings.";
+  });
+  await save.click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Could not save settings",
+  );
+  await expect(toggle).toBeChecked();
+  await expect(save).toBeEnabled();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(false);
+  await page.evaluate(() => {
+    window.__launcherTest.rejectSettings = null;
+  });
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await toggle.uncheck();
+  await discard.click();
+  await expect(toggle).toBeChecked();
+  await expect(save).toBeDisabled();
+  await page.reload();
+  await expect(toggle).toBeChecked();
+});
+
+for (const platform of ["windows", "linux"]) {
+  test(`menu bar icon switch is hidden on ${platform}`, async ({ page }) => {
+    await page.addInitScript(
+      (value) => localStorage.setItem("tinydash.test.platform", value),
+      platform,
+    );
+    await openSettings(page);
+    await expect(
+      page.getByRole("switch", { name: "Show menu bar icon" }),
+    ).toHaveCount(0);
+  });
+}
+
 test("five themes keep Compact independent and export both saved choices", async ({
   page,
 }) => {
@@ -922,4 +1030,58 @@ test("clears unpinned clipboard entries separately and keeps pinned entries", as
   expect(
     await page.evaluate(() => window.__launcherTest.calls.at(-1)?.payload),
   ).toEqual({ keepPinned: true });
+});
+
+test("settings keep save controls and all sections reachable in a short window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 720, height: 550 });
+  await openSettings(page);
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "About", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "About", exact: true }),
+  ).toBeVisible();
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "Shortcut", exact: true }).click();
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  await toggle.check();
+  await expect(save).toBeInViewport();
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+});
+
+test("narrow settings search shows matching sections and preserves the draft", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 600 });
+  await openSettings(page);
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  await toggle.check();
+  const search = page.getByRole("searchbox", { name: "Search settings" });
+  await search.fill("clipboard");
+  const match = page.getByRole("button", {
+    name: "Clipboard history",
+    exact: true,
+  });
+  await expect(match).toBeVisible();
+  await match.click();
+  await expect(
+    page.getByRole("heading", { name: "Clipboard history", exact: true }),
+  ).toBeVisible();
+  await search.fill("no-such-section");
+  await expect(
+    page.getByRole("status").filter({ hasText: "No matching settings." }),
+  ).toBeVisible();
+  await search.fill("");
+  await page
+    .getByRole("combobox", { name: "Settings section" })
+    .selectOption("shortcut");
+  await expect(toggle).toBeChecked();
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(save).toBeEnabled();
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(toggle).not.toBeChecked();
 });

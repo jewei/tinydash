@@ -10,6 +10,8 @@ import type {
   SettingsImport,
   SettingsValues,
   UpdateStatus,
+  PasteQueueAction,
+  PasteQueueStatus,
 } from "../src/bridge";
 import { defaultCategories, resultCategories } from "../src/categories";
 
@@ -37,6 +39,10 @@ declare global {
       storageError: string | null;
       warnings: LauncherWarning[];
       usedAppFirst: boolean;
+      suggestions: SearchResult[];
+      pasteQueueIds: string[];
+      pasteQueuePosition: number;
+      rejectPasteQueue: string | null;
       clipboardDeleted: string[];
       clipboardCleared: boolean;
       rejectClear: boolean;
@@ -288,18 +294,29 @@ window.isTauri = true;
 const defaultSettings: SettingsValues = {
   clearQueryOnOpen: true,
   hideOnBlur: true,
+  showSuggestions: true,
+  emojiSkinTone: 0,
+  emojiLanguages: [],
   shortcut: "Control+Shift+Space",
   categoryShortcuts: [],
   startAtLogin: false,
+  showMenuBarIcon: false,
   appPreferences: {},
   webSearches: [],
+  itemPreferences: {},
   clipboardHistoryEnabled: true,
   clipboardHistoryDecided: true,
   clipboardHistoryLimit: 100,
+  clipboardRetentionDays: 0,
+  clipboardExcludedApps: [],
+  clipboardCaptureImages: false,
+  clipboardCaptureFiles: false,
   fileSearchRoots: null,
   fileSearchLimit: 50000,
   fileSearchExcludedDirs: ["node_modules", "target"],
   fileWatchEnabled: true,
+  fileSearchIncludeHidden: false,
+  fileSearchIgnorePatterns: [],
   currencyRatesEnabled: true,
   visibleCategories: [...defaultCategories],
 };
@@ -313,7 +330,9 @@ window.__launcherTest = {
   holdNativeGlass: false,
   platform:
     (localStorage.getItem("tinydash.test.platform") as
-      "macos" | "windows" | "linux") ?? "macos",
+      | "macos"
+      | "windows"
+      | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
   rejectReady: localStorage.getItem("tinydash.test.rejectReady"),
   rejectSearch: null,
@@ -329,6 +348,10 @@ window.__launcherTest = {
   storageError: null,
   warnings: [],
   usedAppFirst: false,
+  suggestions: [],
+  pasteQueueIds: [],
+  pasteQueuePosition: 0,
+  rejectPasteQueue: null,
   clipboardDeleted: [],
   clipboardCleared: false,
   rejectClear: false,
@@ -540,6 +563,30 @@ mockIPC(
       );
       return state.settings;
     }
+    if (command === "rich_clipboard_history")
+      return {
+        entries: [],
+        captureSupported: true,
+        supportNotice: "Native rich capture is supported on macOS.",
+        storageNotice:
+          "0 entries (maximum 32) · 0 of 16777216 bytes · 0 pinned.",
+      };
+    if (command === "utility_awake_status")
+      return { active: false, endsAt: null, remainingSeconds: 0 };
+    if (command === "drag_result" || command === "share_result")
+      throw new Error(
+        "Native file transfers are unavailable in the browser preview.",
+      );
+    if (command === "utility_processes" || command === "library_list")
+      return [];
+    if (command === "utility_capabilities")
+      return {
+        processes: "Available",
+        eyedropper: "Unavailable",
+        awake: "Available",
+        media: "Available",
+        windows: "Available",
+      };
     if (command === "refresh_files") {
       if (state.filePhase !== "disabled" && state.filePhase !== "scanning")
         state.filePhase = "queued";
@@ -547,6 +594,7 @@ mockIPC(
       return;
     }
     if (command === "app_catalog") return apps;
+    if (command === "item_catalog") return [...apps, ...systemCommands];
     if (command === "set_app_preference") {
       const { id, aliases, hidden } = payload as {
         id: string;
@@ -596,6 +644,47 @@ mockIPC(
       if (state.rejectClipboardCopy) throw new Error(state.rejectClipboardCopy);
       state.copiedSelection = payload as { ids: string[]; separator: string };
       return;
+    }
+    if (command === "paste_queue") {
+      const { action, ids } = payload as {
+        action: PasteQueueAction;
+        ids: string[];
+      };
+      if (action !== "status" && state.rejectPasteQueue)
+        throw new Error(state.rejectPasteQueue);
+      if (action === "start") {
+        state.pasteQueueIds = ids;
+        state.pasteQueuePosition = 0;
+      }
+      if (action === "cancel") {
+        state.pasteQueueIds = [];
+        state.pasteQueuePosition = 0;
+      }
+      if (action === "next" || action === "skip") state.pasteQueuePosition++;
+      while (
+        state.pasteQueuePosition < state.pasteQueueIds.length &&
+        (state.clipboardDeleted.includes(
+          state.pasteQueueIds[state.pasteQueuePosition],
+        ) ||
+          state.clipboardCleared)
+      )
+        state.pasteQueuePosition++;
+      const id = state.pasteQueueIds[state.pasteQueuePosition];
+      const status: PasteQueueStatus = {
+        total: state.pasteQueueIds.length,
+        position: state.pasteQueuePosition,
+        next: id
+          ? {
+              id: Number(id.split(":")[1]),
+              content:
+                clips.find((entry) => entry.id === id)?.title ?? "Fixture text",
+              createdAt: 1,
+              lastUsedAt: null,
+            }
+          : null,
+      };
+      if (action !== "status") await emit("paste-queue-changed", status);
+      return status;
     }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
@@ -698,7 +787,11 @@ mockIPC(
                               ? [apps[1], apps[0], ...apps.slice(2)]
                               : apps);
       const described = describePins(
-        mode === "all" && !query.trim() ? [] : results,
+        mode === "all" && !query.trim()
+          ? state.settings.showSuggestions
+            ? state.suggestions
+            : []
+          : results,
         query,
       );
       if (!query.trim()) {

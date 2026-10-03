@@ -11,14 +11,15 @@ name = "tinydash_lib"
 crate-type = ["lib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.3", features = [] }
+tauri-build = { version = "=3.0.0-alpha.2", features = [] }
 
 [dependencies]
-tauri = { version = "2.11.5", features = ["tray-icon", "macos-private-api"] }
-tauri-plugin-global-shortcut = "2.3.2"
-tauri-plugin-opener = "2.5.5"
-tauri-plugin-single-instance = "2.4.4"
-tauri-plugin-clipboard-manager = "2.3.3"
+tauri = { version = "=3.0.0-alpha.3", features = ["tray-icon", "macos-private-api"] }
+tauri-runtime-wry = { version = "=3.0.0-alpha.3", features = ["macos-private-api"] }
+tauri-plugin-global-shortcut = "=3.0.0-alpha.1"
+tauri-plugin-opener = "=3.0.0-alpha.1"
+tauri-plugin-single-instance = "=3.0.0-alpha.1"
+tauri-plugin-clipboard-manager = "=3.0.0-alpha.1"
 # The clipboard plugin already uses this version. Its builder adds the
 # platform markers that keep generated passwords out of clipboard history.
 arboard = { version = "3.6.1", features = ["wayland-data-control"] }
@@ -26,49 +27,54 @@ emojis = "0.9.0"
 fend-core = "1.5.8"
 rusqlite = { version = "0.40.2", default-features = false, features = ["bundled", "backup"] }
 tar = "0.4.46"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 nucleo-matcher = "0.3.1"
 unicode-normalization = "0.1.25"
-walkdir = "2.5"
-notify = "8.2.0"
+walkdir = "2.5.0"
+notify = "=9.0.0-rc.5"
 # Reuse the HTTP client already in Tauri's dependency tree and the OS TLS stack.
 reqwest = { version = "0.13.5", default-features = false, features = ["native-tls-no-alpn"] }
-thiserror = "2"
-anyhow = "1"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tempfile = "3"
-getrandom = "0.3.4"
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tempfile = "3.27.0"
+trash = "5.2.9"
+libc = "=1.0.0-alpha.4"
+getrandom = "0.4.3"
 chrono = "0.4.45"
 chrono-tz = "0.10.4"
-url = "2.5"
-zeroize = "1.8"
-tauri-plugin-dialog = "2.7.3"
-tauri-plugin-autostart = "2.5.1"
-tauri-plugin-updater = { version = "2.11.0", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
+url = "2.5.8"
+zeroize = "1.9.0"
+tauri-plugin-dialog = "=3.0.0-alpha.1"
+tauri-plugin-autostart = "=3.0.0-alpha.1"
+tauri-plugin-updater = { version = "=3.0.0-alpha.1", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
 
 [dev-dependencies]
 # Exercise the real IPC authorization path without opening native windows.
-tauri = { version = "2.11.5", features = ["test"] }
+tauri = { version = "=3.0.0-alpha.3", features = ["test"] }
 ts-rs = { version = "12", features = ["no-serde-warnings"] }
 syn = { version = "2", features = ["full", "visit"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 plist = "1.10.1"
-objc2 = "0.6"
+objc2 = "0.6.4"
+block2 = "0.6.2"
 objc2-quartz-core = { version = "0.3.2", default-features = false, features = ["std", "CALayer", "objc2-core-foundation"] }
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard", "NSWorkspace", "NSRunningApplication", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSAppearance", "NSGlassEffectView", "NSResponder", "NSView", "NSWindow", "objc2-quartz-core", "objc2-core-foundation", "objc2-core-graphics"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSColor", "NSColorSampler", "NSColorSpace", "NSScreen", "block2", "NSPasteboard", "NSWorkspace", "NSRunningApplication", "NSSharingService", "NSDragging", "NSDraggingItem", "NSDraggingSession", "NSEvent", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSAppearance", "NSGlassEffectView", "NSResponder", "NSView", "NSWindow", "objc2-quartz-core", "objc2-core-foundation", "objc2-core-graphics"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSDictionary", "NSGeometry", "NSString"] }
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage", "CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation"] }
 objc2-core-services = { version = "0.3.2", default-features = false, features = ["std", "AE", "AEDataModel", "AEMach", "AERegistry"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Shutdown", "Win32_System_Power", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_Security"] }
+windows-collections = "=0.3.2"
+windows = { version = "=0.62.2", features = ["ApplicationModel_DataTransfer", "Foundation", "Storage", "Storage_Streams", "Storage_Search", "Win32_System_WinRT", "Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse"] }
+windows-sys = { version = "0.61.2", features = ["Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Shutdown", "Win32_System_Power", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_Security"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # GIO is used independently for application discovery and D-Bus commands.
-gio = "0.22.9"
+gio = "0.22.10"
 gio-unix = "0.22.8"
 # Tauri requires GTK 0.18. GTK 0.19 conflicts over the native `gtk-3` link.
 gtk = "0.18.2"
@@ -83,3 +89,8 @@ codegen-units = 1
 # https://github.com/rust-lang/rust/issues/157750
 [profile.release.build-override]
 strip = "none"
+
+# Published alpha plugins lack the Manager import required by Tauri alpha.3.
+[patch.crates-io]
+tauri-plugin-dialog = { path = "vendor/tauri-plugin-dialog" }
+tauri-plugin-updater = { path = "vendor/tauri-plugin-updater" }

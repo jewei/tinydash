@@ -72,6 +72,16 @@ impl FileEntry {
     }
 
     pub fn validate(&self) -> Result<()> {
+        // Indexed paths are canonical. Reject a directory replaced by a link
+        // since the scan, not just a symlink at the final filename.
+        for ancestor in Path::new(&self.path).ancestors().skip(1) {
+            if std::fs::symlink_metadata(ancestor)?
+                .file_type()
+                .is_symlink()
+            {
+                return Err(Error::FileNotFound);
+            }
+        }
         let metadata = std::fs::symlink_metadata(&self.path).map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
                 Error::FileNotFound
@@ -317,6 +327,7 @@ pub fn expand_root(path: &Path, home: Option<&Path>) -> Option<PathBuf> {
     }
 }
 
+/// Scan using the original defaults. File contents are never read by the index.
 #[cfg(test)]
 pub fn scan(
     roots: Vec<PathBuf>,
@@ -324,19 +335,182 @@ pub fn scan(
     limit: usize,
     report: &mut ScanReport,
 ) -> FileProvider {
-    scan_cancellable(roots, excluded, limit, report, || false).expect("uncancelled scan")
+    scan_with_rules(roots, excluded, limit, false, &[], report)
 }
 
-/// Scan names and paths only, checking cancellation between traversal steps.
-/// Cancellation discards partial results and skips index preparation. A blocking
-/// OS filesystem call cannot be interrupted; cancellation resumes when it returns.
+const IGNORE_PATTERN_LIMIT: usize = 64;
+const IGNORE_PATTERN_LENGTH: usize = 256;
+const IGNORE_PATH_LENGTH: usize = 4096;
+
+pub fn valid_ignore_patterns(patterns: &[String]) -> bool {
+    patterns.len() <= IGNORE_PATTERN_LIMIT
+        && patterns.iter().all(|pattern| {
+            !pattern.trim().is_empty()
+                && !pattern.chars().any(char::is_control)
+                && IgnorePattern::parse(pattern).is_some()
+        })
+}
+
+#[derive(Clone, Copy)]
+enum GlobToken {
+    Literal(char),
+    Any,
+    Star(bool),
+    Directories,
+}
+
+struct IgnorePattern {
+    tokens: Vec<GlobToken>,
+    basename: bool,
+    directory_only: bool,
+}
+
+impl IgnorePattern {
+    fn parse(value: &str) -> Option<Self> {
+        if value.is_empty()
+            || value.len() > IGNORE_PATTERN_LENGTH
+            || value.contains(['\\', '[', ']', '\0'])
+            || value.starts_with('!')
+        {
+            return None;
+        }
+        let directory_only = value.ends_with('/');
+        let pattern = value.trim_end_matches('/');
+        if pattern.is_empty() {
+            return None;
+        }
+        let basename = !pattern.contains('/');
+        let mut chars = pattern.chars().peekable();
+        let mut tokens = Vec::new();
+        while let Some(ch) = chars.next() {
+            tokens.push(match ch {
+                '*' => {
+                    let recursive = chars.peek() == Some(&'*');
+                    if recursive {
+                        chars.next();
+                    }
+                    if recursive && chars.peek() == Some(&'/') {
+                        chars.next();
+                        GlobToken::Directories
+                    } else {
+                        GlobToken::Star(recursive)
+                    }
+                }
+                '?' => GlobToken::Any,
+                ch => GlobToken::Literal(ch),
+            });
+        }
+        Some(Self {
+            tokens,
+            basename,
+            directory_only,
+        })
+    }
+
+    // Bounded dynamic programming, never recursive/backtracking. Match Unicode
+    // characters, not individual UTF-8 bytes. Patterns use forward slashes.
+    fn matches(&self, relative: &str, name: &str, directory: bool) -> bool {
+        if self.directory_only && !directory {
+            return false;
+        }
+        let value = if self.basename { name } else { relative };
+        if value.len() > IGNORE_PATH_LENGTH {
+            return false;
+        }
+        let chars: Vec<_> = value.chars().collect();
+        let mut previous = vec![false; chars.len() + 1];
+        let mut next = vec![false; chars.len() + 1];
+        previous[0] = true;
+        for token in &self.tokens {
+            next.fill(false);
+            let mut prefix = false;
+            for j in 0..=chars.len() {
+                next[j] = match token {
+                    GlobToken::Literal(ch) => j > 0 && previous[j - 1] && chars[j - 1] == *ch,
+                    GlobToken::Any => j > 0 && previous[j - 1] && chars[j - 1] != '/',
+                    GlobToken::Star(recursive) => {
+                        previous[j] || (j > 0 && next[j - 1] && (*recursive || chars[j - 1] != '/'))
+                    }
+                    GlobToken::Directories => {
+                        previous[j] || (j > 0 && prefix && chars[j - 1] == '/')
+                    }
+                };
+                prefix |= previous[j];
+            }
+            std::mem::swap(&mut previous, &mut next);
+        }
+        previous[chars.len()]
+    }
+}
+
+/// Ignore patterns match basenames or root-relative paths. Supports *, ?, **,
+/// and trailing / for folders; no negation, escaping, or character classes.
+/// An ignored folder is pruned, including its watcher registrations.
+#[cfg(test)]
+pub fn scan_with_rules(
+    roots: Vec<PathBuf>,
+    excluded: &[String],
+    limit: usize,
+    include_hidden: bool,
+    ignore_patterns: &[String],
+    report: &mut ScanReport,
+) -> FileProvider {
+    scan_with_rules_cancellable(
+        roots,
+        excluded,
+        limit,
+        include_hidden,
+        ignore_patterns,
+        report,
+        || false,
+    )
+    .expect("uncancelled scan")
+}
+
+#[cfg(test)]
 pub fn scan_cancellable(
     roots: Vec<PathBuf>,
     excluded: &[String],
     limit: usize,
     report: &mut ScanReport,
+    cancelled: impl FnMut() -> bool,
+) -> Option<FileProvider> {
+    scan_with_rules_cancellable(roots, excluded, limit, false, &[], report, cancelled)
+}
+
+/// Scan names and paths with configured rules and cooperative cancellation.
+pub fn scan_with_rules_cancellable(
+    roots: Vec<PathBuf>,
+    excluded: &[String],
+    limit: usize,
+    include_hidden: bool,
+    ignore_patterns: &[String],
+    report: &mut ScanReport,
     mut cancelled: impl FnMut() -> bool,
 ) -> Option<FileProvider> {
+    if cancelled() {
+        return None;
+    }
+    let patterns: Vec<_> = ignore_patterns
+        .iter()
+        .take(IGNORE_PATTERN_LIMIT)
+        .filter_map(|pattern| {
+            let parsed = IgnorePattern::parse(pattern);
+            if parsed.is_none() {
+                report.issue(
+                    Path::new("fileSearchIgnorePatterns"),
+                    "Invalid ignore pattern: use at most 256 bytes and only *, ?, ** wildcards.",
+                );
+            }
+            parsed
+        })
+        .collect();
+    if ignore_patterns.len() > IGNORE_PATTERN_LIMIT {
+        report.issue(
+            Path::new("fileSearchIgnorePatterns"),
+            "Only the first 64 ignore patterns are used.",
+        );
+    }
     let mut resolved = Vec::new();
     for root in roots {
         if cancelled() {
@@ -410,14 +584,32 @@ pub fn scan_cancellable(
             if cancelled() {
                 return None;
             }
-            let hidden = match platform::file_is_hidden(&entry) {
+            let hidden = match if include_hidden {
+                Ok(false)
+            } else {
+                platform::file_is_hidden(&entry)
+            } {
                 Ok(hidden) => hidden,
                 Err(error) => {
                     report.issue(entry.path(), error);
                     true
                 }
             };
-            if excluded || hidden || entry.file_type().is_symlink() {
+            let ignored = entry
+                .path()
+                .strip_prefix(&root)
+                .ok()
+                .and_then(Path::to_str)
+                .is_some_and(|path| {
+                    #[cfg(target_os = "windows")]
+                    let normalized = path.replace('\\', "/");
+                    #[cfg(target_os = "windows")]
+                    let path = normalized.as_str();
+                    patterns.iter().any(|pattern| {
+                        pattern.matches(path, entry.file_name().to_str().unwrap_or(""), directory)
+                    })
+                });
+            if excluded || hidden || ignored || entry.file_type().is_symlink() {
                 if directory {
                     walk.skip_current_dir();
                 }
@@ -776,6 +968,80 @@ mod tests {
     }
 
     #[test]
+    fn ignore_rules_and_hidden_opt_in_prune_trees_without_changing_defaults() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for name in [
+            ".private/keep.txt",
+            "keep.txt",
+            "root.tmp",
+            "nested/cache.tmp",
+            "nested/keep.txt",
+            "build/keep.txt",
+            "node_modules/keep.txt",
+        ] {
+            write(dir.path(), name, "");
+        }
+        let mut report = ScanReport::default();
+        let files = scan_with_rules(
+            vec![dir.path().into()],
+            &["node_modules".into()],
+            100,
+            true,
+            &["**/*.tmp".into(), "build/".into()],
+            &mut report,
+        );
+        let names: Vec<_> = files
+            .files
+            .iter()
+            .map(|file| file.entry.name.as_str())
+            .collect();
+        assert_eq!(names.len(), 5);
+        assert!(names.contains(&".private"));
+        assert!(!names.contains(&"build"));
+        assert!(!names.contains(&"root.tmp"));
+        assert!(!names.contains(&"cache.tmp"));
+        assert!(
+            report
+                .directories
+                .iter()
+                .all(|path| !path.ends_with("build") && !path.ends_with("node_modules"))
+        );
+        assert!(report.warning().is_none());
+        assert!(
+            scan(
+                vec![dir.path().into()],
+                &[],
+                100,
+                &mut ScanReport::default()
+            )
+            .files
+            .iter()
+            .all(|file| !file.entry.path.contains(".private"))
+        );
+    }
+
+    #[test]
+    fn glob_matching_is_bounded_and_has_explicit_path_semantics() {
+        let matches = |pattern, path: &str, directory| {
+            IgnorePattern::parse(pattern).expect("pattern").matches(
+                path,
+                path.rsplit('/').next().unwrap(),
+                directory,
+            )
+        };
+        assert!(matches("*.txt", "nested/café.txt", false));
+        assert!(matches("caf?.txt", "nested/café.txt", false));
+        assert!(!matches("nested/*.txt", "nested/deeper/a.txt", false));
+        assert!(matches("nested/**/*.txt", "nested/a.txt", false));
+        assert!(matches("nested/**/*.txt", "nested/deeper/a.txt", false));
+        assert!(!matches("build/", "build", false));
+        assert!(matches("build/", "build", true));
+        assert!(IgnorePattern::parse(&"*".repeat(257)).is_none());
+        assert!(IgnorePattern::parse("[abc]").is_none());
+        assert!(!matches("*", &"x".repeat(4097), false));
+    }
+
+    #[test]
     fn folders_are_results_that_open_and_validate_as_folders() {
         let dir = tempfile::tempdir().expect("tempdir");
         write(dir.path(), "Invoices/2026/march.pdf", "");
@@ -960,6 +1226,21 @@ mod tests {
         fs::remove_file(&path).expect("delete");
         symlink(outside.path().join("outside.txt"), &path).expect("replace with link");
         assert!(files.files[0].entry.validate().is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_parent_directory_replaced_by_a_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let path = write(dir.path(), "parent/file.txt", "original")
+            .canonicalize()
+            .unwrap();
+        write(outside.path(), "file.txt", "outside");
+        let entry = FileEntry::new(&path, false).unwrap();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(outside.path(), path.parent().unwrap()).unwrap();
+        assert!(entry.validate().is_err());
     }
 
     #[cfg(unix)]

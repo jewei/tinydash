@@ -31,6 +31,36 @@ fn windows_ipc_test_executable_loads_common_controls_v6() {
 }
 
 const MAIN_ONLY: &[&str] = &[
+    "paste_result",
+    "drag_result",
+    "share_result",
+    "paste_queue",
+    "library_list",
+    "library_get",
+    "library_save",
+    "library_delete",
+    "library_execute",
+    "file_preview",
+    "execute_file_action",
+    "utility_capabilities",
+    "utility_processes",
+    "utility_prepare_process",
+    "utility_prepare_app",
+    "utility_confirm_process",
+    "utility_cancel_process",
+    "utility_color",
+    "utility_copy_color",
+    "utility_eyedropper",
+    "utility_awake_status",
+    "utility_set_awake",
+    "utility_media",
+    "utility_capture_window",
+    "utility_window",
+    "rich_clipboard_history",
+    "rich_clipboard_preview",
+    "copy_rich_clipboard",
+    "delete_rich_clipboard",
+    "set_rich_clipboard_pinned",
     "set_launcher_appearance",
     "launcher_ready",
     "choose_clipboard_history",
@@ -54,7 +84,7 @@ const MAIN_ONLY: &[&str] = &[
 const SETTINGS_ONLY: &[&str] = &[
     "get_settings",
     "save_settings",
-    "app_catalog",
+    "item_catalog",
     "preview_web_search",
     "set_shortcut_recording",
     "reveal_settings_path",
@@ -64,7 +94,7 @@ const SETTINGS_ONLY: &[&str] = &[
     "check_update",
     "install_update",
 ];
-const SHARED: &[&str] = &["clear_clipboard_history", "sync_appearance"];
+const SHARED: &[&str] = &["clear_clipboard_history", "sync_appearance", "app_catalog"];
 
 fn commands() -> Vec<&'static str> {
     MAIN_ONLY
@@ -95,9 +125,9 @@ fn invoke(
             error: CallbackFn(1),
             url: if remote {
                 "https://untrusted.example/"
-            } else if cfg!(windows) {
-                "http://tauri.localhost"
             } else {
+                // Tauri 3's MockRuntime uses this scheme on every OS. Wry's
+                // Windows HTTP mapping belongs to the real desktop checks.
                 "tauri://localhost"
             }
             .parse()

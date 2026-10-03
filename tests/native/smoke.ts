@@ -1090,16 +1090,32 @@ try {
 
   await reopen();
   await selectMode("system");
-  assert.equal((await titles()).length, 10);
-  for (const title of [
-    "Toggle system appearance",
-    "Log out",
-    "Lock screen",
-    "Show desktop",
-    "Toggle mute",
-  ]) {
-    assert((await titles()).includes(title), `System includes ${title}`);
-  }
+  assert.deepEqual(
+    (await titles()).sort(),
+    [
+      "Lock screen",
+      "Sleep",
+      "Restart",
+      "Shut down",
+      "Open system settings",
+      "Toggle system appearance",
+      process.platform === "win32" ? "Empty Recycle Bin" : "Empty Trash",
+      "Log out",
+      "Show desktop",
+      "Toggle mute",
+      "Quicklinks",
+      "Snippets",
+      "Quit a process",
+      "Color picker",
+      "Keep awake",
+      "Media controls",
+      "Window management",
+      "Images and files clipboard",
+    ].sort(),
+  );
+  pass(
+    "System search lists every system action and implemented native command",
+  );
   await keys(inputId, "reboot");
   await until("the system provider resolves the reboot alias", () =>
     observe<boolean>(
@@ -1145,6 +1161,65 @@ try {
   }
   pass(
     "Rust rejects power, logout, and empty-trash IPC requests without explicit confirmation",
+  );
+
+  // Exercise a new command through search and its real panel. The exact system
+  // clipboard value proves the new utility IPC grants and native copy path.
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, "Color picker");
+  await until(
+    "search finds the color utility command",
+    async () =>
+      (await titles())[0] === "Color picker" &&
+      (await observe<boolean>(
+        "return document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+      )),
+  );
+  await keys(inputId, "\uE007");
+  await until("the color utility opens from its search result", () =>
+    observe<boolean>(
+      `return document.querySelector('[aria-label="Native utilities"]') !== null
+        && document.querySelector('[aria-label="Utility categories"] [aria-pressed=true]')?.textContent === 'Colors'
+        && document.querySelector('.utility-content')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  const colorInput = await request<Record<string, string>>(
+    `/session/${session}/element`,
+    "POST",
+    {
+      using: "css selector",
+      value: '[aria-label="Native utilities"] form input',
+    },
+  );
+  await keys(colorInput[elementKey], "\uE009a\uE000");
+  await keys(colorInput[elementKey], "#f00");
+  await until("the color input contains the typed value", () =>
+    observe<boolean>(
+      "return document.querySelector('[aria-label=\"Native utilities\"] form input')?.value === '#f00'",
+    ),
+  );
+  await clickButtonText("Convert color");
+  await until("Rust converts the entered color", () =>
+    observe<boolean>(
+      `return document.querySelector('.utility-color-result input')?.value === '#FF0000'
+        && document.querySelector('.utility-content')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  await clickButtonText("Copy HEX");
+  await until(
+    "the converted HEX reaches the OS clipboard",
+    async () => clipboardText() === "#FF0000",
+  );
+  await saveScreen("native-color-copy.png");
+  await click('[aria-label="Close utilities"]');
+  await until("closing the utility restores search focus", () =>
+    observe<boolean>(
+      `return document.querySelector('[aria-label="Native utilities"]') === null
+        && document.activeElement?.getAttribute('role') === 'combobox'`,
+    ),
+  );
+  pass(
+    "The color command opens its panel, converts in Rust, copies exact HEX, and restores search focus",
   );
   await reopen();
   const queryTimings: QueryTiming[] = [];

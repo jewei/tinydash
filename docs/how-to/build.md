@@ -2,6 +2,8 @@
 
 Install Bun 1.4.2, Rust 1.98.1 or later, and the [Tauri 2 platform prerequisites](https://v2.tauri.app/start/prerequisites/). macOS needs Xcode command line tools. Windows needs the C++ build tools and WebView2. Linux needs GTK and WebKitGTK development libraries.
 
+This experimental branch uses Tauri 3 and Solid 2 previews. Read [dependency previews](../explanation/dependency-previews.md) for version constraints and the temporary package repairs. The platform requirements above still apply to the Wry runtime.
+
 ## Start the desktop app
 
 ```sh

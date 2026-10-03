@@ -52,7 +52,8 @@ export function createSearchQueue<Response>(handlers: {
   let cancellation: Promise<void> | undefined;
   let active: { requestId: number; cancelled: boolean } | undefined;
   let queued:
-    { request: SearchRequest; id: number; queuedAt: number } | undefined;
+    | { request: SearchRequest; id: number; queuedAt: number }
+    | undefined;
 
   function cancelActive() {
     if (!active || active.cancelled) return;

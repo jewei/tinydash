@@ -1,8 +1,8 @@
 # Clipboard history
 
-On a fresh installation, TinyDash asks before it saves clipboard text. Existing installations keep their saved capture choice. When capture is enabled, TinyDash captures text while it runs, including the current clipboard at startup. Select Clipboard mode to see recent entries. Pins stay at the top, and a fresh empty search selects the latest entry. Search saved text, use the arrow keys to inspect its full preview, and press Enter to copy it. Paste it in the target application with Command/Ctrl + V.
+On a fresh installation, TinyDash asks before it saves clipboard text. Existing installations keep their saved capture choice. When capture is enabled, TinyDash captures text while it runs, including the current clipboard at startup. Select Clipboard mode to see recent entries. Pins stay at the top, and a fresh empty search selects the latest entry. Search saved text, use the arrow keys to inspect its full preview, and press Enter to copy it. Paste it in the target application with Command/Ctrl + V, or choose **Paste to previous app** / Command/Ctrl + Shift + Enter. See [direct paste](workflows.md#direct-paste) for permissions and platform limits.
 
-The default limit is 100 unpinned entries. Pins in Clipboard or All keep an entry outside this limit. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, images, and larger values are skipped. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
+The default limit is 100 unpinned entries. Pins in Clipboard or All keep an entry outside this limit. Each entry can contain up to 16 KiB of UTF-8 text. Empty text, whitespace-only text, embedded null characters, and larger values are skipped by text history. Images and file references have a separate opt-in history described below. TinyDash preserves the accepted text exactly. Repeated consecutive values do not create writes. Copying an older value moves its existing entry to the top. Equal search scores keep the newest entries first.
 
 An empty history search constructs at most 30 recent rows before pins are applied. Missing pins resolve their saved entry directly instead of constructing the entire history per pin. Direct clipboard lookup still scans numeric IDs in newest-first storage; it allocates only the requested result. Pins remain first and a full pinned page still leaves a slot for the newest entry.
 
@@ -11,6 +11,30 @@ Use the actions menu or Command/Ctrl + Backspace to delete the selected entry. *
 The actions menu can edit a copy, combine selected entries in a chosen order with a separator, or save the full text as a file. Edited and combined copies leave history unchanged. Editing and combining leave the original entries unchanged. Combining accepts up to 100 entries and 16,384 output bytes. Saving uses the native Save dialog.
 
 History is local plain text in the same SQLite database as usage. It is not encrypted. On Unix, the database is restricted to its owner. SQLite secure deletion is enabled, but backups and filesystem snapshots can retain earlier data. Turn off **Save clipboard history** in Settings to stop capture. Existing history remains searchable and can be cleared.
+
+## Text paste queue
+
+Select a text history result, open Actions, and choose **Create paste queue**. Select entries in the required order, then choose **Queue entries**. Selection is limited to the current result list. The backend accepts at most 100 distinct text entry IDs. Starting a queue does not paste anything and does not replace an active queue.
+
+The queue bar shows the next position and an optional text preview. **Paste next** inserts one entry into the previous app. **Skip entry** advances without copying or pasting. **Cancel queue** releases the queue. After the last entry, the queue shows complete and never wraps. Dismiss it or create another queue.
+
+In Settings → Search → Item shortcuts and aliases, assign global shortcuts to **Paste next queued entry**, **Skip queued entry**, and **Cancel paste queue**. A Next shortcut pastes into the app active at that press without opening the launcher. Direct-paste permissions and platform limits apply. Native Wayland has neither these global shortcuts nor direct paste.
+
+The queue keeps only IDs in memory and ends when TinyDash quits. It reads text from live history before dispatch. Deleted or expired entries are skipped; new copies do not change the selected order. Pasting does not promote history entries. A failed dispatch keeps the current entry for an explicit retry. The copied content can remain on the system clipboard after a failure. Successful dispatch does not prove that a destination field accepted the paste. Repeated presses are rejected while a paste is in progress.
+
+Run `bun run verify:browser tests/daily-workflows.spec.ts` for selection order, preview, error recovery, skip, cancellation, completion, and narrow layouts. Run `bun run test:rust -- paste_queue` for ID validation, deletion, limits, and dispatch state. Desktop checks must compare exact inserted bytes in disposable fields, including two rapid shortcut presses, changed focus, a deleted entry, missing permission, and app restart. Browser tests mock these OS effects.
+
+## Retention, exclusions, and rich history
+
+Settings adds **Retention in days** (0 means no age limit, maximum 3650). Text entries expire by original capture time; copying an old entry does not reset its age. Pins remain exempt. Retention is checked at startup, capture, policy changes, and while the monitor runs. Count limits still apply.
+
+**Excluded applications** accepts exact case-insensitive application names or identifiers. macOS samples the frontmost app's name/bundle ID; this is best-effort attribution. Windows uses the clipboard-owner executable path/basename. Unknown attribution fails closed when exclusions are configured. Linux cannot reliably attribute the source here, so a nonempty exclusion list suspends capture rather than pretending it can enforce per-app exclusions. Secret markers remain independently enforced.
+
+Enable **Capture clipboard images** or **Capture copied files** separately, alongside clipboard-history consent. Open **Actions → Images and files clipboard**, or its All/System command, to preview, copy, and delete these entries. Native rich capture/copy currently supports macOS only; other platforms display this limit. PNG images are supported; TIFF-only and animated images are skipped. Copied files are references to existing local originals, not backups. No text edit/combine action is applied to rich content.
+
+Rich history is a separate owner-restricted `clipboard-rich.sqlite3`, not an overloaded text table. It holds at most 32 entries and 16 MiB of payloads; the configured history count can lower that limit. Each PNG is limited to 4 MiB, 4 megapixels, and a 4096-pixel edge. File lists are limited to 64 references. Pin an image or file entry to keep it during age retention and **Clear unpinned**. Pinned entries appear first and count toward the same 32-entry and 16 MiB hard limits. A lower history-count setting removes only unpinned entries; existing pins remain even if they exceed that lower setting. New captures replace the oldest unpinned entries, or are skipped when they cannot fit beside pins. The panel shows storage use and when pins fill the capture limit. **Unpin saved entry** applies current retention and count limits immediately, which can remove the entry. **Clear all clipboard history** also removes rich pins; the system clipboard is unchanged. Settings exports and the existing text-database migration archive do not back up rich history.
+
+See [clipboard format details](clipboard-formats.md) for source identity, additional format bounds, and native acceptance checks.
 
 ## Storage contention
 
@@ -42,7 +66,11 @@ On macOS and Windows, a source that empties the clipboard may be clearing sensit
 
 macOS checks the [pasteboard change counter](https://developer.apple.com/documentation/appkit/nspasteboard/changecount). Windows checks the [clipboard sequence number](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber). Each check runs once per second and when the launcher opens. Text is read only when the counter changes. Rapid copies within one interval can be missed. Linux uses GTK [owner-change events](https://docs.gtk.org/gtk3/signal.Clipboard.owner-change.html) and asynchronous text requests, with no polling timer. Wayland can restrict background access; opening TinyDash requests the current clipboard again. Desktop session checks remain necessary for Wayland.
 
+Deleting an image or file history entry keeps its confirmation visible when the next entry is selected or the history becomes empty. A preview failure appears separately and does not replace action feedback.
+
 ## Verification
+
+For image/file pins, check Pin/Unpin, pinned-first order, selection after reordering, errors and retry, missing-file actions, and the storage notice. Run `bun run verify:browser tests/rich-clipboard.spec.ts` and `bun run test:rust -- clipboard_rich`. The storage recipes include upgrade from rich schema 1, restart persistence, duplicate captures, clear-unpinned/full-clear, age/count/byte limits, lowering the count below existing pins, and failed writes. On a controlled macOS desktop build, pin both a captured image and file reference, restart, apply retention, and clear unpinned entries. Confirm the originals remain available and native copy still supplies the exact image/file format. Delete the referenced file and confirm the error, then unpin/delete its saved reference. Pins never back up file contents.
 
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
 
@@ -57,6 +85,8 @@ bun run test:rust -- clipboard
 bun run test:rust -- launcher::storage::
 bun run test:rust -- db::
 ```
+
+Also run `bun run verify:browser tests/rich-clipboard.spec.ts tests/roadmap.spec.ts`. In a disposable macOS profile, opt into each rich format separately, capture a PNG and a Finder file list, restart, preview, copy, delete, and compare native clipboard contents. Test disabled capture, exclusions, secret markers, limits, missing referenced files, and retention. Windows/Linux unsupported rich-format messages are not proof of native support.
 
 The storage session tests use a second real SQLite connection holding `BEGIN IMMEDIATE`. They check that failed captures and deletes leave search available, failed clears preserve entries and pins, and capture, deletion, warnings, and pending usage recover after unlocking. They also cover a busy startup merging session-only usage exactly once. `launcher::storage::cleanup_tests` exercises the production observation/automatic-cleanup path: a blocked upstream clear, unrelated successful storage with the privacy warning still pending, a quiet retry, pins in both categories, and same-ID recapture. It also covers queue capacity/overflow, permanent failures, manual-delete isolation, and the memory-only restart limit. Database tests check migration from schema 5 to 6, revision overflow, unchanged creation timestamps, order reuse, touches, and revision rechecks across connections. These are Rust session-layer checks, not proof of Tauri events or system clipboard integration.
 

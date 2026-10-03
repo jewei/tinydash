@@ -5,10 +5,13 @@ import ClipboardPreview from "./ClipboardPreview";
 import Icon from "./Icon";
 import ResultIcon from "./ResultIcon";
 import ToolDetails from "./ToolDetails";
+import FilePreview from "./FilePreview";
 
 export default function ResultPreview(props: {
   result?: SearchResult;
   welcome: boolean;
+  hasQuery?: boolean;
+  searchFailed?: boolean;
   previewReady: boolean;
   enabled: boolean;
   modifier: string;
@@ -46,7 +49,7 @@ export default function ResultPreview(props: {
   const actionLabel = () => {
     switch (props.result?.kind) {
       case "app":
-        return "Launch application";
+        return "Open application";
       case "file":
         return "Open file";
       case "folder":
@@ -54,7 +57,7 @@ export default function ResultPreview(props: {
       case "clipboard":
         return "Copy saved text";
       case "calculation":
-        return "Copy answer";
+        return "Copy result";
       case "systemCommand":
         return "Run selected command";
       case "password":
@@ -82,8 +85,7 @@ export default function ResultPreview(props: {
 
   return (
     <aside
-      class="result-preview"
-      classList={{ "tool-preview": !!props.result?.detail }}
+      class={{ "result-preview": true, "tool-preview": !!props.result?.detail }}
       aria-label="Selected item details"
     >
       <Show
@@ -93,8 +95,20 @@ export default function ResultPreview(props: {
             <span class="welcome-mark">
               <Icon name="search" size={19} />
             </span>
-            <h1>Start typing.</h1>
-            <p>Find an app, a file, or the answer to a quick calculation.</p>
+            <h1>
+              {props.searchFailed
+                ? "Search unavailable."
+                : props.hasQuery
+                  ? "Try another search."
+                  : "Start typing."}
+            </h1>
+            <p>
+              {props.searchFailed
+                ? "Edit your search to try again. You can also change the category."
+                : props.hasQuery
+                  ? "Try a shorter name or choose a different category."
+                  : "Find an app, a file, or the answer to a quick calculation."}
+            </p>
             <dl class="welcome-shortcuts">
               <div>
                 <dt>Move through results</dt>
@@ -127,8 +141,8 @@ export default function ResultPreview(props: {
       >
         <div class="preview-content">
           <div
-            class="preview-summary"
-            classList={{
+            class={{
+              "preview-summary": true,
               "calculation-summary": props.result?.kind === "calculation",
               "password-summary": props.result?.kind === "password",
               "url-summary": props.result?.kind === "cleanedUrl",
@@ -144,8 +158,8 @@ export default function ResultPreview(props: {
                     <button
                       class="pin-button"
                       aria-label={option.label}
-                      aria-pressed={option.pinned}
-                      aria-busy={props.pinBusy}
+                      aria-pressed={option.pinned ? "true" : "false"}
+                      aria-busy={props.pinBusy ? "true" : "false"}
                       disabled={!props.enabled || props.pinBusy}
                       onClick={() => props.onPin(option.category)}
                       title={option.label}
@@ -208,10 +222,19 @@ export default function ResultPreview(props: {
             </Show>
             <Show when={props.result!.confirmation}>
               <p class="preview-notice">
+                <Icon name="lock" size={14} />
                 You will be asked to confirm this command.
               </p>
             </Show>
           </div>
+          <Show
+            when={
+              props.previewReady &&
+              (props.result?.kind === "file" || props.result?.kind === "folder")
+            }
+          >
+            <FilePreview result={props.result!} enabled={props.enabled} />
+          </Show>
           <ToolDetails detail={props.result?.detail} />
           <Show when={props.result?.kind === "clipboard"}>
             <Show when={props.previewReady}>
@@ -234,6 +257,24 @@ export default function ResultPreview(props: {
             </span>
             <kbd>↵</kbd>
           </button>
+          <Show
+            when={
+              props.result?.primaryAction === "copy" ||
+              props.result?.secondaryActions.includes("copy")
+            }
+          >
+            <button
+              class="preview-action"
+              disabled={!props.enabled}
+              onClick={() => props.onAction("paste")}
+            >
+              <span class="action-label">
+                <Icon name="clipboard" size={15} />
+                Paste to previous app
+              </span>
+              <kbd>{props.modifier} ⇧ ↵</kbd>
+            </button>
+          </Show>
           <Show when={props.result?.secondaryActions.includes("reveal")}>
             <button
               class="preview-action"
@@ -253,7 +294,11 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("delete")}
             >
-              Delete saved text<kbd>{props.modifier} ⌫</kbd>
+              <span class="action-label">
+                <Icon name="delete" size={15} />
+                Delete saved text
+              </span>
+              <kbd>{props.modifier} ⌫</kbd>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("copy")}>
@@ -262,7 +307,10 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("copy")}
             >
-              Copy search URL
+              <span class="action-label">
+                <Icon name="copy" size={15} />
+                Copy search URL
+              </span>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("open")}>
@@ -271,7 +319,10 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("open")}
             >
-              Open cleaned URL
+              <span class="action-label">
+                <Icon name="link" size={15} />
+                Open cleaned URL
+              </span>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("regenerate")}>
@@ -280,7 +331,10 @@ export default function ResultPreview(props: {
               disabled={!props.enabled}
               onClick={() => props.onAction("regenerate")}
             >
-              Generate another
+              <span class="action-label">
+                <Icon name="refresh" size={15} />
+                Generate another
+              </span>
             </button>
           </Show>
         </div>

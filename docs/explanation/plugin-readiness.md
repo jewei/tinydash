@@ -1,6 +1,6 @@
 # Future plugin support
 
-Decision recorded on 20 September 2026: defer the plugin system and public software development kit, or SDK. Keep the current Rust, Tauri 2, and SolidJS architecture. Memory use remains the first performance priority, followed by response time.
+Decision recorded on 20 September 2026: defer the plugin system and public software development kit, or SDK. Keep the current Rust, Tauri, and SolidJS architecture. Memory use remains the first performance priority, followed by response time.
 
 This decision sets rules for current development. TinyDash does not provide an end-user plugin loader or SDK. The Tauri integration plugins used by the desktop application are separate from this future feature.
 

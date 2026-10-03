@@ -78,6 +78,39 @@ test("preserves incomplete folder mode and locally edited exclusion text", () =>
   expect(untouched.draft.fileSearchRoots).toEqual(["/example"]);
 });
 
+test("item drafts preserve edited aliases while accepting remote shortcut and visibility resets", () => {
+  const saved = settings();
+  saved.itemPreferences["library:example"] = {
+    aliases: [],
+    shortcut: "Control+Shift+KeyL",
+    hidden: true,
+    disabled: true,
+  };
+  const draft = structuredClone(saved);
+  draft.itemPreferences["library:example"].aliases = ["local"];
+  const incoming = structuredClone(saved);
+  delete incoming.itemPreferences["library:example"];
+  incoming.itemPreferences["system:new"] = {
+    aliases: ["remote"],
+    shortcut: "",
+    hidden: false,
+    disabled: false,
+  };
+  const before = structuredClone({ saved, draft, incoming });
+  const result = mergeSettingsDraft(saved, draft, incoming, "custom");
+  expect(result.draft.itemPreferences).toEqual({
+    "library:example": {
+      aliases: ["local"],
+      shortcut: "",
+      hidden: false,
+      disabled: false,
+    },
+    "system:new": incoming.itemPreferences["system:new"],
+  });
+  expect(result.saved).toEqual(incoming);
+  expect({ saved, draft, incoming }).toEqual(before);
+});
+
 test("first load normalizes categories and resets text baselines", () => {
   const incoming = settings();
   incoming.visibleCategories = ["apps", "apps", "files"];
@@ -85,4 +118,18 @@ test("first load normalizes categories and resets text baselines", () => {
   expect(result.draft.visibleCategories).toEqual(["apps", "files"]);
   expect(result.updateFolders).toBe(true);
   expect(result.updateExcluded).toBe(true);
+});
+
+test("emoji draft choices survive unrelated saved-settings updates", () => {
+  const saved = settings();
+  const draft = settings();
+  draft.emojiSkinTone = 3;
+  draft.emojiLanguages = ["zh", "ms"];
+  const incoming = settings();
+  incoming.emojiLanguages = ["es"];
+  incoming.hideOnBlur = false;
+  const merged = mergeSettingsDraft(saved, draft, incoming, "custom");
+  expect(merged.draft.emojiSkinTone).toBe(3);
+  expect(merged.draft.emojiLanguages).toEqual(["zh", "ms"]);
+  expect(merged.draft.hideOnBlur).toBe(false);
 });

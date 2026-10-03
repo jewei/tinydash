@@ -7,7 +7,7 @@ use objc2_app_kit::{
 use crate::launcher::window::LauncherAppearance;
 
 pub fn set_launcher_appearance(
-    webview: tauri::webview::PlatformWebview,
+    webview: &tauri_runtime_wry::Webview,
     appearance: LauncherAppearance,
 ) -> Result<bool, String> {
     let mtm = MainThreadMarker::new().ok_or("Window appearance requires the main thread.")?;

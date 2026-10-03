@@ -22,6 +22,8 @@ test("controller reconciles rows and preserves user selection only for refreshes
     await controller.search();
     controller.setSelected(1);
     controller.markSelectionChanged();
+    // Solid 2 commits signal updates after the current synchronous turn.
+    await new Promise<void>((resolve) => queueMicrotask(resolve));
     const selected = controller.current();
     reply = {
       ...response,
@@ -30,6 +32,7 @@ test("controller reconciles rows and preserves user selection only for refreshes
     };
     await controller.search("fixture", true);
     const refreshed = {
+      selectedId: selected.id,
       id: controller.current().id,
       index: controller.selected(),
       sameRow: selected === controller.current(),
@@ -45,6 +48,7 @@ test("controller reconciles rows and preserves user selection only for refreshes
   }, contracts.response);
   expect(result).toEqual({
     refreshed: {
+      selectedId: "result:1",
       id: "result:1",
       index: 0,
       sameRow: true,

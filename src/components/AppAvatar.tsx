@@ -10,8 +10,7 @@ export default function AppAvatar(props: { icon: string | null }) {
       : undefined;
   return (
     <span
-      class="app-avatar"
-      classList={{ "has-app-icon": !!source() }}
+      class={{ "app-avatar": true, "has-app-icon": !!source() }}
       aria-hidden="true"
     >
       <Show when={source()} fallback={<Icon name="window" size={20} />}>

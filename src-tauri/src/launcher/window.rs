@@ -26,9 +26,11 @@ pub async fn set_launcher_appearance(
     }
     #[cfg(target_os = "macos")]
     {
+        use tauri_runtime_wry::WebviewWryExt;
+
         let (sender, mut receiver) = tauri::async_runtime::channel(1);
         window
-            .with_webview(move |webview| {
+            .with_wry_webview(move |webview| {
                 let _ = sender.try_send(crate::platform::set_launcher_appearance(
                     webview, appearance,
                 ));
@@ -59,6 +61,7 @@ fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> 
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
+    super::paste::remember(app);
     #[cfg(target_os = "macos")]
     if let Some(state) = app.try_state::<LauncherState>() {
         state.focus.remember();
@@ -147,6 +150,10 @@ pub fn dismiss(app: &AppHandle) -> Result<()> {
 }
 
 fn hide_window(app: &AppHandle, _restore_focus: bool) -> Result<()> {
+    // Native drag/share UI owns dismissal until its session ends.
+    if super::transfer::active(app) {
+        return Ok(());
+    }
     // Take the saved app before hiding. The resulting blur event can call hide again.
     #[cfg(target_os = "macos")]
     let previous = app

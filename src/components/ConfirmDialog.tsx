@@ -1,9 +1,11 @@
-import { onMount, Show } from "solid-js";
+import { createEffect, onCleanup, onSettled, Show } from "solid-js";
 
 export default function ConfirmDialog(props: {
   title: string;
   description: string;
   confirmLabel: string;
+  cancelLabel?: string;
+  role?: "dialog" | "alertdialog";
   busyLabel: string;
   busy: boolean;
   error?: string;
@@ -12,17 +14,47 @@ export default function ConfirmDialog(props: {
 }) {
   let dialog!: HTMLDialogElement;
   let cancel!: HTMLButtonElement;
-  onMount(() => {
+  const previousFocus = document.activeElement;
+  onSettled(() => {
     dialog.showModal();
     cancel.focus();
+  });
+  createEffect(
+    () => props.busy,
+    (busy) => {
+      if (!busy) queueMicrotask(() => cancel?.focus());
+    },
+  );
+  onCleanup(() => {
+    dialog.close();
+    if (previousFocus instanceof HTMLElement && previousFocus.isConnected)
+      previousFocus.focus();
   });
   return (
     <dialog
       ref={dialog}
       class="confirm-dialog"
+      role={props.role}
       aria-labelledby="confirm-title"
       aria-describedby="confirm-description"
       onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === "Tab") {
+          const buttons = dialog.querySelectorAll<HTMLButtonElement>(
+            "button:not(:disabled)",
+          );
+          const first = buttons[0];
+          const last = buttons[buttons.length - 1];
+          if (!first) {
+            event.preventDefault();
+          } else if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
         if (event.key === "Enter" && event.repeat) event.preventDefault();
       }}
       onCancel={(event) => {
@@ -44,7 +76,7 @@ export default function ConfirmDialog(props: {
           disabled={props.busy}
           onClick={props.onClose}
         >
-          Cancel
+          {props.cancelLabel ?? "Cancel"}
         </button>
         <button
           class="confirm-button"

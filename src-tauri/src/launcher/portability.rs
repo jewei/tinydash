@@ -319,6 +319,11 @@ fn ensure_output_path_safe(app: &AppHandle, path: &Path) -> Result<(), String> {
         data.join("tinydash.sqlite3-shm"),
         data.join("tinydash.sqlite3-journal"),
         data.join("recovery.tar"),
+        data.join("library.json"),
+        data.join("clipboard-rich.sqlite3"),
+        data.join("clipboard-rich.sqlite3-wal"),
+        data.join("clipboard-rich.sqlite3-shm"),
+        data.join("clipboard-rich.sqlite3-journal"),
     ];
     if protected
         .iter()
@@ -413,6 +418,22 @@ mod tests {
             imported.ignored_keys,
             ["futureTopLevel", "settings.futureSetting"]
         );
+    }
+
+    #[test]
+    fn menu_bar_preference_round_trips_and_defaults_off_for_older_exports() {
+        for visible in [true, false] {
+            let settings = Settings {
+                show_menu_bar_icon: visible,
+                ..Settings::default()
+            };
+            let bytes = export(serde_json::to_value(&settings).unwrap());
+            let imported = parse_settings_import(&bytes).unwrap();
+            assert_eq!(imported.settings, settings);
+            assert!(imported.ignored_keys.is_empty());
+        }
+        let imported = parse_settings_import(&export(serde_json::json!({}))).unwrap();
+        assert!(!imported.settings.show_menu_bar_icon);
     }
 
     #[test]

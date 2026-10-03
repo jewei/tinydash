@@ -1,8 +1,4 @@
-/* Hallmark · macrostructure: Canvas · theme: supplied Organic design.
- * Tone: warm and practical. Anchor: orange. Figtree + Caprasimo.
- * Two-column Canvas, light and dark. Compact uses a single result column.
- * Pre-emit critique: P5 H5 E5 S5 R5 V4. No remote fonts or idle motion.
- */
+/* Shared launcher structure. Theme values live in tokens.css. */
 @import "../../tokens.css";
 
 * {

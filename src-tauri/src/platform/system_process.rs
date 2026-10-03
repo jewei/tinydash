@@ -8,7 +8,7 @@ use std::{
 use crate::error::{Error, Result};
 
 /// Run a fixed OS utility on the action worker, without a shell or an unbounded wait.
-pub(super) fn output(program: impl AsRef<Path>, arguments: &[&str]) -> Result<String> {
+pub(crate) fn output(program: impl AsRef<Path>, arguments: &[&str]) -> Result<String> {
     let program = program.as_ref();
     let failure = |error| Error::SystemCommand(format!("{}: {error}", program.display()));
     // Files avoid pipe deadlocks while waiting for the process. Only a bounded
