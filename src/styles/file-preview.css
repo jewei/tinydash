@@ -35,6 +35,12 @@
   user-select: text;
   font-size: 11px;
   line-height: 1.5;
+  padding: 14px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-control);
+  background: var(--color-code);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-grip) transparent;
 }
 
 .file-preview-image {
@@ -43,6 +49,8 @@
   max-height: 240px;
   object-fit: contain;
   margin: 8px auto;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-control);
 }
 
 .file-action-buttons {
@@ -54,14 +62,14 @@
 
 .file-preview button,
 .file-preview select {
-  min-height: 28px;
+  min-height: 32px;
   font: inherit;
   font-size: 11px;
   color: var(--color-ink);
   background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: 14px;
-  padding: 4px 10px;
+  border-radius: var(--radius-control);
+  padding: 6px 10px;
 }
 
 .file-preview select {

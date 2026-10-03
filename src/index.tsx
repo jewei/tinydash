@@ -3,6 +3,7 @@ import App from "./App";
 import Settings from "./Settings";
 import "./styles/app.css";
 import "./styles/refined.css";
+import "./styles/interaction.css";
 
 const root = document.getElementById("root");
 if (root)

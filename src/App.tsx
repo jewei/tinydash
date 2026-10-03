@@ -180,7 +180,10 @@ export default function App(
     categories.filter(({ id }) => enabledCategories().includes(id)),
   );
   const welcome = () =>
-    mode() === "all" && !query().trim() && results().length === 0;
+    mode() === "all" &&
+    !query().trim() &&
+    results().length === 0 &&
+    !searchError();
   const isPinned = (result?: SearchResult, category = mode()) =>
     result?.pin?.categories.includes(category) ?? false;
   const pinOptions = createMemo(() => {
@@ -274,22 +277,24 @@ export default function App(
       disabled: boolean;
       key?: string;
     };
-    const actions: MenuAction[] = [
-      {
-        label:
-          primaryLabel() === "Open"
-            ? current()?.kind === "file"
-              ? "Open file"
-              : current()?.kind === "folder"
-                ? "Open folder"
-                : "Open application"
-            : primaryLabel(),
-        icon: current()?.primaryAction === "copy" ? "copy" : "return",
-        run: runPrimary,
-        disabled: !canOpen(),
-        key: "↵",
-      },
-    ];
+    const actions: MenuAction[] = current()
+      ? [
+          {
+            label:
+              primaryLabel() === "Open"
+                ? current()?.kind === "file"
+                  ? "Open file"
+                  : current()?.kind === "folder"
+                    ? "Open folder"
+                    : "Open application"
+                : primaryLabel(),
+            icon: current()?.primaryAction === "copy" ? "copy" : "return",
+            run: runPrimary,
+            disabled: !canOpen(),
+            key: "↵",
+          },
+        ]
+      : [];
     if (
       current()?.primaryAction === "copy" ||
       current()?.secondaryActions.includes("copy")
@@ -1220,7 +1225,7 @@ export default function App(
               value={query()}
               onInput={(event) => changeQuery(event.currentTarget.value)}
             />
-            <Show when={query() && results().length > 0}>
+            <Show when={query()}>
               <button
                 class="clear-query"
                 aria-label="Clear search"
@@ -1448,91 +1453,95 @@ export default function App(
                 <h1>
                   {!desktop
                     ? "TinyDash, one shortcut away."
-                    : mode() === "password"
-                      ? "Generate a password"
-                      : mode() === "timezone"
-                        ? "Calculate a date or time"
-                        : mode() === "url"
-                          ? "Clean a URL"
-                          : mode() === "web"
-                            ? "Search the web"
-                            : mode() === "system"
-                              ? "No system commands found"
-                              : mode() === "calculator"
-                                ? "Calculate and convert"
-                                : mode() === "emoji"
-                                  ? "No emoji found"
-                                  : mode() === "clipboard"
-                                    ? query()
-                                      ? "No clipboard entries found"
-                                      : "No saved clipboard text"
-                                    : mode() === "files"
-                                      ? files().phase === "queued"
-                                        ? "Waiting to refresh files"
-                                        : files().phase === "scanning"
-                                          ? "Finding your files"
-                                          : files().phase === "disabled"
-                                            ? "File search is off"
-                                            : files().phase === "failed"
-                                              ? "File scan unavailable"
-                                              : query()
-                                                ? "No files found"
-                                                : "No files in the index"
-                                      : mode() === "all" &&
-                                          filePending() &&
-                                          query()
-                                        ? "No results yet"
-                                        : indexing()
-                                          ? "Finding your applications"
-                                          : query()
-                                            ? "No results found"
-                                            : "No applications in the index"}
+                    : searchError()
+                      ? "Search unavailable"
+                      : mode() === "password"
+                        ? "Generate a password"
+                        : mode() === "timezone"
+                          ? "Calculate a date or time"
+                          : mode() === "url"
+                            ? "Clean a URL"
+                            : mode() === "web"
+                              ? "Search the web"
+                              : mode() === "system"
+                                ? "No system commands found"
+                                : mode() === "calculator"
+                                  ? "Calculate and convert"
+                                  : mode() === "emoji"
+                                    ? "No emoji found"
+                                    : mode() === "clipboard"
+                                      ? query()
+                                        ? "No clipboard entries found"
+                                        : "No saved clipboard text"
+                                      : mode() === "files"
+                                        ? files().phase === "queued"
+                                          ? "Waiting to refresh files"
+                                          : files().phase === "scanning"
+                                            ? "Finding your files"
+                                            : files().phase === "disabled"
+                                              ? "File search is off"
+                                              : files().phase === "failed"
+                                                ? "File scan unavailable"
+                                                : query()
+                                                  ? "No files found"
+                                                  : "No files in the index"
+                                        : mode() === "all" &&
+                                            filePending() &&
+                                            query()
+                                          ? "No results yet"
+                                          : indexing()
+                                            ? "Finding your applications"
+                                            : query()
+                                              ? "No results found"
+                                              : "No applications in the index"}
                 </h1>
                 <p>
                   {!desktop
                     ? "Start the TinyDash desktop app to search this computer."
-                    : mode() === "password"
-                      ? "Try password 32, passphrase 6, or pin 6."
-                      : mode() === "timezone"
-                        ? "Try next Friday + 2 weeks, time in Tokyo, or 10am Pacific Time."
-                        : mode() === "url"
-                          ? "Paste a full http:// or https:// URL."
-                          : mode() === "web"
-                            ? "Type a search, then choose an engine."
-                            : mode() === "system"
-                              ? "Try sleep, restart, or settings."
-                              : mode() === "calculator"
-                                ? "Try 12 * 8, 5 ft to cm, or 100 USD MYR."
-                                : mode() === "emoji"
-                                  ? "Try a name, shortcode, or category, such as coffee or food."
-                                  : mode() === "clipboard"
-                                    ? info()?.settings
-                                        .clipboardHistoryEnabled === false
-                                      ? "Clipboard capture is off in Settings."
-                                      : query()
-                                        ? "Try a word from the text you copied."
-                                        : "Copy text in any application. It will appear here."
-                                    : mode() === "files"
-                                      ? filePending()
-                                        ? files().phase === "queued"
-                                          ? "The refresh is queued. You can search applications while waiting."
-                                          : "You can search applications while the scan runs."
-                                        : files().phase === "disabled"
-                                          ? "File search is off. Choose folders in Settings, File search."
-                                          : files().phase === "failed"
-                                            ? "Use Refresh files to try again."
+                    : searchError()
+                      ? "Check the message above, then change or clear your search to try again."
+                      : mode() === "password"
+                        ? "Try password 32, passphrase 6, or pin 6."
+                        : mode() === "timezone"
+                          ? "Try next Friday + 2 weeks, time in Tokyo, or 10am Pacific Time."
+                          : mode() === "url"
+                            ? "Paste a full http:// or https:// URL."
+                            : mode() === "web"
+                              ? "Type a search, then choose an engine."
+                              : mode() === "system"
+                                ? "Try sleep, restart, or settings."
+                                : mode() === "calculator"
+                                  ? "Try 12 * 8, 5 ft to cm, or 100 USD MYR."
+                                  : mode() === "emoji"
+                                    ? "Try a name, shortcode, or category, such as coffee or food."
+                                    : mode() === "clipboard"
+                                      ? info()?.settings
+                                          .clipboardHistoryEnabled === false
+                                        ? "Clipboard capture is off in Settings."
+                                        : query()
+                                          ? "Try a word from the text you copied."
+                                          : "Copy text in any application. It will appear here."
+                                      : mode() === "files"
+                                        ? filePending()
+                                          ? files().phase === "queued"
+                                            ? "The refresh is queued. You can search applications while waiting."
+                                            : "You can search applications while the scan runs."
+                                          : files().phase === "disabled"
+                                            ? "File search is off. Choose folders in Settings, File search."
+                                            : files().phase === "failed"
+                                              ? "Use Refresh files to try again."
+                                              : query()
+                                                ? "Try a filename or part of a path."
+                                                : "Check your folders in Settings, File search, then refresh the file list."
+                                        : mode() === "all" &&
+                                            filePending() &&
+                                            query()
+                                          ? `${fileActivity()} You can search applications now.`
+                                          : indexing()
+                                            ? "You can start typing while the list loads."
                                             : query()
-                                              ? "Try a filename or part of a path."
-                                              : "Check your folders in Settings, File search, then refresh the file list."
-                                      : mode() === "all" &&
-                                          filePending() &&
-                                          query()
-                                        ? `${fileActivity()} You can search applications now.`
-                                        : indexing()
-                                          ? "You can start typing while the list loads."
-                                          : query()
-                                            ? "Try a name, a file path, or a calculation."
-                                            : "Refresh the list after you install an application."}
+                                              ? "Try a name, a file path, or a calculation."
+                                              : "Refresh the list after you install an application."}
                 </p>
                 <Show
                   when={
@@ -1558,7 +1567,7 @@ export default function App(
                     }}
                   >
                     {query()
-                      ? "Clear search"
+                      ? "Reset search"
                       : mode() === "files"
                         ? "Refresh files"
                         : "Refresh applications"}
@@ -1571,6 +1580,8 @@ export default function App(
             <ResultPreview
               result={current()}
               welcome={!current()}
+              hasQuery={query().trim().length > 0}
+              searchFailed={!!searchError()}
               previewReady={visible() && !pending()}
               enabled={canOpen()}
               modifier={modifier()}
@@ -1663,6 +1674,9 @@ export default function App(
                   id="actions-menu"
                   ref={menu}
                   class="actions-menu"
+                  data-has-result-actions={
+                    resultActions().length > 0 ? "true" : "false"
+                  }
                   role="menu"
                   aria-label="Launcher actions"
                 >
@@ -1678,100 +1692,112 @@ export default function App(
                       setMenuFilter(event.currentTarget.value)
                     }
                   />
-                  <div class="menu-column">
-                    <Show when={resultActions().length > 0}>
+                  <Show when={resultActions().length > 0}>
+                    <div class="menu-column">
                       <div class="menu-heading">
                         {current()?.title ?? "TinyDash"}
                       </div>
-                    </Show>
-                    <For each={resultActions()}>
-                      {(action) => (
-                        <button
-                          role="menuitem"
-                          disabled={action.disabled}
-                          onClick={action.run}
-                        >
-                          <Icon name={action.icon} />
-                          {action.label}
-                          <Show when={action.key}>
-                            <kbd>{action.key}</kbd>
-                          </Show>
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                  <div class="menu-column">
+                      <For each={resultActions()}>
+                        {(action) => (
+                          <button
+                            role="menuitem"
+                            disabled={action.disabled}
+                            onClick={action.run}
+                          >
+                            <Icon name={action.icon} />
+                            {action.label}
+                            <Show when={action.key}>
+                              <kbd>{action.key}</kbd>
+                            </Show>
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  <div class="menu-column launcher-menu-column">
                     <Show
                       when={appearances.some((item) =>
                         matchesMenu(`Appearance ${item.label}`),
                       )}
                     >
-                      <div
-                        class="appearance-group"
-                        role="group"
-                        aria-label="Appearance"
-                      >
-                        <div class="menu-heading">Appearance</div>
-                        <div class="appearance-options">
-                          <For
-                            each={appearances.filter((item) =>
-                              matchesMenu(`Appearance ${item.label}`),
-                            )}
-                          >
-                            {(item) => (
-                              <button
-                                role="menuitemradio"
-                                aria-checked={
-                                  appearance() === item.id ? "true" : "false"
-                                }
-                                title={item.description}
-                                onClick={() => changeAppearance(item.id)}
-                              >
-                                <span
-                                  class={`appearance-swatch swatch-${item.id}`}
-                                  aria-hidden="true"
-                                />
-                                {item.label}
-                              </button>
-                            )}
-                          </For>
-                        </div>
-                      </div>
-                      <div class="menu-divider" />
-                    </Show>
-                    <Show when={matchesMenu("Compact layout")}>
-                      <button
-                        role="menuitemcheckbox"
-                        aria-checked={compact() ? "true" : "false"}
-                        onClick={() => {
-                          const next = !compact();
-                          setCompact(next);
-                          saveCompact(next);
-                          setMenuOpen(false);
-                          focusInput();
-                        }}
-                      >
-                        <span class="menu-check" aria-hidden="true">
-                          {compact() ? "✓" : ""}
-                        </span>
-                        Compact
-                      </button>
-                    </Show>
-                    <For each={launcherActions()}>
-                      {(action) => (
-                        <button
-                          role="menuitem"
-                          disabled={action.disabled}
-                          onClick={action.run}
+                      <div class="launcher-menu-appearance">
+                        <div
+                          class="appearance-group"
+                          role="group"
+                          aria-label="Appearance"
                         >
-                          <Icon name={action.icon} />
-                          {action.label}
-                          <Show when={action.key}>
-                            <kbd>{action.key}</kbd>
-                          </Show>
+                          <div class="menu-heading">Appearance</div>
+                          <div class="appearance-options">
+                            <For
+                              each={appearances.filter((item) =>
+                                matchesMenu(`Appearance ${item.label}`),
+                              )}
+                            >
+                              {(item) => (
+                                <button
+                                  role="menuitemradio"
+                                  aria-checked={
+                                    appearance() === item.id ? "true" : "false"
+                                  }
+                                  title={item.description}
+                                  onClick={() => changeAppearance(item.id)}
+                                >
+                                  <span
+                                    class={`appearance-swatch swatch-${item.id}`}
+                                    aria-hidden="true"
+                                  />
+                                  {item.label}
+                                </button>
+                              )}
+                            </For>
+                          </div>
+                        </div>
+                        <div class="menu-divider" />
+                      </div>
+                    </Show>
+                    <div class="launcher-menu-commands">
+                      <Show
+                        when={
+                          launcherActions().length > 0 ||
+                          matchesMenu("Compact layout")
+                        }
+                      >
+                        <div class="menu-heading">TinyDash</div>
+                      </Show>
+                      <Show when={matchesMenu("Compact layout")}>
+                        <button
+                          role="menuitemcheckbox"
+                          aria-checked={compact() ? "true" : "false"}
+                          onClick={() => {
+                            const next = !compact();
+                            setCompact(next);
+                            saveCompact(next);
+                            setMenuOpen(false);
+                            focusInput();
+                          }}
+                        >
+                          <span class="menu-check" aria-hidden="true">
+                            {compact() ? "✓" : ""}
+                          </span>
+                          Compact
                         </button>
-                      )}
-                    </For>
+                      </Show>
+                      <For each={launcherActions()}>
+                        {(action) => (
+                          <button
+                            role="menuitem"
+                            disabled={action.disabled}
+                            onClick={action.run}
+                          >
+                            <Icon name={action.icon} />
+                            {action.label}
+                            <Show when={action.key}>
+                              <kbd>{action.key}</kbd>
+                            </Show>
+                          </button>
+                        )}
+                      </For>
+                    </div>
                   </div>
                   <Show
                     when={

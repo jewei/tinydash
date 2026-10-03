@@ -6,6 +6,8 @@ Create, edit, search, or delete quicklinks and snippets in the library. Unsaved 
 
 Creating or editing an item puts keyboard focus in Name. Confirmation dialogs start on the cancel action and keep keyboard focus inside the dialog. Escape cancels the confirmation. Focus returns to the control that opened it, or to Search library when that control is removed. The library shows loading, empty-library, and no-match states separately. Retry loading library repeats a failed list request without changing an editor draft.
 
+An empty library explains quicklinks and snippets and directs users to **New quicklink** or **New snippet**. Selected items use the shared theme's selection colors.
+
 Quicklinks support HTTP(S), local file/folder paths, and a restricted set of application URL schemes. Unsupported or executable schemes are rejected. Use `{query}` or `{argument:name}` for explicit input fields. URL arguments are encoded as components and cannot change the destination origin. There is no arbitrary shell execution or custom application routing in the library.
 
 Snippets support literal text, `{date}`, `{time}`, `{clipboard}`, and named argument placeholders. Clipboard interpolation requires consent for each invocation; previews never read the clipboard. Copy leaves the library open. Paste inserts into the previous application where the OS permits it. Keywords are search terms: they do not monitor typing or automatically expand in other applications.

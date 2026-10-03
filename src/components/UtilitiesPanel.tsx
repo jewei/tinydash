@@ -438,18 +438,21 @@ export default function UtilitiesPanel(props: {
                       )}
                     </For>
                   </div>
-                  <For each={[value().hex, value().rgb, value().hsl]}>
-                    {(text) => (
-                      <label>
-                        Converted color
-                        <input
-                          readonly
-                          value={text}
-                          onFocus={(e) => e.currentTarget.select()}
-                        />
-                      </label>
-                    )}
-                  </For>
+                  <div class="utility-color-values">
+                    <For each={["hex", "rgb", "hsl"] as const}>
+                      {(format) => (
+                        <label>
+                          {format.toUpperCase()}
+                          <input
+                            readonly
+                            aria-label={`Converted color ${format.toUpperCase()}`}
+                            value={value()[format]}
+                            onFocus={(e) => e.currentTarget.select()}
+                          />
+                        </label>
+                      )}
+                    </For>
+                  </div>
                 </div>
               )}
             </Show>

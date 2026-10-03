@@ -36,7 +36,7 @@ import {
 } from "./appearance";
 import ConfirmDialog from "./components/ConfirmDialog";
 import ItemPreferences from "./components/ItemPreferences";
-import Icon from "./components/Icon";
+import Icon, { type IconName } from "./components/Icon";
 import {
   AppPreferences,
   WebSearchPreferences,
@@ -97,6 +97,17 @@ const sections = [
   },
 ] as const;
 type Section = (typeof sections)[number]["id"];
+const sectionIcons: Record<Section, IconName> = {
+  shortcut: "window",
+  appearance: "appearance",
+  search: "search",
+  categories: "apps",
+  clipboard: "clipboard",
+  files: "folder",
+  currency: "globe",
+  privacy: "lock",
+  about: "emoji",
+};
 type ShortcutTarget = "global" | SearchMode | `item:${string}`;
 const sectionKeywords: Record<Section, string> = {
   shortcut: "keyboard hotkey startup login blur reset menu bar",
@@ -641,6 +652,7 @@ export default function Settings() {
           <input
             type="search"
             aria-label="Search settings"
+            placeholder="Find a setting…"
             value={settingsQuery()}
             onInput={(event) => setSettingsQuery(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -662,7 +674,8 @@ export default function Settings() {
                 aria-current={section() === item.id ? "page" : undefined}
                 onClick={() => navigate(item.id)}
               >
-                {item.label}
+                <Icon name={sectionIcons[item.id]} size={17} />
+                <span>{item.label}</span>
               </button>
             )}
           </For>
@@ -678,7 +691,9 @@ export default function Settings() {
             </For>
           </select>
         </label>
-        <p class="settings-sidebar-note">Open Settings with {modifier()} ,</p>
+        <p class="settings-sidebar-note">
+          Settings shortcut <kbd>{modifier()} ,</kbd>
+        </p>
       </aside>
       <form
         class="settings-main"
@@ -906,7 +921,11 @@ export default function Settings() {
                               <i />
                               <i />
                             </span>
-                            <span class="style-detail" />
+                            <span class="style-detail">
+                              <i />
+                              <i />
+                              <i />
+                            </span>
                           </span>
                           <span class="style-label">
                             {item.label}

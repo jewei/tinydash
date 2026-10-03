@@ -10,6 +10,8 @@ import FilePreview from "./FilePreview";
 export default function ResultPreview(props: {
   result?: SearchResult;
   welcome: boolean;
+  hasQuery?: boolean;
+  searchFailed?: boolean;
   previewReady: boolean;
   enabled: boolean;
   modifier: string;
@@ -93,8 +95,20 @@ export default function ResultPreview(props: {
             <span class="welcome-mark">
               <Icon name="search" size={19} />
             </span>
-            <h1>Start typing.</h1>
-            <p>Find an app, a file, or the answer to a quick calculation.</p>
+            <h1>
+              {props.searchFailed
+                ? "Search unavailable."
+                : props.hasQuery
+                  ? "Try another search."
+                  : "Start typing."}
+            </h1>
+            <p>
+              {props.searchFailed
+                ? "Edit your search to try again. You can also change the category."
+                : props.hasQuery
+                  ? "Try a shorter name or choose a different category."
+                  : "Find an app, a file, or the answer to a quick calculation."}
+            </p>
             <dl class="welcome-shortcuts">
               <div>
                 <dt>Move through results</dt>

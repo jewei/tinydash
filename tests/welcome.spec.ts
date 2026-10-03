@@ -51,9 +51,9 @@ for (const platform of ["macos", "windows", "linux"]) {
     await openLauncher(page);
     await expect(welcome(page)).toBeVisible();
     await expect(welcome(page).getByRole("button")).toHaveText([
-      "Find an app↵",
-      "128 × 1.08↵",
-      "Find an emoji↵",
+      "Find an appOpen your everyday tools↵",
+      "128 × 1.08Get an answer instantly↵",
+      "Find an emojiFind the right symbol↵",
     ]);
     await expect(
       page.getByRole("heading", { name: "Start typing." }),

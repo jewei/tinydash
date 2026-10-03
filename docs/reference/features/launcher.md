@@ -18,14 +18,18 @@ While an input method composes text, its keys do not run launcher actions. Enter
 
 The search field disables automatic text correction, capitalization, spelling checks, and inline writing suggestions. This keeps application names and commands as entered. These field settings do not control system Siri activation or its keyboard shortcuts.
 
-The actions menu uses Command/Ctrl + K. The tray can open the launcher, open Settings, refresh data, and quit. A second app launch shows the existing process.
+The actions menu uses Command/Ctrl + K. When no result is selected, it shows appearance options and launcher commands without an empty result-action column. Use Search actions to filter commands. The search field's Clear search button stays available while the query has text, including after an empty result or a search error. Clearing the query returns focus to the search field.
+
+Empty search results suggest another search. A search failure shows **Search unavailable** and the error message, so users can distinguish a failed search from a search with no matches.
+
+The tray can open the launcher, open Settings, refresh data, and quit. A second app launch shows the existing process.
 
 ## Verification
 
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
 
 ```sh
-bun run verify:browser tests/welcome.spec.ts tests/categories.spec.ts tests/launcher.spec.ts
+bun run verify:browser tests/welcome.spec.ts tests/categories.spec.ts tests/launcher.spec.ts tests/ui-polish.spec.ts
 bun run verify:browser tests/launcher-controller.spec.ts tests/search-errors.spec.ts tests/native-subscriptions.spec.ts tests/launcher-warnings.spec.ts tests/ipc-contract.spec.ts tests/ipc-drift.spec.ts
 ```
 

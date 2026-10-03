@@ -14,6 +14,8 @@ Linux uses pidfds and requires Linux 5.3 or later. Windows uses the current SID/
 
 Enter short/long hex, RGB(A), or HSL(A), then choose **Convert color**. RGB channels may be numeric or percentages; HSL saturation/lightness use percentages. Invalid, out-of-range, and nonfinite values are rejected. **Copy HEX**, **Copy RGB**, and **Copy HSL** reparse the displayed result's original input in Rust before writing the clipboard. Editing an unconverted draft does not change the copied result. Named colors and other CSS color spaces are not supported.
 
+Converted values have separate HEX, RGB, and HSL labels below the color preview. The values share one row in wide windows and stack in narrow windows. Utility tabs scroll horizontally when they do not fit.
+
 On macOS, **Pick from screen** uses `NSColorSampler` on the main thread and converts to 8-bit sRGB. Click a pixel or press Escape. Only one native session is allowed; the IPC wait is bounded to 120 seconds. macOS provides no cancellation API here: a timed-out sampler must still be dismissed with Escape. Other platforms use the WebView EyeDropper API only when available and directly invoked by a click. Linux WebKitGTK usually lacks it; enter a color instead.
 
 ## Keep awake

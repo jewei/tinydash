@@ -16,6 +16,7 @@ import {
 } from "../library-bridge";
 import "../styles/library.css";
 import ConfirmDialog from "./ConfirmDialog";
+import Icon from "./Icon";
 
 const empty = (kind: LibraryKind): LibraryDraft => ({
   kind,
@@ -342,7 +343,30 @@ export default function LibraryPanel(props: {
               <Show
                 when={entry()}
                 fallback={
-                  <p class="library-hint">Choose an item to run or edit.</p>
+                  <Show
+                    when={
+                      loaded() &&
+                      !listLoading() &&
+                      !listError() &&
+                      !items().length &&
+                      !query().trim()
+                    }
+                    fallback={
+                      <p class="library-hint">Choose an item to run or edit.</p>
+                    }
+                  >
+                    <div class="library-empty">
+                      <span class="library-empty-icon" aria-hidden="true">
+                        <Icon name="link" size={25} />
+                      </span>
+                      <h3>Your shortcuts, in one place</h3>
+                      <p class="library-hint">
+                        Add a quicklink to open a website, or a snippet to reuse
+                        text. Choose New quicklink or New snippet to create your
+                        first item.
+                      </p>
+                    </div>
+                  </Show>
                 }
               >
                 {(saved) => (
