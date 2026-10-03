@@ -4821,6 +4821,7 @@ dependencies = [
  "url",
  "walkdir",
  "windows 0.62.2",
+ "windows-collections 0.3.2",
  "windows-sys 0.61.2",
  "zeroize",
 ]

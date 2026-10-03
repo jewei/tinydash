@@ -26,6 +26,8 @@ The [notify](https://docs.rs/notify/9.0.0-rc.5/notify/) watcher uses FSEvents on
 
 The detail pane shows size, modification time, and a bounded UTF-8 text or raster-image preview. Text is rendered inertly, never as HTML; unsupported, oversized, missing, or changed files report a limitation. Preview requests are serialized and stale selections are discarded. The text cap is 64 KiB; image previews have byte and dimension bounds.
 
+File and app results also offer **Share** on macOS and Windows. The native chooser receives a file reference. Receiving apps decide whether they accept folders or app bundles. See [Share behavior and verification](launcher.md).
+
 File actions include **Copy Path**, **Open With** using an indexed application, **Open in Terminal**, **Quick Look**, **Copy File**, and **Move to Trash**. Trash requires explicit confirmation in both UI and Rust. File IDs and paths are revalidated before operations. Copy File and Quick Look currently require macOS. Open With supports macOS/Linux; Windows reports unsupported. Terminal opening requires Windows Terminal on Windows or `x-terminal-emulator` on Linux. Copy Path works without these tools. Native OS effects are not proved by browser mocks.
 
 ## Verification

@@ -1,4 +1,12 @@
 use crate::launcher::transfer::{DragCompletion, DragOutcome};
+
+pub fn share(
+    _window: &tauri::WebviewWindow,
+    _item: crate::launcher::transfer::ShareItem,
+    _complete: crate::launcher::transfer::ShareCompletion,
+) -> Result<(), String> {
+    Err("Native Share is unavailable on this desktop. Use the copy actions instead.".into())
+}
 use gtk::{gdk, glib::SignalHandlerId, prelude::*};
 use std::{
     cell::{Cell, RefCell},

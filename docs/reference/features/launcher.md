@@ -22,6 +22,10 @@ The search field disables automatic text correction, capitalization, spelling ch
 
 The actions menu uses Command/Ctrl + K. When no result is selected, it shows appearance options and launcher commands without an empty result-action column. Use Search actions to filter commands. The search field's Clear search button stays available while the query has text, including after an empty result or a search error. Clearing the query returns focus to the search field.
 
+On macOS and Windows, select a supported result and choose **Actions > Share** to open the system share chooser. Files, folders, apps, calculations, emoji, clipboard text, cleaned URLs, and web search URLs support this action. Generated passwords do not. Text is limited to 64 KiB. Rust resolves the selected result again before opening the chooser. The action does not change the clipboard or count as a launch.
+
+Select a receiving app or cancel the chooser. TinyDash stays open and blocks other result actions during the native session. Windows releases that state when a target has accepted the prepared data, or when focus returns to the launcher after closing the chooser. A return from Share does not confirm delivery to a recipient. Available targets and accepted formats depend on the operating system and receiving app. Linux does not show Share; use Copy or the file actions instead.
+
 Select an app result, including a pin or suggestion, then choose **Actions > Quit** or **Force Quit**. Both require confirmation, with Cancel focused when the app check completes. Force Quit can lose unsaved work. The launcher stays open after the request and does not count it as a launch. A successful request does not mean that the app has exited.
 
 Rust resolves the app's catalog ID to its bundle or executable path on demand. Search does not enumerate processes. A single-use confirmation expires after 30 seconds and is bound to the process identity and action. An app that has exited, a protected process, or an ambiguous match is not terminated. Use **Actions > Utilities > Processes** when direct app matching is unavailable. See [app process limits](utilities.md#quit-from-app-results).
@@ -31,6 +35,8 @@ Empty search results suggest another search. A search failure shows **Search una
 The tray can open the launcher, open Settings, refresh data, and quit. A second app launch shows the existing process.
 
 ## Verification
+
+For Share, check the supported result kinds, Linux exclusion, menu filtering, disabled actions, and error feedback. On an identified macOS/Windows desktop build, share disposable text, an HTTPS URL, a file, a folder, and an app reference. Confirm the content in the receiving app and cancel before sending. Cancel the chooser without selecting a target, then reopen it. Check missing files, expired results, oversized text, target failure, and returning focus to the launcher. Confirm that other actions become available again and that the system clipboard is unchanged. Browser mocks and static compilation cannot prove the native chooser or transfer.
 
 For app Quit and Force Quit, check menu filtering, Cancel and Escape, initial Cancel focus after preparation, preparation errors, expired confirmation, repeated clicks, background search updates, and launcher hide/reopen. Use a disposable app with unsaved text on each desktop. Confirm that Quit requests normal closure on macOS/Windows, Force Quit stops only the selected app, and another app with the same display name remains open. On Linux, check SIGTERM/SIGKILL and the pidfd kernel requirement. Check stopped apps, multiple matching processes, protected processes, and unsupported launchers. Static compilation does not prove process effects.
 

@@ -5,8 +5,8 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 #[cfg(target_os = "linux")]
-pub use linux::drag;
+pub use linux::{drag, share};
 #[cfg(target_os = "macos")]
-pub use macos::drag;
+pub use macos::{drag, share};
 #[cfg(target_os = "windows")]
-pub use windows::drag;
+pub use windows::{drag, share, share_focus_changed};

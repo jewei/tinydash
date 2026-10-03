@@ -4,6 +4,7 @@ fn main() {
     let manifest = tauri_build::AppManifest::new().commands(&[
         "paste_result",
         "drag_result",
+        "share_result",
         "paste_queue",
         "library_list",
         "library_get",

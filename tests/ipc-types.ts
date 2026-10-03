@@ -91,6 +91,7 @@ export const commandWrappers = {
   item_catalog: "itemCatalog",
   paste_result: "paste",
   drag_result: "drag",
+  share_result: "share",
   paste_queue: "pasteQueue",
   rich_clipboard_history: "richClipboardHistory",
   rich_clipboard_preview: "richClipboardPreview",

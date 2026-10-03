@@ -239,6 +239,10 @@ pub fn run() -> anyhow::Result<()> {
                 return;
             }
             match event {
+            #[cfg(target_os = "windows")]
+            tauri::WindowEvent::Focused(focused) if launcher::transfer::active(window.app_handle()) => {
+                platform::transfer::share_focus_changed(*focused);
+            }
             tauri::WindowEvent::CloseRequested { api, .. } => {
                 api.prevent_close();
                 if let Err(error) = window::dismiss(window.app_handle()) { tracing::warn!(%error, "Could not hide launcher"); }
@@ -257,6 +261,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::commands::item_catalog,
             launcher::paste::paste_result,
             launcher::transfer::drag_result,
+            launcher::transfer::share_result,
             launcher::paste_queue::paste_queue,
             launcher::library::library_list,
             launcher::library::library_get,

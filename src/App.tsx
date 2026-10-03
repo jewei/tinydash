@@ -137,6 +137,24 @@ export default function App(
   const [info, setInfo] = createSignal<LauncherInfo>();
   const [busy, setBusy] = createSignal(false);
   const [dragging, setDragging] = createSignal(false);
+  const [sharing, setSharing] = createSignal(false);
+  async function shareCurrent() {
+    const result = current();
+    if (!result || !canOpen()) return;
+    setMenuOpen(false);
+    setSharing(true);
+    setError(undefined);
+    try {
+      await backend.share(result.id);
+    } catch (reason) {
+      if (!disposed) setError(String(reason));
+    } finally {
+      if (!disposed) {
+        setSharing(false);
+        focusInput();
+      }
+    }
+  }
   let dragCandidate:
     | { id: string; x: number; y: number; pointer: number }
     | undefined;
@@ -290,6 +308,7 @@ export default function App(
     !!current() &&
     !busy() &&
     !dragging() &&
+    !sharing() &&
     !pending() &&
     !clearOpen() &&
     !clipboardTool() &&
@@ -409,6 +428,25 @@ export default function App(
         icon: "pin",
         run: () => void togglePin(option.category),
         disabled: !canOpen() || pinBusy(),
+      });
+    if (
+      ["macos", "windows"].includes(info()?.platform ?? "") &&
+      [
+        "app",
+        "file",
+        "folder",
+        "calculation",
+        "emoji",
+        "clipboard",
+        "cleanedUrl",
+        "webSearch",
+      ].includes(current()?.kind ?? "")
+    )
+      actions.push({
+        label: "Share",
+        icon: "share",
+        run: () => void shareCurrent(),
+        disabled: !canOpen(),
       });
     if (current()?.kind === "app") {
       for (const force of [false, true])
@@ -893,7 +931,7 @@ export default function App(
   }
 
   function onKey(event: KeyboardEvent) {
-    if (dragging()) return;
+    if (dragging() || sharing()) return;
     if (composing || event.isComposing || event.keyCode === 229) return;
     if (panel()) return;
     if (clipboardTool()) return;

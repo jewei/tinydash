@@ -79,6 +79,73 @@ pub enum DragOutcome {
 
 pub type DragCompletion = Box<dyn FnOnce(Result<DragOutcome, String>) + Send>;
 
+#[derive(Clone)]
+pub enum ShareItem {
+    File(PathBuf),
+    Text(String),
+    Url(String),
+}
+
+pub type ShareCompletion = Box<dyn FnOnce(Result<(), String>) + Send>;
+
+fn resolve_share(app: &AppHandle, id: &str) -> Result<ShareItem, String> {
+    if id.starts_with("app:") || id.starts_with("file:") {
+        return resolve_path(app, id).map(ShareItem::File);
+    }
+    // Generated secrets have no Share action. Do not turn a forged ID into one.
+    if id.starts_with("password:") {
+        return Err("Generated passwords cannot be shared from Actions.".into());
+    }
+    let value = {
+        let state = app.state::<LauncherState>();
+        let search = state.search.lock().map_err(|_| "Search is unavailable.")?;
+        match search
+            .resolve_action(id, Action::Copy)
+            .map_err(|e| e.to_string())?
+        {
+            ResolvedAction::Copy(text) => text,
+            _ => return Err("This result does not support Share.".into()),
+        }
+    };
+    if value.len() > 65_536 {
+        return Err("Share supports up to 64 KiB of text.".into());
+    }
+    if url::Url::parse(&value).is_ok_and(|url| matches!(url.scheme(), "http" | "https")) {
+        Ok(ShareItem::Url(value))
+    } else {
+        Ok(ShareItem::Text(value))
+    }
+}
+
+#[tauri::command]
+pub async fn share_result(window: WebviewWindow, id: String) -> Result<(), String> {
+    let _operation = reserve(&window)?;
+    let app = window.app_handle().clone();
+    let item = tauri::async_runtime::spawn_blocking(move || resolve_share(&app, &id))
+        .await
+        .map_err(|e| e.to_string())??;
+    let (sender, mut receiver) = tauri::async_runtime::channel(1);
+    let native_window = window.clone();
+    window
+        .run_on_main_thread(move || {
+            let completed = sender.clone();
+            if let Err(error) = crate::platform::transfer::share(
+                &native_window,
+                item,
+                Box::new(move |result| {
+                    let _ = completed.try_send(result);
+                }),
+            ) {
+                let _ = sender.try_send(Err(error));
+            }
+        })
+        .map_err(|e| e.to_string())?;
+    receiver
+        .recv()
+        .await
+        .ok_or("The native share session ended without a result.")?
+}
+
 #[tauri::command]
 pub async fn drag_result(window: WebviewWindow, id: String) -> Result<DragOutcome, String> {
     let operation = reserve(&window)?;

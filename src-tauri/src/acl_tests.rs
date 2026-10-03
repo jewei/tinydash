@@ -33,6 +33,7 @@ fn windows_ipc_test_executable_loads_common_controls_v6() {
 const MAIN_ONLY: &[&str] = &[
     "paste_result",
     "drag_result",
+    "share_result",
     "paste_queue",
     "library_list",
     "library_get",

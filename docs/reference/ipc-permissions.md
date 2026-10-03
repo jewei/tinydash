@@ -6,7 +6,7 @@ The [window permission sets](../../src-tauri/permissions/windows.toml) have no d
 
 ## Command ownership
 
-`drag_result` is a main-window-only command. It accepts a catalog result ID and resolves the file or application path in Rust. Native transfers block automatic launcher hiding until the session ends.
+`drag_result` and `share_result` are main-window-only commands. They accept a catalog result ID and resolve file paths or share content in Rust. Share rejects generated password IDs and text larger than 64 KiB. Native transfers block automatic launcher hiding until the session ends.
 
 The grants follow actual frontend callers, not the module that implements a command. Calls go through [the frontend bridge](../../src/bridge.ts) and the file, library, clipboard-format, and utility bridges beside it.
 

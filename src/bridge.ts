@@ -215,6 +215,7 @@ export interface PasteQueueStatus {
 
 export const backend = {
   drag: (id: string) => invoke<DragOutcome>("drag_result", { id }),
+  share: (id: string) => invoke<void>("share_result", { id }),
   syncAppearance: (change: AppearanceChange) =>
     invoke<void>("sync_appearance", { change }),
   setLauncherAppearance: (

@@ -569,7 +569,7 @@ mockIPC(
       };
     if (command === "utility_awake_status")
       return { active: false, endsAt: null, remainingSeconds: 0 };
-    if (command === "drag_result")
+    if (command === "drag_result" || command === "share_result")
       throw new Error(
         "Native file transfers are unavailable in the browser preview.",
       );

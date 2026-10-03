@@ -7,6 +7,7 @@ description = "Search, result actions, launcher controls, and the launcher's nar
 permissions = [
   "allow-paste-result",
   "allow-drag-result",
+  "allow-share-result",
   "allow-paste-queue",
   "allow-library-list",
   "allow-library-get",

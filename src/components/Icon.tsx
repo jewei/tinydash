@@ -21,6 +21,7 @@ export type IconName =
   | "volume"
   | "logout"
   | "desktop"
+  | "share"
   | "copy"
   | "clock"
   | "globe"
@@ -43,6 +44,9 @@ export default function Icon(props: { name: IconName; size?: number }) {
       aria-hidden="true"
     >
       <Switch>
+        <Match when={props.name === "share"}>
+          <path d="M12 15V3m-4 4 4-4 4 4M7 10H4v11h16V10h-3" />
+        </Match>
         <Match when={props.name === "emoji"}>
           <circle cx="12" cy="12" r="9" />
           <path d="M8 14a4 4 0 0 0 8 0M8 9h.01M16 9h.01" />

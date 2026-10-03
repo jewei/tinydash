@@ -70,6 +70,7 @@ export async function probeCommands(settings: SettingsValues) {
     itemCatalog: backend.itemCatalog,
     paste: () => backend.paste("clipboard:1"),
     drag: () => backend.drag("app:example"),
+    share: () => backend.share("app:example"),
     pasteQueue: () => backend.pasteQueue("start", ["clipboard:1"]),
     setAppPreference: () =>
       backend.setAppPreference("app:example", ["alias"], true),

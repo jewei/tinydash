@@ -62,13 +62,14 @@ plist = "1.10.1"
 objc2 = "0.6.4"
 block2 = "0.6.2"
 objc2-quartz-core = { version = "0.3.2", default-features = false, features = ["std", "CALayer", "objc2-core-foundation"] }
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSColor", "NSColorSampler", "NSColorSpace", "NSScreen", "block2", "NSPasteboard", "NSWorkspace", "NSRunningApplication", "NSDragging", "NSDraggingItem", "NSDraggingSession", "NSEvent", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSAppearance", "NSGlassEffectView", "NSResponder", "NSView", "NSWindow", "objc2-quartz-core", "objc2-core-foundation", "objc2-core-graphics"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "libc", "NSColor", "NSColorSampler", "NSColorSpace", "NSScreen", "block2", "NSPasteboard", "NSWorkspace", "NSRunningApplication", "NSSharingService", "NSDragging", "NSDraggingItem", "NSDraggingSession", "NSEvent", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSGraphicsContext", "NSAppearance", "NSGlassEffectView", "NSResponder", "NSView", "NSWindow", "objc2-quartz-core", "objc2-core-foundation", "objc2-core-graphics"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSData", "NSDictionary", "NSGeometry", "NSString"] }
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGBitmapContext", "CGColorSpace", "CGContext", "CGImage", "CGEvent", "CGEventTypes", "CGEventSource", "CGRemoteOperation"] }
 objc2-core-services = { version = "0.3.2", default-features = false, features = ["std", "AE", "AEDataModel", "AEMach", "AERegistry"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse"] }
+windows-collections = "=0.3.2"
+windows = { version = "=0.62.2", features = ["ApplicationModel_DataTransfer", "Foundation", "Storage", "Storage_Streams", "Storage_Search", "Win32_System_WinRT", "Win32_Foundation", "Win32_System_Com", "Win32_System_Ole", "Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse"] }
 windows-sys = { version = "0.61.2", features = ["Win32_UI_Shell", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry", "Win32_System_Com", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_System_Shutdown", "Win32_System_Power", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_Security"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
