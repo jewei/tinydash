@@ -40,7 +40,12 @@ pub fn apply_usage(results: &mut [SearchResult], usage: &HashMap<String, Usage>,
 }
 
 pub fn score_with_usage(score: u32, id: &str, usage: &HashMap<String, Usage>, now: i64) -> u32 {
-    score.saturating_add(usage.get(id).map_or(0, |stats| usage_bonus(*stats, now)))
+    let key = crate::providers::emoji::canonical_id(id);
+    score.saturating_add(
+        usage
+            .get(key.as_ref())
+            .map_or(0, |stats| usage_bonus(*stats, now)),
+    )
 }
 
 const EXACT_BONUS: u32 = 10_000;

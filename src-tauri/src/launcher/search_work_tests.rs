@@ -50,7 +50,9 @@ impl SearchManager {
         {
             results.extend(
                 self.emoji
-                    .get_or_insert_with(EmojiProvider::default)
+                    .get_or_insert_with(|| {
+                        EmojiProvider::new(self.emoji_skin_tone, &self.emoji_languages)
+                    })
                     .search(query.text, &mut self.matcher),
             );
         }

@@ -268,7 +268,10 @@ impl Session {
                 return;
             }
         };
-        self.pending_usage.insert(id.to_owned(), usage);
+        self.pending_usage.insert(
+            crate::providers::emoji::canonical_id(id).into_owned(),
+            usage,
+        );
         let _ = self.with_database(|_| Ok(()));
     }
 
@@ -1186,5 +1189,24 @@ mod tests {
         assert_eq!(observed.changed(None), None);
         assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
         assert_eq!(observed.changed(Some(" \n".into())), None);
+    }
+    #[test]
+    fn emoji_variants_persist_usage_under_the_existing_base_key() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("state.sqlite3");
+        let search = Mutex::new(SearchManager::default());
+        let mut session = Session {
+            database: Some(Database::open(&path).unwrap()),
+            health: Health::Healthy,
+            ..Session::default()
+        };
+        session.record(&search, "emoji:👍", 100);
+        session.record(&search, "emoji:👍🏽", 101);
+        session.record(&search, "emoji:👍🏿", 102);
+        drop(session);
+        let usage = Database::open(&path).unwrap().load_usage().unwrap();
+        assert_eq!(usage.len(), 1);
+        assert_eq!(usage["emoji:👍"].count, 3);
+        assert_eq!(usage["emoji:👍"].last_used_at, 102);
     }
 }

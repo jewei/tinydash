@@ -104,6 +104,8 @@ impl WebSearch {
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Settings {
     pub show_suggestions: bool,
+    pub emoji_skin_tone: u8,
+    pub emoji_languages: Vec<String>,
     pub clear_query_on_open: bool,
     pub hide_on_blur: bool,
     pub shortcut: String,
@@ -134,6 +136,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             show_suggestions: true,
+            emoji_skin_tone: 0,
+            emoji_languages: Vec::new(),
             clear_query_on_open: true,
             hide_on_blur: true,
             shortcut: DEFAULT_SHORTCUT.into(),
@@ -202,6 +206,22 @@ impl Settings {
     pub fn validate(&self) -> anyhow::Result<()> {
         use anyhow::ensure;
         use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+        ensure!(
+            self.emoji_skin_tone <= 5,
+            "Select an emoji skin tone from 0 through 5."
+        );
+        ensure!(
+            self.emoji_languages.len() <= 3
+                && self
+                    .emoji_languages
+                    .iter()
+                    .enumerate()
+                    .all(|(index, language)| {
+                        matches!(language.as_str(), "zh" | "ms" | "es")
+                            && !self.emoji_languages[..index].contains(language)
+                    }),
+            "Select each supported emoji search language only once (zh, ms, es)."
+        );
         let allowed_shortcut = |key: &Shortcut| {
             key.mods
                 .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER)
@@ -886,5 +906,33 @@ mod tests {
         );
         assert_eq!(custom.file_limit(), 100_000);
         assert!(custom.file_search_excluded_dirs.is_empty());
+    }
+    #[test]
+    fn emoji_preferences_validate_persist_and_keep_legacy_defaults() {
+        let legacy: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(legacy.emoji_skin_tone, 0);
+        assert!(legacy.emoji_languages.is_empty());
+        let dir = tempfile::tempdir().unwrap();
+        let mut settings = Settings {
+            emoji_skin_tone: 3,
+            emoji_languages: vec!["zh".into(), "ms".into(), "es".into()],
+            ..Settings::default()
+        };
+        save(dir.path(), &settings).unwrap();
+        assert_eq!(load(dir.path()).unwrap(), settings);
+        settings.emoji_skin_tone = 6;
+        assert!(save(dir.path(), &settings).is_err());
+        settings.emoji_skin_tone = 0;
+        for languages in [
+            vec!["zh", "zh"],
+            vec!["unknown"],
+            vec!["zh", "ms", "es", "zh"],
+        ] {
+            settings.emoji_languages = languages.into_iter().map(str::to_owned).collect();
+            assert!(save(dir.path(), &settings).is_err());
+        }
+        let saved = load(dir.path()).unwrap();
+        assert_eq!(saved.emoji_skin_tone, 3);
+        assert_eq!(saved.emoji_languages, ["zh", "ms", "es"]);
     }
 }

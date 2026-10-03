@@ -29,6 +29,8 @@ This partial example leaves clipboard capture off. Fresh installations ask for c
 ```json
 {
   "clearQueryOnOpen": true,
+  "emojiSkinTone": 0,
+  "emojiLanguages": [],
   "hideOnBlur": true,
   "shortcut": "Control+Shift+Space",
   "clipboardHistoryEnabled": false,
@@ -44,6 +46,8 @@ This partial example leaves clipboard capture off. Fresh installations ask for c
 Set `clearQueryOnOpen` to `false` to keep the previous query and search mode. TinyDash selects that text when the window opens. With the default setting, it clears the query and selects the first visible category, which is All by default. Set `hideOnBlur` to `false` to keep the window visible when another app receives focus. Use the settings screen to apply shortcut changes at once. An invalid settings file is left unchanged; the app uses defaults and displays a warning.
 
 `showSuggestions` defaults to `true`. Turn off **Show usage-based suggestions** in Search settings to remove the six-item usage list from empty All. Pins and ordinary search ranking remain available. This choice is included in settings exports.
+
+**Search > Emoji** has a skin-tone preference and optional language keywords. `emojiSkinTone` is 0–5: default, light, medium-light, medium, medium-dark, or dark. `emojiLanguages` is a list of distinct supported codes: `zh` (Simplified Chinese), `ms` (Malay), and `es` (Spanish). The default is `[]`; English names and shortcodes are always enabled. These fields are included in settings import/export. See [emoji behavior](features/emoji.md).
 
 On macOS, a saved `CommandOrControl+Shift+Space` value from earlier TinyDash versions now uses `Control+Shift+Space`. This compatibility rule keeps the settings file intact, including other user settings. Other custom shortcuts remain unchanged. New settings files contain `Control+Shift+Space`.
 

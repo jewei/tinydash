@@ -30,6 +30,8 @@ export const contracts = {
     "clipboardHistoryLimit": 100,
     "clipboardRetentionDays": 0,
     "currencyRatesEnabled": true,
+    "emojiLanguages": [],
+    "emojiSkinTone": 0,
     "fileSearchExcludedDirs": [
       "node_modules",
       "target"
@@ -193,6 +195,8 @@ export const contracts = {
       "clipboardHistoryLimit": 100,
       "clipboardRetentionDays": 0,
       "currencyRatesEnabled": true,
+      "emojiLanguages": [],
+      "emojiSkinTone": 0,
       "fileSearchExcludedDirs": [
         "node_modules",
         "target"
@@ -241,6 +245,8 @@ export const contracts = {
       "clipboardHistoryLimit": 100,
       "clipboardRetentionDays": 0,
       "currencyRatesEnabled": true,
+      "emojiLanguages": [],
+      "emojiSkinTone": 0,
       "fileSearchExcludedDirs": [
         "node_modules",
         "target"
@@ -287,6 +293,8 @@ export const contracts = {
       "clipboardHistoryLimit": 100,
       "clipboardRetentionDays": 0,
       "currencyRatesEnabled": true,
+      "emojiLanguages": [],
+      "emojiSkinTone": 0,
       "fileSearchExcludedDirs": [
         "node_modules",
         "target"
@@ -551,6 +559,8 @@ export const contracts = {
     "clipboardHistoryLimit": 100,
     "clipboardRetentionDays": 0,
     "currencyRatesEnabled": true,
+    "emojiLanguages": [],
+    "emojiSkinTone": 0,
     "fileSearchExcludedDirs": [
       "node_modules",
       "target"
@@ -605,6 +615,8 @@ export const contracts = {
       "clipboardHistoryLimit": 100,
       "clipboardRetentionDays": 0,
       "currencyRatesEnabled": true,
+      "emojiLanguages": [],
+      "emojiSkinTone": 0,
       "fileSearchExcludedDirs": [
         "node_modules",
         "target"
@@ -648,6 +660,8 @@ export const contracts = {
       "clipboardHistoryLimit": 100,
       "clipboardRetentionDays": 0,
       "currencyRatesEnabled": true,
+      "emojiLanguages": [],
+      "emojiSkinTone": 0,
       "fileSearchExcludedDirs": [
         "node_modules",
         "target"

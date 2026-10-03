@@ -295,6 +295,8 @@ const defaultSettings: SettingsValues = {
   clearQueryOnOpen: true,
   hideOnBlur: true,
   showSuggestions: true,
+  emojiSkinTone: 0,
+  emojiLanguages: [],
   shortcut: "Control+Shift+Space",
   categoryShortcuts: [],
   startAtLogin: false,

@@ -126,6 +126,8 @@ export interface SearchResponse {
 
 export interface SettingsValues {
   showSuggestions: boolean;
+  emojiSkinTone: number;
+  emojiLanguages: string[];
   clearQueryOnOpen: boolean;
   hideOnBlur: boolean;
   shortcut: string;

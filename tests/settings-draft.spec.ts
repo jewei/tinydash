@@ -119,3 +119,17 @@ test("first load normalizes categories and resets text baselines", () => {
   expect(result.updateFolders).toBe(true);
   expect(result.updateExcluded).toBe(true);
 });
+
+test("emoji draft choices survive unrelated saved-settings updates", () => {
+  const saved = settings();
+  const draft = settings();
+  draft.emojiSkinTone = 3;
+  draft.emojiLanguages = ["zh", "ms"];
+  const incoming = settings();
+  incoming.emojiLanguages = ["es"];
+  incoming.hideOnBlur = false;
+  const merged = mergeSettingsDraft(saved, draft, incoming, "custom");
+  expect(merged.draft.emojiSkinTone).toBe(3);
+  expect(merged.draft.emojiLanguages).toEqual(["zh", "ms"]);
+  expect(merged.draft.hideOnBlur).toBe(false);
+});

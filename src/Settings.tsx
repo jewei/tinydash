@@ -37,6 +37,7 @@ import {
 } from "./appearance";
 import ConfirmDialog from "./components/ConfirmDialog";
 import ItemPreferences from "./components/ItemPreferences";
+import EmojiPreferences from "./components/EmojiPreferences";
 import Icon, { type IconName } from "./components/Icon";
 import {
   AppPreferences,
@@ -48,6 +49,7 @@ import {
   normalizeCategories,
 } from "./categories";
 import appIconUrl from "../app-icon.svg";
+import emojiDataLicense from "../src-tauri/data/emoji/LICENSE?raw";
 import "./styles/settings.css";
 
 const sections = [
@@ -115,7 +117,7 @@ const sectionKeywords: Record<Section, string> = {
     "keyboard hotkey startup login blur reset menu bar window placement presets restore maximize center",
   appearance: "theme dark light compact glass transparency",
   search:
-    "aliases applications hidden shortcuts commands web keywords suggestions usage paste queue",
+    "aliases applications hidden shortcuts commands web keywords suggestions usage paste queue emoji skin tone language Chinese Malay Spanish 简体中文 Bahasa Melayu Español",
   categories: "tabs visible hide providers",
   clipboard:
     "history copy paste images files exclusions privacy retention days",
@@ -1003,6 +1005,12 @@ export default function Settings() {
                   checked={value().showSuggestions}
                   onChange={(next) => field("showSuggestions", next)}
                 />
+                <EmojiPreferences
+                  skinTone={value().emojiSkinTone}
+                  languages={value().emojiLanguages}
+                  onSkinTone={(next) => field("emojiSkinTone", next)}
+                  onLanguages={(next) => field("emojiLanguages", next)}
+                />
                 <ItemPreferences
                   value={value().itemPreferences}
                   onChange={(next) => field("itemPreferences", next)}
@@ -1597,6 +1605,22 @@ export default function Settings() {
                     <br />
                     creativecommons.org/licenses/by/4.0/
                   </p>
+                </div>
+                <div class="settings-group settings-separated">
+                  <h2>Emoji search data</h2>
+                  <p>
+                    Language keywords use Unicode CLDR 48.0.0 under the Unicode
+                    License V3.
+                  </p>
+                  <details>
+                    <summary>Emoji data license</summary>
+                    <p
+                      class="settings-hint"
+                      style={{ "white-space": "pre-wrap" }}
+                    >
+                      {emojiDataLicense}
+                    </p>
+                  </details>
                 </div>
                 <div class="settings-group settings-separated">
                   <h2>Updates</h2>

@@ -4,7 +4,7 @@ These tab-separated tables contain Simplified Chinese (`zh`), Malay (`ms`), and 
 
 Each row starts with a Unicode sequence, followed by distinct search terms. The generator combines `annotations` and `annotationsDerived`, normalizes terms to NFC, and excludes skin-tone rows. The Rust provider accepts only sequences present in its `emojis` catalog and indexes only selected languages. The catalog supplies skin-tone variants and English result labels.
 
-The data uses the [Unicode License V3](LICENSE). Keep that notice with redistributed data. There is no runtime download.
+The data uses the [Unicode License V3](LICENSE). Keep that notice with redistributed data. Settings > About embeds the complete notice in the shipped frontend. There is no runtime download.
 
 Regenerate from the repository root:
 

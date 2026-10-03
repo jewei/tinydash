@@ -128,6 +128,8 @@ pub struct SearchManager {
     files: FileProvider,
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
+    emoji_skin_tone: u8,
+    emoji_languages: Vec<String>,
     system: Option<SystemCommandProvider>,
     calculator: CalculatorProvider,
     pub clipboard: ClipboardProvider,
@@ -155,6 +157,8 @@ impl Default for SearchManager {
             files: FileProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
+            emoji_skin_tone: 0,
+            emoji_languages: Vec::new(),
             system: None,
             calculator: CalculatorProvider::default(),
             clipboard: ClipboardProvider::default(),
@@ -172,6 +176,14 @@ impl Default for SearchManager {
 impl SearchManager {
     pub fn apply_settings(&mut self, settings: &crate::settings::Settings) {
         self.show_suggestions = settings.show_suggestions;
+        self.emoji_skin_tone = settings.emoji_skin_tone;
+        if self.emoji_languages != settings.emoji_languages {
+            self.emoji_languages = settings.emoji_languages.clone();
+            self.emoji = None;
+        }
+        if let Some(emoji) = self.emoji.as_mut() {
+            emoji.set_skin_tone(settings.emoji_skin_tone);
+        }
         self.app_preferences = settings.app_preferences.clone();
         self.item_preferences = settings.item_preferences.clone();
         for (id, item) in &self.item_preferences {
@@ -272,7 +284,7 @@ impl SearchManager {
                 }
                 .key()
             } else {
-                result.id.clone()
+                crate::providers::emoji::canonical_id(&result.id).into_owned()
             };
             *index += 1;
             result.pin = Some(self.describe_pin(key));
@@ -305,11 +317,7 @@ impl SearchManager {
         } else if key.starts_with("file:") {
             self.files.get(key).map(|file| file.result(0))
         } else if key.starts_with("emoji:") {
-            self.emoji
-                .get_or_insert_with(EmojiProvider::default)
-                .search(EmojiProvider::copy_value(key)?, &mut self.matcher)
-                .into_iter()
-                .find(|result| result.id == key)
+            EmojiProvider::pinned_result(key, self.emoji_skin_tone)
         } else if key.starts_with("clipboard:") {
             self.clipboard.result(key)
         } else if key.starts_with("system:") {
@@ -347,7 +355,10 @@ impl SearchManager {
     }
 
     pub fn record_usage(&mut self, id: &str, now: i64) -> ranking::Usage {
-        let usage = self.usage.entry(id.to_owned()).or_default();
+        let usage = self
+            .usage
+            .entry(crate::providers::emoji::canonical_id(id).into_owned())
+            .or_default();
         usage.count = usage.count.saturating_add(1);
         usage.last_used_at = now.max(0);
         *usage
@@ -790,8 +801,10 @@ impl SearchManager {
                     .search(query.text, &mut self.matcher),
                 SearchMode::Emoji => self
                     .emoji
-                    .get_or_insert_with(EmojiProvider::default)
-                    .search(query.text, &mut self.matcher),
+                    .get_or_insert_with(|| {
+                        EmojiProvider::new(self.emoji_skin_tone, &self.emoji_languages)
+                    })
+                    .search_interruptible(query.text, &mut self.matcher, || budget.stopped()),
                 _ => unreachable!("ordinary search category"),
             };
             let provider = match category {
@@ -2197,6 +2210,65 @@ mod tests {
                 .results
                 .is_empty()
         );
+    }
+    #[test]
+    fn emoji_preferences_preserve_pins_usage_and_exact_copy_after_changes() {
+        let mut search = SearchManager::default();
+        search.record_usage("emoji:👍", ranking::now());
+        search.set_pinned("emoji:👍", SearchMode::Emoji, true);
+        let mut settings = crate::settings::Settings {
+            emoji_skin_tone: 3,
+            emoji_languages: vec!["zh".into()],
+            ..crate::settings::Settings::default()
+        };
+        search.apply_settings(&settings);
+        let result = search
+            .search("拇指向上", SearchMode::Emoji)
+            .unwrap()
+            .results[0]
+            .clone();
+        assert_eq!(result.id, "emoji:👍🏽");
+        assert_eq!(
+            search.pin_key(&result.id, SearchMode::Emoji).unwrap(),
+            "emoji:👍"
+        );
+        assert!(
+            result
+                .pin
+                .as_ref()
+                .unwrap()
+                .categories
+                .contains(&SearchMode::Emoji)
+        );
+        assert_eq!(search.record_usage(&result.id, ranking::now()).count, 2);
+        assert_eq!(search.usage["emoji:👍"].count, 2);
+        assert!(!search.usage.contains_key("emoji:👍🏽"));
+        let pinned = search.search("", SearchMode::Emoji).unwrap().results[0].clone();
+        assert_eq!(pinned.id, "emoji:👍🏽");
+        settings.emoji_skin_tone = 5;
+        settings.emoji_languages.clear();
+        search.apply_settings(&settings);
+        assert!(
+            matches!(search.resolve_action(&result.id, Action::Copy).unwrap(), ResolvedAction::Copy(text) if text == "👍🏽")
+        );
+        assert_eq!(
+            search.search("", SearchMode::Emoji).unwrap().results[0].id,
+            "emoji:👍🏿"
+        );
+        assert!(
+            search
+                .search("火箭", SearchMode::Emoji)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+        let suggestion = search.search("", SearchMode::All).unwrap().results[0].clone();
+        assert_eq!(suggestion.id, "emoji:👍🏿");
+        let usage = search.usage.clone();
+        let mut restored = SearchManager::default();
+        restored.set_usage(usage);
+        restored.apply_settings(&settings);
+        assert_eq!(restored.record_usage("emoji:👍🏻", ranking::now()).count, 3);
     }
 }
 
