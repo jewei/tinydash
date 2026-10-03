@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Appearance } from "./appearance";
 
+export type DragOutcome = "dropped" | "cancelled";
+
 export type AppearanceChange =
   | { kind: "appearance"; value: Appearance }
   | { kind: "compact"; value: boolean }
@@ -212,6 +214,7 @@ export interface PasteQueueStatus {
 }
 
 export const backend = {
+  drag: (id: string) => invoke<DragOutcome>("drag_result", { id }),
   syncAppearance: (change: AppearanceChange) =>
     invoke<void>("sync_appearance", { change }),
   setLauncherAppearance: (

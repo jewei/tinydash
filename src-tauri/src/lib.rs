@@ -123,6 +123,7 @@ pub fn run() -> anyhow::Result<()> {
         .manage(launcher::startup::Startup(std::sync::Mutex::new(request)))
         .manage(launcher::updates::UpdateState::default())
         .manage(launcher::paste::PasteState::default())
+        .manage(launcher::transfer::TransferState::default())
         .manage(launcher::paste_queue::PasteQueueState::default())
         .manage(launcher::utilities::UtilitiesState::default())
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
@@ -243,7 +244,7 @@ pub fn run() -> anyhow::Result<()> {
                 if let Err(error) = window::dismiss(window.app_handle()) { tracing::warn!(%error, "Could not hide launcher"); }
             }
             tauri::WindowEvent::Focused(false)
-                if window.app_handle().try_state::<LauncherState>().is_some_and(|state| state.settings().hide_on_blur) => {
+                if !launcher::transfer::active(window.app_handle()) && window.app_handle().try_state::<LauncherState>().is_some_and(|state| state.settings().hide_on_blur) => {
                 if let Err(error) = window::hide(window.app_handle()) { tracing::warn!(%error, "Could not hide launcher"); }
             }
             _ => {}
@@ -255,6 +256,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::preferences::get_settings,
             launcher::commands::item_catalog,
             launcher::paste::paste_result,
+            launcher::transfer::drag_result,
             launcher::paste_queue::paste_queue,
             launcher::library::library_list,
             launcher::library::library_get,

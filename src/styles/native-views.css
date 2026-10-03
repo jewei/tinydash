@@ -6,6 +6,14 @@
   background: var(--color-paper);
 }
 
+.result-row.can-drag {
+  cursor: grab;
+}
+
+.result-row.can-drag:active {
+  cursor: grabbing;
+}
+
 .paste-queue {
   padding: var(--space-sm) var(--space-md);
   border-bottom: 1px solid var(--color-border);

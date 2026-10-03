@@ -6,6 +6,7 @@ identifier = "launcher"
 description = "Search, result actions, launcher controls, and the launcher's narrow preference actions."
 permissions = [
   "allow-paste-result",
+  "allow-drag-result",
   "allow-paste-queue",
   "allow-library-list",
   "allow-library-get",

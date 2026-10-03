@@ -69,6 +69,7 @@ export async function probeCommands(settings: SettingsValues) {
     appCatalog: backend.appCatalog,
     itemCatalog: backend.itemCatalog,
     paste: () => backend.paste("clipboard:1"),
+    drag: () => backend.drag("app:example"),
     pasteQueue: () => backend.pasteQueue("start", ["clipboard:1"]),
     setAppPreference: () =>
       backend.setAppPreference("app:example", ["alias"], true),

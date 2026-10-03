@@ -136,6 +136,70 @@ export default function App(
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
   const [busy, setBusy] = createSignal(false);
+  const [dragging, setDragging] = createSignal(false);
+  let dragCandidate:
+    | { id: string; x: number; y: number; pointer: number }
+    | undefined;
+  let suppressResultClick = false;
+  const canDrag = (result: SearchResult) =>
+    desktop && ["app", "file", "folder"].includes(result.kind);
+
+  function prepareDrag(event: PointerEvent, result: SearchResult) {
+    if (event.button !== 0 || !event.isPrimary) return;
+    suppressResultClick = false;
+    dragCandidate =
+      canDrag(result) && canOpen() && event.pointerType === "mouse"
+        ? {
+            id: result.id,
+            x: event.clientX,
+            y: event.clientY,
+            pointer: event.pointerId,
+          }
+        : undefined;
+  }
+
+  function moveDrag(event: PointerEvent) {
+    const candidate = dragCandidate;
+    if (!candidate || event.pointerId !== candidate.pointer) return;
+    if (!(event.buttons & 1)) {
+      dragCandidate = undefined;
+      return;
+    }
+    if (
+      Math.hypot(event.clientX - candidate.x, event.clientY - candidate.y) < 6
+    )
+      return;
+    dragCandidate = undefined;
+    if (!canOpen()) return;
+    suppressResultClick = true;
+    setDragging(true);
+    setError(undefined);
+    setMenuOpen(false);
+    setNotice("Drop into another app to copy. Press Escape to cancel.");
+    void backend
+      .drag(candidate.id)
+      .then((outcome) => {
+        if (!disposed)
+          setNotice(
+            outcome === "cancelled"
+              ? "Drag canceled or not accepted."
+              : "Drop accepted by the receiving app.",
+          );
+      })
+      .catch((reason: unknown) => {
+        if (!disposed) {
+          setNotice(undefined);
+          setError(String(reason));
+        }
+      })
+      .finally(() => {
+        if (!disposed) setDragging(false);
+      });
+  }
+
+  function releaseDrag() {
+    dragCandidate = undefined;
+  }
   const [menuOpen, setMenuOpen] = createSignal(false);
   const [panel, setPanel] = createSignal<string>();
   const [panelNotice, setPanelNotice] = createSignal<string>();
@@ -225,6 +289,7 @@ export default function App(
     visible() &&
     !!current() &&
     !busy() &&
+    !dragging() &&
     !pending() &&
     !clearOpen() &&
     !clipboardTool() &&
@@ -828,6 +893,7 @@ export default function App(
   }
 
   function onKey(event: KeyboardEvent) {
+    if (dragging()) return;
     if (composing || event.isComposing || event.keyCode === 229) return;
     if (panel()) return;
     if (clipboardTool()) return;
@@ -1180,6 +1246,9 @@ export default function App(
 
   onCleanup(() => {
     disposed = true;
+    document.removeEventListener("pointermove", moveDrag);
+    document.removeEventListener("pointerup", releaseDrag);
+    document.removeEventListener("pointercancel", releaseDrag);
     controller.dispose();
     subscriptions.dispose();
     document.removeEventListener("keydown", onKey);
@@ -1187,6 +1256,12 @@ export default function App(
     document.removeEventListener("compositionend", endComposition);
     clearComposition();
     document.removeEventListener("pointerdown", outsideClick);
+  });
+
+  onSettled(() => {
+    document.addEventListener("pointermove", moveDrag);
+    document.addEventListener("pointerup", releaseDrag);
+    document.addEventListener("pointercancel", releaseDrag);
   });
 
   return (
@@ -1456,15 +1531,28 @@ export default function App(
                         pending: pending(),
                         "calculation-row": result.kind === "calculation",
                         "password-row": result.kind === "password",
+                        "can-drag": canDrag(result),
                       }}
+                      title={
+                        canDrag(result)
+                          ? "Drag to copy into another app"
+                          : undefined
+                      }
+                      onPointerDown={(event) => prepareDrag(event, result)}
                       onPointerMove={() => {
-                        if (!pending()) {
+                        if (!pending() && !dragging() && !dragCandidate) {
                           markSelectionChanged();
                           setSelected(index());
                         }
                       }}
                       onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => void run(result.primaryAction, result)}
+                      onClick={(event) => {
+                        if (suppressResultClick || dragging()) {
+                          event.preventDefault();
+                          return;
+                        }
+                        void run(result.primaryAction, result);
+                      }}
                     >
                       <ResultIcon result={result} />
                       <span class="result-copy">

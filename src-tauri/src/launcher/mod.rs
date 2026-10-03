@@ -19,6 +19,7 @@ mod roadmap_tests;
 pub mod search;
 pub mod startup;
 mod storage;
+pub mod transfer;
 pub mod updates;
 pub mod utilities;
 pub mod warning;

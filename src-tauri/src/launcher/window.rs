@@ -150,6 +150,10 @@ pub fn dismiss(app: &AppHandle) -> Result<()> {
 }
 
 fn hide_window(app: &AppHandle, _restore_focus: bool) -> Result<()> {
+    // Native drag/share UI owns dismissal until its session ends.
+    if super::transfer::active(app) {
+        return Ok(());
+    }
     // Take the saved app before hiding. The resulting blur event can call hide again.
     #[cfg(target_os = "macos")]
     let previous = app

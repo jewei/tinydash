@@ -4,6 +4,7 @@ mod linux;
 mod macos;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 pub(crate) mod system_process;
+pub(crate) mod transfer;
 #[cfg(target_os = "windows")]
 mod windows;
 

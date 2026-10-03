@@ -1,5 +1,9 @@
 # File search
 
+Drag a file or folder result into another app to copy it. App results also support dragging their bundle, executable, or shortcut file. Hold the left mouse button and move at least six pixels to start. Clicking still opens the result. Dragging offers a native file reference, not a text path, and does not change the clipboard or launch count.
+
+The launcher stays visible during a drag. Escape or an unsupported drop cancels it. A completed drop hides the launcher when Hide on blur is enabled; acceptance means that the receiving app accepted the drag, not that it finished copying. This path supports macOS, Windows, and Linux X11. On Wayland, use Copy file or Show in folder. Rust resolves the catalog ID again and rejects missing or invalid files before starting.
+
 TinyDash scans Desktop, Documents, and Downloads after the launcher opens. It uses the OS folder locations, including Windows Known Folders and Linux XDG user directories. Missing default folders are skipped. Select Files to search file and folder names and paths, or search in All mode. Press Enter to open a file with its default application, or a folder in Finder, File Explorer, or the default file manager. Command/Ctrl + Enter shows the item in its parent folder.
 
 The index contains regular files and folders under the roots. The roots themselves are not results. By default it excludes dot files, hidden files, Windows system files, symbolic links, and the `node_modules` and `target` folders. **Include hidden files** opts into hidden entries; symbolic links and symlink ancestors remain rejected. Ignore patterns match a basename or root-relative path, using `*`, `?`, `**`, or a trailing `/` for folders. Use forward slashes; negation and character classes are not supported. Patterns are limited to 64 entries of 256 bytes each. Hidden and excluded folders are not traversed. Configured roots must be folders and cannot be symbolic links. Overlapping roots are scanned once. Paths that cannot be represented as UTF-8 are skipped. Access errors appear as a scan warning; other folders remain searchable. The index does not read file contents. Selecting a result can request a separate bounded preview outside the search lock.
@@ -25,6 +29,8 @@ The detail pane shows size, modification time, and a bounded UTF-8 text or raste
 File actions include **Copy Path**, **Open With** using an indexed application, **Open in Terminal**, **Quick Look**, **Copy File**, and **Move to Trash**. Trash requires explicit confirmation in both UI and Rust. File IDs and paths are revalidated before operations. Copy File and Quick Look currently require macOS. Open With supports macOS/Linux; Windows reports unsupported. Terminal opening requires Windows Terminal on Windows or `x-terminal-emulator` on Linux. Copy Path works without these tools. Native OS effects are not proved by browser mocks.
 
 ## Verification
+
+For result dragging, check the pointer threshold, click suppression, cancellation, error feedback, and disabled actions in browser checks. Use an identified desktop build with disposable files to drag into a file manager and an attachment target. Confirm that the exact file is received, the original remains, and clipboard contents do not change. Check app bundles/shortcuts, folders, missing files, Unicode and reserved URI characters in paths, rapid pointer release, rejected drops, and Hide on blur on/off. Check X11 behavior and Wayland rejection separately. Mocked IPC cannot prove a native drag or a completed copy.
 
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
 

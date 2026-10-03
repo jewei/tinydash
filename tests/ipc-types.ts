@@ -19,6 +19,7 @@ type Assert<T extends true> = T;
 
 export type WireTypesMatch = [
   Assert<Equal<Bridge.Action, Wire.Action>>,
+  Assert<Equal<Bridge.DragOutcome, Wire.DragOutcome>>,
   Assert<Equal<Bridge.SearchMode, Wire.SearchMode>>,
   Assert<Equal<Bridge.SearchResult, Wire.SearchResult>>,
   Assert<Equal<Bridge.SearchResponse, Wire.SearchResponse>>,
@@ -89,6 +90,7 @@ export const commandWrappers = {
   quit_app: "quit",
   item_catalog: "itemCatalog",
   paste_result: "paste",
+  drag_result: "drag",
   paste_queue: "pasteQueue",
   rich_clipboard_history: "richClipboardHistory",
   rich_clipboard_preview: "richClipboardPreview",
