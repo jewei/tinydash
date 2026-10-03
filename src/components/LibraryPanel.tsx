@@ -15,6 +15,7 @@ import {
   type LibraryKind,
 } from "../library-bridge";
 import "../styles/library.css";
+import ConfirmDialog from "./ConfirmDialog";
 
 const empty = (kind: LibraryKind): LibraryDraft => ({
   kind,
@@ -43,8 +44,11 @@ export default function LibraryPanel(props: {
   const [error, setError] = createSignal("");
   const [notice, setNotice] = createSignal("");
   const [loaded, setLoaded] = createSignal(false);
+  const [listLoading, setListLoading] = createSignal(true);
+  const [listError, setListError] = createSignal("");
   let alive = true;
   let filter!: HTMLInputElement;
+  let nameInput: HTMLInputElement | undefined;
   let listRequest = 0;
   let pendingNavigation: (() => void) | undefined;
   onCleanup(() => {
@@ -59,6 +63,8 @@ export default function LibraryPanel(props: {
 
   async function refresh(search = query()) {
     const request = ++listRequest;
+    setListLoading(true);
+    setListError("");
     try {
       const result = await libraryBackend.list(search);
       if (alive && request === listRequest) {
@@ -66,7 +72,9 @@ export default function LibraryPanel(props: {
         setLoaded(true);
       }
     } catch (reason) {
-      if (alive && request === listRequest) setError(String(reason));
+      if (alive && request === listRequest) setListError(String(reason));
+    } finally {
+      if (alive && request === listRequest) setListLoading(false);
     }
   }
 
@@ -119,6 +127,21 @@ export default function LibraryPanel(props: {
     if (props.initialId) void select(props.initialId);
   });
 
+  createEffect(editing, (active) => {
+    if (active) queueMicrotask(() => nameInput?.focus());
+  });
+
+  function focusFilterIfNeeded() {
+    queueMicrotask(() => {
+      if (alive && document.activeElement === document.body) filter.focus();
+    });
+  }
+
+  function closeDiscard() {
+    setConfirmDiscard(false);
+    pendingNavigation = undefined;
+  }
+
   function create(kind: LibraryKind) {
     navigate(() => {
       setEntry(undefined);
@@ -129,6 +152,7 @@ export default function LibraryPanel(props: {
       setError("");
       setNotice("");
       setConfirmDelete(false);
+      queueMicrotask(() => nameInput?.focus());
     });
   }
 
@@ -155,6 +179,7 @@ export default function LibraryPanel(props: {
       setAllowClipboard(false);
       setNotice("Saved");
       await refresh();
+      focusFilterIfNeeded();
     });
   }
 
@@ -185,8 +210,9 @@ export default function LibraryPanel(props: {
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          if (confirmDelete()) setConfirmDelete(false);
-          else if (confirmDiscard()) setConfirmDiscard(false);
+          if (confirmDelete()) {
+            if (!busy()) setConfirmDelete(false);
+          } else if (confirmDiscard()) closeDiscard();
           else navigate(props.onClose);
         }
       }}
@@ -205,41 +231,30 @@ export default function LibraryPanel(props: {
         Run items explicitly. Keywords help search; they do not expand as you
         type. Stored locally as plaintext, not a secrets vault.
       </p>
-      <Show when={error()}>
+      <Show when={error() && !confirmDelete()}>
         <p role="alert">{error()}</p>
       </Show>
       <p role="status" class="library-status">
         {notice()}
       </p>
       <Show when={confirmDiscard()}>
-        <div
+        <ConfirmDialog
           role="alertdialog"
-          aria-label="Discard unsaved changes?"
-          class="library-confirm"
-        >
-          <p>Discard unsaved changes?</p>
-          <button
-            type="button"
-            onClick={() => {
-              setConfirmDiscard(false);
-              setDirty(false);
-              pendingNavigation?.();
-              pendingNavigation = undefined;
-            }}
-          >
-            Discard changes
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setConfirmDiscard(false);
-              pendingNavigation = undefined;
-            }}
-            autofocus
-          >
-            Keep editing
-          </button>
-        </div>
+          title="Discard unsaved changes?"
+          description="Your changes have not been saved. Discard them to continue."
+          confirmLabel="Discard changes"
+          cancelLabel="Keep editing"
+          busyLabel="Discarding..."
+          busy={false}
+          onClose={closeDiscard}
+          onConfirm={() => {
+            const navigate = pendingNavigation;
+            closeDiscard();
+            setDirty(false);
+            navigate?.();
+            focusFilterIfNeeded();
+          }}
+        />
       </Show>
       <div class="library-layout" inert={confirmDiscard()}>
         <aside class="library-sidebar">
@@ -269,7 +284,28 @@ export default function LibraryPanel(props: {
               New snippet
             </button>
           </div>
-          <ul class="library-items" aria-label="Library items">
+          <Show when={listLoading()}>
+            <p class="library-hint" role="status">
+              Loading library...
+            </p>
+          </Show>
+          <Show when={listError()}>
+            <div class="library-list-error">
+              <p role="alert">{listError()}</p>
+              <button
+                type="button"
+                onClick={() => void refresh()}
+                disabled={listLoading()}
+              >
+                Retry loading library
+              </button>
+            </div>
+          </Show>
+          <ul
+            class="library-items"
+            aria-label="Library items"
+            aria-busy={listLoading() ? "true" : "false"}
+          >
             <For each={items()}>
               {(item) => (
                 <li>
@@ -289,9 +325,13 @@ export default function LibraryPanel(props: {
               )}
             </For>
           </ul>
-          <Show when={loaded() && !items().length}>
+          <Show
+            when={loaded() && !listLoading() && !listError() && !items().length}
+          >
             <p class="library-hint">
-              No matching items. Create a quicklink or snippet to get started.
+              {query().trim()
+                ? "No matching items. Try another search."
+                : "Your library is empty. Create a quicklink or snippet to get started."}
             </p>
           </Show>
         </aside>
@@ -346,6 +386,7 @@ export default function LibraryPanel(props: {
                           <>
                             <button
                               type="button"
+                              class="panel-primary"
                               disabled={
                                 busy() ||
                                 (!!current()?.usesClipboard &&
@@ -371,6 +412,7 @@ export default function LibraryPanel(props: {
                       >
                         <button
                           type="button"
+                          class="panel-primary"
                           disabled={
                             busy() ||
                             (current()?.arguments ?? []).some(
@@ -403,6 +445,7 @@ export default function LibraryPanel(props: {
                         type="button"
                         disabled={busy()}
                         onClick={() => setConfirmDelete(true)}
+                        class="panel-danger"
                       >
                         Delete item
                       </button>
@@ -415,39 +458,30 @@ export default function LibraryPanel(props: {
                       </p>
                     </Show>
                     <Show when={confirmDelete()}>
-                      <div
+                      <ConfirmDialog
                         role="alertdialog"
-                        aria-label="Delete library item?"
-                        class="library-confirm"
-                      >
-                        <p>Delete “{saved().name}”? This cannot be undone.</p>
-                        <button
-                          type="button"
-                          disabled={busy()}
-                          onClick={() =>
-                            void run(async () => {
-                              await libraryBackend.delete(saved().id);
-                              if (!alive) return;
-                              setEntry(undefined);
-                              setMetadata(undefined);
-                              setConfirmDelete(false);
-                              setNotice("Item deleted");
-                              props.onChanged?.();
-                              await refresh();
-                            })
-                          }
-                        >
-                          Confirm delete
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy()}
-                          onClick={() => setConfirmDelete(false)}
-                          autofocus
-                        >
-                          Cancel deletion
-                        </button>
-                      </div>
+                        title="Delete library item?"
+                        description={`Delete “${saved().name}”? This cannot be undone.`}
+                        confirmLabel="Confirm delete"
+                        cancelLabel="Cancel deletion"
+                        busyLabel="Deleting..."
+                        busy={busy()}
+                        error={error()}
+                        onClose={() => setConfirmDelete(false)}
+                        onConfirm={() =>
+                          void run(async () => {
+                            await libraryBackend.delete(saved().id);
+                            if (!alive) return;
+                            setEntry(undefined);
+                            setMetadata(undefined);
+                            setConfirmDelete(false);
+                            setNotice("Item deleted");
+                            props.onChanged?.();
+                            await refresh();
+                            focusFilterIfNeeded();
+                          })
+                        }
+                      />
                     </Show>
                   </>
                 )}
@@ -467,6 +501,7 @@ export default function LibraryPanel(props: {
                 <label>
                   Name
                   <input
+                    ref={nameInput}
                     required
                     maxlength={120}
                     value={draft().name}
@@ -519,13 +554,16 @@ export default function LibraryPanel(props: {
                   </p>
                 </Show>
                 <div class="library-toolbar">
-                  <button type="submit">Save item</button>
+                  <button type="submit" class="panel-primary">
+                    Save item
+                  </button>
                   <button
                     type="button"
                     onClick={() =>
                       navigate(() => {
                         setEditing(false);
                         setDirty(false);
+                        focusFilterIfNeeded();
                       })
                     }
                   >

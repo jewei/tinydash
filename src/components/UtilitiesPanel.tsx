@@ -373,7 +373,9 @@ export default function UtilitiesPanel(props: {
                   placeholder="#RRGGBB or hsl(210 50% 50%)"
                 />
               </label>
-              <button disabled={busy()}>Convert color</button>
+              <button class="panel-primary" disabled={busy()}>
+                Convert color
+              </button>
             </form>
             <button
               disabled={
@@ -471,6 +473,7 @@ export default function UtilitiesPanel(props: {
             </label>
             <div class="utility-toolbar">
               <button
+                class="panel-primary"
                 disabled={
                   busy() ||
                   !Number.isInteger(minutes()) ||

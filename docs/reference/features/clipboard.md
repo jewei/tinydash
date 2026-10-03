@@ -54,6 +54,8 @@ On macOS and Windows, a source that empties the clipboard may be clearing sensit
 
 macOS checks the [pasteboard change counter](https://developer.apple.com/documentation/appkit/nspasteboard/changecount). Windows checks the [clipboard sequence number](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getclipboardsequencenumber). Each check runs once per second and when the launcher opens. Text is read only when the counter changes. Rapid copies within one interval can be missed. Linux uses GTK [owner-change events](https://docs.gtk.org/gtk3/signal.Clipboard.owner-change.html) and asynchronous text requests, with no polling timer. Wayland can restrict background access; opening TinyDash requests the current clipboard again. Desktop session checks remain necessary for Wayland.
 
+Deleting an image or file history entry keeps its confirmation visible when the next entry is selected or the history becomes empty. A preview failure appears separately and does not replace action feedback.
+
 ## Verification
 
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:

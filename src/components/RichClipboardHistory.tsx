@@ -19,6 +19,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
   const [preview, setPreview] = createSignal<RichClipboardPreview>();
   const [imageUrl, setImageUrl] = createSignal<string>();
   const [message, setMessage] = createSignal<string>();
+  const [previewError, setPreviewError] = createSignal<string>();
   const [busy, setBusy] = createSignal(false);
   let disposed = false;
   let refreshSequence = 0;
@@ -43,7 +44,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
             setPreview(value);
         } catch (error) {
           if (!disposed && request.sequence === previewSequence)
-            setMessage(String(error));
+            setPreviewError(String(error));
         }
       }
     } finally {
@@ -96,7 +97,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
   createEffect(selected, (id) => {
     const request = ++previewSequence;
     setPreview(undefined);
-    setMessage(undefined);
+    setPreviewError(undefined);
     pendingPreview = id === undefined ? undefined : { id, sequence: request };
     void loadPreview();
   });
@@ -222,6 +223,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
               )}
             </Show>
             <button
+              class="panel-primary"
               type="button"
               disabled={busy() || !preview() || !value().captureSupported}
               onClick={() => void action("copy")}
@@ -229,6 +231,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
               Copy original format
             </button>
             <button
+              class="panel-danger"
               type="button"
               disabled={busy() || selected() === undefined}
               onClick={() => void action("delete")}
@@ -237,6 +240,9 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
             </button>
           </>
         )}
+      </Show>
+      <Show when={previewError()}>
+        {(text) => <p role="alert">Preview unavailable. {text()}</p>}
       </Show>
       <Show when={message()}>{(text) => <p role="status">{text()}</p>}</Show>
     </section>

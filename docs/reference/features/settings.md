@@ -4,6 +4,8 @@ Open Settings from Actions, the tray, Command/Ctrl + comma, or `tinydash --setti
 
 On macOS, **Shortcut > Show menu bar icon** is off by default, including existing settings without an explicit choice. Save to show or hide it without restarting; Discard restores the saved choice. The choice is included in settings exports. TinyDash never shows a Dock icon. Windows and Linux retain their tray icon.
 
+The section list and settings content scroll separately, so the save controls remain visible in short windows. At narrow widths, Search settings shows matching section buttons. Clear the search to return to the section selector. Searching and switching sections retain the draft.
+
 Settings covers shortcuts, start at login, appearance, categories, application aliases, custom web searches, clipboard capture, file roots, currency requests, and privacy. **Search settings** filters sections by labels and related terms; Enter opens the first match without discarding drafts. Search also configures item aliases, global shortcuts, and separate Hide/Disable controls for apps, built-in commands, and library entries. Hidden items retain shortcuts; disabled items reject execution. Shortcut conflicts are validated in Rust before saving. Clipboard adds age retention, app exclusions, and independent image/file opt-ins; File search adds hidden-file inclusion and bounded ignore patterns. See the [settings reference](../settings.md).
 
 Appearance has five themes: Light, Dark, Sage, Rose, and Ink. Compact is a separate layout switch. Both choices apply immediately and are included in settings exports. On macOS, Follow macOS Liquid Glass also saves immediately and is included in exports. Turn it off for a solid theme background. Import previews keep them unsaved until Save changes. The macOS launcher uses system-controlled Liquid Glass where supported. See [appearance](appearance.md) for the OS limits and desktop checks.
@@ -28,6 +30,8 @@ bun run verify:browser tests/settings-draft.spec.ts tests/native-subscriptions.s
 ```
 
 Draft merging preserves local app and item aliases while accepting remote changes to unchanged fields. A remote removal restores default visibility, disabled state, and shortcuts without discarding edited aliases. Shortcut warnings clear when the affected bindings change; unrelated preference changes keep those warnings.
+
+Browser layout checks also cover the visible save controls at 720 × 550 and matching section navigation with a retained draft at 360 × 600.
 
 Standalone draft tests check local edits against incoming saved values, nested application preferences, remote deletion of default preferences while aliases are dirty, local deletions, category normalization, and incomplete folder input. Browser tests additionally exercise clean and dirty forms receiving changes from another window. A saved-settings event must not discard unrelated local edits.
 

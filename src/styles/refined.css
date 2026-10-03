@@ -1,7 +1,4 @@
-/* Hallmark · approved warm TinyDash design, applied to the native launcher.
- * Pre-emit critique: P5 H5 E5 S5 R5 V4. Figtree + Caprasimo; no idle motion.
- * These rules refine the existing layout and keep the native tool states.
- */
+/* Launcher refinements. Shared palettes and scales live in tokens.css. */
 html,
 body {
   overflow-x: clip;
@@ -256,7 +253,7 @@ body {
   font-weight: 600;
 }
 .result-subtitle {
-  font-size: 11px;
+  font-size: 12px;
 }
 .result-shortcut {
   gap: 1px;
@@ -454,7 +451,7 @@ body {
   min-height: 38px;
   padding: 8px 12px;
   border: 1px solid var(--color-transparent);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: var(--color-transparent);
   font-size: 12px;
   font-weight: 500;
@@ -660,7 +657,7 @@ body {
   gap: 10px;
 }
 .open-button {
-  font-size: 11px;
+  font-size: 12px;
   gap: 7px;
 }
 .open-button svg {
@@ -670,7 +667,7 @@ body {
   border-radius: 5px;
 }
 .footer-selection {
-  font-size: 11px;
+  font-size: 12px;
   max-width: 180px;
 }
 .navigation-hint {
@@ -693,7 +690,7 @@ body {
   border-radius: 6px;
   border-color: var(--color-transparent);
   padding: 4px 6px;
-  font-size: 11px;
+  font-size: 12px;
   gap: 7px;
 }
 .actions-button:hover,
@@ -804,7 +801,7 @@ body {
 @media (min-width: 601px) and (max-width: 800px) {
   .category-tab {
     padding-inline: 9px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .result-list {
     padding-inline: 8px;
@@ -825,7 +822,7 @@ body {
   }
   .preview-action {
     padding-inline: 9px;
-    font-size: 11px;
+    font-size: 12px;
   }
 }
 @media (max-width: 600px) {
@@ -853,7 +850,7 @@ body {
     display: flex;
   }
   .category-tab {
-    font-size: 11px;
+    font-size: 12px;
     padding-inline: 10px;
   }
   .category-hint {
@@ -891,7 +888,7 @@ body {
     display: none;
   }
   .list-count {
-    font-size: 9px;
+    font-size: 11px;
   }
   .actions-button {
     gap: 5px;

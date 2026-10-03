@@ -620,7 +620,12 @@ export default function Settings() {
 
   return (
     <main class="settings-shell" aria-label="TinyDash settings">
-      <aside class="settings-sidebar">
+      <aside
+        class={{
+          "settings-sidebar": true,
+          "is-searching": !!settingsQuery().trim(),
+        }}
+      >
         <div class="settings-brand">
           <img
             class="tiny-mark"

@@ -5,12 +5,17 @@ import type { RichClipboardEntry } from "../../src/clipboardBridge";
 
 declare global {
   interface Window {
-    __richClipboardTest: { calls: string[]; missing: boolean; closed: boolean };
+    __richClipboardTest: {
+      calls: string[];
+      missing: boolean;
+      closed: boolean;
+      entries: RichClipboardEntry[];
+      previewError: boolean;
+    };
   }
 }
 
-window.__richClipboardTest = { calls: [], missing: false, closed: false };
-let entries: RichClipboardEntry[] = [
+const entries: RichClipboardEntry[] = [
   {
     id: 1,
     kind: "files",
@@ -20,29 +25,41 @@ let entries: RichClipboardEntry[] = [
     bytes: 64,
   },
 ];
+window.__richClipboardTest = {
+  calls: [],
+  missing: false,
+  closed: false,
+  entries,
+  previewError: false,
+};
 mockWindows("main");
 mockIPC(
-  (command) => {
+  (command, args) => {
+    const state = window.__richClipboardTest;
+    const id = args && "id" in args ? args.id : undefined;
     window.__richClipboardTest.calls.push(command);
     if (command === "rich_clipboard_history")
       return {
-        entries,
+        entries: state.entries,
         captureSupported: true,
         supportNotice: "Rich history: up to 32 entries and 16 MiB; no pins.",
       };
-    if (command === "rich_clipboard_preview")
+    if (command === "rich_clipboard_preview") {
+      if (state.previewError)
+        throw new Error("The saved preview cannot be read.");
       return {
-        entry: entries[0],
+        entry: state.entries.find((entry) => entry.id === id),
         png: null,
         files: ["/fixtures/report.pdf", "/fixtures/design.png"],
       };
+    }
     if (command === "copy_rich_clipboard") {
       if (window.__richClipboardTest.missing)
         throw new Error("A referenced file is no longer available.");
       return;
     }
     if (command === "delete_rich_clipboard") {
-      entries = [];
+      state.entries = state.entries.filter((entry) => entry.id !== id);
       return;
     }
   },

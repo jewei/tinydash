@@ -12,6 +12,8 @@ Ink uses a monochrome palette with off-white backgrounds, black controls, strong
 
 The app bundles Figtree and Caprasimo with their license files. It does not need a font service. The desktop window is 980 by 620. The launcher has rounded corners and a native shadow, with no added outer border in any theme. At narrow widths, the result list uses the full width and clipboard previews appear below it.
 
+Settings, Library, Utilities, and image/file clipboard history share the launcher palette, heading fonts, focus outlines, and control sizes. Primary actions use the accent color. Library and Settings keep save actions within reach when content scrolls.
+
 Settings, Categories controls visible categories. Keep at least one selected. The category bar scrolls when required. Hiding a category does not remove its results from All.
 
 ## Verification

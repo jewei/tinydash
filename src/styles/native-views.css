@@ -1,7 +1,7 @@
 .native-view {
-  height: 100vh;
+  height: 100dvh;
   overflow: auto;
-  padding: 16px;
+  padding: 0;
   color: var(--color-ink);
   background: var(--color-paper);
 }
@@ -83,4 +83,77 @@
 .settings-sidebar input[type="search"] {
   width: 100%;
   min-width: 0;
+}
+
+/* Secondary tools share the launcher's control and heading scale. */
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel) {
+  padding: var(--space-lg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-grip) transparent;
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel) header {
+  padding-bottom: var(--space-md);
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-rule);
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel) header h2 {
+  margin: 0;
+  font: 24px/1.25 var(--font-heading);
+  letter-spacing: -0.3px;
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel) button {
+  min-height: var(--control-height);
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: normal;
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel)
+  button.panel-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel)
+  button.panel-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel)
+  button.panel-danger {
+  color: var(--color-error);
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel)
+  :is(input:not([type="checkbox"]), textarea) {
+  min-height: var(--control-height);
+  background: var(--color-paper);
+  border-color: var(--color-border);
+  border-radius: var(--radius-control);
+}
+:is(.library-panel, .utilities-panel, .rich-clipboard-panel) [role="alert"] {
+  padding: 10px 12px;
+  border: 1px solid var(--color-selection-border);
+  border-radius: var(--radius-control);
+  background: var(--color-warning);
+  color: var(--color-error);
+}
+.rich-clipboard-panel header h2 {
+  flex-basis: 100%;
+  margin-bottom: 8px;
+}
+.rich-clipboard-panel li button {
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.rich-clipboard-panel > button {
+  margin-bottom: 8px;
+}
+@media (max-width: 520px) {
+  :is(.library-panel, .utilities-panel, .rich-clipboard-panel) {
+    padding: var(--space-md);
+  }
+  :is(.library-panel, .utilities-panel, .rich-clipboard-panel) header h2 {
+    font-size: 22px;
+  }
 }

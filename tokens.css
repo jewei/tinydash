@@ -1,6 +1,4 @@
-/* User-supplied TinyDash Canvas design: Organic palette, Figtree + Caprasimo.
- * Pre-emit critique: P5 H5 E5 S5 R5 V4. Light / Dark / Sage / Rose / Ink.
- */
+/* TinyDash: warm palettes with Figtree UI text and Caprasimo headings. */
 @font-face {
   font-family: "Caprasimo";
   font-style: normal;
@@ -77,6 +75,8 @@
   --text-title: 14px;
   --text-search: 23px;
   --radius-sm: 6px;
+  --radius-control: 8px;
+  --control-height: 36px;
   --radius-md: 12px;
   --radius-lg: 20px;
   --row-height: 54px;

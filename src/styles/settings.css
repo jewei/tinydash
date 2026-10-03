@@ -1,17 +1,17 @@
-/* Hallmark · supplied Canvas design · sidebar and settings form.
- * Pre-emit critique: P5 H5 E5 S5 R5 V4. Shared fonts and colour tokens.
- */
+/* Settings shares the launcher palette, typography, and control geometry. */
 .settings-shell {
   height: 100%;
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--color-paper);
   color: var(--color-ink);
 }
 .settings-sidebar {
   display: flex;
   flex-direction: column;
-  padding: 28px 14px 20px;
+  padding: 24px 14px 16px;
+  min-height: 0;
   border-right: 1px solid var(--color-rule);
   background: var(--color-field);
   min-width: 0;
@@ -20,7 +20,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 12px 30px;
+  margin: 0 10px 24px;
   font: 21px/1.2 var(--font-heading);
 }
 .tiny-mark {
@@ -31,13 +31,19 @@
 }
 .settings-sidebar nav {
   display: grid;
-  gap: 5px;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 4px;
+  margin: -4px;
+  gap: 3px;
 }
 .settings-sidebar nav button {
-  padding: 12px 14px;
-  min-height: 44px;
+  padding: 10px 12px;
+  min-height: 40px;
   border: 1px solid var(--color-transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background: var(--color-transparent);
   color: var(--color-muted);
   text-align: left;
@@ -51,7 +57,8 @@
 }
 .settings-sidebar-note {
   margin: auto 14px 0;
-  padding-top: 24px;
+  padding-top: 16px;
+  flex-shrink: 0;
   color: var(--color-muted);
   font-size: 12px;
 }
@@ -73,7 +80,7 @@
   scrollbar-color: var(--color-grip) var(--color-transparent);
 }
 .settings-heading {
-  margin-bottom: 30px;
+  margin-bottom: 24px;
 }
 .settings-eyebrow,
 .settings-group h2,
@@ -88,7 +95,7 @@
 }
 .settings-heading h1 {
   margin: 0 0 8px;
-  font: 32px/1.15 var(--font-heading);
+  font: 28px/1.2 var(--font-heading);
 }
 .settings-heading p,
 .settings-group p {
@@ -290,7 +297,7 @@
   gap: 8px;
   min-height: 40px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   padding: 8px 16px;
   background: var(--color-raised);
   color: var(--color-ink);
@@ -312,10 +319,10 @@
   justify-content: space-between;
   gap: 10px;
   border: 1px solid var(--color-border);
-  border-radius: 24px;
+  border-radius: var(--radius-md);
   background: var(--color-field);
   padding: 10px 12px 10px 16px;
-  min-height: 64px;
+  min-height: 60px;
 }
 .shortcut-recorder.is-recording {
   border-color: var(--color-accent);
@@ -499,7 +506,8 @@
 .settings-footer {
   flex: none;
   border-top: 1px solid var(--color-rule);
-  padding: 16px 24px;
+  padding: 14px 24px;
+  background: var(--color-paper);
 }
 .settings-save-row {
   display: flex;
@@ -555,12 +563,6 @@
   .settings-scroll {
     padding: 26px 24px;
   }
-  .shortcut-recorder {
-    align-items: flex-start;
-    flex-direction: column;
-    border-radius: 16px;
-    padding: 14px;
-  }
   .settings-appearances {
     gap: 9px;
   }
@@ -588,6 +590,21 @@
   }
   .settings-mobile-nav {
     display: block;
+  }
+  .settings-sidebar .settings-field-label {
+    margin-bottom: 10px;
+  }
+  .settings-sidebar.is-searching nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-block: 5px;
+  }
+  .settings-sidebar.is-searching nav button {
+    flex: none;
+  }
+  .settings-sidebar.is-searching .settings-mobile-nav {
+    display: none;
   }
   .settings-scroll {
     padding: 22px 20px;
@@ -709,4 +726,14 @@
 :root[data-appearance="ink"] .settings-sidebar nav button[aria-current="page"] {
   background: var(--color-accent);
   color: var(--color-accent-ink);
+}
+
+@media (max-width: 400px) {
+  .shortcut-recorder {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .settings-appearances {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

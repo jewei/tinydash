@@ -1031,3 +1031,57 @@ test("clears unpinned clipboard entries separately and keeps pinned entries", as
     await page.evaluate(() => window.__launcherTest.calls.at(-1)?.payload),
   ).toEqual({ keepPinned: true });
 });
+
+test("settings keep save controls and all sections reachable in a short window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 720, height: 550 });
+  await openSettings(page);
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "About", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "About", exact: true }),
+  ).toBeVisible();
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "Shortcut", exact: true }).click();
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  await toggle.check();
+  await expect(save).toBeInViewport();
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+});
+
+test("narrow settings search shows matching sections and preserves the draft", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 600 });
+  await openSettings(page);
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  await toggle.check();
+  const search = page.getByRole("searchbox", { name: "Search settings" });
+  await search.fill("clipboard");
+  const match = page.getByRole("button", {
+    name: "Clipboard history",
+    exact: true,
+  });
+  await expect(match).toBeVisible();
+  await match.click();
+  await expect(
+    page.getByRole("heading", { name: "Clipboard history", exact: true }),
+  ).toBeVisible();
+  await search.fill("no-such-section");
+  await expect(
+    page.getByRole("status").filter({ hasText: "No matching settings." }),
+  ).toBeVisible();
+  await search.fill("");
+  await page
+    .getByRole("combobox", { name: "Settings section" })
+    .selectOption("shortcut");
+  await expect(toggle).toBeChecked();
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(save).toBeEnabled();
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(toggle).not.toBeChecked();
+});

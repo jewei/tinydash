@@ -4,8 +4,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 18px;
-  min-height: calc(100vh - 32px);
-  max-height: calc(100vh - 32px);
+  min-height: 100dvh;
   overflow: auto;
   color: inherit;
   background: var(--color-paper);
@@ -37,7 +36,7 @@
 .utility-awake-indicator {
   font: inherit;
   color: inherit;
-  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   padding: 7px 10px;
   background: transparent;
@@ -91,7 +90,7 @@
   align-items: center;
   gap: 8px;
   padding: 9px 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-bottom: 1px solid var(--color-rule);
 }
 .utility-processes li > div {
   flex: 1;
@@ -104,7 +103,7 @@
 }
 .utility-processes small {
   display: block;
-  opacity: 0.65;
+  color: var(--color-muted);
   margin-top: 4px;
 }
 .utility-danger,
@@ -119,7 +118,7 @@
   padding: 24px;
   background: var(--color-raised);
   color: inherit;
-  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 .utility-confirm p {
@@ -142,4 +141,53 @@
 .utility-awake-indicator {
   font-size: 11px;
   cursor: pointer;
+}
+
+.utilities-panel nav {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.utilities-panel nav button {
+  border-color: transparent;
+  color: var(--color-muted);
+  border-radius: 16px;
+  padding-inline: 12px;
+}
+.utilities-panel
+  button:hover:not(:disabled):not([aria-pressed="true"]):not(.panel-primary) {
+  background: var(--color-hover);
+}
+.utility-content {
+  padding-top: 8px;
+}
+.utility-content > p {
+  color: var(--color-muted);
+  font-size: 12px;
+  max-width: 70ch;
+}
+.utility-toolbar input {
+  flex: 1;
+  min-width: 140px;
+}
+.utility-color-result {
+  margin-top: 20px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-rule);
+}
+.utility-color-result input {
+  font-family: var(--font-mono);
+}
+.utility-awake-state {
+  padding: 14px 16px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-control);
+  background: var(--color-preview);
+}
+@media (max-width: 400px) {
+  .utilities-panel form {
+    flex-wrap: wrap;
+  }
+  .utilities-panel form label {
+    flex-basis: 100%;
+  }
 }

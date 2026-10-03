@@ -4,6 +4,8 @@ Open **Actions → Quicklinks and snippets**, or search for **Quicklinks** or **
 
 Create, edit, search, or delete quicklinks and snippets in the library. Unsaved edits require confirmation before navigation; deleting an item also requires confirmation. While a native view is open, shortcuts that open another view or request a system-action confirmation ask you to close it first, preserving drafts. Data is stored locally in `library.json` in the application data directory. It is plaintext, not a credential vault, and is not included in settings exports. Writes replace the file atomically. A damaged library is preserved and reported without preventing the rest of TinyDash from starting.
 
+Creating or editing an item puts keyboard focus in Name. Confirmation dialogs start on the cancel action and keep keyboard focus inside the dialog. Escape cancels the confirmation. Focus returns to the control that opened it, or to Search library when that control is removed. The library shows loading, empty-library, and no-match states separately. Retry loading library repeats a failed list request without changing an editor draft.
+
 Quicklinks support HTTP(S), local file/folder paths, and a restricted set of application URL schemes. Unsupported or executable schemes are rejected. Use `{query}` or `{argument:name}` for explicit input fields. URL arguments are encoded as components and cannot change the destination origin. There is no arbitrary shell execution or custom application routing in the library.
 
 Snippets support literal text, `{date}`, `{time}`, `{clipboard}`, and named argument placeholders. Clipboard interpolation requires consent for each invocation; previews never read the clipboard. Copy leaves the library open. Paste inserts into the previous application where the OS permits it. Keywords are search terms: they do not monitor typing or automatically expand in other applications.
@@ -28,6 +30,6 @@ bun run test:rust -- launcher::library
 bun run test:rust -- launcher::roadmap_tests
 ```
 
-Browser tests cover library CRUD, encoded arguments, per-invocation clipboard consent, copy/paste dispatch, error recovery, unsaved-edit confirmation, launcher routes, and result-ID-only paste. Rust tests cover bounds, unsafe targets, persistence, unavailable storage, template parsing, and consent. Browser IPC is mocked.
+Browser tests cover library CRUD, encoded arguments, per-invocation clipboard consent, copy/paste dispatch, error recovery, unsaved-edit confirmation, dialog and editor focus, loading and retry states, launcher routes, and result-ID-only paste. Rust tests cover bounds, unsafe targets, persistence, unavailable storage, template parsing, and consent. Browser IPC is mocked.
 
 Desktop proof requires a controlled profile and identified build: open TinyDash from an editable fixture, paste exact text/emoji/calculation results, and verify both destination and bytes. Deny Accessibility, close the target, change focus during the action, and exercise Wayland rejection. Use only disposable clipboard contents and URLs/files. Verify persistence after restart and confirm corrupt-library recovery leaves the original file unchanged. See [verification](../../how-to/verify.md).
