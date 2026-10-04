@@ -318,3 +318,133 @@ test("rich paste sends the selected image ID and is absent on unsupported platfo
     page.getByRole("button", { name: "Copy original format" }),
   ).toBeDisabled();
 });
+
+test("rich history combines filename, source app, and type filters with a clear empty state", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const state = window.__richClipboardTest;
+    state.entries.push({
+      ...state.entries[0],
+      id: 2,
+      kind: "image",
+      title: "Saved PNG",
+      sourceApp: "com.example.Editor",
+    });
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  const search = page.getByRole("searchbox", {
+    name: "Search images and files",
+  });
+  const type = page.getByRole("combobox", { name: "Clipboard content type" });
+  const source = page.getByRole("combobox", { name: "Clipboard source app" });
+  const list = page.getByRole("list", { name: "Saved images and files" });
+  await search.fill("REPORT.PDF finder");
+  await expect(list.getByRole("button")).toHaveCount(1);
+  await expect(page.getByText("1 of 2 entries", { exact: true })).toBeVisible();
+  await type.selectOption("files");
+  await source.selectOption("com.apple.finder");
+  await expect(list.getByRole("button")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await type.selectOption("image");
+  await expect(page.getByText("No entries match these filters.")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Delete saved entry" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(list.getByRole("button")).toHaveCount(2);
+  await expect(search).toHaveValue("");
+  await source.selectOption("com.example.Editor");
+  await expect(list.getByRole("button")).toContainText("Saved PNG");
+  await expect(
+    page.getByRole("img", { name: "Saved clipboard image" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.getByRole("button", { name: /Saved PNG/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("rich history rejects stale replies and keeps only the newest queued search", async ({
+  page,
+}) => {
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdHistory = true;
+    window.__richClipboardTest.historyQueries = [];
+  });
+  const search = page.getByRole("searchbox", {
+    name: "Search images and files",
+  });
+  await search.fill("report");
+  await expect
+    .poll(() =>
+      page.evaluate(() => !!window.__richClipboardTest.releaseHistory),
+    )
+    .toBe(true);
+  await search.fill("design");
+  await search.fill("missing");
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeDisabled();
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.historyQueries),
+  ).toEqual(["report"]);
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdHistory = false;
+    window.__richClipboardTest.releaseHistory?.();
+  });
+  await expect(page.getByText("No entries match these filters.")).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.historyQueries),
+  ).toEqual(["report", "missing"]);
+  await expect(
+    page.getByRole("list", { name: "Saved file references" }),
+  ).toHaveCount(0);
+});
+
+test("rich search errors keep filters for retry and selection remains stable on refresh", async ({
+  page,
+}) => {
+  const search = page.getByRole("searchbox", {
+    name: "Search images and files",
+  });
+  await page.evaluate(() => {
+    window.__richClipboardTest.historyError = "Clipboard storage is busy.";
+  });
+  await search.fill("report");
+  await expect(page.getByRole("alert")).toContainText(
+    "Clipboard storage is busy",
+  );
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeDisabled();
+  await expect(search).toHaveValue("report");
+  await page.evaluate(() => {
+    window.__richClipboardTest.historyError = null;
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await expect(
+    page
+      .getByRole("list", { name: "Saved images and files" })
+      .getByRole("button"),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(search).toHaveValue("report");
+  await page.getByRole("button", { name: "Delete saved entry" }).click();
+  await expect(
+    page.getByText("No saved images or file references."),
+  ).toBeVisible();
+  await expect(page.getByText("0 of 0 entries", { exact: true })).toBeVisible();
+});

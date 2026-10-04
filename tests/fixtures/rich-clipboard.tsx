@@ -17,6 +17,11 @@ declare global {
       holdPaste: boolean;
       releasePaste?: () => void;
       pastedIds: number[];
+      filesById: Record<number, string[]>;
+      historyError: string | null;
+      holdHistory: boolean;
+      releaseHistory?: () => void;
+      historyQueries: string[];
     };
   }
 }
@@ -43,6 +48,10 @@ window.__richClipboardTest = {
   pasteError: null,
   holdPaste: false,
   pastedIds: [],
+  filesById: { 1: ["/fixtures/report.pdf", "/fixtures/design.png"] },
+  historyError: null,
+  holdHistory: false,
+  historyQueries: [],
 };
 mockWindows("main");
 mockIPC(
@@ -50,16 +59,55 @@ mockIPC(
     const state = window.__richClipboardTest;
     const id = args && "id" in args ? args.id : undefined;
     window.__richClipboardTest.calls.push(command);
-    if (command === "rich_clipboard_history")
-      return {
-        entries: [...state.entries].sort(
-          (a, b) => Number(b.pinned) - Number(a.pinned),
-        ),
+    if (command === "rich_clipboard_history") {
+      const query = String(args && "query" in args ? args.query : "");
+      const kind = args && "kind" in args ? args.kind : undefined;
+      const source = args && "sourceApp" in args ? args.sourceApp : undefined;
+      state.historyQueries.push(query);
+      const terms = query
+        .normalize("NFC")
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
+      const result = {
+        entries: [...state.entries]
+          .filter((entry) => {
+            const text = [
+              entry.title,
+              entry.sourceApp,
+              ...(state.filesById[entry.id] ?? []),
+            ]
+              .join(" ")
+              .normalize("NFC")
+              .toLowerCase();
+            return (
+              (!kind || entry.kind === kind) &&
+              (!source || entry.sourceApp === source) &&
+              terms.every((term) => text.includes(term))
+            );
+          })
+          .sort((a, b) => Number(b.pinned) - Number(a.pinned)),
+        total: state.entries.length,
+        sourceApps: [
+          ...new Set(
+            state.entries.flatMap((entry) =>
+              entry.sourceApp ? [entry.sourceApp] : [],
+            ),
+          ),
+        ].sort(),
         captureSupported: state.supported,
         supportNotice:
           "Pinned entries survive automatic cleanup and Clear unpinned.",
         storageNotice: "Capture limit: 32 entries and 16 MiB, including pins.",
       };
+      const error = state.historyError;
+      if (state.holdHistory)
+        await new Promise<void>((resolve) => {
+          state.releaseHistory = resolve;
+        });
+      if (error) throw new Error(error);
+      return result;
+    }
     if (command === "rich_clipboard_preview") {
       if (state.previewError)
         throw new Error("The saved preview cannot be read.");
@@ -77,7 +125,10 @@ mockIPC(
         files:
           state.entries.find((entry) => entry.id === id)?.kind === "image"
             ? null
-            : ["/fixtures/report.pdf", "/fixtures/design.png"],
+            : (state.filesById[Number(id)] ?? [
+                "/fixtures/report.pdf",
+                "/fixtures/design.png",
+              ]),
       };
     }
     if (command === "paste_rich_clipboard") {

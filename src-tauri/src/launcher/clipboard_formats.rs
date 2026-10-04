@@ -10,8 +10,9 @@ use anyhow::{Context, ensure};
 use rusqlite::Connection;
 #[cfg(any(test, target_os = "macos", target_os = "windows"))]
 use rusqlite::{OptionalExtension, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
+use unicode_normalization::UnicodeNormalization;
 
 use super::super::LauncherState;
 
@@ -165,7 +166,7 @@ impl Payload {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub enum RichKind {
@@ -209,6 +210,8 @@ pub struct RichPreview {
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct RichHistory {
     pub entries: Vec<RichEntry>,
+    pub total: u32,
+    pub source_apps: Vec<String>,
     pub capture_supported: bool,
     pub support_notice: String,
     pub storage_notice: String,
@@ -269,6 +272,68 @@ impl Store {
         Ok(statement
             .query_map([], entry)?
             .collect::<rusqlite::Result<_>>()?)
+    }
+
+    fn search(
+        &self,
+        query: &str,
+        kind: Option<RichKind>,
+        source_app: Option<&str>,
+    ) -> anyhow::Result<(Vec<RichEntry>, u32, Vec<String>)> {
+        ensure!(query.len() <= 1024, "Search is limited to 1 KiB of text.");
+        ensure!(
+            source_app.is_none_or(|source| source.len() <= 1024),
+            "Source app filter is too long."
+        );
+        let entries = self.list()?;
+        let total = entries.len() as u32;
+        let source_apps = entries
+            .iter()
+            .filter_map(|entry| entry.source_app.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let normalize = |text: &str| text.nfc().collect::<String>().to_lowercase();
+        let query = normalize(query);
+        let terms: Vec<_> = query.split_whitespace().collect();
+        let source = source_app.map(normalize);
+        let mut matches = Vec::new();
+        for entry in entries {
+            if kind.is_some_and(|kind| kind != entry.kind)
+                || source.as_ref().is_some_and(|source| {
+                    entry
+                        .source_app
+                        .as_deref()
+                        .is_none_or(|app| normalize(app) != *source)
+                })
+            {
+                continue;
+            }
+            let mut text = normalize(&format!(
+                "{} {}",
+                entry.title,
+                entry.source_app.as_deref().unwrap_or_default()
+            ));
+            if !terms.iter().all(|term| text.contains(term)) && entry.kind == RichKind::Files {
+                // Read bounded file metadata only. Never load image blobs or check
+                // the filesystem for search: missing references must stay findable.
+                let data = self.connection.query_row(
+                    "SELECT payload FROM rich_clipboard WHERE id = ?1",
+                    [entry.id],
+                    |row| row.get::<_, Vec<u8>>(0),
+                )?;
+                if let Payload::Files(paths) = Payload::decode("files", data)? {
+                    for path in paths {
+                        text.push('\n');
+                        text.push_str(&normalize(&path.to_string_lossy()));
+                    }
+                }
+            }
+            if terms.iter().all(|term| text.contains(term)) {
+                matches.push(entry);
+            }
+        }
+        Ok((matches, total, source_apps))
     }
 
     fn prune(&self, days: u32, now: i64, limit: usize) -> anyhow::Result<()> {
@@ -571,15 +636,27 @@ pub fn clear(app: &AppHandle, keep_pinned: bool) -> anyhow::Result<()> {
 }
 
 #[tauri::command]
-pub async fn rich_clipboard_history(app: AppHandle) -> Result<RichHistory, String> {
-    tauri::async_runtime::spawn_blocking(move || with_store(&app, |store| Ok(RichHistory {
-        entries: store.list()?,
-        storage_notice: store.storage_notice(app.state::<LauncherState>().settings().clipboard_limit())?,
-        capture_supported: cfg!(target_os = "macos"),
-        support_notice: if cfg!(target_os = "macos") {
-            "Captures native PNG images and Finder file lists on macOS. TIFF-only images and URL-only file sources are skipped. Images: up to 4 MiB and 4 megapixels. Files: up to 64 existing paths, not file contents. Pinned entries survive retention and Clear unpinned. Unpinning applies the current retention and count limits immediately.".into()
-        } else { "Image and file capture, copy, and paste are currently supported only on macOS. Text history remains available.".into() },
-    })).map_err(|error| error.to_string())).await.map_err(|error| error.to_string())?
+pub async fn rich_clipboard_history(
+    query: String,
+    kind: Option<RichKind>,
+    source_app: Option<String>,
+    app: AppHandle,
+) -> Result<RichHistory, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        with_store(&app, |store| {
+            let (entries, total, source_apps) = store.search(&query, kind, source_app.as_deref())?;
+            Ok(RichHistory {
+                entries,
+                total,
+                source_apps,
+                storage_notice: store.storage_notice(app.state::<LauncherState>().settings().clipboard_limit())?,
+                capture_supported: cfg!(target_os = "macos"),
+                support_notice: if cfg!(target_os = "macos") {
+                    "Captures native PNG images and Finder file lists on macOS. TIFF-only images and URL-only file sources are skipped. Images: up to 4 MiB and 4 megapixels. Files: up to 64 existing paths, not file contents. Pinned entries survive retention and Clear unpinned. Unpinning applies the current retention and count limits immediately.".into()
+                } else { "Image and file capture, copy, and paste are currently supported only on macOS. Text history remains available.".into() },
+            })
+        }).map_err(|error| error.to_string())
+    }).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -677,6 +754,119 @@ mod tests {
         let store = Store::open(&dir.path().join("rich.sqlite3")).unwrap();
         (dir, store)
     }
+    #[test]
+    fn rich_search_combines_metadata_filters_and_preserves_missing_references() {
+        let (dir, mut store) = store();
+        let report = dir.path().join("Résumé 100%_done.pdf");
+        let design = dir.path().join("design.png");
+        std::fs::write(&report, "private file content not searched").unwrap();
+        std::fs::write(&design, "fixture").unwrap();
+        let finder = SourceApp {
+            id: "com.apple.Finder".into(),
+            name: "Finder".into(),
+        };
+        store
+            .capture(
+                &Payload::Files(vec![report.clone()]),
+                Some(&finder),
+                100,
+                0,
+                32,
+            )
+            .unwrap();
+        let first = store.list().unwrap()[0].id;
+        store
+            .capture(&Payload::Files(vec![design]), None, 101, 0, 32)
+            .unwrap();
+        store.set_pinned(first, true, 0, 102, 32).unwrap();
+        let (entries, total, sources) = store.search("", None, None).unwrap();
+        assert_eq!(total, 2);
+        assert_eq!(entries[0].id, first);
+        assert_eq!(sources, vec!["com.apple.Finder"]);
+        std::fs::remove_file(report).unwrap();
+        let (entries, _, _) = store
+            .search(
+                "RE\u{301}SUME\u{301} finder",
+                Some(RichKind::Files),
+                Some("COM.APPLE.FINDER"),
+            )
+            .unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].id, first);
+        assert!(store.preview(first).is_err());
+        assert_eq!(store.search("100%_done", None, None).unwrap().0.len(), 1);
+        assert!(
+            store
+                .search("100%_missing", None, None)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        assert!(
+            store
+                .search("private file content", None, None)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        assert!(
+            store
+                .search("design", None, Some("com.apple.Finder"))
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        assert!(
+            store
+                .search("", Some(RichKind::Image), None)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        drop(store);
+        let store = Store::open(&dir.path().join("rich.sqlite3")).unwrap();
+        assert_eq!(
+            store.search("100%_done", None, None).unwrap().0[0].id,
+            first
+        );
+    }
+
+    #[test]
+    fn rich_search_never_decodes_image_blobs_and_bounds_input() {
+        let (_dir, mut store) = store();
+        store
+            .capture(
+                &Payload::Png(include_bytes!("../../icons/32x32.png").to_vec()),
+                None,
+                1,
+                0,
+                32,
+            )
+            .unwrap();
+        store
+            .connection
+            .execute("UPDATE rich_clipboard SET payload = X'00'", [])
+            .unwrap();
+        assert_eq!(
+            store
+                .search("", Some(RichKind::Image), None)
+                .unwrap()
+                .0
+                .len(),
+            1
+        );
+        assert!(
+            store
+                .search("no match", Some(RichKind::Image), None)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        assert!(store.search(&"a".repeat(1025), None, None).is_err());
+        assert!(store.search("", None, Some(&"a".repeat(1025))).is_err());
+        assert!(serde_json::from_str::<RichKind>(r#""unknown""#).is_err());
+    }
+
     #[test]
     fn clipboard_exclusions_are_exact_and_fail_closed_for_unknown_sources() {
         let app = SourceApp {

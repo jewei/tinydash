@@ -567,6 +567,8 @@ mockIPC(
     if (command === "rich_clipboard_history")
       return {
         entries: [],
+        total: 0,
+        sourceApps: [],
         captureSupported: true,
         supportNotice: "Native rich capture is supported on macOS.",
         storageNotice:

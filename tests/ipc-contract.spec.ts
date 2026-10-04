@@ -177,6 +177,9 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
         case "number":
           expect(Number.isSafeInteger(value) && Number(value) > 0).toBe(true);
           break;
+        case "RichKind":
+          expect(value).toBe("files");
+          break;
         case "FileAction":
           expect(value).toBe("openWith");
           break;

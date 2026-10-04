@@ -12,6 +12,8 @@ export interface RichClipboardEntry {
 
 export interface RichClipboardHistory {
   entries: RichClipboardEntry[];
+  total: number;
+  sourceApps: string[];
   captureSupported: boolean;
   supportNotice: string;
   storageNotice: string;
@@ -24,7 +26,16 @@ export interface RichClipboardPreview {
 }
 
 export const richClipboardBackend = {
-  history: () => invoke<RichClipboardHistory>("rich_clipboard_history"),
+  history: (
+    query: string,
+    kind?: RichClipboardEntry["kind"],
+    sourceApp?: string,
+  ) =>
+    invoke<RichClipboardHistory>("rich_clipboard_history", {
+      query,
+      kind,
+      sourceApp,
+    }),
   preview: (id: number) =>
     invoke<RichClipboardPreview>("rich_clipboard_preview", { id }),
   paste: (id: number) => invoke<void>("paste_rich_clipboard", { id }),
