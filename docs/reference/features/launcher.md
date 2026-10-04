@@ -61,7 +61,7 @@ Open with the global shortcut, tray, and a second process when those entry point
 
 Move the window, enter a query, select a result, and use **Reset window position** from Actions. Check that it centers on the same monitor and keeps the query, category, selection, and input focus. Repeat on a second monitor when available. Browser tests check the command and retained state; Rust tests check work-area geometry. Desktop checks prove the actual move.
 
-Run `bun run verify:native` on Windows and Linux X11 for launch and reopen. Use the desktop launcher checks for macOS, focus return, tray, physical shortcuts, input methods, and Wayland. The native suite does not prove those additional paths.
+Run `bun run verify:native` on Windows and Linux X11 for launch and reopen. The suite keeps suggestions enabled, checks the exact expected suggestions after clearing the query, and launches a used app from its suggestion to verify the fixture's output marker. Use the desktop launcher checks for macOS, focus return, tray, physical shortcuts, input methods, and Wayland. The native suite does not prove those additional paths.
 
 Open All with no pins. The welcome controls appear and the search field has focus. Choose Apps by keyboard, select a result, and confirm that Enter launches the selected fixture application.
 

@@ -185,6 +185,7 @@ export async function installFixtures(
         path,
         JSON.stringify({
           ...settings,
+          showSuggestions: true,
           fileSearchRoots: [fileRoot],
           fileWatchEnabled: true,
           currencyRatesEnabled: false,
@@ -203,6 +204,7 @@ export async function installFixtures(
       await writeFile(
         join(config, "settings.json"),
         JSON.stringify({
+          showSuggestions: true,
           fileSearchRoots: [fileRoot],
           fileWatchEnabled: true,
           currencyRatesEnabled: false,
