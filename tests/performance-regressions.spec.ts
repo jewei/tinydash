@@ -186,3 +186,32 @@ test("hide and reopen release image nodes but reuse settled icon payloads", asyn
   await settle(page);
   expect(await iconTraffic(page)).toEqual(traffic);
 });
+
+test("warm native icons do not construct transient fallback shapes", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("missing");
+  await expect(page.getByRole("option")).toHaveCount(0);
+  const counter = await page.evaluateHandle(() => {
+    const state = { count: 0 };
+    const clone = Node.prototype.cloneNode;
+    Node.prototype.cloneNode = function (deep?: boolean) {
+      const node = clone.call(this, deep);
+      if (
+        node instanceof Element &&
+        (node.matches('rect[x="3"][width="18"][rx="3"]') ||
+          node.querySelector('rect[x="3"][width="18"][rx="3"]'))
+      )
+        state.count++;
+      return node;
+    };
+    return state;
+  });
+  await input.fill("sa");
+  await settle(page);
+  await expect(page.locator(".app-avatar img")).toHaveCount(2);
+  expect(await counter.evaluate((state) => state.count)).toBe(0);
+  await counter.dispose();
+});

@@ -12,7 +12,7 @@ On macOS, search returns icon keys. The launcher loads icons for visible results
 
 See [platform support](../platform-support.md) for the directories and application formats that each operating system discovers.
 
-Visible native icons can start loading when they mount. A shared observer defers clipped icons until scrolling makes them visible. CSS tokens define row and preview sizes. Compact mode, window resizing, and display-scale changes update the required resolution. The launcher groups layout reads before updating images. It shares its display-scale listener and disconnects display observers when no active native icon needs them. Later results reuse the disconnected observers without retaining old targets. Static images and fallback icons do not register native loading observers. Fallback icons construct only the selected SVG shape. A name change replaces the shape and keeps the outer SVG element.
+Visible native icons can start loading when they mount. A shared observer defers clipped icons until scrolling makes them visible. CSS tokens define row and preview sizes. Compact mode, window resizing, and display-scale changes update the required resolution. The launcher groups layout reads before updating images. It shares its display-scale listener and disconnects display observers when no active native icon needs them. Later results reuse the disconnected observers without retaining old targets. Static images and fallback icons do not register native loading observers. Fallback icons construct only the selected SVG shape. A name change replaces the shape and keeps the outer SVG element. Native avatars check the warm cache before mounting a fallback shape.
 
 ## Verification
 

@@ -10,7 +10,7 @@ export default function AppAvatar(props: {
   let element!: HTMLSpanElement;
   const [nativeSource, setNativeSource] = createSignal<{
     key: string;
-    url: string;
+    url?: string;
   }>();
   const [failedSource, setFailedSource] = createSignal<string>();
   createEffect(
@@ -29,7 +29,9 @@ export default function AppAvatar(props: {
         setNativeSource(undefined);
         if (visible) {
           releaseImage = loadAppIcon(key, pixels, (url) => {
-            setNativeSource(url === undefined ? undefined : { key, url });
+            // An entry exists even while loading. A warm hit supplies its URL
+            // in this callback, before a fallback shape needs to mount.
+            setNativeSource({ key, url });
           });
         }
       });
@@ -55,7 +57,19 @@ export default function AppAvatar(props: {
       class={{ "app-avatar": true, "has-app-icon": !!source() }}
       aria-hidden="true"
     >
-      <Show when={source()} fallback={<Icon name="window" size={20} />}>
+      <Show
+        when={source()}
+        fallback={
+          <Show
+            when={
+              !props.icon?.startsWith("app-icon:") ||
+              nativeSource()?.key === props.icon
+            }
+          >
+            <Icon name="window" size={20} />
+          </Show>
+        }
+      >
         {(url) => (
           <img
             src={url()}
