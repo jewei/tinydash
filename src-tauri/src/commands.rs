@@ -144,7 +144,7 @@ pub async fn preview(app: AppHandle, id: String) -> Result<Option<Preview>> {
                     },
                 })
             }
-            "file" => std::fs::symlink_metadata(key)
+            "file" | "app" => std::fs::symlink_metadata(key)
                 .ok()
                 .map(|metadata| Preview::File {
                     path: key.into(),

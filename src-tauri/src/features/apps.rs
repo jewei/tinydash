@@ -3,8 +3,11 @@
 
 use unicode_normalization::UnicodeNormalization;
 
+use std::path::Path;
+
 use crate::{
     actions::Action,
+    features::files,
     platform,
     search::{
         Context,
@@ -94,7 +97,10 @@ fn result(app: &App, ctx: &Context) -> SearchResult {
     SearchResult {
         kind: ResultKind::App,
         title: app.name.clone(),
-        subtitle: "Application".into(),
+        subtitle: Path::new(&app.path)
+            .parent()
+            .map(files::display_path)
+            .unwrap_or_default(),
         icon: if platform::NATIVE_ICONS {
             Icon::File {
                 path: app.path.clone(),

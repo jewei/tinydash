@@ -88,13 +88,14 @@ pub fn open_settings(app: &AppHandle) -> Result<()> {
         window.set_focus()?;
         return Ok(());
     }
-    WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
+    let window = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("settings.html".into()))
         .title("TinyDash Settings")
         .inner_size(760.0, 560.0)
         .min_inner_size(640.0, 440.0)
         .center()
-        .focused(true)
         .build()?;
+    // TinyDash has no Dock icon, so it must bring itself to the front.
+    window.set_focus()?;
     Ok(())
 }
 

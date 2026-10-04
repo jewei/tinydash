@@ -122,7 +122,7 @@ const COMMANDS: &[Command] = &[
 ];
 
 fn result(command: &Command, ctx: &Context) -> SearchResult {
-    let mut run = ResultAction::new("Run", command.action.clone());
+    let mut run = ResultAction::new(command.name, command.action.clone());
     run.confirm = command.confirm.map(String::from);
     SearchResult {
         id: command.id.into(),
