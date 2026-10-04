@@ -78,10 +78,10 @@ test("deleting an entry keeps its confirmation when the next entry is selected",
     state.entries.push({ ...state.entries[0], id: 2, title: "Next file" });
   });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Next file/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Next file/ })).toBeVisible();
   await page.getByRole("button", { name: "Delete saved entry" }).click();
-  await expect(page.getByRole("button", { name: /Next file/ })).toHaveAttribute(
-    "aria-pressed",
+  await expect(page.getByRole("option", { name: /Next file/ })).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   await expect(
@@ -130,17 +130,17 @@ test("rich pins persist through refresh and retain selection when sorted first",
     state.entries.push({ ...state.entries[0], id: 2, title: "Other file" });
   });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await page.getByRole("button", { name: /Other file/ }).click();
+  await page.getByRole("option", { name: /Other file/ }).click();
   await page
     .getByRole("button", { name: "Pin saved entry", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("Pinned.");
-  const list = page.getByRole("list", { name: "Saved images and files" });
-  await expect(list.getByRole("button").first()).toContainText(
+  const list = page.getByRole("listbox", { name: "Saved images and files" });
+  await expect(list.getByRole("option").first()).toContainText(
     "Pinned · Other file",
   );
-  await expect(list.getByRole("button").first()).toHaveAttribute(
-    "aria-pressed",
+  await expect(list.getByRole("option").first()).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -197,7 +197,7 @@ test("unreadable pinned entries can still be unpinned and deleted", async ({
     state.previewError = true;
   });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await page.getByRole("button", { name: /Missing reference/ }).click();
+  await page.getByRole("option", { name: /Missing reference/ }).click();
   await expect(page.getByRole("alert")).toContainText("Preview unavailable");
   await expect(
     page.getByRole("button", { name: "Copy original format" }),
@@ -208,7 +208,7 @@ test("unreadable pinned entries can still be unpinned and deleted", async ({
   await expect(page.getByRole("status")).toContainText("Unpinned.");
   await page.getByRole("button", { name: "Delete saved entry" }).click();
   await expect(
-    page.getByRole("button", { name: /Missing reference/ }),
+    page.getByRole("option", { name: /Missing reference/ }),
   ).toHaveCount(0);
 });
 
@@ -296,7 +296,7 @@ test("rich paste sends the selected image ID and is absent on unsupported platfo
     });
   });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  await page.getByRole("button", { name: /Saved PNG/ }).click();
+  await page.getByRole("option", { name: /Saved PNG/ }).click();
   await expect(
     page.getByRole("img", { name: "Saved clipboard image" }),
   ).toBeVisible();
@@ -333,19 +333,19 @@ test("rich history combines filename, source app, and type filters with a clear 
     });
   });
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
-  const search = page.getByRole("searchbox", {
+  const search = page.getByRole("combobox", {
     name: "Search images and files",
   });
   const type = page.getByRole("combobox", { name: "Clipboard content type" });
   const source = page.getByRole("combobox", { name: "Clipboard source app" });
-  const list = page.getByRole("list", { name: "Saved images and files" });
+  const list = page.getByRole("listbox", { name: "Saved images and files" });
   await search.fill("REPORT.PDF finder");
-  await expect(list.getByRole("button")).toHaveCount(1);
+  await expect(list.getByRole("option")).toHaveCount(1);
   await expect(page.getByText("1 of 2 entries", { exact: true })).toBeVisible();
   await type.selectOption("files");
   await source.selectOption("com.apple.finder");
-  await expect(list.getByRole("button")).toHaveAttribute(
-    "aria-pressed",
+  await expect(list.getByRole("option")).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   await type.selectOption("image");
@@ -357,16 +357,16 @@ test("rich history combines filename, source app, and type filters with a clear 
     page.getByRole("button", { name: "Delete saved entry" }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(list.getByRole("button")).toHaveCount(2);
+  await expect(list.getByRole("option")).toHaveCount(2);
   await expect(search).toHaveValue("");
   await source.selectOption("com.example.Editor");
-  await expect(list.getByRole("button")).toContainText("Saved PNG");
+  await expect(list.getByRole("option")).toContainText("Saved PNG");
   await expect(
     page.getByRole("img", { name: "Saved clipboard image" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Clear filters" }).click();
-  await expect(page.getByRole("button", { name: /Saved PNG/ })).toHaveAttribute(
-    "aria-pressed",
+  await expect(page.getByRole("option", { name: /Saved PNG/ })).toHaveAttribute(
+    "aria-selected",
     "true",
   );
 });
@@ -381,7 +381,7 @@ test("rich history rejects stale replies and keeps only the newest queued search
     window.__richClipboardTest.holdHistory = true;
     window.__richClipboardTest.historyQueries = [];
   });
-  const search = page.getByRole("searchbox", {
+  const search = page.getByRole("combobox", {
     name: "Search images and files",
   });
   await search.fill("report");
@@ -414,7 +414,7 @@ test("rich history rejects stale replies and keeps only the newest queued search
 test("rich search errors keep filters for retry and selection remains stable on refresh", async ({
   page,
 }) => {
-  const search = page.getByRole("searchbox", {
+  const search = page.getByRole("combobox", {
     name: "Search images and files",
   });
   await page.evaluate(() => {
@@ -438,13 +438,244 @@ test("rich search errors keep filters for retry and selection remains stable on 
   ).toBeEnabled();
   await expect(
     page
-      .getByRole("list", { name: "Saved images and files" })
-      .getByRole("button"),
-  ).toHaveAttribute("aria-pressed", "true");
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toHaveAttribute("aria-selected", "true");
   await expect(search).toHaveValue("report");
   await page.getByRole("button", { name: "Delete saved entry" }).click();
   await expect(
     page.getByText("No saved images or file references."),
   ).toBeVisible();
   await expect(page.getByText("0 of 0 entries", { exact: true })).toBeVisible();
+});
+
+test("rich keyboard navigation keeps search focus and copies the selected filtered entry", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const state = window.__richClipboardTest;
+    state.entries.push({ ...state.entries[0], id: 2, title: "Second file" });
+    state.filesById[2] = ["/fixtures/report-second.pdf"];
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  const search = page.getByRole("combobox", {
+    name: "Search images and files",
+  });
+  await search.fill("report");
+  await expect(page.getByText("2 of 2 entries", { exact: true })).toBeVisible();
+  await search.press("ArrowDown");
+  const second = page.getByRole("option", { name: /Second file/ });
+  await expect(second).toHaveAttribute("aria-selected", "true");
+  await expect(search).toBeFocused();
+  await expect(search).toHaveAttribute(
+    "aria-activedescendant",
+    "rich-clipboard-entry-2",
+  );
+  await search.press("ArrowDown");
+  await expect(second).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await search.press("Enter");
+  await expect
+    .poll(() => page.evaluate(() => window.__richClipboardTest.copiedIds))
+    .toEqual([2]);
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("report");
+  await second.focus();
+  await page.keyboard.press("ArrowUp");
+  const first = page.getByRole("option", { name: /2 file references/ });
+  await expect(first).toBeFocused();
+  await expect(first).toHaveAttribute("tabindex", "0");
+  await expect(second).toHaveAttribute("tabindex", "-1");
+  await page.keyboard.press("ArrowUp");
+  await expect(first).toBeFocused();
+  await page.keyboard.press("Space");
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.copiedIds),
+  ).toEqual([2]);
+  // Refresh without moving focus, as a background clipboard event would.
+  await page
+    .getByRole("button", { name: "Refresh", exact: true })
+    .evaluate((button) => (button as HTMLButtonElement).click());
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await expect(first).toBeFocused();
+});
+
+test("rich keyboard paste uses the platform modifier and restores keyboard focus after failure", async ({
+  page,
+}) => {
+  const search = page.getByRole("combobox", {
+    name: "Search images and files",
+  });
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.pasteError =
+      "Direct paste needs Accessibility access.";
+  });
+  await search.press("Control+Shift+Enter");
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.pastedIds),
+  ).toEqual([]);
+  await search.press("Meta+Shift+Enter");
+  await expect(page.getByRole("status")).toContainText("Accessibility");
+  await expect(search).toBeFocused();
+  await search.press("Enter");
+  await expect
+    .poll(() => page.evaluate(() => window.__richClipboardTest.copiedIds))
+    .toEqual([1]);
+  await page.goto("/?platform=windows");
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await search.press("Meta+Shift+Enter");
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.pastedIds),
+  ).toEqual([]);
+  await search.press("Control+Shift+Enter");
+  await expect
+    .poll(() => page.evaluate(() => window.__richClipboardTest.pastedIds))
+    .toEqual([1]);
+});
+
+test("rich shortcuts ignore composition, repeated activation, and incomplete previews", async ({
+  page,
+}) => {
+  const search = page.getByRole("combobox", {
+    name: "Search images and files",
+  });
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await search.dispatchEvent("keydown", { key: "Enter", repeat: true });
+  await search.dispatchEvent("keydown", { key: "Enter", isComposing: true });
+  await search.evaluate((input) => {
+    input.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true }),
+    );
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    input.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true }),
+    );
+    input.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.copiedIds),
+  ).toEqual([]);
+  await page.evaluate(() => {
+    const state = window.__richClipboardTest;
+    state.entries.push({ ...state.entries[0], id: 2, title: "Slow file" });
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdPreview = true;
+  });
+  await search.press("ArrowDown");
+  await expect(page.getByRole("option", { name: /Slow file/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await search.press("Enter");
+  await search.press("Meta+Shift+Enter");
+  expect(
+    await page.evaluate(() => [
+      window.__richClipboardTest.copiedIds,
+      window.__richClipboardTest.pastedIds,
+    ]),
+  ).toEqual([[], []]);
+  await expect
+    .poll(() =>
+      page.evaluate(() => !!window.__richClipboardTest.releasePreview),
+    )
+    .toBe(true);
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdPreview = false;
+    window.__richClipboardTest.releasePreview?.();
+  });
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await search.press("Enter");
+  await expect
+    .poll(() => page.evaluate(() => window.__richClipboardTest.copiedIds))
+    .toEqual([2]);
+});
+
+test("rich shortcuts leave filter and button behavior intact and cannot duplicate busy paste", async ({
+  page,
+}) => {
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  const filter = page.getByRole("combobox", { name: "Clipboard content type" });
+  await filter.focus();
+  await filter.dispatchEvent("keydown", {
+    key: "Enter",
+    metaKey: true,
+    shiftKey: true,
+  });
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.pastedIds),
+  ).toEqual([]);
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Unpin saved entry", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.copiedIds),
+  ).toEqual([]);
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeEnabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdPaste = true;
+  });
+  const row = page
+    .getByRole("listbox", { name: "Saved images and files" })
+    .getByRole("option")
+    .first();
+  await row.focus();
+  await page.keyboard.press("Meta+Shift+Enter");
+  await expect
+    .poll(() => page.evaluate(() => !!window.__richClipboardTest.releasePaste))
+    .toBe(true);
+  await row.dispatchEvent("keydown", {
+    key: "Enter",
+    metaKey: true,
+    shiftKey: true,
+  });
+  await row.dispatchEvent("keydown", { key: "Enter" });
+  expect(
+    await page.evaluate(() => [
+      window.__richClipboardTest.copiedIds,
+      window.__richClipboardTest.pastedIds,
+    ]),
+  ).toEqual([[], [1]]);
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdPaste = false;
+    window.__richClipboardTest.releasePaste?.();
+  });
+  await expect(row).toBeFocused();
 });

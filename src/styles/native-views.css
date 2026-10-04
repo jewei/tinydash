@@ -109,7 +109,7 @@
   cursor: pointer;
 }
 
-.rich-clipboard-panel button[aria-pressed="true"] {
+.rich-clipboard-panel [role="option"][aria-selected="true"] {
   background: var(--color-selected);
   border-color: var(--color-selection-border);
 }
@@ -192,7 +192,13 @@
   flex-basis: 100%;
   margin-bottom: 8px;
 }
-.rich-clipboard-panel li button {
+.rich-clipboard-panel [role="option"] {
+  cursor: pointer;
+  min-height: var(--control-height);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
   width: 100%;
   padding: 10px 12px;
   text-align: left;
@@ -200,7 +206,7 @@
   border-color: transparent;
   background: var(--color-preview);
 }
-.rich-clipboard-panel li button[aria-pressed="true"] {
+.rich-clipboard-panel [role="option"][aria-selected="true"] {
   border-color: var(--color-selection-border);
   background: var(--color-selected);
   color: var(--color-selection-ink);
@@ -249,4 +255,13 @@
   background: var(--color-paper);
   color: var(--color-ink);
   font: inherit;
+}
+
+.rich-clipboard-panel [role="option"][aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rich-clipboard-shortcuts {
+  font-size: 12px;
 }

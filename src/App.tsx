@@ -1339,7 +1339,12 @@ export default function App(
             </Show>
             <Show
               when={name !== "rich-clipboard"}
-              fallback={<RichClipboardHistory onClose={closePanel} />}
+              fallback={
+                <RichClipboardHistory
+                  onClose={closePanel}
+                  platform={info()?.platform}
+                />
+              }
             >
               <Show
                 when={

@@ -14,7 +14,10 @@ import {
   type RichClipboardEntry,
 } from "../clipboardBridge";
 
-export default function RichClipboardHistory(props: { onClose: () => void }) {
+export default function RichClipboardHistory(props: {
+  onClose: () => void;
+  platform?: string;
+}) {
   const [history, setHistory] = createSignal<History>();
   const [query, setQuery] = createSignal("");
   const [kind, setKind] = createSignal<RichClipboardEntry["kind"]>();
@@ -33,6 +36,9 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
   let unlisten: (() => void) | undefined;
   let searchInput!: HTMLInputElement;
   let pasteButton!: HTMLButtonElement;
+  let resultList!: HTMLUListElement;
+  let composing = false;
+  let compositionTimer: number | undefined;
   let refreshing = false;
   let refreshAgain = false;
   let loadingPreview = false;
@@ -75,12 +81,31 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
         sourceApp(),
       );
       if (disposed || request !== refreshSequence) return;
+      const focused = document.activeElement;
+      const keepResultFocus =
+        focused instanceof HTMLElement &&
+        focused.getAttribute("role") === "option" &&
+        resultList?.contains(focused);
       setHistory(value);
       const next = value.entries.some((entry) => entry.id === selected())
         ? selected()
         : value.entries[0]?.id;
       if (next !== undefined && next === selected()) requestPreview(next);
       else setSelected(next);
+      if (keepResultFocus)
+        queueMicrotask(() => {
+          if (
+            disposed ||
+            (document.activeElement !== document.body &&
+              document.activeElement !== focused)
+          )
+            return;
+          const row =
+            next === undefined
+              ? undefined
+              : resultList?.querySelector<HTMLElement>(`#${resultId(next)}`);
+          (row ?? searchInput).focus({ preventScroll: true });
+        });
     } catch (error) {
       if (!disposed && request === refreshSequence)
         setHistoryError(String(error));
@@ -110,6 +135,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     disposed = true;
     pendingPreview = undefined;
     unlisten?.();
+    window.clearTimeout(compositionTimer);
   });
 
   function requestPreview(id: number | undefined) {
@@ -147,6 +173,83 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
   const selectedEntry = () =>
     history()?.entries.find((entry) => entry.id === selected());
 
+  const canTransfer = () =>
+    !unavailable() &&
+    !!history()?.captureSupported &&
+    !!selectedEntry() &&
+    preview()?.entry.id === selected();
+  const resultId = (id: number) => `rich-clipboard-entry-${id}`;
+  const modifier = () => (props.platform === "macos" ? "⌘" : "Ctrl");
+
+  function startComposition() {
+    window.clearTimeout(compositionTimer);
+    composing = true;
+  }
+  function endComposition() {
+    // WebKit can deliver the committing Enter just after compositionend.
+    window.clearTimeout(compositionTimer);
+    compositionTimer = window.setTimeout(() => {
+      composing = false;
+    }, 0);
+  }
+
+  function onKey(event: KeyboardEvent) {
+    if (event.defaultPrevented) return;
+    if (composing || event.isComposing || event.keyCode === 229) {
+      event.stopPropagation();
+      return;
+    }
+    if (event.key === "Escape" && busy()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    const target = event.target as HTMLElement;
+    const fromSearch = target === searchInput;
+    const fromResult =
+      target.getAttribute("role") === "option" && resultList?.contains(target);
+    if (!fromSearch && !fromResult) return;
+    const plain =
+      !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey;
+    const move =
+      plain && (event.key === "ArrowDown" || event.key === "ArrowUp");
+    const paste =
+      event.key === "Enter" &&
+      event.shiftKey &&
+      !event.altKey &&
+      (props.platform === "macos"
+        ? event.metaKey && !event.ctrlKey
+        : event.ctrlKey && !event.metaKey);
+    const copy = plain && event.key === "Enter";
+    const select = plain && fromResult && event.key === " ";
+    if (!move && !paste && !copy && !select) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (unavailable()) return;
+    if (move) {
+      const entries = history()?.entries ?? [];
+      if (!entries.length) return;
+      const current = entries.findIndex((entry) => entry.id === selected());
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      const next =
+        current < 0
+          ? step > 0
+            ? 0
+            : entries.length - 1
+          : Math.max(0, Math.min(entries.length - 1, current + step));
+      const id = entries[next].id;
+      setSelected(id);
+      queueMicrotask(() => {
+        if (disposed || selected() !== id) return;
+        const row = resultList?.querySelector<HTMLElement>(`#${resultId(id)}`);
+        if (fromResult) row?.focus({ preventScroll: true });
+        row?.scrollIntoView({ block: "nearest" });
+      });
+    } else if (!event.repeat && canTransfer() && !select) {
+      void action(paste ? "paste" : "copy", target);
+    }
+  }
+
   async function togglePin() {
     const entry = selectedEntry();
     if (!entry || unavailable()) return;
@@ -170,9 +273,17 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     }
   }
 
-  async function action(kind: "copy" | "paste" | "delete") {
+  async function action(
+    kind: "copy" | "paste" | "delete",
+    restoreFocus?: HTMLElement,
+  ) {
     const id = selected();
-    if (id === undefined || unavailable()) return;
+    if (
+      id === undefined ||
+      unavailable() ||
+      (kind !== "delete" && !canTransfer())
+    )
+      return;
     setBusy(true);
     setMessage(undefined);
     try {
@@ -192,9 +303,14 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     } finally {
       if (!disposed) {
         setBusy(false);
-        if (kind === "paste")
+        if (restoreFocus || kind === "paste")
           queueMicrotask(() => {
-            if (!disposed) pasteButton?.focus();
+            if (disposed) return;
+            if (restoreFocus) {
+              (restoreFocus.isConnected ? restoreFocus : searchInput).focus({
+                preventScroll: true,
+              });
+            } else pasteButton?.focus();
           });
       }
     }
@@ -204,6 +320,9 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     <section
       class="rich-clipboard-panel"
       aria-label="Image and file clipboard history"
+      onKeyDown={onKey}
+      onCompositionStart={startComposition}
+      onCompositionEnd={endComposition}
     >
       <header>
         <h2>Clipboard images and files</h2>
@@ -224,7 +343,19 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
           <input
             ref={searchInput}
             type="search"
+            role="combobox"
             aria-label="Search images and files"
+            aria-autocomplete="list"
+            aria-expanded={history()?.entries.length ? "true" : "false"}
+            aria-controls={
+              history()?.entries.length ? "rich-clipboard-results" : undefined
+            }
+            aria-activedescendant={
+              !unavailable() && selected() !== undefined
+                ? resultId(selected()!)
+                : undefined
+            }
+            aria-describedby="rich-clipboard-shortcuts"
             placeholder="Filename, path, title, or source app"
             maxlength={256}
             value={query()}
@@ -286,6 +417,14 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
           Clear filters
         </button>
       </div>
+      <p id="rich-clipboard-shortcuts" class="rich-clipboard-shortcuts">
+        In search or results: <kbd>↑</kbd> <kbd>↓</kbd> select
+        <Show when={history()?.captureSupported}>
+          {" · "}
+          <kbd>Enter</kbd> copy{" · "}
+          <kbd>{modifier()} + Shift + Enter</kbd> paste
+        </Show>
+      </p>
       <Show when={historyError()}>
         {(error) => (
           <p role="alert">
@@ -328,22 +467,34 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
                 </p>
               }
             >
-              <ul aria-label="Saved images and files">
+              <ul
+                ref={resultList}
+                id="rich-clipboard-results"
+                role="listbox"
+                aria-label="Saved images and files"
+                aria-describedby="rich-clipboard-shortcuts"
+                aria-busy={loadingHistory() ? "true" : "false"}
+              >
                 <For each={value().entries}>
                   {(entry) => (
-                    <li>
-                      <button
-                        type="button"
-                        aria-pressed={
-                          selected() === entry.id ? "true" : "false"
-                        }
-                        disabled={unavailable()}
-                        onClick={() => setSelected(entry.id)}
-                      >
-                        {entry.pinned ? "Pinned · " : ""}
-                        {entry.title} ·{" "}
-                        {new Date(entry.createdAt * 1000).toLocaleString()}
-                      </button>
+                    <li
+                      id={resultId(entry.id)}
+                      role="option"
+                      aria-selected={selected() === entry.id ? "true" : "false"}
+                      aria-disabled={unavailable() ? "true" : "false"}
+                      tabindex={
+                        !unavailable() && selected() === entry.id ? 0 : -1
+                      }
+                      onFocus={() => {
+                        if (!unavailable()) setSelected(entry.id);
+                      }}
+                      onClick={() => {
+                        if (!unavailable()) setSelected(entry.id);
+                      }}
+                    >
+                      {entry.pinned ? "Pinned · " : ""}
+                      {entry.title} ·{" "}
+                      {new Date(entry.createdAt * 1000).toLocaleString()}
                     </li>
                   )}
                 </For>
@@ -385,12 +536,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
             <button
               class="panel-primary"
               type="button"
-              disabled={
-                unavailable() ||
-                preview()?.entry.id !== selected() ||
-                !preview() ||
-                !value().captureSupported
-              }
+              disabled={!canTransfer()}
               onClick={() => void action("copy")}
             >
               Copy original format
@@ -399,11 +545,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
               <button
                 ref={pasteButton}
                 type="button"
-                disabled={
-                  unavailable() ||
-                  !preview() ||
-                  preview()?.entry.id !== selected()
-                }
+                disabled={!canTransfer()}
                 onClick={() => void action("paste")}
               >
                 Paste to previous app

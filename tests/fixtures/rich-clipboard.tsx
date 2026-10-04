@@ -17,11 +17,14 @@ declare global {
       holdPaste: boolean;
       releasePaste?: () => void;
       pastedIds: number[];
+      copiedIds: number[];
       filesById: Record<number, string[]>;
       historyError: string | null;
       holdHistory: boolean;
       releaseHistory?: () => void;
       historyQueries: string[];
+      holdPreview: boolean;
+      releasePreview?: () => void;
     };
   }
 }
@@ -48,10 +51,12 @@ window.__richClipboardTest = {
   pasteError: null,
   holdPaste: false,
   pastedIds: [],
+  copiedIds: [],
   filesById: { 1: ["/fixtures/report.pdf", "/fixtures/design.png"] },
   historyError: null,
   holdHistory: false,
   historyQueries: [],
+  holdPreview: false,
 };
 mockWindows("main");
 mockIPC(
@@ -109,6 +114,10 @@ mockIPC(
       return result;
     }
     if (command === "rich_clipboard_preview") {
+      if (state.holdPreview)
+        await new Promise<void>((resolve) => {
+          state.releasePreview = resolve;
+        });
       if (state.previewError)
         throw new Error("The saved preview cannot be read.");
       return {
@@ -143,6 +152,7 @@ mockIPC(
       return;
     }
     if (command === "copy_rich_clipboard") {
+      state.copiedIds.push(Number(id));
       if (window.__richClipboardTest.missing)
         throw new Error("A referenced file is no longer available.");
       return;
@@ -173,6 +183,7 @@ mockIPC(
 render(
   () => (
     <RichClipboardHistory
+      platform={new URLSearchParams(location.search).get("platform") ?? "macos"}
       onClose={() => {
         window.__richClipboardTest.closed = true;
       }}
