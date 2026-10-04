@@ -8,6 +8,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
+use tauri::Manager;
 use windows::{
     ApplicationModel::DataTransfer::{
         DataRequestedEventArgs, DataTransferManager, TargetApplicationChosenEventArgs,

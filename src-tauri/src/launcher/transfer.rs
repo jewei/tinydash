@@ -80,6 +80,13 @@ pub enum DragOutcome {
 pub type DragCompletion = Box<dyn FnOnce(Result<DragOutcome, String>) + Send>;
 
 #[derive(Clone)]
+#[cfg_attr(
+    target_os = "linux",
+    expect(
+        dead_code,
+        reason = "Linux rejects Share without reading its payloads."
+    )
+)]
 pub enum ShareItem {
     File(PathBuf),
     Text(String),
