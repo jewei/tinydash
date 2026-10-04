@@ -1,5 +1,7 @@
 import { createSignal, For, type JSX } from "solid-js";
 
+import { isComposing } from "../lib/keys";
+
 /** One labeled setting: text on the left, its control on the right. */
 export function Row(props: { label: string; description?: string; children: JSX.Element }) {
   return (
@@ -64,10 +66,16 @@ export function NumberField(props: {
   max: number;
   onChange: (value: number) => void;
 }) {
+  // An empty or invalid field restores the saved value instead of saving 0.
   const commit = (input: HTMLInputElement) => {
-    const value = Math.round(Number(input.value));
-    if (Number.isFinite(value) && value !== props.value) props.onChange(value);
-    else input.value = String(props.value);
+    const value = input.value.trim() === "" ? Number.NaN : Math.round(Number(input.value));
+    if (!Number.isFinite(value)) {
+      input.value = String(props.value);
+      return;
+    }
+    const clamped = Math.min(Math.max(value, props.min), props.max);
+    input.value = String(clamped);
+    if (clamped !== props.value) props.onChange(clamped);
   };
   return (
     <input
@@ -78,7 +86,9 @@ export function NumberField(props: {
       max={props.max}
       value={props.value}
       onBlur={(event) => commit(event.currentTarget)}
-      onKeyDown={(event) => event.key === "Enter" && commit(event.currentTarget)}
+      onKeyDown={(event) =>
+        event.key === "Enter" && !isComposing(event) && commit(event.currentTarget)
+      }
     />
   );
 }
@@ -123,7 +133,7 @@ export function ListEditor(props: {
           placeholder={props.placeholder}
           value={draft()}
           onInput={(event) => setDraft(event.currentTarget.value)}
-          onKeyDown={(event) => event.key === "Enter" && add()}
+          onKeyDown={(event) => event.key === "Enter" && !isComposing(event) && add()}
         />
         <button type="button" class="button" onClick={add}>
           Add

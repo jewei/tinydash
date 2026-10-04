@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 
-import { hasMod } from "../lib/keys";
+import { hasMod, isComposing } from "../lib/keys";
 import { Keys } from "../ui/Keys";
 
 export interface MenuItem {
@@ -30,32 +30,57 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
 
   const onKeyDown = (event: KeyboardEvent) => {
     event.stopPropagation();
+    if (isComposing(event)) return;
     const last = visible().length - 1;
     if (event.key === "ArrowDown") setActive(Math.min(active() + 1, last));
     else if (event.key === "ArrowUp") setActive(Math.max(active() - 1, 0));
-    else if (event.key === "Enter" && !event.isComposing) choose(visible()[active()]);
+    else if (event.key === "Enter") choose(visible()[active()]);
     else if (event.key === "Escape" || (hasMod(event) && event.key === "k")) props.onClose();
-    else return;
+    // The filter is the only control; Tab must not move focus out of an open menu.
+    else if (event.key !== "Tab") return;
     event.preventDefault();
   };
 
+  // Clicking anywhere else closes the menu, like any popup.
+  const onFocusOut = (event: FocusEvent) => {
+    const next = event.relatedTarget;
+    if (!(next instanceof Node) || !(event.currentTarget as HTMLElement).contains(next)) {
+      props.onClose();
+    }
+  };
+
   return (
-    <div class="menu" role="dialog" aria-label="Actions" onKeyDown={onKeyDown}>
+    <div
+      class="menu"
+      role="dialog"
+      aria-label="Actions"
+      onKeyDown={onKeyDown}
+      onFocusOut={onFocusOut}
+    >
       <input
         ref={input}
         class="menu-filter"
+        role="combobox"
+        aria-label="Search actions"
+        aria-expanded="true"
+        aria-controls="menu-items"
+        aria-activedescendant={visible().length ? `menu-item-${active()}` : undefined}
         placeholder="Search actions"
         value={filter()}
         onInput={(event) => {
           setFilter(event.currentTarget.value);
           setActive(0);
         }}
-        aria-controls="menu-items"
-        aria-activedescendant={`menu-item-${active()}`}
         autocomplete="off"
         spellcheck={false}
       />
-      <ul id="menu-items" class="menu-items" role="listbox">
+      {/* Clicking an item must not move focus out of the filter first. */}
+      <ul
+        id="menu-items"
+        class="menu-items"
+        role="listbox"
+        onMouseDown={(event) => event.preventDefault()}
+      >
         <For each={visible()} fallback={<li class="menu-empty">No matching actions</li>}>
           {(item, index) => (
             <li

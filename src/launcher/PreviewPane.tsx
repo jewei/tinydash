@@ -13,12 +13,17 @@ const LOADED = new Set(["app", "clipboard", "file", "folder", "snippet"]);
 
 export function PreviewPane(props: {
   result: SearchResult | undefined;
+  /** Changes whenever results refresh, so an edited item reloads. */
+  revision: number;
   disabled: boolean;
   onRun: (action: ResultAction) => void;
 }) {
   const [details] = createResource(
-    () => (props.result && LOADED.has(props.result.kind) ? props.result.id : false),
-    async (id) => ({ id, preview: await loadPreview(id).catch(() => null) }),
+    () =>
+      props.result && LOADED.has(props.result.kind)
+        ? { id: props.result.id, revision: props.revision }
+        : false,
+    async ({ id }) => ({ id, preview: await loadPreview(id).catch(() => null) }),
   );
   // The resource keeps its last value; show it only for the result it belongs to.
   const current = () => {
@@ -117,7 +122,7 @@ function Details(props: { preview: Preview }) {
   );
 }
 
-export function formatBytes(bytes: number) {
+function formatBytes(bytes: number) {
   const units = ["bytes", "KB", "MB", "GB", "TB"];
   let value = bytes;
   let unit = 0;

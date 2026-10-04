@@ -42,7 +42,11 @@ export function ShortcutRecorder(props: {
       type="button"
       class="button recorder"
       classList={{ recording: recording() }}
-      aria-label="Launcher shortcut"
+      aria-label={
+        recording()
+          ? "Launcher shortcut: press the new keys, or Escape to cancel"
+          : `Launcher shortcut: ${displayKeys(props.value).join(" ")}`
+      }
       onClick={() => (recording() ? void stop() : start())}
       onKeyDown={onKeyDown}
       onBlur={() => void stop()}

@@ -139,4 +139,58 @@ describe("Launcher", () => {
     press("Enter");
     expect((await screen.findByRole("alert")).textContent).toContain("no longer installed");
   });
+
+  it("waits for the newest search before Enter runs a result", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const notes = { ...app, id: "app:/Applications/Notes.app", title: "Notes" };
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "notes") await slow;
+        return args.query === "notes" ? [notes] : [app];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Safari/ });
+    fireEvent.input(input, { target: { value: "notes" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(backend.called("run_action")).toHaveLength(0);
+    release();
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
+  });
+
+  it("never repeats an action while a key is held", async () => {
+    const { backend, press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter", { repeat: true });
+    press("Enter", { ctrlKey: true, repeat: true });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("keeps the position when the selected entry disappears", async () => {
+    const clip = (id: number) => ({ ...app, id: `clip:${id}`, title: `Entry ${id}` });
+    let entries = [clip(3), clip(2), clip(1)];
+    const { press } = setup(() => entries);
+    await screen.findByRole("option", { name: /Entry 3/ });
+    press("ArrowDown");
+    entries = [clip(3), clip(1)];
+    await emit("results:stale", null);
+    await waitFor(() =>
+      expect(screen.getByRole("option", { name: /Entry 1/ }).getAttribute("aria-selected")).toBe(
+        "true",
+      ),
+    );
+  });
+
+  it("closes the action menu when focus leaves it", async () => {
+    const { input, press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByRole("combobox", { name: "Search actions" });
+    fireEvent.focusOut(filter, { relatedTarget: input });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull());
+  });
 });

@@ -423,21 +423,3 @@ body {
 .menu-empty {
   color: var(--muted);
 }
-
-/* Narrow windows stack the preview under the list. */
-@media (max-width: 640px) {
-  .body {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-  }
-
-  .preview {
-    max-height: 45%;
-    border-top: 1px solid var(--rule);
-    border-left: 0;
-  }
-
-  .tabs-hint {
-    display: none;
-  }
-}

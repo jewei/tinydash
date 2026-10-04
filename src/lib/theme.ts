@@ -9,6 +9,8 @@ function paint() {
 }
 
 darkQuery.addEventListener("change", paint);
+// Follow the OS until settings load, so a dark desktop never flashes light.
+paint();
 
 /** Apply a theme. "system" follows the OS, including later changes. */
 export function applyTheme(theme: Theme) {

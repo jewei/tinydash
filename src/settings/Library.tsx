@@ -24,6 +24,8 @@ export function Library(props: { kind: LibraryKind }) {
   const [draft, setDraft] = createSignal<LibraryItem>(blank(props.kind));
   const [error, setError] = createSignal<string>();
   const [confirmingDelete, setConfirmingDelete] = createSignal(false);
+  const [busy, setBusy] = createSignal(false);
+  let nameField!: HTMLInputElement;
 
   const ofKind = () => (items() ?? []).filter((item) => item.kind === props.kind);
   const noun = () => (props.kind === "snippet" ? "Snippet" : "Quicklink");
@@ -35,26 +37,30 @@ export function Library(props: { kind: LibraryKind }) {
   const change = (field: "name" | "keyword" | "text", value: string) =>
     setDraft((item) => ({ ...item, [field]: value }));
 
-  const save = async () => {
+  /** Run one write at a time, so a double click cannot save twice. */
+  const write = async (work: () => Promise<void>) => {
+    if (busy()) return;
+    setBusy(true);
     try {
-      edit(await ipc.saveLibraryItem(draft()));
+      await work();
       await refetch();
     } catch (failure) {
       setError(ipc.message(failure));
+    } finally {
+      setBusy(false);
     }
   };
 
-  const remove = async () => {
-    const id = draft().id;
-    if (id === null) return;
-    try {
+  const save = () => write(async () => edit(await ipc.saveLibraryItem(draft())));
+
+  const remove = () =>
+    write(async () => {
+      const id = draft().id;
+      if (id === null) return;
       await ipc.deleteLibraryItem(id);
       edit(blank(props.kind));
-      await refetch();
-    } catch (failure) {
-      setError(ipc.message(failure));
-    }
-  };
+      nameField.focus();
+    });
 
   return (
     <div class="library">
@@ -96,6 +102,7 @@ export function Library(props: { kind: LibraryKind }) {
         <label>
           Name
           <input
+            ref={nameField}
             class="field"
             required
             maxLength={100}
@@ -160,7 +167,7 @@ export function Library(props: { kind: LibraryKind }) {
               </button>
             </Show>
           </Show>
-          <button type="submit" class="button primary">
+          <button type="submit" class="button primary" disabled={busy()}>
             Save {noun()}
           </button>
         </div>

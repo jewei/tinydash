@@ -30,7 +30,7 @@ export const hideLauncher = () => invoke<void>("hide_launcher");
 
 export const getSettings = () => invoke<Settings>("get_settings");
 
-/** Resolves to the saved, normalized settings; rejects with a message when nothing changed. */
+/** Resolves to the saved, normalized settings; rejects with the reason when nothing was saved. */
 export const updateSettings = (settings: Settings) =>
   invoke<Settings>("update_settings", { settings });
 

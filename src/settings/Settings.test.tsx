@@ -47,7 +47,7 @@ describe("Settings", () => {
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
-    const recorder = await screen.findByRole("button", { name: "Launcher shortcut" });
+    const recorder = await screen.findByRole("button", { name: /Launcher shortcut/ });
     fireEvent.click(recorder);
     fireEvent.keyDown(recorder, { key: " ", code: "Space", altKey: true });
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
@@ -85,5 +85,41 @@ describe("Settings", () => {
       text: "Regards, {date}",
     });
     expect(await screen.findByRole("button", { name: /Signature/ })).toBeTruthy();
+  });
+
+  it("does not send a failed change again with the next one", async () => {
+    let calls = 0;
+    const backend = fakeBackend({
+      update_settings: (args) => {
+        calls += 1;
+        if (calls === 1) throw "Could not change open at login.";
+        return args.settings;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("switch", { name: "Open at login" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Hide when another app is focused" }));
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
+    expect(backend.called("update_settings")[1]?.args).toEqual({
+      settings: { ...defaultSettings, hideOnBlur: false },
+    });
+  });
+
+  it("restores an emptied number instead of saving zero", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Clipboard" }));
+    const field = (await screen.findByRole("spinbutton", {
+      name: "Entries to keep",
+    })) as HTMLInputElement;
+    fireEvent.input(field, { target: { value: "" } });
+    fireEvent.blur(field);
+    expect(field.value).toBe("200");
+    fireEvent.input(field, { target: { value: "5000" } });
+    fireEvent.blur(field);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toMatchObject({
+      settings: { clipboardHistoryLimit: 1000 },
+    });
   });
 });

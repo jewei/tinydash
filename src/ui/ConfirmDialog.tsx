@@ -25,7 +25,13 @@ export function ConfirmDialog(props: {
 
   return (
     <div class="backdrop" onKeyDown={onKeyDown}>
-      <div class="dialog" role="alertdialog" aria-modal="true" aria-describedby="dialog-message">
+      <div
+        class="dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Confirm"
+        aria-describedby="dialog-message"
+      >
         <p id="dialog-message">{props.message}</p>
         <div class="dialog-buttons">
           <button ref={cancel} type="button" class="button" onClick={() => props.onCancel()}>

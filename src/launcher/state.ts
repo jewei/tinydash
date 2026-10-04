@@ -22,12 +22,16 @@ interface Input {
 }
 
 /** An action that asked for confirmation, waiting for the user. */
-export interface Pending {
+interface Pending {
   action: ResultAction;
   resultId?: string;
 }
 
-export type Launcher = ReturnType<typeof createLauncher>;
+/** A row and action to run once the results match what was typed. */
+interface Queued {
+  index: number;
+  position: number;
+}
 
 /** Launcher state and behavior, without any rendering. */
 export function createLauncher() {
@@ -35,6 +39,7 @@ export function createLauncher() {
   const [category, setCategoryValue] = createSignal<Category>("all");
   const [results, setResults] = createSignal<SearchResult[]>([]);
   const [selectedIndex, setSelectedIndex] = createSignal(0);
+  const [revision, setRevision] = createSignal(0);
   const [searchError, setSearchError] = createSignal<string>();
   const [actionError, setActionError] = createSignal<string>();
   const [pending, setPending] = createSignal<Pending>();
@@ -42,25 +47,32 @@ export function createLauncher() {
 
   const selected = () => results()[selectedIndex()];
 
-  // The input whose results are on screen. A refresh of the same input
-  // keeps the selected result; a new input selects the first one.
+  // The input whose results are on screen, and a run that waits for the
+  // results of the latest input.
   let shown: Input | undefined;
+  let queued: Queued | undefined;
+  const isCurrent = () => shown?.query === query() && shown?.category === category();
+
   const request = latestOnly(
     (input: Input) => ipc.search(input.query, input.category),
     (found, input) => {
       const same = shown?.query === input.query && shown?.category === input.category;
-      const keep = same ? selected()?.id : undefined;
       shown = input;
       batch(() => {
+        // A refresh keeps the selected result, or its position when it is
+        // gone (after a delete); a new input selects the first result.
+        const kept = same ? found.findIndex((result) => result.id === selected()?.id) : 0;
+        const index = kept >= 0 ? kept : Math.min(selectedIndex(), found.length - 1);
         setResults(found);
-        setSelectedIndex(
-          Math.max(
-            0,
-            found.findIndex((result) => result.id === keep),
-          ),
-        );
+        setSelectedIndex(Math.max(index, 0));
+        setRevision((value) => value + 1);
         setSearchError(undefined);
       });
+      if (queued && isCurrent()) {
+        const { index, position } = queued;
+        queued = undefined;
+        activate(index, position);
+      }
     },
     (error) => setSearchError(ipc.message(error)),
   );
@@ -96,6 +108,8 @@ export function createLauncher() {
 
   /** The launcher opened: start over with an empty query. */
   function reset(next: Category | null) {
+    shown = undefined;
+    queued = undefined;
     batch(() => {
       setQueryValue("");
       setCategoryValue(next ?? "all");
@@ -103,6 +117,21 @@ export function createLauncher() {
       setPending(undefined);
     });
     void refresh();
+  }
+
+  /**
+   * Run the action at `position` of the result at `index`. While a newer
+   * search is still on its way, wait for it, so Enter never runs a result
+   * of an older query.
+   */
+  function activate(index: number, position = 0) {
+    if (!isCurrent()) {
+      queued = { index, position };
+      return;
+    }
+    const result = results()[index];
+    const action = result?.actions[position];
+    if (result && action) run(action, result);
   }
 
   /** Run an action, or ask first when it needs confirmation. */
@@ -139,6 +168,7 @@ export function createLauncher() {
     selected,
     selectedIndex,
     select: setSelectedIndex,
+    revision,
     searchError,
     actionError,
     pending,
@@ -149,6 +179,7 @@ export function createLauncher() {
     move,
     reset,
     refresh,
+    activate,
     run,
     confirm,
     cancel: () => setPending(undefined),

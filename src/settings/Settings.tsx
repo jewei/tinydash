@@ -1,4 +1,6 @@
 import {
+  createEffect,
+  createMemo,
   createResource,
   createSignal,
   For,
@@ -62,37 +64,43 @@ const LANGUAGES: ReadonlyArray<{ value: EmojiLanguage; label: string }> = [
 ];
 
 export function Settings() {
-  const [values, setValues] = createSignal<Values>();
+  // `saved` is what the backend holds; `changes` are edits on their way.
+  // The form shows saved values with pending changes on top.
+  const [saved, setSaved] = createSignal<Values>();
+  const [changes, setChanges] = createSignal<Partial<Values>[]>([]);
+  const values = createMemo(() => {
+    const base = saved();
+    return base && changes().reduce<Values>((all, change) => ({ ...all, ...change }), base);
+  });
   const [section, setSection] = createSignal<Section>("general");
   const [error, setError] = createSignal<string>();
   const [confirmClear, setConfirmClear] = createSignal(false);
 
-  const apply = (next: Values) => {
-    setValues(next);
-    applyTheme(next.theme);
-  };
-
-  onMount(() => {
-    const stop = ipc.onSettingsChanged(apply);
-    onCleanup(() => void stop.then((unlisten) => unlisten()));
-    ipc.getSettings().then(apply, (failure) => setError(ipc.message(failure)));
+  createEffect(() => {
+    const current = values();
+    if (current) applyTheme(current.theme);
   });
 
-  // Saves run one after another, each from the newest local values, so
-  // quick changes cannot overwrite each other.
+  onMount(() => {
+    const stop = ipc.onSettingsChanged(setSaved);
+    onCleanup(() => void stop.then((unlisten) => unlisten()));
+    ipc.getSettings().then(setSaved, (failure) => setError(ipc.message(failure)));
+  });
+
+  // Saves run one at a time. Each applies its change on top of the latest
+  // saved settings, so a change that failed is never sent again.
   let saving = Promise.resolve();
   const save = (change: Partial<Values>) => {
-    const current = values();
-    if (!current) return Promise.resolve();
-    const next = { ...current, ...change };
-    setValues(next);
+    setChanges((list) => [...list, change]);
     saving = saving.then(async () => {
+      const base = saved();
       try {
-        apply(await ipc.updateSettings(next));
+        if (base) setSaved(await ipc.updateSettings({ ...base, ...change }));
         setError(undefined);
       } catch (failure) {
         setError(ipc.message(failure));
-        apply(await ipc.getSettings());
+      } finally {
+        setChanges((list) => list.filter((pending) => pending !== change));
       }
     });
     return saving;
@@ -159,7 +167,7 @@ export function Settings() {
                 </Row>
                 <Row label={IS_MAC ? "Show menu bar icon" : "Show tray icon"}>
                   <Toggle
-                    label="Show tray icon"
+                    label={IS_MAC ? "Show menu bar icon" : "Show tray icon"}
                     checked={settings().showTrayIcon}
                     onChange={(showTrayIcon) => void save({ showTrayIcon })}
                   />

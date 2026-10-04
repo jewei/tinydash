@@ -2,7 +2,6 @@ import { createSignal, For, type JSX, Match, onCleanup, onMount, Show, Switch } 
 
 import type { Action } from "../generated/Action";
 import type { Category } from "../generated/Category";
-
 import type { Platform } from "../generated/Platform";
 import type { ResultAction } from "../generated/ResultAction";
 import type { Settings } from "../generated/Settings";
@@ -22,11 +21,6 @@ import { CATEGORIES, createLauncher } from "./state";
 /** Actions that belong to no result, listed in the actions menu. */
 const GENERAL_ACTIONS: ResultAction[] = [
   { label: "Refresh Apps and Files", action: { type: "refresh" }, confirm: null },
-  {
-    label: "Clear Clipboard History",
-    action: { type: "clearClipboard" },
-    confirm: "Delete all clipboard history except pinned entries?",
-  },
   { label: "Settings", action: { type: "openSettings" }, confirm: null },
   { label: "Quit TinyDash", action: { type: "quit" }, confirm: null },
 ];
@@ -72,37 +66,30 @@ export function Launcher() {
   /** Actions that belong to no result, such as opening Settings. */
   const runGeneral = (action: Action) => launcher.run({ label: "", action, confirm: null });
 
-  const runIndex = (index: number) => {
-    const result = launcher.results()[index];
-    const action = result?.actions[0];
-    if (result && action) launcher.run(action, result);
-  };
-
-  const runSelected = (position: number) => {
-    const result = launcher.selected();
-    const action = result?.actions[position];
-    if (result && action) launcher.run(action, result);
-  };
-
   const deleteSelected = () => {
-    const result = launcher.selected();
-    const action = result?.actions.find((entry) => entry.action.type === "deleteClip");
-    if (result && action) launcher.run(action, result);
+    const position = launcher
+      .selected()
+      ?.actions.findIndex((entry) => entry.action.type === "deleteClip");
+    if (position !== undefined && position >= 0) {
+      launcher.activate(launcher.selectedIndex(), position);
+    }
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (isComposing(event) || menuOpen() || launcher.pending()) return;
+    if (clipboardOff() && event.key === "Enter") return enableClipboard();
     const command = commandFor(event, launcher.selectedIndex());
     if (!command) return;
     event.preventDefault();
-    if (event.repeat && command.type === "run") return;
+    // Holding a key moves the selection; it never repeats an action.
+    if (event.repeat && command.type !== "move") return;
     switch (command.type) {
       case "move":
         return launcher.move(command.by);
       case "run":
-        return runIndex(command.index);
+        return launcher.activate(command.index);
       case "runSecondary":
-        return runSelected(1);
+        return launcher.activate(launcher.selectedIndex(), 1);
       case "delete":
         return deleteSelected();
       case "menu":
@@ -112,6 +99,10 @@ export function Launcher() {
       case "settings":
         return runGeneral({ type: "openSettings" });
       case "hide":
+        // Escape first dismisses a startup warning, then hides.
+        if (warnings().length && !launcher.actionError() && !launcher.searchError()) {
+          return setWarnings((list) => list.slice(1));
+        }
         return void ipc.hideLauncher();
     }
   };
@@ -153,8 +144,8 @@ export function Launcher() {
           ref={input}
           class="search-input"
           role="combobox"
-          aria-expanded="true"
-          aria-controls="results"
+          aria-expanded={launcher.results().length > 0}
+          aria-controls={launcher.results().length ? "results" : undefined}
           aria-activedescendant={
             launcher.results().length ? optionId(launcher.selectedIndex()) : undefined
           }
@@ -203,7 +194,7 @@ export function Launcher() {
                   focusInput();
                 }}
               >
-                Dismiss
+                Dismiss <Keys keys={["esc"]} />
               </button>
             </Show>
           </div>
@@ -238,11 +229,12 @@ export function Launcher() {
               onSelect={launcher.select}
               onRun={(index) => {
                 launcher.select(index);
-                runIndex(index);
+                launcher.activate(index);
               }}
             />
             <PreviewPane
               result={launcher.selected()}
+              revision={launcher.revision()}
               disabled={launcher.running()}
               onRun={(action) => launcher.run(action, launcher.selected())}
             />
