@@ -9,6 +9,7 @@ export const ipcBridges = {
   ...backend,
   richClipboardHistory: richClipboardBackend.history,
   richClipboardPreview: richClipboardBackend.preview,
+  revealRichClipboardFile: richClipboardBackend.revealFile,
   copyRichClipboard: richClipboardBackend.copy,
   pasteRichClipboard: richClipboardBackend.paste,
   deleteRichClipboard: richClipboardBackend.delete,
@@ -105,6 +106,7 @@ export async function probeCommands(settings: SettingsValues) {
     richClipboardHistory: () =>
       richClipboardBackend.history("fixture", "files", "com.apple.finder"),
     richClipboardPreview: () => richClipboardBackend.preview(1),
+    revealRichClipboardFile: () => richClipboardBackend.revealFile(1, 0),
     copyRichClipboard: () => richClipboardBackend.copy(1),
     pasteRichClipboard: () => richClipboardBackend.paste(1),
     deleteRichClipboard: () => richClipboardBackend.delete(1),

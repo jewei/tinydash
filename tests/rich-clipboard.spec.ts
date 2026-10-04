@@ -817,3 +817,112 @@ test("name editor cancels without writes and blocks composition and result actio
     await page.evaluate(() => window.__richClipboardTest.namedEntries),
   ).toEqual([]);
 });
+
+test("reveal sends the saved entry and exact file index without copying", async ({
+  page,
+}) => {
+  const first = page.getByRole("button", {
+    name: "Reveal in Finder: /fixtures/report.pdf",
+    exact: true,
+  });
+  const second = page.getByRole("button", {
+    name: "Reveal in Finder: /fixtures/design.png",
+    exact: true,
+  });
+  await first.click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Reveal request sent to Finder.",
+  );
+  await second.focus();
+  await second.press("Enter");
+  await expect
+    .poll(() => page.evaluate(() => window.__richClipboardTest.revealedFiles))
+    .toEqual([
+      { id: 1, fileIndex: 0 },
+      { id: 1, fileIndex: 1 },
+    ]);
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.copiedIds),
+  ).toEqual([]);
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.pastedIds),
+  ).toEqual([]);
+  await expect(page.getByRole("option")).toContainText("2 file references");
+});
+
+test("reveal blocks concurrent actions and keeps an error available for retry", async ({
+  page,
+}) => {
+  const reveal = page.getByRole("button", {
+    name: "Reveal in Finder: /fixtures/design.png",
+    exact: true,
+  });
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdReveal = true;
+  });
+  await reveal.click();
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Delete saved entry" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Back", exact: true }),
+  ).toBeDisabled();
+  await expect(reveal).toBeDisabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.revealError =
+      "Finder could not reveal the file.";
+    window.__richClipboardTest.holdReveal = false;
+    window.__richClipboardTest.releaseReveal?.();
+  });
+  await expect(page.getByRole("status")).toHaveText(
+    "Finder could not reveal the file.",
+  );
+  await expect(reveal).toBeFocused();
+  await page.evaluate(() => {
+    window.__richClipboardTest.revealError = null;
+    window.__richClipboardTest.missing = true;
+  });
+  await reveal.click();
+  await expect(page.getByRole("status")).toContainText("no longer available");
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await page.evaluate(() => {
+    window.__richClipboardTest.missing = false;
+  });
+  await reveal.click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Reveal request sent to Finder.",
+  );
+});
+
+test("reveal is unavailable while naming and absent for images and unsupported platforms", async ({
+  page,
+}) => {
+  const reveals = page.getByRole("button", { name: /^Reveal in Finder:/ });
+  await expect(reveals).toHaveCount(2);
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Name pinned entry", exact: true })
+    .click();
+  await expect(reveals.first()).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Cancel naming", exact: true })
+    .click();
+  await page.evaluate(() => {
+    window.__richClipboardTest.entries[0].kind = "image";
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(
+    page.getByRole("img", { name: "Saved clipboard image" }),
+  ).toBeVisible();
+  await expect(reveals).toHaveCount(0);
+  await page.goto("/?platform=windows");
+  await expect(
+    page.getByRole("list", { name: "Saved file references" }),
+  ).toBeVisible();
+  await expect(reveals).toHaveCount(0);
+});

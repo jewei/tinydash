@@ -20,6 +20,10 @@ declare global {
       releasePaste?: () => void;
       pastedIds: number[];
       copiedIds: number[];
+      revealedFiles: { id: number; fileIndex: number }[];
+      revealError: string | null;
+      holdReveal: boolean;
+      releaseReveal?: () => void;
       filesById: Record<number, string[]>;
       historyError: string | null;
       holdHistory: boolean;
@@ -57,6 +61,9 @@ window.__richClipboardTest = {
   holdPaste: false,
   pastedIds: [],
   copiedIds: [],
+  revealedFiles: [],
+  revealError: null,
+  holdReveal: false,
   filesById: { 1: ["/fixtures/report.pdf", "/fixtures/design.png"] },
   historyError: null,
   holdHistory: false,
@@ -145,6 +152,20 @@ mockIPC(
                 "/fixtures/design.png",
               ]),
       };
+    }
+    if (command === "reveal_rich_clipboard_file") {
+      state.revealedFiles.push({
+        id: Number(id),
+        fileIndex: Number(args && "fileIndex" in args ? args.fileIndex : -1),
+      });
+      if (state.holdReveal)
+        await new Promise<void>((resolve) => {
+          state.releaseReveal = resolve;
+        });
+      if (state.missing)
+        throw new Error("A referenced file is no longer available.");
+      if (state.revealError) throw new Error(state.revealError);
+      return;
     }
     if (command === "paste_rich_clipboard") {
       state.pastedIds.push(Number(id));

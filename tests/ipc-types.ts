@@ -95,6 +95,7 @@ export const commandWrappers = {
   paste_queue: "pasteQueue",
   rich_clipboard_history: "richClipboardHistory",
   rich_clipboard_preview: "richClipboardPreview",
+  reveal_rich_clipboard_file: "revealRichClipboardFile",
   copy_rich_clipboard: "copyRichClipboard",
   paste_rich_clipboard: "pasteRichClipboard",
   delete_rich_clipboard: "deleteRichClipboard",

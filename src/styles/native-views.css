@@ -287,3 +287,16 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
 }
+
+.rich-clipboard-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.rich-clipboard-file span {
+  min-width: 0;
+  flex: 1 1 220px;
+  overflow-wrap: anywhere;
+}

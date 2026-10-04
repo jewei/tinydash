@@ -12,6 +12,7 @@ use rusqlite::Connection;
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
+use tauri_plugin_opener::OpenerExt;
 use unicode_normalization::UnicodeNormalization;
 
 use super::super::LauncherState;
@@ -516,6 +517,18 @@ impl Store {
         Ok(RichPreview { entry, png, files })
     }
 
+    fn file_to_reveal(&self, id: i64, file_index: u32) -> anyhow::Result<PathBuf> {
+        ensure!((file_index as usize) < MAX_FILES, "Invalid file reference.");
+        let preview = self.preview(id)?;
+        let files = preview
+            .files
+            .context("Only saved file references can be revealed.")?;
+        let path = files
+            .get(file_index as usize)
+            .context("This file reference is no longer available.")?;
+        Ok(PathBuf::from(path))
+    }
+
     fn delete(&self, id: Option<i64>) -> anyhow::Result<()> {
         if let Some(id) = id {
             ensure!(id > 0, "Invalid clipboard entry.");
@@ -736,6 +749,28 @@ pub async fn paste_rich_clipboard(id: i64, app: AppHandle) -> Result<(), String>
     let writer_app = app.clone();
     super::super::paste::paste_with_clipboard(&app, target, move || copy_saved(&writer_app, id))
         .await
+}
+
+#[tauri::command]
+pub async fn reveal_rich_clipboard_file(
+    id: i64,
+    file_index: u32,
+    app: AppHandle,
+) -> Result<(), String> {
+    if !cfg!(target_os = "macos") {
+        return Err("Revealing saved file references is currently supported only on macOS.".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        // Resolve the saved entry again; the frontend supplies no path.
+        // Release clipboard storage before asking the file manager to reveal it.
+        let path = with_store(&app, |store| store.file_to_reveal(id, file_index))
+            .map_err(|error| error.to_string())?;
+        app.opener()
+            .reveal_item_in_dir(path)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1187,6 +1222,60 @@ mod tests {
         blocker.execute_batch("ROLLBACK").unwrap();
         store.set_pinned(id, true, 0, 2, 32).unwrap();
         assert!(store.list().unwrap()[0].pinned);
+    }
+
+    #[test]
+    fn clipboard_rich_reveal_resolves_each_live_reference_without_writes() {
+        let (dir, mut store) = store();
+        let first = dir.path().join("report with spaces.txt");
+        let second = dir.path().join("folder");
+        std::fs::write(&first, "fixture").unwrap();
+        std::fs::create_dir(&second).unwrap();
+        store
+            .capture(
+                &Payload::Files(vec![first.clone(), second.clone()]),
+                None,
+                1,
+                0,
+                32,
+            )
+            .unwrap();
+        let id = store.list().unwrap()[0].id;
+        store.set_pinned(id, true, 0, 2, 32).unwrap();
+        store.set_name(id, "Release files").unwrap();
+        assert_eq!(store.file_to_reveal(id, 0).unwrap(), first);
+        assert_eq!(store.file_to_reveal(id, 1).unwrap(), second);
+        assert!(store.file_to_reveal(id, 2).is_err());
+        assert!(store.file_to_reveal(id, u32::MAX).is_err());
+        assert!(store.file_to_reveal(-1, 0).is_err());
+        assert!(store.file_to_reveal(id + 1, 0).is_err());
+        assert_eq!(
+            store.list().unwrap()[0].custom_name.as_deref(),
+            Some("Release files")
+        );
+        assert_eq!(store.list().unwrap()[0].created_at, 1);
+        assert!(store.list().unwrap()[0].pinned);
+        assert_eq!(std::fs::read_to_string(&first).unwrap(), "fixture");
+        std::fs::remove_file(first).unwrap();
+        assert!(store.file_to_reveal(id, 0).is_err());
+        // Reveal uses the same whole-list availability check as preview/copy.
+        assert!(store.file_to_reveal(id, 1).is_err());
+        store.delete(Some(id)).unwrap();
+        assert!(store.file_to_reveal(id, 1).is_err());
+        store
+            .capture(
+                &Payload::Png(include_bytes!("../../icons/32x32.png").to_vec()),
+                None,
+                3,
+                0,
+                32,
+            )
+            .unwrap();
+        assert!(
+            store
+                .file_to_reveal(store.list().unwrap()[0].id, 0)
+                .is_err()
+        );
     }
 
     #[test]

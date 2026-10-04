@@ -308,6 +308,32 @@ export default function RichClipboardHistory(props: {
     }
   }
 
+  const canReveal = () =>
+    props.platform === "macos" && canTransfer() && !!preview()?.files;
+
+  async function revealFile(
+    id: number,
+    fileIndex: number,
+    button: HTMLButtonElement,
+  ) {
+    if (!canReveal() || selected() !== id) return;
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await richClipboardBackend.revealFile(id, fileIndex);
+      if (!disposed) setMessage("Reveal request sent to Finder.");
+    } catch (error) {
+      if (!disposed) {
+        setMessage(String(error));
+        queueMicrotask(() => {
+          if (!disposed) (button.isConnected ? button : searchInput).focus();
+        });
+      }
+    } finally {
+      if (!disposed) setBusy(false);
+    }
+  }
+
   async function togglePin() {
     const entry = selectedEntry();
     if (!entry || unavailable()) return;
@@ -589,7 +615,34 @@ export default function RichClipboardHistory(props: {
                   <Show when={detail().files}>
                     {(files) => (
                       <ul aria-label="Saved file references">
-                        <For each={files()}>{(file) => <li>{file}</li>}</For>
+                        <For each={files()}>
+                          {(file, index) => (
+                            <li class="rich-clipboard-file">
+                              <span>{file}</span>
+                              <Show
+                                when={
+                                  props.platform === "macos" &&
+                                  value().captureSupported
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  aria-label={`Reveal in Finder: ${file}`}
+                                  disabled={!canReveal()}
+                                  onClick={(event) =>
+                                    void revealFile(
+                                      detail().entry.id,
+                                      index(),
+                                      event.currentTarget,
+                                    )
+                                  }
+                                >
+                                  Reveal in Finder
+                                </button>
+                              </Show>
+                            </li>
+                          )}
+                        </For>
                       </ul>
                     )}
                   </Show>
