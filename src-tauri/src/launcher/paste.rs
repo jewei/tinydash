@@ -157,10 +157,11 @@ async fn paste_current(app: &AppHandle, saved: SavedTarget) -> Result<(), String
         Ok(())
     })
     .await
-    .map_err(|error| error.to_string())?;
+    .map_err(|error| error.to_string())
+    .and_then(|result| result);
     if result.is_err() {
         // Surface failure instead of losing the error in a hidden launcher.
-        let _ = super::window::show(app);
+        let _ = super::window::show_after_paste_failure(app);
     }
     result
 }

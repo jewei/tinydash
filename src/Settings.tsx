@@ -120,7 +120,7 @@ const sectionKeywords: Record<Section, string> = {
     "aliases applications hidden shortcuts commands web keywords suggestions usage paste queue emoji skin tone language Chinese Malay Spanish 简体中文 Bahasa Melayu Español",
   categories: "tabs visible hide providers",
   clipboard:
-    "history copy paste images files exclusions privacy retention days",
+    "history copy paste default action enter images files exclusions privacy retention days",
   files: "index folders roots ignore patterns hidden watch preview",
   currency: "exchange rates offline updates",
   privacy: "backup import export recovery data storage",
@@ -1121,6 +1121,35 @@ export default function Settings() {
                     field("clipboardHistoryDecided", true);
                   }}
                 />
+                <label class="settings-row">
+                  <span>
+                    <strong>Default text action</strong>
+                    <span class="settings-hint">
+                      Enter copies saved text or pastes it into the previous
+                      app. Both actions stay available in Actions.
+                    </span>
+                  </span>
+                  <select
+                    aria-label="Default text action"
+                    value={value().clipboardDefaultAction}
+                    onChange={(event) =>
+                      field(
+                        "clipboardDefaultAction",
+                        event.currentTarget.value === "paste"
+                          ? "paste"
+                          : "copy",
+                      )
+                    }
+                  >
+                    <option value="copy">Copy text</option>
+                    <option value="paste">Paste to previous app</option>
+                  </select>
+                </label>
+                <p class="settings-callout">
+                  Direct paste needs Accessibility access on macOS or xdotool on
+                  Linux X11. It is unavailable on Wayland. If paste fails, use
+                  Copy text in Actions.
+                </p>
                 <label class="settings-row">
                   <span>
                     <strong>History limit</strong>

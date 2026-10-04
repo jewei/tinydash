@@ -306,6 +306,7 @@ const defaultSettings: SettingsValues = {
   itemPreferences: {},
   clipboardHistoryEnabled: true,
   clipboardHistoryDecided: true,
+  clipboardDefaultAction: "copy",
   clipboardHistoryLimit: 100,
   clipboardRetentionDays: 0,
   clipboardExcludedApps: [],
@@ -734,7 +735,7 @@ mockIPC(
               : query === "Projects"
                 ? [folder]
                 : [file]
-            : mode === "clipboard"
+            : mode === "clipboard" || (mode === "all" && query === "Meeting")
               ? clips.filter((entry) => {
                   const pinned = Object.values(state.pins).some((keys) =>
                     keys?.includes(entry.id),

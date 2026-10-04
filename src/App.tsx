@@ -136,6 +136,7 @@ export default function App(
   const [pinBusy, setPinBusy] = createSignal(false);
   const [info, setInfo] = createSignal<LauncherInfo>();
   const [busy, setBusy] = createSignal(false);
+  const [executingAction, setExecutingAction] = createSignal<Action>();
   const [dragging, setDragging] = createSignal(false);
   const [sharing, setSharing] = createSignal(false);
   async function shareCurrent() {
@@ -328,6 +329,10 @@ export default function App(
     (mode() === "all" || mode() === "files" ? files().warning : undefined) ??
     (mode() === "calculator" ? currency().warning : undefined) ??
     info()?.warnings[0]?.message;
+  const primaryAction = (result = current()): Action | undefined =>
+    result?.kind === "clipboard" && result.id.startsWith("clipboard:")
+      ? (info()?.settings.clipboardDefaultAction ?? "copy")
+      : result?.primaryAction;
   const primaryLabel = () =>
     current()?.id.startsWith("library:") && current()?.subtitle === "Snippet"
       ? "Insert snippet"
@@ -348,7 +353,9 @@ export default function App(
                   : current()?.kind === "calculation" || mode() === "calculator"
                     ? "Copy result"
                     : current()?.kind === "clipboard" || mode() === "clipboard"
-                      ? "Copy text"
+                      ? primaryAction() === "paste"
+                        ? "Paste to previous app"
+                        : "Copy text"
                       : "Open";
   const placeholder = () =>
     mode() === "password"
@@ -396,7 +403,12 @@ export default function App(
                     ? "Open folder"
                     : "Open application"
                 : primaryLabel(),
-            icon: current()?.primaryAction === "copy" ? "copy" : "return",
+            icon:
+              primaryAction() === "paste"
+                ? "clipboard"
+                : primaryAction() === "copy"
+                  ? "copy"
+                  : "return",
             run: runPrimary,
             disabled: !canOpen(),
             key: "↵",
@@ -408,11 +420,12 @@ export default function App(
       current()?.secondaryActions.includes("copy")
     )
       actions.push({
-        label: "Paste to previous app",
-        icon: "clipboard",
-        run: () => void run("paste"),
+        label:
+          primaryAction() === "paste" ? "Copy text" : "Paste to previous app",
+        icon: primaryAction() === "paste" ? "copy" : "clipboard",
+        run: () => void run(primaryAction() === "paste" ? "copy" : "paste"),
         disabled: !canOpen(),
-        key: `${modifier()} ⇧ ↵`,
+        key: primaryAction() === "paste" ? undefined : `${modifier()} ⇧ ↵`,
       });
     if (current()?.secondaryActions.includes("reveal"))
       actions.push({
@@ -781,7 +794,7 @@ export default function App(
 
   function runPrimary() {
     const result = current();
-    if (result) void run(result.primaryAction, result);
+    if (result) void run(primaryAction(result)!, result);
   }
 
   async function run(action: Action, result = current()) {
@@ -804,6 +817,7 @@ export default function App(
   ) {
     if (busy()) return;
     setBusy(true);
+    setExecutingAction(action);
     setError(undefined);
     const previousQuery = query();
     const previousMode = mode();
@@ -828,6 +842,7 @@ export default function App(
       if (!pendingAction()) focusInput();
     } finally {
       setBusy(false);
+      setExecutingAction(undefined);
     }
   }
 
@@ -1020,7 +1035,7 @@ export default function App(
     if (command && /^[1-9]$/.test(event.key)) {
       event.preventDefault();
       const result = results()[Number(event.key) - 1];
-      if (result) void run(result.primaryAction, result);
+      if (result) void run(primaryAction(result)!, result);
       return;
     }
     if (
@@ -1242,7 +1257,8 @@ export default function App(
             setPendingAction(undefined);
             setAppQuit(undefined);
             setClipboardTool(undefined);
-            setError(undefined);
+            // A failed native paste restores this window before returning its error.
+            if (!busy()) setError(undefined);
             if (clear === true) {
               setMode(enabledCategories()[0]);
               changeQuery("");
@@ -1589,7 +1605,7 @@ export default function App(
                           event.preventDefault();
                           return;
                         }
-                        void run(result.primaryAction, result);
+                        void run(primaryAction(result)!, result);
                       }}
                     >
                       <ResultIcon result={result} />
@@ -1755,6 +1771,7 @@ export default function App(
           <Show when={mode() !== "emoji"}>
             <ResultPreview
               result={current()}
+              primaryAction={primaryAction()}
               welcome={!current()}
               hasQuery={query().trim().length > 0}
               searchFailed={!!searchError()}
@@ -1781,11 +1798,13 @@ export default function App(
                 onClick={runPrimary}
               >
                 {busy()
-                  ? current()?.primaryAction === "run"
-                    ? "Running..."
-                    : current()?.primaryAction === "copy"
-                      ? "Copying..."
-                      : "Opening..."
+                  ? executingAction() === "paste"
+                    ? "Pasting..."
+                    : executingAction() === "run"
+                      ? "Running..."
+                      : executingAction() === "copy"
+                        ? "Copying..."
+                        : "Opening..."
                   : primaryLabel()}
                 <Icon name="return" size={17} />
               </button>

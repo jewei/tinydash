@@ -9,6 +9,7 @@ import FilePreview from "./FilePreview";
 
 export default function ResultPreview(props: {
   result?: SearchResult;
+  primaryAction?: Action;
   welcome: boolean;
   hasQuery?: boolean;
   searchFailed?: boolean;
@@ -46,7 +47,10 @@ export default function ResultPreview(props: {
         return "Emoji";
     }
   };
+  const primaryAction = () =>
+    props.primaryAction ?? props.result?.primaryAction;
   const actionLabel = () => {
+    if (primaryAction() === "paste") return "Paste to previous app";
     switch (props.result?.kind) {
       case "app":
         return "Open application";
@@ -246,11 +250,17 @@ export default function ResultPreview(props: {
           <button
             class="preview-action primary"
             disabled={!props.enabled}
-            onClick={() => props.onAction(props.result!.primaryAction)}
+            onClick={() => props.onAction(primaryAction()!)}
           >
             <span class="action-label">
               <Icon
-                name={props.result?.primaryAction === "copy" ? "copy" : "arrow"}
+                name={
+                  primaryAction() === "paste"
+                    ? "clipboard"
+                    : primaryAction() === "copy"
+                      ? "copy"
+                      : "arrow"
+                }
                 size={15}
               />
               {actionLabel()}
@@ -266,13 +276,22 @@ export default function ResultPreview(props: {
             <button
               class="preview-action"
               disabled={!props.enabled}
-              onClick={() => props.onAction("paste")}
+              onClick={() =>
+                props.onAction(primaryAction() === "paste" ? "copy" : "paste")
+              }
             >
               <span class="action-label">
-                <Icon name="clipboard" size={15} />
-                Paste to previous app
+                <Icon
+                  name={primaryAction() === "paste" ? "copy" : "clipboard"}
+                  size={15}
+                />
+                {primaryAction() === "paste"
+                  ? "Copy saved text"
+                  : "Paste to previous app"}
               </span>
-              <kbd>{props.modifier} ⇧ ↵</kbd>
+              <Show when={primaryAction() !== "paste"}>
+                <kbd>{props.modifier} ⇧ ↵</kbd>
+              </Show>
             </button>
           </Show>
           <Show when={props.result?.secondaryActions.includes("reveal")}>

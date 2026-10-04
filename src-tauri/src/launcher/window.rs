@@ -49,19 +49,29 @@ pub async fn set_launcher_appearance(
 }
 
 pub fn show(app: &AppHandle) -> Result<()> {
-    show_in_category(app, None)
+    show_in_category(app, None, false)
 }
 
 pub fn show_category(app: &AppHandle, mode: super::query::SearchMode) -> Result<()> {
-    show_in_category(app, Some(mode))
+    show_in_category(app, Some(mode), false)
 }
 
-fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> Result<()> {
+pub(super) fn show_after_paste_failure(app: &AppHandle) -> Result<()> {
+    show_in_category(app, None, true)
+}
+
+fn show_in_category(
+    app: &AppHandle,
+    mode: Option<super::query::SearchMode>,
+    preserve_query: bool,
+) -> Result<()> {
     let started = std::time::Instant::now();
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
-    super::paste::remember(app);
+    if !preserve_query {
+        super::paste::remember(app);
+    }
     #[cfg(target_os = "macos")]
     if let Some(state) = app.try_state::<LauncherState>() {
         state.focus.remember();
@@ -77,7 +87,10 @@ fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> 
     let clear = app
         .try_state::<LauncherState>()
         .is_none_or(|state| state.settings().clear_query_on_open);
-    window.emit("launcher-opened", clear || mode.is_some())?;
+    window.emit(
+        "launcher-opened",
+        !preserve_query && (clear || mode.is_some()),
+    )?;
     if let Some(mode) = mode {
         window.emit("launcher-category", mode)?;
     }

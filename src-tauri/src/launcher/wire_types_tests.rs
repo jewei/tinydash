@@ -442,6 +442,7 @@ fn generated_ipc_wire_types_match_frontend() {
         currency::CurrencyStatus,
         window::LauncherAppearance,
         Settings,
+        settings::ClipboardDefaultAction,
         settings::AppPreference,
         settings::ItemPreference,
         settings::CategoryShortcut,

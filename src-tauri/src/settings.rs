@@ -99,6 +99,15 @@ impl WebSearch {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub enum ClipboardDefaultAction {
+    #[default]
+    Copy,
+    Paste,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase")]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -117,6 +126,7 @@ pub struct Settings {
     pub item_preferences: BTreeMap<String, ItemPreference>,
     pub clipboard_history_enabled: bool,
     pub clipboard_history_decided: bool,
+    pub clipboard_default_action: ClipboardDefaultAction,
     pub clipboard_history_limit: u16,
     pub clipboard_retention_days: u32,
     pub clipboard_excluded_apps: Vec<String>,
@@ -149,6 +159,7 @@ impl Default for Settings {
             item_preferences: BTreeMap::new(),
             clipboard_history_enabled: true,
             clipboard_history_decided: true,
+            clipboard_default_action: ClipboardDefaultAction::Copy,
             clipboard_history_limit: 100,
             clipboard_retention_days: 0,
             clipboard_excluded_apps: Vec::new(),
@@ -556,6 +567,37 @@ mod tests {
     }
 
     #[test]
+    fn clipboard_default_action_migrates_and_rejects_unknown_actions() {
+        let legacy: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            legacy.clipboard_default_action,
+            ClipboardDefaultAction::Copy
+        );
+        assert_eq!(
+            Settings::fresh_install().clipboard_default_action,
+            ClipboardDefaultAction::Copy
+        );
+        let paste: Settings =
+            serde_json::from_str(r#"{"clipboardDefaultAction":"paste"}"#).unwrap();
+        assert_eq!(
+            paste.clipboard_default_action,
+            ClipboardDefaultAction::Paste
+        );
+        assert_eq!(
+            serde_json::to_value(paste).unwrap()["clipboardDefaultAction"],
+            "paste"
+        );
+        for action in ["delete", "Paste", "", "launch"] {
+            assert!(
+                serde_json::from_value::<Settings>(serde_json::json!({
+                    "clipboardDefaultAction": action
+                }))
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
     fn saves_all_preferences_and_preserves_unknown_fields() {
         let dir = tempfile::tempdir().expect("tempdir");
         std::fs::write(
@@ -567,6 +609,7 @@ mod tests {
             shortcut: "Alt+Shift+KeyJ".into(),
             visible_categories: vec![SearchMode::Apps, SearchMode::Calculator],
             clipboard_history_enabled: false,
+            clipboard_default_action: ClipboardDefaultAction::Paste,
             clipboard_history_limit: 42,
             file_search_roots: Some(vec!["~/Projects".into()]),
             file_watch_enabled: false,

@@ -139,6 +139,7 @@ export interface SettingsValues {
   itemPreferences: Record<string, ItemPreference>;
   clipboardHistoryEnabled: boolean;
   clipboardHistoryDecided: boolean;
+  clipboardDefaultAction: "copy" | "paste";
   clipboardHistoryLimit: number;
   clipboardRetentionDays: number;
   clipboardExcludedApps: string[];
