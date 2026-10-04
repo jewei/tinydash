@@ -31,6 +31,8 @@ fn windows_ipc_test_executable_loads_common_controls_v6() {
 }
 
 const MAIN_ONLY: &[&str] = &[
+    "app_icon",
+    "cancel_app_icon",
     "paste_result",
     "drag_result",
     "share_result",
@@ -98,13 +100,7 @@ const SETTINGS_ONLY: &[&str] = &[
     "check_update",
     "install_update",
 ];
-const SHARED: &[&str] = &[
-    "clear_clipboard_history",
-    "sync_appearance",
-    "app_catalog",
-    "app_icon",
-    "cancel_app_icon",
-];
+const SHARED: &[&str] = &["clear_clipboard_history", "sync_appearance", "app_catalog"];
 
 fn commands() -> Vec<&'static str> {
     MAIN_ONLY
