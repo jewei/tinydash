@@ -26,9 +26,11 @@ pub async fn set_launcher_appearance(
     }
     #[cfg(target_os = "macos")]
     {
+        use tauri_runtime_wry::WebviewWryExt;
+
         let (sender, mut receiver) = tauri::async_runtime::channel(1);
         window
-            .with_webview(move |webview| {
+            .with_wry_webview(move |webview| {
                 let _ = sender.try_send(crate::platform::set_launcher_appearance(
                     webview, appearance,
                 ));
@@ -47,18 +49,29 @@ pub async fn set_launcher_appearance(
 }
 
 pub fn show(app: &AppHandle) -> Result<()> {
-    show_in_category(app, None)
+    show_in_category(app, None, false)
 }
 
 pub fn show_category(app: &AppHandle, mode: super::query::SearchMode) -> Result<()> {
-    show_in_category(app, Some(mode))
+    show_in_category(app, Some(mode), false)
 }
 
-fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> Result<()> {
+pub(super) fn show_after_paste_failure(app: &AppHandle) -> Result<()> {
+    show_in_category(app, None, true)
+}
+
+fn show_in_category(
+    app: &AppHandle,
+    mode: Option<super::query::SearchMode>,
+    preserve_query: bool,
+) -> Result<()> {
     let started = std::time::Instant::now();
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
+    if !preserve_query {
+        super::paste::remember(app);
+    }
     #[cfg(target_os = "macos")]
     if let Some(state) = app.try_state::<LauncherState>() {
         state.focus.remember();
@@ -74,7 +87,10 @@ fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> 
     let clear = app
         .try_state::<LauncherState>()
         .is_none_or(|state| state.settings().clear_query_on_open);
-    window.emit("launcher-opened", clear || mode.is_some())?;
+    window.emit(
+        "launcher-opened",
+        !preserve_query && (clear || mode.is_some()),
+    )?;
     if let Some(mode) = mode {
         window.emit("launcher-category", mode)?;
     }
@@ -147,6 +163,10 @@ pub fn dismiss(app: &AppHandle) -> Result<()> {
 }
 
 fn hide_window(app: &AppHandle, _restore_focus: bool) -> Result<()> {
+    // Native drag, share, and image-save UI owns dismissal until its session ends.
+    if super::transfer::active(app) {
+        return Ok(());
+    }
     // Take the saved app before hiding. The resulting blur event can call hide again.
     #[cfg(target_os = "macos")]
     let previous = app

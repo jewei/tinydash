@@ -16,6 +16,7 @@ fn fixture() -> (
             &directory.path().join("settings.json"),
             &search,
             Some(100),
+            0,
         )
         .unwrap()
         .unwrap();
@@ -24,7 +25,7 @@ fn fixture() -> (
 }
 
 fn observe(session: &mut Session, search: &Mutex<SearchManager>, text: &str) -> CaptureRevision {
-    session.observe_text(search, Some(text.into()), 100, 100);
+    session.observe_text(search, Some(text.into()), 100, 100, 0);
     session.observed.captured.unwrap().0
 }
 
@@ -52,6 +53,50 @@ fn privacy_warning(session: &Session) -> LauncherWarning {
             .contains("Sensitive clipboard cleanup is pending")
     );
     warning
+}
+
+#[test]
+fn retention_recapture_preserves_pending_cleanup_and_recovers_after_contention() {
+    let (_directory, mut session, search, external) = fixture();
+    let first = session
+        .capture(&search, "expired fixture", 1, 100, 0)
+        .unwrap();
+    session.enqueue_cleanup(first);
+    external.execute_batch("BEGIN IMMEDIATE").unwrap();
+    assert!(
+        session
+            .capture(&search, "expired fixture", 86_402, 100, 1)
+            .is_err()
+    );
+    assert_eq!(session.health, Health::Busy);
+    assert!(saved(&external, first.id));
+    assert!(
+        search
+            .lock()
+            .unwrap()
+            .clipboard_entry(&format!("clipboard:{}", first.id))
+            .is_ok()
+    );
+    assert_eq!(session.cleanup, VecDeque::from([first]));
+    external.execute_batch("ROLLBACK").unwrap();
+
+    let fresh = session
+        .capture(&search, "expired fixture", 86_402, 100, 1)
+        .unwrap();
+    assert_ne!(fresh.id, first.id);
+    assert!(!saved(&external, first.id));
+    assert!(saved(&external, fresh.id));
+    assert!(
+        search
+            .lock()
+            .unwrap()
+            .clipboard_entry(&format!("clipboard:{}", first.id))
+            .is_err()
+    );
+    assert!(session.retry_cleanup(&search));
+    assert!(session.cleanup.is_empty());
+    assert!(saved(&external, fresh.id));
+    assert!(session.warning.lock().unwrap().is_none());
 }
 
 #[test]
@@ -257,7 +302,7 @@ fn cleanup_capacity_pauses_capture_and_overflow_requires_successful_full_clear()
             .message
             .contains("capacity is full")
     );
-    session.observe_text(&search, Some("must not be captured".into()), 102, 100);
+    session.observe_text(&search, Some("must not be captured".into()), 102, 100, 0);
     assert!(session.observed.captured.is_none());
     assert_eq!(
         session
@@ -361,6 +406,7 @@ fn pending_cleanup_is_session_only_and_restart_does_not_replay_old_deletes() {
             &directory.path().join("settings.json"),
             &search,
             Some(100),
+            0,
         )
         .unwrap()
         .unwrap();

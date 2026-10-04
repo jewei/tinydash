@@ -4,6 +4,7 @@ import { commandArguments } from "./fixtures/ipc-wire";
 import { resolve } from "node:path";
 import type {
   Action,
+  PasteQueueAction,
   FilePhase,
   LauncherWarning,
   SearchMode,
@@ -14,6 +15,7 @@ import { commandWrappers } from "./ipc-types";
 
 // A new TS variant also needs a serialized Rust example, not just a widened union.
 type MissingExamples =
+  | Exclude<PasteQueueAction, (typeof contracts.pasteQueueActions)[number]>
   | Exclude<Action, (typeof contracts.actions)[number]>
   | Exclude<FilePhase, (typeof contracts.fileStatuses)[number]["phase"]>
   | Exclude<SearchMode, (typeof contracts.modes)[number]>
@@ -46,6 +48,11 @@ function variants(path: string, name: string) {
 
 test("canonical serde fixtures cover variants and representative omitted/nullable values", () => {
   expect(complete).toBe(true);
+  expect([...contracts.pasteQueueActions].sort()).toEqual(
+    variants("launcher/paste_queue.rs", "PasteQueueAction"),
+  );
+  expect(contracts.pasteQueueEmpty.next).toBeNull();
+  expect(contracts.pasteQueueActive.next?.content).toBe("Next text");
   expect(contracts.fileStatuses.map((status) => status.phase).sort()).toEqual(
     variants("launcher/files.rs", "FilePhase"),
   );
@@ -126,6 +133,13 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
     ).toEqual([]);
     for (const arg of required) expect(args, command).toHaveProperty(arg.name);
     for (const [name, value] of Object.entries(args)) {
+      if (value === null) {
+        expect(
+          signature.find((arg) => arg.name === name)?.type,
+          command,
+        ).toContain(" | null");
+        continue;
+      }
       const type = signature
         .find((arg) => arg.name === name)!
         .type.replace(/ \| null$/, "");
@@ -161,7 +175,54 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
           expect(value).toEqual({ kind: "appearance", value: "dark" });
           break;
         case "number":
-          expect(Number.isSafeInteger(value) && Number(value) > 0).toBe(true);
+          if (
+            command === "reveal_rich_clipboard_file" &&
+            name === "fileIndex"
+          ) {
+            // File references use a zero-based index; IDs remain positive.
+            expect(value).toBe(0);
+          } else {
+            expect(Number.isSafeInteger(value) && Number(value) > 0).toBe(true);
+          }
+          break;
+        case "RichKind":
+          expect(value).toBe("files");
+          break;
+        case "FileAction":
+          expect(value).toBe("openWith");
+          break;
+        case "LibraryAction":
+          expect(value).toBe("copy");
+          break;
+        case "PasteQueueAction":
+          expect(value).toBe("start");
+          break;
+        case "LibraryDraft":
+          expect(value).toEqual({
+            kind: "snippet",
+            name: "Fixture",
+            keywords: "example",
+            content: "Synthetic text",
+          });
+          break;
+        case "Record<string, string>":
+          expect(value).toEqual({ query: "fixture" });
+          break;
+        case "ProcessInfo":
+          expect(value).toEqual({
+            pid: 123,
+            identity: "fixture",
+            name: "Fixture",
+          });
+          break;
+        case "ColorFormat":
+          expect(value).toBe("hex");
+          break;
+        case "MediaAction":
+          expect(value).toBe("playPause");
+          break;
+        case "WindowAction":
+          expect(value).toBe("center");
           break;
         default:
           throw new Error(`Add coverage for ${command}.${name}: ${type}`);

@@ -1,5 +1,4 @@
-import { batch, createSignal } from "solid-js";
-import { createStore, reconcile } from "solid-js/store";
+import { createSignal, createStore, flush, reconcile } from "solid-js";
 import type {
   CurrencyStatus,
   FileStatus,
@@ -12,6 +11,13 @@ import type {
 } from "./bridge";
 import { chooseSelection, createSearchQueue } from "./search";
 
+function itemShortcuts(settings: SettingsValues) {
+  return Object.entries(settings.itemPreferences)
+    .filter(([, preference]) => preference.shortcut)
+    .map(([id, preference]) => [id, preference.shortcut])
+    .sort(([a], [b]) => a.localeCompare(b));
+}
+
 /** Clear only warning categories whose cause a successful settings save repairs. */
 export function receiveLauncherSettings(
   current: LauncherInfo,
@@ -20,7 +26,9 @@ export function receiveLauncherSettings(
   const shortcutsChanged =
     current.settings.shortcut !== settings.shortcut ||
     JSON.stringify(current.settings.categoryShortcuts) !==
-      JSON.stringify(settings.categoryShortcuts);
+      JSON.stringify(settings.categoryShortcuts) ||
+    JSON.stringify(itemShortcuts(current.settings)) !==
+      JSON.stringify(itemShortcuts(settings));
   return {
     ...current,
     settings,
@@ -50,7 +58,9 @@ export function createLauncherController(options: {
   });
   const results = () => view.results;
   const setResults = (next: SearchResult[]) =>
-    setView("results", reconcile(next, { key: "id" }));
+    setView((draft) => {
+      reconcile(next, "id")(draft.results);
+    });
   const [selected, setSelected] = createSignal(0);
   const current = () => results()[selected()];
   const [pending, setPending] = createSignal(false);
@@ -88,20 +98,18 @@ export function createLauncherController(options: {
         selectionChangedByUser,
       });
       displayedQuery = { value: request.value, mode: request.mode };
-      batch(() => {
-        // The queue delivers only current replies. A background retry can
-        // repair search without dismissing App-owned action/startup errors.
-        setSearchError(undefined);
-        setResults(response.results);
-        setSelected(index);
-        setTotal(response.total);
-        setIndexing(response.indexing);
-        setFiles(response.files);
-        setCurrency(response.currency);
-        setIndexError(response.indexError ?? undefined);
-        setStorageError(response.storageError ?? undefined);
-        setNotice(response.notice ?? undefined);
-      });
+      // The queue delivers only current replies. A background retry can
+      // repair search without dismissing App-owned action/startup errors.
+      setSearchError(undefined);
+      setResults(response.results);
+      setSelected(index);
+      setTotal(response.total);
+      setIndexing(response.indexing);
+      setFiles(response.files);
+      setCurrency(response.currency);
+      setIndexError(response.indexError ?? undefined);
+      setStorageError(response.storageError ?? undefined);
+      setNotice(response.notice ?? undefined);
     },
     fail(_request, reason) {
       setResults([]);
@@ -110,10 +118,17 @@ export function createLauncherController(options: {
     settled: () => setPending(false),
   });
 
-  function search(value = query(), preserveSelection = false) {
-    if (!options.desktop || !visible() || disposed) return Promise.resolve();
-    if (!preserveSelection) selectionChangedByUser = false;
+  function search(value?: string, preserveSelection = false) {
+    // Commit category/visibility changes before reading this request's state.
+    // Mark pending first so the old selection cannot start a preview request.
     setPending(true);
+    flush();
+    value ??= query();
+    if (!options.desktop || !visible() || disposed) {
+      setPending(false);
+      return Promise.resolve();
+    }
+    if (!preserveSelection) selectionChangedByUser = false;
     if (
       mode() === "all" &&
       !value.trim() &&

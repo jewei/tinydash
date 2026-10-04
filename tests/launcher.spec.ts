@@ -197,7 +197,7 @@ test("rounded window corners remain transparent behind menus and dialogs", async
     expect(png[24]).toBe(8); // Eight bits per channel.
     expect(png[25]).toBe(6); // RGBA, rather than an opaque RGB screenshot.
     const chunks: Buffer[] = [];
-    for (let offset = 8; offset < png.length;) {
+    for (let offset = 8; offset < png.length; ) {
       const length = png.readUInt32BE(offset);
       if (png.toString("ascii", offset + 4, offset + 8) === "IDAT") {
         chunks.push(png.subarray(offset + 8, offset + 8 + length));
@@ -260,7 +260,7 @@ test("Canvas detail actions follow the selection and keep system confirmation", 
     details.getByText("/Applications", { exact: true }),
   ).toBeVisible();
   await expect(details.getByText("Safari.app", { exact: true })).toBeVisible();
-  await details.getByRole("button", { name: "Launch application" }).click();
+  await details.getByRole("button", { name: "Open application" }).click();
   await details
     .getByRole("button", { name: "Show in enclosing folder" })
     .click();

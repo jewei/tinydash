@@ -8,11 +8,29 @@ Open the GitHub Actions **Checks** run for the commit under test. Download the `
 
 Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. The Checks workflow supplies unsigned development builds. For a release candidate, use the Release workflow artifacts. Confirm the distribution and publisher-signing fields in `build.txt`. Mac candidates require Developer ID signing and notarization. Windows candidates are unsigned previews with separate updater signatures. Ubuntu uses checksums and manual updates. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
 
-Quit any older TinyDash process through its tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
+Quit any older TinyDash process through **Actions > Quit TinyDash** or its enabled tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
 
 Start the installed app from Applications on macOS, the Start menu on Windows, or the application menu on Linux. For standalone checks, use the inner Mac ZIP, the Windows executable without `-setup` in its name, or the Linux tar archive.
 
 CI checks installation, same-version replacement, and removal. On a physical desktop, also check replacement while the app is running, the Windows WebView2 download on a clean system, and the OS response to an unsigned build. Confirm that removal preserves saved settings and history unless you explicitly request their deletion.
+
+## Use a disposable macOS receiver
+
+`tests/native/receiver-macos.swift` supplies a small native window for file drag, app quit, and window-placement checks. It does not read or change the general clipboard. Use only synthetic files in the fixture root and a new evidence directory for each process:
+
+```sh
+mkdir -p .local/receiver-fixtures
+swiftc tests/native/receiver-macos.swift -o .local/native-receiver
+.local/native-receiver .local/receiver-fixtures .local/receiver-run-1
+```
+
+The green window accepts file references inside the fixture root. Each accepted drop copies the files and writes `drop-N.json` with the source operation mask, copied paths, and regular-file hashes. A copy-only source has mask `1`. Compare the received file identity and content, confirm the original remains, and separately compare the system clipboard before and after dragging. A receiver record proves that target's acceptance; it does not prove support in every attachment app. Failed copies leave a failure record and return a rejected drop.
+
+For app-result Quit tests, put the compiled executable in a disposable `.app` bundle under the test user's Applications folder. Set its `CFBundleExecutable`, unique `CFBundleIdentifier`, `CFBundleName`, and `CFBundlePackageType` (`APPL`). Set `FixtureRoot` and `FixtureEvidence` in `Info.plist` to absolute test paths. The executable uses these keys when launched without arguments. Use a new evidence directory for each launch. Confirm search resolves that bundle, Cancel leaves its recorded PID alive, and Quit or Force Quit stops that PID. Normal AppKit termination writes `quit.json`; force termination may not. Remove only the owned fixture app after all its processes stop.
+
+For window placement, capture the receiver's external position and size before and after the command. Its `ready.json` uses AppKit screen coordinates; Accessibility uses a different vertical origin. Compare geometry in one coordinate system. Check that the same PID and window remain selected. Missing TinyDash Accessibility permission must leave the window unchanged and show an error. This negative check is not a successful placement check. Keep permission-dependent checks pending until a controlled session has the required access.
+
+For saved image/file data, use the [rich history restart recipe](../reference/features/clipboard.md#rich-history-restart-recipe).
 
 ## Check the launcher
 
@@ -22,7 +40,7 @@ CI checks installation, same-version replacement, and removal. On a physical des
 4. Press Control + Shift + Space while another app has focus. Confirm that TinyDash appears and immediately accepts text. Confirm that Siri, Spotlight, or another system panel does not open. Repeat ten times.
 5. Type in a browser or terminal, then open TinyDash with the shortcut. Press Escape without entering a query. Confirm that the palette hides and you can continue typing in the same window without a click. Repeat after copying a calculation result and after closing the palette with the shortcut. Alternate between two apps to check that each opening remembers the current app.
 6. Click another app. Confirm that TinyDash hides with the default `hideOnBlur` setting.
-7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash. Install a small test application, or copy one into the user application folder. Confirm that it appears in Apps within ten seconds without a refresh. Remove it and confirm that it disappears.
+7. On macOS, first confirm the Dock and menu bar icons are absent by default, then enable **Shortcut > Show menu bar icon** in Settings and save. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash. Install a small test application, or copy one into the user application folder. Confirm that it appears in Apps within ten seconds without a refresh. Remove it and confirm that it disappears.
 8. Start TinyDash again while it is running. Confirm that the existing window appears and a second launcher process does not remain running.
 9. Use Command/Ctrl + Enter on an app result. Confirm that the OS file manager shows its location.
 10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and selects the first visible category (All by default).
@@ -53,7 +71,8 @@ On macOS, run `swift tests/native/focus-macos.swift` with the built app open and
 11. Record a category shortcut. Save and use it while another app has focus. Confirm that it opens an empty search in that category. Remove the binding, save, and confirm that it stops working. Test a conflict without losing the previous binding. On Wayland, use a desktop shortcut for `tinydash --mode clipboard`. Test the command with both a stopped and a running TinyDash process.
 12. Turn on **Start at login**, save, and sign out and in. Confirm that one TinyDash process starts and the launcher stays hidden. Turn it off, save, and repeat. Confirm that TinyDash does not start.
 13. Export saved settings through **Privacy**. Preview the file through import. Cancel and confirm that nothing changes. Import again, apply the preview, and confirm that settings stay unchanged until **Save changes**. Check invalid JSON, unsupported versions, unknown keys, and file paths from another operating system. An invalid import must leave saved settings unchanged.
-14. In **About**, check for updates in a development build. Confirm that it gives package instructions. Use release candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in the local verification record. Windows previews have updater signatures but no publisher signature. Preserve the source files before manual recovery.
+14. On macOS, toggle **Shortcut > Show menu bar icon** and save. Confirm the icon appears or disappears immediately, and that the choice survives a restart. Check Discard before saving. With the icon hidden, confirm the global shortcut, second launch, Actions > Settings, and Command + comma still work. Confirm no Dock icon appears with either window open. Check an older settings file without `showMenuBarIcon`; the menu bar icon must stay hidden by default.
+15. In **About**, check for updates in a development build. Confirm that it gives package instructions. Use release candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in the local verification record. Windows previews have updater signatures but no publisher signature. Preserve the source files before manual recovery.
 
 ## Check passwords, time zones, URLs, and web search
 
@@ -86,7 +105,7 @@ Password generation, time conversion, and URL cleaning must also work with the n
 9. Set `currencyRatesEnabled` to `false` and restart. Confirm that saved rates remain usable and a manual refresh reports the disabled setting. Restore the setting after the check.
 10. With saved rates, compare `10 USD CAD` and `10 USD to CAD`. Confirm that both give the same value and rate date. Confirm that ordinary unit conversions still work.
 
-Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. Automatic paste is not implemented.
+Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. For direct paste, follow the [workflow checks](../reference/features/workflows.md#verification) and compare the destination contents; a successful copy is not paste proof.
 
 ## Check usage ranking
 

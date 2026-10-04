@@ -24,6 +24,16 @@ pub struct CategoryShortcut {
     pub shortcut: String,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub struct ItemPreference {
+    pub aliases: Vec<String>,
+    pub shortcut: String,
+    pub hidden: bool,
+    pub disabled: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[cfg_attr(test, derive(ts_rs::TS))]
@@ -89,24 +99,45 @@ impl WebSearch {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub enum ClipboardDefaultAction {
+    #[default]
+    Copy,
+    Paste,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, rename_all = "camelCase")]
 #[cfg_attr(test, derive(ts_rs::TS))]
 pub struct Settings {
+    pub show_suggestions: bool,
+    pub emoji_skin_tone: u8,
+    pub emoji_languages: Vec<String>,
     pub clear_query_on_open: bool,
     pub hide_on_blur: bool,
     pub shortcut: String,
     pub category_shortcuts: Vec<CategoryShortcut>,
     pub start_at_login: bool,
+    pub show_menu_bar_icon: bool,
     pub app_preferences: BTreeMap<String, AppPreference>,
     pub web_searches: Vec<WebSearch>,
+    pub item_preferences: BTreeMap<String, ItemPreference>,
     pub clipboard_history_enabled: bool,
     pub clipboard_history_decided: bool,
+    pub clipboard_default_action: ClipboardDefaultAction,
     pub clipboard_history_limit: u16,
+    pub clipboard_retention_days: u32,
+    pub clipboard_excluded_apps: Vec<String>,
+    pub clipboard_capture_images: bool,
+    pub clipboard_capture_files: bool,
     pub file_search_roots: Option<Vec<PathBuf>>,
     pub file_search_limit: u32,
     pub file_search_excluded_dirs: Vec<String>,
     pub file_watch_enabled: bool,
+    pub file_search_include_hidden: bool,
+    pub file_search_ignore_patterns: Vec<String>,
     pub currency_rates_enabled: bool,
     pub visible_categories: Vec<SearchMode>,
 }
@@ -114,20 +145,32 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            show_suggestions: true,
+            emoji_skin_tone: 0,
+            emoji_languages: Vec::new(),
             clear_query_on_open: true,
             hide_on_blur: true,
             shortcut: DEFAULT_SHORTCUT.into(),
             category_shortcuts: Vec::new(),
             start_at_login: false,
+            show_menu_bar_icon: false,
             app_preferences: BTreeMap::new(),
             web_searches: Vec::new(),
+            item_preferences: BTreeMap::new(),
             clipboard_history_enabled: true,
             clipboard_history_decided: true,
+            clipboard_default_action: ClipboardDefaultAction::Copy,
             clipboard_history_limit: 100,
+            clipboard_retention_days: 0,
+            clipboard_excluded_apps: Vec::new(),
+            clipboard_capture_images: false,
+            clipboard_capture_files: false,
             file_search_roots: None,
             file_search_limit: 50_000,
             file_search_excluded_dirs: vec!["node_modules".into(), "target".into()],
             file_watch_enabled: true,
+            file_search_include_hidden: false,
+            file_search_ignore_patterns: Vec::new(),
             currency_rates_enabled: true,
             visible_categories: vec![
                 SearchMode::All,
@@ -162,12 +205,34 @@ impl Settings {
                     .iter()
                     .map(|binding| binding.shortcut.as_str()),
             )
+            .chain(
+                self.item_preferences
+                    .values()
+                    .filter(|item| !item.disabled && !item.shortcut.is_empty())
+                    .map(|item| item.shortcut.as_str()),
+            )
             .collect()
     }
 
     pub fn validate(&self) -> anyhow::Result<()> {
         use anyhow::ensure;
         use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+        ensure!(
+            self.emoji_skin_tone <= 5,
+            "Select an emoji skin tone from 0 through 5."
+        );
+        ensure!(
+            self.emoji_languages.len() <= 3
+                && self
+                    .emoji_languages
+                    .iter()
+                    .enumerate()
+                    .all(|(index, language)| {
+                        matches!(language.as_str(), "zh" | "ms" | "es")
+                            && !self.emoji_languages[..index].contains(language)
+                    }),
+            "Select each supported emoji search language only once (zh, ms, es)."
+        );
         let allowed_shortcut = |key: &Shortcut| {
             key.mods
                 .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER)
@@ -213,6 +278,56 @@ impl Settings {
                 "Show a category before assigning its shortcut."
             );
         }
+        ensure!(
+            self.item_preferences.len() <= 512,
+            "Configure no more than 512 items."
+        );
+        for (id, item) in &self.item_preferences {
+            ensure!(
+                id.len() <= 4100
+                    && !id.contains('\0')
+                    && ["app:", "system:", "command:", "library:"]
+                        .iter()
+                        .any(|prefix| id.starts_with(prefix)),
+                "Invalid item ID."
+            );
+            ensure!(
+                item.aliases.len() <= 16
+                    && item.aliases.iter().all(|alias| !alias.trim().is_empty()
+                        && alias.len() <= 160
+                        && !alias.chars().any(char::is_control)),
+                "Use up to 16 single-line aliases of 1–160 bytes."
+            );
+            if !item.shortcut.is_empty() {
+                let key: Shortcut = item
+                    .shortcut
+                    .parse()
+                    .map_err(|_| anyhow::anyhow!("Invalid item shortcut."))?;
+                ensure!(allowed_shortcut(&key), "Item shortcuts need a modifier.");
+                ensure!(
+                    item.disabled || keys.insert(key.id()),
+                    "Each shortcut must be different."
+                );
+            }
+        }
+        ensure!(
+            self.clipboard_retention_days <= 3650,
+            "Clipboard retention must be 0–3650 days (0 keeps entries until the count limit)."
+        );
+        ensure!(
+            self.clipboard_excluded_apps.len() <= 128
+                && self
+                    .clipboard_excluded_apps
+                    .iter()
+                    .all(|app| !app.trim().is_empty()
+                        && app.len() <= 512
+                        && !app.chars().any(char::is_control)),
+            "Use up to 128 application names or IDs."
+        );
+        ensure!(
+            crate::providers::files::valid_ignore_patterns(&self.file_search_ignore_patterns),
+            "Use up to 64 ignore patterns of 1–256 bytes, with *, ? or ** wildcards and forward slashes. Negation and character classes are not supported."
+        );
         ensure!(
             self.clipboard_history_decided || !self.clipboard_history_enabled,
             "Choose whether to save clipboard history first."
@@ -317,6 +432,8 @@ impl Settings {
             && self.file_search_limit == other.file_search_limit
             && self.file_search_excluded_dirs == other.file_search_excluded_dirs
             && self.file_watch_enabled == other.file_watch_enabled
+            && self.file_search_include_hidden == other.file_search_include_hidden
+            && self.file_search_ignore_patterns == other.file_search_ignore_patterns
     }
 
     pub fn clipboard_limit(&self) -> usize {
@@ -414,6 +531,27 @@ mod tests {
     }
 
     #[test]
+    fn menu_bar_icon_is_opt_in_for_fresh_and_legacy_settings() {
+        let directory = tempfile::tempdir().unwrap();
+        assert!(!Settings::default().show_menu_bar_icon);
+        assert!(!load(directory.path()).unwrap().show_menu_bar_icon);
+        let path = directory.path().join("settings.json");
+        let legacy = r#"{"hideOnBlur":false}"#;
+        std::fs::write(&path, legacy).unwrap();
+        let mut settings = load(directory.path()).unwrap();
+        assert!(!settings.show_menu_bar_icon);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
+        for visible in [true, false] {
+            settings.show_menu_bar_icon = visible;
+            save(directory.path(), &settings).unwrap();
+            assert_eq!(load(directory.path()).unwrap(), settings);
+            let json: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            assert_eq!(json["showMenuBarIcon"], visible);
+        }
+    }
+
+    #[test]
     fn invalid_categories_cannot_replace_saved_settings() {
         let directory = tempfile::tempdir().unwrap();
         let mut settings = Settings::default();
@@ -429,6 +567,37 @@ mod tests {
     }
 
     #[test]
+    fn clipboard_default_action_migrates_and_rejects_unknown_actions() {
+        let legacy: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            legacy.clipboard_default_action,
+            ClipboardDefaultAction::Copy
+        );
+        assert_eq!(
+            Settings::fresh_install().clipboard_default_action,
+            ClipboardDefaultAction::Copy
+        );
+        let paste: Settings =
+            serde_json::from_str(r#"{"clipboardDefaultAction":"paste"}"#).unwrap();
+        assert_eq!(
+            paste.clipboard_default_action,
+            ClipboardDefaultAction::Paste
+        );
+        assert_eq!(
+            serde_json::to_value(paste).unwrap()["clipboardDefaultAction"],
+            "paste"
+        );
+        for action in ["delete", "Paste", "", "launch"] {
+            assert!(
+                serde_json::from_value::<Settings>(serde_json::json!({
+                    "clipboardDefaultAction": action
+                }))
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
     fn saves_all_preferences_and_preserves_unknown_fields() {
         let dir = tempfile::tempdir().expect("tempdir");
         std::fs::write(
@@ -440,6 +609,7 @@ mod tests {
             shortcut: "Alt+Shift+KeyJ".into(),
             visible_categories: vec![SearchMode::Apps, SearchMode::Calculator],
             clipboard_history_enabled: false,
+            clipboard_default_action: ClipboardDefaultAction::Paste,
             clipboard_history_limit: 42,
             file_search_roots: Some(vec!["~/Projects".into()]),
             file_watch_enabled: false,
@@ -779,5 +949,33 @@ mod tests {
         );
         assert_eq!(custom.file_limit(), 100_000);
         assert!(custom.file_search_excluded_dirs.is_empty());
+    }
+    #[test]
+    fn emoji_preferences_validate_persist_and_keep_legacy_defaults() {
+        let legacy: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(legacy.emoji_skin_tone, 0);
+        assert!(legacy.emoji_languages.is_empty());
+        let dir = tempfile::tempdir().unwrap();
+        let mut settings = Settings {
+            emoji_skin_tone: 3,
+            emoji_languages: vec!["zh".into(), "ms".into(), "es".into()],
+            ..Settings::default()
+        };
+        save(dir.path(), &settings).unwrap();
+        assert_eq!(load(dir.path()).unwrap(), settings);
+        settings.emoji_skin_tone = 6;
+        assert!(save(dir.path(), &settings).is_err());
+        settings.emoji_skin_tone = 0;
+        for languages in [
+            vec!["zh", "zh"],
+            vec!["unknown"],
+            vec!["zh", "ms", "es", "zh"],
+        ] {
+            settings.emoji_languages = languages.into_iter().map(str::to_owned).collect();
+            assert!(save(dir.path(), &settings).is_err());
+        }
+        let saved = load(dir.path()).unwrap();
+        assert_eq!(saved.emoji_skin_tone, 3);
+        assert_eq!(saved.emoji_languages, ["zh", "ms", "es"]);
     }
 }

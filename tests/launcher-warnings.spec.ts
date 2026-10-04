@@ -45,6 +45,30 @@ test("settings warnings clear by code while unrelated and unrepaired warnings su
     categoryShortcuts: [{ mode: "apps", shortcut: "Control+KeyA" }],
   });
   expect(categoryChanged.warnings).toEqual(changed.warnings);
+  const itemChanged = receiveLauncherSettings(info, {
+    ...info.settings,
+    itemPreferences: {
+      "library:example": {
+        aliases: [],
+        shortcut: "Control+KeyL",
+        hidden: false,
+        disabled: false,
+      },
+    },
+  });
+  expect(itemChanged.warnings).toEqual(changed.warnings);
+  const aliasChanged = receiveLauncherSettings(info, {
+    ...info.settings,
+    itemPreferences: {
+      "library:example": {
+        aliases: ["local"],
+        shortcut: "",
+        hidden: false,
+        disabled: false,
+      },
+    },
+  });
+  expect(aliasChanged.warnings).toEqual(unchanged.warnings);
   expect(info.warnings).toEqual(warnings);
 });
 

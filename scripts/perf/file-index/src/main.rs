@@ -32,6 +32,17 @@ mod launcher {
     }
 }
 mod providers {
+    pub mod emoji {
+        pub fn canonical_id(id: &str) -> std::borrow::Cow<'_, str> {
+            // Production normalization borrows every non-emoji ID unchanged.
+            // This harness measures file/clipboard ranking, never emoji lookup.
+            assert!(
+                !id.starts_with("emoji:"),
+                "emoji ranking is outside this harness"
+            );
+            std::borrow::Cow::Borrowed(id)
+        }
+    }
     pub mod tools {
         pub mod url_cleaner {
             pub fn is_candidate(_: &str) -> bool {

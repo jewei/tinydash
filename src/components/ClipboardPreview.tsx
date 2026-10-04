@@ -6,20 +6,22 @@ export default function ClipboardPreview(props: { id: string }) {
   const [error, setError] = createSignal<string>();
   let sequence = 0;
   let disposed = false;
-  createEffect(() => {
-    const id = props.id;
-    const request = ++sequence;
-    setEntry(undefined);
-    setError(undefined);
-    void backend
-      .clipboardPreview(id)
-      .then((value) => {
-        if (!disposed && request === sequence) setEntry(value);
-      })
-      .catch((reason) => {
-        if (!disposed && request === sequence) setError(String(reason));
-      });
-  });
+  createEffect(
+    () => props.id,
+    (id) => {
+      const request = ++sequence;
+      setEntry(undefined);
+      setError(undefined);
+      void backend
+        .clipboardPreview(id)
+        .then((value) => {
+          if (!disposed && request === sequence) setEntry(value);
+        })
+        .catch((reason) => {
+          if (!disposed && request === sequence) setError(String(reason));
+        });
+    },
+  );
   onCleanup(() => {
     disposed = true;
     sequence += 1;
@@ -33,7 +35,7 @@ export default function ClipboardPreview(props: { id: string }) {
       >
         {(value) => (
           <>
-            <pre tabIndex={0} aria-label="Saved clipboard text">
+            <pre tabindex={0} aria-label="Saved clipboard text">
               {value().content}
             </pre>
             <p class="clipboard-date">

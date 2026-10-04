@@ -6,6 +6,9 @@ use std::sync::{
 
 use tauri::{AppHandle, Emitter, Manager};
 
+#[path = "clipboard_formats.rs"]
+pub mod formats;
+
 use super::LauncherState;
 #[cfg(target_os = "linux")]
 use crate::providers::clipboard::Observed;
@@ -17,6 +20,7 @@ pub struct Monitor {
     stopped: AtomicBool,
     generation: AtomicU64,
     warning: Mutex<Option<String>>,
+    rich: Mutex<Option<formats::Store>>,
     #[cfg(target_os = "linux")]
     read_sequence: AtomicU64,
     #[cfg(target_os = "linux")]
@@ -42,7 +46,7 @@ impl Monitor {
     pub fn warning(&self) -> Option<String> {
         self.warning.lock().ok().and_then(|warning| warning.clone())
     }
-    fn failed(&self) {
+    pub(super) fn failed(&self) {
         if let Ok(mut warning) = self.warning.lock()
             && warning.is_none()
         {
@@ -98,21 +102,65 @@ pub fn start(app: &AppHandle) {
             #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
                 let mut previous = None;
+                let mut retention_check = std::time::Instant::now();
                 loop {
                     if state.clipboard.stopped.load(Ordering::Acquire) {
                         break;
+                    }
+                    if retention_check.elapsed() >= std::time::Duration::from_secs(60) {
+                        if state.settings().clipboard_retention_days > 0 {
+                            state.storage.apply_clipboard_limit(&worker_app);
+                        }
+                        retention_check = std::time::Instant::now();
                     }
                     // Cleanup must progress even if the OS change counter is
                     // quiet or the user has disabled new captures.
                     state.storage.retry_cleanup(&worker_app);
                     let generation = state.clipboard.generation();
-                    if state.settings().clipboard_history_enabled {
-                        match crate::platform::clipboard_snapshot(previous) {
+                    let settings = state.settings();
+                    if settings.clipboard_history_enabled {
+                        let source = formats::source_app();
+                        // Check exclusions before the platform reads any text.
+                        let snapshot = if formats::excluded(
+                            source.as_ref(),
+                            &settings.clipboard_excluded_apps,
+                        ) {
+                            let counter = formats::counter();
+                            Ok((previous != Some(counter))
+                                .then_some((counter, crate::providers::clipboard::Observed::Other)))
+                        } else {
+                            crate::platform::clipboard_snapshot(previous)
+                        };
+                        match snapshot {
                             Ok(Some((counter, observed))) => {
                                 previous = Some(counter);
                                 if let Ok(mut warning) = state.clipboard.warning.lock() {
                                     *warning = None;
                                 }
+                                if !matches!(
+                                    observed,
+                                    crate::providers::clipboard::Observed::Secret
+                                        | crate::providers::clipboard::Observed::Cleared
+                                ) && (settings.clipboard_capture_images
+                                    || settings.clipboard_capture_files)
+                                    && formats::capture(
+                                        &worker_app,
+                                        counter,
+                                        generation,
+                                        source.as_ref(),
+                                    )
+                                    .is_err()
+                                {
+                                    state.clipboard.failed();
+                                }
+                                let observed = if formats::excluded(
+                                    source.as_ref(),
+                                    &state.settings().clipboard_excluded_apps,
+                                ) {
+                                    crate::providers::clipboard::Observed::Other
+                                } else {
+                                    observed
+                                };
                                 state.storage.capture(&worker_app, observed, generation);
                             }
                             Ok(None) => {}
@@ -130,7 +178,20 @@ pub fn start(app: &AppHandle) {
                 }
             }
             #[cfg(target_os = "linux")]
-            while receiver.recv().is_ok() {
+            loop {
+                match receiver.recv_timeout(std::time::Duration::from_secs(60)) {
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    Err(mpsc::RecvTimeoutError::Timeout) => {
+                        if state.settings().clipboard_retention_days > 0 {
+                            state.storage.apply_clipboard_limit(&worker_app);
+                            if formats::apply_retention(&worker_app).is_err() {
+                                state.clipboard.failed();
+                            }
+                        }
+                        continue;
+                    }
+                    Ok(()) => {}
+                }
                 if state.clipboard.stopped.load(Ordering::Acquire) {
                     break;
                 }
@@ -192,6 +253,17 @@ fn request_linux(app: &AppHandle) {
         return;
     }
     let generation = state.clipboard.generation();
+    if formats::excluded(
+        formats::source_app().as_ref(),
+        &state.settings().clipboard_excluded_apps,
+    ) {
+        state.clipboard.read_sequence.fetch_add(1, Ordering::AcqRel);
+        if let Ok(mut pending) = state.clipboard.pending.lock() {
+            *pending = Some((Observed::Other, generation));
+        }
+        state.clipboard.wake();
+        return;
+    }
     let sequence = state
         .clipboard
         .read_sequence
@@ -203,6 +275,14 @@ fn request_linux(app: &AppHandle) {
         if sequence != state.clipboard.read_sequence.load(Ordering::Acquire) {
             return;
         }
+        let observed = if formats::excluded(
+            formats::source_app().as_ref(),
+            &state.settings().clipboard_excluded_apps,
+        ) {
+            Observed::Other
+        } else {
+            observed
+        };
         // Keep only the latest pending text. A burst of owner changes cannot
         // allocate an unbounded queue while SQLite is busy.
         if let Ok(mut pending) = state.clipboard.pending.lock() {
@@ -235,10 +315,13 @@ pub async fn clear_clipboard_history(
     tauri::async_runtime::spawn_blocking(move || {
         let storage = &app.state::<LauncherState>().storage;
         if keep_pinned.unwrap_or(false) {
-            storage.clear_unpinned_clipboard(&app)
+            storage.clear_unpinned_clipboard(&app)?;
         } else {
-            storage.delete_clipboard(&app, None)
+            storage.delete_clipboard(&app, None)?;
         }
+        formats::clear(&app, keep_pinned.unwrap_or(false)).map_err(|error| error.to_string())?;
+        changed(&app);
+        Ok(())
     })
     .await
     .map_err(|error| error.to_string())?

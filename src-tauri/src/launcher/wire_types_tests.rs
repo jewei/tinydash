@@ -56,6 +56,11 @@ fn wire_type(ty: &Type, types: &BTreeMap<String, String>) -> String {
                 format!("Array<{inner}>")
             }
         }
+        "BTreeMap" => {
+            assert_eq!(arguments.len(), 2);
+            assert_eq!(wire_type(arguments[0], types), "string");
+            format!("Record<string, {}>", wire_type(arguments[1], types))
+        }
         _ => {
             assert!(arguments.is_empty());
             match name.as_str() {
@@ -121,6 +126,8 @@ fn check_attributes(attrs: &[syn::Attribute], field: bool) {
                 .any(|key| meta.path.is_ident(key))
                 {
                     let _: syn::LitStr = meta.value()?.parse()?;
+                } else if field && meta.path.is_ident("flatten") {
+                    // ts-rs expands the same named struct fields as serde.
                 } else if !field
                     && (meta.path.is_ident("default") || meta.path.is_ident("deny_unknown_fields"))
                 {
@@ -266,10 +273,26 @@ fn commands(
                 };
                 if let Type::Path(path) = &*arg.ty
                     && path.qself.is_none()
-                    && path.path.segments.len() == 1
-                    && let segment = &path.path.segments[0]
-                    && (segment.ident == "AppHandle" || segment.ident == "WebviewWindow")
+                    && (path.path.segments.len() == 1
+                        || (path.path.segments.len() == 2
+                            && path.path.segments[0].ident == "tauri"))
+                    && let segment = path.path.segments.last().unwrap()
+                    && (segment.ident == "AppHandle"
+                        || segment.ident == "WebviewWindow"
+                        || segment.ident == "State")
                 {
+                    if segment.ident == "State" {
+                        let PathArguments::AngleBracketed(arguments) = &segment.arguments else {
+                            panic!("Review injected state type");
+                        };
+                        assert_eq!(arguments.args.len(), 2);
+                        assert!(matches!(&arguments.args[0], GenericArgument::Lifetime(_)));
+                        assert!(matches!(
+                            &arguments.args[1],
+                            GenericArgument::Type(Type::Path(_))
+                        ));
+                        continue;
+                    }
                     match &segment.arguments {
                         PathArguments::None => {}
                         PathArguments::AngleBracketed(arguments) => {
@@ -401,6 +424,9 @@ fn generated_ipc_wire_types_match_frontend() {
     macro_rules! register { ($($ty:ty),+ $(,)?) => { $(declaration::<$ty>(&mut types, &config);)+ }; }
     register!(
         Action,
+        transfer::DragOutcome,
+        paste_queue::PasteQueueAction,
+        paste_queue::PasteQueueStatus,
         crate::appearance::AppearanceChange,
         ActionConfirmation,
         ResultKind,
@@ -416,7 +442,9 @@ fn generated_ipc_wire_types_match_frontend() {
         currency::CurrencyStatus,
         window::LauncherAppearance,
         Settings,
+        settings::ClipboardDefaultAction,
         settings::AppPreference,
+        settings::ItemPreference,
         settings::CategoryShortcut,
         settings::WebSearch,
         LauncherInfo,
@@ -424,6 +452,26 @@ fn generated_ipc_wire_types_match_frontend() {
         portability::SettingsImport,
         updates::UpdateStatus,
         crate::providers::clipboard::ClipboardEntry,
+        clipboard::formats::RichKind,
+        clipboard::formats::RichEntry,
+        clipboard::formats::RichHistory,
+        clipboard::formats::RichPreview,
+        file_actions::FilePreview,
+        file_actions::PreviewContent,
+        file_actions::FileAction,
+        library::LibraryKind,
+        library::LibraryDraft,
+        library::LibraryEntry,
+        library::LibraryItem,
+        library::LibraryAction,
+        utilities::Capabilities,
+        utilities::ProcessConfirmation,
+        utilities::ColorFormat,
+        utilities::MediaAction,
+        utilities::WindowAction,
+        utilities::awake::Status,
+        utilities::color::Color,
+        utilities::process::ProcessInfo,
     );
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut signatures = BTreeMap::new();

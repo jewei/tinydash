@@ -121,11 +121,15 @@ impl SearchTimings {
 }
 
 pub struct SearchManager {
+    show_suggestions: bool,
     app_preferences: std::collections::BTreeMap<String, crate::settings::AppPreference>,
     apps: AppProvider,
+    item_preferences: std::collections::BTreeMap<String, crate::settings::ItemPreference>,
     files: FileProvider,
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
+    emoji_skin_tone: u8,
+    emoji_languages: Vec<String>,
     system: Option<SystemCommandProvider>,
     calculator: CalculatorProvider,
     pub clipboard: ClipboardProvider,
@@ -146,11 +150,15 @@ pub struct SearchOutcome {
 impl Default for SearchManager {
     fn default() -> Self {
         Self {
+            show_suggestions: true,
             app_preferences: Default::default(),
             apps: AppProvider::default(),
+            item_preferences: Default::default(),
             files: FileProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
+            emoji_skin_tone: 0,
+            emoji_languages: Vec::new(),
             system: None,
             calculator: CalculatorProvider::default(),
             clipboard: ClipboardProvider::default(),
@@ -167,7 +175,24 @@ impl Default for SearchManager {
 
 impl SearchManager {
     pub fn apply_settings(&mut self, settings: &crate::settings::Settings) {
+        self.show_suggestions = settings.show_suggestions;
+        self.emoji_skin_tone = settings.emoji_skin_tone;
+        if self.emoji_languages != settings.emoji_languages {
+            self.emoji_languages = settings.emoji_languages.clone();
+            self.emoji = None;
+        }
+        if let Some(emoji) = self.emoji.as_mut() {
+            emoji.set_skin_tone(settings.emoji_skin_tone);
+        }
         self.app_preferences = settings.app_preferences.clone();
+        self.item_preferences = settings.item_preferences.clone();
+        for (id, item) in &self.item_preferences {
+            if id.starts_with("app:") {
+                let preference = self.app_preferences.entry(id.clone()).or_default();
+                preference.aliases.extend(item.aliases.clone());
+                preference.hidden |= item.hidden || item.disabled;
+            }
+        }
         self.apps.apply_preferences(&self.app_preferences);
         self.tools.set_web_searches(&settings.web_searches);
     }
@@ -175,6 +200,17 @@ impl SearchManager {
     pub fn app_catalog(&self) -> Vec<SearchResult> {
         self.apps.catalog()
     }
+    pub fn item_catalog(&mut self) -> Vec<SearchResult> {
+        let mut items = self.apps.catalog();
+        items.extend(
+            self.system
+                .get_or_insert_with(SystemCommandProvider::default)
+                .search("", &mut self.matcher),
+        );
+        items.extend(super::commands::catalog());
+        items
+    }
+
     pub fn set_pins(&mut self, pins: Pins) {
         self.pins = pins;
     }
@@ -248,7 +284,7 @@ impl SearchManager {
                 }
                 .key()
             } else {
-                result.id.clone()
+                crate::providers::emoji::canonical_id(&result.id).into_owned()
             };
             *index += 1;
             result.pin = Some(self.describe_pin(key));
@@ -281,11 +317,7 @@ impl SearchManager {
         } else if key.starts_with("file:") {
             self.files.get(key).map(|file| file.result(0))
         } else if key.starts_with("emoji:") {
-            self.emoji
-                .get_or_insert_with(EmojiProvider::default)
-                .search(EmojiProvider::copy_value(key)?, &mut self.matcher)
-                .into_iter()
-                .find(|result| result.id == key)
+            EmojiProvider::pinned_result(key, self.emoji_skin_tone)
         } else if key.starts_with("clipboard:") {
             self.clipboard.result(key)
         } else if key.starts_with("system:") {
@@ -323,7 +355,10 @@ impl SearchManager {
     }
 
     pub fn record_usage(&mut self, id: &str, now: i64) -> ranking::Usage {
-        let usage = self.usage.entry(id.to_owned()).or_default();
+        let usage = self
+            .usage
+            .entry(crate::providers::emoji::canonical_id(id).into_owned())
+            .or_default();
         usage.count = usage.count.saturating_add(1);
         usage.last_used_at = now.max(0);
         *usage
@@ -351,12 +386,12 @@ impl SearchManager {
         self.files.len()
     }
 
-    fn file(&self, id: &str) -> Result<FileEntry> {
+    pub fn file(&self, id: &str) -> Result<FileEntry> {
         self.files.get(id).cloned().ok_or(Error::FileNotFound)
     }
 
     pub fn app(&self, id: &str) -> Result<AppEntry> {
-        self.apps.get(id).cloned().ok_or(Error::AppNotFound)
+        self.apps.get_any(id).cloned().ok_or(Error::AppNotFound)
     }
 
     pub fn clipboard_entry(&self, id: &str) -> Result<&ClipboardEntry> {
@@ -364,6 +399,16 @@ impl SearchManager {
     }
 
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
+        if self
+            .item_preferences
+            .get(id)
+            .is_some_and(|item| item.disabled)
+        {
+            return Err(Error::InvalidAction);
+        }
+        if action == Action::Run && super::commands::panel(id).is_some() {
+            return Ok(ResolvedAction::Panel(id.to_owned()));
+        }
         if id.starts_with("password:") || id.starts_with("tool:") {
             return self.tools.resolve(id, action);
         }
@@ -453,8 +498,60 @@ impl SearchManager {
             });
         }
         let mut outcome = self.search_unpinned(&query, budget);
+        // Empty search still ends active tool queries (including password
+        // generation). Suggestions replace only its result list.
+        if query.mode == SearchMode::All && query.text.is_empty() {
+            outcome.results = self.suggestions(budget);
+        }
         if budget.stopped() {
             return Ok(outcome);
+        }
+        if matches!(query.mode, SearchMode::All | SearchMode::System)
+            && (query.mode == SearchMode::System || !query.text.is_empty())
+        {
+            let text = ranking::normalize(query.text);
+            let mut extras = super::commands::catalog();
+            if self
+                .item_preferences
+                .keys()
+                .any(|id| id.starts_with("system:"))
+            {
+                extras.extend(
+                    self.system
+                        .get_or_insert_with(SystemCommandProvider::default)
+                        .search("", &mut self.matcher)
+                        .into_iter()
+                        .filter(|result| self.item_preferences.contains_key(&result.id)),
+                );
+            }
+            extras.retain_mut(|result| {
+                let alias = self.item_preferences.get(&result.id).is_some_and(|item| {
+                    item.aliases
+                        .iter()
+                        .any(|alias| ranking::normalize(alias).starts_with(&text))
+                });
+                let title = ranking::normalize(&result.title);
+                let matches = text.is_empty() || title.starts_with(&text) || alias;
+                result.score = if text.is_empty() {
+                    0
+                } else if alias {
+                    ranking::EXACT_MATCH
+                } else {
+                    ranking::name_score(0, &title, &text)
+                };
+                matches
+                    && !self
+                        .item_preferences
+                        .get(&result.id)
+                        .is_some_and(|item| item.hidden || item.disabled)
+            });
+            if !extras.is_empty() {
+                ranking::apply_usage(&mut extras, &self.usage, ranking::now());
+                let ids: HashSet<_> = extras.iter().map(|result| result.id.clone()).collect();
+                outcome.results.retain(|result| !ids.contains(&result.id));
+                outcome.results.extend(extras);
+                outcome.results = ranking::top_results(outcome.results, RESULT_LIMIT);
+            }
         }
         self.describe_results(&mut outcome.results, &query);
         if input.trim().is_empty() {
@@ -514,6 +611,12 @@ impl SearchManager {
             outcome.results.truncate(RESULT_LIMIT - 1);
             outcome.results.push(latest);
         }
+        outcome.results.retain(|result| {
+            !self
+                .item_preferences
+                .get(&result.id)
+                .is_some_and(|item| item.hidden || item.disabled)
+        });
         outcome.results.truncate(RESULT_LIMIT);
         // Pins, usage, category order, and all response limits have now been
         // applied. Only returned apps need an icon payload.
@@ -535,6 +638,60 @@ impl SearchManager {
             self.issued_pins.pop_front();
         }
         Ok(outcome)
+    }
+
+    fn suggestions(&mut self, budget: &SearchBudget) -> Vec<SearchResult> {
+        if !self.show_suggestions {
+            return Vec::new();
+        }
+        let now = ranking::now();
+        let mut candidates = Vec::with_capacity(7);
+        for (id, usage) in &self.usage {
+            if budget.stopped() {
+                return Vec::new();
+            }
+            // Never suggest private clipboard content, generated values, or power actions.
+            if usage.count > 0
+                && ((id.starts_with("app:") && self.apps.get(id).is_some())
+                    || (id.starts_with("file:") && self.files.get(id).is_some())
+                    || (id.starts_with("emoji:") && EmojiProvider::copy_value(id).is_some()))
+                && !self
+                    .pins
+                    .get(&SearchMode::All)
+                    .is_some_and(|pins| pins.contains(id))
+                && !self
+                    .item_preferences
+                    .get(id)
+                    .is_some_and(|item| item.hidden || item.disabled)
+            {
+                candidates.push((
+                    id,
+                    ranking::score_with_usage(0, id, &self.usage, now),
+                    usage.last_used_at,
+                ));
+                candidates.sort_by(|a, b| {
+                    b.1.cmp(&a.1)
+                        .then_with(|| b.2.cmp(&a.2))
+                        .then_with(|| a.0.cmp(b.0))
+                });
+                candidates.truncate(6);
+            }
+        }
+        let candidates: Vec<_> = candidates
+            .into_iter()
+            .map(|(id, score, _)| (id.clone(), score))
+            .collect();
+        let mut results = Vec::new();
+        for (id, score) in candidates {
+            if budget.stopped() || results.len() == 6 {
+                break;
+            }
+            if let Some(mut result) = self.pinned_result(&id, budget) {
+                result.score = score;
+                results.push(result);
+            }
+        }
+        results
     }
 
     fn search_unpinned(&mut self, query: &Query<'_>, budget: &SearchBudget) -> SearchOutcome {
@@ -644,8 +801,10 @@ impl SearchManager {
                     .search(query.text, &mut self.matcher),
                 SearchMode::Emoji => self
                     .emoji
-                    .get_or_insert_with(EmojiProvider::default)
-                    .search(query.text, &mut self.matcher),
+                    .get_or_insert_with(|| {
+                        EmojiProvider::new(self.emoji_skin_tone, &self.emoji_languages)
+                    })
+                    .search_interruptible(query.text, &mut self.matcher, || budget.stopped()),
                 _ => unreachable!("ordinary search category"),
             };
             let provider = match category {
@@ -1358,6 +1517,105 @@ mod tests {
     }
 
     #[test]
+    fn suggestions_use_usage_keep_pins_first_and_reject_private_or_hidden_items() {
+        let mut manager = manager();
+        let now = ranking::now();
+        for id in [
+            "app:/apps/Code.app",
+            "app:/apps/cafe.app",
+            "app:/apps/vscode.app",
+            "clipboard:1",
+            "system:restart",
+            "app:/gone",
+        ] {
+            manager.record_usage(id, now);
+        }
+        manager.record_usage("emoji:🚀", now);
+        manager.record_usage("emoji:🚀", now);
+        manager.set_pinned("app:/apps/Code.app", SearchMode::All, true);
+        let mut settings = crate::settings::Settings::default();
+        settings.app_preferences.insert(
+            "app:/apps/cafe.app".into(),
+            crate::settings::AppPreference {
+                hidden: true,
+                ..Default::default()
+            },
+        );
+        manager.apply_settings(&settings);
+        let results = manager.search("", SearchMode::All).unwrap().results;
+        let ids: Vec<_> = results.iter().map(|result| result.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            ["app:/apps/Code.app", "emoji:🚀", "app:/apps/vscode.app"]
+        );
+        assert!(manager.resolve_action(&results[1].id, Action::Copy).is_ok());
+        settings.show_suggestions = false;
+        manager.apply_settings(&settings);
+        assert_eq!(
+            manager.search("", SearchMode::All).unwrap().results.len(),
+            1
+        );
+        assert!(
+            !manager
+                .search("rocket", SearchMode::All)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn suggestions_are_bounded_deterministic_and_restore_from_saved_usage() {
+        let mut manager = SearchManager::default();
+        let entries: Vec<_> = (0..20)
+            .map(|i| {
+                AppEntry::new(
+                    format!("App {i:02}"),
+                    format!("/apps/{i:02}").into(),
+                    vec![],
+                )
+            })
+            .collect();
+        manager.replace_apps(AppProvider::new(entries.clone()));
+        let now = ranking::now();
+        let usage: HashMap<_, _> = entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry.id.clone(),
+                    ranking::Usage {
+                        count: 1,
+                        last_used_at: now,
+                    },
+                )
+            })
+            .collect();
+        manager.set_usage(usage.clone());
+        let first: Vec<_> = manager
+            .search("", SearchMode::All)
+            .unwrap()
+            .results
+            .into_iter()
+            .map(|result| result.id)
+            .collect();
+        assert_eq!(first.len(), 6);
+        assert_eq!(first[0], "app:/apps/00");
+        let mut restored = SearchManager::default();
+        restored.replace_apps(AppProvider::new(entries));
+        restored.set_usage(usage);
+        assert_eq!(
+            first,
+            restored
+                .search("", SearchMode::All)
+                .unwrap()
+                .results
+                .into_iter()
+                .map(|result| result.id)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn system_search_is_lazy_scoped_and_uses_durable_ranking() {
         let mut manager = manager();
         manager.search("", SearchMode::All).expect("home");
@@ -1384,7 +1642,7 @@ mod tests {
                 .expect("commands")
                 .results
                 .len(),
-            SystemCommand::ALL.len()
+            SystemCommand::ALL.len() + super::super::commands::catalog().len()
         );
         manager.record_usage("system:settings", ranking::now());
         assert_eq!(
@@ -1952,6 +2210,65 @@ mod tests {
                 .results
                 .is_empty()
         );
+    }
+    #[test]
+    fn emoji_preferences_preserve_pins_usage_and_exact_copy_after_changes() {
+        let mut search = SearchManager::default();
+        search.record_usage("emoji:👍", ranking::now());
+        search.set_pinned("emoji:👍", SearchMode::Emoji, true);
+        let mut settings = crate::settings::Settings {
+            emoji_skin_tone: 3,
+            emoji_languages: vec!["zh".into()],
+            ..crate::settings::Settings::default()
+        };
+        search.apply_settings(&settings);
+        let result = search
+            .search("拇指向上", SearchMode::Emoji)
+            .unwrap()
+            .results[0]
+            .clone();
+        assert_eq!(result.id, "emoji:👍🏽");
+        assert_eq!(
+            search.pin_key(&result.id, SearchMode::Emoji).unwrap(),
+            "emoji:👍"
+        );
+        assert!(
+            result
+                .pin
+                .as_ref()
+                .unwrap()
+                .categories
+                .contains(&SearchMode::Emoji)
+        );
+        assert_eq!(search.record_usage(&result.id, ranking::now()).count, 2);
+        assert_eq!(search.usage["emoji:👍"].count, 2);
+        assert!(!search.usage.contains_key("emoji:👍🏽"));
+        let pinned = search.search("", SearchMode::Emoji).unwrap().results[0].clone();
+        assert_eq!(pinned.id, "emoji:👍🏽");
+        settings.emoji_skin_tone = 5;
+        settings.emoji_languages.clear();
+        search.apply_settings(&settings);
+        assert!(
+            matches!(search.resolve_action(&result.id, Action::Copy).unwrap(), ResolvedAction::Copy(text) if text == "👍🏽")
+        );
+        assert_eq!(
+            search.search("", SearchMode::Emoji).unwrap().results[0].id,
+            "emoji:👍🏿"
+        );
+        assert!(
+            search
+                .search("火箭", SearchMode::Emoji)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+        let suggestion = search.search("", SearchMode::All).unwrap().results[0].clone();
+        assert_eq!(suggestion.id, "emoji:👍🏿");
+        let usage = search.usage.clone();
+        let mut restored = SearchManager::default();
+        restored.set_usage(usage);
+        restored.apply_settings(&settings);
+        assert_eq!(restored.record_usage("emoji:👍🏻", ranking::now()).count, 3);
     }
 }
 

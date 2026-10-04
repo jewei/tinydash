@@ -28,6 +28,27 @@ export function mergeDraft<T extends object>(
   return merged;
 }
 
+function mergePreferences<T extends object>(
+  previous: Record<string, T>,
+  current: Record<string, T>,
+  incoming: Record<string, T>,
+  defaults: T,
+): Record<string, T> {
+  const merged = mergeDraft(previous, current, incoming);
+  for (const [id, preference] of Object.entries(current)) {
+    // Rust omits default preferences. A remote deletion restores defaults
+    // for unchanged fields while preserving locally edited fields.
+    if (incoming[id] || !equal(preference, previous[id])) {
+      merged[id] = mergeDraft(
+        previous[id] ?? defaults,
+        preference,
+        incoming[id] ?? defaults,
+      );
+    }
+  }
+  return merged;
+}
+
 export function mergeSettingsDraft(
   previous: SettingsValues | undefined,
   current: SettingsValues | undefined,
@@ -41,25 +62,18 @@ export function mergeSettingsDraft(
   const merged =
     previous && current ? mergeDraft(previous, current, next) : { ...next };
   if (previous && current) {
-    merged.appPreferences = mergeDraft(
+    merged.appPreferences = mergePreferences(
       previous.appPreferences,
       current.appPreferences,
       next.appPreferences,
+      { aliases: [], hidden: false },
     );
-    for (const [id, preference] of Object.entries(current.appPreferences)) {
-      // Rust omits default preferences. A remote deletion is therefore an
-      // incoming { aliases: [], hidden: false }, not an absent update.
-      if (
-        next.appPreferences[id] ||
-        !equal(preference, previous.appPreferences[id])
-      ) {
-        merged.appPreferences[id] = mergeDraft(
-          previous.appPreferences[id] ?? { aliases: [], hidden: false },
-          preference,
-          next.appPreferences[id] ?? { aliases: [], hidden: false },
-        );
-      }
-    }
+    merged.itemPreferences = mergePreferences(
+      previous.itemPreferences,
+      current.itemPreferences,
+      next.itemPreferences,
+      { aliases: [], shortcut: "", hidden: false, disabled: false },
+    );
   }
   return {
     saved: next,

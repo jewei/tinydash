@@ -223,7 +223,7 @@ mod folders {
 mod desktop_entries {
     use std::{cell::RefCell, sync::mpsc};
 
-    use tauri::AppHandle;
+    use tauri::{AppHandle, Manager};
 
     use super::{MAXIMUM, QUIET, wait_for_scan};
     use crate::launcher::{

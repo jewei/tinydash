@@ -4,6 +4,8 @@ This harness compiles the checkout's actual `providers/files.rs`,
 `providers/clipboard.rs`, `ranking/mod.rs`, and launcher result/query/pin types.
 It does not copy the matching or ranking implementation. Tiny stubs satisfy
 unrelated module references; calling the platform scanner or URL parser panics.
+The usage-key adapter borrows non-emoji IDs unchanged, as production does. It
+rejects emoji IDs because emoji normalization is outside this file/text harness.
 
 This is **requested Rust heap allocation**, not native application RSS or physical
 footprint. Allocator metadata, fragmentation, Tauri, WebView helpers, SQLite, IPC,

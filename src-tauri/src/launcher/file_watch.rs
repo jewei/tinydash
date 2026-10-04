@@ -145,6 +145,7 @@ impl FileWatcher {
     pub fn new(
         roots: Vec<PathBuf>,
         excluded: Vec<String>,
+        include_hidden: bool,
         sender: SyncSender<Request>,
     ) -> notify::Result<Self> {
         let changes = Arc::new(Changes::default());
@@ -153,7 +154,14 @@ impl FileWatcher {
         let watcher = RecommendedWatcher::new(
             move |event: notify::Result<Event>| {
                 match event {
-                    Ok(event) if relevant(&event, &filter_roots, &excluded) => {
+                    Ok(event)
+                        if relevant_with_hidden(
+                            &event,
+                            &filter_roots,
+                            &excluded,
+                            include_hidden,
+                        ) =>
+                    {
                         if event.need_rescan()
                             || matches!(
                                 event.kind,
@@ -261,23 +269,21 @@ impl<W: Watcher> FileWatcher<W> {
             return Some((false, warning));
         }
         let mut registered = false;
-        // FSEvents can apply the entire batch with one stream restart.
         if cancelled() {
             return None;
         }
-        let mut paths = self.watcher.paths_mut();
         for path in removed {
             if cancelled() {
                 return None;
             }
-            let _ = paths.remove(&path); // The OS may have removed its watch already.
+            let _ = self.watcher.unwatch(&path); // The OS may have removed its watch already.
             self.watched.remove(&path);
         }
         for (path, mode) in added {
             if cancelled() {
                 return None;
             }
-            match paths.add(&path, mode) {
+            match self.watcher.watch(&path, mode) {
                 Ok(()) => {
                     self.watched.insert(path, mode);
                     registered = true;
@@ -292,23 +298,21 @@ impl<W: Watcher> FileWatcher<W> {
                 }
             };
         }
-        if cancelled() {
-            return None;
-        }
-        if let Err(error) = paths.commit() {
-            self.watched.clear();
-            // A failed registration must wait for a later event or manual retry.
-            // Retrying through the follow-up scan would create a busy loop.
-            registered = false;
-            warning = Some(format!(
-                "Cannot start automatic file updates: {error}. Use Refresh files."
-            ));
-        }
         (!cancelled()).then_some((registered, warning))
     }
 }
 
+#[cfg(test)]
 fn relevant(event: &Event, roots: &[PathBuf], excluded: &[String]) -> bool {
+    relevant_with_hidden(event, roots, excluded, false)
+}
+
+fn relevant_with_hidden(
+    event: &Event,
+    roots: &[PathBuf],
+    excluded: &[String],
+    include_hidden: bool,
+) -> bool {
     if event.need_rescan() {
         return true;
     }
@@ -333,7 +337,9 @@ fn relevant(event: &Event, roots: &[PathBuf], excluded: &[String]) -> bool {
                     let name = component.as_os_str().to_string_lossy();
                     // A folder renamed to a hidden name changes the index. Work
                     // inside an already excluded tree does not need a rescan.
-                    if (name.starts_with('.') && (components.peek().is_some() || !renamed))
+                    if (!include_hidden
+                        && name.starts_with('.')
+                        && (components.peek().is_some() || !renamed))
                         || (components.peek().is_some()
                             && excluded.iter().any(|excluded| *excluded == name))
                     {
@@ -516,23 +522,6 @@ mod tests {
         fn kind() -> notify::WatcherKind {
             notify::WatcherKind::NullWatcher
         }
-        fn paths_mut(&mut self) -> Box<dyn notify::PathsMut + '_> {
-            struct Batch<'a>(&'a mut ControlledWatcher);
-            impl notify::PathsMut for Batch<'_> {
-                fn add(&mut self, path: &Path, mode: RecursiveMode) -> notify::Result<()> {
-                    self.0.watch(path, mode)
-                }
-                fn remove(&mut self, path: &Path) -> notify::Result<()> {
-                    self.0.unwatch(path)
-                }
-                fn commit(self: Box<Self>) -> notify::Result<()> {
-                    self.0.operation("commit");
-                    Ok(())
-                }
-            }
-            self.operation("begin");
-            Box::new(Batch(self))
-        }
     }
 
     #[test]
@@ -548,8 +537,8 @@ mod tests {
             directories: roots.clone(),
             ..ScanReport::default()
         };
-        for phase in ["begin", "remove", "add", "commit"] {
-            let cancelled = Arc::new(AtomicBool::new(false));
+        for phase in ["before", "remove", "add"] {
+            let cancelled = Arc::new(AtomicBool::new(phase == "before"));
             let mut watcher = FileWatcher {
                 watcher: ControlledWatcher {
                     calls: vec![],
@@ -569,15 +558,16 @@ mod tests {
                     .is_none()
             );
             let calls = &watcher.watcher.calls;
+            if phase == "before" {
+                assert!(calls.is_empty());
+                continue;
+            }
             assert_eq!(calls.last(), Some(&phase));
             assert_eq!(
                 calls.iter().filter(|call| **call == phase).count(),
                 1,
                 "Obsolete {phase} batch continued: {calls:?}"
             );
-            if phase != "commit" {
-                assert!(!calls.contains(&"commit"));
-            }
         }
     }
 
@@ -615,7 +605,8 @@ mod tests {
         let directory = tempfile::tempdir().expect("directory");
         let root = directory.path().canonicalize().expect("root");
         let (sender, receiver) = sync_channel(1);
-        let mut watcher = FileWatcher::new(vec![root.clone()], vec![], sender).expect("watcher");
+        let mut watcher =
+            FileWatcher::new(vec![root.clone()], vec![], false, sender).expect("watcher");
         let report = ScanReport {
             directories: vec![root.clone()],
             ..ScanReport::default()

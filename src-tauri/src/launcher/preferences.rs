@@ -60,7 +60,7 @@ pub async fn get_settings(app: AppHandle) -> Result<SettingsInfo, String> {
                 .into_owned(),
             shortcuts_available: !platform::is_wayland()
                 && app
-                    .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+                    .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
                     .is_some(),
         })
     })
@@ -111,12 +111,12 @@ struct NativeShortcuts<'a>(&'a AppHandle);
 impl ShortcutRegistry for NativeShortcuts<'_> {
     fn contains(&self, shortcut: &str) -> bool {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .is_some_and(|registry| registry.is_registered(shortcut))
     }
     fn register(&self, shortcut: &str) -> Result<(), String> {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .ok_or("Global shortcuts are unavailable. Restart TinyDash and try again.")?
             .register(shortcut)
             .map_err(|error| {
@@ -125,7 +125,7 @@ impl ShortcutRegistry for NativeShortcuts<'_> {
     }
     fn unregister(&self, shortcut: &str) -> Result<(), String> {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .ok_or("Global shortcuts are unavailable. Restart TinyDash and try again.")?
             .unregister(shortcut)
             .map_err(|error| error.to_string())
@@ -243,8 +243,21 @@ pub fn edit_settings(
                 }
                 .map_err(|error| format!("Could not change start at login: {error}"))?;
             }
-            if let Err(error) = settings::save(&directory, &settings) {
-                let mut message = format!("{error:#}");
+            let menu_bar_changed = previous.show_menu_bar_icon != settings.show_menu_bar_icon;
+            let result = (|| {
+                if menu_bar_changed {
+                    crate::set_menu_bar_visible(app, settings.show_menu_bar_icon)
+                        .map_err(|error| format!("Could not change menu bar icon: {error}"))?;
+                }
+                settings::save(&directory, &settings).map_err(|error| format!("{error:#}"))
+            })();
+            if let Err(mut message) = result {
+                if menu_bar_changed
+                    && let Err(error) =
+                        crate::set_menu_bar_visible(app, previous.show_menu_bar_icon)
+                {
+                    message.push_str(&format!(" Could not restore menu bar icon: {error}"));
+                }
                 if changed {
                     let rollback = if was_enabled {
                         autostart.enable()
@@ -261,14 +274,20 @@ pub fn edit_settings(
         },
     )?;
     state.replace_settings(settings.clone());
-    if previous.clipboard_history_enabled != settings.clipboard_history_enabled {
+    if previous.clipboard_history_enabled != settings.clipboard_history_enabled
+        || previous.clipboard_excluded_apps != settings.clipboard_excluded_apps
+        || previous.clipboard_capture_images != settings.clipboard_capture_images
+        || previous.clipboard_capture_files != settings.clipboard_capture_files
+    {
         state.clipboard.invalidate();
     }
     if settings.clipboard_history_enabled {
         super::clipboard::start(app);
         super::clipboard::refresh(app);
     }
-    if previous.clipboard_history_limit != settings.clipboard_history_limit {
+    if previous.clipboard_history_limit != settings.clipboard_history_limit
+        || previous.clipboard_retention_days != settings.clipboard_retention_days
+    {
         state.storage.apply_clipboard_limit(app);
     }
     if !previous.same_file_settings(&settings) {

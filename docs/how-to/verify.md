@@ -116,7 +116,7 @@ The wrapper removes `test-results/verification/native.lock` only after confirmed
 
 Run `bun run test:ui tests/native-cancellation.spec.ts` for cancellation regression tests. These run the real wrapper and suite with a dummy driver and temporary settings. They cover setup, compilation, pending requests, repeated cancellation, forced process termination, and missing or failed cleanup records. They do not replace Windows and Linux desktop checks.
 
-The suite checks application launch markers, calculator and emoji clipboard values, clipboard history, file watching, and canceled system commands. It starts and stops its own driver and fixture processes. Native evidence is separate from browser evidence.
+The suite checks application launch markers, calculator and emoji clipboard values, clipboard history, file watching, the complete System command catalog, canceled system commands, and color conversion/copy through the utility panel. It starts and stops its own driver and fixture processes. Native evidence is separate from browser evidence.
 
 Use the Native app checks workflow to verify an existing CI package without rebuilding it. Set its build run ID. Use `release_artifacts=true` for a release candidate. The workflow records both the build commit and test-code commit.
 

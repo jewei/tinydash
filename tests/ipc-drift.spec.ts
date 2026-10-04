@@ -117,10 +117,19 @@ test("exact Rust-derived contracts reject deliberate wire and bridge drift", asy
   const dir = mkdtempSync(resolve(root, "test-results/ipc-drift-"));
   mkdirSync(resolve(dir, "src"));
   mkdirSync(resolve(dir, "tests/fixtures"), { recursive: true });
-  writeFileSync(
-    resolve(dir, "src/appearance.ts"),
-    readFileSync(resolve(root, "src/appearance.ts"), "utf8"),
-  );
+  for (const path of [
+    "src/appearance.ts",
+    "src/clipboardBridge.ts",
+    "src/file-actions-bridge.ts",
+    "src/library-bridge.ts",
+    "src/utilities-bridge.ts",
+    "tests/ipc-probe.ts",
+  ]) {
+    writeFileSync(
+      resolve(dir, path),
+      readFileSync(resolve(root, path), "utf8"),
+    );
+  }
   writeFileSync(resolve(dir, "tests/ipc-types.ts"), checks);
   writeFileSync(
     resolve(dir, "tsconfig.json"),
@@ -129,6 +138,8 @@ test("exact Rust-derived contracts reject deliberate wire and bridge drift", asy
         strict: true,
         noEmit: true,
         target: "ES2022",
+        // Tauri 3 declares async disposal without the app's Node ambient types.
+        lib: ["ES2022", "ESNext.Disposable", "DOM"],
         module: "ESNext",
         moduleResolution: "Bundler",
         types: [],

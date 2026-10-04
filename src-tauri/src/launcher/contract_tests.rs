@@ -34,6 +34,7 @@ fn serialized_ipc_contracts_match_frontend_fixture() {
         Action::Delete,
         Action::Run,
         Action::Regenerate,
+        Action::Paste,
     ];
     let kinds = [
         ResultKind::App,
@@ -207,6 +208,15 @@ fn serialized_ipc_contracts_match_frontend_fixture() {
     })
     .collect();
     let value = json!({
+        "pasteQueueActions": [
+            crate::launcher::paste_queue::PasteQueueAction::Status,
+            crate::launcher::paste_queue::PasteQueueAction::Start,
+            crate::launcher::paste_queue::PasteQueueAction::Next,
+            crate::launcher::paste_queue::PasteQueueAction::Skip,
+            crate::launcher::paste_queue::PasteQueueAction::Cancel,
+        ],
+        "pasteQueueEmpty": crate::launcher::paste_queue::PasteQueueStatus { total: 0, position: 0, next: None },
+        "pasteQueueActive": crate::launcher::paste_queue::PasteQueueStatus { total: 2, position: 1, next: Some(crate::providers::clipboard::ClipboardEntry { id: 42, content: "Next text".into(), created_at: 1, last_used_at: None }) },
         "fileStatuses": file_statuses,
         "modes": modes, "actions": actions, "response": response, "warningResponse": warning_response,
         "fullResult": full_result, "details": details, "settings": settings,

@@ -4,22 +4,24 @@ This is the maintained feature catalog. Each page states supported behavior, ent
 
 For a development change, run the affected recipes and add proof for behavior they do not cover. Each browser recipe uses `verify:browser` to retain successful traces. Run the required final source checks after the last edit. During a maintenance audit, inspect every feature against source and exercise every feature live. Record missing desktop prerequisites separately; do not count them as passes.
 
-| Feature                                        | Current checks                               |
-| ---------------------------------------------- | -------------------------------------------- |
-| [Launcher and navigation](launcher.md)         | Native and browser                           |
-| [Application search](apps.md)                  | Native and browser                           |
-| [File search](files.md)                        | Native and browser                           |
-| [Clipboard history](clipboard.md)              | Native and browser                           |
-| [Calculator and currency](calculator.md)       | Native and browser                           |
-| [Emoji search](emoji.md)                       | Native and browser                           |
-| [System commands](system.md)                   | Native and browser                           |
-| [Password generation](passwords.md)            | Browser and Rust; desktop checks where noted |
-| [Dates and time zones](datetime.md)            | Browser and Rust; desktop checks where noted |
-| [URL cleaning](urls.md)                        | Browser and Rust; desktop checks where noted |
-| [Web search](web.md)                           | Browser and Rust; desktop checks where noted |
-| [Pins](pins.md)                                | Browser and Rust; desktop checks where noted |
-| [Appearance and categories](appearance.md)     | Browser and Rust; desktop checks where noted |
-| [Settings, recovery, and updates](settings.md) | Browser and Rust; desktop checks where noted |
+| Feature                                                | Current checks                                           |
+| ------------------------------------------------------ | -------------------------------------------------------- |
+| [Launcher and navigation](launcher.md)                 | Native and browser                                       |
+| [Application search](apps.md)                          | Native and browser                                       |
+| [File search](files.md)                                | Native and browser                                       |
+| [Clipboard history](clipboard.md)                      | Native and browser                                       |
+| [Calculator and currency](calculator.md)               | Native and browser                                       |
+| [Emoji search](emoji.md)                               | Native and browser                                       |
+| [System commands](system.md)                           | Native and browser                                       |
+| [Password generation](passwords.md)                    | Browser and Rust; desktop checks where noted             |
+| [Dates and time zones](datetime.md)                    | Browser and Rust; desktop checks where noted             |
+| [URL cleaning](urls.md)                                | Browser and Rust; desktop checks where noted             |
+| [Web search](web.md)                                   | Browser and Rust; desktop checks where noted             |
+| [Pins](pins.md)                                        | Browser and Rust; desktop checks where noted             |
+| [Appearance and categories](appearance.md)             | Browser and Rust; desktop checks where noted             |
+| [Settings, recovery, and updates](settings.md)         | Browser and Rust; desktop checks where noted             |
+| [Quicklinks, snippets, and direct paste](workflows.md) | Browser and Rust; desktop checks required for OS effects |
+| [Native utilities](utilities.md)                       | Browser and Rust; desktop checks required for OS effects |
 
 Start with launcher navigation, application launch, calculator copying, clipboard history, and file watching when checking a desktop build. Other features remain part of the full catalog.
 

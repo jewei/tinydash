@@ -5,6 +5,40 @@
 identifier = "launcher"
 description = "Search, result actions, launcher controls, and the launcher's narrow preference actions."
 permissions = [
+  "allow-paste-result",
+  "allow-drag-result",
+  "allow-share-result",
+  "allow-paste-queue",
+  "allow-library-list",
+  "allow-library-get",
+  "allow-library-save",
+  "allow-library-delete",
+  "allow-library-execute",
+  "allow-file-preview",
+  "allow-execute-file-action",
+  "allow-utility-capabilities",
+  "allow-utility-processes",
+  "allow-utility-prepare-process",
+  "allow-utility-prepare-app",
+  "allow-utility-confirm-process",
+  "allow-utility-cancel-process",
+  "allow-utility-color",
+  "allow-utility-copy-color",
+  "allow-utility-eyedropper",
+  "allow-utility-awake-status",
+  "allow-utility-set-awake",
+  "allow-utility-media",
+  "allow-utility-capture-window",
+  "allow-utility-window",
+  "allow-rich-clipboard-history",
+  "allow-rich-clipboard-preview",
+  "allow-reveal-rich-clipboard-file",
+  "allow-save-rich-clipboard-image",
+  "allow-copy-rich-clipboard",
+  "allow-paste-rich-clipboard",
+  "allow-delete-rich-clipboard",
+  "allow-set-rich-clipboard-pinned",
+  "allow-set-rich-clipboard-name",
   "allow-set-launcher-appearance",
   "allow-launcher-ready",
   "allow-choose-clipboard-history",
@@ -32,7 +66,7 @@ description = "Preferences form, application catalog, web search preview, portab
 permissions = [
   "allow-get-settings",
   "allow-save-settings",
-  "allow-app-catalog",
+  "allow-item-catalog",
   "allow-preview-web-search",
   "allow-set-shortcut-recording",
   "allow-reveal-settings-path",
@@ -45,8 +79,9 @@ permissions = [
 
 [[set]]
 identifier = "shared"
-description = "Both windows offer history clearing and synchronize validated appearance choices."
+description = "Both windows offer history clearing, application selection, and validated appearance synchronization."
 permissions = [
+  "allow-app-catalog",
   "allow-clear-clipboard-history",
   "allow-sync-appearance",
 ]

@@ -48,6 +48,21 @@ impl Database {
             .collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Age retention uses the original capture time, never the last copy time.
+    /// Pinned history is explicitly exempt. Zero keeps the existing unlimited age.
+    pub fn prune_clipboard_retention(&self, days: u32, now: i64) -> Result<Vec<i64>> {
+        if days == 0 {
+            return Ok(Vec::new());
+        }
+        let cutoff = now.saturating_sub(i64::from(days) * 86_400);
+        let mut statement = self.connection.prepare(
+            "DELETE FROM clipboard_history WHERE pinned = 0 AND created_at <= ?1 RETURNING id",
+        )?;
+        Ok(statement
+            .query_map([cutoff], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?)
+    }
+
     #[cfg(test)]
     pub fn capture_clipboard(
         &mut self,
@@ -55,17 +70,54 @@ impl Database {
         now: i64,
         limit: usize,
     ) -> Result<(ClipboardEntry, Vec<i64>)> {
-        self.capture_clipboard_revision(content, now, limit)
+        self.capture_clipboard_with_retention(content, now, limit, 0)
+    }
+
+    #[cfg(test)]
+    pub fn capture_clipboard_with_retention(
+        &mut self,
+        content: &str,
+        now: i64,
+        limit: usize,
+        retention_days: u32,
+    ) -> Result<(ClipboardEntry, Vec<i64>)> {
+        self.capture_clipboard_revision_with_retention(content, now, limit, retention_days)
             .map(|(entry, removed, _)| (entry, removed))
     }
 
+    #[cfg(test)]
     pub fn capture_clipboard_revision(
         &mut self,
         content: &str,
         now: i64,
         limit: usize,
     ) -> Result<(ClipboardEntry, Vec<i64>, CaptureRevision)> {
+        self.capture_clipboard_revision_with_retention(content, now, limit, 0)
+    }
+
+    pub fn capture_clipboard_revision_with_retention(
+        &mut self,
+        content: &str,
+        now: i64,
+        limit: usize,
+        retention_days: u32,
+    ) -> Result<(ClipboardEntry, Vec<i64>, CaptureRevision)> {
         let transaction = self.connection.transaction()?;
+        // Prune before the upsert: re-copying expired text creates a fresh entry
+        // rather than immediately removing the entry returned to the index.
+        let mut removed = if retention_days == 0 {
+            Vec::new()
+        } else {
+            let mut statement = transaction.prepare(
+                "DELETE FROM clipboard_history WHERE pinned = 0 AND created_at <= ?1 RETURNING id",
+            )?;
+            statement
+                .query_map(
+                    [now.saturating_sub(i64::from(retention_days) * 86_400)],
+                    |row| row.get(0),
+                )?
+                .collect::<rusqlite::Result<Vec<i64>>>()?
+        };
         let (entry, revision) = transaction.query_row(
             "INSERT INTO clipboard_history (content, created_at, sort_order)
              VALUES (?1, ?2, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM clipboard_history))
@@ -75,7 +127,7 @@ impl Database {
             params![content, now],
             |row| Ok((entry(row)?, row.get(4)?)),
         )?;
-        let removed = {
+        removed.extend({
             let mut statement = transaction.prepare(
                 "DELETE FROM clipboard_history WHERE id IN (
                     SELECT id FROM clipboard_history WHERE pinned = 0 ORDER BY sort_order DESC LIMIT -1 OFFSET ?1
@@ -84,7 +136,7 @@ impl Database {
             statement
                 .query_map([limit as i64], |row| row.get(0))?
                 .collect::<rusqlite::Result<Vec<i64>>>()?
-        };
+        });
         transaction.commit()?;
         let capture = CaptureRevision {
             id: entry.id,
@@ -203,6 +255,60 @@ mod tests {
                 .expect("expired")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn age_retention_preserves_pins_and_zero_means_unlimited() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut db = Database::open(&directory.path().join("history.sqlite3")).unwrap();
+        let old = db.capture_clipboard("old", 1, 100).unwrap().0;
+        let pinned = db.capture_clipboard("pinned", 1, 100).unwrap().0;
+        let recent = db.capture_clipboard("recent", 86_402, 100).unwrap().0;
+        db.set_pinned(
+            &format!("clipboard:{}", pinned.id),
+            SearchMode::Clipboard,
+            true,
+        )
+        .unwrap();
+        assert!(
+            db.prune_clipboard_retention(0, i64::MAX)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            db.prune_clipboard_retention(u32::MAX, 0)
+                .unwrap()
+                .is_empty()
+        );
+        db.touch_clipboard(old.id, 86_400).unwrap();
+        assert_eq!(db.prune_clipboard_retention(1, 86_401).unwrap(), [old.id]);
+        let ids: Vec<_> = db
+            .load_clipboard()
+            .unwrap()
+            .iter()
+            .map(|entry| entry.id)
+            .collect();
+        assert!(ids.contains(&pinned.id));
+        assert!(ids.contains(&recent.id));
+        assert_eq!(db.load_pins().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn recapture_expired_text_is_fresh_and_failed_capture_rolls_back_pruning() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut db = Database::open(&directory.path().join("history.sqlite3")).unwrap();
+        let old = db.capture_clipboard("old", 1, 100).unwrap().0;
+        assert!(
+            db.capture_clipboard_with_retention(&"x".repeat(16_385), 86_401, 100, 1)
+                .is_err()
+        );
+        assert_eq!(db.load_clipboard().unwrap()[0].id, old.id);
+        let (fresh, removed) = db
+            .capture_clipboard_with_retention("old", 86_401, 100, 1)
+            .unwrap();
+        assert_ne!(fresh.id, old.id);
+        assert_eq!(fresh.created_at, 86_401);
+        assert_eq!(removed, [old.id]);
     }
 
     #[test]

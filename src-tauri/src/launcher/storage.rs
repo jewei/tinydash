@@ -185,6 +185,7 @@ impl Session {
         settings: &Path,
         search: &Mutex<SearchManager>,
         limit: Option<usize>,
+        retention_days: u32,
     ) -> anyhow::Result<Result<Option<crate::currency::Rates>, crate::db::Error>> {
         if self.database.is_some() || !matches!(self.health, Health::Uninitialized | Health::Busy) {
             return Ok(Ok(None));
@@ -202,6 +203,7 @@ impl Session {
             let pins = database.load_pins()?;
             if let Some(limit) = limit {
                 database.prune_clipboard(limit)?;
+                database.prune_clipboard_retention(retention_days, ranking::now())?;
             }
             let clipboard = ClipboardProvider::new(database.load_clipboard()?);
             let rates = database.load_rates();
@@ -266,7 +268,10 @@ impl Session {
                 return;
             }
         };
-        self.pending_usage.insert(id.to_owned(), usage);
+        self.pending_usage.insert(
+            crate::providers::emoji::canonical_id(id).into_owned(),
+            usage,
+        );
         let _ = self.with_database(|_| Ok(()));
     }
 
@@ -293,13 +298,15 @@ impl Session {
         text: &str,
         now: i64,
         limit: usize,
+        retention_days: u32,
     ) -> anyhow::Result<CaptureRevision> {
         anyhow::ensure!(
             !self.capture_paused(),
             "Clipboard capture is paused for pending sensitive cleanup."
         );
-        let (entry, removed, capture) =
-            self.with_database(|database| database.capture_clipboard_revision(text, now, limit))?;
+        let (entry, removed, capture) = self.with_database(|database| {
+            database.capture_clipboard_revision_with_retention(text, now, limit, retention_days)
+        })?;
         search
             .lock()
             .map_err(|_| Error::IndexUnavailable)?
@@ -314,11 +321,12 @@ impl Session {
         text: Option<String>,
         now: i64,
         limit: usize,
+        retention_days: u32,
     ) -> bool {
         let Some(text) = self.observed.changed(text) else {
             return false;
         };
-        if let Ok(capture) = self.capture(search, &text, now, limit) {
+        if let Ok(capture) = self.capture(search, &text, now, limit, retention_days) {
             self.observed.captured = Some((capture, now));
         }
         true
@@ -397,6 +405,7 @@ impl Storage {
                     settings
                         .clipboard_history_decided
                         .then(|| settings.clipboard_limit()),
+                    settings.clipboard_retention_days,
                 )
             })();
             match loaded {
@@ -422,6 +431,12 @@ impl Storage {
 
     pub fn initialize(&self, app: &AppHandle, search: &Mutex<SearchManager>) {
         self.session(app, search);
+        let state = app.state::<LauncherState>();
+        if state.settings().clipboard_history_decided
+            && super::clipboard::formats::apply_retention(app).is_err()
+        {
+            state.clipboard.failed();
+        }
     }
 
     pub fn set_pinned(
@@ -456,11 +471,17 @@ impl Storage {
 
     pub fn apply_clipboard_limit(&self, app: &AppHandle) {
         let state = app.state::<LauncherState>();
+        let settings = state.settings();
+        if super::clipboard::formats::apply_retention(app).is_err() {
+            state.clipboard.failed();
+        }
         let Ok(mut session) = self.session(app, &state.search).lock() else {
             return;
         };
         let entries = session.with_database(|database| {
-            database.prune_clipboard(state.settings().clipboard_limit())?;
+            database.prune_clipboard(settings.clipboard_limit())?;
+            database
+                .prune_clipboard_retention(settings.clipboard_retention_days, ranking::now())?;
             database.load_clipboard()
         });
         if let Ok(entries) = entries
@@ -495,6 +516,11 @@ impl Storage {
 
     pub fn capture(&self, app: &AppHandle, observed: Observed, generation: u64) {
         let state = app.state::<LauncherState>();
+        // Serialize the final policy/generation check with settings commits.
+        // Keep the same order as edit_settings: policy before storage.
+        let Ok(_policy) = state.settings_update.lock() else {
+            return;
+        };
         let Ok(mut session) = self.session(app, &state.search).lock() else {
             return;
         };
@@ -520,6 +546,7 @@ impl Storage {
             text,
             ranking::now(),
             state.settings().clipboard_limit(),
+            state.settings().clipboard_retention_days,
         ) {
             super::clipboard::changed(app);
         }
@@ -556,6 +583,7 @@ impl Storage {
             text,
             ranking::now(),
             state.settings().clipboard_limit(),
+            state.settings().clipboard_retention_days,
         );
         super::clipboard::changed(app);
         result.ok()
@@ -894,11 +922,11 @@ mod tests {
         let search = Mutex::new(SearchManager::default());
         let mut session = Session::default();
         session
-            .initialize(&path, &settings, &search, Some(100))
+            .initialize(&path, &settings, &search, Some(100), 0)
             .unwrap()
             .unwrap();
         session.record(&search, "app:one", 100);
-        let kept = session.capture(&search, "kept", 100, 100).unwrap().id;
+        let kept = session.capture(&search, "kept", 100, 100, 0).unwrap().id;
         let other = rusqlite::Connection::open(&path).unwrap();
         other.execute_batch("BEGIN IMMEDIATE").unwrap();
         // Exercise capture's own write failure, before a pending usage flush can fail.
@@ -907,7 +935,7 @@ mod tests {
             let capturing = scope.spawn(move || {
                 assert!(
                     session
-                        .capture(search_ref, "missed capture", 101, 100)
+                        .capture(search_ref, "missed capture", 101, 100, 0)
                         .is_err()
                 );
                 session
@@ -926,7 +954,7 @@ mod tests {
         session.record(&search, "app:one", 101);
         session.record(&search, "app:one", 102);
         session.record(&search, "app:two", 103);
-        assert!(session.capture(&search, "missed", 104, 100).is_err());
+        assert!(session.capture(&search, "missed", 104, 100, 0).is_err());
         assert_eq!(session.health, Health::Busy);
         assert_eq!(session.pending_usage["app:one"].count, 3);
         assert_eq!(
@@ -943,7 +971,10 @@ mod tests {
         other.execute_batch("ROLLBACK").unwrap();
 
         // An unrelated capture retries storage and persists every pending count.
-        let captured = session.capture(&search, "recovered", 105, 100).unwrap().id;
+        let captured = session
+            .capture(&search, "recovered", 105, 100, 0)
+            .unwrap()
+            .id;
         assert_eq!(session.health, Health::Healthy);
         assert!(session.pending_usage.is_empty());
         assert!(session.warning.lock().unwrap().is_none());
@@ -986,7 +1017,7 @@ mod tests {
         let mut session = Session::default();
         assert!(
             session
-                .initialize(&path, &settings, &search, Some(100))
+                .initialize(&path, &settings, &search, Some(100), 0)
                 .is_err()
         );
         assert_eq!(session.health, Health::Busy);
@@ -997,16 +1028,16 @@ mod tests {
         // A second failed initialization must not lose or multiply increments.
         assert!(
             session
-                .initialize(&path, &settings, &search, Some(100))
+                .initialize(&path, &settings, &search, Some(100), 0)
                 .is_err()
         );
         other.execute_batch("ROLLBACK").unwrap();
         session
-            .initialize(&path, &settings, &search, Some(100))
+            .initialize(&path, &settings, &search, Some(100), 0)
             .unwrap()
             .unwrap();
         session
-            .initialize(&path, &settings, &search, Some(100))
+            .initialize(&path, &settings, &search, Some(100), 0)
             .unwrap()
             .unwrap();
         session.record(&search, "app:kept", 103);
@@ -1043,6 +1074,7 @@ mod tests {
                     &path.with_file_name("settings.json"),
                     &search,
                     Some(100),
+                    0,
                 )
                 .unwrap()
                 .unwrap();
@@ -1105,7 +1137,13 @@ mod tests {
             let mut session = Session::default();
             assert!(
                 session
-                    .initialize(&path, &path.with_file_name("settings.json"), &search, None)
+                    .initialize(
+                        &path,
+                        &path.with_file_name("settings.json"),
+                        &search,
+                        None,
+                        0
+                    )
                     .is_err()
             );
             assert_eq!(
@@ -1117,13 +1155,19 @@ mod tests {
                 }
             );
             session.record(&search, "app:session-only", 100);
-            assert!(session.capture(&search, "not saved", 101, 100).is_err());
+            assert!(session.capture(&search, "not saved", 101, 100, 0).is_err());
             assert_eq!(std::fs::read(&path).unwrap(), original);
             // Even replacing the file must not silently reopen a permanent failure.
             std::fs::remove_file(&path).unwrap();
             Database::open(&path).unwrap();
             session
-                .initialize(&path, &path.with_file_name("settings.json"), &search, None)
+                .initialize(
+                    &path,
+                    &path.with_file_name("settings.json"),
+                    &search,
+                    None,
+                    0,
+                )
                 .unwrap()
                 .unwrap();
             assert!(session.database.is_none());
@@ -1145,5 +1189,24 @@ mod tests {
         assert_eq!(observed.changed(None), None);
         assert_eq!(observed.changed(Some("A".into())), Some("A".into()));
         assert_eq!(observed.changed(Some(" \n".into())), None);
+    }
+    #[test]
+    fn emoji_variants_persist_usage_under_the_existing_base_key() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("state.sqlite3");
+        let search = Mutex::new(SearchManager::default());
+        let mut session = Session {
+            database: Some(Database::open(&path).unwrap()),
+            health: Health::Healthy,
+            ..Session::default()
+        };
+        session.record(&search, "emoji:👍", 100);
+        session.record(&search, "emoji:👍🏽", 101);
+        session.record(&search, "emoji:👍🏿", 102);
+        drop(session);
+        let usage = Database::open(&path).unwrap().load_usage().unwrap();
+        assert_eq!(usage.len(), 1);
+        assert_eq!(usage["emoji:👍"].count, 3);
+        assert_eq!(usage["emoji:👍"].last_used_at, 102);
     }
 }

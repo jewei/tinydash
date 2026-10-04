@@ -61,6 +61,7 @@ let appLog: number | undefined;
 const passed: string[] = [];
 const reopenCheckMs: number[] = [];
 const secondInstances = new Set<ChildProcess>();
+const expectedIdleTitles = new Set<string>();
 
 function recordOwnedResources() {
   writeFileSync(
@@ -313,22 +314,25 @@ async function reopen() {
       await stopProcessTree(child);
     secondInstances.delete(child);
   }
-  await until("the existing window reopens on the welcome screen", () =>
-    request<boolean>(`/session/${session}/execute/async`, "POST", {
-      // Hidden webviews retain DOM state and activeElement. Those alone cannot
-      // prove that the resident native window has actually reopened.
-      script: `const done = arguments[arguments.length - 1];
+  await until(
+    "the existing window reopens with the expected empty-query results",
+    () =>
+      request<boolean>(`/session/${session}/execute/async`, "POST", {
+        // Hidden webviews retain DOM state and activeElement. Those alone cannot
+        // prove that the resident native window has actually reopened.
+        script: `const done = arguments[arguments.length - 1];
+        const expected = arguments[0];
         window.__TAURI_INTERNALS__.invoke('launcher_ready').then(info => done(
           info.visible
           && document.querySelector('input[role=combobox]')?.value === ''
           && document.activeElement?.getAttribute('role') === 'combobox'
           && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
           && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
-          && document.querySelector('.welcome-suggestions') !== null
-          && document.querySelectorAll('[role=option]').length === 0
+          && (document.querySelector('.welcome-suggestions') !== null) === (expected.length === 0)
+          && JSON.stringify([...document.querySelectorAll('[role=option] .result-title')].map(item => item.textContent).sort()) === JSON.stringify(expected)
         ), error => done({ error: String(error) }));`,
-      args: [],
-    }),
+        args: [[...expectedIdleTitles].sort()],
+      }),
   );
   reopenCheckMs.push(performance.now() - started);
 }
@@ -557,8 +561,11 @@ try {
   pass(
     "Emoji search uses local Rust data, and Enter copies the complete emoji to the OS clipboard",
   );
+  expectedIdleTitles.add("rocket");
   await reopen();
-  pass("Starting TinyDash again reopens its existing window after copying");
+  pass(
+    "Starting TinyDash again clears the query and shows the copied emoji suggestion",
+  );
 
   await keys(inputId, ":");
   await until(
@@ -643,6 +650,31 @@ try {
   });
   pass("Enter launches the selected fixture through the OS");
 
+  expectedIdleTitles.add(orderedNames[1]);
+  await reopen();
+  await saveScreen("suggestions.png");
+  await rm(fixtures.marker);
+  const suggestions = await titles();
+  const currentSuggestion = suggestions.indexOf(await selectedTitle());
+  const appSuggestion = suggestions.indexOf(orderedNames[1]);
+  assert(currentSuggestion >= 0 && appSuggestion >= 0);
+  const moves =
+    (appSuggestion - currentSuggestion + suggestions.length) %
+    suggestions.length;
+  for (let index = 0; index < moves; index++) await keys(inputId, "\uE015");
+  assert.equal(await selectedTitle(), orderedNames[1]);
+  await keys(inputId, "\uE007");
+  await until("the app suggestion launches the selected fixture", async () => {
+    try {
+      return (await readFile(fixtures.marker, "utf8")) === expectedLabel;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  });
+  pass(
+    "Empty All suggests used apps and emoji; activating the app suggestion writes its launch marker",
+  );
   await reopen();
   await selectMode("apps");
   await until(
@@ -966,6 +998,7 @@ try {
       (await readFile(fixtures.fileMarker, "utf8")) === fixtures.filePath,
   );
   pass("Enter opens the selected file through its OS document association");
+  expectedIdleTitles.add(fixtures.fileName);
   await reopen();
   await selectMode("files");
   await keys(inputId, fixtures.fileName);
@@ -975,6 +1008,7 @@ try {
     ),
   );
   await rm(fixtures.filePath);
+  expectedIdleTitles.delete(fixtures.fileName);
   await rm(fixtures.fileMarker);
   await until(
     "the watcher removes the deleted file",
@@ -1090,16 +1124,40 @@ try {
 
   await reopen();
   await selectMode("system");
-  assert.equal((await titles()).length, 10);
-  for (const title of [
-    "Toggle system appearance",
-    "Log out",
-    "Lock screen",
-    "Show desktop",
-    "Toggle mute",
-  ]) {
-    assert((await titles()).includes(title), `System includes ${title}`);
-  }
+  assert.deepEqual(
+    (await titles()).sort(),
+    [
+      "Lock screen",
+      "Sleep",
+      "Restart",
+      "Shut down",
+      "Open system settings",
+      "Toggle system appearance",
+      process.platform === "win32" ? "Empty Recycle Bin" : "Empty Trash",
+      "Log out",
+      "Show desktop",
+      "Toggle mute",
+      "Paste next queued entry",
+      "Skip queued entry",
+      "Cancel paste queue",
+      "Quicklinks",
+      "Snippets",
+      "Quit a process",
+      "Color picker",
+      "Keep awake",
+      "Media controls",
+      "Window management",
+      "Move window left",
+      "Move window right",
+      "Maximize window",
+      "Center window",
+      "Restore window",
+      "Images and files clipboard",
+    ].sort(),
+  );
+  pass(
+    "System search lists every system action and implemented native command",
+  );
   await keys(inputId, "reboot");
   await until("the system provider resolves the reboot alias", () =>
     observe<boolean>(
@@ -1145,6 +1203,74 @@ try {
   }
   pass(
     "Rust rejects power, logout, and empty-trash IPC requests without explicit confirmation",
+  );
+
+  // Exercise a new command through search and its real panel. The exact system
+  // clipboard value proves the new utility IPC grants and native copy path.
+  // Backend-only rejection probes do not prove native visibility. Windows can
+  // retain DOM focus in a hidden webview; reestablish readiness before typing.
+  await reopen();
+  await selectMode("system");
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, "Color picker");
+  await until("the color command query reaches the visible search field", () =>
+    observe<boolean>(
+      "return document.querySelector('input[role=combobox]')?.value === 'Color picker'",
+    ),
+  );
+  await until(
+    "search finds the color utility command",
+    async () =>
+      (await titles())[0] === "Color picker" &&
+      (await observe<boolean>(
+        "return document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+      )),
+  );
+  await keys(inputId, "\uE007");
+  await until("the color utility opens from its search result", () =>
+    observe<boolean>(
+      `return document.querySelector('[aria-label="Native utilities"]') !== null
+        && document.querySelector('[aria-label="Utility categories"] [aria-pressed=true]')?.textContent === 'Colors'
+        && document.querySelector('.utility-content')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  const colorInput = await request<Record<string, string>>(
+    `/session/${session}/element`,
+    "POST",
+    {
+      using: "css selector",
+      value: '[aria-label="Native utilities"] form input',
+    },
+  );
+  await keys(colorInput[elementKey], "\uE009a\uE000");
+  await keys(colorInput[elementKey], "#f00");
+  await until("the color input contains the typed value", () =>
+    observe<boolean>(
+      "return document.querySelector('[aria-label=\"Native utilities\"] form input')?.value === '#f00'",
+    ),
+  );
+  await clickButtonText("Convert color");
+  await until("Rust converts the entered color", () =>
+    observe<boolean>(
+      `return document.querySelector('.utility-color-result input')?.value === '#FF0000'
+        && document.querySelector('.utility-content')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  await clickButtonText("Copy HEX");
+  await until(
+    "the converted HEX reaches the OS clipboard",
+    async () => clipboardText() === "#FF0000",
+  );
+  await saveScreen("native-color-copy.png");
+  await click('[aria-label="Close utilities"]');
+  await until("closing the utility restores search focus", () =>
+    observe<boolean>(
+      `return document.querySelector('[aria-label="Native utilities"]') === null
+        && document.activeElement?.getAttribute('role') === 'combobox'`,
+    ),
+  );
+  pass(
+    "The color command opens its panel, converts in Rust, copies exact HEX, and restores search focus",
   );
   await reopen();
   const queryTimings: QueryTiming[] = [];
