@@ -29,6 +29,7 @@ pub enum SystemCommand {
 struct Command {
     id: &'static str,
     name: &'static str,
+    description: &'static str,
     aliases: &'static [&'static str],
     symbol: Symbol,
     action: Action,
@@ -50,6 +51,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:lock",
         name: "Lock Screen",
+        description: "Lock this computer",
         aliases: &["lock"],
         symbol: Symbol::Lock,
         action: system(SystemCommand::Lock),
@@ -58,6 +60,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:sleep",
         name: "Sleep",
+        description: "Put the computer to sleep",
         aliases: &["suspend"],
         symbol: Symbol::Moon,
         action: system(SystemCommand::Sleep),
@@ -66,6 +69,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:restart",
         name: "Restart",
+        description: "Restart the computer",
         aliases: &["reboot"],
         symbol: Symbol::Restart,
         action: system(SystemCommand::Restart),
@@ -74,6 +78,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:shut-down",
         name: "Shut Down",
+        description: "Turn off the computer",
         aliases: &["shutdown", "power off", "turn off"],
         symbol: Symbol::Power,
         action: system(SystemCommand::ShutDown),
@@ -82,6 +87,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:log-out",
         name: "Log Out",
+        description: "End this session",
         aliases: &["logout", "sign out"],
         symbol: Symbol::LogOut,
         action: system(SystemCommand::LogOut),
@@ -90,6 +96,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:empty-trash",
         name: TRASH,
+        description: "Permanently delete trashed items",
         aliases: &["empty trash", "empty recycle bin", "trash", "recycle bin"],
         symbol: Symbol::Trash,
         action: system(SystemCommand::EmptyTrash),
@@ -98,6 +105,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:settings",
         name: "System Settings",
+        description: "Open the operating system settings",
         aliases: &["preferences", "control panel"],
         symbol: Symbol::Settings,
         action: system(SystemCommand::OpenSystemSettings),
@@ -106,6 +114,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:tinydash-settings",
         name: "TinyDash Settings",
+        description: "Shortcut, clipboard, files, and more",
         aliases: &["preferences", "configure"],
         symbol: Symbol::Settings,
         action: Action::OpenSettings,
@@ -114,6 +123,7 @@ const COMMANDS: &[Command] = &[
     Command {
         id: "system:quit-tinydash",
         name: "Quit TinyDash",
+        description: "Stop TinyDash until you open it again",
         aliases: &["exit"],
         symbol: Symbol::Quit,
         action: Action::Quit,
@@ -128,7 +138,7 @@ fn result(command: &Command, ctx: &Context) -> SearchResult {
         id: command.id.into(),
         kind: ResultKind::System,
         title: command.name.into(),
-        subtitle: "System".into(),
+        subtitle: command.description.into(),
         icon: Icon::Symbol {
             name: command.symbol,
         },

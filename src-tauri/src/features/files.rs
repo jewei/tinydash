@@ -270,7 +270,10 @@ mod tests {
 
     #[test]
     fn nested_roots_are_scanned_once() {
-        let roots = distinct_roots(&[PathBuf::from("/"), std::env::temp_dir()]);
-        assert_eq!(roots, [PathBuf::from("/")]);
+        let outer = std::env::temp_dir();
+        let inner = outer.join(format!("tinydash-nested-{}", std::process::id()));
+        std::fs::create_dir_all(&inner).unwrap();
+        assert_eq!(distinct_roots(&[inner.clone(), outer.clone()]), [outer]);
+        std::fs::remove_dir_all(inner).unwrap();
     }
 }

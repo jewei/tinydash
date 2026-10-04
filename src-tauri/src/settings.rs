@@ -190,14 +190,14 @@ mod tests {
 
     #[test]
     fn expands_the_home_folder_and_drops_relative_paths() {
-        let home = Path::new("/home/me");
+        let home = std::env::temp_dir();
         let settings = Settings {
             file_search_folders: vec!["~".into(), "~/Notes".into(), "relative".into()],
             ..Settings::default()
         };
         assert_eq!(
-            settings.file_folders(home),
-            [home.to_owned(), home.join("Notes")]
+            settings.file_folders(&home),
+            [home.clone(), home.join("Notes")]
         );
     }
 
