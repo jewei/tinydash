@@ -53,6 +53,21 @@ for (const native of [false, true]) {
     });
     await openApps(page, native);
     await expect(page.getByRole("option").first().locator("img")).toBeVisible();
+    const categories = page.getByRole("navigation", {
+      name: "Search categories",
+    });
+    for (let cycle = 0; cycle < 5; cycle++) {
+      await categories
+        .getByRole("button", { name: "All", exact: true })
+        .click();
+      await expect(page.getByRole("option")).toHaveCount(0);
+      await categories
+        .getByRole("button", { name: "Apps", exact: true })
+        .click();
+      await expect(
+        page.getByRole("option").first().locator("img"),
+      ).toBeVisible();
+    }
     const counts = await page.evaluate(
       () =>
         (

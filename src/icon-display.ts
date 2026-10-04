@@ -7,6 +7,7 @@ let intersections: IntersectionObserver | undefined;
 let appearance: MutationObserver | undefined;
 let scale: MediaQueryList | undefined;
 let scaleValue = 0;
+let refreshQueued = false;
 
 function pixels(element: HTMLElement) {
   const size = Number.parseFloat(
@@ -32,23 +33,42 @@ function visible(element: HTMLElement) {
 }
 
 function refresh() {
-  for (const [element, consume] of targets)
-    consume(visible(element), pixels(element));
+  // Finish layout reads before a consumer can change an image or its classes.
+  const updates = Array.from(targets, ([element, consume]) => ({
+    element,
+    consume,
+    visible: visible(element),
+    pixels: pixels(element),
+  }));
+  for (const update of updates)
+    if (targets.get(update.element) === update.consume)
+      update.consume(update.visible, update.pixels);
   if (scaleValue !== window.devicePixelRatio) watchScale();
 }
 
+function scheduleRefresh() {
+  if (refreshQueued) return;
+  refreshQueued = true;
+  queueMicrotask(() => {
+    refreshQueued = false;
+    if (targets.size) refresh();
+  });
+}
+
 function watchScale() {
-  scale?.removeEventListener("change", refresh);
-  scaleValue = window.devicePixelRatio;
-  scale = matchMedia(`(resolution: ${scaleValue}dppx)`);
-  scale.addEventListener("change", refresh);
+  scale?.removeEventListener("change", scheduleRefresh);
+  if (!scale || scaleValue !== window.devicePixelRatio) {
+    scaleValue = window.devicePixelRatio;
+    scale = matchMedia(`(resolution: ${scaleValue}dppx)`);
+  }
+  scale.addEventListener("change", scheduleRefresh);
 }
 
 // Only active native avatars subscribe. All targets share one observer and
 // one display-scale listener; CSS tokens define row and preview sizes.
 export function observeIconDisplay(element: HTMLElement, consume: Consumer) {
   if (!targets.size) {
-    intersections = new IntersectionObserver((entries) => {
+    intersections ??= new IntersectionObserver((entries) => {
       for (const entry of entries) {
         const target = entry.target as HTMLElement;
         targets.get(target)?.(
@@ -59,30 +79,30 @@ export function observeIconDisplay(element: HTMLElement, consume: Consumer) {
         );
       }
     });
-    appearance = new MutationObserver(refresh);
+    appearance ??= new MutationObserver(scheduleRefresh);
     appearance.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["data-appearance", "data-compact"],
     });
-    window.addEventListener("resize", refresh);
+    window.addEventListener("resize", scheduleRefresh);
     watchScale();
   }
   targets.set(element, consume);
   intersections!.observe(element);
-  // A layout check permits immediate work only for an actually visible icon.
-  // The shared observer handles later scrolling and clipping changes.
-  consume(visible(element), pixels(element));
+  // A single microtask reads the completed row layout before starting images.
+  // This does not wait for an intersection event or load clipped icons.
+  scheduleRefresh();
   return () => {
     if (targets.get(element) !== consume) return;
     targets.delete(element);
     intersections?.unobserve(element);
     if (targets.size) return;
     intersections?.disconnect();
+    intersections?.takeRecords();
     appearance?.disconnect();
-    scale?.removeEventListener("change", refresh);
-    window.removeEventListener("resize", refresh);
-    intersections = undefined;
-    appearance = undefined;
-    scale = undefined;
+    scale?.removeEventListener("change", scheduleRefresh);
+    window.removeEventListener("resize", scheduleRefresh);
+    // Keep one disconnected observer of each type for the next result list.
+    // Neither retains observed targets while the launcher is empty or hidden.
   };
 }
