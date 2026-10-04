@@ -9,17 +9,17 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 use crate::{
-    actions::Action,
     platform,
     search::{
         Context,
+        id::Source,
         matcher::Matcher,
-        result::{Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
+        result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
         top,
     },
 };
 
-/// Most entries an index holds. Larger trees are cut off, and the user is told.
+/// Most entries an index holds. Larger trees are cut off, and a warning is logged.
 pub const LIMIT: usize = 50_000;
 
 struct Entry {
@@ -95,8 +95,17 @@ impl FileIndex {
     }
 
     pub fn contains(&self, path: &str) -> bool {
+        self.entry(path).is_some()
+    }
+
+    fn entry(&self, path: &str) -> Option<&Entry> {
         let path = Path::new(path);
-        self.entries.iter().any(|entry| entry.os_path() == path)
+        self.entries.iter().find(|entry| entry.os_path() == path)
+    }
+
+    pub fn get(&self, path: &str, ctx: &Context) -> Option<SearchResult> {
+        self.entry(path)
+            .map(|entry| result(entry.os_path(), entry.is_dir, ctx))
     }
 
     /// Match names; with two or more words or a separator, also match whole
@@ -160,14 +169,7 @@ pub fn display_path(path: &Path) -> String {
 }
 
 fn id(path: &Path) -> String {
-    format!("file:{}", path.display())
-}
-
-/// A result for any existing path, so pins outside the index still work.
-pub fn result_for_path(path: &str, ctx: &Context) -> Option<SearchResult> {
-    let path = Path::new(path);
-    let metadata = std::fs::symlink_metadata(path).ok()?;
-    Some(result(path, metadata.is_dir(), ctx))
+    Source::File.id(path.display())
 }
 
 fn result(path: &Path, is_dir: bool, ctx: &Context) -> SearchResult {

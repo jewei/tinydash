@@ -10,9 +10,12 @@
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
-//! - `clipboard_is_concealed()`: the source marked the content secret.
+//! - `read_clipboard(reader, images, files)`: the content for the latest
+//!   change, or `None` when its source marked it secret.
+//! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `watch_clipboard()`: start change notifications; call on the main thread.
 //! - `prepare_launcher(window)`: native window tweaks; call on the main thread.
+//! - `place_launcher(app, window)`: move the launcher to the screen with the pointer.
 //! - `remember_frontmost_app()` / `restore_frontmost_app()`: return focus after Escape.
 
 #[cfg(target_os = "linux")]
@@ -30,6 +33,8 @@ pub use macos::*;
 pub use windows::*;
 
 use crate::error::{Error, Result};
+#[cfg(not(target_os = "linux"))]
+use crate::features::clipboard::{Content, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
 
 /// Clipboard formats that password managers set to ask history tools to skip
 /// a copy. See <http://nspasteboard.org> and the Windows clipboard docs.
@@ -42,6 +47,66 @@ pub const SECRET_FORMATS: &[&str] = &[
     "Clipboard Viewer Ignore",
     "x-kde-passwordManagerHint",
 ];
+
+/// Center the launcher horizontally, a fifth of the way down the work area
+/// of the monitor under the pointer. Every value here is in physical pixels,
+/// which Windows and X11 use consistently across monitors.
+#[cfg(not(target_os = "macos"))]
+fn place_in_physical_pixels(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+) -> tauri::Result<()> {
+    let cursor = app.cursor_position()?;
+    let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y)? else {
+        return Ok(());
+    };
+    let area = monitor.work_area();
+    let size = window.outer_size()?;
+    let free_width = i64::from(area.size.width.saturating_sub(size.width));
+    let free_height = i64::from(area.size.height.saturating_sub(size.height));
+    let x = i64::from(area.position.x) + free_width / 2;
+    let y = i64::from(area.position.y) + free_height / 5;
+    window.set_position(tauri::PhysicalPosition::new(
+        i32::try_from(x).unwrap_or(area.position.x),
+        i32::try_from(y).unwrap_or(area.position.y),
+    ))
+}
+
+#[cfg(not(target_os = "linux"))]
+/// Read what the clipboard holds, in the order apps expect: copied files
+/// first (Finder also offers their names as text), then text, then images.
+/// Kinds the user did not opt into are skipped, not saved as text.
+fn read_with_arboard(
+    reader: &mut arboard::Clipboard,
+    images: bool,
+    files: bool,
+) -> Option<Content> {
+    if let Ok(paths) = reader.get().file_list()
+        && !paths.is_empty()
+    {
+        return files.then_some(Content::Files(paths));
+    }
+    if let Ok(text) = reader.get_text() {
+        return Some(Content::Text(text));
+    }
+    if !images {
+        return None;
+    }
+    let image = reader.get_image().ok()?;
+    let (width, height) = (
+        u32::try_from(image.width).ok()?,
+        u32::try_from(image.height).ok()?,
+    );
+    if u64::from(width) * u64::from(height) > MAX_IMAGE_PIXELS {
+        return None;
+    }
+    let buffer = image::RgbaImage::from_raw(width, height, image.bytes.into_owned())?;
+    let mut png = Vec::new();
+    buffer
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .ok()?;
+    (png.len() <= MAX_IMAGE_BYTES).then_some(Content::Image { png, width, height })
+}
 
 /// Run a helper program with fixed arguments. Never pass user text here.
 fn run(program: &str, args: &[&str]) -> Result<()> {

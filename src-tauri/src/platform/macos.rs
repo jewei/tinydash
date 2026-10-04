@@ -18,7 +18,7 @@ use objc2_foundation::{NSDictionary, NSPoint, NSRect, NSSize, NSString};
 use super::SECRET_FORMATS;
 use crate::{
     error::{Error, Result},
-    features::{apps::App, system::SystemCommand},
+    features::{apps::App, clipboard::Content, system::SystemCommand},
 };
 
 pub const FILE_MANAGER: &str = "Finder";
@@ -47,7 +47,11 @@ pub fn discover_apps() -> Vec<App> {
         let mut walker = walkdir::WalkDir::new(folder)
             .max_depth(APP_DEPTH)
             .into_iter();
-        while let Some(Ok(entry)) = walker.next() {
+        while let Some(entry) = walker.next() {
+            // An unreadable folder is an error entry; skip it and keep walking.
+            let Ok(entry) = entry else {
+                continue;
+            };
             let name = entry.file_name().to_string_lossy();
             let is_dir = entry.file_type().is_dir();
             if entry.depth() > 0 && name.starts_with('.') {
@@ -217,7 +221,7 @@ pub fn clipboard_change() -> u64 {
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
-pub fn clipboard_is_concealed() -> bool {
+fn clipboard_is_concealed() -> bool {
     autoreleasepool(|_| {
         let marked = NSPasteboard::generalPasteboard()
             .types()
@@ -235,7 +239,62 @@ pub fn clipboard_is_concealed() -> bool {
 }
 
 /// macOS needs no change notifications: `clipboard_change` is a cheap counter.
+/// The clipboard content for the latest change, or `None` when its source
+/// marked it secret.
+pub fn read_clipboard(
+    reader: &mut arboard::Clipboard,
+    images: bool,
+    files: bool,
+) -> Option<Content> {
+    if clipboard_is_concealed() {
+        return None;
+    }
+    super::read_with_arboard(reader, images, files)
+}
+
+/// Marks a copy so clipboard managers skip it (`org.nspasteboard.ConcealedType`).
+pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
+    arboard::SetExtApple::exclude_from_history(set)
+}
+
 pub fn watch_clipboard() {}
+
+/// Center the launcher on the screen with the pointer, in points.
+///
+/// Tauri reports positions in physical pixels, but on macOS each value uses a
+/// different scale: the cursor uses the primary display's, each monitor its
+/// own. Converting everything to points makes mixed-DPI setups agree.
+pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    let primary_scale = app
+        .primary_monitor()?
+        .map_or(1.0, |monitor| monitor.scale_factor());
+    let cursor = app.cursor_position()?;
+    let (x, y) = (cursor.x / primary_scale, cursor.y / primary_scale);
+    let monitors = app.available_monitors()?;
+    let Some(monitor) = monitors.iter().find(|monitor| {
+        let scale = monitor.scale_factor();
+        let (position, size) = (monitor.position(), monitor.size());
+        let (left, top) = (f64::from(position.x) / scale, f64::from(position.y) / scale);
+        let (width, height) = (
+            f64::from(size.width) / scale,
+            f64::from(size.height) / scale,
+        );
+        (left..left + width).contains(&x) && (top..top + height).contains(&y)
+    }) else {
+        return Ok(());
+    };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let size = window
+        .outer_size()?
+        .to_logical::<f64>(window.scale_factor()?);
+    let free_width = (f64::from(area.size.width) / scale - size.width).max(0.0);
+    let free_height = (f64::from(area.size.height) / scale - size.height).max(0.0);
+    window.set_position(tauri::LogicalPosition::new(
+        f64::from(area.position.x) / scale + free_width / 2.0,
+        f64::from(area.position.y) / scale + free_height / 5.0,
+    ))
+}
 
 /// Open on the active Space, even over a full-screen app.
 pub fn prepare_launcher(window: &tauri::WebviewWindow) {
@@ -258,10 +317,10 @@ pub fn remember_frontmost_app() {
     let Some(app) = NSWorkspace::sharedWorkspace().frontmostApplication() else {
         return;
     };
-    // Reopening while TinyDash is in front keeps the original app.
-    if app != NSRunningApplication::currentApplication() {
-        *PREVIOUS_APP.lock().unwrap_or_else(|e| e.into_inner()) = Some(app);
-    }
+    // When TinyDash itself is in front (for example, Settings), Escape should
+    // leave focus there, not jump to an app from an earlier session.
+    let previous = (app != NSRunningApplication::currentApplication()).then_some(app);
+    *PREVIOUS_APP.lock().unwrap_or_else(|e| e.into_inner()) = previous;
 }
 
 /// Hand focus back to the app that was in front before the launcher opened.

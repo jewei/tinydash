@@ -1,15 +1,12 @@
 //! The launcher and Settings windows.
 
-use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
-};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
 use crate::{
     error::{Error, Result},
-    events::{self, LauncherShown},
-    platform, refresh,
+    events, platform, refresh,
     search::Category,
+    shortcut,
     state::State,
 };
 
@@ -26,12 +23,13 @@ fn launcher(app: &AppHandle) -> Result<WebviewWindow> {
 pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
     let window = launcher(app)?;
     platform::remember_frontmost_app();
-    if let Err(error) = place_on_active_screen(app, &window) {
+    if let Err(error) = platform::place_launcher(app, &window) {
         tracing::debug!(%error, "Could not place the launcher");
     }
+    // Reset the view before it becomes visible, so the old query never flashes.
+    events::launcher_shown(app, category);
     window.show()?;
     window.set_focus()?;
-    app.emit_to(LAUNCHER, events::LAUNCHER_SHOWN, LauncherShown { category })?;
     refresh::on_launcher_shown(app);
     Ok(())
 }
@@ -61,25 +59,6 @@ pub fn toggle(app: &AppHandle) -> Result<()> {
     }
 }
 
-/// Horizontally centered, a fifth of the way down the work area.
-fn place_on_active_screen(app: &AppHandle, window: &WebviewWindow) -> Result<()> {
-    let cursor = app.cursor_position()?;
-    let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y)? else {
-        return Ok(());
-    };
-    let area = monitor.work_area();
-    let size = window.outer_size()?;
-    let free_width = i64::from(area.size.width.saturating_sub(size.width));
-    let free_height = i64::from(area.size.height.saturating_sub(size.height));
-    let x = i64::from(area.position.x) + free_width / 2;
-    let y = i64::from(area.position.y) + free_height / 5;
-    window.set_position(PhysicalPosition::new(
-        i32::try_from(x).unwrap_or(area.position.x),
-        i32::try_from(y).unwrap_or(area.position.y),
-    ))?;
-    Ok(())
-}
-
 pub fn open_settings(app: &AppHandle) -> Result<()> {
     hide(app)?;
     if let Some(window) = app.get_webview_window(SETTINGS) {
@@ -100,10 +79,16 @@ pub fn open_settings(app: &AppHandle) -> Result<()> {
 }
 
 pub fn on_event(window: &tauri::Window, event: &WindowEvent) {
-    if window.label() != LAUNCHER {
+    let app = window.app_handle();
+    if window.label() == SETTINGS {
+        // Settings may close while it records a shortcut; turn it back on.
+        if let WindowEvent::Destroyed = event
+            && let Err(error) = shortcut::pause(app, false)
+        {
+            tracing::warn!(%error, "Could not restore the shortcut");
+        }
         return;
     }
-    let app = window.app_handle();
     let result = match event {
         // The launcher stays resident: closing only hides it.
         WindowEvent::CloseRequested { api, .. } => {

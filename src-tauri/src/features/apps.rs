@@ -6,13 +6,13 @@ use unicode_normalization::UnicodeNormalization;
 use std::path::Path;
 
 use crate::{
-    actions::Action,
     features::files,
     platform,
     search::{
         Context,
+        id::Source,
         matcher::Matcher,
-        result::{Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
+        result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
         top,
     },
 };
@@ -89,7 +89,7 @@ impl AppIndex {
 }
 
 fn id(app: &App) -> String {
-    format!("app:{}", app.path)
+    Source::App.id(&app.path)
 }
 
 fn result(app: &App, ctx: &Context) -> SearchResult {

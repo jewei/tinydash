@@ -6,84 +6,19 @@
 
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
-use ts_rs::TS;
 
 use crate::{
     error::{Error, Result},
     events,
-    features::{
-        library::{self, Target},
-        system::SystemCommand,
-    },
+    features::library::{self, Target},
     platform, refresh,
+    search::{self, Context, id::Source, result::Action},
     state::State,
     system_clipboard, window,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(
-    tag = "type",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-#[ts(export)]
-pub enum Action {
-    /// Start an indexed application.
-    Launch {
-        path: String,
-    },
-    /// Open an indexed or pinned file with its default app.
-    Open {
-        path: String,
-    },
-    /// Show a file or app in the file manager.
-    Reveal {
-        path: String,
-    },
-    /// Open an http(s) URL in the browser.
-    OpenUrl {
-        url: String,
-    },
-    Copy {
-        text: String,
-    },
-    /// Copy text marked secret, so clipboard managers skip it.
-    CopySecret {
-        text: String,
-    },
-    /// Copy a clipboard history entry in its original format.
-    CopyClip {
-        id: i64,
-    },
-    DeleteClip {
-        id: i64,
-    },
-    /// Delete every unpinned clipboard history entry.
-    ClearClipboard,
-    /// Copy a snippet with its placeholders filled.
-    CopySnippet {
-        id: i64,
-    },
-    OpenQuicklink {
-        id: i64,
-        query: String,
-    },
-    System {
-        command: SystemCommand,
-    },
-    Pin {
-        id: String,
-    },
-    Unpin {
-        id: String,
-    },
-    /// Rescan apps and files and download exchange rates now.
-    Refresh,
-    OpenSettings,
-    Quit,
-}
+const MAX_PINS: usize = 100;
 
 /// Run an action. `result_id` identifies the result it came from, for usage ranking.
 pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<()> {
@@ -107,16 +42,15 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             window::hide(app)?;
         }
         Action::Open { path } => {
-            let id = format!("file:{path}");
-            if !state.files.get().contains(&path) && !state.pins.get().contains(&id) {
+            if !state.files.get().contains(&path) {
                 return Err(Error::msg("This file is not in the index."));
             }
             open_path(Path::new(&path))?;
             window::hide(app)?;
         }
         Action::Reveal { path } => {
-            if !Path::new(&path).exists() {
-                return Err(Error::msg(format!("{path} no longer exists.")));
+            if !state.apps.get().contains(&path) && !state.files.get().contains(&path) {
+                return Err(Error::msg("This item is not in the index."));
             }
             tauri_plugin_opener::reveal_item_in_dir(&path)
                 .map_err(|e| Error::msg(e.to_string()))?;
@@ -148,7 +82,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         }
         Action::DeleteClip { id } => {
             state.store.delete_clip(id)?;
-            state.pins.update(|pins| pins.remove(&format!("clip:{id}")));
+            state.pins.update(|pins| pins.remove(&Source::Clip.id(id)));
             state.reload_clipboard()?;
         }
         Action::ClearClipboard => {
@@ -184,6 +118,14 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             platform::run_system_command(command)?;
         }
         Action::Pin { id } => {
+            // Only items that exist can be pinned, so a pin never widens
+            // what Open and Reveal accept.
+            if search::resolve(&state.snapshot(), &Context::none(), &id).is_none() {
+                return Err(Error::msg("This item no longer exists."));
+            }
+            if state.pins.get().ids().len() >= MAX_PINS {
+                return Err(Error::msg(format!("You can pin up to {MAX_PINS} items.")));
+            }
             state.store.set_pinned(&id, true)?;
             state.pins.update(|pins| pins.add(&id));
         }
@@ -199,7 +141,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         Action::OpenSettings => window::open_settings(app)?,
         Action::Quit => app.exit(0),
     }
-    if counts_as_use && let Some(id) = result_id.filter(|id| tracks_usage(id)) {
+    if counts_as_use && let Some(id) = result_id.filter(|id| learns_from_use(id)) {
         record_use(&state, id);
     }
     events::results_stale(app);
@@ -220,10 +162,8 @@ fn open_path(path: &Path) -> Result<()> {
 }
 
 /// Results with stable IDs learn from use; computed answers do not.
-fn tracks_usage(id: &str) -> bool {
-    ["app:", "file:", "emoji:", "snippet:", "link:", "system:"]
-        .iter()
-        .any(|prefix| id.starts_with(prefix))
+fn learns_from_use(id: &str) -> bool {
+    Source::parse(id).is_some_and(|(source, _)| source.learns_from_use())
 }
 
 fn record_use(state: &State, id: &str) {
@@ -240,10 +180,10 @@ mod tests {
 
     #[test]
     fn only_stable_results_learn_from_use() {
-        assert!(tracks_usage("app:/Applications/Safari.app"));
-        assert!(tracks_usage("emoji:🚀"));
-        assert!(!tracks_usage("calc:1+1"));
-        assert!(!tracks_usage("clip:3"));
-        assert!(!tracks_usage("password:Pin:6"));
+        assert!(learns_from_use("app:/Applications/Safari.app"));
+        assert!(learns_from_use("emoji:🚀"));
+        assert!(!learns_from_use("calc:1+1"));
+        assert!(!learns_from_use("clip:3"));
+        assert!(!learns_from_use("password:Pin:6"));
     }
 }

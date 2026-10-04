@@ -1,6 +1,7 @@
-//! Turns a query into ranked results. Everything here is pure: it reads a
-//! [`Snapshot`] of the indexes and never touches Tauri, the database, or the OS.
+//! Turns a query into ranked results. It reads a [`Snapshot`] of the indexes
+//! and never touches Tauri, the database, or the clipboard.
 
+pub mod id;
 pub mod matcher;
 pub mod result;
 pub mod usage;
@@ -15,16 +16,15 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::{
-    actions::Action,
     features::{
         apps::AppIndex, calculator, clipboard::ClipboardHistory, currency::Rates, datetime,
-        emoji::EmojiIndex, files, files::FileIndex, library::Library, password, system,
-        url_cleaner, web,
+        emoji::EmojiIndex, files::FileIndex, library::Library, password, system, url_cleaner, web,
     },
     settings::Settings,
 };
+use id::Source;
 use matcher::{Matcher, STRONG};
-use result::{ResultAction, Scored, SearchResult};
+use result::{Action, ResultAction, ResultKind, Scored, SearchResult};
 use usage::{Pins, Usage};
 
 /// Results in All. Instant answers and the web fallback count toward it.
@@ -69,20 +69,6 @@ impl Category {
             Self::Emoji => "emoji",
             Self::System => "system",
         }
-    }
-
-    /// The category that owns a result ID, from its prefix.
-    fn of(id: &str) -> Option<Self> {
-        let prefix = id.split_once(':')?.0;
-        Some(match prefix {
-            "app" => Self::Apps,
-            "file" => Self::Files,
-            "clip" => Self::Clipboard,
-            "snippet" | "link" => Self::Snippets,
-            "emoji" => Self::Emoji,
-            "system" => Self::System,
-            _ => return None,
-        })
     }
 }
 
@@ -172,7 +158,10 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
         .pins
         .ids()
         .iter()
-        .filter(|id| category == Category::All || Category::of(id) == Some(category))
+        .filter(|id| {
+            category == Category::All
+                || Source::parse(id).is_some_and(|(source, _)| source.category() == category)
+        })
         .filter_map(|id| resolve(s, ctx, id))
         .collect();
     let rest = match category {
@@ -180,7 +169,9 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
             .usage
             .ranked(ctx.now)
             .into_iter()
-            .filter(|id| !ctx.pinned(id) && suggestible(id))
+            .filter(|id| {
+                !ctx.pinned(id) && Source::parse(id).is_some_and(|(source, _)| source.suggestible())
+            })
             .filter_map(|id| resolve(s, ctx, id))
             .take(SUGGESTIONS)
             .collect(),
@@ -189,8 +180,9 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
             .usage
             .ranked(ctx.now)
             .into_iter()
-            .filter(|id| id.starts_with("file:"))
+            .filter(|id| Source::parse(id).is_some_and(|(source, _)| source == Source::File))
             .filter_map(|id| resolve(s, ctx, id))
+            .take(CATEGORY_LIMIT)
             .collect(),
         Category::Clipboard => s.clipboard.browse(ctx),
         Category::Snippets => s.library.browse(ctx),
@@ -202,23 +194,17 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
     results
 }
 
-/// Suggestions skip clipboard text and system commands: neither should be
-/// one keystroke away just because it was used before.
-fn suggestible(id: &str) -> bool {
-    !id.starts_with("clip:") && !id.starts_with("system:")
-}
-
-/// Rebuild the current result for a pinned or used ID.
-fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
-    let (prefix, key) = id.split_once(':')?;
-    match prefix {
-        "app" => s.apps.get(key, ctx),
-        "file" => files::result_for_path(key, ctx),
-        "clip" => s.clipboard.get(key.parse().ok()?, ctx),
-        "snippet" | "link" => s.library.get(id, ctx),
-        "emoji" => s.emoji.get(key, ctx),
-        "system" => system::get(id, ctx),
-        _ => None,
+/// Rebuild the current result for a pinned or used ID, or `None` when the
+/// item is gone.
+pub fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
+    let (source, key) = Source::parse(id)?;
+    match source {
+        Source::App => s.apps.get(key, ctx),
+        Source::File => s.files.get(key, ctx),
+        Source::Clip => s.clipboard.get(key.parse().ok()?, ctx),
+        Source::Snippet | Source::Link => s.library.get(key.parse().ok()?, ctx),
+        Source::Emoji => s.emoji.get(key, ctx),
+        Source::System => system::get(key, ctx),
     }
 }
 
@@ -227,7 +213,7 @@ fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
 /// so that, for example, an app named like the query beats an emoji code.
 fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
     let mut results = answers(s, query);
-    let keyword_search = results.iter().any(|r| r.id.starts_with("web:"));
+    let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
 
     let sources = [
         s.apps.search(matcher, ctx, ALL_LIMIT),
@@ -292,12 +278,5 @@ mod tests {
         let hits = vec![(1, 'a'), (5, 'b'), (3, 'c'), (4, 'd')];
         assert_eq!(top(hits, 2), [(5, 'b'), (4, 'd')]);
         assert_eq!(top(vec![(1, 'a')], 5), [(1, 'a')]);
-    }
-
-    #[test]
-    fn ids_map_to_their_category() {
-        assert_eq!(Category::of("app:/A.app"), Some(Category::Apps));
-        assert_eq!(Category::of("link:3"), Some(Category::Snippets));
-        assert_eq!(Category::of("calc:1+1"), None);
     }
 }

@@ -3,16 +3,11 @@
 
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
-use ts_rs::TS;
-
-use crate::{
-    actions::Action,
-    search::{
-        Context,
-        matcher::Matcher,
-        result::{Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
-    },
+use crate::search::{
+    Context,
+    id::Source,
+    matcher::{Matcher, normalize},
+    result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
 };
 
 /// Longer text is not saved. Very large copies are usually data, not snippets.
@@ -25,9 +20,7 @@ pub const MAX_FILES: usize = 64;
 /// Most unpinned images kept, whatever the history limit.
 pub const MAX_IMAGES: usize = 32;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClipKind {
     Text,
     Image,
@@ -136,10 +129,23 @@ pub struct Entry {
     pub id: i64,
     pub kind: ClipKind,
     pub title: String,
-    /// Lowercased title and content (text, or file paths) for search.
-    pub haystack: String,
+    /// Title and content (text, or file paths) in the form matching compares.
+    haystack: String,
     /// Unix seconds of the last copy.
     pub copied_at: i64,
+}
+
+impl Entry {
+    /// `searchable` is the text or the file paths, not the stored form.
+    pub fn new(id: i64, kind: ClipKind, title: String, searchable: &str, copied_at: i64) -> Self {
+        Self {
+            haystack: normalize(&format!("{title}\n{searchable}")),
+            id,
+            kind,
+            title,
+            copied_at,
+        }
+    }
 }
 
 /// Saved entries, newest first.
@@ -185,7 +191,7 @@ impl ClipboardHistory {
 }
 
 fn result(entry: &Entry, ctx: &Context) -> SearchResult {
-    let id = format!("clip:{}", entry.id);
+    let id = Source::Clip.id(entry.id);
     let (label, symbol) = match entry.kind {
         ClipKind::Text => ("Text", Symbol::Text),
         ClipKind::Image => ("Image", Symbol::Image),
@@ -222,13 +228,7 @@ mod tests {
 
     fn entry(id: i64, text: &str) -> Entry {
         let content = Content::Text(text.into());
-        Entry {
-            id,
-            kind: content.kind(),
-            title: content.title(),
-            haystack: format!("{}\n{text}", content.title()).to_lowercase(),
-            copied_at: 0,
-        }
+        Entry::new(id, content.kind(), content.title(), text, 0)
     }
 
     #[test]

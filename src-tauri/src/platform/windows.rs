@@ -17,7 +17,7 @@ use windows_sys::Win32::{
 use super::SECRET_FORMATS;
 use crate::{
     error::{Error, Result},
-    features::{apps::App, system::SystemCommand},
+    features::{apps::App, clipboard::Content, system::SystemCommand},
 };
 
 pub const FILE_MANAGER: &str = "File Explorer";
@@ -44,7 +44,7 @@ pub fn discover_apps() -> Vec<App> {
         for entry in walker.flatten() {
             let path = entry.path();
             let is_app = path.extension().is_some_and(|ext| {
-                ["lnk", "exe", "appref-ms"]
+                ["lnk", "url", "exe", "appref-ms"]
                     .iter()
                     .any(|allowed| ext.eq_ignore_ascii_case(allowed))
             });
@@ -83,34 +83,40 @@ pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
 }
 
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
+    let failed = |what: &str| {
+        Error::msg(format!(
+            "Windows could not {what}: {}",
+            std::io::Error::last_os_error()
+        ))
+    };
     // SAFETY: These Win32 calls take no pointers except the documented null
     // window handle and root path, meaning "no owner" and "all drives".
-    let succeeded = unsafe {
+    unsafe {
         match command {
-            SystemCommand::Lock => LockWorkStation() != 0,
-            SystemCommand::Sleep => SetSuspendState(false, false, false),
+            SystemCommand::Lock if LockWorkStation() == 0 => Err(failed("lock the screen")),
+            SystemCommand::Sleep if !SetSuspendState(false, false, false) => Err(failed("sleep")),
+            SystemCommand::Lock | SystemCommand::Sleep => Ok(()),
             SystemCommand::EmptyTrash => {
                 let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
                 let result = SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags);
                 // An already empty bin reports E_UNEXPECTED; that is not a failure.
-                result >= 0 || result == 0x8000_FFFF_u32 as i32
+                if result >= 0 || result == 0x8000_FFFF_u32 as i32 {
+                    Ok(())
+                } else {
+                    let error = std::io::Error::from_raw_os_error(result);
+                    Err(Error::msg(format!(
+                        "Windows could not empty the Recycle Bin: {error}"
+                    )))
+                }
             }
-            SystemCommand::Restart => return super::run("shutdown", &["/r", "/t", "0"]),
-            SystemCommand::ShutDown => return super::run("shutdown", &["/s", "/t", "0"]),
-            SystemCommand::LogOut => return super::run("shutdown", &["/l"]),
+            SystemCommand::Restart => super::run("shutdown", &["/r", "/t", "0"]),
+            SystemCommand::ShutDown => super::run("shutdown", &["/s", "/t", "0"]),
+            SystemCommand::LogOut => super::run("shutdown", &["/l"]),
             SystemCommand::OpenSystemSettings => {
-                return tauri_plugin_opener::open_url("ms-settings:", None::<&str>)
-                    .map_err(|error| Error::msg(error.to_string()));
+                tauri_plugin_opener::open_url("ms-settings:", None::<&str>)
+                    .map_err(|error| Error::msg(error.to_string()))
             }
         }
-    };
-    if succeeded {
-        Ok(())
-    } else {
-        Err(Error::msg(format!(
-            "Windows could not run the command: {}",
-            std::io::Error::last_os_error()
-        )))
     }
 }
 
@@ -121,7 +127,7 @@ pub fn clipboard_change() -> u64 {
 
 /// The source asked history tools to skip this copy, either with a marker
 /// format or with `CanIncludeInClipboardHistory` set to 0.
-pub fn clipboard_is_concealed() -> bool {
+fn clipboard_is_concealed() -> bool {
     let format = |name: &str| {
         let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
         // SAFETY: `wide` is a NUL-terminated UTF-16 string that outlives the call.
@@ -158,9 +164,31 @@ pub fn clipboard_is_concealed() -> bool {
 }
 
 /// Windows needs no change notifications: `clipboard_change` is a cheap counter.
+/// The clipboard content for the latest change, or `None` when its source
+/// marked it secret.
+pub fn read_clipboard(
+    reader: &mut arboard::Clipboard,
+    images: bool,
+    files: bool,
+) -> Option<Content> {
+    if clipboard_is_concealed() {
+        return None;
+    }
+    super::read_with_arboard(reader, images, files)
+}
+
+/// Marks a copy so clipboard managers skip it (`ExcludeClipboardContentFromMonitorProcessing`).
+pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
+    arboard::SetExtWindows::exclude_from_cloud(arboard::SetExtWindows::exclude_from_history(set))
+}
+
 pub fn watch_clipboard() {}
 
 /// Ask Windows 11 for rounded corners on the borderless launcher.
+pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    super::place_in_physical_pixels(app, window)
+}
+
 pub fn prepare_launcher(window: &tauri::WebviewWindow) {
     let Ok(hwnd) = window.hwnd() else {
         return;

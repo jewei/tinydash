@@ -1,7 +1,7 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::actions::Action;
+use crate::features::system::SystemCommand;
 
 /// One row in the launcher. Results carry their own actions, so the frontend
 /// renders them without knowing how each kind works.
@@ -110,4 +110,69 @@ impl ResultAction {
 pub struct Scored {
     pub score: u32,
     pub result: SearchResult,
+}
+
+/// What running a result does. Searches produce these; the frontend sends
+/// the chosen one back, and `actions::run` checks it again before it runs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(export)]
+pub enum Action {
+    /// Start an indexed application.
+    Launch {
+        path: String,
+    },
+    /// Open an indexed or pinned file with its default app.
+    Open {
+        path: String,
+    },
+    /// Show a file or app in the file manager.
+    Reveal {
+        path: String,
+    },
+    /// Open an http(s) URL in the browser.
+    OpenUrl {
+        url: String,
+    },
+    Copy {
+        text: String,
+    },
+    /// Copy text marked secret, so clipboard managers skip it.
+    CopySecret {
+        text: String,
+    },
+    /// Copy a clipboard history entry in its original format.
+    CopyClip {
+        id: i64,
+    },
+    DeleteClip {
+        id: i64,
+    },
+    /// Delete every unpinned clipboard history entry.
+    ClearClipboard,
+    /// Copy a snippet with its placeholders filled.
+    CopySnippet {
+        id: i64,
+    },
+    OpenQuicklink {
+        id: i64,
+        query: String,
+    },
+    System {
+        command: SystemCommand,
+    },
+    Pin {
+        id: String,
+    },
+    Unpin {
+        id: String,
+    },
+    /// Rescan apps and files and download exchange rates now.
+    Refresh,
+    OpenSettings,
+    Quit,
 }

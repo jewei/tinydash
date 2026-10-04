@@ -3,14 +3,12 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::{
-    actions::Action,
-    search::{
-        CATEGORY_LIMIT, Context,
-        matcher::Matcher,
-        result::{Icon, ResultAction, ResultKind, Scored, SearchResult},
-        top,
-    },
+use crate::search::{
+    CATEGORY_LIMIT, Context,
+    id::Source,
+    matcher::Matcher,
+    result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult},
+    top,
 };
 
 /// Extra keyword languages. English names and shortcodes are always on.
@@ -147,7 +145,7 @@ fn base(emoji: &'static emojis::Emoji) -> &'static emojis::Emoji {
 }
 
 fn id(emoji: &emojis::Emoji) -> String {
-    format!("emoji:{}", emoji.as_str())
+    Source::Emoji.id(emoji.as_str())
 }
 
 fn toned(emoji: &'static emojis::Emoji, tone: u8) -> &'static emojis::Emoji {
@@ -226,7 +224,7 @@ mod tests {
     fn localized_keywords_only_when_enabled() {
         assert!(
             EmojiIndex::default()
-                .search(&mut Matcher::new("火箭"), &ctx_default(), 5)
+                .search(&mut Matcher::new("火箭"), &Context::none(), 5)
                 .is_empty()
         );
         let index = EmojiIndex::new(&[EmojiLanguage::Zh, EmojiLanguage::Ms, EmojiLanguage::Es]);
@@ -245,16 +243,5 @@ mod tests {
                 glyph: "👋🏽".into()
             }
         );
-    }
-
-    fn ctx_default() -> Context<'static> {
-        static USAGE: std::sync::LazyLock<Usage> = std::sync::LazyLock::new(Usage::default);
-        static PINS: std::sync::LazyLock<Pins> = std::sync::LazyLock::new(Pins::default);
-        Context {
-            usage: &USAGE,
-            pins: &PINS,
-            now: 0,
-            skin_tone: 0,
-        }
     }
 }

@@ -3,6 +3,6 @@ import type { Category } from "./Category";
 
 export type LauncherShown = { 
 /**
- * Open this category with an empty query; `None` keeps the current one.
+ * Open this category with an empty query; `None` opens All.
  */
 category: Category | null, };

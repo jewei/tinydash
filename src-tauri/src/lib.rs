@@ -11,6 +11,7 @@ mod features;
 mod images;
 mod monitor;
 mod platform;
+mod preview;
 mod refresh;
 mod search;
 mod settings;
@@ -26,7 +27,7 @@ mod window;
 use tauri::{App, AppHandle, Manager};
 
 use cli::Launch;
-use state::State;
+use state::{Dirs, State};
 
 pub fn run() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -88,6 +89,9 @@ pub fn run() {
         .expect("TinyDash failed to start");
 }
 
+/// The database of TinyDash 0.1, which this version does not read.
+const LEGACY_DATABASE: &str = "tinydash.sqlite3";
+
 /// Load state and start background work. Problems become launcher warnings;
 /// only a missing app folder location stops startup.
 fn setup(app: &mut App) {
@@ -103,6 +107,12 @@ fn setup(app: &mut App) {
     let mut warnings = Vec::new();
     let (settings, warning) = settings::load(&config_dir);
     warnings.extend(warning);
+    if data_dir.join(LEGACY_DATABASE).exists() {
+        warnings.push(format!(
+            "This version starts with new history and pins. Data from TinyDash 0.1 is still in {}: delete {LEGACY_DATABASE} and recovery.tar there if you no longer need it.",
+            data_dir.display()
+        ));
+    }
     let store = store::Store::open(&data_dir).unwrap_or_else(|error| {
         warnings.push(format!(
             "Could not open saved data ({error}). Changes this session will not be saved."
@@ -114,7 +124,11 @@ fn setup(app: &mut App) {
     app.manage(State::new(
         settings,
         store,
-        [config_dir, data_dir, home_dir],
+        Dirs {
+            config: config_dir,
+            data: data_dir,
+            home: home_dir,
+        },
         warnings,
     ));
 

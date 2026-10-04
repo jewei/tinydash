@@ -10,16 +10,17 @@ use tauri_plugin_autostart::ManagerExt;
 use ts_rs::TS;
 
 use crate::{
-    actions::{self, Action},
+    actions,
     error::{Error, Result},
     events,
-    features::{
-        clipboard::Content,
-        emoji::EmojiIndex,
-        library::{LibraryItem, LibraryKind},
-    },
+    features::{emoji::EmojiIndex, library::LibraryItem},
+    preview::{self, Preview},
     refresh,
-    search::{self, Category, result::SearchResult},
+    search::{
+        self, Category,
+        id::Source,
+        result::{Action, SearchResult},
+    },
     settings::{self, Settings},
     shortcut,
     state::State,
@@ -52,35 +53,6 @@ const PLATFORM: Platform = if cfg!(target_os = "macos") {
 } else {
     Platform::Linux
 };
-
-/// Details for the preview pane, loaded when a result is selected.
-#[derive(Serialize, TS)]
-#[serde(
-    tag = "type",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-#[ts(export)]
-pub enum Preview {
-    Text {
-        text: String,
-    },
-    /// Load the pixels from `clip://localhost/<id>`.
-    Image {
-        id: i64,
-        width: u32,
-        height: u32,
-    },
-    Files {
-        paths: Vec<String>,
-    },
-    File {
-        path: String,
-        size: u64,
-        modified: Option<i64>,
-        is_dir: bool,
-    },
-}
 
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -128,44 +100,7 @@ pub async fn run_action(app: AppHandle, action: Action, result_id: Option<String
 
 #[tauri::command]
 pub async fn preview(app: AppHandle, id: String) -> Result<Option<Preview>> {
-    blocking(move || {
-        let state = app.state::<State>();
-        let Some((prefix, key)) = id.split_once(':') else {
-            return Ok(None);
-        };
-        Ok(match prefix {
-            "clip" => {
-                let Ok(id) = key.parse() else { return Ok(None) };
-                state.store.clip(id)?.map(|content| match content {
-                    Content::Text(text) => Preview::Text { text },
-                    Content::Image { width, height, .. } => Preview::Image { id, width, height },
-                    Content::Files(paths) => Preview::Files {
-                        paths: paths.iter().map(|p| p.display().to_string()).collect(),
-                    },
-                })
-            }
-            "file" | "app" => std::fs::symlink_metadata(key)
-                .ok()
-                .map(|metadata| Preview::File {
-                    path: key.into(),
-                    size: metadata.len(),
-                    modified: metadata
-                        .modified()
-                        .ok()
-                        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
-                        .and_then(|age| i64::try_from(age.as_secs()).ok()),
-                    is_dir: metadata.is_dir(),
-                }),
-            "snippet" => key
-                .parse()
-                .ok()
-                .and_then(|id| state.library.get().find(id).cloned())
-                .filter(|item| item.kind == LibraryKind::Snippet)
-                .map(|item| Preview::Text { text: item.text }),
-            _ => None,
-        })
-    })
-    .await
+    blocking(move || preview::load(&app.state::<State>(), &id)).await
 }
 
 #[tauri::command]
@@ -178,37 +113,23 @@ pub fn get_settings(state: tauri::State<State>) -> Settings {
     Settings::clone(&state.settings.get())
 }
 
-/// Validate, apply, and save new settings. If any part cannot apply, the
-/// previous settings stay in effect and the error explains why.
+/// Validate, apply, and save new settings. Either everything applies, or
+/// the previous settings stay in effect and the error explains why.
 #[tauri::command]
 pub async fn update_settings(app: AppHandle, settings: Settings) -> Result<Settings> {
     blocking(move || {
         let state = app.state::<State>();
         let new = settings.normalized();
         let old = state.settings.get();
-        if new.shortcut != old.shortcut
-            && let Err(error) = shortcut::register(&app, &new.shortcut)
-        {
-            shortcut::register(&app, &old.shortcut).ok();
+        let applied = apply_to_system(&app, &old, &new)
+            .and_then(|()| settings::save(&state.config_dir, &new));
+        if let Err(error) = applied {
+            // Undo whatever part did apply; the original error is the one to show.
+            apply_to_system(&app, &new, &old).ok();
             return Err(error);
         }
-        if new.launch_at_login != old.launch_at_login {
-            let autostart = app.autolaunch();
-            let toggled = if new.launch_at_login {
-                autostart.enable()
-            } else {
-                autostart.disable()
-            };
-            toggled.map_err(|error| {
-                Error::msg(format!("Could not change launch at login: {error}"))
-            })?;
-        }
-        settings::save(&state.config_dir, &new)?;
         state.settings.set(new.clone());
 
-        if new.show_tray_icon != old.show_tray_icon {
-            tray::set_visible(&app, new.show_tray_icon)?;
-        }
         if new.emoji_languages != old.emoji_languages {
             state.emoji.set(EmojiIndex::new(&new.emoji_languages));
         }
@@ -228,6 +149,26 @@ pub async fn update_settings(app: AppHandle, settings: Settings) -> Result<Setti
     .await
 }
 
+/// The settings that change the OS: shortcut, login item, and tray icon.
+fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()> {
+    if to.shortcut != from.shortcut {
+        shortcut::register(app, &to.shortcut)?;
+    }
+    if to.launch_at_login != from.launch_at_login {
+        let autostart = app.autolaunch();
+        let toggled = if to.launch_at_login {
+            autostart.enable()
+        } else {
+            autostart.disable()
+        };
+        toggled.map_err(|error| Error::msg(format!("Could not change open at login: {error}")))?;
+    }
+    if to.show_tray_icon != from.show_tray_icon {
+        tray::set_visible(app, to.show_tray_icon)?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn pause_shortcut(app: AppHandle, paused: bool) -> Result<()> {
     shortcut::pause(&app, paused)
@@ -239,28 +180,34 @@ pub fn library_items(state: tauri::State<State>) -> Vec<LibraryItem> {
 }
 
 #[tauri::command]
-pub fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<LibraryItem> {
-    let state = app.state::<State>();
-    let saved = state.store.save_library_item(&item.validated()?)?;
-    state.reload_library()?;
-    events::results_stale(&app);
-    Ok(saved)
+pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<LibraryItem> {
+    blocking(move || {
+        let state = app.state::<State>();
+        let saved = state.store.save_library_item(&item.validated()?)?;
+        state.reload_library()?;
+        events::results_stale(&app);
+        Ok(saved)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
-    let state = app.state::<State>();
-    state.store.delete_library_item(id)?;
-    let ids = [format!("snippet:{id}"), format!("link:{id}")];
-    state
-        .pins
-        .update(|pins| ids.iter().for_each(|id| pins.remove(id)));
-    state
-        .usage
-        .update(|usage| ids.iter().for_each(|id| usage.remove(id)));
-    state.reload_library()?;
-    events::results_stale(&app);
-    Ok(())
+pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
+    blocking(move || {
+        let state = app.state::<State>();
+        state.store.delete_library_item(id)?;
+        let ids = [Source::Snippet.id(id), Source::Link.id(id)];
+        state
+            .pins
+            .update(|pins| ids.iter().for_each(|id| pins.remove(id)));
+        state
+            .usage
+            .update(|usage| ids.iter().for_each(|id| usage.remove(id)));
+        state.reload_library()?;
+        events::results_stale(&app);
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]

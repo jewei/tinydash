@@ -29,9 +29,16 @@ fn create(app: &AppHandle) -> Result<()> {
             &MenuItem::with_id(app, "quit", "Quit TinyDash", true, None::<&str>)?,
         ],
     )?;
+    // macOS tints a black template image for the menu bar; other desktops
+    // show icons as drawn, so they get the colored app icon.
+    let template = cfg!(target_os = "macos");
+    let icon = match app.default_window_icon() {
+        Some(icon) if !template => icon.clone(),
+        _ => template_icon(),
+    };
     TrayIconBuilder::with_id(ID)
-        .icon(icon())
-        .icon_as_template(true)
+        .icon(icon)
+        .icon_as_template(template)
         .tooltip("TinyDash")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -64,8 +71,8 @@ fn create(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// Two short dashes, drawn as a 36 px template image so the OS tints it.
-fn icon() -> Image<'static> {
+/// Two short dashes, drawn as a 36 px template image so macOS tints it.
+fn template_icon() -> Image<'static> {
     const SIZE: usize = 36;
     let mut rgba = vec![0_u8; SIZE * SIZE * 4];
     let dashes = [(6..26, 11..17), (12..32, 20..26)];

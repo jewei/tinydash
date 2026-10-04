@@ -1,6 +1,9 @@
 use std::{
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    sync::{
+        Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use gio::prelude::*;
@@ -8,7 +11,7 @@ use gio::prelude::*;
 use super::{SECRET_FORMATS, run};
 use crate::{
     error::{Error, Result},
-    features::{apps::App, system::SystemCommand},
+    features::{apps::App, clipboard::Content, system::SystemCommand},
 };
 
 pub const FILE_MANAGER: &str = "Files";
@@ -111,39 +114,67 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     }
 }
 
-/// Updated by the GTK owner-change handler, read by the clipboard monitor.
+/// Bumped on every owner change, before any request, so a callback can tell
+/// that a newer owner replaced the one it asked.
+static OWNER: AtomicU64 = AtomicU64::new(0);
+/// Bumped after a checked read finishes; the monitor watches this counter.
 static CHANGE: AtomicU64 = AtomicU64::new(0);
-static CONCEALED: AtomicBool = AtomicBool::new(false);
+/// Text from the last checked owner, waiting for the monitor.
+static CAPTURED: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn clipboard_change() -> u64 {
     CHANGE.load(Ordering::Acquire)
 }
 
-pub fn clipboard_is_concealed() -> bool {
-    CONCEALED.load(Ordering::Acquire)
+/// Text captured by the GTK handler for the latest change. Linux saves text
+/// only: GTK reads it in the same request chain that checked for secrets.
+pub fn read_clipboard(_: &mut arboard::Clipboard, _images: bool, _files: bool) -> Option<Content> {
+    CAPTURED
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take()
+        .map(Content::Text)
 }
 
-/// X11 has no change counter, so count GTK owner changes. Each change first
-/// checks the offered formats for a password-manager marker; the counter
-/// moves only after that check, so the monitor never reads unchecked content.
+/// X11 has no change counter, so watch GTK owner changes. For each owner,
+/// first check the offered formats for a password-manager marker, then read
+/// the text, and drop both replies if a newer owner appeared meanwhile.
 pub fn watch_clipboard() {
     use gtk::prelude::*;
     let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
     // gtk-rs 0.18 has no typed binding for this signal.
     clipboard.connect_local("owner-change", false, |_| {
+        let owner = OWNER.fetch_add(1, Ordering::AcqRel) + 1;
+        let current = move || OWNER.load(Ordering::Acquire) == owner;
         let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
         let targets = gtk::gdk::Atom::intern("TARGETS");
-        clipboard.request_contents(&targets, |_, selection| {
+        clipboard.request_contents(&targets, move |clipboard, selection| {
             let concealed = selection.targets().is_some_and(|targets| {
                 targets
                     .iter()
                     .any(|target| SECRET_FORMATS.contains(&target.name().as_str()))
             });
-            CONCEALED.store(concealed, Ordering::Release);
-            CHANGE.fetch_add(1, Ordering::AcqRel);
+            if !current() || concealed {
+                return;
+            }
+            clipboard.request_text(move |_, text| {
+                if current() {
+                    *CAPTURED.lock().unwrap_or_else(|e| e.into_inner()) = text.map(str::to_owned);
+                    CHANGE.fetch_add(1, Ordering::AcqRel);
+                }
+            });
         });
         None
     });
+}
+
+/// Marks a copy so clipboard managers skip it (`x-kde-passwordManagerHint`).
+pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
+    arboard::SetExtLinux::exclude_from_history(set)
+}
+
+pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    super::place_in_physical_pixels(app, window)
 }
 
 pub fn prepare_launcher(_window: &tauri::WebviewWindow) {}

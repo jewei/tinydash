@@ -12,17 +12,30 @@ pub struct Use {
 pub struct Usage(HashMap<String, Use>);
 
 const DAY: i64 = 86_400;
+/// Most result IDs whose usage is remembered, in memory and in the database.
+pub const MAX_USAGE: usize = 1000;
 
 impl Usage {
     pub fn new(entries: impl IntoIterator<Item = (String, Use)>) -> Self {
         Self(entries.into_iter().collect())
     }
 
+    /// Count one use. Past [`MAX_USAGE`] IDs, the least recently used goes.
     pub fn record(&mut self, id: &str, now: i64) -> Use {
         let entry = self.0.entry(id.to_owned()).or_default();
         entry.count = entry.count.saturating_add(1);
         entry.last_used = now;
-        *entry
+        let used = *entry;
+        if self.0.len() > MAX_USAGE
+            && let Some(oldest) = self
+                .0
+                .iter()
+                .min_by_key(|(id, entry)| (entry.last_used, *id))
+                .map(|(id, _)| id.clone())
+        {
+            self.0.remove(&oldest);
+        }
+        used
     }
 
     pub fn remove(&mut self, id: &str) {

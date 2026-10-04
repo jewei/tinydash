@@ -3,13 +3,11 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::{
-    actions::Action,
-    search::{
-        Context,
-        matcher::Matcher,
-        result::{Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
-    },
+use crate::search::{
+    Context,
+    id::Source,
+    matcher::Matcher,
+    result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
 };
 
 /// Commands the platform layer runs. See `platform::run_system_command`.
@@ -27,7 +25,8 @@ pub enum SystemCommand {
 }
 
 struct Command {
-    id: &'static str,
+    /// Stable key in the result ID `system:<key>`.
+    key: &'static str,
     name: &'static str,
     description: &'static str,
     aliases: &'static [&'static str],
@@ -49,7 +48,7 @@ const fn system(command: SystemCommand) -> Action {
 
 const COMMANDS: &[Command] = &[
     Command {
-        id: "system:lock",
+        key: "lock",
         name: "Lock Screen",
         description: "Lock this computer",
         aliases: &["lock"],
@@ -58,7 +57,7 @@ const COMMANDS: &[Command] = &[
         confirm: None,
     },
     Command {
-        id: "system:sleep",
+        key: "sleep",
         name: "Sleep",
         description: "Put the computer to sleep",
         aliases: &["suspend"],
@@ -67,7 +66,7 @@ const COMMANDS: &[Command] = &[
         confirm: Some("Put the computer to sleep?"),
     },
     Command {
-        id: "system:restart",
+        key: "restart",
         name: "Restart",
         description: "Restart the computer",
         aliases: &["reboot"],
@@ -76,7 +75,7 @@ const COMMANDS: &[Command] = &[
         confirm: Some("Restart the computer? Apps will be asked to quit."),
     },
     Command {
-        id: "system:shut-down",
+        key: "shut-down",
         name: "Shut Down",
         description: "Turn off the computer",
         aliases: &["shutdown", "power off", "turn off"],
@@ -85,7 +84,7 @@ const COMMANDS: &[Command] = &[
         confirm: Some("Shut down the computer? Apps will be asked to quit."),
     },
     Command {
-        id: "system:log-out",
+        key: "log-out",
         name: "Log Out",
         description: "End this session",
         aliases: &["logout", "sign out"],
@@ -94,7 +93,7 @@ const COMMANDS: &[Command] = &[
         confirm: Some("Log out? Apps will be asked to quit."),
     },
     Command {
-        id: "system:empty-trash",
+        key: "empty-trash",
         name: TRASH,
         description: "Permanently delete trashed items",
         aliases: &["empty trash", "empty recycle bin", "trash", "recycle bin"],
@@ -103,7 +102,16 @@ const COMMANDS: &[Command] = &[
         confirm: Some("Permanently delete everything in the trash? This cannot be undone."),
     },
     Command {
-        id: "system:settings",
+        key: "clear-clipboard",
+        name: "Clear Clipboard History",
+        description: "Delete every entry except pinned ones",
+        aliases: &["clear history", "delete clipboard"],
+        symbol: Symbol::Trash,
+        action: Action::ClearClipboard,
+        confirm: Some("Delete all clipboard history except pinned entries?"),
+    },
+    Command {
+        key: "settings",
         name: "System Settings",
         description: "Open the operating system settings",
         aliases: &["preferences", "control panel"],
@@ -112,7 +120,7 @@ const COMMANDS: &[Command] = &[
         confirm: None,
     },
     Command {
-        id: "system:tinydash-settings",
+        key: "tinydash-settings",
         name: "TinyDash Settings",
         description: "Shortcut, clipboard, files, and more",
         aliases: &["preferences", "configure"],
@@ -121,7 +129,7 @@ const COMMANDS: &[Command] = &[
         confirm: None,
     },
     Command {
-        id: "system:quit-tinydash",
+        key: "quit-tinydash",
         name: "Quit TinyDash",
         description: "Stop TinyDash until you open it again",
         aliases: &["exit"],
@@ -132,18 +140,19 @@ const COMMANDS: &[Command] = &[
 ];
 
 fn result(command: &Command, ctx: &Context) -> SearchResult {
+    let id = Source::System.id(command.key);
     let mut run = ResultAction::new(command.name, command.action.clone());
     run.confirm = command.confirm.map(String::from);
     SearchResult {
-        id: command.id.into(),
+        id: id.clone(),
         kind: ResultKind::System,
         title: command.name.into(),
         subtitle: command.description.into(),
         icon: Icon::Symbol {
             name: command.symbol,
         },
-        actions: vec![run, ctx.pin_action(command.id)],
-        pinned: ctx.pinned(command.id),
+        actions: vec![run, ctx.pin_action(&id)],
+        pinned: ctx.pinned(&id),
     }
 }
 
@@ -153,7 +162,7 @@ pub fn search(matcher: &mut Matcher, ctx: &Context) -> Vec<Scored> {
         .filter_map(|command| {
             let score = matcher.best(command.name, command.aliases.iter().copied())?;
             Some(Scored {
-                score: score + ctx.boost(command.id),
+                score: score + ctx.boost(&Source::System.id(command.key)),
                 result: result(command, ctx),
             })
         })
@@ -167,10 +176,10 @@ pub fn browse(ctx: &Context) -> Vec<SearchResult> {
         .collect()
 }
 
-pub fn get(id: &str, ctx: &Context) -> Option<SearchResult> {
+pub fn get(key: &str, ctx: &Context) -> Option<SearchResult> {
     COMMANDS
         .iter()
-        .find(|command| command.id == id)
+        .find(|command| command.key == key)
         .map(|command| result(command, ctx))
 }
 
@@ -208,9 +217,9 @@ mod tests {
             now: 0,
             skin_tone: 0,
         };
-        let confirmed = |id: &str| get(id, &ctx).unwrap().actions[0].confirm.is_some();
-        assert!(confirmed("system:shut-down"));
-        assert!(confirmed("system:empty-trash"));
-        assert!(!confirmed("system:lock"));
+        let confirmed = |key: &str| get(key, &ctx).unwrap().actions[0].confirm.is_some();
+        assert!(confirmed("shut-down"));
+        assert!(confirmed("empty-trash"));
+        assert!(!confirmed("lock"));
     }
 }

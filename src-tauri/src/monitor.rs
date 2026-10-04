@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Manager};
 
-use crate::{events, platform, state::State, system_clipboard};
+use crate::{events, platform, state::State};
 
 const INTERVAL: Duration = Duration::from_millis(500);
 
@@ -34,7 +34,7 @@ fn capture_forever(app: &AppHandle) {
         }
         seen = change;
         let settings = state.settings.get();
-        if !settings.clipboard_history_enabled || platform::clipboard_is_concealed() {
+        if !settings.clipboard_history_enabled {
             continue;
         }
         if reader.is_none() {
@@ -45,7 +45,7 @@ fn capture_forever(app: &AppHandle) {
         let Some(reader) = reader.as_mut() else {
             continue;
         };
-        let content = system_clipboard::read(
+        let content = platform::read_clipboard(
             reader,
             settings.clipboard_capture_images,
             settings.clipboard_capture_files,

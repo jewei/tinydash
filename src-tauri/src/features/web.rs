@@ -4,10 +4,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::{
-    actions::Action,
-    search::result::{Icon, ResultAction, ResultKind, SearchResult, Symbol},
-};
+use crate::search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol};
 
 /// The engine for the fallback search.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -115,10 +112,16 @@ fn result(engine: &Engine, text: &str) -> SearchResult {
     }
 }
 
-/// Replace `{query}` with the text, encoded as one URL query value.
+/// Replace `{query}` with the text, percent-encoded so it stays one value in
+/// a path or a query string (a space becomes `%20`, never `+`).
 pub fn fill(template: &str, text: &str) -> String {
-    let encoded: String = url::form_urlencoded::byte_serialize(text.as_bytes()).collect();
-    template.replace("{query}", &encoded)
+    use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+    const VALUE: &AsciiSet = &NON_ALPHANUMERIC
+        .remove(b'-')
+        .remove(b'.')
+        .remove(b'_')
+        .remove(b'~');
+    template.replace("{query}", &utf8_percent_encode(text, VALUE).to_string())
 }
 
 #[cfg(test)]
@@ -138,7 +141,7 @@ mod tests {
         assert_eq!(answer("gh  "), None);
         assert_eq!(
             opened(&answer("GH tauri app").unwrap()),
-            "https://github.com/search?q=tauri+app"
+            "https://github.com/search?q=tauri%20app"
         );
         assert_eq!(answer("ghostty settings"), None);
     }
@@ -147,7 +150,7 @@ mod tests {
     fn encodes_the_text_as_one_value() {
         assert_eq!(
             fill("https://x.test/?q={query}", "a&b=c 東京"),
-            "https://x.test/?q=a%26b%3Dc+%E6%9D%B1%E4%BA%AC"
+            "https://x.test/?q=a%26b%3Dc%20%E6%9D%B1%E4%BA%AC"
         );
         assert!(
             opened(&fallback("rust", SearchEngine::DuckDuckGo))

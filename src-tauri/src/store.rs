@@ -16,7 +16,10 @@ use crate::{
         currency::Rates,
         library::{LibraryItem, LibraryKind},
     },
-    search::usage::{Pins, Usage, Use},
+    search::{
+        id::Source,
+        usage::{MAX_USAGE, Pins, Usage, Use},
+    },
 };
 
 pub const FILE_NAME: &str = "tinydash.db";
@@ -80,7 +83,7 @@ impl Store {
 
     fn new(mut connection: Connection) -> Result<Self> {
         // Deleted clipboard rows are overwritten on disk, not just unlinked.
-        connection.execute_batch("PRAGMA secure_delete = ON; PRAGMA foreign_keys = ON;")?;
+        connection.execute_batch("PRAGMA secure_delete = ON;")?;
         connection.busy_timeout(std::time::Duration::from_secs(2))?;
         migrate(&mut connection)?;
         Ok(Self {
@@ -109,12 +112,18 @@ impl Store {
         })
     }
 
+    /// Save one result's usage, keeping only the most recently used rows.
     pub fn record_use(&self, id: &str, used: Use) -> Result<()> {
         self.with(|db| {
             db.execute(
                 "INSERT INTO usage (id, count, last_used) VALUES (?1, ?2, ?3)
                  ON CONFLICT (id) DO UPDATE SET count = ?2, last_used = ?3",
                 params![id, used.count, used.last_used],
+            )?;
+            db.execute(
+                "DELETE FROM usage WHERE id NOT IN
+                 (SELECT id FROM usage ORDER BY last_used DESC, id LIMIT ?1)",
+                [MAX_USAGE as i64],
             )
             .map(drop)
         })
@@ -150,15 +159,16 @@ impl Store {
                 "SELECT id, kind, title, content, copied_at FROM clipboard ORDER BY copied_at DESC, id DESC",
             )?;
             let rows = statement.query_map([], |row| {
-                let title: String = row.get(2)?;
+                let kind = kind_from_sql(&row.get::<_, String>(1)?)?;
                 let content: String = row.get(3)?;
-                Ok(Entry {
-                    id: row.get(0)?,
-                    kind: kind_from_sql(&row.get::<_, String>(1)?)?,
-                    haystack: format!("{title}\n{content}").to_lowercase(),
-                    title,
-                    copied_at: row.get(4)?,
-                })
+                // File lists are stored as JSON; search their plain paths.
+                let searchable = match kind {
+                    ClipKind::Files => serde_json::from_str::<Vec<String>>(&content)
+                        .map(|paths| paths.join("\n"))
+                        .unwrap_or(content),
+                    _ => content,
+                };
+                Ok(Entry::new(row.get(0)?, kind, row.get(2)?, &searchable, row.get(4)?))
             })?;
             rows.collect()
         })
@@ -249,7 +259,7 @@ impl Store {
         self.with(|db| {
             let transaction = db.transaction()?;
             transaction.execute("DELETE FROM clipboard WHERE id = ?1", [id])?;
-            transaction.execute("DELETE FROM pins WHERE id = ?1", [format!("clip:{id}")])?;
+            transaction.execute("DELETE FROM pins WHERE id = ?1", [Source::Clip.id(id)])?;
             transaction.commit()
         })
     }
@@ -272,8 +282,9 @@ impl Store {
                 Ok(LibraryItem {
                     id: Some(row.get(0)?),
                     kind: match row.get::<_, String>(1)?.as_str() {
+                        "snippet" => LibraryKind::Snippet,
                         "quicklink" => LibraryKind::Quicklink,
-                        _ => LibraryKind::Snippet,
+                        other => return Err(invalid_kind(1, other)),
                     },
                     name: row.get(2)?,
                     keyword: row.get(3)?,
@@ -316,11 +327,11 @@ impl Store {
             transaction.execute("DELETE FROM library WHERE id = ?1", [id])?;
             transaction.execute(
                 "DELETE FROM pins WHERE id IN (?1, ?2)",
-                [format!("snippet:{id}"), format!("link:{id}")],
+                [Source::Snippet.id(id), Source::Link.id(id)],
             )?;
             transaction.execute(
                 "DELETE FROM usage WHERE id IN (?1, ?2)",
-                [format!("snippet:{id}"), format!("link:{id}")],
+                [Source::Snippet.id(id), Source::Link.id(id)],
             )?;
             transaction.commit()
         })
@@ -381,12 +392,13 @@ fn kind_from_sql(kind: &str) -> rusqlite::Result<ClipKind> {
         "text" => Ok(ClipKind::Text),
         "image" => Ok(ClipKind::Image),
         "files" => Ok(ClipKind::Files),
-        other => Err(rusqlite::Error::InvalidColumnType(
-            1,
-            format!("clipboard kind {other}"),
-            rusqlite::types::Type::Text,
-        )),
+        other => Err(invalid_kind(1, other)),
     }
+}
+
+/// A kind column held a value this version does not know.
+fn invalid_kind(column: usize, kind: &str) -> rusqlite::Error {
+    rusqlite::Error::InvalidColumnType(column, format!("kind {kind}"), rusqlite::types::Type::Text)
 }
 
 /// Clipboard history can hold private text: keep the file owner-only.

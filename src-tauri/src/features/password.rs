@@ -5,10 +5,7 @@
 
 use std::sync::LazyLock;
 
-use crate::{
-    actions::Action,
-    search::result::{Icon, ResultAction, ResultKind, SearchResult, Symbol},
-};
+use crate::search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol};
 
 const LOWER: &str = "abcdefghijklmnopqrstuvwxyz";
 const UPPER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";

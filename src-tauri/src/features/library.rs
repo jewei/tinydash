@@ -12,13 +12,13 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::{
-    actions::Action,
     error::{Error, Result},
     features::web,
     search::{
         Context,
+        id::Source,
         matcher::Matcher,
-        result::{Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
+        result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
         top,
     },
 };
@@ -51,11 +51,11 @@ pub struct LibraryItem {
 
 impl LibraryItem {
     fn result_id(&self) -> String {
-        let prefix = match self.kind {
-            LibraryKind::Snippet => "snippet",
-            LibraryKind::Quicklink => "link",
+        let source = match self.kind {
+            LibraryKind::Snippet => Source::Snippet,
+            LibraryKind::Quicklink => Source::Link,
         };
-        format!("{prefix}:{}", self.id.unwrap_or_default())
+        source.id(self.id.unwrap_or_default())
     }
 
     /// Trim fields and reject items that could not work.
@@ -104,6 +104,10 @@ pub fn quicklink_target(template: &str, query: &str) -> Result<Target> {
         let url = web::fill(template, query);
         url::Url::parse(&url).map_err(|e| Error::msg(format!("Invalid quicklink URL: {e}")))?;
         return Ok(Target::Url(url));
+    }
+    // The query fills in a name; it must not climb out of the folder.
+    if query.contains(['/', '\\']) || query.split_whitespace().any(|part| part == "..") {
+        return Err(Error::msg("A path quicklink accepts a name, not a path."));
     }
     let path = template.replace("{query}", query);
     let path = match path.strip_prefix('~') {
@@ -186,11 +190,8 @@ impl Library {
             .collect()
     }
 
-    pub fn get(&self, result_id: &str, ctx: &Context) -> Option<SearchResult> {
-        self.items
-            .iter()
-            .find(|item| item.result_id() == result_id)
-            .map(|item| result(item, "", ctx))
+    pub fn get(&self, id: i64, ctx: &Context) -> Option<SearchResult> {
+        self.find(id).map(|item| result(item, "", ctx))
     }
 
     /// `keyword text` for a quicklink whose keyword is the first word.
@@ -305,13 +306,15 @@ mod tests {
                 .validated()
                 .is_ok()
         );
+        assert!(quicklink_target("~/Projects/{query}", "../../Downloads/x.app").is_err());
+        assert!(quicklink_target("~/Projects/{query}", "notes").is_ok());
     }
 
     #[test]
     fn fills_quicklinks_and_snippets() {
         assert_eq!(
             quicklink_target("https://x.test/?q={query}", "a b").unwrap(),
-            Target::Url("https://x.test/?q=a+b".into())
+            Target::Url("https://x.test/?q=a%20b".into())
         );
         let now = Local.with_ymd_and_hms(2026, 10, 4, 9, 5, 0).unwrap();
         assert_eq!(

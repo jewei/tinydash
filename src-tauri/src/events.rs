@@ -14,8 +14,18 @@ pub const SETTINGS_CHANGED: &str = "settings:changed";
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct LauncherShown {
-    /// Open this category with an empty query; `None` keeps the current one.
+    /// Open this category with an empty query; `None` opens All.
     pub category: Option<Category>,
+}
+
+pub fn launcher_shown(app: &AppHandle, category: Option<Category>) {
+    if let Err(error) = app.emit_to(
+        crate::window::LAUNCHER,
+        LAUNCHER_SHOWN,
+        LauncherShown { category },
+    ) {
+        tracing::debug!(%error, "The launcher did not receive the show event");
+    }
 }
 
 /// Indexed data changed; the launcher should run its search again.

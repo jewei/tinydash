@@ -12,15 +12,12 @@ use chrono::{
 };
 use chrono_tz::Tz;
 
-use crate::{
-    actions::Action,
-    search::result::{Icon, ResultAction, ResultKind, SearchResult, Symbol},
-};
+use crate::search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol};
 
 pub fn answers(query: &str, now: DateTime<Local>) -> Vec<SearchResult> {
     let query = query.trim().to_lowercase();
-    if let Some(place) = current_time_place(&query) {
-        return current_time(place, now).into_iter().collect();
+    if let Some(answer) = current_time_place(&query).and_then(|place| current_time(place, now)) {
+        return vec![answer];
     }
     if let Some(answers) = conversion(&query, now) {
         return answers;
@@ -158,7 +155,11 @@ static CITIES: LazyLock<HashMap<String, Tz>> = LazyLock::new(|| {
     let mut cities = HashMap::new();
     for tz in chrono_tz::TZ_VARIANTS {
         let name = tz.name().to_lowercase();
-        if let Some(city) = name.rsplit('/').next() {
+        // `Etc/GMT+5` is UTC−5 (POSIX signs), so `gmt+5` must not find it by
+        // its last part. The full name still works.
+        if !name.starts_with("etc/")
+            && let Some(city) = name.rsplit('/').next()
+        {
             cities.entry(city.replace('_', " ")).or_insert(tz);
         }
         cities.insert(name, tz);
@@ -522,6 +523,19 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[test]
+    fn a_trailing_time_word_still_converts() {
+        let results = conversion("2026-07-01 10am pacific time to utc", now()).unwrap();
+        assert!(results[0].title.starts_with("17:00"));
+        assert_eq!(answers("10am pacific time", now()).len(), 1);
+    }
+
+    #[test]
+    fn posix_etc_zones_are_not_found_by_offset() {
+        assert!(zone("gmt+5").is_none());
+        assert!(zone("etc/gmt+5").is_some());
     }
 
     #[test]

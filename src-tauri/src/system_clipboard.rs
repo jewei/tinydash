@@ -1,12 +1,13 @@
 //! Reading and writing the OS clipboard through arboard.
 
-use std::{borrow::Cow, io::Cursor, sync::Mutex};
+use std::{borrow::Cow, sync::Mutex};
 
 use arboard::{Clipboard, ImageData};
 
 use crate::{
     error::{Error, Result},
-    features::clipboard::{Content, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS},
+    features::clipboard::Content,
+    platform,
 };
 
 /// One long-lived handle for writes. On X11 the owner must stay alive to
@@ -26,17 +27,11 @@ fn with_writer<T>(write: impl FnOnce(&mut Clipboard) -> Result<T>) -> Result<T> 
 pub fn write_text(text: &str, secret: bool) -> Result<()> {
     with_writer(|clipboard| {
         let set = clipboard.set();
-        if !secret {
-            return Ok(set.text(text)?);
-        }
-        #[cfg(target_os = "macos")]
-        let set = arboard::SetExtApple::exclude_from_history(set);
-        #[cfg(target_os = "windows")]
-        let set = arboard::SetExtWindows::exclude_from_cloud(
-            arboard::SetExtWindows::exclude_from_history(set),
-        );
-        #[cfg(target_os = "linux")]
-        let set = arboard::SetExtLinux::exclude_from_history(set);
+        let set = if secret {
+            platform::exclude_from_history(set)
+        } else {
+            set
+        };
         Ok(set.text(text)?)
     })
 }
@@ -70,35 +65,4 @@ pub fn write(content: &Content) -> Result<()> {
 
 pub fn read_text() -> Option<String> {
     Clipboard::new().ok()?.get_text().ok()
-}
-
-/// Read what the clipboard holds, in the order apps expect: copied files
-/// first (Finder also offers their names as text), then text, then images.
-/// Kinds the user did not opt into are skipped, not saved as text.
-pub fn read(reader: &mut Clipboard, images: bool, files: bool) -> Option<Content> {
-    if let Ok(paths) = reader.get().file_list()
-        && !paths.is_empty()
-    {
-        return files.then_some(Content::Files(paths));
-    }
-    if let Ok(text) = reader.get_text() {
-        return Some(Content::Text(text));
-    }
-    if !images {
-        return None;
-    }
-    let image = reader.get_image().ok()?;
-    let (width, height) = (
-        u32::try_from(image.width).ok()?,
-        u32::try_from(image.height).ok()?,
-    );
-    if u64::from(width) * u64::from(height) > MAX_IMAGE_PIXELS {
-        return None;
-    }
-    let buffer = image::RgbaImage::from_raw(width, height, image.bytes.into_owned())?;
-    let mut png = Vec::new();
-    buffer
-        .write_to(&mut Cursor::new(&mut png), image::ImageFormat::Png)
-        .ok()?;
-    (png.len() <= MAX_IMAGE_BYTES).then_some(Content::Image { png, width, height })
 }

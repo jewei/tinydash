@@ -18,6 +18,13 @@ use crate::{
     store::Store,
 };
 
+/// Folders the OS assigns to the app and the user.
+pub struct Dirs {
+    pub config: PathBuf,
+    pub data: PathBuf,
+    pub home: PathBuf,
+}
+
 /// Everything the app keeps in memory, managed by Tauri. Indexes are
 /// [`Shared`] snapshots: background work builds a new value and swaps it in.
 pub struct State {
@@ -41,12 +48,7 @@ pub struct State {
 
 impl State {
     /// Load saved data. A broken database part is reported, not fatal.
-    pub fn new(
-        settings: Settings,
-        store: Store,
-        dirs: [PathBuf; 3],
-        mut warnings: Vec<String>,
-    ) -> Self {
+    pub fn new(settings: Settings, store: Store, dirs: Dirs, mut warnings: Vec<String>) -> Self {
         let mut load = |what: &str, error: crate::error::Error| {
             warnings.push(format!("Could not load {what}: {error}"));
         };
@@ -70,7 +72,6 @@ impl State {
             load("exchange rates", e);
             None
         });
-        let [config_dir, data_dir, home_dir] = dirs;
         Self {
             emoji: Shared::new(EmojiIndex::new(&settings.emoji_languages)),
             settings: Shared::new(settings),
@@ -83,9 +84,9 @@ impl State {
             pins: Shared::new(pins),
             rates: Shared::new(rates),
             freshness: Freshness::default(),
-            config_dir,
-            data_dir,
-            home_dir,
+            config_dir: dirs.config,
+            data_dir: dirs.data,
+            home_dir: dirs.home,
             warnings: Mutex::new(warnings),
         }
     }

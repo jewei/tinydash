@@ -9,9 +9,8 @@ use std::{
 };
 
 use crate::{
-    actions::Action,
     features::currency::Rates,
-    search::result::{Icon, ResultAction, ResultKind, SearchResult, Symbol},
+    search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
 };
 
 /// fend checks this deadline while it works, so huge inputs cannot hang search.

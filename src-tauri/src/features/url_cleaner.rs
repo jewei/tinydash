@@ -3,10 +3,7 @@
 
 use url::Url;
 
-use crate::{
-    actions::Action,
-    search::result::{Icon, ResultAction, ResultKind, SearchResult, Symbol},
-};
+use crate::search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol};
 
 const MAX_LENGTH: usize = 8192;
 

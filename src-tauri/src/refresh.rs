@@ -16,7 +16,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::{
     events,
-    features::{apps::AppIndex, currency, files::FileIndex},
+    features::{apps::AppIndex, currency, files, files::FileIndex},
     platform,
     state::State,
 };
@@ -100,11 +100,13 @@ pub fn files(app: &AppHandle) {
             let settings = state.settings.get();
             let folders = settings.file_folders(&state.home_dir);
             let index = FileIndex::scan(&folders, &settings.file_search_excluded_dirs);
-            tracing::info!(
-                files = index.len(),
-                truncated = index.truncated,
-                "Indexed files"
-            );
+            if index.truncated {
+                tracing::warn!(
+                    limit = files::LIMIT,
+                    "The file index is full; index fewer folders"
+                );
+            }
+            tracing::info!(files = index.len(), "Indexed files");
             state.files.set(index);
         },
     );
@@ -126,11 +128,16 @@ fn rebuild(app: &AppHandle, slot: fn(&State) -> &Slot, work: fn(&State)) {
             slot.dirty.store(false, Ordering::Release);
             work(&state);
             *slot.finished.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
-            if !slot.dirty.load(Ordering::Acquire) {
+            if slot.dirty.load(Ordering::Acquire) {
+                continue;
+            }
+            slot.busy.store(false, Ordering::Release);
+            // A request that arrived after the check above saw `busy` and only
+            // marked the slot dirty; take the slot back and run it.
+            if !slot.dirty.load(Ordering::Acquire) || slot.busy.swap(true, Ordering::AcqRel) {
                 break;
             }
         }
-        slot.busy.store(false, Ordering::Release);
         events::results_stale(&app);
     });
 }
