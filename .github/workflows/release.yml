@@ -19,6 +19,14 @@ jobs:
         os: [macos-15, windows-2025, ubuntu-24.04]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Tag matches the app version
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d '"' -f2)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match version $version in src-tauri/Cargo.toml"
+            exit 1
+          fi
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: package.json
@@ -33,6 +41,9 @@ jobs:
             libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
       - name: Install Rust from rust-toolchain.toml
         run: rustup toolchain install
+      - name: Add both Mac architectures
+        if: runner.os == 'macOS'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
@@ -46,3 +57,5 @@ jobs:
           releaseName: TinyDash ${{ github.ref_name }}
           releaseDraft: true
           generateReleaseNotes: true
+          # One macOS app for Apple silicon and Intel.
+          args: ${{ runner.os == 'macOS' && '--target universal-apple-darwin' || '' }}

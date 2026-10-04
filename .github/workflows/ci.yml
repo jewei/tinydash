@@ -55,11 +55,12 @@ jobs:
       - name: Lint
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
       - name: Test
+        if: runner.os != 'Linux'
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         if: runner.os == 'Linux'
         with:
           bun-version-file: package.json
-      - name: Generated TypeScript is up to date
+      - name: Test and check generated TypeScript
         if: runner.os == 'Linux'
-        run: bun scripts/check-generated.ts
+        run: bun scripts/bindings.ts --ci

@@ -6,7 +6,6 @@ src-tauri/gen/
 
 # Tooling state
 .vite-hooks/_/
-coverage/
 *.log
 .DS_Store
 
