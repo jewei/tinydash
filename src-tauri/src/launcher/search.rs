@@ -2214,6 +2214,9 @@ mod tests {
     #[test]
     fn emoji_preferences_preserve_pins_usage_and_exact_copy_after_changes() {
         let mut search = SearchManager::default();
+        // Check preferences and issued actions independently of cold language
+        // data loading. Dedicated budget tests retain the production deadline.
+        search.calculator.deterministic_selection_test = true;
         search.record_usage("emoji:👍", ranking::now());
         search.set_pinned("emoji:👍", SearchMode::Emoji, true);
         let mut settings = crate::settings::Settings {
