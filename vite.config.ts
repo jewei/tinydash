@@ -20,11 +20,16 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["src/test/setup.ts"],
     restoreMocks: true,
   },
   lint: {
     ignorePatterns: ["dist/**", "src-tauri/**"],
     options: { typeAware: true, typeCheck: true },
+    rules: {
+      // Solid assigns `let el!: T` through `ref={el}`, which this rule cannot see.
+      "no-unassigned-vars": "off",
+    },
   },
   fmt: {
     ignorePatterns: ["dist/**", "src-tauri/**", "src/generated/**"],

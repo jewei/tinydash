@@ -1,0 +1,91 @@
+// A fake backend for component tests: records commands and answers them.
+import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
+
+import type { SearchResult } from "../generated/SearchResult";
+import type { Settings } from "../generated/Settings";
+
+export const defaultSettings: Settings = {
+  shortcut: "Control+Shift+Space",
+  theme: "system",
+  hideOnBlur: true,
+  launchAtLogin: false,
+  showTrayIcon: true,
+  clipboardHistoryEnabled: true,
+  clipboardHistoryLimit: 200,
+  clipboardCaptureImages: false,
+  clipboardCaptureFiles: false,
+  fileSearchFolders: ["~/Desktop", "~/Documents", "~/Downloads"],
+  fileSearchExcludedDirs: ["node_modules", "target"],
+  emojiSkinTone: 0,
+  emojiLanguages: [],
+  currencyRatesEnabled: true,
+  searchEngine: "google",
+};
+
+export const app: SearchResult = {
+  id: "app:/Applications/Safari.app",
+  kind: "app",
+  title: "Safari",
+  subtitle: "Application",
+  icon: { type: "symbol", name: "app" },
+  pinned: false,
+  actions: [
+    { label: "Open", action: { type: "launch", path: "/Applications/Safari.app" }, confirm: null },
+    {
+      label: "Show in Finder",
+      action: { type: "reveal", path: "/Applications/Safari.app" },
+      confirm: null,
+    },
+  ],
+};
+
+export const restart: SearchResult = {
+  id: "system:restart",
+  kind: "system",
+  title: "Restart",
+  subtitle: "System",
+  icon: { type: "symbol", name: "restart" },
+  pinned: false,
+  actions: [
+    {
+      label: "Run",
+      action: { type: "system", command: "restart" },
+      confirm: "Restart the computer?",
+    },
+  ],
+};
+
+export type Call = { command: string; args: Record<string, unknown> };
+type Handler = (args: Record<string, unknown>) => unknown;
+
+/** Install the fake backend. `handlers` override the default replies. */
+export function fakeBackend(handlers: Record<string, Handler> = {}) {
+  const calls: Call[] = [];
+  const defaults: Record<string, Handler> = {
+    launcher_init: () => ({ settings: defaultSettings, platform: "macos", warnings: [] }),
+    search: () => [],
+    run_action: () => null,
+    preview: () => null,
+    hide_launcher: () => null,
+    get_settings: () => defaultSettings,
+    update_settings: (args) => args.settings,
+    pause_shortcut: () => null,
+    library_items: () => [],
+    about: () => ({ version: "0.2.0", dataFolder: "/data" }),
+  };
+  clearMocks();
+  mockIPC(
+    (command, payload) => {
+      const args = (payload ?? {}) as Record<string, unknown>;
+      calls.push({ command, args });
+      const handler = handlers[command] ?? defaults[command];
+      if (!handler) throw new Error(`Unexpected command ${command}`);
+      return handler(args);
+    },
+    { shouldMockEvents: true },
+  );
+  return {
+    calls,
+    called: (command: string) => calls.filter((call) => call.command === command),
+  };
+}

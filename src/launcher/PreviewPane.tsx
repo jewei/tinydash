@@ -1,0 +1,129 @@
+import { createResource, For, Match, Show, Switch } from "solid-js";
+
+import type { Preview } from "../generated/Preview";
+import type { ResultAction } from "../generated/ResultAction";
+import type { SearchResult } from "../generated/SearchResult";
+import { clipboardImageUrl, preview as loadPreview } from "../lib/ipc";
+import { ResultIcon } from "../ui/Icon";
+import { Keys } from "../ui/Keys";
+import { FALLBACK_GLYPHS, isAnswer, KIND_LABELS, shortcutFor } from "./describe";
+
+/** Kinds whose details live in the backend and load on selection. */
+const LOADED = new Set(["app", "clipboard", "file", "folder", "snippet"]);
+
+export function PreviewPane(props: {
+  result: SearchResult | undefined;
+  disabled: boolean;
+  onRun: (action: ResultAction) => void;
+}) {
+  const [details] = createResource(
+    () => (props.result && LOADED.has(props.result.kind) ? props.result.id : false),
+    async (id) => ({ id, preview: await loadPreview(id).catch(() => null) }),
+  );
+  // The resource keeps its last value; show it only for the result it belongs to.
+  const current = () => {
+    const loaded = details.latest;
+    return loaded && loaded.id === props.result?.id ? loaded.preview : null;
+  };
+
+  return (
+    <Show when={props.result} fallback={<aside class="preview" />}>
+      {(result) => (
+        <aside class="preview" aria-label="Details">
+          <div class="preview-header">
+            <ResultIcon icon={result().icon} size={56} fallback={FALLBACK_GLYPHS[result().kind]} />
+            <span class="preview-kind">{KIND_LABELS[result().kind]}</span>
+            <h2
+              class="preview-title"
+              classList={{ answer: isAnswer(result().kind), mono: result().kind === "password" }}
+            >
+              {result().title}
+            </h2>
+            <p class="preview-subtitle">{result().subtitle}</p>
+          </div>
+          <Show when={current()}>{(preview) => <Details preview={preview()} />}</Show>
+          <ul class="preview-actions">
+            <For each={result().actions}>
+              {(action) => (
+                <li>
+                  <button
+                    type="button"
+                    class="preview-action"
+                    disabled={props.disabled}
+                    onClick={() => props.onRun(action)}
+                  >
+                    <span>{action.label}</span>
+                    <Show when={shortcutFor(result(), action.action)}>
+                      {(keys) => <Keys keys={keys()} />}
+                    </Show>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </aside>
+      )}
+    </Show>
+  );
+}
+
+function Details(props: { preview: Preview }) {
+  return (
+    <div class="preview-details">
+      <Switch>
+        <Match when={props.preview.type === "text" && props.preview}>
+          {(text) => <pre class="preview-text">{text().text}</pre>}
+        </Match>
+        <Match when={props.preview.type === "image" && props.preview}>
+          {(image) => (
+            <img
+              class="preview-image"
+              src={clipboardImageUrl(image().id)}
+              width={image().width}
+              height={image().height}
+              alt=""
+            />
+          )}
+        </Match>
+        <Match when={props.preview.type === "files" && props.preview}>
+          {(files) => (
+            <ul class="preview-files">
+              <For each={files().paths}>{(path) => <li>{path}</li>}</For>
+            </ul>
+          )}
+        </Match>
+        <Match when={props.preview.type === "file" && props.preview}>
+          {(file) => (
+            <dl class="preview-facts">
+              <dt>Where</dt>
+              <dd>{file().path}</dd>
+              <Show when={!file().isDir}>
+                <dt>Size</dt>
+                <dd>{formatBytes(file().size)}</dd>
+              </Show>
+              <Show when={file().modified}>
+                {(modified) => (
+                  <>
+                    <dt>Modified</dt>
+                    <dd>{new Date(modified() * 1000).toLocaleString()}</dd>
+                  </>
+                )}
+              </Show>
+            </dl>
+          )}
+        </Match>
+      </Switch>
+    </div>
+  );
+}
+
+export function formatBytes(bytes: number) {
+  const units = ["bytes", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000;
+    unit += 1;
+  }
+  return unit === 0 ? `${bytes} bytes` : `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+}
