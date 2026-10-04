@@ -1047,3 +1047,163 @@ test.describe("saved image export", () => {
     await expect(save).toHaveCount(0);
   });
 });
+
+test.describe("pinned-only rich history", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.evaluate(() => {
+      const state = window.__richClipboardTest;
+      const original = state.entries[0];
+      state.entries = [
+        original,
+        { ...original, id: 2, pinned: true, customName: "Release files" },
+        {
+          ...original,
+          id: 3,
+          kind: "image",
+          pinned: true,
+          title: "PNG image",
+          customName: "Company logo",
+          sourceApp: "com.apple.preview",
+        },
+      ];
+      state.filesById[2] = ["/fixtures/release.zip"];
+    });
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(page.getByRole("option")).toHaveCount(3);
+  });
+
+  test("combines pinned, query, type and source filters and clears all", async ({
+    page,
+  }) => {
+    const pinned = page.getByRole("button", {
+      name: "Pinned only",
+      exact: true,
+    });
+    await expect(pinned).toHaveAttribute("aria-pressed", "false");
+    await pinned.click();
+    await expect(pinned).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByText("2 of 3 entries", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("combobox", { name: "Search images and files" })
+      .fill("release");
+    await page
+      .getByRole("combobox", { name: "Clipboard content type" })
+      .selectOption("files");
+    await page
+      .getByRole("combobox", { name: "Clipboard source app" })
+      .selectOption("com.apple.finder");
+    await expect(
+      page.getByRole("option", { name: /Release files/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByText("1 of 3 entries", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(pinned).toHaveAttribute("aria-pressed", "true");
+    await page
+      .getByRole("button", { name: "Clear filters", exact: true })
+      .click();
+    await expect(pinned).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByRole("option")).toHaveCount(3);
+    await expect(
+      page.getByRole("combobox", { name: "Search images and files" }),
+    ).toHaveValue("");
+    await expect(
+      page.getByRole("combobox", { name: "Clipboard content type" }),
+    ).toHaveValue("");
+    await expect(
+      page.getByRole("combobox", { name: "Clipboard source app" }),
+    ).toHaveValue("");
+  });
+
+  test("unpin removes a match and preserves the active filter through empty results", async ({
+    page,
+  }) => {
+    const pinned = page.getByRole("button", {
+      name: "Pinned only",
+      exact: true,
+    });
+    await pinned.focus();
+    await pinned.press("Space");
+    await expect(page.getByRole("option")).toHaveCount(2);
+    await expect(
+      page.getByRole("option", { name: /Release files/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    await page
+      .getByRole("button", { name: "Unpin saved entry", exact: true })
+      .click();
+    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(
+      page.getByRole("option", { name: /Company logo/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    await page
+      .getByRole("button", { name: "Unpin saved entry", exact: true })
+      .click();
+    await expect(
+      page.getByText("No entries match these filters.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("0 of 3 entries", { exact: true }),
+    ).toBeVisible();
+    await expect(pinned).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByRole("button", { name: "Copy original format" }),
+    ).toBeDisabled();
+    await page
+      .getByRole("button", { name: "Clear filters", exact: true })
+      .click();
+    await expect(page.getByRole("option")).toHaveCount(3);
+  });
+
+  test("keeps the latest toggle during pending replies and retains it after an error", async ({
+    page,
+  }) => {
+    const pinned = page.getByRole("button", {
+      name: "Pinned only",
+      exact: true,
+    });
+    await page.evaluate(() => {
+      window.__richClipboardTest.holdHistory = true;
+    });
+    await pinned.click();
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          window.__richClipboardTest.historyPinnedOnly.at(-1),
+        ),
+      )
+      .toBe(true);
+    await pinned.click();
+    await page.evaluate(() => {
+      window.__richClipboardTest.holdHistory = false;
+      window.__richClipboardTest.releaseHistory?.();
+    });
+    await expect(
+      page.getByText("3 of 3 entries", { exact: true }),
+    ).toBeVisible();
+    await expect(pinned).toHaveAttribute("aria-pressed", "false");
+    await page.evaluate(() => {
+      window.__richClipboardTest.historyError = "Storage is busy.";
+    });
+    await pinned.click();
+    await expect(page.getByRole("alert")).toContainText("History unavailable");
+    await expect(pinned).toHaveAttribute("aria-pressed", "true");
+    await page.evaluate(() => {
+      window.__richClipboardTest.historyError = null;
+    });
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(
+      page.getByText("2 of 3 entries", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Rename pinned entry", exact: true })
+      .click();
+    await expect(pinned).toBeDisabled();
+    await page
+      .getByRole("button", { name: "Cancel naming", exact: true })
+      .click();
+    await expect(pinned).toBeEnabled();
+  });
+});

@@ -300,3 +300,9 @@
   flex: 1 1 220px;
   overflow-wrap: anywhere;
 }
+
+.rich-clipboard-filters button[aria-pressed="true"] {
+  border-color: var(--color-selection-border);
+  background: var(--color-selected);
+  color: var(--color-selection-ink);
+}

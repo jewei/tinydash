@@ -105,7 +105,12 @@ export async function probeCommands(settings: SettingsValues) {
     refreshCurrency: backend.refreshCurrency,
     quit: backend.quit,
     richClipboardHistory: () =>
-      richClipboardBackend.history("fixture", "files", "com.apple.finder"),
+      richClipboardBackend.history(
+        "fixture",
+        "files",
+        "com.apple.finder",
+        true,
+      ),
     richClipboardPreview: () => richClipboardBackend.preview(1),
     revealRichClipboardFile: () => richClipboardBackend.revealFile(1, 0),
     saveRichClipboardImage: () => richClipboardBackend.saveImage(1),

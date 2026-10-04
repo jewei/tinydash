@@ -31,11 +31,13 @@ export const richClipboardBackend = {
     query: string,
     kind?: RichClipboardEntry["kind"],
     sourceApp?: string,
+    pinnedOnly?: boolean,
   ) =>
     invoke<RichClipboardHistory>("rich_clipboard_history", {
       query,
       kind,
       sourceApp,
+      pinnedOnly,
     }),
   preview: (id: number) =>
     invoke<RichClipboardPreview>("rich_clipboard_preview", { id }),

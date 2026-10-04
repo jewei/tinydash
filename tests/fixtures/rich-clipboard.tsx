@@ -34,6 +34,7 @@ declare global {
       holdHistory: boolean;
       releaseHistory?: () => void;
       historyQueries: string[];
+      historyPinnedOnly: boolean[];
       holdPreview: boolean;
       releasePreview?: () => void;
     };
@@ -77,6 +78,7 @@ window.__richClipboardTest = {
   historyError: null,
   holdHistory: false,
   historyQueries: [],
+  historyPinnedOnly: [],
   holdPreview: false,
 };
 mockWindows("main");
@@ -89,7 +91,11 @@ mockIPC(
       const query = String(args && "query" in args ? args.query : "");
       const kind = args && "kind" in args ? args.kind : undefined;
       const source = args && "sourceApp" in args ? args.sourceApp : undefined;
+      const pinnedOnly = Boolean(
+        args && "pinnedOnly" in args && args.pinnedOnly,
+      );
       state.historyQueries.push(query);
+      state.historyPinnedOnly.push(pinnedOnly);
       const terms = query
         .normalize("NFC")
         .toLowerCase()
@@ -108,6 +114,7 @@ mockIPC(
               .normalize("NFC")
               .toLowerCase();
             return (
+              (!pinnedOnly || entry.pinned) &&
               (!kind || entry.kind === kind) &&
               (!source || entry.sourceApp === source) &&
               terms.every((term) => text.includes(term))

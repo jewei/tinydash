@@ -22,6 +22,7 @@ export default function RichClipboardHistory(props: {
   const [query, setQuery] = createSignal("");
   const [kind, setKind] = createSignal<RichClipboardEntry["kind"]>();
   const [sourceApp, setSourceApp] = createSignal<string>();
+  const [pinnedOnly, setPinnedOnly] = createSignal(false);
   const [loadingHistory, setLoadingHistory] = createSignal(true);
   const [historyError, setHistoryError] = createSignal<string>();
   const [selected, setSelected] = createSignal<number>();
@@ -79,10 +80,14 @@ export default function RichClipboardHistory(props: {
     }
     refreshing = true;
     try {
+      // Solid commits filter setters in a microtask. Read after that commit.
+      await Promise.resolve();
+      if (disposed || request !== refreshSequence) return;
       const value = await richClipboardBackend.history(
         query(),
         kind(),
         sourceApp(),
+        pinnedOnly(),
       );
       if (disposed || request !== refreshSequence) return;
       const focused = document.activeElement;
@@ -167,11 +172,13 @@ export default function RichClipboardHistory(props: {
 
   const unavailable = () =>
     busy() || !!editing() || loadingHistory() || !!historyError();
-  const hasFilters = () => !!query().trim() || !!kind() || !!sourceApp();
+  const hasFilters = () =>
+    !!query().trim() || !!kind() || !!sourceApp() || pinnedOnly();
   function clearFilters() {
     setQuery("");
     setKind(undefined);
     setSourceApp(undefined);
+    setPinnedOnly(false);
     void refresh();
     searchInput.focus();
   }
@@ -528,6 +535,17 @@ export default function RichClipboardHistory(props: {
             </Show>
           </select>
         </label>
+        <button
+          type="button"
+          aria-pressed={pinnedOnly() ? "true" : "false"}
+          disabled={busy() || !!editing()}
+          onClick={() => {
+            setPinnedOnly(!pinnedOnly());
+            void refresh();
+          }}
+        >
+          Pinned only
+        </button>
         <button
           type="button"
           disabled={busy() || !!editing() || !hasFilters()}

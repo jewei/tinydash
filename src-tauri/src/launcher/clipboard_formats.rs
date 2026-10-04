@@ -285,6 +285,7 @@ impl Store {
         query: &str,
         kind: Option<RichKind>,
         source_app: Option<&str>,
+        pinned_only: bool,
     ) -> anyhow::Result<(Vec<RichEntry>, u32, Vec<String>)> {
         ensure!(query.len() <= 1024, "Search is limited to 1 KiB of text.");
         ensure!(
@@ -305,7 +306,8 @@ impl Store {
         let source = source_app.map(normalize);
         let mut matches = Vec::new();
         for entry in entries {
-            if kind.is_some_and(|kind| kind != entry.kind)
+            if (pinned_only && !entry.pinned)
+                || kind.is_some_and(|kind| kind != entry.kind)
                 || source.as_ref().is_some_and(|source| {
                     entry
                         .source_app
@@ -689,11 +691,12 @@ pub async fn rich_clipboard_history(
     query: String,
     kind: Option<RichKind>,
     source_app: Option<String>,
+    pinned_only: Option<bool>,
     app: AppHandle,
 ) -> Result<RichHistory, String> {
     tauri::async_runtime::spawn_blocking(move || {
         with_store(&app, |store| {
-            let (entries, total, source_apps) = store.search(&query, kind, source_app.as_deref())?;
+            let (entries, total, source_apps) = store.search(&query, kind, source_app.as_deref(), pinned_only.unwrap_or(false))?;
             Ok(RichHistory {
                 entries,
                 total,
@@ -908,7 +911,7 @@ mod tests {
             .capture(&Payload::Files(vec![design]), None, 101, 0, 32)
             .unwrap();
         store.set_pinned(first, true, 0, 102, 32).unwrap();
-        let (entries, total, sources) = store.search("", None, None).unwrap();
+        let (entries, total, sources) = store.search("", None, None, false).unwrap();
         assert_eq!(total, 2);
         assert_eq!(entries[0].id, first);
         assert_eq!(sources, vec!["com.apple.Finder"]);
@@ -918,36 +921,44 @@ mod tests {
                 "RE\u{301}SUME\u{301} finder",
                 Some(RichKind::Files),
                 Some("COM.APPLE.FINDER"),
+                false,
             )
             .unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].id, first);
         assert!(store.preview(first).is_err());
-        assert_eq!(store.search("100%_done", None, None).unwrap().0.len(), 1);
+        assert_eq!(
+            store
+                .search("100%_done", None, None, false)
+                .unwrap()
+                .0
+                .len(),
+            1
+        );
         assert!(
             store
-                .search("100%_missing", None, None)
+                .search("100%_missing", None, None, false)
                 .unwrap()
                 .0
                 .is_empty()
         );
         assert!(
             store
-                .search("private file content", None, None)
+                .search("private file content", None, None, false)
                 .unwrap()
                 .0
                 .is_empty()
         );
         assert!(
             store
-                .search("design", None, Some("com.apple.Finder"))
+                .search("design", None, Some("com.apple.Finder"), false)
                 .unwrap()
                 .0
                 .is_empty()
         );
         assert!(
             store
-                .search("", Some(RichKind::Image), None)
+                .search("", Some(RichKind::Image), None, false)
                 .unwrap()
                 .0
                 .is_empty()
@@ -955,9 +966,90 @@ mod tests {
         drop(store);
         let store = Store::open(&dir.path().join("rich.sqlite3")).unwrap();
         assert_eq!(
-            store.search("100%_done", None, None).unwrap().0[0].id,
+            store.search("100%_done", None, None, false).unwrap().0[0].id,
             first
         );
+    }
+
+    #[test]
+    fn rich_search_pinned_only_combines_filters_and_keeps_full_metadata() {
+        let (dir, mut store) = store();
+        let finder = SourceApp {
+            id: "com.apple.finder".into(),
+            name: "Finder".into(),
+        };
+        let preview = SourceApp {
+            id: "com.apple.preview".into(),
+            name: "Preview".into(),
+        };
+        let path = dir.path().join("release.txt");
+        std::fs::write(&path, "fixture").unwrap();
+        store
+            .capture(&Payload::Files(vec![path.clone()]), Some(&finder), 1, 0, 32)
+            .unwrap();
+        let file_id = store.list().unwrap()[0].id;
+        store.set_pinned(file_id, true, 0, 2, 32).unwrap();
+        store.set_name(file_id, "Release files").unwrap();
+        store
+            .capture(
+                &Payload::Png(include_bytes!("../../icons/32x32.png").to_vec()),
+                Some(&preview),
+                3,
+                0,
+                32,
+            )
+            .unwrap();
+        let image_id = store
+            .list()
+            .unwrap()
+            .iter()
+            .find(|entry| entry.kind == RichKind::Image)
+            .unwrap()
+            .id;
+        store.set_pinned(image_id, true, 0, 4, 32).unwrap();
+        // Pinned-only search must discard an unpinned corrupt payload before decoding it.
+        store.connection.execute("INSERT INTO rich_clipboard(kind,payload,title,created_at,sort_order) VALUES('files',x'00','Unpinned',5,5)", []).unwrap();
+        std::fs::remove_file(path).unwrap();
+        let (entries, total, sources) = store.search("", None, None, true).unwrap();
+        assert_eq!(
+            entries.iter().map(|entry| entry.id).collect::<Vec<_>>(),
+            vec![image_id, file_id]
+        );
+        assert_eq!(total, 3);
+        assert_eq!(sources, vec!["com.apple.finder", "com.apple.preview"]);
+        let entries = store
+            .search(
+                "release",
+                Some(RichKind::Files),
+                Some("COM.APPLE.FINDER"),
+                true,
+            )
+            .unwrap()
+            .0;
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].id, file_id);
+        assert!(
+            store
+                .search("release", Some(RichKind::Image), None, true)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        assert!(
+            store
+                .search("release", None, Some("com.apple.preview"), true)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        assert_eq!(store.search("", None, None, false).unwrap().0.len(), 3);
+        store.set_pinned(file_id, false, 0, 6, 32).unwrap();
+        assert_eq!(store.search("", None, None, true).unwrap().0.len(), 1);
+        store.set_pinned(image_id, false, 0, 7, 32).unwrap();
+        let (entries, total, sources) = store.search("", None, None, true).unwrap();
+        assert!(entries.is_empty());
+        assert_eq!(total, 3);
+        assert_eq!(sources.len(), 2);
     }
 
     #[test]
@@ -978,7 +1070,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             store
-                .search("", Some(RichKind::Image), None)
+                .search("", Some(RichKind::Image), None, false)
                 .unwrap()
                 .0
                 .len(),
@@ -986,13 +1078,17 @@ mod tests {
         );
         assert!(
             store
-                .search("no match", Some(RichKind::Image), None)
+                .search("no match", Some(RichKind::Image), None, false)
                 .unwrap()
                 .0
                 .is_empty()
         );
-        assert!(store.search(&"a".repeat(1025), None, None).is_err());
-        assert!(store.search("", None, Some(&"a".repeat(1025))).is_err());
+        assert!(store.search(&"a".repeat(1025), None, None, false).is_err());
+        assert!(
+            store
+                .search("", None, Some(&"a".repeat(1025)), false)
+                .is_err()
+        );
         assert!(serde_json::from_str::<RichKind>(r#""unknown""#).is_err());
     }
 
@@ -1403,9 +1499,20 @@ mod tests {
         assert_eq!(renamed.title, original.title);
         assert_eq!(renamed.created_at, original.created_at);
         assert_eq!(store.preview(original.id).unwrap().png, Some(png.clone()));
-        assert_eq!(store.search("CAFÉ logo", None, None).unwrap().0.len(), 1);
         assert_eq!(
-            store.search(&original.title, None, None).unwrap().0.len(),
+            store
+                .search("CAFÉ logo", None, None, false)
+                .unwrap()
+                .0
+                .len(),
+            1
+        );
+        assert_eq!(
+            store
+                .search(&original.title, None, None, false)
+                .unwrap()
+                .0
+                .len(),
             1
         );
         store.set_pinned(original.id, false, 0, 4, 32).unwrap();
@@ -1417,7 +1524,13 @@ mod tests {
         store.set_pinned(original.id, true, 0, 5, 32).unwrap();
         store.set_name(original.id, "   ").unwrap();
         assert!(store.list().unwrap()[0].custom_name.is_none());
-        assert!(store.search("Café", None, None).unwrap().0.is_empty());
+        assert!(
+            store
+                .search("Café", None, None, false)
+                .unwrap()
+                .0
+                .is_empty()
+        );
         assert_eq!(store.preview(original.id).unwrap().png, Some(png));
     }
 
@@ -1459,7 +1572,11 @@ mod tests {
         assert!(store.preview(id).is_err());
         store.set_name(id, "Missing release files").unwrap();
         assert_eq!(
-            store.search("missing release", None, None).unwrap().0.len(),
+            store
+                .search("missing release", None, None, false)
+                .unwrap()
+                .0
+                .len(),
             1
         );
         store.set_name(id, &"😀".repeat(120)).unwrap();
