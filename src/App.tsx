@@ -26,7 +26,7 @@ import {
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
-import { disposeAppIcons } from "./app-icons";
+import { disposeAppIcons, initializeAppIcons } from "./app-icons";
 import ResultPreview from "./components/ResultPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
 import AppQuitDialog from "./components/AppQuitDialog";
@@ -1315,6 +1315,7 @@ export default function App(
   });
 
   onSettled(() => {
+    if (desktop) initializeAppIcons();
     document.addEventListener("pointermove", moveDrag);
     document.addEventListener("pointerup", releaseDrag);
     document.addEventListener("pointercancel", releaseDrag);

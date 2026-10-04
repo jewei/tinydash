@@ -60,7 +60,7 @@ export function observeIconDisplay(element: HTMLElement, consume: Consumer) {
     appearance = new MutationObserver(refresh);
     appearance.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-appearance"],
+      attributeFilter: ["data-appearance", "data-compact"],
     });
     window.addEventListener("resize", refresh);
     watchScale();

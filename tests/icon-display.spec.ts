@@ -190,7 +190,7 @@ test("appearance and viewport changes keep native sizes and preview visibility c
   await page.setViewportSize({ width: 980, height: 620 });
   await expect(preview.locator("img")).toBeVisible();
   await page.evaluate(() =>
-    window.__launcherTest.emit("appearance-changed", "compact"),
+    window.__launcherTest.emit("compact-changed", true),
   );
   await expect(row).toHaveCSS("width", "32px");
   await expect(row.locator("img")).toBeVisible();

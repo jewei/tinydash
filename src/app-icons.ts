@@ -68,6 +68,11 @@ function startListening() {
     }));
 }
 
+// Register while the launcher starts, before the first visible icon needs IPC.
+export function initializeAppIcons() {
+  void startListening();
+}
+
 async function load(entry: Entry) {
   if (entry.inFlight) return;
   entry.waiting = false;
