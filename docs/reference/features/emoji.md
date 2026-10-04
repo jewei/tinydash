@@ -1,6 +1,6 @@
 # Emoji search
 
-Select Emoji, enter a matching term in All, or use the `:` prefix. Search uses local names, shortcodes, and categories. In **Settings > Search > Emoji**, enable Simplified Chinese, Malay, or Spanish keywords. English names and shortcodes always remain available; result names stay in English. For example, `火箭`, `roket`, and `cohete` find the rocket when their language is enabled. For example, `:coffee` finds coffee emoji.
+Select Emoji, enter a matching term in All, or use the `:` prefix. Search uses local names, shortcodes, and categories. In **Settings > Search > Emoji**, enable Simplified Chinese, Malay, or Spanish keywords. An equally strong localized short-name match ranks above a related keyword; for example, the rocket ranks above an astronaut for `火箭`. English names and shortcodes always remain available; result names stay in English. For example, `火箭`, `roket`, and `cohete` find the rocket when their language is enabled. For example, `:coffee` finds coffee emoji.
 
 Use arrow keys to navigate the grid. Enter copies the selected emoji and hides the launcher. Paste with the target application's paste command, or explicitly choose **Paste to previous app** / Command/Ctrl + Shift + Enter. Enter still copies. See [direct paste](workflows.md#direct-paste) for focus verification, permissions, and unsupported desktops.
 

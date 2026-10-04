@@ -32,7 +32,7 @@ async function download(path: string, sha256: string) {
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 await mkdir(resolve(root, "src-tauri/data/emoji"), { recursive: true });
 for (const [locale, hashes] of Object.entries(sources)) {
-  const rows = new Map<string, Set<string>>();
+  const rows = new Map<string, { name: string; terms: Set<string> }>();
   for (const [index, category] of [
     "annotations",
     "annotationsDerived",
@@ -48,7 +48,11 @@ for (const [locale, hashes] of Object.entries(sources)) {
     for (const [emoji, annotation] of Object.entries(records)) {
       // Search indexes base emoji once; the native emoji catalog supplies variants.
       if (/[\u{1f3fb}-\u{1f3ff}]/u.test(emoji)) continue;
-      const terms = rows.get(emoji) ?? new Set<string>();
+      const row = rows.get(emoji) ?? { name: "", terms: new Set<string>() };
+      const names = (annotation.tts ?? []).filter((term) => term !== "↑↑↑");
+      if (names.length > 1)
+        throw new Error(`Unexpected short names: ${locale}`);
+      if (!row.name && names[0]) row.name = names[0].normalize("NFC");
       for (const term of [
         ...(annotation.tts ?? []),
         ...(annotation.default ?? []),
@@ -56,15 +60,21 @@ for (const [locale, hashes] of Object.entries(sources)) {
         if (term === "↑↑↑") continue;
         if (/[\t\r\n]/.test(term))
           throw new Error(`Unexpected term delimiter: ${locale}`);
-        terms.add(term.normalize("NFC"));
+        row.terms.add(term.normalize("NFC"));
       }
-      if (terms.size) rows.set(emoji, terms);
+      if (row.terms.size) rows.set(emoji, row);
     }
   }
   const output =
     [...rows]
       .sort(([a], [b]) => compare(a, b))
-      .map(([emoji, terms]) => [emoji, ...[...terms].sort(compare)].join("\t"))
+      .map(([emoji, { name, terms }]) =>
+        [
+          emoji,
+          name,
+          ...[...terms].filter((term) => term !== name).sort(compare),
+        ].join("\t"),
+      )
       .join("\n") + "\n";
   await writeFile(resolve(root, `src-tauri/data/emoji/${locale}.tsv`), output);
   console.log(`${locale}: ${rows.size} keyword rows`);

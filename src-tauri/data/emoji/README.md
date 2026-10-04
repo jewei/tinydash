@@ -2,7 +2,7 @@
 
 These tab-separated tables contain Simplified Chinese (`zh`), Malay (`ms`), and Spanish (`es`) short names and keywords from [Unicode CLDR JSON 48.0.0](https://github.com/unicode-org/cldr-json/tree/48.0.0). The source commit is `4d06be52b51bb2f75688d0abe55c52a66afed790`.
 
-Each row starts with a Unicode sequence, followed by distinct search terms. The generator combines `annotations` and `annotationsDerived`, normalizes terms to NFC, and excludes skin-tone rows. The Rust provider accepts only sequences present in its `emojis` catalog and indexes only selected languages. The catalog supplies skin-tone variants and English result labels.
+Each row starts with a Unicode sequence and its localized short name, followed by distinct related search terms. The short-name field can be empty when CLDR supplies only keywords. Names remain separate so an equally strong name match ranks above a related keyword. The generator combines `annotations` and `annotationsDerived`, normalizes terms to NFC, and excludes skin-tone rows. The Rust provider accepts only sequences present in its `emojis` catalog and indexes only selected languages. The catalog supplies skin-tone variants and English result labels.
 
 The data uses the [Unicode License V3](LICENSE). Keep that notice with redistributed data. Settings > About embeds the complete notice in the shipped frontend. There is no runtime download.
 

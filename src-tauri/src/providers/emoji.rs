@@ -3,10 +3,7 @@ use nucleo_matcher::{
     Matcher, Utf32String,
     pattern::{AtomKind, CaseMatching, Normalization, Pattern},
 };
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-};
+use std::{borrow::Cow, collections::HashMap};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::{
@@ -16,7 +13,7 @@ use crate::{
 
 struct IndexedEmoji {
     emoji: &'static Emoji,
-    terms: Vec<(Utf32String, String)>,
+    terms: Vec<(Utf32String, String, bool)>,
     category_match: Utf32String,
 }
 
@@ -87,8 +84,8 @@ fn result(emoji: &'static Emoji, score: u32) -> SearchResult {
     }
 }
 
-fn keywords(languages: &[String]) -> HashMap<&'static str, Vec<&'static str>> {
-    let mut keywords: HashMap<&'static str, Vec<&'static str>> = HashMap::new();
+fn keywords(languages: &[String]) -> HashMap<&'static str, Vec<(&'static str, bool)>> {
+    let mut keywords: HashMap<&'static str, Vec<(&'static str, bool)>> = HashMap::new();
     for language in languages {
         let data = match language.as_str() {
             "zh" => include_str!("../../data/emoji/zh.tsv"),
@@ -99,10 +96,11 @@ fn keywords(languages: &[String]) -> HashMap<&'static str, Vec<&'static str>> {
         for line in data.lines() {
             let mut fields = line.split('\t');
             if let Some(emoji) = fields.next().and_then(emojis::get) {
-                keywords
-                    .entry(base(emoji).as_str())
-                    .or_default()
-                    .extend(fields);
+                let terms = keywords.entry(base(emoji).as_str()).or_default();
+                if let Some(name) = fields.next().filter(|name| !name.is_empty()) {
+                    terms.push((name, true));
+                }
+                terms.extend(fields.map(|term| (term, false)));
             }
         }
     }
@@ -124,16 +122,25 @@ impl EmojiProvider {
                     "😂" => &["laugh", "lol"],
                     _ => &[],
                 };
-                let mut seen = HashSet::new();
-                let terms = std::iter::once(emoji.name())
+                let mut terms = HashMap::<String, bool>::new();
+                for (term, is_name) in std::iter::once(emoji.name())
                     .chain(emoji.shortcodes())
                     .chain(synonyms.iter().copied())
+                    .map(|term| (term, true))
                     .chain(keywords.get(emoji.as_str()).into_iter().flatten().copied())
-                    .map(|term| {
-                        ranking::normalize(&term.replace('_', " ").nfc().collect::<String>())
-                    })
-                    .filter(|term| seen.insert(term.clone()))
-                    .map(|term| (term.as_str().into(), term))
+                {
+                    let term =
+                        ranking::normalize(&term.replace('_', " ").nfc().collect::<String>());
+                    // A term can be a keyword in one selected language and a
+                    // short name in another. Preserve the stronger match.
+                    terms
+                        .entry(term)
+                        .and_modify(|name| *name |= is_name)
+                        .or_insert(is_name);
+                }
+                let terms = terms
+                    .into_iter()
+                    .map(|(term, is_name)| (term.as_str().into(), term, is_name))
                     .collect();
                 IndexedEmoji {
                     emoji,
@@ -199,10 +206,15 @@ impl EmojiProvider {
                 let terms = entry
                     .terms
                     .iter()
-                    .filter_map(|(term, normalized)| {
-                        pattern
-                            .score(term.slice(..), matcher)
-                            .map(|score| ranking::name_score(score, normalized, &query))
+                    .filter_map(|(term, normalized, is_name)| {
+                        pattern.score(term.slice(..), matcher).map(|score| {
+                            let score = ranking::name_score(score, normalized, &query);
+                            if *is_name {
+                                score
+                            } else {
+                                score.saturating_sub(ranking::ALIAS_PENALTY)
+                            }
+                        })
                     })
                     .max();
                 let group = pattern
@@ -279,6 +291,16 @@ mod tests {
                     Some("🚀"),
                     "{language}: {query}"
                 );
+                if query != "rocket" {
+                    let astronaut = results
+                        .iter()
+                        .find(|entry| entry.icon.as_deref() == Some("🧑‍🚀"))
+                        .expect("Shared keywords must remain searchable");
+                    assert!(
+                        results[0].score > astronaut.score,
+                        "A localized short name must rank above its shared keyword"
+                    );
+                }
             }
         }
         let provider = EmojiProvider::new(3, &["zh".into(), "ms".into(), "es".into()]);
