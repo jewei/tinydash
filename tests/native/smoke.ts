@@ -16,6 +16,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { createServer } from "node:net";
+import { cpus, release, totalmem } from "node:os";
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { nativeTestBinary } from "../../scripts/verify/native.ts";
@@ -26,7 +27,16 @@ import {
   stopProcessTree,
   waitForExit,
 } from "../../scripts/verify/lifecycle.ts";
+import { clearWindowsClipboard } from "./clipboard";
 import { installFixtures } from "./fixtures";
+import {
+  measureQueryTiming,
+  summarizeTimings,
+  type QueryMeasurement,
+  type QueryTiming,
+} from "./performance";
+import { nativeResponseError } from "./protocol";
+import { storedClipboard, storedUsage, withStorageLock } from "./storage";
 
 if (!process.versions.bun) throw new Error("Run this check with Bun.");
 
@@ -51,6 +61,7 @@ let appLog: number | undefined;
 const passed: string[] = [];
 const reopenCheckMs: number[] = [];
 const secondInstances = new Set<ChildProcess>();
+const expectedIdleTitles = new Set<string>();
 
 function recordOwnedResources() {
   writeFileSync(
@@ -108,11 +119,12 @@ async function request<T>(
   const result = (await response.json()) as {
     value: T & { error?: string; message?: string };
   };
-  if (!response.ok || result.value?.error) {
-    throw new Error(
-      `${method} ${path}: ${result.value?.message ?? response.statusText}`,
-    );
-  }
+  const error = nativeResponseError(
+    response.ok,
+    response.statusText,
+    result.value,
+  );
+  if (error !== null) throw new Error(`${method} ${path}: ${error}`);
   return result.value;
 }
 
@@ -278,6 +290,13 @@ async function selectMode(mode: "apps" | "clipboard" | "files" | "system") {
 
 async function reopen() {
   cancelled.signal.throwIfAborted();
+  // The OS clipboard changes before execute_action hides the window and saves
+  // usage. Reopening during that interval can be hidden by the earlier action.
+  await until("the previous action finishes before reopening", () =>
+    observe<boolean>(
+      `return !/^(Copying|Opening|Running)\\.\\.\\./.test(document.querySelector('.open-button')?.textContent?.trim() ?? '')`,
+    ),
+  );
   const started = performance.now();
   // Start the executable as a desktop shortcut would. Its single-instance
   // handler must show the resident window and reset the search field.
@@ -295,15 +314,25 @@ async function reopen() {
       await stopProcessTree(child);
     secondInstances.delete(child);
   }
-  await until("the existing window reopens on the welcome screen", () =>
-    observe<boolean>(
-      `return document.querySelector('input[role=combobox]')?.value === ''
-      && document.activeElement?.getAttribute('role') === 'combobox'
-      && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
-      && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
-      && document.querySelector('.welcome-suggestions') !== null
-      && document.querySelectorAll('[role=option]').length === 0`,
-    ),
+  await until(
+    "the existing window reopens with the expected empty-query results",
+    () =>
+      request<boolean>(`/session/${session}/execute/async`, "POST", {
+        // Hidden webviews retain DOM state and activeElement. Those alone cannot
+        // prove that the resident native window has actually reopened.
+        script: `const done = arguments[arguments.length - 1];
+        const expected = arguments[0];
+        window.__TAURI_INTERNALS__.invoke('launcher_ready').then(info => done(
+          info.visible
+          && document.querySelector('input[role=combobox]')?.value === ''
+          && document.activeElement?.getAttribute('role') === 'combobox'
+          && document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'
+          && document.querySelector('.category-tab[aria-pressed=true]')?.textContent === 'All'
+          && (document.querySelector('.welcome-suggestions') !== null) === (expected.length === 0)
+          && JSON.stringify([...document.querySelectorAll('[role=option] .result-title')].map(item => item.textContent).sort()) === JSON.stringify(expected)
+        ), error => done({ error: String(error) }));`,
+        args: [[...expectedIdleTitles].sort()],
+      }),
   );
   reopenCheckMs.push(performance.now() - started);
 }
@@ -532,8 +561,11 @@ try {
   pass(
     "Emoji search uses local Rust data, and Enter copies the complete emoji to the OS clipboard",
   );
+  expectedIdleTitles.add("rocket");
   await reopen();
-  pass("Starting TinyDash again reopens its existing window after copying");
+  pass(
+    "Starting TinyDash again clears the query and shows the copied emoji suggestion",
+  );
 
   await keys(inputId, ":");
   await until(
@@ -618,6 +650,31 @@ try {
   });
   pass("Enter launches the selected fixture through the OS");
 
+  expectedIdleTitles.add(orderedNames[1]);
+  await reopen();
+  await saveScreen("suggestions.png");
+  await rm(fixtures.marker);
+  const suggestions = await titles();
+  const currentSuggestion = suggestions.indexOf(await selectedTitle());
+  const appSuggestion = suggestions.indexOf(orderedNames[1]);
+  assert(currentSuggestion >= 0 && appSuggestion >= 0);
+  const moves =
+    (appSuggestion - currentSuggestion + suggestions.length) %
+    suggestions.length;
+  for (let index = 0; index < moves; index++) await keys(inputId, "\uE015");
+  assert.equal(await selectedTitle(), orderedNames[1]);
+  await keys(inputId, "\uE007");
+  await until("the app suggestion launches the selected fixture", async () => {
+    try {
+      return (await readFile(fixtures.marker, "utf8")) === expectedLabel;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw error;
+    }
+  });
+  pass(
+    "Empty All suggests used apps and emoji; activating the app suggestion writes its launch marker",
+  );
   await reopen();
   await selectMode("apps");
   await until(
@@ -684,10 +741,76 @@ try {
     "the copied history entry remains available",
     async () => (await titles())[0] === firstClip.split("\n")[0],
   );
+  const dataRoot =
+    process.platform === "win32"
+      ? process.env.APPDATA
+      : fixtures.env.XDG_DATA_HOME;
+  assert(
+    dataRoot,
+    "The native fixture has an isolated or disposable data directory",
+  );
+  const data = resolve(dataRoot, "dev.tinydash.launcher");
+  const stored = storedClipboard(data, firstClip);
+  assert.equal(stored.length, 1);
+  // Emoji copies record usage; clipboard copies deliberately record recency
+  // only. Exercise the real usage-producing action rather than changing that
+  // product distinction just to satisfy this recovery check.
+  const usageId = "emoji:🚀";
+  const usageBeforeContention = storedUsage(data, usageId);
+  await withStorageLock(data, async () => {
+    await reopen();
+    await keys(inputId, ":rocket");
+    await until(
+      "the usage-recording emoji remains searchable while locked",
+      async () => (await titles())[0] === "rocket",
+    );
+    await keys(inputId, "\uE007");
+    await until(
+      "emoji copying remains available during the outage",
+      async () => clipboardText() === "🚀",
+    );
+    await reopen();
+    await selectMode("clipboard");
+    await keys(inputId, `clipboard ${fixtures.nonce}`);
+    await until(
+      "the original clipboard entry remains available while locked",
+      async () => (await titles())[0] === firstClip.split("\n")[0],
+    );
+    // Restore the original OS clipboard value through the UI, also under
+    // contention, so the later deletion still tests unchanged-text suppression.
+    await keys(inputId, "\uE007");
+    await until(
+      "copy remains available while SQLite is locked",
+      async () => clipboardText() === firstClip,
+    );
+    await reopen();
+    await selectMode("clipboard");
+    await keys(inputId, `clipboard ${fixtures.nonce}`);
+    await until(
+      "search remains responsive during storage contention",
+      async () => (await titles())[0] === firstClip.split("\n")[0],
+    );
+    await keys(inputId, "\uE009\uE003\uE000");
+    await until("a failed durable delete reports its error", () =>
+      observe<boolean>(
+        "return document.querySelector('[role=alert]')?.textContent.includes('Could not delete clipboard history') ?? false",
+      ),
+    );
+    assert.equal((await titles())[0], firstClip.split("\n")[0]);
+    assert.equal(storedClipboard(data, firstClip).length, 1);
+    assert.equal(storedUsage(data, usageId), usageBeforeContention);
+  });
+  // Retry the same user action without restarting the application. A fresh
+  // SQLite connection checks the durable state, not just the renderer cache.
   await keys(inputId, "\uE009\uE003\uE000");
   await until(
-    "the delete shortcut removes the entry",
+    "the delete shortcut removes the entry after storage unlocks",
     async () => (await titles()).length === 0,
+  );
+  assert.deepEqual(storedClipboard(data, firstClip), []);
+  assert.equal(storedUsage(data, usageId), usageBeforeContention + 1);
+  pass(
+    "External SQLite contention preserves visible history and session usage; deletion and persistence recover without restart",
   );
   await reopen();
   await selectMode("clipboard");
@@ -697,6 +820,70 @@ try {
   pass(
     "Deleting an entry keeps the window open and does not recapture unchanged clipboard text",
   );
+  const recoveredClip = `TinyDash recovered ${fixtures.nonce}`;
+  setClipboardText(recoveredClip);
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, `recovered ${fixtures.nonce}`);
+  await until(
+    "clipboard capture resumes after storage unlocks",
+    async () => (await titles())[0] === recoveredClip,
+  );
+  assert.equal(storedClipboard(data, recoveredClip).length, 1);
+  pass("Clipboard capture resumes and persists after transient contention");
+  // Linux does not promise the upstream-clear heuristic. Windows exercises the
+  // actual OS clear and quiet monitor retry, not a test-only backend command.
+  if (process.platform === "win32") {
+    const automaticClip = `TinyDash automatic-cleanup ${fixtures.nonce}`;
+    setClipboardText(automaticClip);
+    await keys(inputId, "\uE009a\uE000");
+    await keys(inputId, `automatic-cleanup ${fixtures.nonce}`);
+    await until(
+      "the automatic cleanup fixture is captured durably",
+      async () =>
+        (await titles())[0] === automaticClip &&
+        storedClipboard(data, automaticClip).length === 1,
+    );
+    await withStorageLock(data, async () => {
+      const cleared = clearWindowsClipboard();
+      await writeFile(
+        resolve(output, "upstream-clear.json"),
+        JSON.stringify(cleared, null, 2),
+      );
+      // Helper processes may hide the launcher on blur. Native readiness must
+      // be restored before expecting its visibility-gated event subscriptions
+      // to refresh the warning; retained DOM focus alone is not readiness.
+      await reopen();
+      await selectMode("clipboard");
+      await keys(inputId, `automatic-cleanup ${fixtures.nonce}`);
+      await until(
+        "a blocked upstream clear exposes pending privacy cleanup",
+        () =>
+          observe<boolean>(
+            "return document.querySelector('[role=alert]')?.textContent.includes('Sensitive clipboard cleanup is pending') ?? false",
+          ),
+      );
+      assert.equal(clipboardText(), "");
+      assert.equal(storedClipboard(data, automaticClip).length, 1);
+      assert.equal((await titles())[0], automaticClip);
+    });
+    // No new clipboard value, user deletion, or application restart follows.
+    // The quiet monitor must finish the retained obligation after unlock.
+    await until(
+      "automatic cleanup completes after unlock with an unchanged empty clipboard",
+      async () =>
+        storedClipboard(data, automaticClip).length === 0 &&
+        (await titles()).length === 0,
+    );
+    await until("completed automatic cleanup clears its privacy warning", () =>
+      observe<boolean>(
+        "return !document.querySelector('[role=alert]')?.textContent.includes('Sensitive clipboard cleanup is pending')",
+      ),
+    );
+    assert.equal(clipboardText(), "");
+    pass(
+      "Windows upstream clipboard clear retains its cleanup intent through SQLite contention and retries while the clipboard remains quiet",
+    );
+  }
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, `second ${fixtures.nonce}`);
   await until(
@@ -770,7 +957,7 @@ try {
       (await titles()).length === 1 &&
       (await titles())[0] === fixtures.fileName &&
       (await observe<boolean>(
-        "return document.querySelector('.list-count')?.textContent === '1 file indexed'",
+        "return document.querySelector('.list-count')?.textContent === '1 item indexed'",
       )),
   );
   pass(
@@ -811,6 +998,7 @@ try {
       (await readFile(fixtures.fileMarker, "utf8")) === fixtures.filePath,
   );
   pass("Enter opens the selected file through its OS document association");
+  expectedIdleTitles.add(fixtures.fileName);
   await reopen();
   await selectMode("files");
   await keys(inputId, fixtures.fileName);
@@ -820,6 +1008,7 @@ try {
     ),
   );
   await rm(fixtures.filePath);
+  expectedIdleTitles.delete(fixtures.fileName);
   await rm(fixtures.fileMarker);
   await until(
     "the watcher removes the deleted file",
@@ -935,7 +1124,40 @@ try {
 
   await reopen();
   await selectMode("system");
-  assert.equal((await titles()).length, 5);
+  assert.deepEqual(
+    (await titles()).sort(),
+    [
+      "Lock screen",
+      "Sleep",
+      "Restart",
+      "Shut down",
+      "Open system settings",
+      "Toggle system appearance",
+      process.platform === "win32" ? "Empty Recycle Bin" : "Empty Trash",
+      "Log out",
+      "Show desktop",
+      "Toggle mute",
+      "Paste next queued entry",
+      "Skip queued entry",
+      "Cancel paste queue",
+      "Quicklinks",
+      "Snippets",
+      "Quit a process",
+      "Color picker",
+      "Keep awake",
+      "Media controls",
+      "Window management",
+      "Move window left",
+      "Move window right",
+      "Maximize window",
+      "Center window",
+      "Restore window",
+      "Images and files clipboard",
+    ].sort(),
+  );
+  pass(
+    "System search lists every system action and implemented native command",
+  );
   await keys(inputId, "reboot");
   await until("the system provider resolves the reboot alias", () =>
     observe<boolean>(
@@ -960,7 +1182,13 @@ try {
   );
   // Intentionally omit consent. Never send confirmed:true for power actions
   // to a real backend: these tests must not disrupt the host or hosted runner.
-  for (const id of ["system:restart", "system:shutdown", "system:sleep"]) {
+  for (const id of [
+    "system:restart",
+    "system:shutdown",
+    "system:sleep",
+    "system:empty-trash",
+    "system:logout",
+  ]) {
     const rejection = await request<string>(
       `/session/${session}/execute/async`,
       "POST",
@@ -974,62 +1202,137 @@ try {
     assert.match(rejection, /Confirm this system command before running it/);
   }
   pass(
-    "Rust rejects sleep, restart, and shutdown IPC requests without explicit confirmation",
+    "Rust rejects power, logout, and empty-trash IPC requests without explicit confirmation",
+  );
+
+  // Exercise a new command through search and its real panel. The exact system
+  // clipboard value proves the new utility IPC grants and native copy path.
+  // Backend-only rejection probes do not prove native visibility. Windows can
+  // retain DOM focus in a hidden webview; reestablish readiness before typing.
+  await reopen();
+  await selectMode("system");
+  await keys(inputId, "\uE009a\uE000");
+  await keys(inputId, "Color picker");
+  await until("the color command query reaches the visible search field", () =>
+    observe<boolean>(
+      "return document.querySelector('input[role=combobox]')?.value === 'Color picker'",
+    ),
+  );
+  await until(
+    "search finds the color utility command",
+    async () =>
+      (await titles())[0] === "Color picker" &&
+      (await observe<boolean>(
+        "return document.querySelector('[role=listbox]')?.getAttribute('aria-busy') === 'false'",
+      )),
+  );
+  await keys(inputId, "\uE007");
+  await until("the color utility opens from its search result", () =>
+    observe<boolean>(
+      `return document.querySelector('[aria-label="Native utilities"]') !== null
+        && document.querySelector('[aria-label="Utility categories"] [aria-pressed=true]')?.textContent === 'Colors'
+        && document.querySelector('.utility-content')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  const colorInput = await request<Record<string, string>>(
+    `/session/${session}/element`,
+    "POST",
+    {
+      using: "css selector",
+      value: '[aria-label="Native utilities"] form input',
+    },
+  );
+  await keys(colorInput[elementKey], "\uE009a\uE000");
+  await keys(colorInput[elementKey], "#f00");
+  await until("the color input contains the typed value", () =>
+    observe<boolean>(
+      "return document.querySelector('[aria-label=\"Native utilities\"] form input')?.value === '#f00'",
+    ),
+  );
+  await clickButtonText("Convert color");
+  await until("Rust converts the entered color", () =>
+    observe<boolean>(
+      `return document.querySelector('.utility-color-result input')?.value === '#FF0000'
+        && document.querySelector('.utility-content')?.getAttribute('aria-busy') === 'false'`,
+    ),
+  );
+  await clickButtonText("Copy HEX");
+  await until(
+    "the converted HEX reaches the OS clipboard",
+    async () => clipboardText() === "#FF0000",
+  );
+  await saveScreen("native-color-copy.png");
+  await click('[aria-label="Close utilities"]');
+  await until("closing the utility restores search focus", () =>
+    observe<boolean>(
+      `return document.querySelector('[aria-label="Native utilities"]') === null
+        && document.activeElement?.getAttribute('role') === 'combobox'`,
+    ),
+  );
+  pass(
+    "The color command opens its panel, converts in Rust, copies exact HEX, and restores search focus",
   );
   await reopen();
-  const queryTimings: { query: string; elapsedMs: number }[] = [];
-  for (let sample = 0; sample < 5; sample += 1) {
-    for (const [query, expected] of [
-      [expectedNames[0], expectedNames[0]],
-      ["12 * 8", "96"],
-      ["5 ft to cm", "152.4 cm"],
-      [":rocket", "rocket"],
-    ]) {
-      const result: {
-        elapsedMs: number;
-        title: string;
-        error?: string;
-      } = await request(`/session/${session}/execute/async`, "POST", {
-        // Measure inside the webview. This includes IPC, Rust search, and
-        // Solid's DOM update, but not WebDriver transport or a screen paint.
-        script: `const done = arguments[arguments.length - 1];
-            const input = document.querySelector('input[role=combobox]');
-            const list = document.querySelector('[role=listbox]');
-            if (!input || !list || list.getAttribute('aria-busy') !== 'false') {
-              done({ error: 'Search was not ready for the timing sample' }); return;
-            }
-            const started = performance.now();
-            const observer = new MutationObserver(() => {
-              if (list.getAttribute('aria-busy') !== 'false') return;
-              observer.disconnect();
-              clearTimeout(timer);
-              done({ elapsedMs: performance.now() - started,
-                title: list.querySelector('.result-title')?.textContent ?? '' });
-            });
-            const timer = setTimeout(() => {
-              observer.disconnect(); done({ error: 'Search timing timed out' });
-            }, 4000);
-            observer.observe(list, { attributes: true, attributeFilter: ['aria-busy'] });
-            input.value = arguments[0];
-            input.dispatchEvent(new Event('input', { bubbles: true }));`,
-        args: [query],
-      });
-      assert(!result.error, result.error);
+  const queryTimings: QueryTiming[] = [];
+  const environment = await observe<{ userAgent: string; pixelRatio: number }>(
+    "return { userAgent: navigator.userAgent, pixelRatio: devicePixelRatio };",
+  );
+  // One untimed warm-up cycle; 25 samples per scenario. These are descriptive
+  // CI observations, not a statistically established product latency target.
+  for (let sample = -1; sample < 25; sample += 1) {
+    for (const [scenario, query, expected] of [
+      ["app", expectedNames[0], expectedNames[0]],
+      ["calculation", "12 * 8", "96"],
+      ["conversion", "5 ft to cm", "152.4 cm"],
+      ["emoji", ":rocket", "rocket"],
+    ] as const) {
+      const result: QueryMeasurement = await request<QueryMeasurement>(
+        `/session/${session}/execute/async`,
+        "POST",
+        {
+          // Measure inside the webview, excluding WebDriver transport. Readiness
+          // wait is recorded separately; two rAF callbacks are NOT paint proof.
+          script: `const done = arguments[arguments.length - 1];
+          (${measureQueryTiming.toString()})(arguments[0]).then(done,
+            error => done({ error: String(error) }));`,
+          args: [query],
+        },
+      );
+      assert(Number.isFinite(result.readyWaitMs) && result.readyWaitMs >= 0);
       assert.equal(result.title, expected);
-      assert(Number.isFinite(result.elapsedMs) && result.elapsedMs >= 0);
-      queryTimings.push({ query, elapsedMs: result.elapsedMs });
+      assert(Number.isFinite(result.domMs) && result.domMs >= 0);
+      assert(
+        Number.isFinite(result.frameOpportunityMs) &&
+          result.frameOpportunityMs >= result.domMs,
+      );
+      if (sample >= 0) {
+        queryTimings.push({
+          scenario,
+          readyWaitMs: result.readyWaitMs,
+          domMs: result.domMs,
+          frameOpportunityMs: result.frameOpportunityMs,
+        });
+      }
     }
   }
   await writeFile(
     resolve(output, "performance.json"),
     JSON.stringify(
       {
+        schemaVersion: 2,
         platform: process.platform,
+        architecture: process.arch,
+        osRelease: release(),
+        cpuModel: cpus()[0]?.model ?? "unknown",
+        logicalCpus: cpus().length,
+        memoryBytes: totalmem(),
+        webview: environment,
         startupCheckMs,
         reopenCheckMs,
+        summary: summarizeTimings(queryTimings),
         queryTimings,
         method:
-          "Startup and reopen include WebDriver and readiness polling. Query samples measure input-event dispatch through IPC and Rust search to settled DOM. None measures screen paint or physical shortcut latency. CI timings have no pass/fail threshold.",
+          "Identified release package and test source are recorded by the native verification wrapper. Startup and reopen include WebDriver and readiness polling; reopen requires native visibility as well as DOM readiness. Before dispatch, background-refresh readiness waiting is retained as readyWaitMs, not discarded or retried; adding it to domMs gives preparation-through-DOM time. After one warm-up cycle, 25 samples per synthetic scenario measure input-event dispatch through IPC and Rust search to settled DOM, then a double-requestAnimationFrame rendering opportunity. This is NOT proof of screen paint or physical shortcut latency. Percentiles use nearest rank; with 25 samples per scenario p99 is the maximum. No queries, clipboard contents, titles or paths are recorded here. CI timings have no pass/fail threshold and do not establish the proposed native p95 target.",
       },
       null,
       2,
@@ -1080,6 +1383,28 @@ try {
     String(error instanceof Error ? error.stack : error),
   );
   if (session && !cancelled.signal.aborted) {
+    await request(`/session/${session}/execute/async`, "POST", {
+      script: `const done = arguments[arguments.length - 1];
+        const query = document.querySelector('input[role=combobox]')?.value ?? '';
+        Promise.all([
+          window.__TAURI_INTERNALS__.invoke('launcher_ready'),
+          window.__TAURI_INTERNALS__.invoke('search', { query, mode: 'all' }),
+        ]).then(([info, response]) => done({
+          query, visible: info.visible,
+          action: document.querySelector('.open-button')?.textContent,
+          focused: document.activeElement?.getAttribute('role'),
+          rendered: [...document.querySelectorAll('[role=option] .result-title')].map(item => item.textContent),
+          backend: response.results.map(item => ({ id: item.id, title: item.title })),
+        }), error => done({ error: String(error) }));`,
+      args: [],
+    })
+      .then((diagnostic) =>
+        writeFile(
+          resolve(output, "failure-state.json"),
+          JSON.stringify(diagnostic, null, 2),
+        ),
+      )
+      .catch(() => {});
     await saveScreen("failure.png").catch(() => {});
     await request<string>(`/session/${session}/source`)
       .then((source) => writeFile(resolve(output, "failure.html"), source))

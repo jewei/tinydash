@@ -36,242 +36,128 @@ async function selectCategory(page: Page, name: string) {
     .click();
 }
 
-test("text search and selection do not wait for native icons", async ({
+test("native glass is exposed only after successful setup and themes reach macOS", async ({
   page,
 }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("tinydash.test.nativeGlass", "true"),
+  );
   await openLauncher(page);
-  await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
-    window.__launcherTest.holdIcons = true;
-  });
+  const launcher = page.getByRole("main", { name: "TinyDash launcher" });
+  await expect(launcher).toHaveAttribute("data-native-glass", "true");
+  await expect(launcher).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   await selectCategory(page, "Apps");
-  await expect(page.getByRole("option").first()).toContainText("Finder");
-  await expect
-    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
-    .toBeGreaterThan(0);
-  const input = page.getByRole("combobox", { name: "Search TinyDash" });
-  await input.press("ArrowDown");
-  await expect(page.locator(".result-row.selected")).toContainText("Safari");
-  await expect(page.locator(".app-avatar img")).toHaveCount(0);
-  await input.fill("sa");
-  await expect(page.getByRole("option")).toHaveCount(1);
-  await expect(page.getByRole("option")).toContainText("Safari");
-  await page.evaluate(() =>
-    window.__launcherTest.heldIcons
-      .filter((icon) => icon.key.endsWith("app-0"))
-      .forEach((icon) => icon.release()),
+  await expect(page.locator(".result-preview")).toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
   );
-  await expect(page.locator(".app-avatar img")).toHaveCount(0);
-  await page.evaluate(() =>
-    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
-  );
-  await expect(page.getByRole("option").locator("img")).toBeVisible();
-  const requests = await page.evaluate(() =>
-    window.__launcherTest.calls
-      .filter((call) => call.command === "app_icon")
-      .map((call) => call.payload as { pixels: number }),
-  );
-  expect(
-    requests.every((request) => request.pixels >= 16 && request.pixels <= 256),
-  ).toBe(true);
-  expect(requests.some((request) => request.pixels >= 64)).toBe(true);
-});
-
-test("hidden launcher releases settled icons without cancellation requests", async ({
-  page,
-}) => {
-  await openLauncher(page);
-  await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
-  });
-  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
-  await expect(page.getByRole("option").locator("img")).toBeVisible();
-  await expect(page.locator(".preview-icon img")).toBeVisible();
-  await page.evaluate(() =>
-    window.__launcherTest.emit("launcher-hidden", null),
-  );
-  await expect(page.locator(".app-avatar img")).toHaveCount(0);
-  expect(
-    await page.evaluate(() =>
-      window.__launcherTest.calls.some(
-        (call) => call.command === "cancel_app_icon",
-      ),
-    ),
-  ).toBe(false);
-});
-
-test("hidden launcher cancels live icons and ignores late replies", async ({
-  page,
-}) => {
-  await openLauncher(page);
-  await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
-    window.__launcherTest.holdIcons = true;
-  });
-  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
-  await expect
-    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
-    .toBe(2);
-  const requests = await page.evaluate(() =>
-    window.__launcherTest.heldIcons.map((icon) => icon.request),
-  );
-  await page.evaluate(() =>
-    window.__launcherTest.emit("launcher-hidden", null),
-  );
-  const cancellations = await page.evaluate(() =>
-    window.__launcherTest.calls
-      .filter((call) => call.command === "cancel_app_icon")
-      .map((call) => (call.payload as { request: string }).request),
-  );
-  expect(cancellations.sort()).toEqual(requests.sort());
-  await page.evaluate(() =>
-    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
-  );
-  await expect(page.locator(".app-avatar img")).toHaveCount(0);
-  await page.evaluate(() => {
-    window.__launcherTest.holdIcons = false;
-    return window.__launcherTest.emit("launcher-opened", false);
-  });
-  await expect(page.getByRole("option").locator("img")).toBeVisible();
-  await expect(page.locator(".preview-icon img")).toBeVisible();
-});
-
-test("hidden launcher does not cancel icon requests rejected for capacity", async ({
-  page,
-}) => {
-  await openLauncher(page);
-  await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
-    window.__launcherTest.busyIcons = true;
-  });
-  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
   await expect
     .poll(() =>
       page.evaluate(
         () =>
-          window.__launcherTest.calls.filter(
-            (call) => call.command === "app_icon",
-          ).length,
+          window.__launcherTest.calls
+            .filter((call) => call.command === "set_launcher_appearance")
+            .at(-1)?.payload,
       ),
     )
-    .toBe(2);
-  await page.evaluate(() =>
-    window.__launcherTest.emit("launcher-hidden", null),
-  );
-  expect(
-    await page.evaluate(() =>
-      window.__launcherTest.calls.filter(
-        (call) => call.command === "cancel_app_icon",
-      ),
-    ),
-  ).toEqual([]);
+    .toEqual({ appearance: "dark" });
+  await page.evaluate(() => {
+    window.__launcherTest.rejectNativeGlass = true;
+  });
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitemradio", { name: "Sage", exact: true }).click();
+  await expect(launcher).not.toHaveAttribute("data-native-glass", "true");
+  await expect(launcher).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(
+    page.getByRole("combobox", { name: "Search TinyDash" }),
+  ).toBeFocused();
 });
 
-test("capacity notification retries only visible icons", async ({ page }) => {
+test("unsupported native glass keeps the themed background opaque", async ({
+  page,
+}) => {
   await openLauncher(page);
+  await expect(page.locator(".launcher")).not.toHaveAttribute(
+    "data-native-glass",
+    "true",
+  );
+  await expect(page.locator(".launcher")).not.toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+});
+
+test("turning Liquid Glass off ignores a pending native response", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("tinydash.test.nativeGlass", "true"),
+  );
+  await openLauncher(page);
+  await expect(page.locator(".launcher")).toHaveAttribute(
+    "data-native-glass",
+    "true",
+  );
   await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
-    window.__launcherTest.busyIcons = true;
+    window.__launcherTest.holdNativeGlass = true;
   });
-  await selectCategory(page, "Apps");
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("menuitemradio", { name: "Dark", exact: true }).click();
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__launcherTest.calls.filter(
-            (call) => call.command === "app_icon",
-          ).length,
-      ),
-    )
-    .toBeGreaterThan(0);
-  await expect(page.locator(".app-avatar img")).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
-  await expect(page.getByRole("option")).toHaveCount(1);
+    .poll(() => page.evaluate(() => !!window.__launcherTest.releaseNativeGlass))
+    .toBe(true);
   await page.evaluate(async () => {
-    window.__launcherTest.busyIcons = false;
-    await window.__launcherTest.emit("app-icons-ready", null);
+    await window.__launcherTest.emit("system-glass-changed", false);
+    window.__launcherTest.releaseNativeGlass!();
   });
-  await expect(page.getByRole("option").locator("img")).toBeVisible();
+  await expect(page.locator(".launcher")).not.toHaveAttribute(
+    "data-native-glass",
+    "true",
+  );
+  await expect(page.locator(".launcher")).not.toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "dark");
 });
 
-test("a capacity notification before the busy reply still retries the icon", async ({
+test("Ink uses monochrome controls with readable selected rows in both layouts", async ({
   page,
 }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem("tinydash.appearance", "ink"),
+  );
+  await page.setViewportSize({ width: 980, height: 620 });
   await openLauncher(page);
-  await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
-    window.__launcherTest.iconReadyBeforeBusy = true;
-  });
-  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
-  await expect(page.getByRole("option").locator("img")).toBeVisible();
-  await expect(page.locator(".preview-icon img")).toBeVisible();
-  expect(
-    await page.evaluate(
-      () =>
-        window.__launcherTest.calls.filter(
-          (call) => call.command === "app_icon",
-        ).length,
-    ),
-  ).toBe(3);
-});
-
-test("a display scale change replaces pending icon sizes", async ({ page }) => {
-  await page.addInitScript(() => {
-    const media: MediaQueryList[] = [];
-    const original = window.matchMedia.bind(window);
-    window.matchMedia = (query) => {
-      const value = original(query);
-      if (query.startsWith("(resolution:")) media.push(value);
-      return value;
-    };
-    Object.assign(window, {
-      changeTestScale: () => {
-        Object.defineProperty(window, "devicePixelRatio", {
-          value: 2,
-          configurable: true,
-        });
-        for (const value of [...media])
-          value.dispatchEvent(new Event("change"));
-      },
-    });
-  });
-  await openLauncher(page);
-  await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
-    window.__launcherTest.holdIcons = true;
-  });
   await selectCategory(page, "Apps");
-  await expect
-    .poll(() => page.evaluate(() => window.__launcherTest.heldIcons.length))
-    .toBeGreaterThan(0);
-  const previous = await page.evaluate(() =>
-    window.__launcherTest.heldIcons.map((icon) => icon.request),
+  const row = page.getByRole("option", { selected: true });
+  await expect(row).toHaveCSS("background-color", "rgb(17, 17, 17)");
+  await expect(row.locator(".result-title")).toHaveCSS(
+    "color",
+    "rgb(255, 255, 255)",
   );
-  await page.evaluate(() =>
-    (window as unknown as { changeTestScale: () => void }).changeTestScale(),
+  await expect(row.locator(".result-subtitle")).toHaveCSS(
+    "color",
+    "rgb(255, 255, 255)",
   );
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__launcherTest.calls.filter(
-            (call) =>
-              call.command === "app_icon" &&
-              (call.payload as { pixels: number }).pixels === 128,
-          ).length,
-      ),
-    )
-    .toBeGreaterThan(0);
-  const cancelled = await page.evaluate(() =>
-    window.__launcherTest.calls
-      .filter((call) => call.command === "cancel_app_icon")
-      .map((call) => (call.payload as { request: string }).request),
+  await expect(row.locator(".result-shortcut")).toHaveCSS(
+    "color",
+    "rgb(17, 17, 17)",
   );
-  expect(previous.every((request) => cancelled.includes(request))).toBe(true);
-  await page.evaluate(() =>
-    window.__launcherTest.heldIcons.forEach((icon) => icon.release()),
-  );
-  await expect(page.getByRole("option").first().locator("img")).toBeVisible();
+  await expect(page.locator(".preview-title")).toHaveCSS("font-weight", "700");
+  await page.screenshot({ path: test.info().outputPath("ink-launcher.png") });
+  await page.keyboard.press("Meta+k");
+  await page
+    .getByRole("menuitemcheckbox", { name: "Compact", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "ink");
+  await expect(page.locator("html")).toHaveAttribute("data-compact", "true");
+  await expect(
+    page.getByRole("complementary", { name: "Selected item details" }),
+  ).toBeHidden();
+  await page.screenshot({ path: test.info().outputPath("ink-compact.png") });
 });
 
 test("installed app icons appear in the result list and detail panel", async ({
@@ -311,7 +197,7 @@ test("rounded window corners remain transparent behind menus and dialogs", async
     expect(png[24]).toBe(8); // Eight bits per channel.
     expect(png[25]).toBe(6); // RGBA, rather than an opaque RGB screenshot.
     const chunks: Buffer[] = [];
-    for (let offset = 8; offset < png.length;) {
+    for (let offset = 8; offset < png.length; ) {
       const length = png.readUInt32BE(offset);
       if (png.toString("ascii", offset + 4, offset + 8) === "IDAT") {
         chunks.push(png.subarray(offset + 8, offset + 8 + length));
@@ -322,11 +208,21 @@ test("rounded window corners remain transparent behind menus and dialogs", async
     // The first byte is the filter, followed by red, green, blue, and alpha.
     expect(inflateSync(Buffer.concat(chunks))[4]).toBe(0);
   }
-  for (const appearance of ["Dark", "Compact", "Light"]) {
+  for (const appearance of [
+    "Dark",
+    "Sage",
+    "Rose",
+    "Ink",
+    "Compact",
+    "Light",
+  ]) {
     await page.keyboard.press("Meta+k");
     await expectClearCorner();
     await page
-      .getByRole("menuitemradio", { name: appearance, exact: true })
+      .getByRole(
+        appearance === "Compact" ? "menuitemcheckbox" : "menuitemradio",
+        { name: appearance, exact: true },
+      )
       .click();
     await expectClearCorner();
   }
@@ -364,7 +260,7 @@ test("Canvas detail actions follow the selection and keep system confirmation", 
     details.getByText("/Applications", { exact: true }),
   ).toBeVisible();
   await expect(details.getByText("Safari.app", { exact: true })).toBeVisible();
-  await details.getByRole("button", { name: "Launch application" }).click();
+  await details.getByRole("button", { name: "Open application" }).click();
   await details
     .getByRole("button", { name: "Show in enclosing folder" })
     .click();
@@ -389,7 +285,9 @@ test("appearance choices persist and Compact keeps clipboard text available", as
   await openLauncher(page);
   for (const [label, value] of [
     ["Dark", "dark"],
-    ["Compact", "compact"],
+    ["Sage", "sage"],
+    ["Rose", "rose"],
+    ["Ink", "ink"],
     ["Light", "light"],
   ]) {
     await page.keyboard.press("Meta+k");
@@ -406,7 +304,24 @@ test("appearance choices persist and Compact keeps clipboard text available", as
     await expect(
       page.getByRole("heading", { name: "What will you do next?" }),
     ).toBeVisible();
-    if (value === "compact") {
+    if (value === "rose") {
+      await page.keyboard.press("Meta+k");
+      await page
+        .getByRole("menuitemcheckbox", { name: "Compact", exact: true })
+        .click();
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-compact",
+        "true",
+      );
+      await page.reload();
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-compact",
+        "true",
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-appearance",
+        "rose",
+      );
       await expect(
         page.getByRole("complementary", { name: "Selected item details" }),
       ).toBeHidden();
@@ -428,16 +343,21 @@ test("previous appearance names migrate to the Canvas choices", async ({
   for (const [previous, current] of [
     ["mint", "dark"],
     ["paper", "light"],
-    ["graphite", "compact"],
+    ["graphite", "light"],
+    ["compact", "light"],
   ]) {
-    await page.evaluate(
-      (value) => localStorage.setItem("tinydash.appearance", value),
-      previous,
-    );
+    await page.evaluate((value) => {
+      localStorage.removeItem("tinydash.compact");
+      localStorage.setItem("tinydash.appearance", value);
+    }, previous);
     await page.reload();
     await expect(page.locator("html")).toHaveAttribute(
       "data-appearance",
       current,
+    );
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-compact",
+      String(["compact", "graphite"].includes(previous)),
     );
   }
 });
@@ -569,6 +489,60 @@ test("missing currency help is readable and its refresh action is available in A
   ).toBe(true);
 });
 
+test("reset window position keeps the search, category, selection and focus", async ({
+  page,
+}, testInfo) => {
+  await openLauncher(page);
+  await selectCategory(page, "Apps");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("a");
+  await expect(page.getByRole("option")).not.toHaveCount(0);
+  await input.press("ArrowDown");
+  const selected = await input.getAttribute("aria-activedescendant");
+  await page.keyboard.press("Meta+k");
+  const reset = page.getByRole("menuitem", { name: "Reset window position" });
+  await expect(reset).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("reset-position-action.png"),
+  });
+  await reset.click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("a");
+  await expect(input).toHaveAttribute("aria-activedescendant", selected!);
+  await expect(
+    page.getByRole("button", { name: "Apps", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "reset_launcher_position",
+      ),
+    ),
+  ).toHaveLength(1);
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.some((call) =>
+        ["hide_launcher", "execute_action"].includes(call.command),
+      ),
+    ),
+  ).toBe(false);
+
+  await page.evaluate(() => {
+    window.__launcherTest.rejectResetPosition =
+      "Your desktop controls window placement.";
+  });
+  await page.keyboard.press("Meta+k");
+  await page.getByRole("searchbox", { name: "Search actions" }).fill("reset");
+  await reset.click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Your desktop controls window placement.",
+  );
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("a");
+  await expect(input).toHaveAttribute("aria-activedescendant", selected!);
+});
+
 test("the drag handle moves the window without taking input focus", async ({
   page,
 }) => {
@@ -609,6 +583,53 @@ test("the drag handle moves the window without taking input focus", async ({
   expect(calls.some((call) => call.command === "hide_launcher")).toBe(true);
 });
 
+test("All shows system command prefixes before apps and clipboard and confirms safely", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const [query, title, question] of [
+    ["sleep", "Sleep", "Put this computer to sleep?"],
+    ["sl", "Sleep", "Put this computer to sleep?"],
+    ["sle", "Sleep", "Put this computer to sleep?"],
+    ["re", "Restart", "Restart this computer?"],
+    ["res", "Restart", "Restart this computer?"],
+    ["sh", "Shut down", "Shut down this computer?"],
+    ["shu", "Shut down", "Shut down this computer?"],
+  ]) {
+    await input.fill(query);
+    await expect(page.locator(".result-title")).toHaveText([
+      title,
+      "Finder",
+      `${title} notes`,
+    ]);
+    await expect(page.locator(".result-group")).toHaveText([
+      /System commands\s*1/,
+      /Applications\s*1/,
+      /Clipboard history\s*1/,
+    ]);
+    await page.screenshot({
+      path: test.info().outputPath(`all-${query}.png`),
+    });
+    if (query.length > 2) {
+      await input.press("Enter");
+    } else {
+      await page
+        .getByRole("option")
+        .filter({ has: page.getByText(title, { exact: true }) })
+        .click();
+    }
+    const dialog = page.getByRole("dialog", {
+      name: question,
+    });
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(input).toBeFocused();
+    expect(await actions(page)).toEqual([]);
+  }
+});
+
 test("system commands ask before running and extra Enter cancels", async ({
   page,
 }) => {
@@ -619,7 +640,7 @@ test("system commands ask before running and extra Enter cancels", async ({
     "placeholder",
     "Search system commands...",
   );
-  await expect(page.locator(".list-count")).toHaveText("4 shown");
+  await expect(page.locator(".list-count")).toHaveText("10 shown");
   await input.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Restart this computer?" });
   await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
@@ -660,9 +681,7 @@ test("confirmation keeps the selected command through a ranking update and preve
     window.__launcherTest.holdAction = true;
     return window.__launcherTest.emit("usage-changed", null);
   });
-  await expect(page.locator(".result-title").first()).toHaveText(
-    "Open system settings",
-  );
+  await expect(page.locator(".result-title").first()).toHaveText("Toggle mute");
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Restart", exact: true }).click();
   await expect
@@ -728,27 +747,21 @@ test("reused rows move and update metadata, pins, icons, and actions", async ({
 }) => {
   await openLauncher(page);
   await page.evaluate(() => {
-    window.__launcherTest.nativeIcons = true;
+    window.__launcherTest.resultOverrides["app-1"] = {
+      icon: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jC1sAAAAASUVORK5CYII=",
+    };
   });
   await selectCategory(page, "Apps");
   const safari = page.getByRole("option").filter({ hasText: "Safari" });
   await expect(safari.locator("img")).toBeVisible();
   const row = await safari.elementHandle();
-  const before = await page.evaluate(
-    () =>
-      window.__launcherTest.calls.filter(
-        (call) =>
-          call.command === "app_icon" &&
-          (call.payload as { key: string }).key === "app-icon:test:app-1",
-      ).length,
-  );
   await page.evaluate(() => {
     window.__launcherTest.usedAppFirst = true;
     window.__launcherTest.pins.apps = ["app-1"];
     window.__launcherTest.resultOverrides["app-1"] = {
       title: "Safari Preview",
       subtitle: "Updated browser",
-      icon: "app-icon:revision-2:app-1",
+      icon: null,
       primaryAction: "reveal",
       secondaryActions: [],
     };
@@ -762,20 +775,7 @@ test("reused rows move and update metadata, pins, icons, and actions", async ({
   await expect(first).toContainText("Updated browser");
   await expect(first.getByLabel("Pinned to Apps")).toBeVisible();
   await expect(first.locator(".result-shortcut")).toHaveText("⌘1");
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.__launcherTest.calls.filter(
-            (call) =>
-              call.command === "app_icon" &&
-              (call.payload as { key: string }).key ===
-                "app-icon:revision-2:app-1",
-          ).length,
-      ),
-    )
-    .toBeGreaterThan(0);
-  expect(before).toBeGreaterThan(0);
+  await expect(first.locator("img")).toHaveCount(0);
   await first.click();
   await expect
     .poll(() => actions(page))
@@ -819,7 +819,7 @@ test("system failures remain in the dialog and reopening discards pending confir
 }) => {
   await openLauncher(page);
   await selectCategory(page, "System");
-  await expect(page.locator(".result-title")).toHaveCount(4);
+  await expect(page.locator(".result-title")).toHaveCount(10);
   await page.keyboard.press("Meta+3");
   const dialog = page.getByRole("dialog", {
     name: "Put this computer to sleep?",
@@ -831,6 +831,7 @@ test("system failures remain in the dialog and reopening discards pending confir
   await expect(dialog.getByRole("alert")).toContainText(
     "The OS denied this system command.",
   );
+  await expect(page.locator('[role="alert"]')).toHaveCount(1);
   await expect(
     dialog.getByRole("button", { name: "Sleep", exact: true }),
   ).toBeEnabled();
@@ -855,7 +856,7 @@ test("settings runs directly and System mode has its own empty state", async ({
 }) => {
   await openLauncher(page);
   await selectCategory(page, "System");
-  await expect(page.locator(".result-title")).toHaveCount(4);
+  await expect(page.locator(".result-title")).toHaveCount(10);
   await page.keyboard.press("Meta+4");
   await expect
     .poll(() => actions(page))
@@ -876,6 +877,155 @@ test("settings runs directly and System mode has its own empty state", async ({
   ).toBeDisabled();
 });
 
+test("new system actions appear in All and System with distinct icons", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const mode of ["All", "System"]) {
+    await selectCategory(page, mode);
+    for (const [query, title] of [
+      ["dar", "Toggle system appearance"],
+      ["em", "Empty Trash"],
+      ["log", "Log out"],
+      ["loc", "Lock screen"],
+      ["des", "Show desktop"],
+      ["mu", "Toggle mute"],
+    ]) {
+      await input.fill(query);
+      await expect(page.locator(".result-title").first()).toHaveText(title);
+      await expect(
+        page.getByRole("option").first().locator("svg path").first(),
+      ).toBeVisible();
+      if (title === "Toggle mute") {
+        await expect(page.getByRole("option").first()).toContainText(
+          "system sound output",
+        );
+      }
+    }
+  }
+  await input.fill("");
+  await expect(page.getByRole("option")).toHaveCount(10);
+  await page.screenshot({ path: test.info().outputPath("system-actions.png") });
+  expect(await actions(page)).toEqual([]);
+});
+
+test("trash and logout system actions require confirmation and preserve OS errors", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const [query, id, question, label] of [
+    ["empty trash", "system:empty-trash", "Empty the Trash?", "Empty Trash"],
+    ["log out", "system:logout", "Log out of your account?", "Log out"],
+  ]) {
+    await page.evaluate(() => {
+      window.__launcherTest.calls = [];
+    });
+    await input.fill(query);
+    await input.press("Enter");
+    const dialog = page.getByRole("dialog", { name: question });
+    await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+    if (id === "system:empty-trash") {
+      await expect(dialog).toContainText("You cannot undo this action.");
+      await page.screenshot({
+        path: test.info().outputPath("empty-trash-confirmation.png"),
+      });
+    }
+    await page.keyboard.press("Enter");
+    await expect(dialog).toHaveCount(0);
+    expect(await actions(page)).toEqual([]);
+    await input.press("Enter");
+    await page.evaluate(() => {
+      window.__launcherTest.rejectActions = true;
+    });
+    await dialog.getByRole("button", { name: label, exact: true }).click();
+    await expect(dialog.getByRole("alert")).toContainText(
+      "The OS denied this system command.",
+    );
+    expect(await actions(page)).toEqual([
+      {
+        command: "execute_action",
+        payload: { id, action: "run", confirmed: true },
+      },
+    ]);
+    await page.keyboard.press("Escape");
+    await expect(input).toBeFocused();
+    await page.evaluate(() => {
+      window.__launcherTest.rejectActions = false;
+    });
+  }
+});
+
+test("Finder cancellation appears once and Empty Trash can be retried", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("emp");
+  await expect(page.locator(".result-title").first()).toHaveText("Empty Trash");
+  await input.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "Empty the Trash?" });
+  await page.evaluate(() => {
+    window.__launcherTest.rejectActions =
+      "Could not run the system command: macOS canceled the command (error -128).";
+  });
+  await dialog
+    .getByRole("button", { name: "Empty Trash", exact: true })
+    .click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Could not run the system command: macOS canceled the command (error -128).",
+  );
+  await expect(page.locator('[role="alert"]')).toHaveCount(1);
+  await expect(dialog).not.toContainText("Automation");
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  await expect(
+    dialog.getByRole("button", { name: "Empty Trash", exact: true }),
+  ).toBeEnabled();
+  await page.screenshot({ path: test.info().outputPath("trash-canceled.png") });
+  await page.evaluate(() => {
+    window.__launcherTest.rejectActions = false;
+  });
+  await dialog
+    .getByRole("button", { name: "Empty Trash", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('[role="alert"]')).toHaveCount(0);
+  expect(await actions(page)).toEqual([
+    {
+      command: "execute_action",
+      payload: { id: "system:empty-trash", action: "run", confirmed: true },
+    },
+    {
+      command: "execute_action",
+      payload: { id: "system:empty-trash", action: "run", confirmed: true },
+    },
+  ]);
+});
+
+test("appearance desktop lock and mute system actions run without a confirmation", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  for (const [query, id] of [
+    ["toggle system appearance", "system:appearance"],
+    ["show desktop", "system:desktop"],
+    ["lock screen", "system:lock"],
+    ["toggle mute", "system:mute"],
+  ]) {
+    await page.evaluate(() => {
+      window.__launcherTest.calls = [];
+    });
+    await input.fill(query);
+    await input.press("Enter");
+    await expect
+      .poll(() => actions(page))
+      .toEqual([{ command: "execute_action", payload: { id, action: "run" } }]);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  }
+});
+
 test("keeps only the latest waiting query when input and index events overlap", async ({
   page,
 }) => {
@@ -889,6 +1039,30 @@ test("keeps only the latest waiting query when input and index events overlap", 
   await input.fill("intermediate");
   await input.fill("sa");
   await page.evaluate(() => window.__launcherTest.emit("files-changed", null));
+  // Cancellation is a separate immediate IPC, not another expensive search.
+  // The held mock reply proves the latest-waiting behavior independently of
+  // whether native work has already observed the cancellation signal.
+  const pending = await page.evaluate(() => {
+    const calls = window.__launcherTest.calls;
+    const request = calls.find(
+      (call) =>
+        call.command === "search" &&
+        (call.payload as { query: string }).query === "slow",
+    );
+    const requestId = (request?.payload as { requestId: number }).requestId;
+    return {
+      requestId,
+      cancellations: calls.filter(
+        (call) =>
+          call.command === "cancel_search" &&
+          (call.payload as { requestId: number }).requestId === requestId,
+      ),
+    };
+  });
+  expect(Number.isSafeInteger(pending.requestId)).toBe(true);
+  expect(pending.cancellations).toEqual([
+    { command: "cancel_search", payload: { requestId: pending.requestId } },
+  ]);
   await expect(
     page.getByRole("button", { name: "Open", exact: true }),
   ).toBeDisabled();
@@ -1070,6 +1244,32 @@ test("a background event does not preserve selection from a different query", as
   ).toContainText("Finder");
 });
 
+test("shows folders as Files results that open and reveal by ID", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("Projects");
+  await expect(page.locator(".result-title")).toHaveText("Projects");
+  await expect(page.locator(".preview-content .eyebrow")).toHaveText("Folder");
+  await expect(page.locator(".preview-metadata")).toContainText("Folder");
+  await input.press("Enter");
+  await input.press("Meta+Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      {
+        command: "execute_action",
+        payload: { id: "file:/Documents/Projects", action: "open" },
+      },
+      {
+        command: "execute_action",
+        payload: { id: "file:/Documents/Projects", action: "reveal" },
+      },
+    ]);
+});
+
 test("opens and reveals files by ID, and refreshes files with the mode shortcut", async ({
   page,
 }) => {
@@ -1081,7 +1281,7 @@ test("opens and reveals files by ID, and refreshes files with the mode shortcut"
     "placeholder",
     "Search filenames and paths...",
   );
-  await expect(page.locator(".list-count")).toHaveText("1 file indexed");
+  await expect(page.locator(".list-count")).toHaveText("1 item indexed");
   await expect(page.locator(".result-title")).toHaveText("Launch notes.md");
   await input.press("Enter");
   await input.press("Meta+Enter");
@@ -1130,7 +1330,7 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
   await openLauncher(page);
   await page.getByRole("combobox", { name: "Search TinyDash" }).fill("any");
   await page.evaluate(() => {
-    window.__launcherTest.fileIndexing = true;
+    window.__launcherTest.filePhase = "scanning";
     return window.__launcherTest.emit("files-changed", null);
   });
   await expect(page.locator(".query-hint")).toContainText("Scanning files...");
@@ -1145,7 +1345,7 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
     page.getByRole("button", { name: "Open", exact: true }),
   ).toBeEnabled();
   await page.evaluate(() => {
-    window.__launcherTest.fileIndexing = false;
+    window.__launcherTest.filePhase = "idle";
     window.__launcherTest.fileWarning =
       "File scan skipped 1 item. Permission denied.";
     return window.__launcherTest.emit("files-changed", null);
@@ -1160,6 +1360,156 @@ test("keeps results usable during a file scan and shows scan warnings and empty 
   ).toBeDisabled();
   await selectCategory(page, "Apps");
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("file refresh distinguishes queued cooldown, active scan, and finished empty results", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await expect(page.locator(".result-title")).toHaveText("Launch notes.md");
+  await input.press("Meta+r");
+  await expect(page.locator(".list-count")).toHaveText(
+    "Waiting to refresh files...",
+  );
+  await expect(
+    page.getByRole("button", { name: "Open", exact: true }),
+  ).toBeEnabled();
+  await input.fill("missing");
+  await expect(
+    page.getByRole("heading", { name: "Waiting to refresh files" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "No files found" }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("files-queued.png") });
+  await selectCategory(page, "All");
+  await expect(page.locator(".query-hint")).toContainText(
+    "Waiting to refresh files...",
+  );
+  await expect(
+    page.getByRole("heading", { name: "No results yet" }),
+  ).toBeVisible();
+  await selectCategory(page, "Files");
+  await page.evaluate(() => {
+    window.__launcherTest.filePhase = "scanning";
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(page.locator(".list-count")).toHaveText("Scanning files...");
+  await expect(
+    page.getByRole("heading", { name: "Finding your files" }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    window.__launcherTest.filePhase = "idle";
+    window.__launcherTest.fileTotal = 0;
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "No files found" }),
+  ).toBeVisible();
+  await input.fill("");
+  await expect(
+    page.getByRole("heading", { name: "No files in the index" }),
+  ).toBeVisible();
+  await expect(page.locator(".list-count")).toHaveText("0 items indexed");
+});
+
+test("file status follows root-change and disable notifications without showing a finished empty scan", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  await expect(page.locator(".result-title")).toHaveText("Launch notes.md");
+  // Model notifications from the separate Settings window. Settings form/save
+  // journeys are covered in settings.spec.ts; this proves their launcher UI.
+  for (const root of ["/Downloads", "/Documents"]) {
+    await page.evaluate(async (root) => {
+      const state = window.__launcherTest;
+      state.settings = { ...state.settings, fileSearchRoots: [root] };
+      state.fileTotal = 0;
+      state.filePhase = "queued";
+      await state.emit("settings-changed", state.settings);
+    }, root);
+    await expect(page.locator(".result-title")).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Waiting to refresh files" }),
+    ).toBeVisible();
+    await expect(page.locator(".list-count")).toHaveText(
+      "Waiting to refresh files...",
+    );
+  }
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = { ...state.settings, fileSearchRoots: [] };
+    state.filePhase = "disabled";
+    await state.emit("settings-changed", state.settings);
+    // A queued files notification carries no stale status payload.
+    await state.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "File search is off" }),
+  ).toBeVisible();
+  await expect(page.locator(".list-count")).toHaveText("File search is off");
+  await expect(
+    page.getByText(
+      "File search is off. Choose folders in Settings, File search.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "No files in the index" }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: test.info().outputPath("files-disabled.png") });
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("missing");
+  await expect(
+    page.getByRole("heading", { name: "File search is off" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "File search is off. Choose folders in Settings, File search.",
+    ),
+  ).toBeVisible();
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = { ...state.settings, fileSearchRoots: null };
+    state.filePhase = "queued";
+    await state.emit("settings-changed", state.settings);
+  });
+  await expect(
+    page.getByRole("heading", { name: "Waiting to refresh files" }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    window.__launcherTest.filePhase = "scanning";
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "Finding your files" }),
+  ).toBeVisible();
+});
+
+test("file scanner startup failure is distinct from a finished empty scan and can retry", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Files");
+  await page.evaluate(() => {
+    window.__launcherTest.fileTotal = 0;
+    window.__launcherTest.filePhase = "failed";
+    window.__launcherTest.fileWarning =
+      "Cannot start the file scanner: unavailable";
+    return window.__launcherTest.emit("files-changed");
+  });
+  await expect(
+    page.getByRole("heading", { name: "File scan unavailable" }),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(
+    "Cannot start the file scanner",
+  );
+  await expect(page.getByText("Use Refresh files to try again.")).toBeVisible();
+  await page.getByRole("combobox", { name: "Search TinyDash" }).press("Meta+r");
+  await expect(
+    page.getByRole("heading", { name: "Waiting to refresh files" }),
+  ).toBeVisible();
 });
 
 test("previews plain text, copies by ID, and deletes without hiding the launcher", async ({
@@ -1295,6 +1645,40 @@ test("shows a storage warning while search and launch remain available", async (
     .toEqual([
       { command: "execute_action", payload: { id: "app-1", action: "launch" } },
     ]);
+});
+
+test("keeps a pending sensitive-cleanup warning visible across successful search and launch", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Clipboard");
+  // Mocked IPC proves rendering only. Real SQLite session tests prove that
+  // unrelated successful writes preserve this warning until cleanup resolves.
+  await page.evaluate(() => {
+    window.__launcherTest.storageError =
+      "Sensitive clipboard cleanup is pending. Saved text may remain. Pinned entries are kept; unpin or delete them to finish cleanup. Automatic retries last only for this session; quitting loses pending cleanup. Cleanup capacity is full. Capture is paused until cleanup makes room. TinyDash retries cleanup while running, even if the clipboard stays unchanged.";
+    return window.__launcherTest.emit("clipboard-changed", null);
+  });
+  const warning = page.getByRole("alert");
+  await expect(warning).toContainText("Sensitive clipboard cleanup is pending");
+  await expect(warning).toContainText("Capture is paused");
+  await selectCategory(page, "Apps");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("sa");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(1);
+  await input.press("Enter");
+  await expect
+    .poll(() => actions(page))
+    .toEqual([
+      { command: "execute_action", payload: { id: "app-1", action: "launch" } },
+    ]);
+  await expect(warning).toContainText("quitting loses pending cleanup");
+  await selectCategory(page, "Clipboard");
+  await page.evaluate(() => {
+    window.__launcherTest.storageError = null;
+    return window.__launcherTest.emit("clipboard-changed", null);
+  });
+  await expect(warning).toHaveCount(0);
 });
 
 test("refreshes Rust ranking when the launcher preserves the query", async ({
@@ -1443,6 +1827,36 @@ test("shows action errors, handles empty results, and ignores IME confirmation",
   ).toBeDisabled();
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(8);
+});
+
+test("IME commit Enter does not execute a result when composition ends before keydown", async ({
+  page,
+}) => {
+  await openLauncher(page);
+  await selectCategory(page, "Apps");
+  const input = page.getByRole("combobox", { name: "Search TinyDash" });
+  await input.fill("sa");
+  await expect(page.getByRole("option").first()).toContainText("Safari");
+  await input.evaluate((element) => {
+    element.dispatchEvent(
+      new CompositionEvent("compositionstart", { bubbles: true }),
+    );
+    element.dispatchEvent(
+      new CompositionEvent("compositionend", { bubbles: true, data: "sa" }),
+    );
+    element.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        key: "Enter",
+        keyCode: 13,
+        isComposing: false,
+      }),
+    );
+  });
+  expect(await actions(page)).toHaveLength(0);
+  await expect(input).toHaveValue("sa");
+  await input.press("Enter");
+  await expect.poll(() => actions(page)).toHaveLength(1);
 });
 
 test("reopening clears or selects the prior query as configured", async ({

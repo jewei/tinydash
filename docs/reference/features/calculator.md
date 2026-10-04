@@ -1,8 +1,14 @@
 # Calculator and currency
 
-Select Calculator or enter an expression in All. The `=` prefix selects calculator parsing. Examples include `12 * 8`, `sqrt(144)`, `5 ft to cm`, and `=32 C to F`. Enter copies the selected value and hides the launcher.
+Select Calculator or enter an expression in All. The `=` prefix selects calculator parsing. Examples include `12 * 8`, `sqrt(144)`, `5 ft to cm`, and `=32 C to F`. Enter copies the selected value and hides the launcher. **Paste to previous app** or Command/Ctrl + Shift + Enter explicitly inserts it into the captured application where supported; see [direct paste](workflows.md#direct-paste) for permissions and platform limits.
 
 Arithmetic and unit conversion work offline. Unit case is preserved. Calculator mode shows errors for invalid expressions. Each query is independent; variables and scripts are not supported.
+
+Each evaluation has a 50 ms cooperative limit and also observes the shared [whole-search budget](launcher.md). Calculator pins share that budget instead of each extending the request by another 50 ms. Superseded requests interrupt evaluation. No calculation-result cache was added: issued copy values remain bounded independently, and no new cache retains secrets or time-sensitive tool results.
+
+Data rates distinguish bytes from bits. `Bps` means bytes per second, and `bps` means bits per second. For example, `8 Mbps to MBps` gives `1 MBps`. Decimal and binary prefixes work with these rates.
+
+Currency input can omit `to`: `100 USD MYR` means `100 USD to MYR`. This shorthand needs a simple number and two uppercase currency codes.
 
 Currency queries such as `100 USD to MYR` use daily ECB rates from [Frankfurter](https://frankfurter.dev/). The result shows the rate date. SQLite saves the complete rate table so conversions keep working offline after the first successful refresh. Old rates remain usable and show a cached-rates label. Unsupported currencies produce an error.
 

@@ -41,10 +41,12 @@ fn known_folder(id: &GUID) -> Option<PathBuf> {
     }
 }
 
-pub fn discover_apps() -> Result<Vec<AppEntry>> {
-    let mut apps = Vec::new();
-    let mut skipped = 0;
-    for root in [
+// Discovery finds shortcuts up to this many levels below a folder.
+const APP_DEPTH: usize = 8;
+
+/// Start menu and desktop folders that contain application shortcuts.
+pub fn app_folders() -> Vec<PathBuf> {
+    [
         FOLDERID_Programs,
         FOLDERID_CommonPrograms,
         FOLDERID_Desktop,
@@ -52,10 +54,16 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
     ]
     .iter()
     .filter_map(known_folder)
-    {
+    .collect()
+}
+
+pub fn discover_apps() -> Result<Vec<AppEntry>> {
+    let mut apps = Vec::new();
+    let mut skipped = 0;
+    for root in app_folders() {
         let walker = walkdir::WalkDir::new(root)
             .follow_links(false)
-            .max_depth(8)
+            .max_depth(APP_DEPTH)
             .into_iter()
             .filter_entry(|entry| !entry.file_name().to_string_lossy().starts_with('.'));
         for entry in walker {
@@ -87,6 +95,29 @@ pub fn discover_apps() -> Result<Vec<AppEntry>> {
     Ok(apps)
 }
 
+/// Maps a changed path to the shortcut that discovery would index.
+pub fn app_change(path: &std::path::Path, roots: &[PathBuf]) -> Option<crate::platform::AppChange> {
+    use crate::platform::AppChange;
+    let root = roots.iter().find(|root| path.starts_with(root))?;
+    let relative = path.strip_prefix(root).ok()?;
+    let depth = relative.components().count();
+    if depth == 0
+        || depth > APP_DEPTH
+        || relative
+            .components()
+            .any(|component| component.as_os_str().to_string_lossy().starts_with('.'))
+    {
+        return None;
+    }
+    let extension = path.extension().and_then(|ext| ext.to_str());
+    if is_app_extension(extension) {
+        Some(AppChange::App(path.to_owned()))
+    } else {
+        // A named folder can hold shortcuts. Documents on the desktop cannot.
+        (extension.is_none() && depth < APP_DEPTH).then_some(AppChange::Folder)
+    }
+}
+
 fn is_app_extension(extension: Option<&str>) -> bool {
     extension.is_some_and(|ext| {
         ["lnk", "exe", "appref-ms"]
@@ -115,6 +146,21 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
             // SAFETY: No pointers; requests a lock of this interactive session.
             windows_result(unsafe { LockWorkStation() } != 0)
         }
+        SystemCommand::ToggleAppearance => toggle_appearance(),
+        SystemCommand::EmptyTrash => empty_recycle_bin(),
+        SystemCommand::ShowDesktop => send_system_keys(&[
+            windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_LWIN,
+            windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_D,
+        ]),
+        SystemCommand::ToggleMute => {
+            send_system_keys(&[windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_VOLUME_MUTE])
+        }
+        SystemCommand::Logout => {
+            use windows_sys::Win32::System::Shutdown::{EWX_LOGOFF, ExitWindowsEx};
+            // Logging out the current interactive session needs no shutdown
+            // privilege. Do not force applications with unsaved work to close.
+            windows_result(unsafe { ExitWindowsEx(EWX_LOGOFF, 0) } != 0)
+        }
         _ => {
             // Token privileges belong to the process. Serialize their temporary
             // changes so simultaneous IPC requests cannot restore stale state.
@@ -142,6 +188,200 @@ pub fn run_system_command(command: crate::providers::system::SystemCommand) -> R
             }
         }
     }
+}
+
+fn empty_recycle_bin() -> Result<()> {
+    use windows_sys::Win32::UI::Shell::{
+        SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW,
+    };
+    // The Rust action boundary already checked explicit confirmation. Null
+    // selects this user's Recycle Bins on all drives, not other users' files.
+    let result = unsafe {
+        SHEmptyRecycleBinW(
+            ptr::null_mut(),
+            ptr::null(),
+            SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND,
+        )
+    };
+    if result >= 0 {
+        Ok(())
+    } else {
+        Err(Error::SystemCommand(format!(
+            "Windows could not empty the Recycle Bin (0x{:08X}).",
+            result as u32
+        )))
+    }
+}
+
+fn send_system_keys(keys: &[u16]) -> Result<()> {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
+        VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    };
+    // A numbered result shortcut can still have a modifier held. Wait for its
+    // release rather than sending a different shortcut or releasing the user's keys.
+    let started = std::time::Instant::now();
+    while [VK_CONTROL, VK_SHIFT, VK_MENU, VK_LWIN, VK_RWIN]
+        .iter()
+        .any(|key| unsafe { GetAsyncKeyState(i32::from(*key)) } < 0)
+    {
+        if started.elapsed() > std::time::Duration::from_secs(2) {
+            return Err(Error::SystemCommand(
+                "Release the modifier keys, then try this command again.".into(),
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    let event = |key, flags| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: key,
+                dwFlags: flags,
+                ..Default::default()
+            },
+        },
+    };
+    let inputs: Vec<_> = keys
+        .iter()
+        .map(|key| event(*key, 0))
+        .chain(keys.iter().rev().map(|key| event(*key, KEYEVENTF_KEYUP)))
+        .collect();
+    // SAFETY: The array contains initialized keyboard records and remains alive.
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            size_of::<INPUT>() as i32,
+        )
+    };
+    if sent != inputs.len() as u32 {
+        // Release any keys inserted before an incomplete send.
+        let releases: Vec<_> = keys
+            .iter()
+            .rev()
+            .map(|key| event(*key, KEYEVENTF_KEYUP))
+            .collect();
+        unsafe {
+            SendInput(
+                releases.len() as u32,
+                releases.as_ptr(),
+                size_of::<INPUT>() as i32,
+            );
+        }
+        return Err(Error::SystemCommand(
+            "Windows could not send the system shortcut. Check desktop permissions and try again."
+                .into(),
+        ));
+    }
+    Ok(())
+}
+
+fn toggle_appearance() -> Result<()> {
+    use windows_sys::{
+        Win32::{
+            Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS},
+            System::Registry::{
+                HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE, REG_DWORD,
+                RRF_RT_REG_DWORD, RegCloseKey, RegDeleteValueW, RegGetValueW, RegOpenKeyExW,
+                RegSetValueExW,
+            },
+            UI::WindowsAndMessaging::{
+                HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
+            },
+        },
+        core::w,
+    };
+    struct Key(HKEY);
+    impl Drop for Key {
+        fn drop(&mut self) {
+            unsafe {
+                RegCloseKey(self.0);
+            }
+        }
+    }
+    let check = |status| {
+        if status == ERROR_SUCCESS {
+            Ok(())
+        } else {
+            Err(Error::SystemCommand(
+                std::io::Error::from_raw_os_error(status as i32).to_string(),
+            ))
+        }
+    };
+    let mut key = Key(ptr::null_mut());
+    // SAFETY: All names are static, null-terminated UTF-16; buffers match DWORD.
+    unsafe {
+        check(RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
+            0,
+            KEY_QUERY_VALUE | KEY_SET_VALUE,
+            &mut key.0,
+        ))?;
+        let read = |name| -> Result<Option<u32>> {
+            let mut value = 0u32;
+            let mut size = size_of::<u32>() as u32;
+            let status = RegGetValueW(
+                key.0,
+                ptr::null(),
+                name,
+                RRF_RT_REG_DWORD,
+                ptr::null_mut(),
+                (&mut value as *mut u32).cast(),
+                &mut size,
+            );
+            if status == ERROR_FILE_NOT_FOUND {
+                return Ok(None);
+            }
+            check(status)?;
+            Ok(Some(value))
+        };
+        let system_name = w!("SystemUsesLightTheme");
+        let apps_name = w!("AppsUseLightTheme");
+        let previous = read(system_name)?;
+        let next: u32 = u32::from(previous.unwrap_or(1) == 0);
+        let write = |name, value: &u32| {
+            check(RegSetValueExW(
+                key.0,
+                name,
+                0,
+                REG_DWORD,
+                (value as *const u32).cast(),
+                size_of::<u32>() as u32,
+            ))
+        };
+        write(system_name, &next)?;
+        if let Err(error) = write(apps_name, &next) {
+            // Restore the first value if the second write fails.
+            let restored = match previous {
+                Some(value) => write(system_name, &value),
+                None => check(RegDeleteValueW(key.0, system_name)),
+            };
+            if let Err(restore_error) = restored {
+                return Err(Error::SystemCommand(format!(
+                    "{error} Could not restore the previous appearance: {restore_error}"
+                )));
+            }
+            return Err(error);
+        }
+        let mut result = 0;
+        if SendMessageTimeoutW(
+            HWND_BROADCAST,
+            WM_SETTINGCHANGE,
+            0,
+            w!("ImmersiveColorSet") as isize,
+            SMTO_ABORTIFHUNG,
+            1000,
+            &mut result,
+        ) == 0
+        {
+            tracing::debug!(
+                "Appearance changed; some applications did not acknowledge the refresh"
+            );
+        }
+    }
+    Ok(())
 }
 
 fn windows_result(success: bool) -> Result<()> {
@@ -249,18 +489,25 @@ impl Drop for ShutdownPrivilege {
 }
 
 // Read only after the native counter changes. No window or frequent text polling.
-pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, Option<String>)>> {
-    use crate::providers::clipboard::{MAX_TEXT_BYTES, valid_text};
+pub fn clipboard_snapshot(
+    previous: Option<u64>,
+) -> anyhow::Result<Option<(u64, crate::providers::clipboard::Observed)>> {
+    use crate::providers::clipboard::{MAX_TEXT_BYTES, Observed, SECRET_FORMATS};
     use windows_sys::Win32::System::{
         DataExchange::{
-            CloseClipboard, GetClipboardData, GetClipboardSequenceNumber,
-            IsClipboardFormatAvailable, OpenClipboard,
+            CloseClipboard, CountClipboardFormats, GetClipboardData, GetClipboardSequenceNumber,
+            IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW,
         },
         Memory::{GlobalLock, GlobalSize, GlobalUnlock},
     };
     const UNICODE_TEXT: u32 = 13; // CF_UNICODETEXT, defined by Win32.
+    let format = |name: &str| {
+        let name = name.encode_utf16().chain([0]).collect::<Vec<_>>();
+        // Registration returns the existing ID for a known name, or 0.
+        unsafe { RegisterClipboardFormatW(name.as_ptr()) }
+    };
     // All pointers come from Win32. Clipboard ownership and the global memory
-    // lock remain held until the bounded UTF-16 slice has been copied.
+    // lock remain held until the bounded data has been copied.
     unsafe {
         let counter = u64::from(GetClipboardSequenceNumber());
         if previous == Some(counter) {
@@ -279,8 +526,33 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         }
         let _close = Close;
         let counter = u64::from(GetClipboardSequenceNumber());
+        if CountClipboardFormats() == 0 {
+            return Ok(Some((counter, Observed::Cleared)));
+        }
+        let available = |id: u32| id != 0 && IsClipboardFormatAvailable(id) != 0;
+        // Windows documents a DWORD 0 in this format as "exclude from history".
+        let history_excluded = || {
+            let id = format("CanIncludeInClipboardHistory");
+            if !available(id) {
+                return false;
+            }
+            let handle = GetClipboardData(id);
+            if handle.is_null() || GlobalSize(handle) < 4 {
+                return false;
+            }
+            let pointer = GlobalLock(handle);
+            if pointer.is_null() {
+                return false;
+            }
+            let value = pointer.cast::<u32>().read_unaligned();
+            GlobalUnlock(handle);
+            value == 0
+        };
+        if SECRET_FORMATS.iter().any(|name| available(format(name))) || history_excluded() {
+            return Ok(Some((counter, Observed::Secret)));
+        }
         if IsClipboardFormatAvailable(UNICODE_TEXT) == 0 {
-            return Ok(Some((counter, None)));
+            return Ok(Some((counter, Observed::Other)));
         }
         let handle = GetClipboardData(UNICODE_TEXT);
         if handle.is_null() {
@@ -288,7 +560,7 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         }
         let bytes = GlobalSize(handle);
         if bytes == 0 || bytes > (MAX_TEXT_BYTES + 1) * 2 || !bytes.is_multiple_of(2) {
-            return Ok(Some((counter, None)));
+            return Ok(Some((counter, Observed::Other)));
         }
         let pointer = GlobalLock(handle);
         if pointer.is_null() {
@@ -298,15 +570,49 @@ pub fn clipboard_snapshot(previous: Option<u64>) -> anyhow::Result<Option<(u64, 
         let text = data
             .iter()
             .position(|value| *value == 0)
-            .and_then(|end| String::from_utf16(&data[..end]).ok())
-            .filter(|text| valid_text(text));
+            .and_then(|end| String::from_utf16(&data[..end]).ok());
         GlobalUnlock(handle);
-        Ok(Some((u64::from(GetClipboardSequenceNumber()), text)))
+        Ok(Some((
+            u64::from(GetClipboardSequenceNumber()),
+            Observed::from_text(text),
+        )))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn maps_changes_to_shortcuts_or_folders() {
+        use crate::platform::AppChange;
+        use std::path::{Path, PathBuf};
+        let roots = [
+            PathBuf::from(r"C:\Start\Programs"),
+            PathBuf::from(r"C:\Users\a\Desktop"),
+        ];
+        let app = |path: &str| Some(AppChange::App(PathBuf::from(path)));
+        for (path, expected) in [
+            (
+                r"C:\Start\Programs\Editor.lnk",
+                app(r"C:\Start\Programs\Editor.lnk"),
+            ),
+            (
+                r"C:\Users\a\Desktop\Tool.EXE",
+                app(r"C:\Users\a\Desktop\Tool.EXE"),
+            ),
+            (r"C:\Start\Programs\Suite", Some(AppChange::Folder)),
+            (r"C:\Users\a\Desktop\report.docx", None),
+            (r"C:\Users\a\Desktop\.hidden\Tool.lnk", None),
+            (r"C:\Start\Programs", None),
+            (r"C:\Other\Editor.lnk", None),
+        ] {
+            assert_eq!(
+                super::app_change(Path::new(path), &roots),
+                expected,
+                "{path}"
+            );
+        }
+    }
+
     #[test]
     fn shutdown_requests_never_force_apps_to_close() {
         use crate::providers::system::SystemCommand;

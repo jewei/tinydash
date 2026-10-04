@@ -112,6 +112,20 @@ impl AppProvider {
             .map(|app| &app.entry)
     }
 
+    /// Hidden results may still be opened by an explicitly configured shortcut.
+    pub fn get_any(&self, id: &str) -> Option<&AppEntry> {
+        self.apps
+            .iter()
+            .find(|app| app.entry.id == id)
+            .map(|app| &app.entry)
+    }
+
+    /// Includes applications that the user hides from results.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn contains(&self, id: &str) -> bool {
+        self.apps.iter().any(|app| app.entry.id == id)
+    }
+
     pub fn catalog(&self) -> Vec<SearchResult> {
         self.apps.iter().map(|app| app.entry.result(0)).collect()
     }
@@ -134,17 +148,31 @@ impl AppProvider {
         }
     }
 
+    #[cfg(test)]
     pub fn search(
         &self,
         query: &str,
         pattern: &Pattern,
         matcher: &mut Matcher,
     ) -> Vec<SearchResult> {
+        self.search_interruptible(query, pattern, matcher, || false)
+    }
+
+    pub fn search_interruptible(
+        &self,
+        query: &str,
+        pattern: &Pattern,
+        matcher: &mut Matcher,
+        mut stopped: impl FnMut() -> bool,
+    ) -> Vec<SearchResult> {
         #[cfg(test)]
         super::search_work::record(super::search_work::Provider::Apps, self.apps.len());
         let matches: Vec<_> = self
             .apps
             .iter()
+            .enumerate()
+            .take_while(|(index, _)| index % 64 != 0 || !stopped())
+            .map(|(_, app)| app)
             .filter(|app| !app.hidden)
             .filter_map(|app| {
                 if query.is_empty() {
@@ -158,7 +186,8 @@ impl AppProvider {
                     .iter()
                     .filter_map(|(alias, normalized)| {
                         pattern.score(alias.slice(..), matcher).map(|score| {
-                            ranking::name_score(score, normalized, query).saturating_sub(100)
+                            ranking::name_score(score, normalized, query)
+                                .saturating_sub(ranking::ALIAS_PENALTY)
                         })
                     })
                     .max();
@@ -196,6 +225,35 @@ mod tests {
             AtomKind::Fuzzy,
         );
         provider.search(query, &pattern, &mut matcher)
+    }
+
+    #[test]
+    fn app_matching_checks_cancellation_between_small_batches() {
+        let provider = AppProvider::new(
+            (0..1000)
+                .map(|index| {
+                    AppEntry::new(
+                        format!("App {index:04}"),
+                        format!("/apps/{index}").into(),
+                        vec![],
+                    )
+                })
+                .collect(),
+        );
+        let mut matcher = Matcher::new(Config::DEFAULT);
+        let pattern = Pattern::new(
+            "app",
+            CaseMatching::Ignore,
+            Normalization::Smart,
+            AtomKind::Fuzzy,
+        );
+        let mut checks = 0;
+        let results = provider.search_interruptible("app", &pattern, &mut matcher, || {
+            checks += 1;
+            checks > 1
+        });
+        assert_eq!(checks, 2);
+        assert_eq!(results.len(), 64);
     }
 
     #[test]

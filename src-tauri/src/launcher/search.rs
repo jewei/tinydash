@@ -1,6 +1,10 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    sync::Arc,
+    sync::{
+        Arc, Mutex, MutexGuard, TryLockError,
+        atomic::{AtomicU64, Ordering},
+    },
+    time::{Duration, Instant},
 };
 
 use nucleo_matcher::{
@@ -30,13 +34,102 @@ use crate::{
 };
 
 pub const RESULT_LIMIT: usize = 30;
+pub const SEARCH_TIME_LIMIT: Duration = Duration::from_millis(250);
+
+/// One budget for the entire request, including worker queueing, lock wait,
+/// provider matching and all pins. Cancellation never takes the search lock.
+pub struct SearchBudget {
+    started: Instant,
+    deadline: Instant,
+    #[cfg(test)]
+    deterministic_selection_test: bool,
+    request_id: Option<u64>,
+    cancelled: Arc<AtomicU64>,
+}
+
+impl SearchBudget {
+    pub fn new(request_id: Option<u64>, cancelled: Arc<AtomicU64>) -> Self {
+        let started = Instant::now();
+        Self {
+            started,
+            deadline: started + SEARCH_TIME_LIMIT,
+            request_id,
+            cancelled,
+            #[cfg(test)]
+            deterministic_selection_test: false,
+        }
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.request_id
+            .is_some_and(|id| self.cancelled.load(Ordering::Acquire) == id)
+    }
+
+    pub fn stopped(&self) -> bool {
+        #[cfg(test)]
+        if self.deterministic_selection_test {
+            return self.is_cancelled();
+        }
+        self.is_cancelled() || Instant::now() >= self.deadline
+    }
+
+    pub fn check(&self) -> std::result::Result<(), String> {
+        if self.is_cancelled() {
+            Err("Search canceled.".into())
+        } else if self.stopped() {
+            Err("Search took too long. Try a more specific query.".into())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.started.elapsed()
+    }
+
+    /// Called only on a blocking worker. A superseded request must not wait
+    /// indefinitely behind publication, preferences, or another search.
+    pub fn lock<'a, T>(
+        &self,
+        mutex: &'a Mutex<T>,
+    ) -> std::result::Result<MutexGuard<'a, T>, String> {
+        loop {
+            self.check()?;
+            match mutex.try_lock() {
+                Ok(guard) => return Ok(guard),
+                Err(TryLockError::Poisoned(_)) => return Err(Error::IndexUnavailable.to_string()),
+                Err(TryLockError::WouldBlock) => std::thread::sleep(Duration::from_millis(1)),
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+struct SearchTimings {
+    // Fixed order: apps, files, clipboard, system, emoji, calculator, tools.
+    provider_us: [u64; 7],
+    calls: [usize; 7],
+    pin_us: u64,
+    pin_attempts: usize,
+}
+
+impl SearchTimings {
+    fn record(&mut self, provider: usize, started: Instant) {
+        self.provider_us[provider] += started.elapsed().as_micros() as u64;
+        self.calls[provider] += 1;
+    }
+}
 
 pub struct SearchManager {
+    show_suggestions: bool,
     app_preferences: std::collections::BTreeMap<String, crate::settings::AppPreference>,
     apps: AppProvider,
+    item_preferences: std::collections::BTreeMap<String, crate::settings::ItemPreference>,
     files: FileProvider,
     matcher: Matcher,
     emoji: Option<EmojiProvider>,
+    emoji_skin_tone: u8,
+    emoji_languages: Vec<String>,
     system: Option<SystemCommandProvider>,
     calculator: CalculatorProvider,
     pub clipboard: ClipboardProvider,
@@ -44,6 +137,7 @@ pub struct SearchManager {
     usage: HashMap<String, ranking::Usage>,
     pins: Pins,
     issued_pins: VecDeque<(String, String, SearchMode)>,
+    timings: SearchTimings,
     #[cfg(test)]
     eager_search: bool,
 }
@@ -56,11 +150,15 @@ pub struct SearchOutcome {
 impl Default for SearchManager {
     fn default() -> Self {
         Self {
+            show_suggestions: true,
             app_preferences: Default::default(),
             apps: AppProvider::default(),
+            item_preferences: Default::default(),
             files: FileProvider::default(),
             matcher: Matcher::new(Config::DEFAULT),
             emoji: None,
+            emoji_skin_tone: 0,
+            emoji_languages: Vec::new(),
             system: None,
             calculator: CalculatorProvider::default(),
             clipboard: ClipboardProvider::default(),
@@ -68,6 +166,7 @@ impl Default for SearchManager {
             usage: HashMap::new(),
             pins: Pins::new(),
             issued_pins: VecDeque::new(),
+            timings: SearchTimings::default(),
             #[cfg(test)]
             eager_search: false,
         }
@@ -76,7 +175,24 @@ impl Default for SearchManager {
 
 impl SearchManager {
     pub fn apply_settings(&mut self, settings: &crate::settings::Settings) {
+        self.show_suggestions = settings.show_suggestions;
+        self.emoji_skin_tone = settings.emoji_skin_tone;
+        if self.emoji_languages != settings.emoji_languages {
+            self.emoji_languages = settings.emoji_languages.clone();
+            self.emoji = None;
+        }
+        if let Some(emoji) = self.emoji.as_mut() {
+            emoji.set_skin_tone(settings.emoji_skin_tone);
+        }
         self.app_preferences = settings.app_preferences.clone();
+        self.item_preferences = settings.item_preferences.clone();
+        for (id, item) in &self.item_preferences {
+            if id.starts_with("app:") {
+                let preference = self.app_preferences.entry(id.clone()).or_default();
+                preference.aliases.extend(item.aliases.clone());
+                preference.hidden |= item.hidden || item.disabled;
+            }
+        }
         self.apps.apply_preferences(&self.app_preferences);
         self.tools.set_web_searches(&settings.web_searches);
     }
@@ -84,6 +200,17 @@ impl SearchManager {
     pub fn app_catalog(&self) -> Vec<SearchResult> {
         self.apps.catalog()
     }
+    pub fn item_catalog(&mut self) -> Vec<SearchResult> {
+        let mut items = self.apps.catalog();
+        items.extend(
+            self.system
+                .get_or_insert_with(SystemCommandProvider::default)
+                .search("", &mut self.matcher),
+        );
+        items.extend(super::commands::catalog());
+        items
+    }
+
     pub fn set_pins(&mut self, pins: Pins) {
         self.pins = pins;
     }
@@ -157,14 +284,14 @@ impl SearchManager {
                 }
                 .key()
             } else {
-                result.id.clone()
+                crate::providers::emoji::canonical_id(&result.id).into_owned()
             };
             *index += 1;
             result.pin = Some(self.describe_pin(key));
         }
     }
 
-    fn pinned_result(&mut self, key: &str) -> Option<SearchResult> {
+    fn pinned_result(&mut self, key: &str, budget: &SearchBudget) -> Option<SearchResult> {
         let result = if let Some(saved) = QueryPin::from_key(key) {
             if let Some(keyword) = &saved.web_keyword {
                 if saved.mode != SearchMode::Web {
@@ -174,7 +301,13 @@ impl SearchManager {
             } else {
                 let query = Query::parse(&saved.text, saved.mode).ok()?;
                 if query.mode == SearchMode::Calculator {
-                    self.calculator.search(query.text).ok()
+                    let started = Instant::now();
+                    let result = self
+                        .calculator
+                        .search_interruptible(query.text, || budget.stopped())
+                        .ok();
+                    self.timings.record(5, started);
+                    result
                 } else {
                     self.tools.search_pinned(&query, saved.index)
                 }
@@ -184,16 +317,9 @@ impl SearchManager {
         } else if key.starts_with("file:") {
             self.files.get(key).map(|file| file.result(0))
         } else if key.starts_with("emoji:") {
-            self.emoji
-                .get_or_insert_with(EmojiProvider::default)
-                .search(EmojiProvider::copy_value(key)?, &mut self.matcher)
-                .into_iter()
-                .find(|result| result.id == key)
+            EmojiProvider::pinned_result(key, self.emoji_skin_tone)
         } else if key.starts_with("clipboard:") {
-            self.clipboard
-                .search("", &mut self.matcher)
-                .into_iter()
-                .find(|result| result.id == key)
+            self.clipboard.result(key)
         } else if key.starts_with("system:") {
             self.system
                 .get_or_insert_with(SystemCommandProvider::default)
@@ -229,7 +355,10 @@ impl SearchManager {
     }
 
     pub fn record_usage(&mut self, id: &str, now: i64) -> ranking::Usage {
-        let usage = self.usage.entry(id.to_owned()).or_default();
+        let usage = self
+            .usage
+            .entry(crate::providers::emoji::canonical_id(id).into_owned())
+            .or_default();
         usage.count = usage.count.saturating_add(1);
         usage.last_used_at = now.max(0);
         *usage
@@ -238,6 +367,11 @@ impl SearchManager {
     pub fn replace_apps(&mut self, mut apps: AppProvider) {
         apps.apply_preferences(&self.app_preferences);
         self.apps = apps;
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub fn has_app(&self, id: &str) -> bool {
+        self.apps.contains(id)
     }
 
     pub fn app_count(&self) -> usize {
@@ -252,12 +386,12 @@ impl SearchManager {
         self.files.len()
     }
 
-    fn file(&self, id: &str) -> Result<FileEntry> {
+    pub fn file(&self, id: &str) -> Result<FileEntry> {
         self.files.get(id).cloned().ok_or(Error::FileNotFound)
     }
 
     pub fn app(&self, id: &str) -> Result<AppEntry> {
-        self.apps.get(id).cloned().ok_or(Error::AppNotFound)
+        self.apps.get_any(id).cloned().ok_or(Error::AppNotFound)
     }
 
     pub fn clipboard_entry(&self, id: &str) -> Result<&ClipboardEntry> {
@@ -265,6 +399,16 @@ impl SearchManager {
     }
 
     pub fn resolve_action(&self, id: &str, action: Action) -> Result<ResolvedAction> {
+        if self
+            .item_preferences
+            .get(id)
+            .is_some_and(|item| item.disabled)
+        {
+            return Err(Error::InvalidAction);
+        }
+        if action == Action::Run && super::commands::panel(id).is_some() {
+            return Ok(ResolvedAction::Panel(id.to_owned()));
+        }
         if id.starts_with("password:") || id.starts_with("tool:") {
             return self.tools.resolve(id, action);
         }
@@ -300,11 +444,118 @@ impl SearchManager {
         }
     }
 
+    #[cfg(test)]
     pub fn search(&mut self, input: &str, mode: SearchMode) -> Result<SearchOutcome> {
+        let mut budget = SearchBudget::new(None, Arc::default());
+        budget.deterministic_selection_test = self.calculator.deterministic_selection_test;
+        self.search_with_budget(input, mode, &budget)
+    }
+
+    pub fn search_with_budget(
+        &mut self,
+        input: &str,
+        mode: SearchMode,
+        budget: &SearchBudget,
+    ) -> Result<SearchOutcome> {
+        self.timings = SearchTimings::default();
+        let started = Instant::now();
+        let mut outcome = self.search_inner(input, mode, budget);
+        if budget.stopped() {
+            // Never publish a partially ranked or superseded result list.
+            outcome = Ok(SearchOutcome {
+                results: Vec::new(),
+                notice: budget.check().err(),
+            });
+        }
+        tracing::debug!(
+            search_us = started.elapsed().as_micros() as u64,
+            request_us = budget.elapsed().as_micros() as u64,
+            provider_us = ?self.timings.provider_us,
+            provider_calls = ?self.timings.calls,
+            indexed_apps = self.apps.len(),
+            indexed_files = self.files.len(),
+            indexed_clipboard = self.clipboard.len(),
+            pin_us = self.timings.pin_us,
+            pin_attempts = self.timings.pin_attempts,
+            returned = outcome.as_ref().map_or(0, |outcome| outcome.results.len()),
+            stopped = budget.stopped(),
+            "Search work (apps/files/clipboard/system/emoji/calculator/tools)"
+        );
+        outcome
+    }
+
+    fn search_inner(
+        &mut self,
+        input: &str,
+        mode: SearchMode,
+        budget: &SearchBudget,
+    ) -> Result<SearchOutcome> {
         let query = Query::parse(input, mode)?;
-        let mut outcome = self.search_unpinned(&query);
+        if budget.stopped() {
+            return Ok(SearchOutcome {
+                results: Vec::new(),
+                notice: None,
+            });
+        }
+        let mut outcome = self.search_unpinned(&query, budget);
+        // Empty search still ends active tool queries (including password
+        // generation). Suggestions replace only its result list.
+        if query.mode == SearchMode::All && query.text.is_empty() {
+            outcome.results = self.suggestions(budget);
+        }
+        if budget.stopped() {
+            return Ok(outcome);
+        }
+        if matches!(query.mode, SearchMode::All | SearchMode::System)
+            && (query.mode == SearchMode::System || !query.text.is_empty())
+        {
+            let text = ranking::normalize(query.text);
+            let mut extras = super::commands::catalog();
+            if self
+                .item_preferences
+                .keys()
+                .any(|id| id.starts_with("system:"))
+            {
+                extras.extend(
+                    self.system
+                        .get_or_insert_with(SystemCommandProvider::default)
+                        .search("", &mut self.matcher)
+                        .into_iter()
+                        .filter(|result| self.item_preferences.contains_key(&result.id)),
+                );
+            }
+            extras.retain_mut(|result| {
+                let alias = self.item_preferences.get(&result.id).is_some_and(|item| {
+                    item.aliases
+                        .iter()
+                        .any(|alias| ranking::normalize(alias).starts_with(&text))
+                });
+                let title = ranking::normalize(&result.title);
+                let matches = text.is_empty() || title.starts_with(&text) || alias;
+                result.score = if text.is_empty() {
+                    0
+                } else if alias {
+                    ranking::EXACT_MATCH
+                } else {
+                    ranking::name_score(0, &title, &text)
+                };
+                matches
+                    && !self
+                        .item_preferences
+                        .get(&result.id)
+                        .is_some_and(|item| item.hidden || item.disabled)
+            });
+            if !extras.is_empty() {
+                ranking::apply_usage(&mut extras, &self.usage, ranking::now());
+                let ids: HashSet<_> = extras.iter().map(|result| result.id.clone()).collect();
+                outcome.results.retain(|result| !ids.contains(&result.id));
+                outcome.results.extend(extras);
+                outcome.results = ranking::top_results(outcome.results, RESULT_LIMIT);
+            }
+        }
         self.describe_results(&mut outcome.results, &query);
         if input.trim().is_empty() {
+            let pin_started = Instant::now();
             let mut keys: Vec<_> = self
                 .pins
                 .get(&mode)
@@ -322,14 +573,16 @@ impl SearchManager {
             // Keep issued tool values bounded, even when a category has many pins.
             let mut added = 0;
             for key in keys.iter().filter(|key| !present.contains(*key)) {
-                if added == RESULT_LIMIT {
+                if added == RESULT_LIMIT || budget.stopped() {
                     break;
                 }
-                if let Some(result) = self.pinned_result(key) {
+                self.timings.pin_attempts += 1;
+                if let Some(result) = self.pinned_result(key, budget) {
                     outcome.results.push(result);
                     added += 1;
                 }
             }
+            self.timings.pin_us = pin_started.elapsed().as_micros() as u64;
             outcome.results.sort_by_key(|result| {
                 !result
                     .pin
@@ -339,6 +592,9 @@ impl SearchManager {
             if !outcome.results.is_empty() {
                 outcome.notice = None;
             }
+        }
+        if budget.stopped() {
+            return Ok(outcome);
         }
         // Pins remain first, but leave a place for the most recent clipboard
         // item even when pinned items fill the result limit.
@@ -355,6 +611,12 @@ impl SearchManager {
             outcome.results.truncate(RESULT_LIMIT - 1);
             outcome.results.push(latest);
         }
+        outcome.results.retain(|result| {
+            !self
+                .item_preferences
+                .get(&result.id)
+                .is_some_and(|item| item.hidden || item.disabled)
+        });
         outcome.results.truncate(RESULT_LIMIT);
         // Pins, usage, category order, and all response limits have now been
         // applied. Only returned apps need an icon payload.
@@ -378,33 +640,85 @@ impl SearchManager {
         Ok(outcome)
     }
 
-    fn search_unpinned(&mut self, query: &Query<'_>) -> SearchOutcome {
+    fn suggestions(&mut self, budget: &SearchBudget) -> Vec<SearchResult> {
+        if !self.show_suggestions {
+            return Vec::new();
+        }
+        let now = ranking::now();
+        let mut candidates = Vec::with_capacity(7);
+        for (id, usage) in &self.usage {
+            if budget.stopped() {
+                return Vec::new();
+            }
+            // Never suggest private clipboard content, generated values, or power actions.
+            if usage.count > 0
+                && ((id.starts_with("app:") && self.apps.get(id).is_some())
+                    || (id.starts_with("file:") && self.files.get(id).is_some())
+                    || (id.starts_with("emoji:") && EmojiProvider::copy_value(id).is_some()))
+                && !self
+                    .pins
+                    .get(&SearchMode::All)
+                    .is_some_and(|pins| pins.contains(id))
+                && !self
+                    .item_preferences
+                    .get(id)
+                    .is_some_and(|item| item.hidden || item.disabled)
+            {
+                candidates.push((
+                    id,
+                    ranking::score_with_usage(0, id, &self.usage, now),
+                    usage.last_used_at,
+                ));
+                candidates.sort_by(|a, b| {
+                    b.1.cmp(&a.1)
+                        .then_with(|| b.2.cmp(&a.2))
+                        .then_with(|| a.0.cmp(b.0))
+                });
+                candidates.truncate(6);
+            }
+        }
+        let candidates: Vec<_> = candidates
+            .into_iter()
+            .map(|(id, score, _)| (id.clone(), score))
+            .collect();
+        let mut results = Vec::new();
+        for (id, score) in candidates {
+            if budget.stopped() || results.len() == 6 {
+                break;
+            }
+            if let Some(mut result) = self.pinned_result(&id, budget) {
+                result.score = score;
+                results.push(result);
+            }
+        }
+        results
+    }
+
+    fn search_unpinned(&mut self, query: &Query<'_>, budget: &SearchBudget) -> SearchOutcome {
         #[cfg(test)]
         if self.eager_search {
             return self.search_unpinned_eager(query);
         }
         if query.mode == SearchMode::Clipboard && query.text.is_empty() {
+            let started = Instant::now();
+            let results = self.clipboard.recent(RESULT_LIMIT);
+            self.timings.record(2, started);
             return SearchOutcome {
-                results: self
-                    .clipboard
-                    .search("", &mut self.matcher)
-                    .into_iter()
-                    .take(RESULT_LIMIT)
-                    .collect(),
+                results,
                 notice: None,
             };
         }
-        if let Some(outcome) = self.tools.search(query) {
-            return match outcome {
-                Ok(results) => SearchOutcome {
-                    results: results.into_iter().take(RESULT_LIMIT).collect(),
-                    notice: None,
-                },
-                Err(notice) => SearchOutcome {
-                    results: vec![],
-                    notice: Some(notice),
-                },
+        let started = Instant::now();
+        let tools = self.tools.search(query);
+        self.timings.record(6, started);
+        if budget.stopped() {
+            return SearchOutcome {
+                results: Vec::new(),
+                notice: None,
             };
+        }
+        if let Some(outcome) = tools {
+            return self.tool_outcome(query, outcome, budget);
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -415,7 +729,11 @@ impl SearchManager {
             && (query.mode == SearchMode::Calculator
                 || (mixed && CalculatorProvider::is_candidate(query.text)))
         {
-            match self.calculator.search(query.text) {
+            let started = Instant::now();
+            match self
+                .calculator
+                .search_interruptible(query.text, || budget.stopped())
+            {
                 Ok(result) => results.push(result),
                 Err(error)
                     if query.mode == SearchMode::Calculator
@@ -428,61 +746,157 @@ impl SearchManager {
                 }
                 Err(_) => {} // Ordinary app names and partial input are not calculator errors.
             }
+            self.timings.record(5, started);
         }
         let now = ranking::now();
-        // This order follows ranking::top_results. A later category cannot
-        // displace an earlier one, even when its usage or fuzzy score is higher.
-        for category in [
-            SearchMode::Apps,
-            SearchMode::Files,
-            SearchMode::Clipboard,
-            SearchMode::System,
-            SearchMode::Emoji,
-        ] {
+        // Command prefixes must survive a full page of fuzzy app or file
+        // matches. Other queries follow ranking::top_results.
+        let categories = if mixed && SystemCommandProvider::is_prefix_query(query.text) {
+            [
+                SearchMode::System,
+                SearchMode::Apps,
+                SearchMode::Files,
+                SearchMode::Clipboard,
+                SearchMode::Emoji,
+            ]
+        } else {
+            [
+                SearchMode::Apps,
+                SearchMode::Files,
+                SearchMode::System,
+                SearchMode::Clipboard,
+                SearchMode::Emoji,
+            ]
+        };
+        // Strong name matches from every category come before fuzzy matches.
+        // Each category gets only the slots that earlier strong matches leave,
+        // so later categories are skipped once strong matches fill the response.
+        let mut fuzzy = Vec::new();
+        for category in categories {
             let remaining = RESULT_LIMIT - results.len();
-            if remaining == 0 {
+            if remaining == 0 || budget.stopped() {
                 break;
             }
             if query.mode != category && !mixed {
                 continue;
             }
+            let started = Instant::now();
             let mut matches = match category {
-                SearchMode::Apps => {
-                    let normalized = ranking::normalize(query.text);
-                    let pattern = Pattern::new(
-                        &normalized,
-                        CaseMatching::Ignore,
-                        Normalization::Smart,
-                        AtomKind::Fuzzy,
-                    );
-                    self.apps.search(&normalized, &pattern, &mut self.matcher)
+                SearchMode::Apps => self.search_apps(query.text, budget),
+                SearchMode::Files => self.files.search_interruptible(
+                    query.text,
+                    &mut self.matcher,
+                    &self.usage,
+                    now,
+                    remaining,
+                    || budget.stopped(),
+                ),
+                SearchMode::Clipboard => {
+                    self.clipboard
+                        .search_interruptible(query.text, &mut self.matcher, || budget.stopped())
                 }
-                SearchMode::Files => {
-                    self.files
-                        .search(query.text, &mut self.matcher, &self.usage, now, remaining)
-                }
-                SearchMode::Clipboard => self.clipboard.search(query.text, &mut self.matcher),
                 SearchMode::System => self
                     .system
                     .get_or_insert_with(SystemCommandProvider::default)
                     .search(query.text, &mut self.matcher),
                 SearchMode::Emoji => self
                     .emoji
-                    .get_or_insert_with(EmojiProvider::default)
-                    .search(query.text, &mut self.matcher),
+                    .get_or_insert_with(|| {
+                        EmojiProvider::new(self.emoji_skin_tone, &self.emoji_languages)
+                    })
+                    .search_interruptible(query.text, &mut self.matcher, || budget.stopped()),
                 _ => unreachable!("ordinary search category"),
             };
+            let provider = match category {
+                SearchMode::Apps => 0,
+                SearchMode::Files => 1,
+                SearchMode::Clipboard => 2,
+                SearchMode::System => 3,
+                SearchMode::Emoji => 4,
+                _ => unreachable!(),
+            };
+            // search_apps also serves explicit tools; it records itself.
+            if category != SearchMode::Apps {
+                self.timings.record(provider, started);
+            }
             // FileProvider already applies usage and its top-N limit. Other
             // providers must receive usage bonuses before selection too.
             if category != SearchMode::Files {
                 ranking::apply_usage(&mut matches, &self.usage, now);
                 matches = ranking::top_results(matches, remaining);
             }
-            results.extend(matches);
+            let (strong, weak): (Vec<_>, Vec<_>) = matches
+                .into_iter()
+                .partition(|result| ranking::tier(result) < 2);
+            results.extend(strong);
+            fuzzy.extend(weak);
         }
+        results.extend(fuzzy);
+        results.truncate(RESULT_LIMIT);
+        SearchOutcome { results, notice }
+    }
+
+    fn search_apps(&mut self, text: &str, budget: &SearchBudget) -> Vec<SearchResult> {
+        let started = Instant::now();
+        let normalized = ranking::normalize(text);
+        // App punctuation remains literal. Calculator input retains its case.
+        let pattern = Pattern::new(
+            &normalized,
+            CaseMatching::Ignore,
+            Normalization::Smart,
+            AtomKind::Fuzzy,
+        );
+        let results =
+            self.apps
+                .search_interruptible(&normalized, &pattern, &mut self.matcher, || {
+                    budget.stopped()
+                });
+        self.timings.record(0, started);
+        results
+    }
+
+    // A tool keyword such as "google" or "time" keeps its scope in All, except
+    // for an app with that exact name. Apps whose names start with the query
+    // follow the tool results, so "Time Machine" is still found by "time".
+    fn tool_outcome(
+        &mut self,
+        query: &Query<'_>,
+        outcome: std::result::Result<Vec<SearchResult>, String>,
+        budget: &SearchBudget,
+    ) -> SearchOutcome {
+        let (tools, notice) = match outcome {
+            Ok(results) => (results, None),
+            Err(notice) => (Vec::new(), Some(notice)),
+        };
+        let apps = if query.mode == SearchMode::All {
+            self.search_apps(query.text, budget)
+        } else {
+            Vec::new()
+        };
+        let (mut exact, mut prefix): (Vec<_>, Vec<_>) = apps
+            .into_iter()
+            .filter(|app| app.score >= ranking::STRONG_MATCH)
+            .partition(|app| app.score >= ranking::EXACT_MATCH);
+        let now = ranking::now();
+        ranking::apply_usage(&mut exact, &self.usage, now);
+        ranking::apply_usage(&mut prefix, &self.usage, now);
+        let results = ranking::top_results(exact, RESULT_LIMIT)
+            .into_iter()
+            .chain(tools)
+            .chain(ranking::top_results(prefix, RESULT_LIMIT))
+            .take(RESULT_LIMIT)
+            .collect();
         SearchOutcome { results, notice }
     }
 }
+
+#[cfg(test)]
+#[path = "search_benchmark_tests.rs"]
+mod benchmark_tests;
+
+#[cfg(test)]
+#[path = "search_budget_tests.rs"]
+mod budget_tests;
 
 #[cfg(test)]
 #[path = "search_work_tests.rs"]
@@ -537,14 +951,14 @@ mod tests {
     }
 
     #[test]
-    fn all_search_keeps_categories_together_in_launcher_order() {
+    fn all_search_puts_strong_matches_first_then_keeps_category_order() {
         let mut manager = SearchManager::default();
         manager.replace_apps(AppProvider::new(vec![
             AppEntry::new("Clock".into(), "/apps/Clock.app".into(), vec![]),
-            AppEntry::new("Logseq".into(), "/apps/Logseq.app".into(), vec![]),
+            AppEntry::new("Octave".into(), "/apps/Octave.app".into(), vec![]),
         ]));
         let directory = tempfile::tempdir().unwrap();
-        std::fs::write(directory.path().join("lo"), "").unwrap();
+        std::fs::write(directory.path().join("oc"), "").unwrap();
         manager.replace_files(scan(
             vec![directory.path().to_owned()],
             &[],
@@ -553,27 +967,216 @@ mod tests {
         ));
         manager.clipboard = ClipboardProvider::new(vec![ClipboardEntry {
             id: 1,
-            content: "lo".into(),
+            content: "oc".into(),
             created_at: 100,
             last_used_at: None,
         }]);
         manager.system = Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec()));
 
-        let results = manager.search("lo", SearchMode::All).unwrap().results;
-        assert_eq!(results[0].title, "Logseq");
-        assert_eq!(results[1].title, "Clock");
-        let mut groups: Vec<_> = results.iter().map(|result| result.kind).collect();
-        groups.dedup();
-        assert_eq!(
-            groups,
-            [
-                ResultKind::App,
-                ResultKind::File,
-                ResultKind::Clipboard,
-                ResultKind::SystemCommand,
-                ResultKind::Emoji,
-            ]
-        );
+        let results = manager.search("oc", SearchMode::All).unwrap().results;
+        let position = |kind, title: &str| {
+            results
+                .iter()
+                .position(|result| result.kind == kind && result.title == title)
+                .unwrap()
+        };
+        // The exact file and clipboard text rank above the fuzzy app match.
+        assert_eq!(results[0].title, "Octave");
+        assert_eq!(position(ResultKind::File, "oc"), 1);
+        assert!(position(ResultKind::Clipboard, "oc") < position(ResultKind::App, "Clock"));
+        let order = [
+            ResultKind::App,
+            ResultKind::File,
+            ResultKind::SystemCommand,
+            ResultKind::Clipboard,
+            ResultKind::Emoji,
+        ];
+        for tier in [1, 2] {
+            let mut groups: Vec<_> = results
+                .iter()
+                .filter(|result| ranking::tier(result) == tier)
+                .map(|result| order.iter().position(|kind| *kind == result.kind))
+                .collect();
+            groups.dedup();
+            assert!(groups.is_sorted(), "Tier {tier} keeps category order");
+        }
+        assert!(results.iter().map(ranking::tier).is_sorted());
+    }
+
+    #[test]
+    fn all_search_keeps_system_commands_before_a_full_clipboard_page() {
+        let mut manager = SearchManager {
+            system: Some(SystemCommandProvider::new(SystemCommand::ALL.to_vec())),
+            clipboard: ClipboardProvider::new(
+                (1..=RESULT_LIMIT as i64)
+                    .map(|id| ClipboardEntry {
+                        id,
+                        content: "sleep suspend standby restart reboot shutdown shut down".into(),
+                        created_at: id,
+                        last_used_at: None,
+                    })
+                    .collect(),
+            ),
+            ..SearchManager::default()
+        };
+        for _ in 0..20 {
+            manager.record_usage("clipboard:1", ranking::now());
+        }
+
+        for (input, command) in [
+            ("sleep", "system:sleep"),
+            (" SLEEP ", "system:sleep"),
+            ("slee", "system:sleep"),
+            ("suspend", "system:sleep"),
+            ("standby", "system:sleep"),
+            ("restart", "system:restart"),
+            ("reboot", "system:restart"),
+            ("shutdown", "system:shutdown"),
+            ("shut down", "system:shutdown"),
+        ] {
+            let results = manager.search(input, SearchMode::All).unwrap().results;
+            assert_eq!(results.len(), RESULT_LIMIT);
+            assert!(
+                results.iter().any(|result| result.id == command),
+                "missing {command} for query: {input}"
+            );
+            assert_eq!(results[0].id, command, "query: {input}");
+            assert!(results[0].confirmation.is_some());
+            assert!(
+                results[1..]
+                    .iter()
+                    .all(|result| result.kind == ResultKind::Clipboard),
+                "query: {input}"
+            );
+        }
+    }
+
+    #[test]
+    fn all_search_keeps_sleep_ahead_of_a_full_page_of_app_path_matches() {
+        for eager_search in [false, true] {
+            let mut manager = SearchManager {
+                eager_search,
+                ..SearchManager::default()
+            };
+            manager.replace_apps(AppProvider::new(
+                (0..RESULT_LIMIT)
+                    .map(|i| {
+                        AppEntry::new(
+                            format!("Utility {i:02}"),
+                            format!("/System/Library/CoreServices/Utility {i:02}.app").into(),
+                            vec![],
+                        )
+                    })
+                    .collect(),
+            ));
+
+            let results = manager.search("sleep", SearchMode::All).unwrap().results;
+            assert!(results.iter().any(|result| result.id == "system:sleep"));
+            assert_eq!(results[0].id, "system:sleep");
+            assert_eq!(results.len(), RESULT_LIMIT);
+            // Emoji names that start with "sleep" are strong matches. Weak app
+            // path matches fill the rest.
+            let strong = results
+                .iter()
+                .take_while(|result| ranking::tier(result) < 2)
+                .count();
+            assert!(
+                results[strong..]
+                    .iter()
+                    .all(|result| result.kind == ResultKind::App)
+            );
+        }
+    }
+
+    #[test]
+    fn all_search_keeps_short_system_prefixes_ahead_of_full_app_and_file_pages() {
+        for category in [SearchMode::Apps, SearchMode::Files] {
+            let mut manager = SearchManager::default();
+            let entries = (0..RESULT_LIMIT).map(|i| {
+                (
+                    format!("Utility {i:02}"),
+                    format!("/fixture/sleep-restart-shutdown-appearance-dark-empty-trash-log-out-lock-screen-show-desktop-mute-unmute/utility-{i:02}"),
+                )
+            });
+            match category {
+                SearchMode::Apps => manager.replace_apps(AppProvider::new(
+                    entries
+                        .map(|(name, path)| AppEntry::new(name, path.into(), vec![]))
+                        .collect(),
+                )),
+                SearchMode::Files => {
+                    manager.replace_files(FileProvider::new(
+                        entries
+                            .map(|(name, path)| FileEntry {
+                                id: format!("file:{path}"),
+                                name,
+                                path,
+                                folder: false,
+                            })
+                            .collect(),
+                    ));
+                }
+                _ => unreachable!(),
+            }
+            for (input, command) in [
+                ("sle", "system:sleep"),
+                ("sl", "system:sleep"),
+                ("re", "system:restart"),
+                ("res", "system:restart"),
+                ("sh", "system:shutdown"),
+                ("shu", "system:shutdown"),
+                (" SHU ", "system:shutdown"),
+                ("dar", "system:appearance"),
+                ("app", "system:appearance"),
+                ("em", "system:empty-trash"),
+                ("log", "system:logout"),
+                ("loc", "system:lock"),
+                ("des", "system:desktop"),
+                ("mu", "system:mute"),
+                ("unm", "system:mute"),
+            ] {
+                let results = manager.search(input, SearchMode::All).unwrap().results;
+                assert_eq!(results.len(), RESULT_LIMIT);
+                assert_eq!(results[0].id, command, "{category:?}, query: {input}");
+                assert_eq!(
+                    results[0].confirmation.is_some(),
+                    matches!(
+                        command,
+                        "system:sleep"
+                            | "system:restart"
+                            | "system:shutdown"
+                            | "system:logout"
+                            | "system:empty-trash"
+                    )
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn all_search_keeps_sleep_ahead_of_a_full_page_of_file_matches() {
+        let mut manager = SearchManager::default();
+        manager.replace_files(FileProvider::new(
+            (0..RESULT_LIMIT)
+                .map(|i| FileEntry {
+                    id: format!("file:/fixture/sleep-{i}.txt"),
+                    name: format!("sleep-{i}.txt"),
+                    path: format!("/fixture/sleep-{i}.txt"),
+                    folder: false,
+                })
+                .collect(),
+        ));
+
+        for input in ["sleep", " SLEEP "] {
+            let results = manager.search(input, SearchMode::All).unwrap().results;
+            assert_eq!(results[0].id, "system:sleep");
+            assert_eq!(results.len(), RESULT_LIMIT);
+            assert!(
+                results[1..]
+                    .iter()
+                    .all(|result| result.kind == ResultKind::File)
+            );
+        }
     }
 
     #[test]
@@ -652,6 +1255,75 @@ mod tests {
         assert_eq!(
             manager.search("", SearchMode::Apps).unwrap().results[0].title,
             "App 000"
+        );
+    }
+
+    #[test]
+    fn exact_app_names_win_over_tool_keywords_in_all() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(vec![
+            AppEntry::new("Google Chrome".into(), "/apps/Chrome.app".into(), vec![]),
+            AppEntry::new("Time Machine".into(), "/apps/Time.app".into(), vec![]),
+            AppEntry::new("Passwords".into(), "/apps/Passwords.app".into(), vec![]),
+            AppEntry::new("Timer".into(), "/apps/Timer.app".into(), vec![]),
+        ]));
+
+        let chrome = manager.search("google chrome", SearchMode::All).unwrap();
+        assert_eq!(chrome.results[0].title, "Google Chrome");
+        assert_eq!(chrome.results[1].kind, ResultKind::WebSearch);
+
+        // Partial tool input keeps its hint, and apps that start with it appear.
+        let time = manager.search("time", SearchMode::All).unwrap();
+        assert!(time.notice.is_some());
+        let titles: Vec<_> = time
+            .results
+            .iter()
+            .map(|result| result.title.as_str())
+            .collect();
+        assert_eq!(titles, ["Time Machine", "Timer"]);
+
+        // A prefix match follows the tool results.
+        let passwords = manager.search("password", SearchMode::All).unwrap();
+        assert_eq!(passwords.results[0].kind, ResultKind::Password);
+        assert_eq!(passwords.results.last().unwrap().title, "Passwords");
+
+        // Explicit tool modes do not add apps.
+        let web = manager.search("google chrome", SearchMode::Web).unwrap();
+        assert!(
+            web.results
+                .iter()
+                .all(|result| result.kind == ResultKind::WebSearch)
+        );
+    }
+
+    #[test]
+    fn an_exact_file_is_not_hidden_behind_a_full_page_of_fuzzy_apps() {
+        let mut manager = SearchManager::default();
+        manager.replace_apps(AppProvider::new(
+            (0..RESULT_LIMIT)
+                .map(|i| {
+                    AppEntry::new(
+                        format!("Budget Viewer {i:02}"),
+                        format!("/apps/b-v.t-x-t/Viewer {i:02}.app").into(),
+                        vec![],
+                    )
+                })
+                .collect(),
+        ));
+        manager.replace_files(FileProvider::new(vec![FileEntry {
+            id: "file:/Documents/bv.txt".into(),
+            name: "bv.txt".into(),
+            path: "/Documents/bv.txt".into(),
+            folder: false,
+        }]));
+        let results = manager.search("bv.txt", SearchMode::All).unwrap().results;
+        assert_eq!(results[0].id, "file:/Documents/bv.txt");
+        // Every app is a fuzzy path match. They fill the remaining slots.
+        assert_eq!(results.len(), RESULT_LIMIT);
+        assert!(
+            results[1..]
+                .iter()
+                .all(|result| result.kind == ResultKind::App)
         );
     }
 
@@ -845,6 +1517,105 @@ mod tests {
     }
 
     #[test]
+    fn suggestions_use_usage_keep_pins_first_and_reject_private_or_hidden_items() {
+        let mut manager = manager();
+        let now = ranking::now();
+        for id in [
+            "app:/apps/Code.app",
+            "app:/apps/cafe.app",
+            "app:/apps/vscode.app",
+            "clipboard:1",
+            "system:restart",
+            "app:/gone",
+        ] {
+            manager.record_usage(id, now);
+        }
+        manager.record_usage("emoji:🚀", now);
+        manager.record_usage("emoji:🚀", now);
+        manager.set_pinned("app:/apps/Code.app", SearchMode::All, true);
+        let mut settings = crate::settings::Settings::default();
+        settings.app_preferences.insert(
+            "app:/apps/cafe.app".into(),
+            crate::settings::AppPreference {
+                hidden: true,
+                ..Default::default()
+            },
+        );
+        manager.apply_settings(&settings);
+        let results = manager.search("", SearchMode::All).unwrap().results;
+        let ids: Vec<_> = results.iter().map(|result| result.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            ["app:/apps/Code.app", "emoji:🚀", "app:/apps/vscode.app"]
+        );
+        assert!(manager.resolve_action(&results[1].id, Action::Copy).is_ok());
+        settings.show_suggestions = false;
+        manager.apply_settings(&settings);
+        assert_eq!(
+            manager.search("", SearchMode::All).unwrap().results.len(),
+            1
+        );
+        assert!(
+            !manager
+                .search("rocket", SearchMode::All)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn suggestions_are_bounded_deterministic_and_restore_from_saved_usage() {
+        let mut manager = SearchManager::default();
+        let entries: Vec<_> = (0..20)
+            .map(|i| {
+                AppEntry::new(
+                    format!("App {i:02}"),
+                    format!("/apps/{i:02}").into(),
+                    vec![],
+                )
+            })
+            .collect();
+        manager.replace_apps(AppProvider::new(entries.clone()));
+        let now = ranking::now();
+        let usage: HashMap<_, _> = entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry.id.clone(),
+                    ranking::Usage {
+                        count: 1,
+                        last_used_at: now,
+                    },
+                )
+            })
+            .collect();
+        manager.set_usage(usage.clone());
+        let first: Vec<_> = manager
+            .search("", SearchMode::All)
+            .unwrap()
+            .results
+            .into_iter()
+            .map(|result| result.id)
+            .collect();
+        assert_eq!(first.len(), 6);
+        assert_eq!(first[0], "app:/apps/00");
+        let mut restored = SearchManager::default();
+        restored.replace_apps(AppProvider::new(entries));
+        restored.set_usage(usage);
+        assert_eq!(
+            first,
+            restored
+                .search("", SearchMode::All)
+                .unwrap()
+                .results
+                .into_iter()
+                .map(|result| result.id)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
     fn system_search_is_lazy_scoped_and_uses_durable_ranking() {
         let mut manager = manager();
         manager.search("", SearchMode::All).expect("home");
@@ -871,7 +1642,7 @@ mod tests {
                 .expect("commands")
                 .results
                 .len(),
-            5
+            SystemCommand::ALL.len() + super::super::commands::catalog().len()
         );
         manager.record_usage("system:settings", ranking::now());
         assert_eq!(
@@ -1439,5 +2210,138 @@ mod tests {
                 .results
                 .is_empty()
         );
+    }
+    #[test]
+    fn emoji_preferences_preserve_pins_usage_and_exact_copy_after_changes() {
+        let mut search = SearchManager::default();
+        search.record_usage("emoji:👍", ranking::now());
+        search.set_pinned("emoji:👍", SearchMode::Emoji, true);
+        let mut settings = crate::settings::Settings {
+            emoji_skin_tone: 3,
+            emoji_languages: vec!["zh".into()],
+            ..crate::settings::Settings::default()
+        };
+        search.apply_settings(&settings);
+        let result = search
+            .search("拇指向上", SearchMode::Emoji)
+            .unwrap()
+            .results[0]
+            .clone();
+        assert_eq!(result.id, "emoji:👍🏽");
+        assert_eq!(
+            search.pin_key(&result.id, SearchMode::Emoji).unwrap(),
+            "emoji:👍"
+        );
+        assert!(
+            result
+                .pin
+                .as_ref()
+                .unwrap()
+                .categories
+                .contains(&SearchMode::Emoji)
+        );
+        assert_eq!(search.record_usage(&result.id, ranking::now()).count, 2);
+        assert_eq!(search.usage["emoji:👍"].count, 2);
+        assert!(!search.usage.contains_key("emoji:👍🏽"));
+        let pinned = search.search("", SearchMode::Emoji).unwrap().results[0].clone();
+        assert_eq!(pinned.id, "emoji:👍🏽");
+        settings.emoji_skin_tone = 5;
+        settings.emoji_languages.clear();
+        search.apply_settings(&settings);
+        assert!(
+            matches!(search.resolve_action(&result.id, Action::Copy).unwrap(), ResolvedAction::Copy(text) if text == "👍🏽")
+        );
+        assert_eq!(
+            search.search("", SearchMode::Emoji).unwrap().results[0].id,
+            "emoji:👍🏿"
+        );
+        assert!(
+            search
+                .search("火箭", SearchMode::Emoji)
+                .unwrap()
+                .results
+                .is_empty()
+        );
+        let suggestion = search.search("", SearchMode::All).unwrap().results[0].clone();
+        assert_eq!(suggestion.id, "emoji:👍🏿");
+        let usage = search.usage.clone();
+        let mut restored = SearchManager::default();
+        restored.set_usage(usage);
+        restored.apply_settings(&settings);
+        assert_eq!(restored.record_usage("emoji:👍🏻", ranking::now()).count, 3);
+    }
+}
+
+// Measures All mode on this computer's apps and default file folders. It
+// prints totals only, never names. Use it to compare ranking changes.
+#[cfg(test)]
+mod ranking_survey {
+    use super::*;
+    use crate::providers::files::{ScanReport, scan};
+
+    #[test]
+    #[ignore = "Reads installed apps and default file folders. Run with --ignored --nocapture."]
+    fn all_mode_finds_what_its_category_finds() {
+        let home = std::path::PathBuf::from(std::env::var_os("HOME").expect("home"));
+        let mut manager = SearchManager::default();
+        let apps = crate::platform::discover_apps().expect("apps");
+        let app_queries: Vec<_> = apps
+            .iter()
+            .flat_map(|app| {
+                [2, 4, usize::MAX]
+                    .map(|length| (app.id.clone(), app.name.chars().take(length).collect()))
+            })
+            .collect::<Vec<(String, String)>>();
+        manager.replace_apps(AppProvider::new(apps));
+        let roots = ["Desktop", "Documents", "Downloads"].map(|name| home.join(name));
+        manager.replace_files(scan(
+            roots.to_vec(),
+            &["node_modules".into(), "target".into()],
+            50_000,
+            &mut ScanReport::default(),
+        ));
+        let mut matcher = Matcher::new(Config::DEFAULT);
+        let catalog = manager
+            .files
+            .search("", &mut matcher, &HashMap::new(), 0, usize::MAX);
+        let step = (catalog.len() / 200).max(1);
+        let file_queries: Vec<(String, String)> = catalog
+            .iter()
+            .step_by(step)
+            .flat_map(|file| {
+                let stem = std::path::Path::new(&file.title)
+                    .file_stem()
+                    .map(|stem| stem.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                [file.title.clone(), stem.chars().take(3).collect(), stem]
+                    .map(|query| (file.id.clone(), query))
+            })
+            .collect();
+        for (label, queries, mode) in [
+            ("apps", app_queries, SearchMode::Apps),
+            ("files", file_queries, SearchMode::Files),
+        ] {
+            let (mut found, mut all, mut first_page) = (0, 0, 0);
+            for (id, query) in queries.iter().filter(|(_, query)| !query.trim().is_empty()) {
+                let mut position = |mode| {
+                    manager
+                        .search(query, mode)
+                        .map(|outcome| outcome.results.iter().position(|result| &result.id == id))
+                        .ok()
+                        .flatten()
+                };
+                if position(mode).is_none() {
+                    continue;
+                }
+                found += 1;
+                if let Some(position) = position(SearchMode::All) {
+                    all += 1;
+                    first_page += usize::from(position < 8);
+                }
+            }
+            println!(
+                "{label}: {found} queries find the item in its category; All finds {all}, {first_page} in the first 8"
+            );
+        }
     }
 }

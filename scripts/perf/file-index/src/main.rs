@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use nucleo_matcher::Matcher;
+#[cfg(feature = "track-allocations")]
 use serde::Serialize;
 #[cfg(not(feature = "track-allocations"))]
 use std::time::Instant;
@@ -17,7 +18,7 @@ mod launcher {
         #[derive(Debug, serde::Serialize)]
         pub struct FileStatus {
             pub total: usize,
-            pub indexing: bool,
+            pub phase: &'static str,
             pub warning: Option<String>,
         }
     }
@@ -31,6 +32,17 @@ mod launcher {
     }
 }
 mod providers {
+    pub mod emoji {
+        pub fn canonical_id(id: &str) -> std::borrow::Cow<'_, str> {
+            // Production normalization borrows every non-emoji ID unchanged.
+            // This harness measures file/clipboard ranking, never emoji lookup.
+            assert!(
+                !id.starts_with("emoji:"),
+                "emoji ranking is outside this harness"
+            );
+            std::borrow::Cow::Borrowed(id)
+        }
+    }
     pub mod tools {
         pub mod url_cleaner {
             pub fn is_candidate(_: &str) -> bool {
@@ -165,6 +177,7 @@ fn fixture(corpus: &str, count: usize) -> Vec<file_provider::FileEntry> {
                 id: format!("file:{path}"),
                 name,
                 path,
+                folder: false,
             }
         })
         .collect()
@@ -321,6 +334,7 @@ fn equivalence_run() -> serde_json::Value {
             id: format!("file:{path}"),
             path: (*path).into(),
             name: path.rsplit(['/', '\\']).next().expect("name").into(),
+            folder: false,
         })
         .collect();
     let provider = file_provider::FileProvider::new(entries);

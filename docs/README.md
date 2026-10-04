@@ -28,6 +28,7 @@ Choose a document for the task you want to complete. The structure follows [Diá
 ## Explanation
 
 - [Architecture](explanation/architecture.md)
+- [Dependency previews](explanation/dependency-previews.md)
 - [Future plugin support](explanation/plugin-readiness.md)
 - [Data storage and privacy](explanation/data-and-privacy.md)
 

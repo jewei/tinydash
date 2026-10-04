@@ -25,10 +25,13 @@ pub struct FileEntry {
     pub id: String,
     pub name: String,
     pub path: String,
+    pub folder: bool,
 }
 
 impl FileEntry {
-    fn new(path: &Path) -> Option<Self> {
+    // A folder keeps the `file:` ID prefix. Paths are unique across both kinds,
+    // so actions, pins, and usage do not change.
+    fn new(path: &Path, folder: bool) -> Option<Self> {
         // The opener accepts UTF-8 paths. Never use a lossy path for an action ID.
         let path = path.to_str()?;
         #[cfg(target_os = "windows")]
@@ -43,13 +46,18 @@ impl FileEntry {
             name: Path::new(&path).file_name()?.to_str()?.to_owned(),
             id: format!("file:{path}"),
             path,
+            folder,
         })
     }
 
     pub fn result(&self, score: u32) -> SearchResult {
         SearchResult {
             id: self.id.clone(),
-            kind: ResultKind::File,
+            kind: if self.folder {
+                ResultKind::Folder
+            } else {
+                ResultKind::File
+            },
             title: self.name.clone(),
             subtitle: self.path.clone(),
             path: Some(self.path.clone()),
@@ -64,6 +72,16 @@ impl FileEntry {
     }
 
     pub fn validate(&self) -> Result<()> {
+        // Indexed paths are canonical. Reject a directory replaced by a link
+        // since the scan, not just a symlink at the final filename.
+        for ancestor in Path::new(&self.path).ancestors().skip(1) {
+            if std::fs::symlink_metadata(ancestor)?
+                .file_type()
+                .is_symlink()
+            {
+                return Err(Error::FileNotFound);
+            }
+        }
         let metadata = std::fs::symlink_metadata(&self.path).map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
                 Error::FileNotFound
@@ -71,7 +89,12 @@ impl FileEntry {
                 error.into()
             }
         })?;
-        if metadata.is_file() && !metadata.file_type().is_symlink() {
+        let kind_matches = if self.folder {
+            metadata.is_dir()
+        } else {
+            metadata.is_file()
+        };
+        if kind_matches && !metadata.file_type().is_symlink() {
             Ok(())
         } else {
             Err(Error::FileNotFound)
@@ -107,6 +130,9 @@ impl IndexedFile {
 #[derive(Default)]
 pub struct FileProvider {
     files: Vec<IndexedFile>,
+    // One owned ID plus a position per file: deliberate O(n) retained memory
+    // in exchange for expected O(1) pin/action lookup. No paths/results cached.
+    by_id: HashMap<Box<str>, usize>,
 }
 
 impl FileProvider {
@@ -142,7 +168,13 @@ impl FileProvider {
                 .cmp(&b.normalized_name)
                 .then_with(|| a.entry.path.cmp(&b.entry.path))
         });
-        Self { files }
+        let mut by_id = HashMap::with_capacity(files.len());
+        for (index, file) in files.iter().enumerate() {
+            by_id
+                .entry(file.entry.id.clone().into_boxed_str())
+                .or_insert(index);
+        }
+        Self { files, by_id }
     }
 
     pub fn len(&self) -> usize {
@@ -150,12 +182,20 @@ impl FileProvider {
     }
 
     pub fn get(&self, id: &str) -> Option<&FileEntry> {
-        self.files
-            .iter()
-            .find(|file| file.entry.id == id)
-            .map(|file| &file.entry)
+        self.by_id.get(id).map(|&index| &self.files[index].entry)
     }
 
+    #[cfg(test)]
+    pub(crate) fn lookup_memory_lower_bound(&self) -> usize {
+        // Excludes hash-table control bytes/load-factor slack and allocator
+        // overhead; this is not RSS or a claimed exact allocation measurement.
+        self.by_id.keys().map(|id| id.len()).sum::<usize>()
+            + self.by_id.capacity() * std::mem::size_of::<(Box<str>, usize)>()
+    }
+
+    // Also used by the standalone synthetic profiling harness. Launcher
+    // requests use search_interruptible with their request-local budget.
+    #[allow(dead_code)]
     pub fn search(
         &self,
         query: &str,
@@ -163,6 +203,19 @@ impl FileProvider {
         usage: &HashMap<String, ranking::Usage>,
         now: i64,
         limit: usize,
+    ) -> Vec<SearchResult> {
+        self.search_interruptible(query, matcher, usage, now, limit, || false)
+    }
+
+    #[allow(clippy::too_many_arguments)] // Prepared ranking inputs plus the request-local interrupt.
+    pub fn search_interruptible(
+        &self,
+        query: &str,
+        matcher: &mut Matcher,
+        usage: &HashMap<String, ranking::Usage>,
+        now: i64,
+        limit: usize,
+        mut stopped: impl FnMut() -> bool,
     ) -> Vec<SearchResult> {
         #[cfg(test)]
         super::search_work::record(super::search_work::Provider::Files, self.files.len());
@@ -185,6 +238,8 @@ impl FileProvider {
             .files
             .iter()
             .enumerate()
+            // Amortize the clock/atomic reads over small matching batches.
+            .take_while(|(index, _)| index % 64 != 0 || !stopped())
             .filter_map(|(index, file)| {
                 let score = if normalized.is_empty() {
                     Some(0)
@@ -219,6 +274,7 @@ impl FileProvider {
 
 #[derive(Default)]
 pub struct ScanReport {
+    pub visited: usize,
     pub issue_count: usize,
     pub first_issue: Option<String>,
     pub limited: bool,
@@ -271,17 +327,200 @@ pub fn expand_root(path: &Path, home: Option<&Path>) -> Option<PathBuf> {
     }
 }
 
-/// Scan names and paths only. This function never reads file contents.
+/// Scan using the original defaults. File contents are never read by the index.
+#[cfg(test)]
 pub fn scan(
     roots: Vec<PathBuf>,
     excluded: &[String],
     limit: usize,
     report: &mut ScanReport,
 ) -> FileProvider {
+    scan_with_rules(roots, excluded, limit, false, &[], report)
+}
+
+const IGNORE_PATTERN_LIMIT: usize = 64;
+const IGNORE_PATTERN_LENGTH: usize = 256;
+const IGNORE_PATH_LENGTH: usize = 4096;
+
+pub fn valid_ignore_patterns(patterns: &[String]) -> bool {
+    patterns.len() <= IGNORE_PATTERN_LIMIT
+        && patterns.iter().all(|pattern| {
+            !pattern.trim().is_empty()
+                && !pattern.chars().any(char::is_control)
+                && IgnorePattern::parse(pattern).is_some()
+        })
+}
+
+#[derive(Clone, Copy)]
+enum GlobToken {
+    Literal(char),
+    Any,
+    Star(bool),
+    Directories,
+}
+
+struct IgnorePattern {
+    tokens: Vec<GlobToken>,
+    basename: bool,
+    directory_only: bool,
+}
+
+impl IgnorePattern {
+    fn parse(value: &str) -> Option<Self> {
+        if value.is_empty()
+            || value.len() > IGNORE_PATTERN_LENGTH
+            || value.contains(['\\', '[', ']', '\0'])
+            || value.starts_with('!')
+        {
+            return None;
+        }
+        let directory_only = value.ends_with('/');
+        let pattern = value.trim_end_matches('/');
+        if pattern.is_empty() {
+            return None;
+        }
+        let basename = !pattern.contains('/');
+        let mut chars = pattern.chars().peekable();
+        let mut tokens = Vec::new();
+        while let Some(ch) = chars.next() {
+            tokens.push(match ch {
+                '*' => {
+                    let recursive = chars.peek() == Some(&'*');
+                    if recursive {
+                        chars.next();
+                    }
+                    if recursive && chars.peek() == Some(&'/') {
+                        chars.next();
+                        GlobToken::Directories
+                    } else {
+                        GlobToken::Star(recursive)
+                    }
+                }
+                '?' => GlobToken::Any,
+                ch => GlobToken::Literal(ch),
+            });
+        }
+        Some(Self {
+            tokens,
+            basename,
+            directory_only,
+        })
+    }
+
+    // Bounded dynamic programming, never recursive/backtracking. Match Unicode
+    // characters, not individual UTF-8 bytes. Patterns use forward slashes.
+    fn matches(&self, relative: &str, name: &str, directory: bool) -> bool {
+        if self.directory_only && !directory {
+            return false;
+        }
+        let value = if self.basename { name } else { relative };
+        if value.len() > IGNORE_PATH_LENGTH {
+            return false;
+        }
+        let chars: Vec<_> = value.chars().collect();
+        let mut previous = vec![false; chars.len() + 1];
+        let mut next = vec![false; chars.len() + 1];
+        previous[0] = true;
+        for token in &self.tokens {
+            next.fill(false);
+            let mut prefix = false;
+            for j in 0..=chars.len() {
+                next[j] = match token {
+                    GlobToken::Literal(ch) => j > 0 && previous[j - 1] && chars[j - 1] == *ch,
+                    GlobToken::Any => j > 0 && previous[j - 1] && chars[j - 1] != '/',
+                    GlobToken::Star(recursive) => {
+                        previous[j] || (j > 0 && next[j - 1] && (*recursive || chars[j - 1] != '/'))
+                    }
+                    GlobToken::Directories => {
+                        previous[j] || (j > 0 && prefix && chars[j - 1] == '/')
+                    }
+                };
+                prefix |= previous[j];
+            }
+            std::mem::swap(&mut previous, &mut next);
+        }
+        previous[chars.len()]
+    }
+}
+
+/// Ignore patterns match basenames or root-relative paths. Supports *, ?, **,
+/// and trailing / for folders; no negation, escaping, or character classes.
+/// An ignored folder is pruned, including its watcher registrations.
+#[cfg(test)]
+pub fn scan_with_rules(
+    roots: Vec<PathBuf>,
+    excluded: &[String],
+    limit: usize,
+    include_hidden: bool,
+    ignore_patterns: &[String],
+    report: &mut ScanReport,
+) -> FileProvider {
+    scan_with_rules_cancellable(
+        roots,
+        excluded,
+        limit,
+        include_hidden,
+        ignore_patterns,
+        report,
+        || false,
+    )
+    .expect("uncancelled scan")
+}
+
+#[cfg(test)]
+pub fn scan_cancellable(
+    roots: Vec<PathBuf>,
+    excluded: &[String],
+    limit: usize,
+    report: &mut ScanReport,
+    cancelled: impl FnMut() -> bool,
+) -> Option<FileProvider> {
+    scan_with_rules_cancellable(roots, excluded, limit, false, &[], report, cancelled)
+}
+
+/// Scan names and paths with configured rules and cooperative cancellation.
+pub fn scan_with_rules_cancellable(
+    roots: Vec<PathBuf>,
+    excluded: &[String],
+    limit: usize,
+    include_hidden: bool,
+    ignore_patterns: &[String],
+    report: &mut ScanReport,
+    mut cancelled: impl FnMut() -> bool,
+) -> Option<FileProvider> {
+    if cancelled() {
+        return None;
+    }
+    let patterns: Vec<_> = ignore_patterns
+        .iter()
+        .take(IGNORE_PATTERN_LIMIT)
+        .filter_map(|pattern| {
+            let parsed = IgnorePattern::parse(pattern);
+            if parsed.is_none() {
+                report.issue(
+                    Path::new("fileSearchIgnorePatterns"),
+                    "Invalid ignore pattern: use at most 256 bytes and only *, ?, ** wildcards.",
+                );
+            }
+            parsed
+        })
+        .collect();
+    if ignore_patterns.len() > IGNORE_PATTERN_LIMIT {
+        report.issue(
+            Path::new("fileSearchIgnorePatterns"),
+            "Only the first 64 ignore patterns are used.",
+        );
+    }
     let mut resolved = Vec::new();
     for root in roots {
+        if cancelled() {
+            return None;
+        }
         match std::fs::symlink_metadata(&root) {
             Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+                if cancelled() {
+                    return None;
+                }
                 match root.canonicalize() {
                     Ok(path) => resolved.push(path),
                     Err(error) => report.issue(&root, error),
@@ -298,12 +537,14 @@ pub fn scan(
     resolved.sort();
     let mut unique: Vec<PathBuf> = Vec::new();
     for root in resolved {
+        if cancelled() {
+            return None;
+        }
         if !unique.iter().any(|parent| root.starts_with(parent)) {
             unique.push(root);
         }
     }
     let mut entries = Vec::new();
-    let mut visited = 0;
     for root in &unique {
         report.directory(root);
     }
@@ -313,9 +554,15 @@ pub fn scan(
             .follow_root_links(false)
             .max_open(16)
             .into_iter();
-        while let Some(item) = walk.next() {
-            visited += 1;
-            if visited > VISIT_LIMIT {
+        loop {
+            if cancelled() {
+                return None;
+            }
+            let Some(item) = walk.next() else {
+                break;
+            };
+            report.visited += 1;
+            if report.visited > VISIT_LIMIT {
                 report.limited = true;
                 break 'roots;
             }
@@ -334,52 +581,152 @@ pub fn scan(
                 && excluded
                     .iter()
                     .any(|name| entry.file_name() == name.as_str());
-            let hidden = match platform::file_is_hidden(&entry) {
+            if cancelled() {
+                return None;
+            }
+            let hidden = match if include_hidden {
+                Ok(false)
+            } else {
+                platform::file_is_hidden(&entry)
+            } {
                 Ok(hidden) => hidden,
                 Err(error) => {
                     report.issue(entry.path(), error);
                     true
                 }
             };
-            if excluded || hidden || entry.file_type().is_symlink() {
+            let ignored = entry
+                .path()
+                .strip_prefix(&root)
+                .ok()
+                .and_then(Path::to_str)
+                .is_some_and(|path| {
+                    #[cfg(target_os = "windows")]
+                    let normalized = path.replace('\\', "/");
+                    #[cfg(target_os = "windows")]
+                    let path = normalized.as_str();
+                    patterns.iter().any(|pattern| {
+                        pattern.matches(path, entry.file_name().to_str().unwrap_or(""), directory)
+                    })
+                });
+            if excluded || hidden || ignored || entry.file_type().is_symlink() {
                 if directory {
                     walk.skip_current_dir();
                 }
                 continue;
             }
-            if entry.file_type().is_file() {
-                if let Some(file) = FileEntry::new(entry.path()) {
-                    if entries.len() >= limit {
-                        report.limited = true;
-                        break 'roots;
-                    }
-                    entries.push(file);
-                } else {
-                    report.issue(entry.path(), "Path is not valid UTF-8.");
-                }
-            } else if directory {
+            if !directory && !entry.file_type().is_file() {
+                continue;
+            }
+            if directory {
                 report.directory(entry.path());
+            }
+            if let Some(item) = FileEntry::new(entry.path(), directory) {
+                if entries.len() >= limit {
+                    report.limited = true;
+                    break 'roots;
+                }
+                entries.push(item);
+            } else {
+                report.issue(entry.path(), "Path is not valid UTF-8.");
+                if directory {
+                    walk.skip_current_dir();
+                }
             }
         }
     }
-    FileProvider::new(entries)
+    if cancelled() {
+        return None;
+    }
+    let provider = FileProvider::new(entries);
+    // Index preparation is bounded by the result limit. Never publish it if
+    // settings changed while it was being prepared.
+    (!cancelled()).then_some(provider)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::launcher::{query::SearchMode, search::SearchManager};
+    use crate::launcher::{actions::ResolvedAction, query::SearchMode, search::SearchManager};
     use std::fs;
+
+    #[test]
+    fn direct_id_lookup_tracks_sorted_positions_and_replacements() {
+        let entries: Vec<_> = (0..1000)
+            .rev()
+            .map(|index| {
+                FileEntry::new(
+                    Path::new(&format!("/fixture/Document-{index:04}.txt")),
+                    false,
+                )
+                .unwrap()
+            })
+            .collect();
+        let mut provider = FileProvider::new(entries);
+        for index in [0, 40, 500, 999] {
+            let id = format!("file:/fixture/Document-{index:04}.txt");
+            let file = provider.get(&id).unwrap();
+            assert_eq!(file.name, format!("Document-{index:04}.txt"));
+            assert!(std::ptr::eq(
+                file,
+                &provider.files[*provider.by_id.get(id.as_str()).unwrap()].entry
+            ));
+        }
+        assert!(provider.get("file:/fixture/missing").is_none());
+        assert!(provider.get("/fixture/Document-0000.txt").is_none());
+        assert_eq!(provider.by_id.len(), 1000);
+        assert!(provider.lookup_memory_lower_bound() > 1000 * 24);
+        provider = FileProvider::default();
+        assert!(provider.get("file:/fixture/Document-0000.txt").is_none());
+        assert_eq!(provider.lookup_memory_lower_bound(), 0);
+    }
+
+    #[test]
+    fn file_matching_checks_cancellation_between_small_batches() {
+        let provider = FileProvider::new(
+            (0..1000)
+                .map(|index| {
+                    FileEntry::new(
+                        Path::new(&format!("/fixture/Document-{index:04}.txt")),
+                        false,
+                    )
+                    .unwrap()
+                })
+                .collect(),
+        );
+        let mut checks = 0;
+        let results = provider.search_interruptible(
+            "document",
+            &mut Matcher::new(nucleo_matcher::Config::DEFAULT),
+            &HashMap::new(),
+            0,
+            1000,
+            || {
+                checks += 1;
+                checks > 1
+            },
+        );
+        assert_eq!(checks, 2);
+        assert_eq!(results.len(), 64);
+        assert!(
+            results
+                .iter()
+                .all(|result| result.title.as_str() < "Document-0064.txt")
+        );
+    }
 
     #[test]
     #[ignore = "Measures search on 50,000 synthetic paths. Run in release mode with --ignored --nocapture."]
     fn profile_search_50k_files() {
         let files = (0..50_000)
             .map(|index| {
-                FileEntry::new(Path::new(&format!(
-                    "/benchmark/Project-{}/Document-{index}.txt",
-                    index % 100
-                )))
+                FileEntry::new(
+                    Path::new(&format!(
+                        "/benchmark/Project-{}/Document-{index}.txt",
+                        index % 100
+                    )),
+                    false,
+                )
                 .expect("entry")
             })
             .collect();
@@ -406,7 +753,7 @@ mod tests {
     #[test]
     fn matches_composed_and_decomposed_unicode_without_changing_file_paths() {
         let path = Path::new("/Documents/cafe\u{301}.txt");
-        let entry = FileEntry::new(path).expect("entry");
+        let entry = FileEntry::new(path, false).expect("entry");
         let id = entry.id.clone();
         let provider = FileProvider::new(vec![entry]);
         let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
@@ -423,7 +770,7 @@ mod tests {
 
     #[test]
     fn ascii_matching_borrows_existing_entry_storage() {
-        let entry = FileEntry::new(Path::new("/Documents/Report.txt")).expect("entry");
+        let entry = FileEntry::new(Path::new("/Documents/Report.txt"), false).expect("entry");
         let provider = FileProvider::new(vec![entry]);
         let file = &provider.files[0];
         assert!(file.name.is_none());
@@ -461,6 +808,7 @@ mod tests {
             id: format!("file:{path}"),
             name: name.into(),
             path: path.into(),
+            folder: false,
         })
         .collect::<Vec<_>>();
         let provider = FileProvider::new(entries.clone());
@@ -551,7 +899,8 @@ mod tests {
             100,
             &mut report,
         );
-        assert_eq!(files.len(), 2);
+        // Two files and the Reports folder.
+        assert_eq!(files.len(), 3);
         assert_eq!(report.warning(), None);
         let mut search = SearchManager::default();
         search.replace_files(files);
@@ -614,7 +963,133 @@ mod tests {
                 .expect("search")
                 .results
                 .len(),
-            2
+            3
+        );
+    }
+
+    #[test]
+    fn ignore_rules_and_hidden_opt_in_prune_trees_without_changing_defaults() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        for name in [
+            ".private/keep.txt",
+            "keep.txt",
+            "root.tmp",
+            "nested/cache.tmp",
+            "nested/keep.txt",
+            "build/keep.txt",
+            "node_modules/keep.txt",
+        ] {
+            write(dir.path(), name, "");
+        }
+        let mut report = ScanReport::default();
+        let files = scan_with_rules(
+            vec![dir.path().into()],
+            &["node_modules".into()],
+            100,
+            true,
+            &["**/*.tmp".into(), "build/".into()],
+            &mut report,
+        );
+        let names: Vec<_> = files
+            .files
+            .iter()
+            .map(|file| file.entry.name.as_str())
+            .collect();
+        assert_eq!(names.len(), 5);
+        assert!(names.contains(&".private"));
+        assert!(!names.contains(&"build"));
+        assert!(!names.contains(&"root.tmp"));
+        assert!(!names.contains(&"cache.tmp"));
+        assert!(
+            report
+                .directories
+                .iter()
+                .all(|path| !path.ends_with("build") && !path.ends_with("node_modules"))
+        );
+        assert!(report.warning().is_none());
+        assert!(
+            scan(
+                vec![dir.path().into()],
+                &[],
+                100,
+                &mut ScanReport::default()
+            )
+            .files
+            .iter()
+            .all(|file| !file.entry.path.contains(".private"))
+        );
+    }
+
+    #[test]
+    fn glob_matching_is_bounded_and_has_explicit_path_semantics() {
+        let matches = |pattern, path: &str, directory| {
+            IgnorePattern::parse(pattern).expect("pattern").matches(
+                path,
+                path.rsplit('/').next().unwrap(),
+                directory,
+            )
+        };
+        assert!(matches("*.txt", "nested/café.txt", false));
+        assert!(matches("caf?.txt", "nested/café.txt", false));
+        assert!(!matches("nested/*.txt", "nested/deeper/a.txt", false));
+        assert!(matches("nested/**/*.txt", "nested/a.txt", false));
+        assert!(matches("nested/**/*.txt", "nested/deeper/a.txt", false));
+        assert!(!matches("build/", "build", false));
+        assert!(matches("build/", "build", true));
+        assert!(IgnorePattern::parse(&"*".repeat(257)).is_none());
+        assert!(IgnorePattern::parse("[abc]").is_none());
+        assert!(!matches("*", &"x".repeat(4097), false));
+    }
+
+    #[test]
+    fn folders_are_results_that_open_and_validate_as_folders() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        write(dir.path(), "Invoices/2026/march.pdf", "");
+        write(dir.path(), "invoices.txt", "");
+        write(dir.path(), ".hidden/Invoices/april.pdf", "");
+        let files = scan(
+            vec![dir.path().into()],
+            &[],
+            100,
+            &mut ScanReport::default(),
+        );
+        let mut search = SearchManager::default();
+        search.replace_files(files);
+        let results = search
+            .search("Invoices", SearchMode::Files)
+            .expect("search")
+            .results;
+        let folder = results
+            .iter()
+            .find(|result| result.kind == ResultKind::Folder)
+            .expect("folder result");
+        assert_eq!(folder.title, "Invoices");
+        assert!(
+            results
+                .iter()
+                .all(|result| !result.subtitle.contains(".hidden")),
+            "Hidden folders stay out of the index"
+        );
+        assert!(results.iter().any(|result| result.kind == ResultKind::File));
+        assert_eq!(folder.primary_action, Action::Open);
+        assert_eq!(folder.secondary_actions, [Action::Reveal]);
+        let Ok(ResolvedAction::File(entry, Action::Open)) =
+            search.resolve_action(&folder.id, Action::Open)
+        else {
+            panic!("folders open like files");
+        };
+        assert!(entry.validate().is_ok());
+        let path = dir.path().join("Invoices");
+        fs::remove_dir_all(&path).expect("delete");
+        fs::write(&path, "").expect("replace with a file");
+        assert!(matches!(entry.validate(), Err(Error::FileNotFound)));
+        assert_eq!(
+            search
+                .search("2026", SearchMode::Files)
+                .expect("search")
+                .results[0]
+                .kind,
+            ResultKind::Folder
         );
     }
 
@@ -755,10 +1230,25 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn rejects_parent_directory_replaced_by_a_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let path = write(dir.path(), "parent/file.txt", "original")
+            .canonicalize()
+            .unwrap();
+        write(outside.path(), "file.txt", "outside");
+        let entry = FileEntry::new(&path, false).unwrap();
+        fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(outside.path(), path.parent().unwrap()).unwrap();
+        assert!(entry.validate().is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn rejects_non_utf8_paths_without_lossy_action_ids() {
         use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
         let path = Path::new(OsStr::from_bytes(b"/bad\xff.txt"));
-        assert!(FileEntry::new(path).is_none());
+        assert!(FileEntry::new(path, false).is_none());
     }
 
     #[cfg(target_os = "linux")]
@@ -791,7 +1281,16 @@ mod tests {
         fs::set_permissions(&denied, fs::Permissions::from_mode(0o700))
             .expect("restore permissions");
         if cannot_read {
-            assert_eq!(files.len(), 1);
+            // The unreadable folder is listed. Its contents are not.
+            assert_eq!(files.len(), 2);
+            assert!(
+                files
+                    .get(&format!(
+                        "file:{}",
+                        denied.canonicalize().expect("path").display()
+                    ))
+                    .is_some_and(|entry| entry.folder)
+            );
             assert!(report.issue_count > 0);
         }
     }

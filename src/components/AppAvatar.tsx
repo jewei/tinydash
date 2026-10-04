@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import Icon from "./Icon";
 import { loadAppIcon } from "../app-icons";
 
@@ -11,7 +11,7 @@ export default function AppAvatar(props: {
   const [inView, setInView] = createSignal(false);
   const [pixels, setPixels] = createSignal(72);
   const [failedSource, setFailedSource] = createSignal<string>();
-  onMount(() => {
+  onSettled(() => {
     let scale: MediaQueryList;
     const resize = () => {
       const required = Math.ceil(
@@ -33,19 +33,26 @@ export default function AppAvatar(props: {
     );
     visible.observe(element);
     resize();
-    onCleanup(() => {
+    return () => {
       sizes.disconnect();
       visible.disconnect();
       scale.removeEventListener("change", resize);
-    });
+    };
   });
-  createEffect(() => {
-    const key = props.icon;
-    setNativeSource(undefined);
-    if (key?.startsWith("app-icon:") && props.active !== false && inView()) {
-      onCleanup(loadAppIcon(key, pixels(), setNativeSource));
-    }
-  });
+  createEffect(
+    () => ({
+      key: props.icon,
+      active: props.active,
+      visible: inView(),
+      pixels: pixels(),
+    }),
+    ({ key, active, visible, pixels }) => {
+      setNativeSource(undefined);
+      if (key?.startsWith("app-icon:") && active !== false && visible) {
+        return loadAppIcon(key, pixels, setNativeSource);
+      }
+    },
+  );
   const source = () =>
     (nativeSource() ??
       (props.icon?.startsWith("data:image/png;base64,")
@@ -59,8 +66,7 @@ export default function AppAvatar(props: {
   return (
     <span
       ref={element}
-      class="app-avatar"
-      classList={{ "has-app-icon": !!source() }}
+      class={{ "app-avatar": true, "has-app-icon": !!source() }}
       aria-hidden="true"
     >
       <Show when={source()} fallback={<Icon name="window" size={20} />}>

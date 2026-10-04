@@ -1,15 +1,21 @@
 import {
-  batch,
   createEffect,
   createMemo,
   createSignal,
   For,
   onCleanup,
-  onMount,
+  onSettled,
   Show,
 } from "solid-js";
 import { isTauri } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import WindowShortcutPreferences from "./components/WindowShortcutPreferences";
+import { listen } from "@tauri-apps/api/event";
+import { createNativeSubscriptions } from "./nativeSubscriptions";
+import {
+  folderModeFor,
+  mergeSettingsDraft,
+  type FolderMode,
+} from "./settingsDraft";
 import {
   backend,
   type SearchMode,
@@ -20,13 +26,19 @@ import {
 } from "./bridge";
 import {
   appearances,
-  type Appearance,
+  isAppearance,
   readAppearance,
+  readCompact,
+  readFollowSystemGlass,
   saveAppearance,
+  saveCompact,
+  saveFollowSystemGlass,
   watchAppearance,
 } from "./appearance";
 import ConfirmDialog from "./components/ConfirmDialog";
-import Icon from "./components/Icon";
+import ItemPreferences from "./components/ItemPreferences";
+import EmojiPreferences from "./components/EmojiPreferences";
+import Icon, { type IconName } from "./components/Icon";
 import {
   AppPreferences,
   WebSearchPreferences,
@@ -37,6 +49,7 @@ import {
   normalizeCategories,
 } from "./categories";
 import appIconUrl from "../app-icon.svg";
+import emojiDataLicense from "../src-tauri/data/emoji/LICENSE?raw";
 import "./styles/settings.css";
 
 const sections = [
@@ -53,7 +66,7 @@ const sections = [
   {
     id: "search",
     label: "Search",
-    description: "Choose app names and web searches.",
+    description: "Choose suggestions, app names, shortcuts, and web searches.",
   },
   {
     id: "categories",
@@ -87,8 +100,32 @@ const sections = [
   },
 ] as const;
 type Section = (typeof sections)[number]["id"];
-type FolderMode = "default" | "custom" | "off";
-type ShortcutTarget = "global" | SearchMode;
+const sectionIcons: Record<Section, IconName> = {
+  shortcut: "window",
+  appearance: "appearance",
+  search: "search",
+  categories: "apps",
+  clipboard: "clipboard",
+  files: "folder",
+  currency: "globe",
+  privacy: "lock",
+  about: "emoji",
+};
+type ShortcutTarget = "global" | SearchMode | `item:${string}`;
+const sectionKeywords: Record<Section, string> = {
+  shortcut:
+    "keyboard hotkey startup login blur reset menu bar window placement presets restore maximize center",
+  appearance: "theme dark light compact glass transparency",
+  search:
+    "aliases applications hidden shortcuts commands web keywords suggestions usage paste queue emoji skin tone language Chinese Malay Spanish 简体中文 Bahasa Melayu Español",
+  categories: "tabs visible hide providers",
+  clipboard:
+    "history copy paste default action enter images files exclusions privacy retention days",
+  files: "index folders roots ignore patterns hidden watch preview",
+  currency: "exchange rates offline updates",
+  privacy: "backup import export recovery data storage",
+  about: "version update license",
+};
 const lines = (text: string) => [
   ...new Set(
     text
@@ -97,24 +134,6 @@ const lines = (text: string) => [
       .filter(Boolean),
   ),
 ];
-const folderModeFor = (value: SettingsValues): FolderMode =>
-  value.fileSearchRoots === null
-    ? "default"
-    : value.fileSearchRoots.length
-      ? "custom"
-      : "off";
-
-function mergeDraft<T extends object>(previous: T, draft: T, incoming: T): T {
-  const merged = { ...incoming };
-  const keys = new Set([...Object.keys(previous), ...Object.keys(draft)]);
-  for (const key of keys as Set<keyof T>) {
-    if (JSON.stringify(draft[key]) === JSON.stringify(previous[key])) continue;
-    if (Object.hasOwn(draft, key)) merged[key] = draft[key];
-    else delete merged[key];
-  }
-  return merged;
-}
-
 function Toggle(props: {
   label: string;
   hint: string;
@@ -144,8 +163,31 @@ export default function Settings() {
   const [draft, setDraft] = createSignal<SettingsValues>();
   const [saved, setSaved] = createSignal<SettingsValues>();
   const [section, setSection] = createSignal<Section>("shortcut");
+  const [settingsQuery, setSettingsQuery] = createSignal("");
+  const matchingSections = createMemo(() => {
+    const words = settingsQuery()
+      .toLocaleLowerCase()
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    return sections.filter((item) =>
+      words.every((word) =>
+        `${item.label} ${item.description} ${sectionKeywords[item.id]}`
+          .toLocaleLowerCase()
+          .includes(word),
+      ),
+    );
+  });
   const [appearance, setAppearance] = createSignal(readAppearance());
   const [savedAppearance, setSavedAppearance] = createSignal(readAppearance());
+  const [compact, setCompact] = createSignal(readCompact());
+  const [savedCompact, setSavedCompact] = createSignal(readCompact());
+  const [followSystemGlass, setFollowSystemGlass] = createSignal(
+    readFollowSystemGlass(),
+  );
+  const [savedSystemGlass, setSavedSystemGlass] = createSignal(
+    readFollowSystemGlass(),
+  );
   const [folderMode, setFolderMode] = createSignal<FolderMode>("default");
   const [foldersText, setFoldersText] = createSignal("");
   const [excludedText, setExcludedText] = createSignal("");
@@ -168,7 +210,7 @@ export default function Settings() {
   let recordingSequence = 0;
   let recorder!: HTMLButtonElement;
   let content!: HTMLDivElement;
-  const stops: UnlistenFn[] = [];
+  const subscriptions = createNativeSubscriptions(listen);
   const value = () => draft()!;
   const currentSection = () => sections.find((item) => item.id === section())!;
   const dirty = createMemo(
@@ -176,12 +218,16 @@ export default function Settings() {
       !!draft() &&
       (JSON.stringify(draft()) !== JSON.stringify(saved()) ||
         folderMode() !== folderModeFor(saved()!) ||
-        appearance() !== savedAppearance()),
+        appearance() !== savedAppearance() ||
+        compact() !== savedCompact() ||
+        followSystemGlass() !== savedSystemGlass()),
   );
   const modifier = () => (info()?.platform === "macos" ? "⌘" : "Ctrl");
   const shortcutKeys = () => shortcutKeysFor("global");
   function shortcutValue(target: ShortcutTarget): string {
     if (target === "global") return draft()?.shortcut ?? "";
+    if (target.startsWith("item:"))
+      return draft()?.itemPreferences[target.slice(5)]?.shortcut ?? "";
     return (
       draft()?.categoryShortcuts.find((binding) => binding.mode === target)
         ?.shortcut ?? ""
@@ -202,8 +248,8 @@ export default function Settings() {
       });
   }
 
-  createEffect(() => {
-    document.documentElement.dataset.appearance = appearance();
+  createEffect(appearance, (value) => {
+    document.documentElement.dataset.appearance = value;
   });
 
   function resetDraft(settings: SettingsValues) {
@@ -217,64 +263,48 @@ export default function Settings() {
   }
 
   function receiveSettings(settings: SettingsValues) {
-    const next = {
-      ...settings,
-      visibleCategories: normalizeCategories(settings.visibleCategories),
-    };
-    const previous = saved();
-    const current = draft();
-    const merged =
-      previous && current ? mergeDraft(previous, current, next) : next;
-    if (previous && current) {
-      merged.appPreferences = mergeDraft(
-        previous.appPreferences,
-        current.appPreferences,
-        next.appPreferences,
-      );
-      for (const [id, preference] of Object.entries(current.appPreferences)) {
-        if (next.appPreferences[id]) {
-          merged.appPreferences[id] = mergeDraft(
-            previous.appPreferences[id] ?? { aliases: [], hidden: false },
-            preference,
-            next.appPreferences[id],
-          );
-        }
-      }
+    const merged = mergeSettingsDraft(saved(), draft(), settings, folderMode());
+    setInfo((info) => (info ? { ...info, settings: merged.saved } : info));
+    setSaved(merged.saved);
+    setDraft(merged.draft);
+    if (merged.updateFolders) {
+      setFolderMode(folderModeFor(merged.draft));
+      setFoldersText(merged.draft.fileSearchRoots?.join("\n") ?? "");
     }
-    batch(() => {
-      setInfo((info) => (info ? { ...info, settings: next } : info));
-      setSaved(next);
-      if (!previous || !current) {
-        resetDraft(merged);
-        return;
-      }
-      setDraft(merged);
-      // Keep incomplete folder input while another window changes settings.
-      if (
-        JSON.stringify(current.fileSearchRoots) ===
-          JSON.stringify(previous.fileSearchRoots) &&
-        folderMode() === folderModeFor(previous)
-      ) {
-        setFolderMode(folderModeFor(merged));
-        setFoldersText(merged.fileSearchRoots?.join("\n") ?? "");
-      }
-      if (
-        JSON.stringify(current.fileSearchExcludedDirs) ===
-        JSON.stringify(previous.fileSearchExcludedDirs)
-      ) {
-        setExcludedText(merged.fileSearchExcludedDirs.join("\n"));
-      }
-    });
+    if (merged.updateExcluded) {
+      setExcludedText(merged.draft.fileSearchExcludedDirs.join("\n"));
+    }
   }
   function setShortcut(target: ShortcutTarget, shortcut: string) {
     if (target === "global") {
       field("shortcut", shortcut);
       return;
     }
+    if (target.startsWith("item:")) {
+      const id = target.slice(5);
+      const item = value().itemPreferences[id] ?? {
+        aliases: [],
+        shortcut: "",
+        hidden: false,
+        disabled: false,
+      };
+      field("itemPreferences", {
+        ...value().itemPreferences,
+        [id]: {
+          ...item,
+          shortcut,
+          ...(id.startsWith("command:window-") ? { disabled: false } : {}),
+        },
+      });
+      return;
+    }
     const bindings = value().categoryShortcuts.filter(
       (binding) => binding.mode !== target,
     );
-    field("categoryShortcuts", [...bindings, { mode: target, shortcut }]);
+    field("categoryShortcuts", [
+      ...bindings,
+      { mode: target as SearchMode, shortcut },
+    ]);
   }
   function field<K extends keyof SettingsValues>(
     key: K,
@@ -332,7 +362,7 @@ export default function Settings() {
       }
       setRecording(true);
       setRecordingTarget(target);
-      recorder.focus();
+      recorder?.focus();
     } catch (reason) {
       if (!disposed) setError(String(reason));
     } finally {
@@ -389,6 +419,14 @@ export default function Settings() {
         saveAppearance(appearance());
         setSavedAppearance(appearance());
       }
+      if (compact() !== savedCompact()) {
+        saveCompact(compact());
+        setSavedCompact(compact());
+      }
+      if (followSystemGlass() !== savedSystemGlass()) {
+        saveFollowSystemGlass(followSystemGlass());
+        setSavedSystemGlass(followSystemGlass());
+      }
       setSaved(settings);
       resetDraft(settings);
       setStatus("Changes saved.");
@@ -416,18 +454,25 @@ export default function Settings() {
     const imported = pendingImport();
     if (!imported) return;
     resetDraft(imported.settings);
-    if (
-      imported.appearance &&
-      ["light", "dark", "compact"].includes(imported.appearance)
-    )
-      setAppearance(imported.appearance as Appearance);
+    if (isAppearance(imported.appearance)) setAppearance(imported.appearance);
+    else if (imported.appearance === "compact") {
+      setAppearance("light");
+      setCompact(true);
+    }
+    if (typeof imported.compact === "boolean") setCompact(imported.compact);
+    if (typeof imported.followSystemGlass === "boolean")
+      setFollowSystemGlass(imported.followSystemGlass);
     setPendingImport(undefined);
     setStatus("Import preview applied. Save changes to keep it.");
   }
   async function exportCurrentSettings() {
     setError(undefined);
     try {
-      const exported = await backend.exportSettings(savedAppearance());
+      const exported = await backend.exportSettings(
+        savedAppearance(),
+        savedCompact(),
+        savedSystemGlass(),
+      );
       setStatus(exported ? "Saved settings exported." : "Export canceled.");
     } catch (reason) {
       setError(String(reason));
@@ -504,11 +549,14 @@ export default function Settings() {
       )
         return;
       if (
-        (!event.ctrlKey && !event.altKey && !event.metaKey) ||
+        (!event.ctrlKey &&
+          !event.altKey &&
+          !event.metaKey &&
+          !(event.shiftKey && event.code === "Space")) ||
         event.getModifierState("AltGraph")
       ) {
         setError(
-          "Hold Control, Option / Alt, or Command / Windows, then press one key.",
+          "Hold Control, Option / Alt, or Command / Windows and press one key. You can also use Shift+Space.",
         );
         return;
       }
@@ -541,18 +589,15 @@ export default function Settings() {
   const onBlur = () => {
     void stopRecording();
   };
-  onMount(() => {
+  onSettled(() => {
     document.title = "TinyDash Settings";
     document.addEventListener("keydown", onKey, true);
     window.addEventListener("blur", onBlur);
     if (desktop) {
-      void listen<SettingsValues>("settings-changed", (event) =>
-        receiveSettings(event.payload),
-      )
-        .then((stop) => {
-          if (disposed) return stop();
-          stops.push(stop);
-          return load();
+      void subscriptions
+        .register<SettingsValues>("settings-changed", receiveSettings)
+        .then((active) => {
+          if (active) return load();
         })
         .catch((reason) => {
           if (!disposed) setError(String(reason));
@@ -560,25 +605,49 @@ export default function Settings() {
     } else {
       void load();
     }
-    void watchAppearance(setAppearance).then((stop) =>
-      disposed ? stop() : stops.push(stop),
-    );
+    void subscriptions
+      .own(
+        watchAppearance(
+          subscriptions.guard((value) => {
+            setAppearance(value);
+            setSavedAppearance(value);
+          }),
+          subscriptions.guard((value) => {
+            setCompact(value);
+            setSavedCompact(value);
+          }),
+          subscriptions.guard((value) => {
+            setFollowSystemGlass(value);
+            setSavedSystemGlass(value);
+          }),
+        ),
+      )
+      .catch((reason) => {
+        if (!disposed) setError(String(reason));
+      });
     if (desktop)
-      void listen<string>("shortcut-error", (event) =>
-        setError(event.payload),
-      ).then((stop) => (disposed ? stop() : stops.push(stop)));
+      void subscriptions
+        .register<string>("shortcut-error", setError)
+        .catch((reason) => {
+          if (!disposed) setError(String(reason));
+        });
   });
   onCleanup(() => {
     void stopRecording();
     disposed = true;
-    stops.forEach((stop) => stop());
+    subscriptions.dispose();
     document.removeEventListener("keydown", onKey, true);
     window.removeEventListener("blur", onBlur);
   });
 
   return (
     <main class="settings-shell" aria-label="TinyDash settings">
-      <aside class="settings-sidebar">
+      <aside
+        class={{
+          "settings-sidebar": true,
+          "is-searching": !!settingsQuery().trim(),
+        }}
+      >
         <div class="settings-brand">
           <img
             class="tiny-mark"
@@ -589,15 +658,35 @@ export default function Settings() {
           />
           TinyDash
         </div>
+        <label class="settings-field-label">
+          Search settings
+          <input
+            type="search"
+            aria-label="Search settings"
+            placeholder="Find a setting…"
+            value={settingsQuery()}
+            onInput={(event) => setSettingsQuery(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && matchingSections()[0]) {
+                event.preventDefault();
+                navigate(matchingSections()[0].id);
+              }
+            }}
+          />
+        </label>
+        <Show when={!matchingSections().length}>
+          <p role="status">No matching settings.</p>
+        </Show>
         <nav aria-label="Settings sections">
-          <For each={sections}>
+          <For each={matchingSections()}>
             {(item) => (
               <button
                 type="button"
                 aria-current={section() === item.id ? "page" : undefined}
                 onClick={() => navigate(item.id)}
               >
-                {item.label}
+                <Icon name={sectionIcons[item.id]} size={17} />
+                <span>{item.label}</span>
               </button>
             )}
           </For>
@@ -613,11 +702,13 @@ export default function Settings() {
             </For>
           </select>
         </label>
-        <p class="settings-sidebar-note">Open Settings with {modifier()} ,</p>
+        <p class="settings-sidebar-note">
+          Settings shortcut <kbd>{modifier()} ,</kbd>
+        </p>
       </aside>
       <form
         class="settings-main"
-        noValidate
+        novalidate
         onSubmit={(event) => {
           event.preventDefault();
           void save();
@@ -651,8 +742,10 @@ export default function Settings() {
                 <div class="settings-group">
                   <h2>Launch shortcut</h2>
                   <div
-                    class="shortcut-recorder"
-                    classList={{ "is-recording": recording() }}
+                    class={{
+                      "shortcut-recorder": true,
+                      "is-recording": recording(),
+                    }}
                   >
                     <div class="shortcut-keys" aria-live="polite">
                       <Show
@@ -683,7 +776,7 @@ export default function Settings() {
                       ? "Global shortcuts are unavailable. On Wayland, set a desktop shortcut that starts TinyDash."
                       : recording()
                         ? "Hold a modifier and press one key. Press Escape to cancel."
-                        : "Click Record new, then press the keys you want to use."}
+                        : "Click Record new, then press the keys you want to use. Shift+Space is also supported."}
                   </p>
                   <button
                     type="button"
@@ -707,12 +800,20 @@ export default function Settings() {
                     onChange={(next) => field("hideOnBlur", next)}
                   />
                   <Toggle
-                    label="Clear the search each time"
-                    hint="Turn this off to keep your last search selected."
+                    label="Reset search and category on open"
+                    hint="Clear the query and return to the first visible category. Turn this off to keep your query and category."
                     checked={value().clearQueryOnOpen}
                     onChange={(next) => field("clearQueryOnOpen", next)}
                   />
                 </div>
+                <Show when={info()?.platform === "macos"}>
+                  <Toggle
+                    label="Show menu bar icon"
+                    hint="The global shortcut remains available when the icon is hidden."
+                    checked={value().showMenuBarIcon}
+                    onChange={(next) => field("showMenuBarIcon", next)}
+                  />
+                </Show>
                 <div class="settings-group">
                   <h2>Category shortcuts</h2>
                   <p>
@@ -786,6 +887,16 @@ export default function Settings() {
                     }}
                   </For>
                 </div>
+                <WindowShortcutPreferences
+                  value={value().itemPreferences}
+                  available={info()?.shortcutsAvailable ?? false}
+                  platform={info()?.platform ?? ""}
+                  preparing={preparing()}
+                  recording={recordingTarget()}
+                  shortcutKeys={(id) => shortcutKeysFor(`item:${id}`)}
+                  onRecord={(id) => void startRecording(`item:${id}`)}
+                  onChange={(next) => field("itemPreferences", next)}
+                />
                 <Toggle
                   label="Start TinyDash when you sign in"
                   hint="Open one launcher process after you sign in."
@@ -795,17 +906,17 @@ export default function Settings() {
               </Show>
               <Show when={section() === "appearance"}>
                 <div class="settings-group">
-                  <h2>Launcher style</h2>
+                  <h2>Theme</h2>
                   <div
                     class="settings-appearances"
                     role="radiogroup"
-                    aria-label="Launcher style"
+                    aria-label="Theme"
                   >
                     <For each={appearances}>
                       {(item) => (
                         <label
-                          class="style-option"
-                          classList={{
+                          class={{
+                            "style-option": true,
                             "is-selected": appearance() === item.id,
                           }}
                         >
@@ -831,7 +942,11 @@ export default function Settings() {
                               <i />
                               <i />
                             </span>
-                            <span class="style-detail" />
+                            <span class="style-detail">
+                              <i />
+                              <i />
+                              <i />
+                            </span>
                           </span>
                           <span class="style-label">
                             {item.label}
@@ -839,23 +954,69 @@ export default function Settings() {
                               {appearance() === item.id ? "✓" : ""}
                             </span>
                           </span>
-                          <span class="settings-hint">
-                            {item.id === "light"
-                              ? "Cream and peach"
-                              : item.id === "dark"
-                                ? "Charcoal and olive"
-                                : "A smaller result list"}
-                          </span>
+                          <span class="settings-hint">{item.description}</span>
                         </label>
                       )}
                     </For>
                   </div>
                   <p class="settings-note">
-                    Appearance changes apply at once in both windows.
+                    Theme changes apply at once in both windows.
                   </p>
                 </div>
+                <Toggle
+                  label="Compact layout"
+                  hint="Use shorter rows and a single result column with any theme."
+                  checked={compact()}
+                  onChange={(next) => {
+                    setCompact(next);
+                    saveCompact(next);
+                    setSavedCompact(next);
+                    setStatus("Layout saved.");
+                  }}
+                />
+                <Show when={info()?.platform === "macos"}>
+                  <Toggle
+                    label="Follow macOS Liquid Glass"
+                    hint="Use the macOS glass settings. Turn off for a solid theme background."
+                    checked={followSystemGlass()}
+                    onChange={(next) => {
+                      setFollowSystemGlass(next);
+                      saveFollowSystemGlass(next);
+                      setSavedSystemGlass(next);
+                      setStatus("Liquid Glass preference saved.");
+                    }}
+                  />
+                  <div class="settings-group">
+                    <h2>Liquid Glass</h2>
+                    <p class="settings-note">
+                      When enabled on macOS 26 or later, the launcher uses
+                      native Liquid Glass. On macOS 27, adjust Liquid Glass in
+                      System Settings, Appearance. macOS controls the blur and
+                      transparency and follows your accessibility settings.
+                      Earlier versions use a solid background.
+                    </p>
+                  </div>
+                </Show>
               </Show>
               <Show when={section() === "search"}>
+                <Toggle
+                  label="Show usage-based suggestions"
+                  hint="Show up to six used apps, files, and emoji below pins in All. Usage stays on this device."
+                  checked={value().showSuggestions}
+                  onChange={(next) => field("showSuggestions", next)}
+                />
+                <EmojiPreferences
+                  skinTone={value().emojiSkinTone}
+                  languages={value().emojiLanguages}
+                  onSkinTone={(next) => field("emojiSkinTone", next)}
+                  onLanguages={(next) => field("emojiLanguages", next)}
+                />
+                <ItemPreferences
+                  value={value().itemPreferences}
+                  onChange={(next) => field("itemPreferences", next)}
+                  onRecord={(id) => void startRecording(`item:${id}`)}
+                  recording={recordingTarget()}
+                />
                 <div class="settings-group">
                   <h2>Application names</h2>
                   <AppPreferences
@@ -886,8 +1047,8 @@ export default function Settings() {
                       <For each={categories}>
                         {(category) => (
                           <label
-                            class="category-choice"
-                            classList={{
+                            class={{
+                              "category-choice": true,
                               "is-selected": value().visibleCategories.includes(
                                 category.id,
                               ),
@@ -962,6 +1123,35 @@ export default function Settings() {
                 />
                 <label class="settings-row">
                   <span>
+                    <strong>Default text action</strong>
+                    <span class="settings-hint">
+                      Enter copies saved text or pastes it into the previous
+                      app. Both actions stay available in Actions.
+                    </span>
+                  </span>
+                  <select
+                    aria-label="Default text action"
+                    value={value().clipboardDefaultAction}
+                    onChange={(event) =>
+                      field(
+                        "clipboardDefaultAction",
+                        event.currentTarget.value === "paste"
+                          ? "paste"
+                          : "copy",
+                      )
+                    }
+                  >
+                    <option value="copy">Copy text</option>
+                    <option value="paste">Paste to previous app</option>
+                  </select>
+                </label>
+                <p class="settings-callout">
+                  Direct paste needs Accessibility access on macOS or xdotool on
+                  Linux X11. It is unavailable on Wayland. If paste fails, use
+                  Copy text in Actions.
+                </p>
+                <label class="settings-row">
+                  <span>
                     <strong>History limit</strong>
                     <span class="settings-hint">
                       Keep 1 to 500 unpinned entries. Pinned entries stay saved.
@@ -984,7 +1174,60 @@ export default function Settings() {
                   />
                 </label>
                 <div class="settings-group settings-separated">
-                  <h2>Saved text</h2>
+                  <label class="settings-field-label">
+                    Retention in days
+                    <input
+                      type="number"
+                      min="0"
+                      max="3650"
+                      aria-label="Clipboard retention days"
+                      value={value().clipboardRetentionDays}
+                      onInput={(event) =>
+                        field(
+                          "clipboardRetentionDays",
+                          Number(event.currentTarget.value),
+                        )
+                      }
+                    />
+                  </label>
+                  <p>
+                    0 keeps entries until the count limit. Pinned text stays
+                    saved.
+                  </p>
+                  <label class="settings-field-label">
+                    Excluded applications
+                    <textarea
+                      aria-label="Excluded clipboard applications"
+                      rows={3}
+                      placeholder="Application name or bundle ID, one per line"
+                      value={value().clipboardExcludedApps.join("\n")}
+                      onInput={(event) =>
+                        field(
+                          "clipboardExcludedApps",
+                          lines(event.currentTarget.value),
+                        )
+                      }
+                    />
+                  </label>
+                  <p>
+                    Exclusions match exact application names or identifiers. If
+                    the source cannot be identified, capture stops while any
+                    exclusions are configured. Linux cannot attribute sources
+                    here. Secret-marked content is always skipped.
+                  </p>
+                  <Toggle
+                    label="Capture clipboard images"
+                    hint="Opt in to bounded local PNG history (currently macOS only). Requires clipboard history to be enabled."
+                    checked={value().clipboardCaptureImages}
+                    onChange={(next) => field("clipboardCaptureImages", next)}
+                  />
+                  <Toggle
+                    label="Capture copied files"
+                    hint="Keep references, not file backups (currently macOS only). Requires clipboard history to be enabled."
+                    checked={value().clipboardCaptureFiles}
+                    onChange={(next) => field("clipboardCaptureFiles", next)}
+                  />
+                  <h2>Saved history</h2>
                   <p>
                     Turning history off stops new entries. It keeps the entries
                     you already saved.
@@ -1064,6 +1307,27 @@ export default function Settings() {
                   </Show>
                 </div>
                 <Show when={folderMode() !== "off"}>
+                  <Toggle
+                    label="Include hidden files"
+                    hint="Search dotfiles and hidden folders. Symbolic links are still not followed."
+                    checked={value().fileSearchIncludeHidden}
+                    onChange={(next) => field("fileSearchIncludeHidden", next)}
+                  />
+                  <label class="settings-field-label">
+                    Ignore patterns
+                    <textarea
+                      aria-label="File ignore patterns"
+                      rows={3}
+                      placeholder={"*.log\nbuild/**"}
+                      value={value().fileSearchIgnorePatterns.join("\n")}
+                      onInput={(event) =>
+                        field(
+                          "fileSearchIgnorePatterns",
+                          lines(event.currentTarget.value),
+                        )
+                      }
+                    />
+                  </label>
                   <Toggle
                     label="Update files automatically"
                     hint="Watch these folders for changes."
@@ -1254,7 +1518,20 @@ export default function Settings() {
                             : "off"}
                           . Start at login:{" "}
                           {preview().settings.startAtLogin ? "on" : "off"}.
-                          Appearance: {preview().appearance ?? "keep current"}.
+                          Theme: {preview().appearance ?? "keep current"}.
+                          Compact layout:{" "}
+                          {preview().compact == null
+                            ? "keep current"
+                            : preview().compact
+                              ? "on"
+                              : "off"}
+                          . Follow macOS Liquid Glass:{" "}
+                          {preview().followSystemGlass == null
+                            ? "keep current"
+                            : preview().followSystemGlass
+                              ? "on"
+                              : "off"}
+                          .
                         </p>
                         <details open>
                           <summary>Settings to import</summary>
@@ -1359,6 +1636,22 @@ export default function Settings() {
                   </p>
                 </div>
                 <div class="settings-group settings-separated">
+                  <h2>Emoji search data</h2>
+                  <p>
+                    Language keywords use Unicode CLDR 48.0.0 under the Unicode
+                    License V3.
+                  </p>
+                  <details>
+                    <summary>Emoji data license</summary>
+                    <p
+                      class="settings-hint"
+                      style={{ "white-space": "pre-wrap" }}
+                    >
+                      {emojiDataLicense}
+                    </p>
+                  </details>
+                </div>
+                <div class="settings-group settings-separated">
                   <h2>Updates</h2>
                   <p>
                     Check for a signed update. TinyDash installs it only after
@@ -1404,7 +1697,7 @@ export default function Settings() {
             </p>
           </Show>
           <div class="settings-save-row">
-            <p role="status" classList={{ "has-changes": dirty() }}>
+            <p role="status" class={{ "has-changes": dirty() }}>
               {saving()
                 ? "Saving changes..."
                 : dirty()
@@ -1420,6 +1713,8 @@ export default function Settings() {
                   onClick={() => {
                     resetDraft(saved()!);
                     setAppearance(savedAppearance());
+                    setCompact(savedCompact());
+                    setFollowSystemGlass(savedSystemGlass());
                     setError(undefined);
                     setStatus("Changes discarded.");
                   }}
@@ -1447,8 +1742,8 @@ export default function Settings() {
           }
           description={
             clearKeepPinned()
-              ? "This deletes saved text entries that are not pinned. Pinned entries stay available."
-              : "This deletes all saved text entries, including pinned entries. The current system clipboard stays available."
+              ? "This deletes unpinned text and all saved images and file references. Pinned text stays available. The system clipboard does not change."
+              : "This deletes all saved text, images, and file references, including pinned text. The system clipboard does not change."
           }
           confirmLabel={clearKeepPinned() ? "Clear unpinned" : "Clear history"}
           busyLabel="Clearing..."

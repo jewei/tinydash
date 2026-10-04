@@ -6,7 +6,7 @@
 | Windows  | User and shared Start menu program folders and desktops, through known-folder APIs | Finds `.lnk`, `.exe`, and `.appref-ms` entries. Does not enumerate packaged apps without shortcuts or scan all of Program Files. Shortcut targets and their aliases are not extracted. |
 | Linux    | GIO's installed desktop entries                                                    | GIO handles desktop visibility, localization, aliases, XDG precedence, launch arguments, and D-Bus activation. AppImages without desktop entries are not discovered.                   |
 
-New applications appear after a refresh or restart. The file watcher applies only to file-search roots. Inaccessible application directories are skipped and counted in logs. The UI retains the old app index if a refresh fails.
+Application lists update automatically. macOS and Windows watch the application directories above; Linux uses the GIO application monitor. See [Application search](features/apps.md). Inaccessible application directories are skipped and counted in logs. The UI retains the old app index if a refresh fails.
 
 The global shortcut backend supports Linux X11, not native Wayland. On Wayland, assign a compositor or desktop shortcut to run the TinyDash binary. The single-instance handler then requests focus for the existing window. Window placement and focus remain subject to compositor policy. This limit comes from the [global-hotkey platform support](https://docs.rs/global-hotkey/latest/global_hotkey/).
 

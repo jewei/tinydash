@@ -1,0 +1,220 @@
+.utilities-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  min-height: 100dvh;
+  overflow: auto;
+  color: inherit;
+  background: var(--color-paper);
+  border-radius: 12px;
+  font-size: 13px;
+}
+.utilities-panel header,
+.utility-toolbar,
+.utilities-panel nav,
+.utility-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.utilities-panel header {
+  justify-content: space-between;
+}
+.utilities-panel h2,
+.utilities-panel h3 {
+  margin: 0;
+}
+.utilities-panel p {
+  line-height: 1.5;
+  margin: 10px 0;
+}
+.utilities-panel button,
+.utilities-panel input,
+.utility-awake-indicator {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  background: transparent;
+}
+.utilities-panel button {
+  cursor: pointer;
+}
+.utilities-panel button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.utilities-panel button[aria-pressed="true"] {
+  background: var(--color-selected);
+  color: var(--color-selection-ink);
+  border-color: var(--color-selection-border);
+}
+.utilities-panel :focus-visible,
+.utility-awake-indicator:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.utilities-panel label {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0;
+}
+.utilities-panel input {
+  min-width: 0;
+  max-width: 100%;
+}
+.utilities-panel form {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+.utilities-panel form label {
+  flex: 1;
+}
+.utilities-panel form button {
+  margin-bottom: 10px;
+}
+.utility-processes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+}
+.utility-processes li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-rule);
+}
+.utility-processes li > div {
+  flex: 1;
+  min-width: 0;
+}
+.utility-processes strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.utility-processes small {
+  display: block;
+  color: var(--color-muted);
+  margin-top: 4px;
+}
+.utility-danger,
+.utility-error {
+  color: var(--color-error) !important;
+}
+.utility-confirm {
+  position: absolute;
+  inset: 10px;
+  z-index: 2;
+  align-content: center;
+  padding: 24px;
+  background: var(--color-raised);
+  color: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.utility-confirm p {
+  overflow-wrap: anywhere;
+}
+.utility-swatch {
+  display: block;
+  width: 100%;
+  height: 42px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 6px;
+  margin: 12px 0;
+}
+.utility-awake-state {
+  font-weight: 600;
+}
+.utility-actions {
+  margin: 14px 0;
+}
+.utility-awake-indicator {
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.utilities-panel nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 5px;
+  gap: 4px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  background: var(--color-preview);
+}
+.utilities-panel nav button {
+  flex: 1 0 auto;
+  border-color: transparent;
+  color: var(--color-muted);
+  border-radius: var(--radius-control);
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+.utilities-panel
+  button:hover:not(:disabled):not([aria-pressed="true"]):not(.panel-primary) {
+  background: var(--color-hover);
+}
+.utility-content {
+  padding-top: 14px;
+}
+.utility-content > p {
+  color: var(--color-muted);
+  font-size: 12px;
+  max-width: 70ch;
+}
+.utility-toolbar input {
+  flex: 1;
+  min-width: 140px;
+}
+.utility-color-result {
+  margin-top: 20px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-rule);
+}
+.utility-color-result input {
+  font-family: var(--font-mono);
+}
+.utility-color-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.utility-awake-state {
+  padding: 14px 16px;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-control);
+  background: var(--color-preview);
+}
+.utilities-panel nav button[aria-pressed="true"] {
+  box-shadow: 0 1px 3px var(--color-shadow);
+}
+.utility-swatch {
+  height: 76px;
+  border-radius: var(--radius-md);
+}
+@media (max-width: 400px) {
+  .utilities-panel form {
+    flex-wrap: wrap;
+  }
+  .utilities-panel form label {
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 720px) {
+  .utility-color-values {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}

@@ -73,8 +73,8 @@ fn selection_matches_the_frozen_baseline() {
         cases.push(json!({"query": query,"mode":mode,"results":results,"notice":outcome.notice}));
     }
     let actual = Value::Array(cases);
-    // Used once in an isolated copy of the original source to record the old
-    // implementation. Normal test runs always compare, never update this file.
+    // Normal runs compare, never update. Intentional catalog changes require a
+    // reviewed fixture update; app-only rankings must remain unchanged.
     if let Ok(path) = std::env::var("TINYDASH_WRITE_SELECTION_FIXTURE") {
         std::fs::write(path, serde_json::to_string(&actual).unwrap() + "\n").unwrap();
         return;

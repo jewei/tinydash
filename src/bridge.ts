@@ -1,7 +1,22 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Appearance } from "./appearance";
+
+export type DragOutcome = "dropped" | "cancelled";
+
+export type AppearanceChange =
+  | { kind: "appearance"; value: Appearance }
+  | { kind: "compact"; value: boolean }
+  | { kind: "systemGlass"; value: boolean };
 
 export type Action =
-  "launch" | "open" | "reveal" | "copy" | "delete" | "run" | "regenerate";
+  | "launch"
+  | "open"
+  | "reveal"
+  | "copy"
+  | "paste"
+  | "delete"
+  | "run"
+  | "regenerate";
 export type SearchMode =
   | "all"
   | "apps"
@@ -15,9 +30,11 @@ export type SearchMode =
   | "url"
   | "web";
 
+export type FilePhase = "disabled" | "idle" | "queued" | "scanning" | "failed";
+
 export interface FileStatus {
   total: number;
-  indexing: boolean;
+  phase: FilePhase;
   warning: string | null;
 }
 
@@ -32,6 +49,7 @@ export interface SearchResult {
   kind:
     | "app"
     | "file"
+    | "folder"
     | "emoji"
     | "calculation"
     | "clipboard"
@@ -78,38 +96,70 @@ export interface SearchResult {
     title: string;
     description: string;
     confirmLabel: string;
-  } | null;
+  };
+}
+
+export interface LauncherWarning {
+  code:
+    | "settingsRead"
+    | "shortcutRegistration"
+    | "shortcutsUnavailable"
+    | "clipboardLimited"
+    | "trayUnavailable"
+    | "storageUnavailable"
+    | "clipboardUnavailable";
+  message: string;
+  retryable: boolean;
 }
 
 export interface SearchResponse {
-  preferredSelectionId?: string | null;
+  preferredSelectionId: string | null;
   results: SearchResult[];
   total: number;
   indexing: boolean;
   indexError: string | null;
   notice: string | null;
-  storageError: string | null;
+  storageError: LauncherWarning | null;
   files: FileStatus;
   currency: CurrencyStatus;
 }
 
 export interface SettingsValues {
+  showSuggestions: boolean;
+  emojiSkinTone: number;
+  emojiLanguages: string[];
   clearQueryOnOpen: boolean;
   hideOnBlur: boolean;
   shortcut: string;
   categoryShortcuts: { mode: SearchMode; shortcut: string }[];
   startAtLogin: boolean;
+  showMenuBarIcon: boolean;
   appPreferences: Record<string, { aliases: string[]; hidden: boolean }>;
   webSearches: WebSearch[];
+  itemPreferences: Record<string, ItemPreference>;
   clipboardHistoryEnabled: boolean;
   clipboardHistoryDecided: boolean;
+  clipboardDefaultAction: "copy" | "paste";
   clipboardHistoryLimit: number;
+  clipboardRetentionDays: number;
+  clipboardExcludedApps: string[];
+  clipboardCaptureImages: boolean;
+  clipboardCaptureFiles: boolean;
   fileSearchRoots: string[] | null;
   fileSearchLimit: number;
   fileSearchExcludedDirs: string[];
   fileWatchEnabled: boolean;
+  fileSearchIncludeHidden: boolean;
+  fileSearchIgnorePatterns: string[];
   currencyRatesEnabled: boolean;
   visibleCategories: SearchMode[];
+}
+
+export interface ItemPreference {
+  aliases: string[];
+  shortcut: string;
+  hidden: boolean;
+  disabled: boolean;
 }
 
 export interface WebSearch {
@@ -122,7 +172,9 @@ export interface WebSearch {
 export interface SettingsImport {
   settings: SettingsValues;
   ignoredKeys: string[];
-  appearance?: string | null;
+  appearance: string | null;
+  compact: boolean | null;
+  followSystemGlass: boolean | null;
 }
 
 export interface UpdateStatus {
@@ -134,10 +186,10 @@ export interface UpdateStatus {
 
 export interface LauncherInfo {
   settings: SettingsValues;
-  platform: "macos" | "windows" | "linux";
-  warnings: string[];
-  visible?: boolean;
-  initialMode?: SearchMode | null;
+  platform: string;
+  warnings: LauncherWarning[];
+  visible: boolean;
+  initialMode: SearchMode | null;
 }
 
 export interface SettingsInfo {
@@ -157,7 +209,21 @@ export interface ClipboardEntry {
   lastUsedAt: number | null;
 }
 
+export type PasteQueueAction = "status" | "start" | "next" | "skip" | "cancel";
+export interface PasteQueueStatus {
+  total: number;
+  position: number;
+  next: ClipboardEntry | null;
+}
+
 export const backend = {
+  drag: (id: string) => invoke<DragOutcome>("drag_result", { id }),
+  share: (id: string) => invoke<void>("share_result", { id }),
+  syncAppearance: (change: AppearanceChange) =>
+    invoke<void>("sync_appearance", { change }),
+  setLauncherAppearance: (
+    appearance: "light" | "dark" | "sage" | "rose" | "ink",
+  ) => invoke<boolean>("set_launcher_appearance", { appearance }),
   ready: () => invoke<LauncherInfo>("launcher_ready"),
   openSettings: () => invoke<void>("open_settings"),
   settings: () => invoke<SettingsInfo>("get_settings"),
@@ -170,12 +236,24 @@ export const backend = {
     invoke<string>("app_icon", { key, pixels, request }),
   cancelAppIcon: (request: string) =>
     invoke<void>("cancel_app_icon", { request }),
+  itemCatalog: () => invoke<SearchResult[]>("item_catalog"),
+  paste: (id: string) => invoke<void>("paste_result", { id }),
+  pasteQueue: (action: PasteQueueAction, ids: string[]) =>
+    invoke<PasteQueueStatus>("paste_queue", { action, ids }),
   setAppPreference: (id: string, aliases: string[], hidden: boolean) =>
     invoke<SettingsValues>("set_app_preference", { id, aliases, hidden }),
   previewWebSearch: (search: WebSearch, query: string) =>
     invoke<string>("preview_web_search", { search, query }),
-  exportSettings: (appearance: string) =>
-    invoke<boolean>("export_settings", { appearance }),
+  exportSettings: (
+    appearance: string,
+    compact: boolean,
+    followSystemGlass: boolean,
+  ) =>
+    invoke<boolean>("export_settings", {
+      appearance,
+      compact,
+      followSystemGlass,
+    }),
   importSettings: () =>
     invoke<SettingsImport | null>("preview_settings_import"),
   revealBackup: () => invoke<void>("reveal_backup"),
@@ -185,8 +263,10 @@ export const backend = {
     invoke<void>("set_shortcut_recording", { recording }),
   revealSettings: (data = false) =>
     invoke<void>("reveal_settings_path", { data }),
-  search: (query: string, mode: SearchMode) =>
-    invoke<SearchResponse>("search", { query, mode }),
+  search: (query: string, mode: SearchMode, requestId?: number) =>
+    invoke<SearchResponse>("search", { query, mode, requestId }),
+  cancelSearch: (requestId: number) =>
+    invoke<void>("cancel_search", { requestId }),
   setPinned: (id: string, category: SearchMode, pinned: boolean) =>
     invoke<void>("set_pinned", { id, category, pinned }),
   execute: (id: string, action: Action, confirmed = false) =>
@@ -206,6 +286,7 @@ export const backend = {
   saveClipboardFile: (id: string) =>
     invoke<boolean>("save_clipboard_file", { id }),
   hide: () => invoke<void>("hide_launcher"),
+  resetPosition: () => invoke<void>("reset_launcher_position"),
   refresh: () => invoke<void>("refresh_apps"),
   refreshFiles: () => invoke<void>("refresh_files"),
   refreshCurrency: () => invoke<void>("refresh_currency"),

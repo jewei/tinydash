@@ -1,7 +1,11 @@
-// The eager evaluator is frozen at 06475d2. It remains test-only so selection
-// equivalence includes the real pin, action, and icon response paths.
+// The eager evaluator comes from 06475d2 and follows the current ranking policy.
+// It remains test-only so selection equivalence includes the real pin, action,
+// and icon response paths.
 use super::*;
-use crate::providers::{search_work, system::SystemCommand};
+use crate::{
+    launcher::result::ResultKind,
+    providers::{search_work, system::SystemCommand},
+};
 
 impl SearchManager {
     pub(super) fn search_unpinned_eager(&mut self, query: &Query<'_>) -> SearchOutcome {
@@ -17,16 +21,9 @@ impl SearchManager {
             };
         }
         if let Some(outcome) = self.tools.search(query) {
-            return match outcome {
-                Ok(results) => SearchOutcome {
-                    results: results.into_iter().take(RESULT_LIMIT).collect(),
-                    notice: None,
-                },
-                Err(notice) => SearchOutcome {
-                    results: vec![],
-                    notice: Some(notice),
-                },
-            };
+            let mut budget = SearchBudget::new(None, Arc::default());
+            budget.deterministic_selection_test = self.calculator.deterministic_selection_test;
+            return self.tool_outcome(query, outcome, &budget);
         }
         let mut results = Vec::new();
         let mut notice = None;
@@ -53,7 +50,9 @@ impl SearchManager {
         {
             results.extend(
                 self.emoji
-                    .get_or_insert_with(EmojiProvider::default)
+                    .get_or_insert_with(|| {
+                        EmojiProvider::new(self.emoji_skin_tone, &self.emoji_languages)
+                    })
                     .search(query.text, &mut self.matcher),
             );
         }
@@ -99,15 +98,29 @@ impl SearchManager {
                 RESULT_LIMIT,
             ));
         }
-        SearchOutcome {
-            results: ranking::top_results(results, RESULT_LIMIT),
-            notice,
+        let mut results = ranking::top_results(results, usize::MAX);
+        // A command prefix moves System to the front of each tier.
+        if query.mode == SearchMode::All && SystemCommandProvider::is_prefix_query(query.text) {
+            results.sort_by_key(|result| {
+                (
+                    ranking::tier(result),
+                    result.kind != ResultKind::SystemCommand,
+                )
+            });
         }
+        results.truncate(RESULT_LIMIT);
+        SearchOutcome { results, notice }
     }
 }
 
 fn fixture(apps: usize, files: usize) -> SearchManager {
     let mut manager = SearchManager::default();
+    // These finite fixtures compare eager/selected results and work counts,
+    // not elapsed time. In debug CI the eager 50k-file reference can exceed
+    // the production budget; timing it out would compare an empty response
+    // with a valid optimized response. Deadline/cancellation tests construct
+    // their own default managers and keep the production limits enabled.
+    manager.calculator.deterministic_selection_test = true;
     manager.replace_apps(AppProvider::new(
         (0..apps)
             .map(|index| {
@@ -127,6 +140,7 @@ fn fixture(apps: usize, files: usize) -> SearchManager {
                     id: format!("file:{path}"),
                     name: format!("Safari-{index:05}.txt"),
                     path,
+                    folder: false,
                 }
             })
             .collect(),
@@ -277,6 +291,10 @@ fn bounded_search_matches_eager_selection_across_seeded_corpora() {
         };
         let mut actual = prepare(false);
         let mut expected = prepare(true);
+        // This finite corpus compares selection, not wall-clock scheduling.
+        // Disable both request/calculator clocks; keep exact result assertions.
+        actual.calculator.deterministic_selection_test = true;
+        expected.calculator.deterministic_selection_test = true;
         for mode in [
             SearchMode::All,
             SearchMode::Apps,
@@ -291,6 +309,32 @@ fn bounded_search_matches_eager_selection_across_seeded_corpora() {
                 "sa",
                 "app",
                 "lo",
+                "oc",
+                "s",
+                "sl",
+                "sle",
+                "re",
+                "res",
+                "sh",
+                "shu",
+                "su",
+                "sta",
+                "sleep",
+                " SLEEP ",
+                "suspend",
+                "reboot",
+                "shutdown",
+                "preferences",
+                "dark mode",
+                "em",
+                "empty trash",
+                "log",
+                "sign out",
+                "loc",
+                "des",
+                "show desktop",
+                "mu",
+                "unmute",
                 "work",
                 "日历",
                 "cafe",

@@ -1,0 +1,88 @@
+/* Keep search and selection immediate. Motion belongs to direct controls
+ * and newly opened surfaces, never to each arriving search result. */
+button {
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    transform var(--motion-fast) var(--ease-out);
+}
+
+input,
+textarea,
+select {
+  accent-color: var(--color-accent);
+}
+
+input::selection,
+textarea::selection,
+pre::selection {
+  background: var(--color-selected);
+  color: var(--color-selection-ink);
+}
+
+.actions-menu,
+.scope-popover {
+  animation: surface-enter var(--motion-enter) var(--ease-out);
+  transform-origin: bottom center;
+}
+
+.confirm-dialog[open] {
+  animation: dialog-enter var(--motion-enter) var(--ease-out);
+}
+
+.menu-scrim,
+.confirm-dialog::backdrop {
+  animation: backdrop-enter var(--motion-fast) ease-out;
+}
+
+/* A backdrop is a dismiss target, not a raised control. */
+.menu-scrim:active:not(:disabled) {
+  transform: none;
+}
+
+@keyframes surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  button:active:not(:disabled) {
+    transform: none !important;
+  }
+}

@@ -2,6 +2,10 @@
 
 Use this procedure after source and desktop checks pass. The release workflow can stage a draft. Publication is a separate step.
 
+The source uses the [MIT license](../../LICENSE). The first release is free to
+download and use. Keep the third-party font and word-list notices with their
+material. Include the project license with a published source archive.
+
 ## Configure signing
 
 | System  | Publisher signing                                           | Update verification        |
@@ -28,9 +32,37 @@ Configure these GitHub Actions secrets. Keep certificate exports and private key
 
 Set the repository variable `TINYDASH_UPDATE_ENDPOINT` to the HTTPS update feed. The stable GitHub feed is `https://github.com/jewei/tinydash/releases/latest/download/latest.json`. It requires a stable release containing that file.
 
-Use the same updater key for Mac and Windows. Restore the existing key when one exists. A replacement key does not verify updates for installed clients that trust the previous key. Keep an encrypted offline backup and store its password separately. Record certificate expiry and key recovery instructions in private maintainer notes.
+Use the same updater key for Mac and Windows. Restore the existing key when one exists. A replacement key does not verify updates for installed clients that trust the previous key. Keep an encrypted backup and store its password separately. Cloud storage is suitable for the encrypted file. Record certificate expiry and key recovery instructions in private maintainer notes.
 
 Follow the [Tauri Mac signing guide](https://v2.tauri.app/distribute/sign/macos/) and [updater signing guide](https://v2.tauri.app/plugin/updater/#signing-updates) for key setup. A Mac certificate and the updater key have different purposes. Renewing the Mac certificate must not replace the updater key.
+
+### Back up and test the updater key
+
+The backup must contain the private key, its password, and the matching public
+key. An encrypted key file alone is not sufficient when its password is lost.
+Use a separate password for the backup container. Store that password in a
+password manager.
+
+On a Mac, an [encrypted disk image](https://support.apple.com/guide/disk-utility/create-a-disk-image-dskutl11888/mac)
+can hold these files. Before copying it to cloud storage, open the image with
+the saved backup password. Restore its contents into a temporary private
+folder, sign a new test file, and verify that signature with the public key
+used by the release candidate. Confirm that verification rejects a changed
+test file. Then unmount the image and remove the temporary restored files.
+Keep only the result and public-key fingerprint in the verification record.
+
+If the only usable copy is in GitHub Actions secrets, use a temporary recovery
+workflow to encrypt those secrets for a public recovery key generated on the
+maintainer's computer. Download only the encrypted artifact and decrypt it on
+that computer. Do not print secrets in workflow logs or put them in workflow
+inputs. Test the recovered key, remove the recovery job and artifact, and make
+the encrypted backup. Do not generate a replacement updater key to avoid this
+recovery step.
+
+After a cloud copy is complete, download it and compare its SHA-256 checksum
+with the verified local file. Record the cloud location and recovery steps in
+private notes. Keep private keys and passwords out of ordinary notes and
+clipboard history.
 
 ## Build a candidate
 
@@ -51,8 +83,70 @@ The Mac job signs and notarizes the app and DMG. Windows remains an unsigned pre
 4. On a disposable installation of an older version, install the exact candidate through its update path. Confirm that invalid signatures and changed bytes are rejected. Use a separate HTTPS test feed for the older test build.
 5. Check cancellation, network failure, data retention, recovery, reinstall, and removal. Keep the evidence in a private verification record.
 
+For automated version-upgrade checks, run **Native app checks** again with the
+same candidate build run ID and set `upgrade_tag` to its version tag. This
+selects the release packages and runs a separate Windows and Linux upgrade
+suite. Leave `upgrade_tag` empty for the ordinary smoke and reinstall checks.
+
+The upgrade suite builds a disposable `0.0.0` app. Windows uses a loopback HTTPS
+feed and the existing updater public key. The suite checks failed downloads,
+invalid metadata, invalid signatures, changed bytes, and a valid update through
+Settings. Linux uses APT to install the candidate over the older package. Both
+checks compare the installed executable with the package and verify saved
+settings, clipboard consent, clipboard text, pins, and usage history after
+restart and removal. The fixture data and process records stay in the workflow
+artifact. The temporary HTTPS certificate is removed from the Windows runner.
+
+These hosted checks do not verify Windows 11 security prompts, macOS updates,
+or a Wayland desktop. Complete those checks separately with the same packages.
+
 Mac updates use `.app.tar.gz` with its `.sig` file. Windows updates use `-setup.exe` with its `.sig` file. The feed contains `darwin-aarch64` and `windows-x86_64`. Ubuntu uses manual `.deb` replacement and does not enter the feed.
 
 ## Publish the tested files
 
-Check the final asset list and release notes. Draft releases can require repository access. Use a public prerelease for anonymous testing when needed. Publish the exact tested files without rebuilding them. Confirm that the stable feed and download links resolve after publication.
+Publication is gated by a machine-readable evidence record, separate from draft staging. A successful build, a package checksum, or a browser test is not native desktop proof. Drafts can remain incomplete while testing; a public prerelease is publication too and needs the same gate.
+
+### Prepare the evidence record
+
+The draft-staging job retains a `release-evidence-template` Actions artifact. Download it and the exact draft assets to an ignored local folder. Alternatively, initialize a record from the downloaded draft:
+
+```sh
+mkdir -p .local/release/assets .local/release/evidence
+gh release download v0.1.3 --dir .local/release/assets
+bun scripts/release/evidence.ts init .local/release/assets \
+  .local/release/evidence/release-evidence.json v0.1.3 \
+  "$(git rev-parse 'v0.1.3^{commit}')"
+```
+
+Replace the example tag throughout. The initializer refuses to overwrite an existing record. It verifies every file against `SHA256SUMS`, requires the complete installer/updater/build-record set, and creates **pending**, never passed, checks. Keep evidence outside the asset folder: adding evidence after checksums would change the tested release set.
+
+The versioned record contains the tag, source commit, every asset's SHA-256, and these required checks:
+
+| IDs                                                                                  | Required evidence                                                                                                                                |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `automated/source-macos`, `source-windows`, `source-linux` (each under `automated/`) | Successful selected-tag source checks and job/run identity; retain logs before Actions artifacts expire.                                         |
+| `automated/native-windows`, `native-linux-x11`                                       | Native wrapper `result.json` for the installed candidate, supporting logs, and installer/removal evidence.                                       |
+| `automated/upgrade-windows`, `upgrade-linux`                                         | Installed-version upgrade results, candidate package identity, negative signature/download cases where supported, retention and cleanup results. |
+| `signing/macos-developer-id-notarization-stapling`                                   | Developer ID, notarization, app/DMG stapling and Gatekeeper results for the exact candidate.                                                     |
+| `signing/windows-unsigned-preview`                                                   | Confirmation of unsigned-preview status and the updater pair; do not claim a trusted Windows publisher.                                          |
+| `signing/updater-signatures`                                                         | Verification of Mac and Windows updater signatures and rejection of changed bytes using the intended public key.                                 |
+| `manual/PLATFORM/SECTION`                                                            | Completed desktop checklist evidence for each section and platform below.                                                                        |
+
+Manual platforms are `macos`, `windows`, `linux-x11`, and `linux-wayland`. Sections are `installation`, `launcher`, `settings`, `tools`, `calculations-emoji`, `ranking`, `clipboard`, `files`, `system`, and `update-recovery-removal`. They map to [desktop checks](desktop-checks.md); the last section also covers the update, cancellation, network failure, data-retention, and recovery steps above. Record OS/version/architecture and desktop session. Record each numbered observation, including actual external effects. Explain genuinely inapplicable platform-specific steps; an unavailable required platform or an unrun applicable step stays pending, not passed. Do not perform destructive power checks on a working machine or hosted runner.
+
+For each completed check, set `status` to `passed`, record the reviewer/operator, UTC `recordedAt`, and the precise `procedure` (command, workflow run URL, or numbered manual steps). Attach one or more retained files as `{ "path": "relative/file.txt", "sha256": "64 lowercase hex characters" }`. Calculate attachment hashes with `shasum -a 256 FILE` or PowerShell `Get-FileHash FILE -Algorithm SHA256`; store the digest in lowercase. Paths resolve within the evidence directory. Do not change `assetSetSha256` to reuse old proof after replacing packages: repeat the affected checks and regenerate the record for the new set.
+
+The validator rejects missing/duplicate checks, pending/failed results, missing hashes, changed assets or attachments, wrong build source/platform, and stale asset-set bindings. Native checks additionally require the real wrapper's `result.json`, successful native suite execution and cleanup, and matching installed-package and executable hashes. Build-only or browser records cannot satisfy them. Automated source/upgrade logs, signing results, and manual observations remain reviewer attestations: the gate verifies completeness and byte identity, not their truth or the trustworthiness of an operator. Inspect those attachments rather than treating a `passed` string as independent proof. Test-code source can differ from build source; record and review both.
+
+### Validate and publish
+
+```sh
+bun scripts/release/evidence.ts validate .local/release/assets \
+  .local/release/evidence/release-evidence.json v0.1.3 \
+  "$(git rev-parse 'v0.1.3^{commit}')"
+bun scripts/release/publish.ts v0.1.3 .local/release/evidence/release-evidence.json
+```
+
+Use the publication script, not a direct `gh release edit` or the web Publish button. It requires an existing draft, checks local and remote tag identity, downloads the draft's current files into a new temporary folder, revalidates all hashes and evidence, checks for concurrent asset/tag changes, and only then publishes. It never rebuilds. Temporary downloads are removed on success or failure; the reviewed evidence remains in its original folder. Freeze edits to the draft/tag while running it: GitHub does not provide an atomic compare-and-publish API.
+
+This is the supported maintainer publication gate, not a claim that repository administrators cannot bypass it. Restrict release-write permissions and review the evidence with another maintainer; administrators with direct GitHub release access can still publish outside the script. The build workflow itself creates drafts only. Keep a durable private copy of the evidence and signing results, since Actions retention is short. Never put keys, personal clipboard contents, or personal file paths in it. Check the final asset list and release notes before publication, then confirm that the stable feed and download links resolve.

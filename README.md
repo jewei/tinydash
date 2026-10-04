@@ -2,11 +2,14 @@
 
 A desktop launcher for macOS, Windows, and Linux, built with Rust, Tauri, and SolidJS.
 
+TinyDash source is available under the [MIT license](LICENSE). TinyDash is free
+to download and use.
+
 Search applications, filenames, and clipboard history. Calculate values, convert units and currencies, find emoji, generate passwords, convert dates and times, clean URLs, and open web searches.
 
 ## Start
 
-TinyDash is in development. Use a build from [GitHub Actions](https://github.com/jewei/tinydash/actions/workflows/check.yml), or build it locally. Read the [installation guide](docs/how-to/install.md) for package types and signing limits.
+Download the [latest release](https://github.com/jewei/tinydash/releases/latest) for macOS (Apple silicon), Windows x64, or Ubuntu 24.04 x64. Read the [installation guide](docs/how-to/install.md) for package types, checksums, and signing limits. Development builds are in [GitHub Actions](https://github.com/jewei/tinydash/actions/workflows/check.yml).
 
 To build from source, install Bun 1.4.2, Rust 1.98.1 or later, and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/).
 
@@ -35,3 +38,10 @@ bun run verify:full
 ```
 
 The fast check runs repository checks, Prettier and Rust formatting checks, type checks, and browser smoke tests. The full check also runs all browser tests, Rust tests, Clippy, and the frontend build. Native desktop checks use a separate command and test session.
+
+## Third-party material
+
+Dependencies keep their own licenses. The bundled [Figtree](public/fonts/Figtree-OFL.txt)
+and [Caprasimo](public/fonts/Caprasimo-OFL.txt) fonts use the SIL Open Font License.
+The [EFF word list](src-tauri/src/providers/tools/data/README.md) uses Creative
+Commons Attribution 4.0.

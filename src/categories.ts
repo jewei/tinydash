@@ -3,6 +3,7 @@ import type { SearchMode, SearchResult } from "./bridge";
 export const resultCategories: Record<SearchResult["kind"], SearchMode> = {
   app: "apps",
   file: "files",
+  folder: "files",
   clipboard: "clipboard",
   emoji: "emoji",
   calculation: "calculator",

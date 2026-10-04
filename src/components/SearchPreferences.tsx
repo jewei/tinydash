@@ -3,9 +3,8 @@ import {
   createMemo,
   createSignal,
   For,
-  Index,
   onCleanup,
-  onMount,
+  onSettled,
   Show,
 } from "solid-js";
 import {
@@ -42,7 +41,7 @@ export function AppPreferences(props: {
     else delete next[selected()];
     props.onChange(next);
   }
-  onMount(() => {
+  onSettled(() => {
     void backend
       .appCatalog()
       .then((values) => {
@@ -150,12 +149,14 @@ export function WebSearchPreferences(props: {
   const [preview, setPreview] = createSignal("");
   const [error, setError] = createSignal("");
   let sequence = 0;
-  createEffect(() => {
-    props.value;
-    sequence += 1;
-    setPreview("");
-    setError("");
-  });
+  createEffect(
+    () => props.value,
+    () => {
+      sequence += 1;
+      setPreview("");
+      setError("");
+    },
+  );
   onCleanup(() => {
     sequence += 1;
   });
@@ -191,7 +192,7 @@ export function WebSearchPreferences(props: {
         Add a website with one {"{query}"} placeholder. Type its keyword
         followed by search text. Searches open only when you choose a result.
       </p>
-      <Index each={props.value}>
+      <For keyed={false} each={props.value}>
         {(search, index) => (
           <fieldset class="settings-editor">
             <legend>Web search {index + 1}</legend>
@@ -255,7 +256,7 @@ export function WebSearchPreferences(props: {
             </div>
           </fieldset>
         )}
-      </Index>
+      </For>
       <button
         type="button"
         disabled={props.value.length >= 24}

@@ -183,14 +183,24 @@ test("web search presents all six engines and opens the selected engine by ID", 
   expect(await calls(page)).toHaveLength(2);
 });
 
-test("tools fit Light, Dark, and Compact at desktop and narrow widths", async ({
+test("tools fit all themes and Compact at desktop and narrow widths", async ({
   page,
 }) => {
   await openLauncher(page);
-  for (const appearance of ["Light", "Dark", "Compact"]) {
+  for (const appearance of [
+    "Light",
+    "Dark",
+    "Sage",
+    "Rose",
+    "Ink",
+    "Compact",
+  ]) {
     await input(page).press("Meta+k");
     await page
-      .getByRole("menuitemradio", { name: appearance, exact: true })
+      .getByRole(
+        appearance === "Compact" ? "menuitemcheckbox" : "menuitemradio",
+        { name: appearance, exact: true },
+      )
       .click();
     for (const width of [320, 375, 414, 768, 980]) {
       await page.setViewportSize({ width, height: 620 });

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type {} from "./mock-backend";
 
-async function openSettings(page: Page) {
+async function mockBackend(page: Page) {
   await page.route(
     (url) => url.pathname === "/src/index.tsx",
     async (route) => {
@@ -12,9 +12,183 @@ async function openSettings(page: Page) {
       });
     },
   );
+}
+
+async function openSettings(page: Page) {
+  await mockBackend(page);
   await page.goto("/?view=settings");
   await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
 }
+
+test("menu bar icon defaults off and saves both choices across reloads", async ({
+  page,
+}) => {
+  await openSettings(page);
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(toggle).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await expect(
+    page.getByText(
+      "The global shortcut remains available when the icon is hidden.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await toggle.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: test.info().outputPath("settings-menu-bar-icon.png"),
+  });
+
+  await toggle.check();
+  await expect(save).toBeEnabled();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(false);
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "save_settings",
+      ),
+    ),
+  ).toHaveLength(0);
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(true);
+  await page.reload();
+  await expect(toggle).toBeChecked();
+  await expect(save).toBeDisabled();
+
+  await toggle.uncheck();
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(toggle).not.toBeChecked();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(false);
+});
+
+test("menu bar icon supports discard and preserves the draft after a failed save", async ({
+  page,
+}) => {
+  await openSettings(page);
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  const save = page.getByRole("button", { name: "Save changes" });
+  const discard = page.getByRole("button", { name: "Discard", exact: true });
+  await toggle.check();
+  await discard.click();
+  await expect(toggle).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.filter(
+        (call) => call.command === "save_settings",
+      ),
+    ),
+  ).toHaveLength(0);
+
+  await toggle.check();
+  await page.evaluate(() => {
+    window.__launcherTest.rejectSettings = "Could not save settings.";
+  });
+  await save.click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Could not save settings",
+  );
+  await expect(toggle).toBeChecked();
+  await expect(save).toBeEnabled();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.showMenuBarIcon),
+  ).toBe(false);
+  await page.evaluate(() => {
+    window.__launcherTest.rejectSettings = null;
+  });
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await toggle.uncheck();
+  await discard.click();
+  await expect(toggle).toBeChecked();
+  await expect(save).toBeDisabled();
+  await page.reload();
+  await expect(toggle).toBeChecked();
+});
+
+for (const platform of ["windows", "linux"]) {
+  test(`menu bar icon switch is hidden on ${platform}`, async ({ page }) => {
+    await page.addInitScript(
+      (value) => localStorage.setItem("tinydash.test.platform", value),
+      platform,
+    );
+    await openSettings(page);
+    await expect(
+      page.getByRole("switch", { name: "Show menu bar icon" }),
+    ).toHaveCount(0);
+  });
+}
+
+test("five themes keep Compact independent and export both saved choices", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await page.getByRole("switch", { name: "Compact layout" }).check();
+  for (const theme of ["Light", "Dark", "Sage", "Rose", "Ink"]) {
+    await page.getByRole("radio", { name: new RegExp(theme) }).check();
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-appearance",
+      theme.toLowerCase(),
+    );
+    await expect(
+      page.getByRole("switch", { name: "Compact layout" }),
+    ).toBeChecked();
+    await expect(
+      page.getByRole("button", { name: "Save changes" }),
+    ).toBeDisabled();
+    for (const width of [320, 375, 414, 768, 980]) {
+      await page.setViewportSize({ width, height: 740 });
+      await page
+        .getByRole("radio", { name: new RegExp(theme) })
+        .scrollIntoViewIfNeeded();
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      await expect(
+        page.getByRole("radio", { name: new RegExp(theme) }),
+      ).toBeInViewport();
+    }
+    await page
+      .getByRole("heading", { name: "Appearance", exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: test.info().outputPath(`theme-${theme.toLowerCase()}.png`),
+    });
+  }
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "ink");
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "Compact layout" }),
+  ).toBeChecked();
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Export settings", exact: true })
+    .click();
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.find(
+          (call) => call.command === "export_settings",
+        )?.payload,
+    ),
+  ).toEqual({ appearance: "ink", compact: true, followSystemGlass: true });
+  await page.goto("/");
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "ink");
+  await expect(page.locator("html")).toHaveAttribute("data-compact", "true");
+});
 
 for (const editBeforeUpdate of [false, true]) {
   test(`keeps external settings changes with a ${editBeforeUpdate ? "dirty" : "clean"} draft`, async ({
@@ -22,7 +196,7 @@ for (const editBeforeUpdate of [false, true]) {
   }) => {
     await openSettings(page);
     const clearSearch = page.getByRole("switch", {
-      name: "Clear the search each time",
+      name: "Reset search and category on open",
     });
     if (editBeforeUpdate) await clearSearch.uncheck();
     await page.evaluate(async () => {
@@ -61,6 +235,206 @@ for (const editBeforeUpdate of [false, true]) {
   });
 }
 
+test("external theme and layout changes remain saved in Settings", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.evaluate(async () => {
+    await window.__launcherTest.emit("appearance-changed", "sage");
+    await window.__launcherTest.emit("compact-changed", true);
+    await window.__launcherTest.emit("system-glass-changed", false);
+  });
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "sage");
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "Compact layout" }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: "Follow macOS Liquid Glass" }),
+  ).not.toBeChecked();
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
+});
+
+test("imported theme and layout can be discarded or saved together", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.evaluate(() => {
+    window.__launcherTest.importPreview = {
+      settings: window.__launcherTest.settings,
+      ignoredKeys: [],
+      appearance: "rose",
+      compact: true,
+      followSystemGlass: false,
+    };
+  });
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  const apply = async () => {
+    await page
+      .getByRole("button", { name: "Import settings", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Apply import", exact: true })
+      .click();
+  };
+  await apply();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "rose");
+  expect(
+    await page.evaluate(() => localStorage.getItem("tinydash.appearance")),
+  ).toBeNull();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem("tinydash.followSystemGlass"),
+    ),
+  ).toBeNull();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-appearance",
+    "light",
+  );
+  await apply();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "rose");
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(
+    page.getByRole("switch", { name: "Compact layout" }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("switch", { name: "Follow macOS Liquid Glass" }),
+  ).not.toBeChecked();
+});
+
+test("Liquid Glass switch applies across windows, persists, and exports the saved choice", async ({
+  page,
+  context,
+}) => {
+  await context.addInitScript(() =>
+    localStorage.setItem("tinydash.test.nativeGlass", "true"),
+  );
+  await openSettings(page);
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  const toggle = page.getByRole("switch", {
+    name: "Follow macOS Liquid Glass",
+  });
+  await expect(toggle).toBeChecked();
+  const launcherPage = await context.newPage();
+  await mockBackend(launcherPage);
+  await launcherPage.goto("/");
+  const launcher = launcherPage.locator(".launcher");
+  await expect(launcher).toHaveAttribute("data-native-glass", "true");
+  await launcherPage.getByRole("button", { name: "Apps", exact: true }).click();
+  await toggle.uncheck();
+  await expect(launcher).not.toHaveAttribute("data-native-glass", "true");
+  await expect(launcherPage.locator(".result-preview")).not.toHaveCSS(
+    "background-color",
+    "rgba(0, 0, 0, 0)",
+  );
+  await page.getByRole("radio", { name: "Ink Black and off-white" }).check();
+  await expect(launcher).toHaveCSS("background-color", "rgb(245, 245, 243)");
+  await expect(
+    page.getByRole("button", { name: "Save changes" }),
+  ).toBeDisabled();
+  await toggle.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: test.info().outputPath("liquid-glass-switch.png"),
+  });
+  await page.reload();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(toggle).not.toBeChecked();
+  await launcherPage.reload();
+  await expect(launcher).toHaveCSS("background-color", "rgb(245, 245, 243)");
+  expect(
+    await launcherPage.evaluate(() =>
+      window.__launcherTest.calls.some(
+        (call) => call.command === "set_launcher_appearance",
+      ),
+    ),
+  ).toBe(false);
+  await page.getByRole("button", { name: "Privacy", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Export settings", exact: true })
+    .click();
+  expect(
+    await page.evaluate(
+      () =>
+        window.__launcherTest.calls.find(
+          (call) => call.command === "export_settings",
+        )?.payload,
+    ),
+  ).toMatchObject({ followSystemGlass: false });
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await toggle.check();
+  await expect(launcher).toHaveAttribute("data-native-glass", "true");
+  await expect(launcher).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+});
+
+for (const platform of ["windows", "linux"]) {
+  test(`Liquid Glass switch is hidden on ${platform}`, async ({ page }) => {
+    await page.addInitScript(
+      (value) => localStorage.setItem("tinydash.test.platform", value),
+      platform,
+    );
+    await openSettings(page);
+    await page.getByRole("button", { name: "Appearance", exact: true }).click();
+    await expect(
+      page.getByRole("switch", { name: "Follow macOS Liquid Glass" }),
+    ).toHaveCount(0);
+  });
+}
+
+test("theme text and controls have readable contrast", async ({ page }) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  for (const theme of ["Light", "Dark", "Sage", "Rose", "Ink"]) {
+    await page.getByRole("radio", { name: new RegExp(theme) }).check();
+    const contrasts = await page.evaluate(() => {
+      const sample = document.createElement("span");
+      document.body.append(sample);
+      const luminance = (token: string) => {
+        sample.style.color = `var(--color-${token})`;
+        const rgb = getComputedStyle(sample)
+          .color.match(/[\d.]+/g)!
+          .slice(0, 3)
+          .map(Number);
+        const linear = rgb.map((v) => {
+          const s = v / 255;
+          return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+        });
+        return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+      };
+      const pairs = [
+        ["ink", "paper"],
+        ["muted", "paper"],
+        ["muted", "preview"],
+        ["subtle", "paper"],
+        ["selection-ink", "selected"],
+        ["accent-ink", "accent"],
+        ["olive-ink", "olive"],
+      ];
+      const values = pairs.map(([foreground, background]) => {
+        const a = luminance(foreground),
+          b = luminance(background);
+        return {
+          foreground,
+          background,
+          ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+        };
+      });
+      sample.remove();
+      return values;
+    });
+    for (const pair of contrasts)
+      expect(
+        pair.ratio,
+        `${theme}: ${pair.foreground} on ${pair.background}`,
+      ).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 test("keeps an edited alias when another window hides apps", async ({
   page,
 }) => {
@@ -96,6 +470,44 @@ test("keeps an edited alias when another window hides apps", async ({
   });
 });
 
+test("keeps dirty aliases but accepts another window unhiding a default preference", async ({
+  page,
+}) => {
+  await openSettings(page);
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = {
+      ...state.settings,
+      appPreferences: { "app-0": { aliases: [], hidden: true } },
+    };
+    await state.emit("settings-changed", state.settings);
+  });
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await page.locator('select[size="6"]').selectOption("app-0");
+  const hidden = page.getByRole("checkbox", {
+    name: "Hide this app from search",
+  });
+  await expect(hidden).toBeChecked();
+  await page.getByLabel("Aliases, one per line").fill("local alias");
+  await page.getByLabel("Aliases, one per line").blur();
+  await page.evaluate(async () => {
+    const state = window.__launcherTest;
+    state.settings = { ...state.settings, appPreferences: {} };
+    await state.emit("settings-changed", state.settings);
+  });
+  await expect(hidden).not.toBeChecked();
+  await expect(page.getByLabel("Aliases, one per line")).toHaveValue(
+    "local alias",
+  );
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.appPreferences),
+  ).toEqual({
+    "app-0": { aliases: ["local alias"], hidden: false },
+  });
+});
+
 test("records, saves, and reloads the launch shortcut and window preferences", async ({
   page,
 }) => {
@@ -105,7 +517,7 @@ test("records, saves, and reloads the launch shortcut and window preferences", a
   await page.keyboard.press("Control+Alt+KeyJ");
   await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
   await page
-    .getByRole("switch", { name: "Clear the search each time" })
+    .getByRole("switch", { name: "Reset search and category on open" })
     .uncheck();
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
@@ -122,7 +534,7 @@ test("records, saves, and reloads the launch shortcut and window preferences", a
   await page.reload();
   await expect(page.locator(".shortcut-keys")).toHaveText("ControlOptionJ");
   await expect(
-    page.getByRole("switch", { name: "Clear the search each time" }),
+    page.getByRole("switch", { name: "Reset search and category on open" }),
   ).not.toBeChecked();
 });
 
@@ -133,12 +545,14 @@ test("invalid recording and shortcut conflicts do not replace saved settings", a
   await page.getByRole("button", { name: "Record new" }).click();
   await page.keyboard.press("KeyK");
   await expect(page.getByRole("alert")).toContainText("Hold Control");
+  await page.keyboard.press("Shift+KeyK");
+  await expect(page.getByRole("alert")).toContainText("Hold Control");
   await page.keyboard.press("Escape");
   await expect(
     page.getByRole("button", { name: "Save changes" }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Record new" }).click();
-  await page.keyboard.press("Control+Alt+KeyL");
+  await page.keyboard.press("Shift+Space");
   await page.evaluate(() => {
     window.__launcherTest.rejectSettings =
       "Could not use this shortcut. It may be in use by another app.";
@@ -150,6 +564,42 @@ test("invalid recording and shortcut conflicts do not replace saved settings", a
   ).toBe("Control+Shift+Space");
   await page.getByRole("button", { name: "Discard" }).click();
   await expect(page.locator(".shortcut-keys")).toHaveText("ControlShiftSpace");
+});
+
+test("records and persists Shift+Space for the launcher and a category", async ({
+  page,
+}, testInfo) => {
+  await openSettings(page);
+  await page.getByRole("button", { name: "Record new" }).click();
+  await page.keyboard.press("Shift+Space");
+  await expect(page.getByRole("button", { name: "Record new" })).toBeEnabled();
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".shortcut-keys")).toHaveText("ShiftSpace");
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.shortcut),
+  ).toBe("Shift+Space");
+  await expect(
+    page.getByText("Turn this off to keep your query and category.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("shortcut-guidance.png") });
+
+  await page.getByRole("button", { name: "Use default shortcut" }).click();
+  const category = page
+    .locator(".shortcut-category-row")
+    .filter({ has: page.getByText("Clipboard", { exact: true }) });
+  await category.getByRole("button", { name: "Record", exact: true }).click();
+  await page.keyboard.press("Shift+Space");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(category).toContainText("Shift + Space");
+  expect(
+    await page.evaluate(() => window.__launcherTest.settings.categoryShortcuts),
+  ).toEqual([{ mode: "clipboard", shortcut: "Shift+Space" }]);
 });
 
 test("saves file, clipboard, and currency preferences across sections", async ({
@@ -437,6 +887,8 @@ test("previews imports without replacing saved settings and preserves failed imp
       settings: { ...window.__launcherTest.settings, hideOnBlur: false },
       ignoredKeys: ["futureField"],
       appearance: "dark",
+      compact: null,
+      followSystemGlass: null,
     };
   });
   await page.getByRole("button", { name: "Privacy", exact: true }).click();
@@ -578,4 +1030,58 @@ test("clears unpinned clipboard entries separately and keeps pinned entries", as
   expect(
     await page.evaluate(() => window.__launcherTest.calls.at(-1)?.payload),
   ).toEqual({ keepPinned: true });
+});
+
+test("settings keep save controls and all sections reachable in a short window", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 720, height: 550 });
+  await openSettings(page);
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "About", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "About", exact: true }),
+  ).toBeVisible();
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "Shortcut", exact: true }).click();
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  await toggle.check();
+  await expect(save).toBeInViewport();
+  await save.click();
+  await expect(page.getByText("Changes saved.", { exact: true })).toBeVisible();
+});
+
+test("narrow settings search shows matching sections and preserves the draft", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 600 });
+  await openSettings(page);
+  const toggle = page.getByRole("switch", { name: "Show menu bar icon" });
+  await toggle.check();
+  const search = page.getByRole("searchbox", { name: "Search settings" });
+  await search.fill("clipboard");
+  const match = page.getByRole("button", {
+    name: "Clipboard history",
+    exact: true,
+  });
+  await expect(match).toBeVisible();
+  await match.click();
+  await expect(
+    page.getByRole("heading", { name: "Clipboard history", exact: true }),
+  ).toBeVisible();
+  await search.fill("no-such-section");
+  await expect(
+    page.getByRole("status").filter({ hasText: "No matching settings." }),
+  ).toBeVisible();
+  await search.fill("");
+  await page
+    .getByRole("combobox", { name: "Settings section" })
+    .selectOption("shortcut");
+  await expect(toggle).toBeChecked();
+  const save = page.getByRole("button", { name: "Save changes" });
+  await expect(save).toBeEnabled();
+  await expect(save).toBeInViewport();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(toggle).not.toBeChecked();
 });

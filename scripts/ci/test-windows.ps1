@@ -1,3 +1,8 @@
+param(
+    [ValidateSet('native', 'upgrade')]
+    [string]$Test = 'native'
+)
+
 $ErrorActionPreference = 'Stop'
 if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'This script requires a disposable GitHub-hosted runner. Run bun run test:native without elevation on a local desktop.'
@@ -22,7 +27,11 @@ try {
     New-ItemProperty -Path $key -Name $appName -PropertyType String -Value "--remote-debugging-port=$debugPort" -Force | Out-Null
     $env:TINYDASH_NATIVE_DEBUG_PORT = "$debugPort"
     Write-Host "Testing an elevated WebView2 host on loopback port $debugPort."
-    bun run verify:native
+    if ($Test -eq 'upgrade') {
+        bun tests/native/upgrade.ts
+    } else {
+        bun run verify:native
+    }
     if ($LASTEXITCODE -ne 0) { throw "Native test failed with exit code $LASTEXITCODE." }
 } finally {
     if ($null -ne $existing) {

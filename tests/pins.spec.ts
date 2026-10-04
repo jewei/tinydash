@@ -45,7 +45,7 @@ test("app pins persist, preserve selection, and can be removed in compact mode",
   await expect(rows).toHaveCount(1);
   await input.press("Meta+k");
   await page
-    .getByRole("menuitemradio", { name: "Compact", exact: true })
+    .getByRole("menuitemcheckbox", { name: "Compact", exact: true })
     .click();
   await input.press("Meta+k");
   await page

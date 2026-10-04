@@ -1,10 +1,16 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(test)]
+#[path = "contract_tests.rs"]
+mod contract_tests;
+
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum ResultKind {
     App,
     File,
+    Folder,
     Calculation,
     Emoji,
     Clipboard,
@@ -20,7 +26,7 @@ impl ResultKind {
         use super::query::SearchMode;
         match self {
             Self::App => SearchMode::Apps,
-            Self::File => SearchMode::Files,
+            Self::File | Self::Folder => SearchMode::Files,
             Self::Calculation => SearchMode::Calculator,
             Self::Emoji => SearchMode::Emoji,
             Self::Clipboard => SearchMode::Clipboard,
@@ -46,11 +52,13 @@ impl ResultKind {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum Action {
     Launch,
     Open,
     Reveal,
     Copy,
+    Paste,
     Delete,
     Run,
     Regenerate,
@@ -58,6 +66,7 @@ pub enum Action {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ActionConfirmation {
     pub title: String,
     pub description: String,
@@ -66,22 +75,27 @@ pub struct ActionConfirmation {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SearchResult {
     pub id: String,
     pub kind: ResultKind,
     pub title: String,
     pub subtitle: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub path: Option<String>,
     pub score: u32,
     pub icon: Option<String>,
     pub primary_action: Action,
     pub secondary_actions: Vec<Action>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub pin: Option<super::pins::ResultPin>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub confirmation: Option<ActionConfirmation>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(test, ts(optional))]
     pub detail: Option<ToolDetail>,
 }
 
@@ -91,6 +105,7 @@ pub struct SearchResult {
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum ToolDetail {
     Password {
         variant: String,
@@ -102,6 +117,7 @@ pub enum ToolDetail {
         local: String,
         source_zone: String,
         #[serde(skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(test, ts(optional))]
         target_zone: Option<String>,
         ambiguous: bool,
     },
@@ -123,6 +139,7 @@ pub enum ToolDetail {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SearchResponse {
     pub preferred_selection_id: Option<String>,
     pub results: Vec<SearchResult>,
@@ -130,7 +147,7 @@ pub struct SearchResponse {
     pub indexing: bool,
     pub index_error: Option<String>,
     pub notice: Option<String>,
-    pub storage_error: Option<String>,
+    pub storage_error: Option<super::warning::LauncherWarning>,
     pub files: super::files::FileStatus,
     pub currency: super::currency::CurrencyStatus,
 }

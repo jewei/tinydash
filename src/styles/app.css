@@ -1,8 +1,4 @@
-/* Hallmark · macrostructure: Canvas · theme: supplied Organic design.
- * Tone: warm and practical. Anchor: orange. Figtree + Caprasimo.
- * Two-column Canvas, light and dark. Compact uses a single result column.
- * Pre-emit critique: P5 H5 E5 S5 R5 V4. No remote fonts or idle motion.
- */
+/* Shared launcher structure. Theme values live in tokens.css. */
 @import "../../tokens.css";
 
 * {
@@ -79,7 +75,6 @@ kbd {
   height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: clip;
   background: var(--color-paper);
@@ -1083,7 +1078,8 @@ kbd {
   cursor: default;
 }
 .appearance-options {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
 .appearance-options button {
@@ -1110,8 +1106,14 @@ kbd {
 .swatch-dark {
   background: var(--swatch-dark);
 }
-.swatch-compact {
-  background: var(--swatch-compact);
+.swatch-sage {
+  background: var(--swatch-sage);
+}
+.swatch-rose {
+  background: var(--swatch-rose);
+}
+.swatch-ink {
+  background: var(--swatch-ink);
 }
 .confirm-dialog {
   width: min(440px, calc(100vw - 32px));
@@ -1159,41 +1161,39 @@ kbd {
   border-color: var(--color-accent);
   color: var(--color-accent-ink);
 }
-:root[data-appearance="compact"] .results-area {
+:root[data-compact="true"] .results-area {
   grid-template-columns: minmax(0, 1fr);
 }
-:root[data-appearance="compact"] .result-column {
+:root[data-compact="true"] .result-column {
   border-right: 0;
 }
-:root[data-appearance="compact"] .result-preview {
+:root[data-compact="true"] .result-preview {
   display: none;
 }
-:root[data-appearance="compact"] .result-list {
+:root[data-compact="true"] .result-list {
   padding: 8px 18px;
 }
-:root[data-appearance="compact"] .result-row {
+:root[data-compact="true"] .result-row {
   padding: 8px 16px;
   border-radius: 99px;
 }
-:root[data-appearance="compact"]
-  .results-area:not(.emoji-results)
-  .result-shortcut {
+:root[data-compact="true"] .results-area:not(.emoji-results) .result-shortcut {
   display: flex;
 }
-:root[data-appearance="compact"] .search-header {
+:root[data-compact="true"] .search-header {
   padding-bottom: 14px;
 }
-:root[data-appearance="compact"] .result-group {
+:root[data-compact="true"] .result-group {
   padding-top: 6px;
   padding-bottom: 6px;
 }
-:root[data-appearance="compact"] .clipboard-results {
+:root[data-compact="true"] .clipboard-results {
   grid-template-columns: minmax(0, 43%) minmax(0, 1fr);
 }
-:root[data-appearance="compact"] .clipboard-results .result-preview {
+:root[data-compact="true"] .clipboard-results .result-preview {
   display: flex;
 }
-:root[data-appearance="compact"] .clipboard-results .result-column {
+:root[data-compact="true"] .clipboard-results .result-column {
   border-right: 1px solid var(--color-rule);
 }
 @media (max-width: 800px) {
@@ -1340,7 +1340,7 @@ kbd {
     height: calc(100vh - 59px);
   }
   .clipboard-results,
-  :root[data-appearance="compact"] .clipboard-results {
+  :root[data-compact="true"] .clipboard-results {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(110px, 0.8fr) minmax(0, 1fr);
   }

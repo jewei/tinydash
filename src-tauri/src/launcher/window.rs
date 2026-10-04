@@ -5,19 +5,73 @@ use tauri::{
 use super::LauncherState;
 use crate::error::{Error, Result};
 
+#[derive(Clone, Copy, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
+pub enum LauncherAppearance {
+    Light,
+    Dark,
+    Sage,
+    Rose,
+    Ink,
+}
+
+#[tauri::command]
+pub async fn set_launcher_appearance(
+    window: WebviewWindow,
+    appearance: LauncherAppearance,
+) -> std::result::Result<bool, String> {
+    if window.label() != "main" {
+        return Ok(false);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_runtime_wry::WebviewWryExt;
+
+        let (sender, mut receiver) = tauri::async_runtime::channel(1);
+        window
+            .with_wry_webview(move |webview| {
+                let _ = sender.try_send(crate::platform::set_launcher_appearance(
+                    webview, appearance,
+                ));
+            })
+            .map_err(|error| error.to_string())?;
+        receiver
+            .recv()
+            .await
+            .ok_or("Window appearance did not complete.")?
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = appearance;
+        Ok(false)
+    }
+}
+
 pub fn show(app: &AppHandle) -> Result<()> {
-    show_in_category(app, None)
+    show_in_category(app, None, false)
 }
 
 pub fn show_category(app: &AppHandle, mode: super::query::SearchMode) -> Result<()> {
-    show_in_category(app, Some(mode))
+    show_in_category(app, Some(mode), false)
 }
 
-fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> Result<()> {
+pub(super) fn show_after_paste_failure(app: &AppHandle) -> Result<()> {
+    show_in_category(app, None, true)
+}
+
+fn show_in_category(
+    app: &AppHandle,
+    mode: Option<super::query::SearchMode>,
+    preserve_query: bool,
+) -> Result<()> {
     let started = std::time::Instant::now();
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| Error::Launch("Launcher window is unavailable".into()))?;
+    if !preserve_query {
+        super::paste::remember(app);
+    }
     #[cfg(target_os = "macos")]
     if let Some(state) = app.try_state::<LauncherState>() {
         state.focus.remember();
@@ -33,7 +87,10 @@ fn show_in_category(app: &AppHandle, mode: Option<super::query::SearchMode>) -> 
     let clear = app
         .try_state::<LauncherState>()
         .is_none_or(|state| state.settings().clear_query_on_open);
-    window.emit("launcher-opened", clear || mode.is_some())?;
+    window.emit(
+        "launcher-opened",
+        !preserve_query && (clear || mode.is_some()),
+    )?;
     if let Some(mode) = mode {
         window.emit("launcher-category", mode)?;
     }
@@ -106,6 +163,10 @@ pub fn dismiss(app: &AppHandle) -> Result<()> {
 }
 
 fn hide_window(app: &AppHandle, _restore_focus: bool) -> Result<()> {
+    // Native drag, share, and image-save UI owns dismissal until its session ends.
+    if super::transfer::active(app) {
+        return Ok(());
+    }
     // Take the saved app before hiding. The resulting blur event can call hide again.
     #[cfg(target_os = "macos")]
     let previous = app
@@ -136,6 +197,55 @@ pub fn hide_launcher(app: AppHandle) -> std::result::Result<(), String> {
     dismiss(&app).map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+pub fn reset_launcher_position(app: AppHandle) -> std::result::Result<(), String> {
+    if crate::platform::is_wayland() {
+        return Err(
+            "Your Wayland desktop controls window placement. Move the window with its drag handle."
+                .into(),
+        );
+    }
+    let window = app
+        .get_webview_window("main")
+        .ok_or("Launcher window is unavailable.")?;
+    let reset = || -> tauri::Result<()> {
+        let monitor = match window.current_monitor()? {
+            Some(monitor) => Some(monitor),
+            None => window.primary_monitor()?,
+        };
+        let position = match monitor {
+            Some(monitor) => centered_position(window.outer_size()?, monitor.work_area()),
+            None => None,
+        };
+        if let Some(position) = position {
+            window.set_position(position)?;
+        } else {
+            window.center()?;
+        }
+        window.set_focus()
+    };
+    reset().map_err(|error| format!("Could not reset window position: {error}"))
+}
+
+fn centered_position(
+    size: PhysicalSize<u32>,
+    area: &PhysicalRect<i32, u32>,
+) -> Option<PhysicalPosition<i32>> {
+    if area.size.width == 0 || area.size.height == 0 {
+        return None;
+    }
+    // Keep the handle within a small display, and account for displays left of
+    // or above the main display. Use the current monitor's physical coordinates.
+    let center = |start: i32, available: u32, length: u32| {
+        (i64::from(start) + i64::from(available.saturating_sub(length) / 2))
+            .min(i64::from(i32::MAX)) as i32
+    };
+    Some(PhysicalPosition::new(
+        center(area.position.x, area.size.width, size.width),
+        center(area.position.y, area.size.height, size.height),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,6 +255,25 @@ mod tests {
             position: PhysicalPosition::new(x, y),
             size: PhysicalSize::new(width, height),
         }
+    }
+
+    #[test]
+    fn centers_in_the_current_work_area_including_negative_origins() {
+        for (screen, size, expected) in [
+            (area(0, 68, 2940, 1844), (1440, 1102), (750, 439)),
+            (area(-1920, -1080, 1920, 1040), (720, 550), (-1320, -835)),
+            (area(0, 24, 640, 480), (720, 551), (0, 24)),
+            (area(i32::MAX - 5, 0, 100, 100), (10, 10), (i32::MAX, 45)),
+        ] {
+            assert_eq!(
+                centered_position(size.into(), &screen),
+                Some(expected.into())
+            );
+        }
+        assert_eq!(
+            centered_position((720, 550).into(), &area(0, 0, 0, 0)),
+            None
+        );
     }
 
     #[test]

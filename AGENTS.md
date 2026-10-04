@@ -2,7 +2,7 @@
 
 ## Project structure and modules
 
-TinyDash is a desktop launcher built with SolidJS, TypeScript, Rust, and Tauri 2.
+TinyDash is a desktop launcher built with SolidJS 2, TypeScript, Rust, and Tauri 3 previews. See [dependency previews](docs/explanation/dependency-previews.md) for version constraints and package repairs.
 
 - `src/` contains frontend views and components. Styles use `tokens.css` and `src/styles/`.
 - `src-tauri/src/` contains `launcher/`, search `providers/`, `ranking/`, SQLite `db/`, and OS-specific `platform/` code.

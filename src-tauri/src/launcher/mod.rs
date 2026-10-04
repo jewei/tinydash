@@ -1,23 +1,37 @@
 pub mod actions;
+pub mod app_watch;
 pub mod clipboard;
+pub mod commands;
 pub mod currency;
+pub mod file_actions;
 mod file_watch;
 pub mod files;
 pub mod icons;
+pub mod library;
+pub mod paste;
+pub mod paste_queue;
 pub mod pins;
 pub mod portability;
 pub mod preferences;
 pub mod query;
 pub mod result;
+#[cfg(test)]
+mod roadmap_tests;
 pub mod search;
 pub mod startup;
 mod storage;
+pub mod transfer;
 pub mod updates;
+pub mod utilities;
+pub mod warning;
 pub mod window;
 
+#[cfg(test)]
+mod contention_tests;
+
 use std::sync::{
-    Mutex, RwLock,
-    atomic::{AtomicBool, Ordering},
+    Arc, Mutex, RwLock,
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
 use serde::Serialize;
@@ -31,11 +45,16 @@ use crate::{
 };
 use query::SearchMode;
 use result::SearchResponse;
-use search::SearchManager;
+use search::{SearchBudget, SearchManager};
+use warning::{LauncherWarning, WarningCode};
+
+#[cfg(test)]
+mod wire_types_tests;
 
 pub struct LauncherState {
     pub search: Mutex<SearchManager>,
     pub icons: icons::IconStore,
+    pub cancelled_search: Arc<AtomicU64>,
     pub scanning: AtomicBool,
     pub ready: AtomicBool,
     #[cfg(target_os = "macos")]
@@ -43,7 +62,7 @@ pub struct LauncherState {
     settings: RwLock<Settings>,
     pub settings_update: Mutex<()>,
     pub shortcut_recording: AtomicBool,
-    pub warnings: Vec<String>,
+    pub warnings: Vec<LauncherWarning>,
     pub index_error: Mutex<Option<String>>,
     pub storage: storage::Storage,
     pub clipboard: clipboard::Monitor,
@@ -52,12 +71,14 @@ pub struct LauncherState {
 }
 
 impl LauncherState {
-    pub fn new(settings: Settings, warnings: Vec<String>) -> Self {
+    pub fn new(settings: Settings, warnings: Vec<LauncherWarning>) -> Self {
         let mut search = SearchManager::default();
         search.apply_settings(&settings);
+        let files = files::FileScan::new(&settings);
         Self {
             search: Mutex::new(search),
             icons: icons::IconStore::default(),
+            cancelled_search: Arc::default(),
             scanning: AtomicBool::new(false),
             ready: AtomicBool::new(false),
             #[cfg(target_os = "macos")]
@@ -69,7 +90,7 @@ impl LauncherState {
             index_error: Mutex::new(None),
             storage: storage::Storage::default(),
             clipboard: clipboard::Monitor::default(),
-            files: files::FileScan::default(),
+            files,
             currency: currency::Currency::default(),
         }
     }
@@ -82,40 +103,57 @@ impl LauncherState {
     }
 
     pub fn replace_settings(&self, settings: Settings) {
-        // Use the same lock order as scan publication. A scan for the old roots
-        // must not restore removed files after the new settings are accepted.
+        // Acquire search before settings in every publisher. Main-thread
+        // window/shortcut/clipboard callbacks read settings; never hold its
+        // write lock while waiting for search or preparing app preferences.
+        let mut search = self.search.lock().ok();
+        if let Some(search) = search.as_mut() {
+            search.apply_settings(&settings);
+        }
         let mut current = self
             .settings
             .write()
             .unwrap_or_else(|error| error.into_inner());
-        let previous_files = self.search.lock().ok().and_then(|mut search| {
-            search.apply_settings(&settings);
-            (!current.same_file_settings(&settings))
-                .then(|| search.replace_files(FileProvider::default()))
+        let files_changed = !current.same_file_settings(&settings);
+        if files_changed {
+            // Advance under the publication lock, even for A -> B -> A changes.
+            self.files.invalidate(&settings);
+        }
+        let previous_files = search.as_mut().and_then(|search| {
+            files_changed.then(|| search.replace_files(FileProvider::default()))
         });
-        *current = settings;
+        let previous_settings = std::mem::replace(&mut *current, settings);
         drop(current);
+        drop(search);
+        drop(previous_settings);
         drop(previous_files);
     }
 
     pub fn accept_file_scan(
         &self,
         settings: &Settings,
+        generation: u64,
         files: FileProvider,
     ) -> Result<bool, String> {
+        let mut search = self
+            .search
+            .lock()
+            .map_err(|_| Error::IndexUnavailable.to_string())?;
         let current = self
             .settings
             .read()
             .unwrap_or_else(|error| error.into_inner());
-        if !current.same_file_settings(settings) {
+        // Check generation and shutdown after acquiring search: both can
+        // change while this worker waits behind a running query.
+        if self.files.cancelled(generation) || !current.same_file_settings(settings) {
+            // A rejected large index must also be dropped outside the lock.
+            drop(current);
+            drop(search);
             return Ok(false);
         }
-        let previous = self
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?
-            .replace_files(files);
+        let previous = search.replace_files(files);
         drop(current);
+        drop(search);
         drop(previous);
         Ok(true)
     }
@@ -123,12 +161,35 @@ impl LauncherState {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct LauncherInfo {
     settings: Settings,
     platform: &'static str,
-    warnings: Vec<String>,
+    warnings: Vec<LauncherWarning>,
     visible: bool,
     initial_mode: Option<SearchMode>,
+}
+
+#[cfg(test)]
+fn contract_launcher_info() -> LauncherInfo {
+    LauncherInfo {
+        settings: Settings::default(),
+        platform: "linux",
+        warnings: [
+            WarningCode::SettingsRead,
+            WarningCode::ShortcutRegistration,
+            WarningCode::ShortcutsUnavailable,
+            WarningCode::ClipboardLimited,
+            WarningCode::TrayUnavailable,
+            WarningCode::StorageUnavailable,
+            WarningCode::ClipboardUnavailable,
+        ]
+        .into_iter()
+        .map(|code| LauncherWarning::new(code, "Fixture warning", false))
+        .collect(),
+        visible: true,
+        initial_mode: Some(SearchMode::Apps),
+    }
 }
 
 #[tauri::command]
@@ -163,21 +224,77 @@ pub async fn launcher_ready(app: AppHandle) -> Result<LauncherInfo, String> {
 }
 
 #[tauri::command]
+pub fn cancel_search(app: AppHandle, request_id: u64) {
+    app.state::<LauncherState>()
+        .cancelled_search
+        .store(request_id, Ordering::Release);
+}
+
+#[tauri::command]
 pub async fn search(
     query: String,
     mode: SearchMode,
+    request_id: Option<u64>,
     app: AppHandle,
 ) -> Result<SearchResponse, String> {
+    let budget = SearchBudget::new(
+        request_id,
+        app.state::<LauncherState>().cancelled_search.clone(),
+    );
     tauri::async_runtime::spawn_blocking(move || {
+        let queue_us = budget.elapsed().as_micros() as u64;
         let state = app.state::<LauncherState>();
-        let mut search = state
-            .search
-            .lock()
-            .map_err(|_| Error::IndexUnavailable.to_string())?;
-        let outcome = search
-            .search(&query, mode)
+        let settings = state.settings();
+        let library_items =
+            if mode == SearchMode::All && !query.trim().is_empty() && query.len() <= 512 {
+                let text = query.trim().to_lowercase();
+                app.state::<library::LibraryState>()
+                    .search_items("")
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|item| {
+                        let preference = settings.item_preferences.get(&item.id);
+                        !preference.is_some_and(|p| p.hidden || p.disabled)
+                            && (format!("{} {}", item.name, item.keywords)
+                                .to_lowercase()
+                                .contains(&text)
+                                || preference.is_some_and(|p| {
+                                    p.aliases
+                                        .iter()
+                                        .any(|alias| alias.to_lowercase().starts_with(&text))
+                                }))
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+        let lock_started = std::time::Instant::now();
+        let locked = budget.lock(&state.search);
+        let lock_us = lock_started.elapsed().as_micros() as u64;
+        tracing::debug!(
+            queue_us,
+            lock_us,
+            acquired = locked.is_ok(),
+            "Search scheduling"
+        );
+        let mut search = locked?;
+        budget.check()?;
+        let mut outcome = search
+            .search_with_budget(&query, mode, &budget)
             .map_err(|error| error.to_string())?;
-        Ok(SearchResponse {
+        let insert_at = outcome
+            .results
+            .iter()
+            .take_while(|result| result.score >= crate::ranking::EXACT_MATCH)
+            .count();
+        for (offset, item) in library_items.into_iter().take(5).enumerate() {
+            outcome
+                .results
+                .insert(insert_at + offset, commands::library_result(item));
+        }
+        outcome.results.truncate(search::RESULT_LIMIT);
+        budget.check()?;
+        let response = SearchResponse {
             preferred_selection_id: if mode == SearchMode::Clipboard && query.trim().is_empty() {
                 search.clipboard.newest_id()
             } else {
@@ -185,10 +302,11 @@ pub async fn search(
             },
             results: outcome.results,
             notice: outcome.notice,
-            storage_error: state
-                .storage
-                .warning()
-                .or_else(|| state.clipboard.warning()),
+            storage_error: state.storage.warning().or_else(|| {
+                state.clipboard.warning().map(|message| {
+                    LauncherWarning::new(WarningCode::ClipboardUnavailable, message, true)
+                })
+            }),
             total: search.app_count(),
             files: state.files.status(search.file_count()),
             currency: state.currency.status(search.rates()),
@@ -198,7 +316,14 @@ pub async fn search(
                 .lock()
                 .ok()
                 .and_then(|error| error.clone()),
-        })
+        };
+        drop(search);
+        budget.check()?;
+        tracing::debug!(
+            request_us = budget.elapsed().as_micros() as u64,
+            "Search response ready"
+        );
+        Ok(response)
     })
     .await
     .map_err(|error| error.to_string())?

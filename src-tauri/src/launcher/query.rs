@@ -4,6 +4,7 @@ use crate::error::{Error, Result};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub enum SearchMode {
     #[default]
     All,

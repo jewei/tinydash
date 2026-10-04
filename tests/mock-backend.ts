@@ -1,12 +1,17 @@
 // Loaded only by the browser tests. Production always calls the Rust backend.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import { emit } from "@tauri-apps/api/event";
+import { emit, emitTo, type EventTarget } from "@tauri-apps/api/event";
 import type {
+  AppearanceChange,
+  FilePhase,
   SearchResult,
   SearchMode,
+  LauncherWarning,
   SettingsImport,
   SettingsValues,
   UpdateStatus,
+  PasteQueueAction,
+  PasteQueueStatus,
 } from "../src/bridge";
 import { defaultCategories, resultCategories } from "../src/categories";
 
@@ -15,8 +20,15 @@ declare global {
     isTauri: boolean;
     __launcherTest: {
       calls: { command: string; payload: unknown }[];
+      eventDeliveries: { event: string; payload: unknown }[];
       settings: SettingsValues;
       platform: "macos" | "windows" | "linux";
+      nativeGlass: boolean;
+      rejectNativeGlass: boolean;
+      holdNativeGlass: boolean;
+      releaseNativeGlass?: () => void;
+      rejectReady: string | null;
+      rejectSearch: string | null;
       rejectSettings: string | null;
       nativeIcons: boolean;
       holdIcons: boolean;
@@ -28,18 +40,25 @@ declare global {
         pixels: number;
         release: () => void;
       }[];
+      rejectResetPosition: string | null;
       pins: Partial<Record<SearchMode, string[]>>;
       rejectPin: boolean;
       emojiGrid: boolean;
       toolRevision: number;
-      rejectActions: boolean;
+      rejectActions: boolean | string;
       storageError: string | null;
+      warnings: LauncherWarning[];
       usedAppFirst: boolean;
+      suggestions: SearchResult[];
+      pasteQueueIds: string[];
+      pasteQueuePosition: number;
+      rejectPasteQueue: string | null;
       clipboardDeleted: string[];
       clipboardCleared: boolean;
       rejectClear: boolean;
       slowPreview: boolean;
-      fileIndexing: boolean;
+      filePhase: FilePhase;
+      fileTotal: number;
       fileWarning: string | null;
       currencyDate: string | null;
       currencyRefreshing: boolean;
@@ -112,13 +131,21 @@ const systemCommands: SearchResult[] = [
   ["shutdown", "Shut down", "Shut down this computer?"],
   ["sleep", "Sleep", "Put this computer to sleep?"],
   ["settings", "Open system settings", ""],
+  ["lock", "Lock screen", ""],
+  ["appearance", "Toggle system appearance", ""],
+  ["empty-trash", "Empty Trash", "Empty the Trash?"],
+  ["logout", "Log out", "Log out of your account?"],
+  ["desktop", "Show desktop", ""],
+  ["mute", "Toggle mute", ""],
 ].map(([id, title, question]) => ({
   id: `system:${id}`,
   kind: "systemCommand",
   title,
   subtitle: question
     ? "Confirmation required"
-    : "Open your operating system settings",
+    : id === "mute"
+      ? "Mute or unmute system sound output"
+      : title,
   score: 1000,
   icon: null,
   primaryAction: "run",
@@ -126,17 +153,55 @@ const systemCommands: SearchResult[] = [
   confirmation: question
     ? {
         title: question,
-        description: "Save your work before you continue.",
+        description:
+          id === "empty-trash"
+            ? "This permanently deletes all trashed items, including items on connected drives. You cannot undo this action."
+            : "Save your work before you continue.",
         confirmLabel: title,
       }
-    : null,
+    : undefined,
 }));
+const commandQueries = new Map([
+  ["sleep", systemCommands[2]],
+  ["slee", systemCommands[2]],
+  ["sle", systemCommands[2]],
+  ["sl", systemCommands[2]],
+  ["re", systemCommands[0]],
+  ["res", systemCommands[0]],
+  ["sh", systemCommands[1]],
+  ["shu", systemCommands[1]],
+  ["loc", systemCommands[4]],
+  ["lock screen", systemCommands[4]],
+  ["dar", systemCommands[5]],
+  ["dark mode", systemCommands[5]],
+  ["toggle system appearance", systemCommands[5]],
+  ["em", systemCommands[6]],
+  ["emp", systemCommands[6]],
+  ["empty trash", systemCommands[6]],
+  ["log", systemCommands[7]],
+  ["log out", systemCommands[7]],
+  ["des", systemCommands[8]],
+  ["show desktop", systemCommands[8]],
+  ["mu", systemCommands[9]],
+  ["toggle mute", systemCommands[9]],
+]);
 const file: SearchResult = {
   id: "file:/Documents/Launch notes.md",
   kind: "file",
   title: "Launch notes.md",
   subtitle: "/Documents/Launch notes.md",
   path: "/Documents/Launch notes.md",
+  score: 2000,
+  icon: null,
+  primaryAction: "open",
+  secondaryActions: ["reveal"],
+};
+const folder: SearchResult = {
+  id: "file:/Documents/Projects",
+  kind: "folder",
+  title: "Projects",
+  subtitle: "/Documents/Projects",
+  path: "/Documents/Projects",
   score: 2000,
   icon: null,
   primaryAction: "open",
@@ -216,6 +281,7 @@ function restorePin(key: string): SearchResult | undefined {
   const available = [
     ...apps,
     file,
+    folder,
     emoji,
     ...gridEmoji,
     ...systemCommands,
@@ -238,18 +304,30 @@ window.isTauri = true;
 const defaultSettings: SettingsValues = {
   clearQueryOnOpen: true,
   hideOnBlur: true,
+  showSuggestions: true,
+  emojiSkinTone: 0,
+  emojiLanguages: [],
   shortcut: "Control+Shift+Space",
   categoryShortcuts: [],
   startAtLogin: false,
+  showMenuBarIcon: false,
   appPreferences: {},
   webSearches: [],
+  itemPreferences: {},
   clipboardHistoryEnabled: true,
   clipboardHistoryDecided: true,
+  clipboardDefaultAction: "copy",
   clipboardHistoryLimit: 100,
+  clipboardRetentionDays: 0,
+  clipboardExcludedApps: [],
+  clipboardCaptureImages: false,
+  clipboardCaptureFiles: false,
   fileSearchRoots: null,
   fileSearchLimit: 50000,
   fileSearchExcludedDirs: ["node_modules", "target"],
   fileWatchEnabled: true,
+  fileSearchIncludeHidden: false,
+  fileSearchIgnorePatterns: [],
   currencyRatesEnabled: true,
   visibleCategories: [...defaultCategories],
 };
@@ -258,16 +336,24 @@ const savedSettings = JSON.parse(
 ) as Partial<SettingsValues> | null;
 window.__launcherTest = {
   calls: [],
+  nativeGlass: localStorage.getItem("tinydash.test.nativeGlass") === "true",
+  rejectNativeGlass: false,
+  holdNativeGlass: false,
   platform:
     (localStorage.getItem("tinydash.test.platform") as
-      "macos" | "windows" | "linux") ?? "macos",
+      | "macos"
+      | "windows"
+      | "linux") ?? "macos",
   settings: { ...defaultSettings, ...savedSettings },
+  rejectReady: localStorage.getItem("tinydash.test.rejectReady"),
+  rejectSearch: null,
   rejectSettings: null,
   nativeIcons: false,
   holdIcons: false,
   busyIcons: false,
   iconReadyBeforeBusy: false,
   heldIcons: [],
+  rejectResetPosition: null,
   pins: Array.isArray(savedPins)
     ? { all: savedPins, apps: savedPins }
     : savedPins,
@@ -276,12 +362,18 @@ window.__launcherTest = {
   toolRevision: 0,
   rejectActions: false,
   storageError: null,
+  warnings: [],
   usedAppFirst: false,
+  suggestions: [],
+  pasteQueueIds: [],
+  pasteQueuePosition: 0,
+  rejectPasteQueue: null,
   clipboardDeleted: [],
   clipboardCleared: false,
   rejectClear: false,
   slowPreview: false,
-  fileIndexing: false,
+  filePhase: "idle",
+  fileTotal: 1,
   fileWarning: null,
   currencyDate: null,
   currencyRefreshing: false,
@@ -316,24 +408,122 @@ window.__launcherTest = {
   resultOverrides: {},
   holdAction: false,
   emit,
+  eventDeliveries: [],
 };
-mockWindows("main");
+
+// Tauri's built-in event mock ignores listen targets and does not support emitTo.
+// Match its callback plumbing, but preserve the target filtering used by Rust.
+const eventListeners = new Map<
+  number,
+  { event: string; target: EventTarget; handler: number }
+>();
+function mockEvent(command: string, args: Record<string, unknown>) {
+  if (command === "plugin:event|listen") {
+    const listener = args as unknown as {
+      event: string;
+      target: EventTarget;
+      handler: number;
+    };
+    eventListeners.set(listener.handler, listener);
+    return listener.handler;
+  }
+  if (command === "plugin:event|unlisten") {
+    eventListeners.delete(args.eventId as number);
+    return;
+  }
+  if (command !== "plugin:event|emit" && command !== "plugin:event|emit_to")
+    throw new Error(`Unsupported mock event command: ${command}`);
+  const target = (args.target as EventTarget | undefined) ?? { kind: "Any" };
+  for (const [id, listener] of eventListeners) {
+    const subscribed = listener.target;
+    const matches =
+      target.kind === "Any" ||
+      subscribed.kind === "Any" ||
+      ("label" in target && "label" in subscribed
+        ? target.label === subscribed.label &&
+          (target.kind === subscribed.kind ||
+            target.kind === "AnyLabel" ||
+            subscribed.kind === "AnyLabel")
+        : target.kind === subscribed.kind);
+    if (listener.event !== args.event || !matches) continue;
+    const message = { event: listener.event, payload: args.payload };
+    window.__launcherTest.eventDeliveries.push(message);
+    const internals = (
+      window as unknown as {
+        __TAURI_INTERNALS__: { runCallback(id: number, data: unknown): void };
+      }
+    ).__TAURI_INTERNALS__;
+    internals.runCallback(listener.handler, { ...message, id });
+  }
+}
+
+// Simulate the Rust appearance relay across browser pages. This is UI proof,
+// not ACL proof; acl_tests.rs exercises Tauri's actual IPC authorization.
+const appearanceChannel = new BroadcastChannel("tinydash.test.appearance");
+async function relayAppearance(change: AppearanceChange) {
+  const events = {
+    appearance: "appearance-changed",
+    compact: "compact-changed",
+    systemGlass: "system-glass-changed",
+  };
+  // The backend emits once per target. An Any subscription receives both.
+  for (const label of ["main", "settings"]) {
+    await emitTo(
+      { kind: "WebviewWindow", label },
+      events[change.kind],
+      change.value,
+    );
+  }
+}
+appearanceChannel.onmessage = (event: MessageEvent<AppearanceChange>) => {
+  void relayAppearance(event.data);
+};
+window.addEventListener("pagehide", () => appearanceChannel.close());
+mockWindows(
+  new URLSearchParams(location.search).get("view") === "settings"
+    ? "settings"
+    : "main",
+);
 mockIPC(
   async (command, payload) => {
     const state = window.__launcherTest;
     state.calls.push({ command, payload });
+    if (command.startsWith("plugin:event|"))
+      return mockEvent(command, payload as Record<string, unknown>);
+    if (command === "sync_appearance") {
+      const { change } = payload as { change: AppearanceChange };
+      await relayAppearance(change);
+      appearanceChannel.postMessage(change);
+      return;
+    }
+    // Queue tests control delayed search replies independently. Native
+    // cancellation is covered by Rust, not simulated as desktop proof here.
+    if (command === "cancel_search") return;
     if (command === "hide_launcher") {
       await emit("launcher-hidden");
       return;
     }
+    if (command === "reset_launcher_position") {
+      if (state.rejectResetPosition) throw new Error(state.rejectResetPosition);
+      return;
+    }
     if (command === "launcher_ready") {
+      if (state.rejectReady) throw new Error(state.rejectReady);
       return {
         platform: state.platform,
         settings: state.settings,
-        warnings: [],
+        warnings: state.warnings,
         visible: state.initialVisible,
         initialMode: state.initialMode,
       };
+    }
+    if (command === "set_launcher_appearance") {
+      if (state.holdNativeGlass)
+        await new Promise<void>((resolve) => {
+          state.releaseNativeGlass = resolve;
+        });
+      if (state.rejectNativeGlass) throw new Error("Native glass unavailable");
+      return state.platform === "macos" && state.nativeGlass;
     }
     if (command === "get_settings") {
       return {
@@ -367,7 +557,25 @@ mockIPC(
     if (command === "cancel_app_icon") return;
     if (command === "save_settings") {
       if (state.rejectSettings) throw new Error(state.rejectSettings);
-      state.settings = (payload as { settings: SettingsValues }).settings;
+      const next = (payload as { settings: SettingsValues }).settings;
+      if (
+        [
+          "fileSearchRoots",
+          "fileSearchExcludedDirs",
+          "fileSearchLimit",
+          "fileWatchEnabled",
+        ].some(
+          (key) =>
+            JSON.stringify(state.settings[key as keyof SettingsValues]) !==
+            JSON.stringify(next[key as keyof SettingsValues]),
+        )
+      ) {
+        state.filePhase =
+          next.fileSearchRoots?.length === 0 ? "disabled" : "queued";
+        state.fileTotal = 0;
+        state.fileWarning = null;
+      }
+      state.settings = next;
       localStorage.setItem(
         "tinydash.test.settings",
         JSON.stringify(state.settings),
@@ -388,7 +596,40 @@ mockIPC(
       );
       return state.settings;
     }
+    if (command === "rich_clipboard_history")
+      return {
+        entries: [],
+        total: 0,
+        sourceApps: [],
+        captureSupported: true,
+        supportNotice: "Native rich capture is supported on macOS.",
+        storageNotice:
+          "0 entries (maximum 32) · 0 of 16777216 bytes · 0 pinned.",
+      };
+    if (command === "utility_awake_status")
+      return { active: false, endsAt: null, remainingSeconds: 0 };
+    if (command === "drag_result" || command === "share_result")
+      throw new Error(
+        "Native file transfers are unavailable in the browser preview.",
+      );
+    if (command === "utility_processes" || command === "library_list")
+      return [];
+    if (command === "utility_capabilities")
+      return {
+        processes: "Available",
+        eyedropper: "Unavailable",
+        awake: "Available",
+        media: "Available",
+        windows: "Available",
+      };
+    if (command === "refresh_files") {
+      if (state.filePhase !== "disabled" && state.filePhase !== "scanning")
+        state.filePhase = "queued";
+      await emit("files-changed");
+      return;
+    }
     if (command === "app_catalog") return apps;
+    if (command === "item_catalog") return [...apps, ...systemCommands];
     if (command === "set_app_preference") {
       const { id, aliases, hidden } = payload as {
         id: string;
@@ -439,8 +680,52 @@ mockIPC(
       state.copiedSelection = payload as { ids: string[]; separator: string };
       return;
     }
+    if (command === "paste_queue") {
+      const { action, ids } = payload as {
+        action: PasteQueueAction;
+        ids: string[];
+      };
+      if (action !== "status" && state.rejectPasteQueue)
+        throw new Error(state.rejectPasteQueue);
+      if (action === "start") {
+        state.pasteQueueIds = ids;
+        state.pasteQueuePosition = 0;
+      }
+      if (action === "cancel") {
+        state.pasteQueueIds = [];
+        state.pasteQueuePosition = 0;
+      }
+      if (action === "next" || action === "skip") state.pasteQueuePosition++;
+      while (
+        state.pasteQueuePosition < state.pasteQueueIds.length &&
+        (state.clipboardDeleted.includes(
+          state.pasteQueueIds[state.pasteQueuePosition],
+        ) ||
+          state.clipboardCleared)
+      )
+        state.pasteQueuePosition++;
+      const id = state.pasteQueueIds[state.pasteQueuePosition];
+      const status: PasteQueueStatus = {
+        total: state.pasteQueueIds.length,
+        position: state.pasteQueuePosition,
+        next: id
+          ? {
+              id: Number(id.split(":")[1]),
+              content:
+                clips.find((entry) => entry.id === id)?.title ?? "Fixture text",
+              createdAt: 1,
+              lastUsedAt: null,
+            }
+          : null,
+      };
+      if (action !== "status") await emit("paste-queue-changed", status);
+      return status;
+    }
     if (command === "search") {
       const { query, mode } = payload as { query: string; mode: SearchMode };
+      // Capture the outcome at dispatch so a held old success can race a
+      // newer failure without changing the old request's result.
+      const rejection = state.rejectSearch;
       if (state.holdNextSearch) {
         state.holdNextSearch = false;
         await new Promise<void>((resolve) => {
@@ -454,13 +739,22 @@ mockIPC(
           });
         else await new Promise((resolve) => setTimeout(resolve, 250));
       }
+      if (rejection) throw new Error(rejection);
       if (query === "error")
         throw new Error(
           "The application index is unavailable. Restart TinyDash.",
         );
       // These fixed responses test rendering and IPC order, not TypeScript search.
+      const command = commandQueries.get(query);
+      const commandResults =
+        mode === "all" && command
+          ? [command, apps[0], { ...clips[0], title: `${command.title} notes` }]
+          : mode === "system" && command
+            ? [command]
+            : null;
       const results =
         toolResults(query, mode) ??
+        commandResults ??
         (mode === "system" || query === "reboot"
           ? query === "missing"
             ? []
@@ -468,10 +762,14 @@ mockIPC(
               ? [...systemCommands].reverse()
               : systemCommands
           : mode === "files" || query === "Launch notes.md"
-            ? query === "missing"
+            ? query === "missing" ||
+              state.fileTotal === 0 ||
+              state.settings.fileSearchRoots?.length === 0
               ? []
-              : [file]
-            : mode === "clipboard"
+              : query === "Projects"
+                ? [folder]
+                : [file]
+            : mode === "clipboard" || (mode === "all" && query === "Meeting")
               ? clips.filter((entry) => {
                   const pinned = Object.values(state.pins).some((keys) =>
                     keys?.includes(entry.id),
@@ -524,7 +822,11 @@ mockIPC(
                               ? [apps[1], apps[0], ...apps.slice(2)]
                               : apps);
       const described = describePins(
-        mode === "all" && !query.trim() ? [] : results,
+        mode === "all" && !query.trim()
+          ? state.settings.showSuggestions
+            ? state.suggestions
+            : []
+          : results,
         query,
       );
       if (!query.trim()) {
@@ -573,15 +875,25 @@ mockIPC(
             : query === "=1 / 0"
               ? "Division by zero is not allowed."
               : null,
-        storageError: state.storageError,
+        storageError: state.storageError
+          ? {
+              code: "storageUnavailable",
+              message: state.storageError,
+              retryable: false,
+            }
+          : null,
         currency: {
           asOf: state.currencyDate,
           refreshing: state.currencyRefreshing,
           warning: state.currencyWarning,
         },
         files: {
-          total: 1,
-          indexing: state.fileIndexing,
+          total:
+            state.settings.fileSearchRoots?.length === 0 ? 0 : state.fileTotal,
+          phase:
+            state.settings.fileSearchRoots?.length === 0
+              ? "disabled"
+              : state.filePhase,
           warning: state.fileWarning,
         },
       };
@@ -614,6 +926,7 @@ mockIPC(
       });
     }
     if (command === "execute_action" && state.rejectActions) {
+      if (typeof state.rejectActions === "string") throw state.rejectActions;
       if ((payload as { action: string }).action === "run")
         throw new Error("The OS denied this system command.");
       throw new Error(
@@ -650,7 +963,7 @@ mockIPC(
     }
     return undefined;
   },
-  { shouldMockEvents: true },
+  { shouldMockEvents: false },
 );
 
 // Fixed tool values verify UI behavior. Rust tests verify generation and parsing.

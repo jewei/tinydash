@@ -18,6 +18,7 @@ pub enum ResolvedAction {
     System(SystemCommand),
     OpenUrl(String),
     RegeneratePassword(String),
+    Panel(String),
 }
 
 impl ResolvedAction {
@@ -47,7 +48,68 @@ pub async fn execute_action(
     confirmed: Option<bool>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let keep_open = matches!(action, Action::Delete | Action::Regenerate);
+    if id.starts_with("library:") && action == Action::Run {
+        if app
+            .state::<LauncherState>()
+            .settings()
+            .item_preferences
+            .get(&id)
+            .is_some_and(|item| item.disabled)
+        {
+            return Err("This library item is disabled.".into());
+        }
+        let entry = app.state::<super::library::LibraryState>().get(&id)?;
+        if entry.inserts_directly() {
+            return super::library::library_execute(
+                id,
+                super::library::LibraryAction::Paste,
+                Default::default(),
+                false,
+                app,
+            )
+            .await;
+        }
+        window::show(&app).map_err(|error| error.to_string())?;
+        return app
+            .emit("open-panel", id)
+            .map_err(|error| error.to_string());
+    }
+    if action == Action::Paste {
+        return super::paste::paste_result(app, id).await;
+    }
+    if action == Action::Run
+        && let Some(placement) = super::commands::window_action(&id)
+    {
+        {
+            let state = app.state::<LauncherState>();
+            state
+                .search
+                .lock()
+                .map_err(|_| "Search is unavailable.")?
+                .resolve_action(&id, action)
+                .map_err(|error| error.to_string())?;
+        }
+        super::utilities::window_placement::previous(&app, placement).await?;
+        return window::dismiss(&app).map_err(|error| error.to_string());
+    }
+    if action == Action::Run
+        && let Some(queue_action) = super::paste_queue::command_action(&id)
+    {
+        {
+            let state = app.state::<LauncherState>();
+            state
+                .search
+                .lock()
+                .map_err(|_| "Search is unavailable.")?
+                .resolve_action(&id, action)
+                .map_err(|error| error.to_string())?;
+        }
+        return super::paste_queue::paste_queue(app, queue_action, Vec::new())
+            .await
+            .map(|_| ());
+    }
+    let keep_open = matches!(action, Action::Delete | Action::Regenerate)
+        || (action == Action::Run && super::commands::panel(&id).is_some());
     let worker_app = app.clone();
     let (usage_id, restore_focus) = tauri::async_runtime::spawn_blocking(move || {
         // Resolve backend-owned IDs. The webview supplies neither executable
@@ -67,6 +129,7 @@ pub async fn execute_action(
             .check_confirmation(confirmed.unwrap_or(false))
             .map_err(|error| error.to_string())?;
         match action {
+            ResolvedAction::Panel(id) => super::commands::open(&worker_app, &id),
             ResolvedAction::System(command) => {
                 platform::run_system_command(command).map_err(|error| error.to_string())
             }
@@ -142,11 +205,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolved_power_actions_cannot_skip_confirmation() {
+    fn resolved_disruptive_actions_cannot_skip_confirmation() {
         for command in [
             SystemCommand::Sleep,
             SystemCommand::Restart,
             SystemCommand::Shutdown,
+            SystemCommand::EmptyTrash,
+            SystemCommand::Logout,
         ] {
             let action = ResolvedAction::System(command);
             assert!(matches!(
@@ -186,6 +251,7 @@ mod tests {
             id: "file:/test.txt".into(),
             name: "test.txt".into(),
             path: "/test.txt".into(),
+            folder: false,
         };
         assert_eq!(
             ResolvedAction::File(file.clone(), Action::Open).usage_id("ignored"),

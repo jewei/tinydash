@@ -17,6 +17,52 @@ pub fn valid_text(text: &str) -> bool {
     text.len() <= MAX_TEXT_BYTES && !text.trim().is_empty() && !text.contains('\0')
 }
 
+/// Formats that a source adds when it copies a password, one-time code, or
+/// other secret. History never reads or saves such content. The presence of
+/// the format is the signal; its payload varies between sources.
+///
+/// - macOS: the nspasteboard.org concealed and transient types, and Apple's
+///   marker for autofill and browser password fields.
+/// - Windows: the documented clipboard monitor exclusion, and the older
+///   format that KeePass and similar tools set.
+/// - Linux: the KDE password manager hint, also set by KeePassXC.
+pub const SECRET_FORMATS: [&str; 6] = [
+    "org.nspasteboard.ConcealedType",
+    "org.nspasteboard.TransientType",
+    "com.apple.is-sensitive",
+    "ExcludeClipboardContentFromMonitorProcessing",
+    "Clipboard Viewer Ignore",
+    "x-kde-passwordManagerHint",
+];
+
+// Windows registers each name instead. Its reader uses the list directly.
+#[cfg_attr(windows, allow(dead_code))]
+pub fn is_secret_format(format: &str) -> bool {
+    SECRET_FORMATS.contains(&format)
+}
+
+/// The result of one read after the native clipboard changes.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Observed {
+    /// Text that history can save.
+    Text(String),
+    /// Content that its source marked as secret. The text is never read.
+    Secret,
+    /// A source emptied the clipboard. Password managers do this after a copy.
+    /// Linux cannot tell a clear from an application exit, so it never reports one.
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
+    Cleared,
+    /// Non-text content, or text that history does not accept.
+    Other,
+}
+
+impl Observed {
+    pub fn from_text(text: Option<String>) -> Self {
+        text.filter(|text| valid_text(text))
+            .map_or(Self::Other, Self::Text)
+    }
+}
+
 pub fn combine_entries(entries: &[&ClipboardEntry], separator: &str) -> Result<String, String> {
     if entries.is_empty() {
         return Err("Select at least one clipboard entry.".into());
@@ -58,6 +104,7 @@ pub fn combine_entries(entries: &[&ClipboardEntry], separator: &str) -> Result<S
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct ClipboardEntry {
     pub id: i64,
     pub content: String,
@@ -78,6 +125,30 @@ pub struct IndexedEntry {
     normalized: String,
     title: String,
     subtitle: String,
+}
+
+#[cfg(test)]
+thread_local! { static RESULT_ROWS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
+impl IndexedEntry {
+    fn result(&self, score: u32) -> SearchResult {
+        #[cfg(test)]
+        RESULT_ROWS.with(|count| count.set(count.get() + 1));
+        SearchResult {
+            id: format!("clipboard:{}", self.entry.id),
+            kind: ResultKind::Clipboard,
+            path: None,
+            title: self.title.clone(),
+            subtitle: self.subtitle.clone(),
+            score,
+            icon: None,
+            primary_action: Action::Copy,
+            secondary_actions: vec![Action::Delete],
+            pin: None,
+            confirmation: None,
+            detail: None,
+        }
+    }
 }
 
 impl From<ClipboardEntry> for IndexedEntry {
@@ -157,7 +228,44 @@ impl ClipboardProvider {
             .map(|entry| &entry.entry)
     }
 
+    /// Resolve a pin without constructing every history row. History remains
+    /// newest-first; this lookup scans IDs but allocates only the selected row.
+    pub fn result(&self, id: &str) -> Option<SearchResult> {
+        let id = entry_id(id)?;
+        self.entries
+            .iter()
+            .find(|entry| entry.entry.id == id)
+            .map(|entry| entry.result(0))
+    }
+
+    pub fn recent(&self, limit: usize) -> Vec<SearchResult> {
+        #[cfg(test)]
+        super::search_work::record(
+            super::search_work::Provider::Clipboard,
+            self.entries.len().min(limit),
+        );
+        self.entries
+            .iter()
+            .take(limit)
+            .map(|entry| entry.result(0))
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    #[cfg(test)]
     pub fn search(&self, input: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
+        self.search_interruptible(input, matcher, || false)
+    }
+
+    pub fn search_interruptible(
+        &self,
+        input: &str,
+        matcher: &mut Matcher,
+        mut stopped: impl FnMut() -> bool,
+    ) -> Vec<SearchResult> {
         #[cfg(test)]
         super::search_work::record(super::search_work::Provider::Clipboard, self.entries.len());
         let query = ranking::normalize(input);
@@ -169,7 +277,9 @@ impl ClipboardProvider {
         );
         self.entries
             .iter()
-            .filter_map(|entry| {
+            .enumerate()
+            .take_while(|(index, _)| index % 16 != 0 || !stopped())
+            .filter_map(|(_, entry)| {
                 let score = if query.is_empty() {
                     0
                 } else {
@@ -179,20 +289,7 @@ impl ClipboardProvider {
                         &query,
                     )
                 };
-                Some(SearchResult {
-                    id: format!("clipboard:{}", entry.entry.id),
-                    kind: ResultKind::Clipboard,
-                    path: None,
-                    title: entry.title.clone(),
-                    subtitle: entry.subtitle.clone(),
-                    score,
-                    icon: None,
-                    primary_action: Action::Copy,
-                    secondary_actions: vec![Action::Delete],
-                    pin: None,
-                    confirmation: None,
-                    detail: None,
-                })
+                Some(entry.result(score))
             })
             .collect()
     }
@@ -200,6 +297,34 @@ impl ClipboardProvider {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn secret_formats_cover_each_platform_convention() {
+        for format in [
+            "org.nspasteboard.ConcealedType",
+            "org.nspasteboard.TransientType",
+            "com.apple.is-sensitive",
+            "ExcludeClipboardContentFromMonitorProcessing",
+            "Clipboard Viewer Ignore",
+            "x-kde-passwordManagerHint",
+        ] {
+            assert!(is_secret_format(format), "{format}");
+        }
+        for format in [
+            "public.utf8-plain-text",
+            "UTF8_STRING",
+            "CF_UNICODETEXT",
+            "",
+        ] {
+            assert!(!is_secret_format(format), "{format}");
+        }
+        assert_eq!(
+            Observed::from_text(Some("A".into())),
+            Observed::Text("A".into())
+        );
+        assert_eq!(Observed::from_text(Some(" \n".into())), Observed::Other);
+        assert_eq!(Observed::from_text(None), Observed::Other);
+    }
+
     use super::*;
 
     fn entry(id: i64, content: &str) -> ClipboardEntry {
@@ -209,6 +334,39 @@ mod tests {
             created_at: 1,
             last_used_at: None,
         }
+    }
+
+    #[test]
+    fn recent_history_and_direct_pins_materialize_only_requested_rows() {
+        let provider = ClipboardProvider::new(
+            (1..=1000)
+                .rev()
+                .map(|id| entry(id, &format!("History {id}")))
+                .collect(),
+        );
+        RESULT_ROWS.with(|count| count.set(0));
+        let recent = provider.recent(30);
+        assert_eq!(recent.len(), 30);
+        assert_eq!(recent[0].id, "clipboard:1000");
+        assert_eq!(RESULT_ROWS.with(|count| count.get()), 30);
+        assert_eq!(provider.result("clipboard:1").unwrap().title, "History 1");
+        assert_eq!(RESULT_ROWS.with(|count| count.get()), 31);
+        assert!(provider.result("clipboard:1001").is_none());
+        assert!(provider.recent(0).is_empty());
+        assert_eq!(RESULT_ROWS.with(|count| count.get()), 31);
+    }
+
+    #[test]
+    fn clipboard_matching_checks_cancellation_between_small_batches() {
+        let provider = ClipboardProvider::new((1..=1000).map(|id| entry(id, "History")).collect());
+        let mut matcher = Matcher::new(nucleo_matcher::Config::DEFAULT);
+        let mut checks = 0;
+        let results = provider.search_interruptible("history", &mut matcher, || {
+            checks += 1;
+            checks > 1
+        });
+        assert_eq!(checks, 2);
+        assert_eq!(results.len(), 16);
     }
 
     #[test]

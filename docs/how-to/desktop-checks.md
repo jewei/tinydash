@@ -8,11 +8,29 @@ Open the GitHub Actions **Checks** run for the commit under test. Download the `
 
 Use the [installation guide](install.md) to verify checksums and install the DMG, Windows setup executable, or Ubuntu 24.04 Debian package. The Checks workflow supplies unsigned development builds. For a release candidate, use the Release workflow artifacts. Confirm the distribution and publisher-signing fields in `build.txt`. Mac candidates require Developer ID signing and notarization. Windows candidates are unsigned previews with separate updater signatures. Ubuntu uses checksums and manual updates. Windows needs the WebView2 Runtime. The Linux package needs compatible GTK 3, WebKitGTK 4.1, AppIndicator, libxdo, and OpenSSL libraries. Bun and Rust are not needed to run the build.
 
-Quit any older TinyDash process through its tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
+Quit any older TinyDash process through **Actions > Quit TinyDash** or its enabled tray menu before opening the new build. Reopening the window of an existing process does not load the new code.
 
 Start the installed app from Applications on macOS, the Start menu on Windows, or the application menu on Linux. For standalone checks, use the inner Mac ZIP, the Windows executable without `-setup` in its name, or the Linux tar archive.
 
 CI checks installation, same-version replacement, and removal. On a physical desktop, also check replacement while the app is running, the Windows WebView2 download on a clean system, and the OS response to an unsigned build. Confirm that removal preserves saved settings and history unless you explicitly request their deletion.
+
+## Use a disposable macOS receiver
+
+`tests/native/receiver-macos.swift` supplies a small native window for file drag, app quit, and window-placement checks. It does not read or change the general clipboard. Use only synthetic files in the fixture root and a new evidence directory for each process:
+
+```sh
+mkdir -p .local/receiver-fixtures
+swiftc tests/native/receiver-macos.swift -o .local/native-receiver
+.local/native-receiver .local/receiver-fixtures .local/receiver-run-1
+```
+
+The green window accepts file references inside the fixture root. Each accepted drop copies the files and writes `drop-N.json` with the source operation mask, copied paths, and regular-file hashes. A copy-only source has mask `1`. Compare the received file identity and content, confirm the original remains, and separately compare the system clipboard before and after dragging. A receiver record proves that target's acceptance; it does not prove support in every attachment app. Failed copies leave a failure record and return a rejected drop.
+
+For app-result Quit tests, put the compiled executable in a disposable `.app` bundle under the test user's Applications folder. Set its `CFBundleExecutable`, unique `CFBundleIdentifier`, `CFBundleName`, and `CFBundlePackageType` (`APPL`). Set `FixtureRoot` and `FixtureEvidence` in `Info.plist` to absolute test paths. The executable uses these keys when launched without arguments. Use a new evidence directory for each launch. Confirm search resolves that bundle, Cancel leaves its recorded PID alive, and Quit or Force Quit stops that PID. Normal AppKit termination writes `quit.json`; force termination may not. Remove only the owned fixture app after all its processes stop.
+
+For window placement, capture the receiver's external position and size before and after the command. Its `ready.json` uses AppKit screen coordinates; Accessibility uses a different vertical origin. Compare geometry in one coordinate system. Check that the same PID and window remain selected. Missing TinyDash Accessibility permission must leave the window unchanged and show an error. This negative check is not a successful placement check. Keep permission-dependent checks pending until a controlled session has the required access.
+
+For saved image/file data, use the [rich history restart recipe](../reference/features/clipboard.md#rich-history-restart-recipe).
 
 ## Check the launcher
 
@@ -22,7 +40,7 @@ CI checks installation, same-version replacement, and removal. On a physical des
 4. Press Control + Shift + Space while another app has focus. Confirm that TinyDash appears and immediately accepts text. Confirm that Siri, Spotlight, or another system panel does not open. Repeat ten times.
 5. Type in a browser or terminal, then open TinyDash with the shortcut. Press Escape without entering a query. Confirm that the palette hides and you can continue typing in the same window without a click. Repeat after copying a calculation result and after closing the palette with the shortcut. Alternate between two apps to check that each opening remembers the current app.
 6. Click another app. Confirm that TinyDash hides with the default `hideOnBlur` setting.
-7. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash.
+7. On macOS, first confirm the Dock and menu bar icons are absent by default, then enable **Shortcut > Show menu bar icon** in Settings and save. Use the tray menu to open the launcher and refresh the app list. Confirm that the tray can quit TinyDash. Install a small test application, or copy one into the user application folder. Confirm that it appears in Apps within ten seconds without a refresh. Remove it and confirm that it disappears.
 8. Start TinyDash again while it is running. Confirm that the existing window appears and a second launcher process does not remain running.
 9. Use Command/Ctrl + Enter on an app result. Confirm that the OS file manager shows its location.
 10. Set `clearQueryOnOpen` to `false` in `settings.json`, restart, and reopen after a search in Emoji mode. Confirm that the query and mode remain and the query text is selected. Restore the setting after the check. Confirm that reopening then clears the query and selects the first visible category (All by default).
@@ -44,7 +62,7 @@ On macOS, run `swift tests/native/focus-macos.swift` with the built app open and
 2. Select **Record new**. Press a key combination, then **Save changes**. Use that combination while another app has focus. Confirm that TinyDash opens without a restart. Restore the original shortcut after this check.
 3. Cancel a recording with Escape. Confirm that the saved shortcut still works. Try a shortcut already used by another app. If the OS rejects it, confirm that the error appears and the previous shortcut still works.
 4. Change **Hide when focus is lost** and **Clear search when opened**. Save, then check each behaviour. Confirm that Settings stays open when another app has focus.
-5. Choose Light, Dark, and Compact in Appearance. Confirm that the launcher changes immediately and keeps the choice after a restart.
+5. Choose Light, Dark, Sage, Rose, and Ink in Appearance. Toggle Compact layout with each theme. Confirm that the launcher changes immediately and keeps both choices after a restart. On macOS 27, change the Liquid Glass slider in System Settings, Appearance, while TinyDash is visible over a patterned test window. Confirm that the glass changes without a restart, then restore the system value. Repeat with Reduce transparency and restore it. On earlier macOS versions without Liquid Glass, confirm that the launcher has a solid background.
 6. In a separate test profile, change the clipboard limit and file folders. Save and confirm that the history limit and file index update without a restart. Turn currency updates off and confirm that saved rates remain usable.
 7. Change a field without saving, close Settings, and reopen it. Confirm that the edit remains. Select **Discard** and confirm that the saved value returns.
 8. Close Settings with its window close control, Escape, and the launcher shortcut. Confirm that TinyDash stays running, the launcher can reopen, and only one Settings window exists after reopening. Repeat while another app has focus.
@@ -53,13 +71,14 @@ On macOS, run `swift tests/native/focus-macos.swift` with the built app open and
 11. Record a category shortcut. Save and use it while another app has focus. Confirm that it opens an empty search in that category. Remove the binding, save, and confirm that it stops working. Test a conflict without losing the previous binding. On Wayland, use a desktop shortcut for `tinydash --mode clipboard`. Test the command with both a stopped and a running TinyDash process.
 12. Turn on **Start at login**, save, and sign out and in. Confirm that one TinyDash process starts and the launcher stays hidden. Turn it off, save, and repeat. Confirm that TinyDash does not start.
 13. Export saved settings through **Privacy**. Preview the file through import. Cancel and confirm that nothing changes. Import again, apply the preview, and confirm that settings stay unchanged until **Save changes**. Check invalid JSON, unsupported versions, unknown keys, and file paths from another operating system. An invalid import must leave saved settings unchanged.
-14. In **About**, check for updates in a development build. Confirm that it gives package instructions. Use release candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in the local verification record. Windows previews have updater signatures but no publisher signature. Preserve the source files before manual recovery.
+14. On macOS, toggle **Shortcut > Show menu bar icon** and save. Confirm the icon appears or disappears immediately, and that the choice survives a restart. Check Discard before saving. With the icon hidden, confirm the global shortcut, second launch, Actions > Settings, and Command + comma still work. Confirm no Dock icon appears with either window open. Check an older settings file without `showMenuBarIcon`; the menu bar icon must stay hidden by default.
+15. In **About**, check for updates in a development build. Confirm that it gives package instructions. Use release candidate packages and the separate test feed for the update, failed-download, signature, and recovery checks in the local verification record. Windows previews have updater signatures but no publisher signature. Preserve the source files before manual recovery.
 
 ## Check passwords, time zones, URLs, and web search
 
 Use generated test values for these checks. Restore the original clipboard when finished.
 
-1. Enter `password 32`. Confirm that the results include symbols, letters and digits, a word passphrase, and a PIN. Check the strength estimate. Copy the first result and confirm that it matches the displayed 32 characters. Confirm that this copy does not appear in TinyDash's clipboard history.
+1. Enter `password 32`. Confirm that the results include symbols, letters and digits, a word passphrase, and a PIN. Check the strength estimate. Copy the first result and confirm that it matches the displayed 32 characters. Confirm that this copy does not appear in TinyDash's clipboard history. Quit TinyDash without changing the clipboard, start it again, and confirm that the password still does not appear.
 2. Check `password letters 64`, `passphrase 6`, and `pin 6`. Confirm the character, word, or digit count. Check that `password 5` and `password 65` show an error. Select **Generate another** and confirm that the selected type stays selected. Clear the query, enter it again, and confirm that new passwords appear.
 3. Enter `time in tokyo` and `time in us`. Check the named zones, dates, and UTC offsets. Leave the current time visible across a minute change and confirm that it updates.
 4. Enter `tomorrow 3pm london`. Confirm that the source date is tomorrow in London and the local result has the correct date and offset. Check `2026-03-29 1:30 london` for a missing-time error and `2026-10-25 1:30 london` for two possible results.
@@ -86,7 +105,7 @@ Password generation, time conversion, and URL cleaning must also work with the n
 9. Set `currencyRatesEnabled` to `false` and restart. Confirm that saved rates remain usable and a manual refresh reports the disabled setting. Restore the setting after the check.
 10. With saved rates, compare `10 USD CAD` and `10 USD to CAD`. Confirm that both give the same value and rate date. Confirm that ordinary unit conversions still work.
 
-Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. Automatic paste is not implemented.
+Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. For direct paste, follow the [workflow checks](../reference/features/workflows.md#verification) and compare the destination contents; a successful copy is not paste proof.
 
 ## Check usage ranking
 
@@ -120,6 +139,7 @@ On a fresh profile, copy text before choosing a history setting. Confirm that Ti
 12. Pin one entry in All and another in Clipboard. Keep two unpinned entries. Use **Actions > Clear unpinned history** and restart. Confirm that both pins remain and the unpinned entries are gone. Use **Clear all clipboard history**, restart, and confirm that all entries and their pins are gone. Before each restart, copy whitespace-only text in another app so startup capture cannot add the previous clipboard value again.
 13. Use **Edit a copy** on multiline text with spaces and Unicode. Copy the edit into a text editor. Confirm that the exact edit was copied and the original history entry is unchanged. Test cancellation and an edit over 16,384 bytes. The error must keep the dialog open without changing the clipboard.
 14. Use **Copy selected entries**. Select entries in a different order from the list. Check each separator and compare the pasted output. Test a combined value over 16,384 bytes. Use **Save text as a file**, cancel once, then save. Confirm that the file contains the full original text and that neither action changes the history entries.
+15. Copy a test password from a password manager that marks secrets, such as 1Password, Bitwarden, or KeePassXC. Confirm that no entry appears. On macOS, also copy from Apple Passwords. On macOS and Windows, copy test text, then empty the clipboard within two minutes with a password manager's clear action. Confirm that the entry disappears and older entries remain.
 
 macOS and Windows read their clipboard change counters once per second. Copies made within the same interval can be missed. Linux uses GTK clipboard events. On Wayland, the compositor can limit access while TinyDash lacks focus; record which changes appear only after opening the launcher.
 
@@ -128,12 +148,12 @@ macOS and Windows read their clipboard change counters once per second. Copies m
 1. Put a text file in Documents. Give it a name with spaces and Unicode characters. Restart TinyDash, select Files, and wait for the scan to finish.
 2. Search by filename, abbreviation, and part of the full path. Confirm that All mode also finds the file. Confirm that Apps mode does not return it.
 3. Search for text that occurs only inside the file. Confirm that the file does not appear.
-4. Press Enter on the file. Confirm that its default application opens it. Reopen TinyDash and use Command/Ctrl + Enter to show it in the file manager.
+4. Press Enter on the file. Confirm that its default application opens it. Reopen TinyDash and use Command/Ctrl + Enter to show it in the file manager. Search for its parent folder, press Enter, and confirm that the folder opens in the file manager.
 5. Add and rename a second file. Confirm that the results update without a manual refresh. Create a new subfolder and immediately add a file inside it. Confirm that the file appears.
 6. Delete the first file outside TinyDash. Confirm that its result disappears automatically. If an old result is opened before the scan finishes, confirm that the app reports that the file is unavailable.
 7. Rename a configured root folder, then recreate it and add a file. Confirm that the replacement root updates. Use Refresh files to confirm that manual recovery remains available. Set `fileWatchEnabled` to `false` and restart to check manual-only operation, then restore the setting.
 8. Configure a temporary folder in `fileSearchRoots`. Add hidden files, an excluded `node_modules` folder, and symbolic links. Restart and confirm that the scanner excludes them. Test a folder without read permission and confirm that the app stays usable and shows a warning.
-9. Set `fileSearchLimit` to 2 in a folder with three files. Restart and confirm that the UI reports an incomplete scan. Set `fileSearchRoots` to `[]`, restart, and confirm that Files mode is empty. Restore the settings when finished.
+9. Set `fileSearchLimit` to 2 in a folder with three files and no subfolders. Restart and confirm that the UI reports an incomplete scan. Set `fileSearchRoots` to `[]`, restart, and confirm that Files mode is empty. Restore the settings when finished.
 10. In Settings, select only `~/Documents` and save. Confirm that a known Documents file appears. Change the folder to `~/Downloads` and save without restarting. Confirm that the Documents result disappears immediately and only Downloads files appear after the scan. Repeat while a scan is in progress, then turn file search off and confirm that the results stay empty.
 
 File access depends on OS permissions. On macOS, record any Files and Folders permission prompt or denial. Test Windows redirected Known Folders and Linux XDG user directories if available. Files open through their OS association; a missing or broken association can prevent the target application from opening.

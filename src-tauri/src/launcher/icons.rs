@@ -379,9 +379,9 @@ pub async fn app_icon(
     key: String,
     pixels: u16,
     request: String,
-) -> Result<String, IconError> {
+) -> Result<String, String> {
     if !window.is_visible().unwrap_or(false) {
-        return Err(IconError::Cancelled);
+        return Err("cancelled".into());
     }
     let store = &app.state::<super::LauncherState>().icons;
     store
@@ -400,6 +400,15 @@ pub async fn app_icon(
             }),
         )
         .await
+        .map_err(|error| {
+            match error {
+                IconError::Unavailable => "unavailable",
+                IconError::InvalidSize => "invalidSize",
+                IconError::Busy => "busy",
+                IconError::Cancelled => "cancelled",
+            }
+            .into()
+        })
 }
 
 #[tauri::command]

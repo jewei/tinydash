@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(test, derive(ts_rs::TS))]
 pub struct SettingsInfo {
     settings: Settings,
     defaults: Settings,
@@ -22,32 +23,57 @@ pub struct SettingsInfo {
     shortcuts_available: bool,
 }
 
-#[tauri::command]
-pub fn get_settings(app: AppHandle) -> Result<SettingsInfo, String> {
-    Ok(SettingsInfo {
-        settings: app.state::<LauncherState>().settings(),
+#[cfg(test)]
+pub(super) fn contract_settings_info() -> SettingsInfo {
+    SettingsInfo {
+        settings: Settings::default(),
         defaults: Settings::default(),
-        platform: std::env::consts::OS,
-        version: app.package_info().version.to_string(),
-        config_path: app
-            .path()
-            .app_config_dir()
-            .map_err(|error| error.to_string())?
-            .join("settings.json")
-            .to_string_lossy()
-            .into_owned(),
-        data_path: app
-            .path()
-            .app_data_dir()
-            .map_err(|error| error.to_string())?
-            .join("tinydash.sqlite3")
-            .to_string_lossy()
-            .into_owned(),
-        shortcuts_available: !platform::is_wayland()
-            && app
-                .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
-                .is_some(),
+        platform: "linux",
+        version: "0.1.3".into(),
+        config_path: "/example/settings.json".into(),
+        data_path: "/example/tinydash.sqlite3".into(),
+        shortcuts_available: true,
+    }
+}
+
+#[tauri::command]
+pub async fn get_settings(app: AppHandle) -> Result<SettingsInfo, String> {
+    blocking_read(move || {
+        Ok(SettingsInfo {
+            settings: app.state::<LauncherState>().settings(),
+            defaults: Settings::default(),
+            platform: std::env::consts::OS,
+            version: app.package_info().version.to_string(),
+            config_path: app
+                .path()
+                .app_config_dir()
+                .map_err(|error| error.to_string())?
+                .join("settings.json")
+                .to_string_lossy()
+                .into_owned(),
+            data_path: app
+                .path()
+                .app_data_dir()
+                .map_err(|error| error.to_string())?
+                .join("tinydash.sqlite3")
+                .to_string_lossy()
+                .into_owned(),
+            shortcuts_available: !platform::is_wayland()
+                && app
+                    .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
+                    .is_some(),
+        })
     })
+    .await
+}
+
+// Keep contended reads off the webview/event thread, not merely their callers.
+async fn blocking_read<T: Send + 'static>(
+    read: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(read)
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -85,12 +111,12 @@ struct NativeShortcuts<'a>(&'a AppHandle);
 impl ShortcutRegistry for NativeShortcuts<'_> {
     fn contains(&self, shortcut: &str) -> bool {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .is_some_and(|registry| registry.is_registered(shortcut))
     }
     fn register(&self, shortcut: &str) -> Result<(), String> {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .ok_or("Global shortcuts are unavailable. Restart TinyDash and try again.")?
             .register(shortcut)
             .map_err(|error| {
@@ -99,7 +125,7 @@ impl ShortcutRegistry for NativeShortcuts<'_> {
     }
     fn unregister(&self, shortcut: &str) -> Result<(), String> {
         self.0
-            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::Wry>>()
+            .try_state::<tauri_plugin_global_shortcut::GlobalShortcut<tauri::DynRuntime>>()
             .ok_or("Global shortcuts are unavailable. Restart TinyDash and try again.")?
             .unregister(shortcut)
             .map_err(|error| error.to_string())
@@ -217,8 +243,21 @@ pub fn edit_settings(
                 }
                 .map_err(|error| format!("Could not change start at login: {error}"))?;
             }
-            if let Err(error) = settings::save(&directory, &settings) {
-                let mut message = format!("{error:#}");
+            let menu_bar_changed = previous.show_menu_bar_icon != settings.show_menu_bar_icon;
+            let result = (|| {
+                if menu_bar_changed {
+                    crate::set_menu_bar_visible(app, settings.show_menu_bar_icon)
+                        .map_err(|error| format!("Could not change menu bar icon: {error}"))?;
+                }
+                settings::save(&directory, &settings).map_err(|error| format!("{error:#}"))
+            })();
+            if let Err(mut message) = result {
+                if menu_bar_changed
+                    && let Err(error) =
+                        crate::set_menu_bar_visible(app, previous.show_menu_bar_icon)
+                {
+                    message.push_str(&format!(" Could not restore menu bar icon: {error}"));
+                }
                 if changed {
                     let rollback = if was_enabled {
                         autostart.enable()
@@ -235,14 +274,20 @@ pub fn edit_settings(
         },
     )?;
     state.replace_settings(settings.clone());
-    if previous.clipboard_history_enabled != settings.clipboard_history_enabled {
+    if previous.clipboard_history_enabled != settings.clipboard_history_enabled
+        || previous.clipboard_excluded_apps != settings.clipboard_excluded_apps
+        || previous.clipboard_capture_images != settings.clipboard_capture_images
+        || previous.clipboard_capture_files != settings.clipboard_capture_files
+    {
         state.clipboard.invalidate();
     }
     if settings.clipboard_history_enabled {
         super::clipboard::start(app);
         super::clipboard::refresh(app);
     }
-    if previous.clipboard_history_limit != settings.clipboard_history_limit {
+    if previous.clipboard_history_limit != settings.clipboard_history_limit
+        || previous.clipboard_retention_days != settings.clipboard_retention_days
+    {
         state.storage.apply_clipboard_limit(app);
     }
     if !previous.same_file_settings(&settings) {
@@ -279,12 +324,15 @@ pub async fn choose_clipboard_history(app: AppHandle, enabled: bool) -> Result<S
 }
 
 #[tauri::command]
-pub fn app_catalog(app: AppHandle) -> Result<Vec<super::result::SearchResult>, String> {
-    app.state::<LauncherState>()
-        .search
-        .lock()
-        .map(|search| search.app_catalog())
-        .map_err(|_| "Application list is unavailable.".into())
+pub async fn app_catalog(app: AppHandle) -> Result<Vec<super::result::SearchResult>, String> {
+    blocking_read(move || {
+        app.state::<LauncherState>()
+            .search
+            .lock()
+            .map(|search| search.app_catalog())
+            .map_err(|_| "Application list is unavailable.".into())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -405,6 +453,33 @@ pub async fn reveal_settings_path(app: AppHandle, data: bool) -> Result<(), Stri
 mod tests {
     use super::*;
     use std::{cell::RefCell, collections::HashSet};
+
+    #[test]
+    fn contended_catalog_read_yields_without_blocking_the_calling_thread() {
+        use std::{
+            future::Future,
+            sync::{Arc, Mutex, mpsc},
+            task::{Context, Poll, Waker},
+            time::Duration,
+        };
+        let manager = Arc::new(Mutex::new(super::super::search::SearchManager::default()));
+        let held = manager.lock().unwrap();
+        let worker = manager.clone();
+        let (entered, waiting) = mpsc::channel();
+        // This is the same blocking_read path used by app_catalog and
+        // get_settings. A regression to an inline lock blocks the first poll.
+        let mut read = std::pin::pin!(blocking_read(move || {
+            entered.send(()).unwrap();
+            Ok(worker.lock().unwrap().app_catalog())
+        }));
+        let mut context = Context::from_waker(Waker::noop());
+        assert!(matches!(read.as_mut().poll(&mut context), Poll::Pending));
+        waiting.recv_timeout(Duration::from_secs(5)).unwrap();
+        // The calling/event thread stays available while the worker waits.
+        assert!(matches!(read.as_mut().poll(&mut context), Poll::Pending));
+        drop(held);
+        assert!(tauri::async_runtime::block_on(read).unwrap().is_empty());
+    }
 
     struct Registry {
         active: RefCell<HashSet<String>>,
