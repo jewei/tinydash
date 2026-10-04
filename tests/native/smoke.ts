@@ -1207,8 +1207,17 @@ try {
 
   // Exercise a new command through search and its real panel. The exact system
   // clipboard value proves the new utility IPC grants and native copy path.
+  // Backend-only rejection probes do not prove native visibility. Windows can
+  // retain DOM focus in a hidden webview; reestablish readiness before typing.
+  await reopen();
+  await selectMode("system");
   await keys(inputId, "\uE009a\uE000");
   await keys(inputId, "Color picker");
+  await until("the color command query reaches the visible search field", () =>
+    observe<boolean>(
+      "return document.querySelector('input[role=combobox]')?.value === 'Color picker'",
+    ),
+  );
   await until(
     "search finds the color utility command",
     async () =>
