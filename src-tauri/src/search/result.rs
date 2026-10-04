@@ -1,0 +1,113 @@
+use serde::Serialize;
+use ts_rs::TS;
+
+use crate::actions::Action;
+
+/// One row in the launcher. Results carry their own actions, so the frontend
+/// renders them without knowing how each kind works.
+#[derive(Clone, Debug, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct SearchResult {
+    /// Stable key for pins and usage, such as `app:/Applications/Safari.app`.
+    pub id: String,
+    pub kind: ResultKind,
+    pub title: String,
+    pub subtitle: String,
+    pub icon: Icon,
+    /// The first action runs on Enter, the second on Mod+Enter.
+    pub actions: Vec<ResultAction>,
+    pub pinned: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum ResultKind {
+    App,
+    File,
+    Folder,
+    Clipboard,
+    Snippet,
+    Quicklink,
+    Emoji,
+    Calculation,
+    DateTime,
+    Password,
+    Url,
+    WebSearch,
+    System,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(export)]
+pub enum Icon {
+    /// The system icon for a file or app, served by the `icon:` protocol.
+    File {
+        path: String,
+    },
+    Emoji {
+        glyph: String,
+    },
+    Symbol {
+        name: Symbol,
+    },
+}
+
+/// Built-in glyphs that the frontend draws.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Symbol {
+    App,
+    File,
+    Folder,
+    Text,
+    Image,
+    Files,
+    Snippet,
+    Link,
+    Calculator,
+    Clock,
+    Key,
+    Globe,
+    Lock,
+    Moon,
+    Restart,
+    Power,
+    LogOut,
+    Trash,
+    Settings,
+    Quit,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ResultAction {
+    pub label: String,
+    pub action: Action,
+    /// When set, the launcher asks for confirmation with this message first.
+    pub confirm: Option<String>,
+}
+
+impl ResultAction {
+    pub fn new(label: impl Into<String>, action: Action) -> Self {
+        Self {
+            label: label.into(),
+            action,
+            confirm: None,
+        }
+    }
+}
+
+/// A result with its ranking score, before results from all sources merge.
+pub struct Scored {
+    pub score: u32,
+    pub result: SearchResult,
+}

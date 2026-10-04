@@ -1,0 +1,154 @@
+use std::{
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+};
+
+use gio::prelude::*;
+
+use super::{SECRET_FORMATS, run};
+use crate::{
+    error::{Error, Result},
+    features::{apps::App, system::SystemCommand},
+};
+
+pub const FILE_MANAGER: &str = "Files";
+pub const NATIVE_ICONS: bool = false;
+
+const OWN_DESKTOP_IDS: &[&str] = &[
+    "TinyDash.desktop",
+    "tinydash.desktop",
+    "dev.tinydash.launcher.desktop",
+];
+
+/// XDG application folders, including Flatpak and Snap exports listed in
+/// `XDG_DATA_DIRS`.
+pub fn app_folders() -> Vec<PathBuf> {
+    let home = std::env::home_dir().unwrap_or_default();
+    let data_home = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".local/share"));
+    let data_dirs =
+        std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
+    std::iter::once(data_home)
+        .chain(
+            data_dirs
+                .split(':')
+                .filter(|dir| !dir.is_empty())
+                .map(PathBuf::from),
+        )
+        .map(|dir| dir.join("applications"))
+        .collect()
+}
+
+/// GIO applies XDG precedence, localization, `NoDisplay`, `OnlyShowIn`, and `TryExec`.
+pub fn discover_apps() -> Vec<App> {
+    gio::AppInfo::all()
+        .into_iter()
+        .filter(|app| app.should_show())
+        .filter_map(|app| {
+            let desktop = app.downcast::<gio::DesktopAppInfo>().ok()?;
+            if desktop
+                .id()
+                .is_some_and(|id| OWN_DESKTOP_IDS.contains(&id.as_str()))
+            {
+                return None;
+            }
+            let mut aliases: Vec<String> =
+                desktop.keywords().iter().map(ToString::to_string).collect();
+            if let Some(executable) = desktop.executable().file_name() {
+                aliases.push(executable.to_string_lossy().into_owned());
+            }
+            Some(App {
+                name: desktop.display_name().to_string(),
+                path: desktop.filename()?.to_str()?.to_owned(),
+                aliases,
+            })
+        })
+        .collect()
+}
+
+/// Launch through GIO, which handles field codes, terminals, and D-Bus
+/// activation. Desktop files are never run through a shell.
+pub fn launch_app(path: &Path) -> Result<()> {
+    let app = gio::DesktopAppInfo::from_filename(path)
+        .ok_or_else(|| Error::msg("The application is no longer installed."))?;
+    app.launch(&[], None::<&gio::AppLaunchContext>)
+        .map_err(|error| Error::msg(error.to_string()))
+}
+
+pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
+    None
+}
+
+pub fn run_system_command(command: SystemCommand) -> Result<()> {
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP")
+        .unwrap_or_default()
+        .to_lowercase();
+    let unsupported = || Err(Error::msg("This command is not supported on your desktop."));
+    match command {
+        SystemCommand::Lock => run("loginctl", &["lock-session"]),
+        SystemCommand::Sleep => run("systemctl", &["suspend"]),
+        SystemCommand::Restart => run("systemctl", &["reboot"]),
+        SystemCommand::ShutDown => run("systemctl", &["poweroff"]),
+        SystemCommand::EmptyTrash => run("gio", &["trash", "--empty"]),
+        SystemCommand::LogOut if desktop.contains("gnome") => {
+            run("gnome-session-quit", &["--logout", "--no-prompt"])
+        }
+        SystemCommand::LogOut if desktop.contains("kde") => {
+            run("qdbus", &["org.kde.Shutdown", "/Shutdown", "logout"])
+        }
+        SystemCommand::LogOut if desktop.contains("xfce") => {
+            run("xfce4-session-logout", &["--logout"])
+        }
+        SystemCommand::OpenSystemSettings if desktop.contains("gnome") => {
+            run("gnome-control-center", &[])
+        }
+        SystemCommand::OpenSystemSettings if desktop.contains("kde") => run("systemsettings", &[]),
+        SystemCommand::OpenSystemSettings if desktop.contains("xfce") => {
+            run("xfce4-settings-manager", &[])
+        }
+        SystemCommand::LogOut | SystemCommand::OpenSystemSettings => unsupported(),
+    }
+}
+
+/// Updated by the GTK owner-change handler, read by the clipboard monitor.
+static CHANGE: AtomicU64 = AtomicU64::new(0);
+static CONCEALED: AtomicBool = AtomicBool::new(false);
+
+pub fn clipboard_change() -> u64 {
+    CHANGE.load(Ordering::Acquire)
+}
+
+pub fn clipboard_is_concealed() -> bool {
+    CONCEALED.load(Ordering::Acquire)
+}
+
+/// X11 has no change counter, so count GTK owner changes. Each change first
+/// checks the offered formats for a password-manager marker; the counter
+/// moves only after that check, so the monitor never reads unchecked content.
+pub fn watch_clipboard() {
+    use gtk::prelude::*;
+    let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
+    // gtk-rs 0.18 has no typed binding for this signal.
+    clipboard.connect_local("owner-change", false, |_| {
+        let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
+        let targets = gtk::gdk::Atom::intern("TARGETS");
+        clipboard.request_contents(&targets, |_, selection| {
+            let concealed = selection.targets().is_some_and(|targets| {
+                targets
+                    .iter()
+                    .any(|target| SECRET_FORMATS.contains(&target.name().as_str()))
+            });
+            CONCEALED.store(concealed, Ordering::Release);
+            CHANGE.fetch_add(1, Ordering::AcqRel);
+        });
+        None
+    });
+}
+
+pub fn prepare_launcher(_window: &tauri::WebviewWindow) {}
+
+/// The window manager returns focus when the launcher hides.
+pub fn remember_frontmost_app() {}
+
+pub fn restore_frontmost_app() {}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "launcher",
+        "url": "index.html",
+        "title": "TinyDash",
+        "width": 880,
+        "height": 560,
+        "center": true,
+        "visible": false,
+        "resizable": false,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true
+      }
+    ]
+  }
+}

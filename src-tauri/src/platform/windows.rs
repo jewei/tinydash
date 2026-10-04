@@ -1,0 +1,185 @@
+use std::path::{Path, PathBuf};
+
+use windows_sys::Win32::{
+    Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute},
+    System::{
+        DataExchange::{
+            CloseClipboard, GetClipboardData, GetClipboardSequenceNumber,
+            IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW,
+        },
+        Memory::{GlobalLock, GlobalSize, GlobalUnlock},
+        Power::SetSuspendState,
+        Shutdown::LockWorkStation,
+    },
+    UI::Shell::{SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW},
+};
+
+use super::SECRET_FORMATS;
+use crate::{
+    error::{Error, Result},
+    features::{apps::App, system::SystemCommand},
+};
+
+pub const FILE_MANAGER: &str = "File Explorer";
+pub const NATIVE_ICONS: bool = false;
+
+/// Shortcuts are found up to this many folders deep.
+const APP_DEPTH: usize = 6;
+
+/// The per-user and shared Start menu program folders.
+pub fn app_folders() -> Vec<PathBuf> {
+    ["APPDATA", "PROGRAMDATA"]
+        .into_iter()
+        .filter_map(std::env::var_os)
+        .map(|base| PathBuf::from(base).join(r"Microsoft\Windows\Start Menu\Programs"))
+        .collect()
+}
+
+pub fn discover_apps() -> Vec<App> {
+    let mut apps = Vec::new();
+    for folder in app_folders() {
+        let walker = walkdir::WalkDir::new(folder)
+            .max_depth(APP_DEPTH)
+            .into_iter();
+        for entry in walker.flatten() {
+            let path = entry.path();
+            let is_app = path.extension().is_some_and(|ext| {
+                ["lnk", "exe", "appref-ms"]
+                    .iter()
+                    .any(|allowed| ext.eq_ignore_ascii_case(allowed))
+            });
+            let Some(name) = path
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+            else {
+                continue;
+            };
+            // Start menus also hold uninstallers; nobody launches those by name.
+            if !is_app
+                || !entry.file_type().is_file()
+                || name.to_lowercase().starts_with("uninstall")
+            {
+                continue;
+            }
+            if let Some(path) = path.to_str() {
+                apps.push(App {
+                    name,
+                    path: path.to_owned(),
+                    aliases: Vec::new(),
+                });
+            }
+        }
+    }
+    apps
+}
+
+pub fn launch_app(path: &Path) -> Result<()> {
+    tauri_plugin_opener::open_path(path, None::<&str>)
+        .map_err(|error| Error::msg(error.to_string()))
+}
+
+pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
+    None
+}
+
+pub fn run_system_command(command: SystemCommand) -> Result<()> {
+    // SAFETY: These Win32 calls take no pointers except the documented null
+    // window handle and root path, meaning "no owner" and "all drives".
+    let succeeded = unsafe {
+        match command {
+            SystemCommand::Lock => LockWorkStation() != 0,
+            SystemCommand::Sleep => SetSuspendState(0, 0, 0) != 0,
+            SystemCommand::EmptyTrash => {
+                let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
+                let result = SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags);
+                // An already empty bin reports E_UNEXPECTED; that is not a failure.
+                result >= 0 || result == 0x8000_FFFF_u32 as i32
+            }
+            SystemCommand::Restart => return super::run("shutdown", &["/r", "/t", "0"]),
+            SystemCommand::ShutDown => return super::run("shutdown", &["/s", "/t", "0"]),
+            SystemCommand::LogOut => return super::run("shutdown", &["/l"]),
+            SystemCommand::OpenSystemSettings => {
+                return tauri_plugin_opener::open_url("ms-settings:", None::<&str>)
+                    .map_err(|error| Error::msg(error.to_string()));
+            }
+        }
+    };
+    if succeeded {
+        Ok(())
+    } else {
+        Err(Error::msg(format!(
+            "Windows could not run the command: {}",
+            std::io::Error::last_os_error()
+        )))
+    }
+}
+
+pub fn clipboard_change() -> u64 {
+    // SAFETY: Takes no arguments and only reads a counter.
+    u64::from(unsafe { GetClipboardSequenceNumber() })
+}
+
+/// The source asked history tools to skip this copy, either with a marker
+/// format or with `CanIncludeInClipboardHistory` set to 0.
+pub fn clipboard_is_concealed() -> bool {
+    let format = |name: &str| {
+        let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
+        // SAFETY: `wide` is a NUL-terminated UTF-16 string that outlives the call.
+        unsafe { RegisterClipboardFormatW(wide.as_ptr()) }
+    };
+    // SAFETY: Format IDs come from RegisterClipboardFormatW; 0 is never available.
+    let available = |id: u32| id != 0 && unsafe { IsClipboardFormatAvailable(id) } != 0;
+    if SECRET_FORMATS.iter().any(|name| available(format(name))) {
+        return true;
+    }
+    let history = format("CanIncludeInClipboardHistory");
+    if !available(history) {
+        return false;
+    }
+    // SAFETY: The clipboard stays open until CloseClipboard, and the global
+    // memory stays locked while the DWORD is read.
+    unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            // Busy: treat as secret rather than risk saving a password.
+            return true;
+        }
+        let handle = GetClipboardData(history);
+        let mut excluded = false;
+        if !handle.is_null() && GlobalSize(handle) >= 4 {
+            let pointer = GlobalLock(handle);
+            if !pointer.is_null() {
+                excluded = pointer.cast::<u32>().read_unaligned() == 0;
+                GlobalUnlock(handle);
+            }
+        }
+        CloseClipboard();
+        excluded
+    }
+}
+
+/// Windows needs no change notifications: `clipboard_change` is a cheap counter.
+pub fn watch_clipboard() {}
+
+/// Ask Windows 11 for rounded corners on the borderless launcher.
+pub fn prepare_launcher(window: &tauri::WebviewWindow) {
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    let preference = DWMWCP_ROUND;
+    // SAFETY: The handle belongs to a live window, and the attribute value is a
+    // DWM_WINDOW_CORNER_PREFERENCE that outlives the call. Older Windows
+    // versions reject the attribute, which is harmless.
+    unsafe {
+        DwmSetWindowAttribute(
+            hwnd.0,
+            DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+            std::ptr::from_ref(&preference).cast(),
+            size_of_val(&preference) as u32,
+        );
+    }
+}
+
+/// Windows activates the previous window when the launcher hides.
+pub fn remember_frontmost_app() {}
+
+pub fn restore_frontmost_app() {}
