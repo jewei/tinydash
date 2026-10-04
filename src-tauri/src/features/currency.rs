@@ -67,7 +67,7 @@ impl Rates {
     #[cfg(test)]
     pub fn fixture() -> Self {
         Self::parse(
-            br#"{"amount":1.0,"base":"EUR","date":"2026-10-02","rates":{"USD":1.25,"MYR":5.0}}"#,
+            br#"{"amount":1.0,"base":"EUR","date":"2026-10-02","rates":{"USD":1.17,"MYR":4.7}}"#,
             0,
         )
         .unwrap()
@@ -107,7 +107,7 @@ mod tests {
     fn parses_and_checks_rates() {
         let rates = Rates::fixture();
         assert_eq!(rates.per_euro("EUR"), Some(1.0));
-        assert_eq!(rates.per_euro("MYR"), Some(5.0));
+        assert_eq!(rates.per_euro("MYR"), Some(4.7));
         assert_eq!(rates.per_euro("XYZ"), None);
         assert!(!rates.is_stale(MAX_AGE_SECONDS - 1));
         assert!(rates.is_stale(MAX_AGE_SECONDS));

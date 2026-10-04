@@ -64,15 +64,29 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     let deadline = Deadline(Instant::now() + TIME_LIMIT);
     let input = currency_shorthand(query).unwrap_or_else(|| query.to_owned());
     let result = fend_core::evaluate_preview_with_interrupt(&input, &context, &deadline);
-    let value = result.get_main_result().trim();
     let is_number = result
         .get_main_result_spans()
         .any(|span| span.kind() == fend_core::SpanKind::Number);
-    // A bare number echoes itself; that is not an answer.
-    if value.is_empty() || !is_number || value == query.trim() {
+    let value = result.get_main_result().trim().to_owned();
+    if !is_number || value.is_empty() {
         return None;
     }
-    Some((value.to_owned(), used_rates.load(Ordering::Relaxed)))
+    // A bare number echoes itself; that is not an answer.
+    if value == query.trim() {
+        return None;
+    }
+    if !used_rates.load(Ordering::Relaxed) {
+        return Some((value, false));
+    }
+    Some((money(&value).unwrap_or(value), true))
+}
+
+/// `approx. 401.7094 MYR` as `401.71 MYR`. The subtitle already says the
+/// value comes from daily rates. (fend's own `to 2 dp` rounds incorrectly.)
+fn money(value: &str) -> Option<String> {
+    let (amount, currency) = value.trim_start_matches("approx. ").split_once(' ')?;
+    let amount: f64 = amount.parse().ok()?;
+    Some(format!("{amount:.2} {currency}"))
 }
 
 /// `100 USD MYR` means `100 USD to MYR`.
@@ -139,9 +153,19 @@ mod tests {
         let rates = Rates::fixture();
         let (value, used) = evaluate("100 USD MYR", Some(&rates)).unwrap();
         assert!(used);
-        assert_eq!(value, "400 MYR");
+        assert_eq!(value, "401.71 MYR");
         let answer = answer("100 USD to MYR", Some(&rates)).unwrap();
         assert!(answer.subtitle.contains("2026-10-02"));
         assert_eq!(evaluate("100 USD to MYR", None), None);
+    }
+
+    #[test]
+    fn rounds_money_to_cents() {
+        assert_eq!(
+            money("approx. 401.7094017094 MYR").as_deref(),
+            Some("401.71 MYR")
+        );
+        assert_eq!(money("400 MYR").as_deref(), Some("400.00 MYR"));
+        assert_eq!(money("MYR"), None);
     }
 }

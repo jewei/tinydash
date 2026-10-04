@@ -18,6 +18,7 @@ pub const STRONG: u32 = PREFIX;
 pub struct Matcher {
     nucleo: Nucleo,
     pattern: Pattern,
+    words: Pattern,
     query: String,
     buffer: Vec<char>,
 }
@@ -25,15 +26,11 @@ pub struct Matcher {
 impl Matcher {
     pub fn new(query: &str) -> Self {
         let query = normalize(query);
-        let pattern = Pattern::new(
-            &query,
-            CaseMatching::Ignore,
-            Normalization::Smart,
-            AtomKind::Fuzzy,
-        );
+        let pattern = |kind| Pattern::new(&query, CaseMatching::Ignore, Normalization::Smart, kind);
         Self {
             nucleo: Nucleo::new(Config::DEFAULT),
-            pattern,
+            pattern: pattern(AtomKind::Fuzzy),
+            words: pattern(AtomKind::Substring),
             query,
             buffer: Vec::new(),
         }
@@ -62,9 +59,16 @@ impl Matcher {
         Some(fuzzy + bonus)
     }
 
-    /// Fuzzy score without name bonuses, for paths and keywords.
-    pub fn fuzzy(&mut self, text: &str) -> Option<u32> {
+    /// Fuzzy score without name bonuses.
+    fn fuzzy(&mut self, text: &str) -> Option<u32> {
         self.pattern
+            .score(Utf32Str::new(text, &mut self.buffer), &mut self.nucleo)
+    }
+
+    /// Score when every query word appears in `text` as written, for long
+    /// text such as paths, where fuzzy matching finds too much.
+    pub fn words(&mut self, text: &str) -> Option<u32> {
+        self.words
             .score(Utf32Str::new(text, &mut self.buffer), &mut self.nucleo)
     }
 
@@ -141,5 +145,12 @@ mod tests {
         let alias = matcher.best("Visual Studio Code", ["vsc"]).unwrap();
         let name = matcher.name("vsc").unwrap();
         assert_eq!(alias, name - 100);
+    }
+
+    #[test]
+    fn words_must_appear_as_written() {
+        let mut matcher = Matcher::new("project readme");
+        assert!(matcher.words("/Users/me/Project/README.md").is_some());
+        assert!(matcher.words("/p/r/o/j/e/c/t/readme").is_none());
     }
 }

@@ -1,7 +1,10 @@
 //! File and folder names under the configured folders. The index stores
 //! paths only; it never reads file contents.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::LazyLock,
+};
 
 use unicode_normalization::UnicodeNormalization;
 
@@ -105,7 +108,7 @@ impl FileIndex {
         for (index, entry) in self.entries.iter().enumerate() {
             let score = matcher
                 .name(entry.name())
-                .or_else(|| match_paths.then(|| matcher.fuzzy(&entry.path)).flatten());
+                .or_else(|| match_paths.then(|| matcher.words(&entry.path)).flatten());
             if let Some(score) = score {
                 hits.push((score, index));
             }
@@ -142,6 +145,20 @@ fn distinct_roots(folders: &[PathBuf]) -> Vec<PathBuf> {
     distinct
 }
 
+/// A path for display: NFC, with the home folder shown as `~`.
+pub fn display_path(path: &Path) -> String {
+    static HOME: LazyLock<Option<PathBuf>> = LazyLock::new(std::env::home_dir);
+    let shown = match HOME
+        .as_deref()
+        .and_then(|home| path.strip_prefix(home).ok())
+    {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_owned(),
+        Some(rest) => format!("~{}{}", std::path::MAIN_SEPARATOR, rest.display()),
+        None => path.display().to_string(),
+    };
+    shown.nfc().collect()
+}
+
 fn id(path: &Path) -> String {
     format!("file:{}", path.display())
 }
@@ -160,10 +177,7 @@ fn result(path: &Path, is_dir: bool, ctx: &Context) -> SearchResult {
         || text.clone(),
         |name| name.to_string_lossy().nfc().collect(),
     );
-    let parent = path
-        .parent()
-        .map(|p| p.display().to_string())
-        .unwrap_or_default();
+    let parent = path.parent().map(display_path).unwrap_or_default();
     SearchResult {
         kind: if is_dir {
             ResultKind::Folder
@@ -171,7 +185,7 @@ fn result(path: &Path, is_dir: bool, ctx: &Context) -> SearchResult {
             ResultKind::File
         },
         title: name,
-        subtitle: parent.nfc().collect(),
+        subtitle: parent,
         icon: if platform::NATIVE_ICONS {
             Icon::File { path: text.clone() }
         } else {
@@ -244,6 +258,14 @@ mod tests {
         assert_eq!(titles("project readme")[0], "README.md");
         assert!(index.contains(&root.join("notes/todo.txt").display().to_string()));
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn display_paths_shorten_the_home_folder() {
+        let home = std::env::home_dir().unwrap();
+        assert_eq!(display_path(&home), "~");
+        assert!(display_path(&home.join("Notes")).starts_with('~'));
+        assert_eq!(display_path(Path::new("/Applications")), "/Applications");
     }
 
     #[test]
