@@ -7,7 +7,7 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The
 | Task                                    | Command                                                  |
 | --------------------------------------- | -------------------------------------------------------- |
 | Install dependencies                    | `bun install`                                            |
-| Run the desktop app (hot reload)        | `bun run dev`                                            |
+| Run the desktop app (hot reload)        | `bun run dev` (own identifier and data, never yours)     |
 | Format, lint, and type-check everything | `bun run check`                                          |
 | Run all tests                           | `bun run test`                                           |
 | Fix formatting                          | `bun run fix`                                            |
@@ -15,17 +15,20 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The
 | One Rust test                           | `cargo test --manifest-path src-tauri/Cargo.toml <name>` |
 | One frontend test file                  | `bunx vp test src/launcher/keymap.test.ts`               |
 
-`bun run verify` runs `check`, `test`, and fails if `src/generated` is stale. CI runs the same steps on macOS, Windows, and Linux.
+`bun run verify` runs `check`, the frontend tests, then `scripts/bindings.ts`, which runs the Rust tests and fails if that regenerated anything in `src/generated`. CI runs the frontend checks and the binding check on Linux, and rustfmt, Clippy, and Rust tests on macOS, Windows, and Linux.
 
 ## Where things are
 
 ```
 src-tauri/src/
   lib.rs               App setup and the list of IPC commands. Start here.
+  cli.rs               Command-line arguments.
   commands.rs          Every IPC command. TypeScript wrappers: src/lib/ipc.ts.
-  actions.rs           The Action enum and what each action does to the OS.
-  search/              Query → ranked results. Pure: no Tauri, no I/O.
-  features/            One file per feature (apps, files, clipboard, emoji, ...). Pure.
+  actions.rs           What each Action does to the OS, after checking it.
+  preview.rs           Details for the preview pane.
+  search/              Query → ranked results: result.rs (SearchResult, Action),
+                       id.rs (result IDs), matcher.rs, usage.rs.
+  features/            One file per feature (apps, files, clipboard, emoji, ...).
   platform/            macOS, Windows, Linux. Each file implements the contract in platform/mod.rs.
   store.rs             SQLite schema, migrations, and all SQL.
   settings.rs          settings.json model and defaults.
@@ -33,7 +36,7 @@ src-tauri/src/
   refresh.rs           When indexes and exchange rates rebuild.
   watcher.rs           File system events → "index is dirty".
   monitor.rs           Clipboard capture thread.
-  window.rs, tray.rs, shortcut.rs, images.rs, events.rs, system_clipboard.rs
+  window.rs, tray.rs, shortcut.rs, images.rs, events.rs, system_clipboard.rs, error.rs
 src/
   launcher/            Launcher window: state.ts (logic), Launcher.tsx (view), keymap.ts.
   settings/            Settings window.
@@ -42,16 +45,19 @@ src/
   generated/           TypeScript types written by ts-rs. Never edit by hand.
   test/backend.ts      Fake backend for component tests.
 docs/                  architecture.md, features.md, development.md
+scripts/               emoji-data.ts (regenerates CLDR data), bindings.ts (IPC type check)
 ```
+
+Keep private notes, plans, and evidence in `.local/` (ignored by git).
 
 ## Rules
 
 1. **Logic lives in Rust.** Search, ranking, validation, and OS work are Rust. The frontend renders results and maps keys to actions; it never decides what an action does.
-2. **Feature modules are pure.** Files in `features/` and `search/` never call Tauri, SQLite, the clipboard, or the OS. Glue modules at the top level do that.
+2. **Features stay out of the app's plumbing.** Files in `features/` and `search/` never call Tauri, SQLite, the clipboard, windows, or the OS beyond reading files. The two indexers that touch the disk or network, `FileIndex::scan` and `currency::fetch`, run only from `refresh.rs`. Glue modules at the top level do everything else.
 3. **Results carry their actions.** A `SearchResult` lists `ResultAction`s; the frontend sends the chosen `Action` back. `actions.rs` checks every action again before it runs.
 4. **One source of truth for IPC types.** Add `#[derive(TS)] #[ts(export)]` to Rust types that cross IPC. `cargo test` regenerates `src/generated`; commit the result. Add each new command to `lib.rs`, `commands.rs`, and `src/lib/ipc.ts`.
 5. **All SQL lives in `store.rs`.** Change the schema by appending to `MIGRATIONS`. Never edit a migration that has shipped.
-6. **Platform code lives only in `platform/`.** Add a function to all three OS files and document it in `platform/mod.rs`.
+6. **Platform code lives only in `platform/`.** Add a function to all three OS files and document it in `platform/mod.rs`. Outside `platform/`, `cfg!` may choose only a label or a default value.
 7. **Bound what you keep.** Every list, cache, and stored item has a limit (see the constants in each feature).
 8. **No new dependency without need.** Prefer the standard library and existing crates. Pin exact versions in `package.json`.
 9. **No dead code.** No commented-out code, no TODOs, no unused exports, no speculative abstractions.
@@ -60,7 +66,7 @@ docs/                  architecture.md, features.md, development.md
 
 ## Add a feature
 
-- **New search source:** add `features/<name>.rs` with `search`, `browse`, and `get` (see `features/apps.rs`). Wire it into `search/mod.rs`: `all()`, `search()`, `browse()`, `resolve()`, and `Category` if it gets a tab.
+- **New search source:** add `features/<name>.rs` with `search`, `browse`, and `get(key)` (see `features/apps.rs`). Add a `Source` in `search/id.rs` for its result IDs. Add its index to `Snapshot` (`search/mod.rs`) and `State` (`state.rs`), and fill it from `refresh.rs` or `state.rs`. Wire it into `search/mod.rs`: `all()`, `search()`, `browse()`, and `resolve()`. For a new tab, add a `Category` variant, an entry in `CATEGORIES` in `src/launcher/state.ts`, and its name in `cli::USAGE`.
 - **New instant answer** (computed from the query, like the calculator): add an `answer(query)` function and call it from `answers()` in `search/mod.rs`.
 - **New action:** add a variant to `Action`, handle it in `actions::run`, and decide whether it counts as use (`counts_as_use`).
 - **New setting:** add a field with a default in `settings.rs`, apply it in `commands::update_settings`, and add a control in `src/settings/Settings.tsx`.

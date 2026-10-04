@@ -12,30 +12,31 @@
 
 ## Daily commands
 
-| Command          | What it does                                                                           |
-| ---------------- | -------------------------------------------------------------------------------------- |
-| `bun run dev`    | Runs the app with hot reload (Vite on port 1420 plus the Rust app).                    |
-| `bun run web`    | Runs only the Vite server, for styling; IPC calls fail without Tauri.                  |
-| `bun run check`  | `vp check` (Oxfmt, Oxlint, TypeScript), `cargo fmt --check`, Clippy.                   |
-| `bun run test`   | `vp test` (Vitest + jsdom) and `cargo test`. `cargo test` also writes `src/generated`. |
-| `bun run verify` | `check`, `test`, then fails if `src/generated` changed. Run before every PR.           |
-| `bun run fix`    | Formats TypeScript, CSS, JSON, Markdown, and Rust.                                     |
-| `bun run build`  | Builds installers for this OS into `src-tauri/target/release/bundle`.                  |
+| Command          | What it does                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `bun run dev`    | Runs the app with hot reload as "TinyDash Dev", with its own data (see below).                                            |
+| `bun run web`    | Runs only the Vite server, for styling; IPC calls fail without Tauri.                                                     |
+| `bun run check`  | `vp check` (Oxfmt, Oxlint, TypeScript), `cargo fmt --check`, Clippy.                                                      |
+| `bun run test`   | `vp test` (Vitest + jsdom) and `cargo test`. `cargo test` also writes `src/generated`.                                    |
+| `bun run verify` | `check`, `vp test`, then `scripts/bindings.ts`: Rust tests, failing if they changed `src/generated`. Run before every PR. |
+| `bun run fix`    | Formats TypeScript, CSS, JSON, Markdown, and Rust.                                                                        |
+| `bun run build`  | Builds installers for this OS into `src-tauri/target/release/bundle`.                                                     |
 
 Logs go to stderr. Set `RUST_LOG=tinydash_lib=debug` for more.
 
 ## Run the app without touching your own TinyDash
 
-The app identifier `dev.tinydash.launcher` decides the data folder and the single-instance lock. If an installed TinyDash is running, `bun run dev` hands over to it and exits, and a dev build would read and write your real settings and history. Build an isolated copy instead:
+The app identifier decides the data folder and the single-instance lock. `bun run dev` uses `src-tauri/tauri.dev.conf.json`, which sets the identifier `dev.tinydash.dev`, so it never reads or writes an installed TinyDash's settings and history, and does not hand over to it. Its data is in the `dev.tinydash.dev` folder (on macOS, `~/Library/Application Support/dev.tinydash.dev`); delete that folder to start fresh.
+
+To try a build with the frontend bundled in, without hot reload:
 
 ```sh
-bunx tauri build --debug --no-bundle \
-  --config '{"identifier":"dev.tinydash.test","productName":"TinyDash Test"}'
+bunx tauri build --debug --no-bundle --config src-tauri/tauri.dev.conf.json
 ./src-tauri/target/debug/tinydash            # shows the launcher
 ./src-tauri/target/debug/tinydash --settings # opens Settings
 ```
 
-Its data lives in the `dev.tinydash.test` folder (on macOS, `~/Library/Application Support/dev.tinydash.test`). Delete that folder to start fresh. Run the binary again to toggle the launcher if the global shortcut is taken.
+If another TinyDash holds the global shortcut, run the binary again to toggle the launcher.
 
 ## Tests
 
@@ -60,7 +61,7 @@ Automated tests do not cover the OS effects. Check these by hand on a real deskt
 ## Dependencies
 
 - Pin exact versions in `package.json`. `bun install --frozen-lockfile` must pass.
-- Vite+ pins `vite` and `vitest` through `overrides`. Upgrade it with `bunx vp migrate`, which updates all three together; Dependabot ignores them.
+- Vite+ pins `vite` and `vitest` through `overrides`, and Dependabot ignores all three. To upgrade, set the new `vite-plus` version in `package.json`, run `bun install`, then `bunx vp migrate`; on a project already on Vite+ it only re-pins `vite` and `vitest` to match.
 - Rust crates follow Cargo semver; commit `Cargo.lock`. Change the Rust version in `rust-toolchain.toml` and fix new Clippy findings in the same PR.
 
 ## Bundled data
@@ -71,5 +72,5 @@ Automated tests do not cover the OS effects. Check these by hand on a real deskt
 
 1. Bump `version` in `src-tauri/Cargo.toml`; Tauri reads the app version from it.
 2. Merge to `main`, then push a tag such as `v0.2.0`.
-3. The Release workflow builds the macOS app and DMG, the Windows installer, and the Debian package, and attaches them to a draft GitHub release. Builds are not code-signed; macOS uses an ad-hoc signature.
+3. The Release workflow checks that the tag matches the version, builds a universal macOS app and DMG (Apple silicon and Intel), the Windows installer, and the Debian package, and attaches them to a draft GitHub release. Builds are not code-signed; macOS uses an ad-hoc signature.
 4. Review the draft and publish it.

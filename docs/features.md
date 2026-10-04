@@ -6,18 +6,18 @@ What TinyDash does, for users and for anyone changing it. Keep this page true: u
 
 Press **Control+Shift+Space** (change it in Settings > General) from any app. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
 
-| Keys            | Action                                                                  |
-| --------------- | ----------------------------------------------------------------------- |
-| Type            | Search                                                                  |
-| ↑ / ↓           | Select a result                                                         |
-| Enter           | Run the selected result's main action                                   |
-| Mod+Enter       | Run its second action (often Show in Finder)                            |
-| Mod+1 … Mod+9   | Run the main action of that row                                         |
-| Mod+K           | All actions for the result, plus Settings, Refresh, Clear History, Quit |
-| Mod+Backspace   | Delete the selected clipboard entry                                     |
-| Tab / Shift+Tab | Next / previous category                                                |
-| Mod+,           | Open Settings                                                           |
-| Escape          | Hide, and return to the previous app                                    |
+| Keys            | Action                                                       |
+| --------------- | ------------------------------------------------------------ |
+| Type            | Search                                                       |
+| ↑ / ↓           | Select a result                                              |
+| Enter           | Run the selected result's main action                        |
+| Mod+Enter       | Run its second action (often Show in Finder)                 |
+| Mod+1 … Mod+9   | Run the main action of that row                              |
+| Mod+K           | All actions for the result, plus Refresh, Settings, and Quit |
+| Mod+Backspace   | Delete the selected clipboard entry                          |
+| Tab / Shift+Tab | Next / previous category                                     |
+| Mod+,           | Open Settings                                                |
+| Escape          | Dismiss a warning, or hide and return to the previous app    |
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens on the screen with the pointer, with an empty query, and hides when another app gets focus (optional).
 
@@ -27,30 +27,30 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 
 **All** mixes everything. An empty All shows pins, then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source; its empty view is listed below.
 
-| Category  | Finds                                                                                           | Empty view                  |
-| --------- | ----------------------------------------------------------------------------------------------- | --------------------------- |
-| Apps      | Installed apps by name, bundle name, or executable                                              | All apps, most used first   |
-| Files     | Names of files and folders in the indexed folders                                               | Files you opened before     |
-| Clipboard | Text, images, and file lists you copied                                                         | Newest first                |
-| Snippets  | Saved snippets and quicklinks by name or keyword                                                | All of them                 |
-| Emoji     | Name, :shortcode:, or keywords in chosen languages                                              | Most used, then the catalog |
-| System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, System Settings, TinyDash Settings, Quit | All commands                |
+| Category  | Finds                                                                                                                    | Empty view                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| Apps      | Installed apps by name, bundle name, or executable                                                                       | All apps, most used first   |
+| Files     | Names of files and folders in the indexed folders                                                                        | Files you opened before     |
+| Clipboard | Text, images, and file lists you copied                                                                                  | Newest first                |
+| Snippets  | Saved snippets and quicklinks by name or keyword                                                                         | All of them                 |
+| Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                       | Most used, then the catalog |
+| System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
 
-Pin any app, file, clipboard entry, snippet, emoji, or command from its actions. Pins stay at the top of the empty All view and of their category.
+Pin any app, file, clipboard entry, snippet, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category.
 
-Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count.
+Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
 
 ## Instant answers (All only)
 
-| Type       | Examples                                                                                | Enter copies         |
-| ---------- | --------------------------------------------------------------------------------------- | -------------------- |
-| Calculator | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                   | Result               |
-| Currency   | `100 usd to eur`, `100 USD MYR`                                                         | Result, in cents     |
-| Time zones | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york` | Time                 |
-| Dates      | `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`          | `YYYY-MM-DD`         |
-| Passwords  | `password`, `pw 32`, `passphrase 8`, `pin 4`                                            | Value, marked secret |
-| Clean URL  | Paste a link with `utm_*`, `fbclid`, … parameters                                       | Clean URL            |
-| Web search | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser        |
+| Type       | Examples                                                                                | Enter copies          |
+| ---------- | --------------------------------------------------------------------------------------- | --------------------- |
+| Calculator | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                   | Result                |
+| Currency   | `100 usd to eur`, `100 USD MYR`                                                         | Result, to 2 decimals |
+| Time zones | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york` | Time                  |
+| Dates      | `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`          | `YYYY-MM-DD`          |
+| Passwords  | `password`, `pw 32`, `passphrase 8`, `pin 4`                                            | Value, marked secret  |
+| Clean URL  | Paste a link with `utm_*`, `fbclid`, … parameters                                       | Clean URL             |
+| Web search | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser         |
 
 Every All search with text ends with a web search on the chosen engine (Settings > Search).
 
@@ -65,7 +65,8 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 - Text up to 16 KB. Images (up to 32, each at most 8 MB and 16 megapixels) and copied files (up to 64 paths, as references) are separate opt-ins.
 - Copies marked secret by password managers are never read. On macOS, copies made while Passwords or Keychain Access is in front are skipped.
 - Enter copies the entry back in its original format and returns you to the previous app, ready to paste. Copying an entry again moves it to the top.
-- Clear History deletes everything except pins. Data stays on this computer in `tinydash.db`, unencrypted.
+- Clear History (in Settings, or the System command Clear Clipboard History) deletes everything except pins. Data stays on this computer in `tinydash.db`, unencrypted.
+- Linux saves text only, and on Wayland the desktop reports a copy only while TinyDash has focus, so copies made elsewhere are saved when the launcher next opens (the latest one only).
 
 ## Snippets and quicklinks
 
@@ -94,5 +95,5 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 ## Platform notes
 
 - **macOS:** app and file icons, and returning focus to the previous app after Escape or a copy. Restart, Shut Down, Log Out, and Empty Trash ask for Automation permission the first time. TinyDash has no Dock icon; the menu bar icon is off by default.
-- **Windows:** the launcher uses native rounded corners; Start menu shortcuts are the app list. Results use generic icons.
-- **Linux:** apps come from desktop entries. Global shortcuts need X11; on Wayland, bind a desktop shortcut to `tinydash`. Log Out and System Settings support GNOME, KDE, and Xfce.
+- **Windows:** the launcher uses native rounded corners. The app list comes from Start menu shortcuts (`.lnk`, `.url`, `.exe`); Store apps without a shortcut, such as Calculator, are not listed. Results use generic icons.
+- **Linux:** apps come from desktop entries. Clipboard history saves text only. Global shortcuts need X11; on Wayland, bind a desktop shortcut to `tinydash`. Log Out and System Settings support GNOME, KDE, and Xfce.
