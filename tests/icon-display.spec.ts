@@ -1,0 +1,225 @@
+import { expect, test, type Page } from "@playwright/test";
+import type {} from "./mock-backend";
+
+async function openApps(page: Page, native = true) {
+  await page.route(
+    (url) => url.pathname === "/src/index.tsx",
+    async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({
+        response,
+        body: `import "/tests/mock-backend.ts";\n${await response.text()}`,
+      });
+    },
+  );
+  await page.goto("/");
+  await expect(page.locator(".list-count")).toHaveText("0 results");
+  await page.evaluate((value) => {
+    window.__launcherTest.nativeIcons = value;
+  }, native);
+  await page
+    .getByRole("navigation", { name: "Search categories" })
+    .getByRole("button", { name: "Apps", exact: true })
+    .click();
+  await expect(page.getByRole("option").first()).toContainText("Finder");
+}
+
+for (const native of [false, true]) {
+  test(`${native ? "native" : "static"} app avatars bound display observers`, async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const counts = { intersection: 0, resize: 0, resolution: 0 };
+      const Intersection = window.IntersectionObserver;
+      const Resize = window.ResizeObserver;
+      window.IntersectionObserver = class extends Intersection {
+        constructor(...args: ConstructorParameters<typeof Intersection>) {
+          super(...args);
+          counts.intersection++;
+        }
+      };
+      window.ResizeObserver = class extends Resize {
+        constructor(...args: ConstructorParameters<typeof Resize>) {
+          super(...args);
+          counts.resize++;
+        }
+      };
+      const media = window.matchMedia.bind(window);
+      window.matchMedia = (query) => {
+        if (query.startsWith("(resolution:")) counts.resolution++;
+        return media(query);
+      };
+      Object.assign(window, { iconDisplayCounts: counts });
+    });
+    await openApps(page, native);
+    await expect(page.getByRole("option").first().locator("img")).toBeVisible();
+    const categories = page.getByRole("navigation", {
+      name: "Search categories",
+    });
+    for (let cycle = 0; cycle < 5; cycle++) {
+      await categories
+        .getByRole("button", { name: "All", exact: true })
+        .click();
+      await expect(page.getByRole("option")).toHaveCount(0);
+      await categories
+        .getByRole("button", { name: "Apps", exact: true })
+        .click();
+      await expect(
+        page.getByRole("option").first().locator("img"),
+      ).toBeVisible();
+    }
+    const counts = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            iconDisplayCounts: {
+              intersection: number;
+              resize: number;
+              resolution: number;
+            };
+          }
+        ).iconDisplayCounts,
+    );
+    expect(counts).toEqual({
+      intersection: native ? 1 : 0,
+      resize: 0,
+      resolution: native ? 1 : 0,
+    });
+  });
+}
+
+test("visible icons load before intersection delivery without loading clipped rows", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 980, height: 350 });
+  await page.addInitScript(() => {
+    const Original = window.IntersectionObserver;
+    window.IntersectionObserver = class extends Original {
+      constructor() {
+        super(() => {});
+      }
+    };
+  });
+  await openApps(page);
+  await expect(page.getByRole("option").first().locator("img")).toBeVisible({
+    timeout: 2000,
+  });
+  const last = page.getByRole("option").last();
+  await expect(last).toContainText("System Settings");
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.some(
+        (call) =>
+          call.command === "app_icon" &&
+          (call.payload as { key: string }).key === "app-icon:test:app-7",
+      ),
+    ),
+  ).toBe(false);
+});
+
+test("a clipped app loads when scrolling makes it visible", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 980, height: 350 });
+  await openApps(page);
+  const last = page.getByRole("option").last();
+  await expect(last.locator("img")).toHaveCount(0);
+  await last.scrollIntoViewIfNeeded();
+  await expect(last.locator("img")).toBeVisible();
+});
+
+for (const change of ["resize", "selection"] as const) {
+  test(`a scrolled preview stays inactive after ${change}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 980, height: 420 });
+    await openApps(page);
+    const avatar = page.locator(".preview-icon .app-avatar");
+    await expect(avatar.locator("img")).toHaveCount(1);
+    const clipped = await page
+      .locator(".preview-content")
+      .evaluate((content) => {
+        const icon = content.querySelector(".app-avatar")!;
+        const bounds = icon.getBoundingClientRect();
+        content.scrollTop =
+          bounds.bottom - content.getBoundingClientRect().top + 1;
+        return {
+          bottom: icon.getBoundingClientRect().bottom,
+          scrollTop: content.getBoundingClientRect().top,
+          outerTop: content.closest(".result-preview")!.getBoundingClientRect()
+            .top,
+        };
+      });
+    expect(clipped.bottom).toBeLessThan(clipped.scrollTop);
+    expect(clipped.bottom).toBeGreaterThan(clipped.outerTop);
+    await expect(avatar.locator("img")).toHaveCount(0);
+    await expect(
+      page.getByRole("option").filter({ hasText: "Safari" }).locator("img"),
+    ).toBeVisible();
+    const safariRequests = () =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls.filter(
+            (call) =>
+              call.command === "app_icon" &&
+              (call.payload as { key: string }).key === "app-icon:test:app-1",
+          ).length,
+      );
+    const before = await safariRequests();
+    if (change === "resize") {
+      await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+    } else {
+      await page.getByRole("option").filter({ hasText: "Safari" }).click();
+      await expect(page.locator(".preview-title")).toHaveText("Safari");
+    }
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
+    await expect(avatar.locator("img")).toHaveCount(0);
+    // The visible row already owns the shared image. A clipped preview must
+    // remain absent and must not create another native request.
+    expect(await safariRequests()).toBe(before);
+    await page.locator(".preview-content").evaluate((content) => {
+      content.scrollTop = 0;
+    });
+    await expect(avatar.locator("img")).toBeVisible();
+    expect(await safariRequests()).toBe(before);
+  });
+}
+
+test("appearance and viewport changes keep native sizes and preview visibility correct", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 980, height: 620 });
+  await openApps(page);
+  await page.getByRole("combobox", { name: "Search TinyDash" }).fill("sa");
+  const row = page.getByRole("option").locator(".app-avatar");
+  const preview = page.locator(".preview-icon .app-avatar");
+  await expect(row.locator("img")).toBeVisible();
+  await expect(preview).toHaveCSS("width", "64px");
+  await page.setViewportSize({ width: 700, height: 620 });
+  await expect(preview).toHaveCSS("width", "56px");
+  await expect(preview.locator("img")).toBeVisible();
+  await page.setViewportSize({ width: 560, height: 620 });
+  await expect(preview.locator("img")).toHaveCount(0);
+  await page.setViewportSize({ width: 980, height: 620 });
+  await expect(preview.locator("img")).toBeVisible();
+  await page.evaluate(() =>
+    window.__launcherTest.emit("compact-changed", true),
+  );
+  await expect(row).toHaveCSS("width", "32px");
+  await expect(row.locator("img")).toBeVisible();
+  await expect(preview.locator("img")).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      window.__launcherTest.calls.some(
+        (call) =>
+          call.command === "app_icon" &&
+          (call.payload as { pixels: number }).pixels === 32,
+      ),
+    ),
+  ).toBe(true);
+});

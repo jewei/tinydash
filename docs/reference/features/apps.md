@@ -8,7 +8,11 @@ On macOS and Windows, TinyDash watches the application folders. It compares each
 
 Settings loads the app catalog on a blocking worker, so a competing search does not block the event thread. Settings publication waits for search before taking its brief settings write lock; launcher shortcuts, blur handling, and clipboard callbacks can still read the previous settings while publication waits. Rust contention regressions cover these lock paths; they are not native responsiveness measurements.
 
+On macOS, search returns icon keys. The launcher loads icons for visible results at a size bucket that meets the required physical resolution. Nearby row and preview sizes share one payload. AppKit selects the source representation for the target bitmap's physical pixels. Text results and keyboard selection remain available while icons load. Hiding the launcher releases its image subscriptions and cancels pending requests. A frontend cache retains up to 64 completed icon payloads and 512 KiB of accounted string data for reuse. This limit excludes active payloads and decoded images. Rust limits its icon cache and pending work. Windows and Linux keep their existing icon behavior.
+
 See [platform support](../platform-support.md) for the directories and application formats that each operating system discovers.
+
+Visible native icons can start loading when they mount. A shared observer defers clipped icons until scrolling makes them visible. CSS tokens define row and preview sizes. Compact mode, window resizing, and display-scale changes update the required resolution. The launcher groups layout reads before updating images. It shares its display-scale listener and disconnects display observers when no active native icon needs them. Later results reuse the disconnected observers without retaining old targets. Static images and fallback icons do not register native loading observers. Fallback icons construct only the selected SVG shape. A name change replaces the shape and keeps the outer SVG element. Native avatars check the warm cache before mounting a fallback shape.
 
 ## Verification
 
@@ -16,12 +20,14 @@ Run this browser recipe from the repository root. It retains successful traces i
 
 ```sh
 bun run verify:browser tests/launcher.spec.ts tests/settings.spec.ts
+bun run verify:browser tests/app-icons.spec.ts tests/app-icon-cache.spec.ts tests/icon-display.spec.ts tests/icons.spec.ts tests/performance-regressions.spec.ts
 ```
 
 For affected backend behavior:
 
 ```sh
 bun run test:rust -- providers::apps
+bun run test:rust -- launcher::icons
 ```
 
 On macOS or Windows, also run the application-folder watcher regressions:
@@ -37,6 +43,8 @@ Use Apps and All. Find an application by name, abbreviation, and alias. Press En
 Run `bun run verify:native` on Windows and Linux X11 for real discovery and launch. Use the application and Settings desktop checks for reveal, tray refresh, aliases, and macOS. Platform discovery changes need a check on the affected OS.
 
 Search for a temporary application fixture, select it, and press Enter. Check both the selected UI result and the marker written by the launched process.
+
+On macOS, check icons in the result list and preview. Change the query and selection while icons load. Hide and reopen the launcher, then refresh applications. Confirm that current icons appear and stale images do not replace them. Native memory and response-time claims need a comparison against the baseline build; browser tests and Windows or Linux native checks do not prove a macOS performance benefit.
 
 Tests: [tests/launcher.spec.ts](../../../tests/launcher.spec.ts), [tests/settings.spec.ts](../../../tests/settings.spec.ts), [tests/native/smoke.ts](../../../tests/native/smoke.ts).
 

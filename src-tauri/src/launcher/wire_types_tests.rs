@@ -66,7 +66,7 @@ fn wire_type(ty: &Type, types: &BTreeMap<String, String>) -> String {
             match name.as_str() {
                 "String" => "string".into(),
                 "bool" => "boolean".into(),
-                "u32" | "u64" | "i64" | "usize" => "number".into(),
+                "u16" | "u32" | "u64" | "i64" | "usize" => "number".into(),
                 _ => {
                     assert!(
                         types.contains_key(&name),

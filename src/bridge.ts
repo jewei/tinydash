@@ -232,6 +232,10 @@ export const backend = {
   chooseClipboardHistory: (enabled: boolean) =>
     invoke<SettingsValues>("choose_clipboard_history", { enabled }),
   appCatalog: () => invoke<SearchResult[]>("app_catalog"),
+  appIcon: (key: string, pixels: number, request: string) =>
+    invoke<string>("app_icon", { key, pixels, request }),
+  cancelAppIcon: (request: string) =>
+    invoke<void>("cancel_app_icon", { request }),
   itemCatalog: () => invoke<SearchResult[]>("item_catalog"),
   paste: (id: string) => invoke<void>("paste_result", { id }),
   pasteQueue: (action: PasteQueueAction, ids: string[]) =>

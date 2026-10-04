@@ -44,6 +44,8 @@ fn main() {
         "save_settings",
         "choose_clipboard_history",
         "app_catalog",
+        "app_icon",
+        "cancel_app_icon",
         "set_app_preference",
         "preview_web_search",
         "open_settings",

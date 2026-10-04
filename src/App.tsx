@@ -26,6 +26,7 @@ import {
 } from "./bridge";
 import Icon from "./components/Icon";
 import ResultIcon from "./components/ResultIcon";
+import { disposeAppIcons, initializeAppIcons } from "./app-icons";
 import ResultPreview from "./components/ResultPreview";
 import ConfirmDialog from "./components/ConfirmDialog";
 import AppQuitDialog from "./components/AppQuitDialog";
@@ -1300,6 +1301,7 @@ export default function App(
 
   onCleanup(() => {
     disposed = true;
+    disposeAppIcons();
     document.removeEventListener("pointermove", moveDrag);
     document.removeEventListener("pointerup", releaseDrag);
     document.removeEventListener("pointercancel", releaseDrag);
@@ -1313,6 +1315,7 @@ export default function App(
   });
 
   onSettled(() => {
+    if (desktop) initializeAppIcons();
     document.addEventListener("pointermove", moveDrag);
     document.addEventListener("pointerup", releaseDrag);
     document.addEventListener("pointercancel", releaseDrag);
@@ -1613,7 +1616,10 @@ export default function App(
                         void run(primaryAction(result)!, result);
                       }}
                     >
-                      <ResultIcon result={result} />
+                      <ResultIcon
+                        result={result}
+                        active={visible() && !panel()}
+                      />
                       <span class="result-copy">
                         <span class="result-title" title={result.title}>
                           {result.title}
@@ -1775,6 +1781,7 @@ export default function App(
           </div>
           <Show when={mode() !== "emoji"}>
             <ResultPreview
+              active={visible() && !panel()}
               result={current()}
               primaryAction={primaryAction()}
               welcome={!current()}

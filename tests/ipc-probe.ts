@@ -72,6 +72,8 @@ export async function probeCommands(settings: SettingsValues) {
     saveSettings: () => backend.saveSettings(settings),
     chooseClipboardHistory: () => backend.chooseClipboardHistory(true),
     appCatalog: backend.appCatalog,
+    appIcon: () => backend.appIcon("app-icon:fixture", 72, "fixture"),
+    cancelAppIcon: () => backend.cancelAppIcon("fixture"),
     itemCatalog: backend.itemCatalog,
     paste: () => backend.paste("clipboard:1"),
     drag: () => backend.drag("app:example"),

@@ -31,6 +31,8 @@ fn windows_ipc_test_executable_loads_common_controls_v6() {
 }
 
 const MAIN_ONLY: &[&str] = &[
+    "app_icon",
+    "cancel_app_icon",
     "paste_result",
     "drag_result",
     "share_result",

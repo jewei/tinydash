@@ -65,6 +65,8 @@ export const commandWrappers = {
   save_settings: "saveSettings",
   choose_clipboard_history: "chooseClipboardHistory",
   app_catalog: "appCatalog",
+  app_icon: "appIcon",
+  cancel_app_icon: "cancelAppIcon",
   set_app_preference: "setAppPreference",
   preview_web_search: "previewWebSearch",
   export_settings: "exportSettings",

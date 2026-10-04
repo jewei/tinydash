@@ -6,6 +6,7 @@ pub mod currency;
 pub mod file_actions;
 mod file_watch;
 pub mod files;
+pub mod icons;
 pub mod library;
 pub mod paste;
 pub mod paste_queue;
@@ -52,6 +53,7 @@ mod wire_types_tests;
 
 pub struct LauncherState {
     pub search: Mutex<SearchManager>,
+    pub icons: icons::IconStore,
     pub cancelled_search: Arc<AtomicU64>,
     pub scanning: AtomicBool,
     pub ready: AtomicBool,
@@ -75,6 +77,7 @@ impl LauncherState {
         let files = files::FileScan::new(&settings);
         Self {
             search: Mutex::new(search),
+            icons: icons::IconStore::default(),
             cancelled_search: Arc::default(),
             scanning: AtomicBool::new(false),
             ready: AtomicBool::new(false),
@@ -366,24 +369,16 @@ pub fn scan_apps(app: &AppHandle) {
         let started = std::time::Instant::now();
         let worker_app = app.clone();
         let scanned = tauri::async_runtime::spawn_blocking(move || {
-            let entries = platform::discover_apps()?;
-            // Native icon resolution can take longer than app discovery. Publish
-            // searchable names first and never hold the search lock while loading images.
-            #[cfg(target_os = "macos")]
-            {
-                let state = worker_app.state::<LauncherState>();
-                state
-                    .search
-                    .lock()
-                    .map_err(|_| Error::IndexUnavailable)?
-                    .replace_apps(AppProvider::new(entries.clone()));
-                if let Err(error) = worker_app.emit("apps-changed", ()) {
-                    tracing::debug!(%error, "No index listener");
-                }
-            }
-            #[cfg(not(target_os = "macos"))]
-            let _ = worker_app;
-            Ok::<_, Error>(AppProvider::new(platform::load_app_icons(entries)))
+            let mut entries = platform::discover_apps()?;
+            // Publish metadata and small icon identities. Image extraction starts
+            // only when a visible row requests it, outside the search lock.
+            worker_app
+                .state::<LauncherState>()
+                .icons
+                .replace_catalog(&mut entries, || {
+                    let _ = worker_app.emit("app-icons-ready", ());
+                });
+            Ok::<_, Error>(AppProvider::new(entries))
         })
         .await;
         let state = app.state::<LauncherState>();

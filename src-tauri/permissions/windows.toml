@@ -44,6 +44,8 @@ permissions = [
   "allow-choose-clipboard-history",
   "allow-set-app-preference",
   "allow-open-settings",
+  "allow-app-icon",
+  "allow-cancel-app-icon",
   "allow-search",
   "allow-cancel-search",
   "allow-set-pinned",
