@@ -80,40 +80,50 @@ test("clipboard default saves, reloads, discards, and retains failed edits", asy
   await expect(choice).toHaveValue("copy");
 });
 
-test("clipboard Enter follows live preferences and leaves both explicit actions available", async ({
-  page,
-}) => {
-  await open(page);
-  await page.getByRole("button", { name: "Clipboard", exact: true }).click();
-  const search = page.getByRole("combobox", { name: "Search TinyDash" });
-  const footer = page.locator(".footer .open-button");
-  await expect(footer).toHaveText("Copy text");
-  await search.press("Enter");
-  await expect
-    .poll(() => actionCalls(page))
-    .toContainEqual({ id: "clipboard:1", action: "copy", confirmed: false });
-  await preferPaste(page);
-  await expect(footer).toHaveText("Paste to previous app");
-  await search.press("Enter");
-  await expect
-    .poll(() => actionCalls(page))
-    .toContainEqual({ id: "clipboard:1", action: "paste", confirmed: false });
-  await page.getByRole("button", { name: /^Actions/ }).click();
-  await expect(
-    page.getByRole("menuitem", { name: /^Paste to previous app/ }),
-  ).toHaveCount(1);
-  await page.getByRole("menuitem", { name: "Copy text", exact: true }).click();
-  await expect
-    .poll(async () => (await actionCalls(page)).at(-1))
-    .toEqual({ id: "clipboard:1", action: "copy", confirmed: false });
-  await page
-    .getByRole("button", { name: "Copy saved text", exact: true })
-    .click();
-  await search.press("ControlOrMeta+Shift+Enter");
-  await expect
-    .poll(async () => (await actionCalls(page)).at(-1))
-    .toEqual({ id: "clipboard:1", action: "paste", confirmed: false });
-});
+for (const platform of ["macos", "windows", "linux"] as const) {
+  test(`${platform} clipboard Enter follows live preferences and leaves both explicit actions available`, async ({
+    page,
+  }) => {
+    await page.addInitScript((platform) => {
+      localStorage.setItem("tinydash.test.platform", platform);
+    }, platform);
+    await open(page);
+    await page.getByRole("button", { name: "Clipboard", exact: true }).click();
+    const search = page.getByRole("combobox", { name: "Search TinyDash" });
+    const footer = page.locator(".footer .open-button");
+    await expect(footer).toHaveText("Copy text");
+    await search.press("Enter");
+    await expect
+      .poll(() => actionCalls(page))
+      .toContainEqual({ id: "clipboard:1", action: "copy", confirmed: false });
+    await preferPaste(page);
+    await expect(footer).toHaveText("Paste to previous app");
+    await search.press("Enter");
+    await expect
+      .poll(() => actionCalls(page))
+      .toContainEqual({ id: "clipboard:1", action: "paste", confirmed: false });
+    await page.getByRole("button", { name: /^Actions/ }).click();
+    await expect(
+      page.getByRole("menuitem", { name: /^Paste to previous app/ }),
+    ).toHaveCount(1);
+    await page
+      .getByRole("menuitem", { name: "Copy text", exact: true })
+      .click();
+    await expect
+      .poll(async () => (await actionCalls(page)).at(-1))
+      .toEqual({ id: "clipboard:1", action: "copy", confirmed: false });
+    await page
+      .getByRole("button", { name: "Copy saved text", exact: true })
+      .click();
+    // Use the simulated platform, independently of the browser runner's OS.
+    await search.press(
+      platform === "macos" ? "Meta+Shift+Enter" : "Control+Shift+Enter",
+    );
+    await expect
+      .poll(async () => (await actionCalls(page)).at(-1))
+      .toEqual({ id: "clipboard:1", action: "paste", confirmed: false });
+  });
+}
 
 test("paste default applies to clipboard rows in All and keeps failed paste available for Copy", async ({
   page,
