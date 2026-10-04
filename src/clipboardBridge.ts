@@ -39,6 +39,8 @@ export const richClipboardBackend = {
     }),
   preview: (id: number) =>
     invoke<RichClipboardPreview>("rich_clipboard_preview", { id }),
+  saveImage: (id: number) =>
+    invoke<boolean>("save_rich_clipboard_image", { id }),
   revealFile: (id: number, fileIndex: number) =>
     invoke<void>("reveal_rich_clipboard_file", { id, fileIndex }),
   paste: (id: number) => invoke<void>("paste_rich_clipboard", { id }),

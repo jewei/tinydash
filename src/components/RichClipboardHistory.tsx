@@ -308,6 +308,33 @@ export default function RichClipboardHistory(props: {
     }
   }
 
+  const canSaveImage = () =>
+    props.platform === "macos" && canTransfer() && !!preview()?.png;
+
+  async function saveImage(button: HTMLButtonElement) {
+    const id = selected();
+    if (id === undefined || !canSaveImage()) return;
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      const saved = await richClipboardBackend.saveImage(id);
+      if (!disposed) setMessage(saved ? "PNG image saved." : "Save canceled.");
+    } catch (error) {
+      if (!disposed) setMessage(String(error));
+    } finally {
+      if (!disposed) {
+        setBusy(false);
+        queueMicrotask(() => {
+          if (!disposed)
+            (button.isConnected && !button.disabled
+              ? button
+              : searchInput
+            ).focus();
+        });
+      }
+    }
+  }
+
   const canReveal = () =>
     props.platform === "macos" && canTransfer() && !!preview()?.files;
 
@@ -719,6 +746,21 @@ export default function RichClipboardHistory(props: {
                   </button>
                 </div>
               )}
+            </Show>
+            <Show
+              when={
+                props.platform === "macos" &&
+                value().captureSupported &&
+                selectedEntry()?.kind === "image"
+              }
+            >
+              <button
+                type="button"
+                disabled={!canSaveImage()}
+                onClick={(event) => void saveImage(event.currentTarget)}
+              >
+                Save image as…
+              </button>
             </Show>
             <button
               ref={nameButton}

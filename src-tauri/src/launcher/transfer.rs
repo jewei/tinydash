@@ -14,7 +14,7 @@ pub fn active(app: &AppHandle) -> bool {
         .is_some_and(|state| state.0.load(Ordering::Acquire))
 }
 
-struct Operation(AppHandle);
+pub(super) struct Operation(AppHandle);
 impl Drop for Operation {
     fn drop(&mut self) {
         self.0
@@ -24,7 +24,7 @@ impl Drop for Operation {
     }
 }
 
-fn reserve(window: &WebviewWindow) -> Result<Operation, String> {
+pub(super) fn reserve(window: &WebviewWindow) -> Result<Operation, String> {
     if window.label() != "main" || !window.is_visible().map_err(|e| e.to_string())? {
         return Err("Open the launcher before transferring an item.".into());
     }

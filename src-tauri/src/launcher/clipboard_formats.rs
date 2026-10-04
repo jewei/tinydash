@@ -11,7 +11,8 @@ use rusqlite::Connection;
 #[cfg(any(test, target_os = "macos", target_os = "windows"))]
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use unicode_normalization::UnicodeNormalization;
 
@@ -517,6 +518,12 @@ impl Store {
         Ok(RichPreview { entry, png, files })
     }
 
+    fn image_to_save(&self, id: i64) -> anyhow::Result<Vec<u8>> {
+        self.preview(id)?
+            .png
+            .context("Only saved PNG images can be exported.")
+    }
+
     fn file_to_reveal(&self, id: i64, file_index: u32) -> anyhow::Result<PathBuf> {
         ensure!((file_index as usize) < MAX_FILES, "Invalid file reference.");
         let preview = self.preview(id)?;
@@ -749,6 +756,53 @@ pub async fn paste_rich_clipboard(id: i64, app: AppHandle) -> Result<(), String>
     let writer_app = app.clone();
     super::super::paste::paste_with_clipboard(&app, target, move || copy_saved(&writer_app, id))
         .await
+}
+
+fn write_png_file(path: &Path, png: &[u8]) -> Result<(), String> {
+    if !path
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("png"))
+    {
+        return Err("Choose a filename with the .png extension.".into());
+    }
+    png_dimensions(png).map_err(|error| error.to_string())?;
+    super::super::portability::write_private_atomic(path, png)
+}
+
+#[tauri::command]
+pub async fn save_rich_clipboard_image(id: i64, window: WebviewWindow) -> Result<bool, String> {
+    if !cfg!(target_os = "macos") {
+        return Err("Saving clipboard images is currently supported only on macOS.".into());
+    }
+    let operation = super::super::transfer::reserve(&window)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        // The guard blocks concurrent transfers and launcher hiding until the
+        // chooser and write finish. No storage lock crosses the native dialog.
+        let _operation = operation;
+        let app = window.app_handle();
+        with_store(app, |store| store.image_to_save(id)).map_err(|error| error.to_string())?;
+        let Some(path) = app
+            .dialog()
+            .file()
+            .set_parent(&window)
+            .set_title("Save clipboard image")
+            .set_file_name("clipboard-image.png")
+            .add_filter("PNG image", &["png"])
+            .blocking_save_file()
+        else {
+            return Ok(false);
+        };
+        let path = path.into_path().map_err(|error| error.to_string())?;
+        super::super::portability::ensure_output_path_safe(app, &path)?;
+        // A deleted or expired entry must not be exported after the chooser.
+        let png =
+            with_store(app, |store| store.image_to_save(id)).map_err(|error| error.to_string())?;
+        write_png_file(&path, &png)?;
+        Ok(true)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1222,6 +1276,59 @@ mod tests {
         blocker.execute_batch("ROLLBACK").unwrap();
         store.set_pinned(id, true, 0, 2, 32).unwrap();
         assert!(store.list().unwrap()[0].pinned);
+    }
+
+    #[test]
+    fn clipboard_rich_image_export_preserves_exact_bytes_and_history() {
+        let (dir, mut store) = store();
+        let png = include_bytes!("../../icons/32x32.png").to_vec();
+        store
+            .capture(&Payload::Png(png.clone()), None, 1, 0, 32)
+            .unwrap();
+        let id = store.list().unwrap()[0].id;
+        store.set_pinned(id, true, 0, 1, 32).unwrap();
+        store.set_name(id, "Company logo").unwrap();
+        let path = dir.path().join("saved image.PNG");
+        std::fs::write(&path, "replace this").unwrap();
+        write_png_file(&path, &store.image_to_save(id).unwrap()).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), png);
+        let entry = store.list().unwrap().remove(0);
+        assert_eq!(entry.id, id);
+        assert_eq!(entry.created_at, 1);
+        assert!(entry.pinned);
+        assert_eq!(entry.custom_name.as_deref(), Some("Company logo"));
+        assert_eq!(store.image_to_save(id).unwrap(), png);
+        assert!(store.image_to_save(-1).is_err());
+        assert!(store.image_to_save(id + 1).is_err());
+        store.delete(Some(id)).unwrap();
+        assert!(store.image_to_save(id).is_err());
+        store
+            .capture(&Payload::Files(vec![path]), None, 2, 0, 32)
+            .unwrap();
+        assert!(store.image_to_save(store.list().unwrap()[0].id).is_err());
+    }
+
+    #[test]
+    fn clipboard_rich_image_export_failures_do_not_replace_output() {
+        let dir = tempfile::tempdir().unwrap();
+        let png = include_bytes!("../../icons/32x32.png");
+        let wrong_extension = dir.path().join("image.jpg");
+        std::fs::write(&wrong_extension, "original").unwrap();
+        assert!(write_png_file(&wrong_extension, png).is_err());
+        assert_eq!(
+            std::fs::read_to_string(wrong_extension).unwrap(),
+            "original"
+        );
+        let existing = dir.path().join("image.png");
+        std::fs::write(&existing, "original").unwrap();
+        assert!(write_png_file(&existing, b"invalid PNG").is_err());
+        assert_eq!(std::fs::read_to_string(existing).unwrap(), "original");
+        let folder = dir.path().join("folder.png");
+        std::fs::create_dir(&folder).unwrap();
+        assert!(write_png_file(&folder, png).is_err());
+        assert!(folder.is_dir());
+        assert!(write_png_file(&dir.path().join("absent/image.png"), png).is_err());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 3);
     }
 
     #[test]

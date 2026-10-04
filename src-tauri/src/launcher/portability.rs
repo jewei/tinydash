@@ -283,7 +283,7 @@ fn read_bounded(path: &Path) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-fn write_private_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(super) fn write_private_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let directory = path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
@@ -303,7 +303,7 @@ fn write_private_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn ensure_output_path_safe(app: &AppHandle, path: &Path) -> Result<(), String> {
+pub(super) fn ensure_output_path_safe(app: &AppHandle, path: &Path) -> Result<(), String> {
     let config = app
         .path()
         .app_config_dir()

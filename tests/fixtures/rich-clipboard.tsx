@@ -20,6 +20,11 @@ declare global {
       releasePaste?: () => void;
       pastedIds: number[];
       copiedIds: number[];
+      savedImageIds: number[];
+      saveImageResult: boolean;
+      saveImageError: string | null;
+      holdSaveImage: boolean;
+      releaseSaveImage?: () => void;
       revealedFiles: { id: number; fileIndex: number }[];
       revealError: string | null;
       holdReveal: boolean;
@@ -61,6 +66,10 @@ window.__richClipboardTest = {
   holdPaste: false,
   pastedIds: [],
   copiedIds: [],
+  savedImageIds: [],
+  saveImageResult: true,
+  saveImageError: null,
+  holdSaveImage: false,
   revealedFiles: [],
   revealError: null,
   holdReveal: false,
@@ -152,6 +161,15 @@ mockIPC(
                 "/fixtures/design.png",
               ]),
       };
+    }
+    if (command === "save_rich_clipboard_image") {
+      state.savedImageIds.push(Number(id));
+      if (state.holdSaveImage)
+        await new Promise<void>((resolve) => {
+          state.releaseSaveImage = resolve;
+        });
+      if (state.saveImageError) throw new Error(state.saveImageError);
+      return state.saveImageResult;
     }
     if (command === "reveal_rich_clipboard_file") {
       state.revealedFiles.push({

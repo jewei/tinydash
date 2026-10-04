@@ -30,6 +30,7 @@ fn main() {
         "rich_clipboard_history",
         "rich_clipboard_preview",
         "reveal_rich_clipboard_file",
+        "save_rich_clipboard_image",
         "copy_rich_clipboard",
         "paste_rich_clipboard",
         "delete_rich_clipboard",

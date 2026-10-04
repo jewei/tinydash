@@ -926,3 +926,124 @@ test("reveal is unavailable while naming and absent for images and unsupported p
   ).toBeVisible();
   await expect(reveals).toHaveCount(0);
 });
+
+test.describe("saved image export", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.evaluate(() => {
+      window.__richClipboardTest.entries[0].kind = "image";
+    });
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(
+      page.getByRole("img", { name: "Saved clipboard image" }),
+    ).toBeVisible();
+  });
+
+  test("save and cancel send only the entry ID and keep history and clipboard", async ({
+    page,
+  }) => {
+    const save = page.getByRole("button", {
+      name: "Save image as…",
+      exact: true,
+    });
+    await save.click();
+    await expect(page.getByRole("status")).toHaveText("PNG image saved.");
+    await expect(save).toBeFocused();
+    await page.evaluate(() => {
+      window.__richClipboardTest.saveImageResult = false;
+    });
+    await save.press("Enter");
+    await expect(page.getByRole("status")).toHaveText("Save canceled.");
+    await expect(save).toBeFocused();
+    await expect(page.getByRole("option")).toHaveCount(1);
+    expect(
+      await page.evaluate(() => window.__richClipboardTest.savedImageIds),
+    ).toEqual([1, 1]);
+    expect(
+      await page.evaluate(() => window.__richClipboardTest.copiedIds),
+    ).toEqual([]);
+    expect(
+      await page.evaluate(() => window.__richClipboardTest.pastedIds),
+    ).toEqual([]);
+  });
+
+  test("save blocks other controls, retains errors, and permits retry", async ({
+    page,
+  }) => {
+    const save = page.getByRole("button", {
+      name: "Save image as…",
+      exact: true,
+    });
+    await page.evaluate(() => {
+      window.__richClipboardTest.holdSaveImage = true;
+    });
+    await save.click();
+    await expect(save).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Back", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Delete saved entry" }),
+    ).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Copy original format" }),
+    ).toBeDisabled();
+    await page.evaluate(() => {
+      window.__richClipboardTest.saveImageError =
+        "Could not save the output file.";
+      window.__richClipboardTest.holdSaveImage = false;
+      window.__richClipboardTest.releaseSaveImage?.();
+    });
+    await expect(page.getByRole("status")).toHaveText(
+      "Could not save the output file.",
+    );
+    await expect(save).toBeFocused();
+    await expect(
+      page.getByRole("img", { name: "Saved clipboard image" }),
+    ).toBeVisible();
+    await page.evaluate(() => {
+      window.__richClipboardTest.saveImageError = null;
+    });
+    await save.click();
+    await expect(page.getByRole("status")).toHaveText("PNG image saved.");
+  });
+
+  test("save requires a current preview and is absent for file lists and other platforms", async ({
+    page,
+  }) => {
+    const save = page.getByRole("button", {
+      name: "Save image as…",
+      exact: true,
+    });
+    await page
+      .getByRole("button", { name: "Pin saved entry", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Name pinned entry", exact: true })
+      .click();
+    await expect(save).toBeDisabled();
+    await page
+      .getByRole("button", { name: "Cancel naming", exact: true })
+      .click();
+    await page.evaluate(() => {
+      window.__richClipboardTest.previewError = true;
+    });
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("Preview unavailable");
+    await expect(save).toBeDisabled();
+    await page.evaluate(() => {
+      window.__richClipboardTest.previewError = false;
+      window.__richClipboardTest.entries[0].kind = "files";
+    });
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(save).toHaveCount(0);
+    await page.goto("/?platform=windows");
+    await page.evaluate(() => {
+      window.__richClipboardTest.entries[0].kind = "image";
+    });
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(
+      page.getByRole("img", { name: "Saved clipboard image" }),
+    ).toBeVisible();
+    await expect(save).toHaveCount(0);
+  });
+});
