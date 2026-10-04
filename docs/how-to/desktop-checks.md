@@ -14,6 +14,24 @@ Start the installed app from Applications on macOS, the Start menu on Windows, o
 
 CI checks installation, same-version replacement, and removal. On a physical desktop, also check replacement while the app is running, the Windows WebView2 download on a clean system, and the OS response to an unsigned build. Confirm that removal preserves saved settings and history unless you explicitly request their deletion.
 
+## Use a disposable macOS receiver
+
+`tests/native/receiver-macos.swift` supplies a small native window for file drag, app quit, and window-placement checks. It does not read or change the general clipboard. Use only synthetic files in the fixture root and a new evidence directory for each process:
+
+```sh
+mkdir -p .local/receiver-fixtures
+swiftc tests/native/receiver-macos.swift -o .local/native-receiver
+.local/native-receiver .local/receiver-fixtures .local/receiver-run-1
+```
+
+The green window accepts file references inside the fixture root. Each accepted drop copies the files and writes `drop-N.json` with the source operation mask, copied paths, and regular-file hashes. A copy-only source has mask `1`. Compare the received file identity and content, confirm the original remains, and separately compare the system clipboard before and after dragging. A receiver record proves that target's acceptance; it does not prove support in every attachment app. Failed copies leave a failure record and return a rejected drop.
+
+For app-result Quit tests, put the compiled executable in a disposable `.app` bundle under the test user's Applications folder. Set its `CFBundleExecutable`, unique `CFBundleIdentifier`, `CFBundleName`, and `CFBundlePackageType` (`APPL`). Set `FixtureRoot` and `FixtureEvidence` in `Info.plist` to absolute test paths. The executable uses these keys when launched without arguments. Use a new evidence directory for each launch. Confirm search resolves that bundle, Cancel leaves its recorded PID alive, and Quit or Force Quit stops that PID. Normal AppKit termination writes `quit.json`; force termination may not. Remove only the owned fixture app after all its processes stop.
+
+For window placement, capture the receiver's external position and size before and after the command. Its `ready.json` uses AppKit screen coordinates; Accessibility uses a different vertical origin. Compare geometry in one coordinate system. Check that the same PID and window remain selected. Missing TinyDash Accessibility permission must leave the window unchanged and show an error. This negative check is not a successful placement check. Keep permission-dependent checks pending until a controlled session has the required access.
+
+For saved image/file data, use the [rich history restart recipe](../reference/features/clipboard.md#rich-history-restart-recipe).
+
 ## Check the launcher
 
 1. Start TinyDash. Confirm that the window appears and typing immediately enters text in the search field.
@@ -87,7 +105,7 @@ Password generation, time conversion, and URL cleaning must also work with the n
 9. Set `currencyRatesEnabled` to `false` and restart. Confirm that saved rates remain usable and a manual refresh reports the disabled setting. Restore the setting after the check.
 10. With saved rates, compare `10 USD CAD` and `10 USD to CAD`. Confirm that both give the same value and rate date. Confirm that ordinary unit conversions still work.
 
-Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. Automatic paste is not implemented.
+Clipboard access and emoji fonts can differ across desktop sessions; record any failure with the session details. For direct paste, follow the [workflow checks](../reference/features/workflows.md#verification) and compare the destination contents; a successful copy is not paste proof.
 
 ## Check usage ranking
 

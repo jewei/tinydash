@@ -78,6 +78,21 @@ Deleting an image or file history entry keeps its confirmation visible when the 
 
 For image/file pins, check Pin/Unpin, pinned-first order, selection after reordering, errors and retry, missing-file actions, and the storage notice. Run `bun run verify:browser tests/rich-clipboard.spec.ts` and `bun run test:rust -- clipboard_rich`. The storage recipes include upgrade from rich schema 1, restart persistence, duplicate captures, clear-unpinned/full-clear, age/count/byte limits, lowering the count below existing pins, and failed writes. On a controlled macOS desktop build, pin both a captured image and file reference, restart, apply retention, and clear unpinned entries. Confirm the originals remain available and native copy still supplies the exact image/file format. Delete the referenced file and confirm the error, then unpin/delete its saved reference. Pins never back up file contents.
 
+### Rich history restart recipe
+
+Use an identified macOS build with isolated app data and synthetic clipboard contents. Save and restore every clipboard format when using a shared desktop. Close the personal TinyDash instance before replacing the clipboard. Enable text history, image capture, and file capture through Settings.
+
+1. Capture a small PNG and a two-file list containing spaces and Unicode in its filenames. Wait for each entry and its enabled action buttons; explanatory text about PNG support does not prove capture.
+2. Pin both entries and give each a distinct Unicode custom name. Confirm the names and pinned state in the list. Save a different default text action in Settings and record the selected value. Selecting Paste for this check does not require executing it.
+3. Apply a name query and **Pinned only**. Quit TinyDash fully and wait for its process to exit. Start the same identified build and record its new PID. A second launch that only shows the resident window is not a restart.
+4. Open image/file history. Confirm both names and pins remain. Search, content type, source app, and Pinned only are panel-local controls: they reset when the panel is recreated and are not saved preferences. Confirm the unfiltered count and disabled **Clear filters** button, then filter the retained entries again.
+5. Copy each retained entry with **Copy original format**. Compare the PNG bytes or hash and both native file references with the originals. On macOS, Unicode normalization can change a path's spelling; verify that it resolves to the same file as well as checking file contents.
+6. Reopen Settings. Confirm capture choices and the default text action survived. Restore Copy before testing Enter unless the direct-paste recipe is also in scope.
+7. Capture one unpinned fixture. Put a pinned fixture on the system clipboard before **Clear unpinned**, so startup cannot recapture the removed entry. Confirm only the two pins remain, quit, and repeat the checks after a new process starts.
+8. Reduce the history count below the number of rich pins, save, and restart. Confirm both pins remain available. Restore the test limit when finished. A short run with a retention preference does not prove that age-based expiration has occurred.
+
+Retain the build/test source, old and new PIDs, UI records, exact clipboard comparisons, and cleanup result. Filter reset is expected behavior, not lost saved data. Browser and SQLite round-trip tests do not replace this native sequence.
+
 Run this browser recipe from the repository root. It retains successful traces in a unique evidence directory:
 
 ```sh
