@@ -175,7 +175,8 @@ mockIPC(
         await new Promise<void>((resolve) => {
           state.releaseSaveImage = resolve;
         });
-      if (state.saveImageError) throw new Error(state.saveImageError);
+      // Rust command errors cross IPC as strings, not JavaScript Error objects.
+      if (state.saveImageError) throw state.saveImageError;
       return state.saveImageResult;
     }
     if (command === "reveal_rich_clipboard_file") {
@@ -189,7 +190,7 @@ mockIPC(
         });
       if (state.missing)
         throw new Error("A referenced file is no longer available.");
-      if (state.revealError) throw new Error(state.revealError);
+      if (state.revealError) throw state.revealError;
       return;
     }
     if (command === "paste_rich_clipboard") {

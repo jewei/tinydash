@@ -175,7 +175,15 @@ test("every bridge wrapper invokes a registered Rust command with matching argum
           expect(value).toEqual({ kind: "appearance", value: "dark" });
           break;
         case "number":
-          expect(Number.isSafeInteger(value) && Number(value) > 0).toBe(true);
+          if (
+            command === "reveal_rich_clipboard_file" &&
+            name === "fileIndex"
+          ) {
+            // File references use a zero-based index; IDs remain positive.
+            expect(value).toBe(0);
+          } else {
+            expect(Number.isSafeInteger(value) && Number(value) > 0).toBe(true);
+          }
           break;
         case "RichKind":
           expect(value).toBe("files");

@@ -19,7 +19,15 @@ async function actionCalls(page: Page) {
   return page.evaluate(() =>
     window.__launcherTest.calls
       .filter((call) => call.command === "execute_action")
-      .map((call) => call.payload),
+      .map((call) => {
+        const payload = call.payload as {
+          id: string;
+          action: string;
+          confirmed?: boolean;
+        };
+        // The bridge omits false; Rust treats an omitted confirmation as false.
+        return { ...payload, confirmed: payload.confirmed ?? false };
+      }),
   );
 }
 

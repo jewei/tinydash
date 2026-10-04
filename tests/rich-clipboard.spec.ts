@@ -709,11 +709,19 @@ test("pinned names save, search, keep original paths, and restore", async ({
     name: "Search images and files",
   });
   await search.fill("release");
-  await expect(page.getByRole("option")).toHaveCount(1);
+  await expect(
+    page
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toHaveCount(1);
   await page
     .getByRole("button", { name: "Unpin saved entry", exact: true })
     .click();
-  await expect(page.getByRole("option")).toContainText("Release files");
+  await expect(
+    page
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toContainText("Release files");
   await expect(
     page.getByRole("button", { name: "Rename pinned entry", exact: true }),
   ).toBeDisabled();
@@ -732,7 +740,11 @@ test("pinned names save, search, keep original paths, and restore", async ({
   await page
     .getByRole("button", { name: "Clear filters", exact: true })
     .click();
-  await expect(page.getByRole("option")).toContainText("2 file references");
+  await expect(
+    page
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toContainText("2 file references");
 });
 
 test("name editor keeps its draft on write error and can name an unavailable preview", async ({
@@ -758,12 +770,20 @@ test("name editor keeps its draft on write error and can name an unavailable pre
   );
   await expect(input).toHaveValue("Find these files");
   await expect(input).toBeFocused();
-  await expect(page.getByRole("option")).toContainText("2 file references");
+  await expect(
+    page
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toContainText("2 file references");
   await page.evaluate(() => {
     window.__richClipboardTest.nameError = false;
   });
   await input.press("Enter");
-  await expect(page.getByRole("option")).toContainText("Find these files");
+  await expect(
+    page
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toContainText("Find these files");
   expect(
     await page.evaluate(() => window.__richClipboardTest.namedEntries),
   ).toEqual([
@@ -847,7 +867,11 @@ test("reveal sends the saved entry and exact file index without copying", async 
   expect(
     await page.evaluate(() => window.__richClipboardTest.pastedIds),
   ).toEqual([]);
-  await expect(page.getByRole("option")).toContainText("2 file references");
+  await expect(
+    page
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toContainText("2 file references");
 });
 
 test("reveal blocks concurrent actions and keeps an error available for retry", async ({
@@ -887,7 +911,11 @@ test("reveal blocks concurrent actions and keeps an error available for retry", 
   });
   await reveal.click();
   await expect(page.getByRole("status")).toContainText("no longer available");
-  await expect(page.getByRole("option")).toHaveCount(1);
+  await expect(
+    page
+      .getByRole("listbox", { name: "Saved images and files" })
+      .getByRole("option"),
+  ).toHaveCount(1);
   await page.evaluate(() => {
     window.__richClipboardTest.missing = false;
   });
@@ -954,7 +982,11 @@ test.describe("saved image export", () => {
     await save.press("Enter");
     await expect(page.getByRole("status")).toHaveText("Save canceled.");
     await expect(save).toBeFocused();
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(
+      page
+        .getByRole("listbox", { name: "Saved images and files" })
+        .getByRole("option"),
+    ).toHaveCount(1);
     expect(
       await page.evaluate(() => window.__richClipboardTest.savedImageIds),
     ).toEqual([1, 1]);
@@ -1069,7 +1101,11 @@ test.describe("pinned-only rich history", () => {
       state.filesById[2] = ["/fixtures/release.zip"];
     });
     await page.getByRole("button", { name: "Refresh", exact: true }).click();
-    await expect(page.getByRole("option")).toHaveCount(3);
+    await expect(
+      page
+        .getByRole("listbox", { name: "Saved images and files" })
+        .getByRole("option"),
+    ).toHaveCount(3);
   });
 
   test("combines pinned, query, type and source filters and clears all", async ({
@@ -1106,7 +1142,11 @@ test.describe("pinned-only rich history", () => {
       .getByRole("button", { name: "Clear filters", exact: true })
       .click();
     await expect(pinned).toHaveAttribute("aria-pressed", "false");
-    await expect(page.getByRole("option")).toHaveCount(3);
+    await expect(
+      page
+        .getByRole("listbox", { name: "Saved images and files" })
+        .getByRole("option"),
+    ).toHaveCount(3);
     await expect(
       page.getByRole("combobox", { name: "Search images and files" }),
     ).toHaveValue("");
@@ -1127,14 +1167,22 @@ test.describe("pinned-only rich history", () => {
     });
     await pinned.focus();
     await pinned.press("Space");
-    await expect(page.getByRole("option")).toHaveCount(2);
+    await expect(
+      page
+        .getByRole("listbox", { name: "Saved images and files" })
+        .getByRole("option"),
+    ).toHaveCount(2);
     await expect(
       page.getByRole("option", { name: /Release files/ }),
     ).toHaveAttribute("aria-selected", "true");
     await page
       .getByRole("button", { name: "Unpin saved entry", exact: true })
       .click();
-    await expect(page.getByRole("option")).toHaveCount(1);
+    await expect(
+      page
+        .getByRole("listbox", { name: "Saved images and files" })
+        .getByRole("option"),
+    ).toHaveCount(1);
     await expect(
       page.getByRole("option", { name: /Company logo/ }),
     ).toHaveAttribute("aria-selected", "true");
@@ -1154,7 +1202,11 @@ test.describe("pinned-only rich history", () => {
     await page
       .getByRole("button", { name: "Clear filters", exact: true })
       .click();
-    await expect(page.getByRole("option")).toHaveCount(3);
+    await expect(
+      page
+        .getByRole("listbox", { name: "Saved images and files" })
+        .getByRole("option"),
+    ).toHaveCount(3);
   });
 
   test("keeps the latest toggle during pending replies and retains it after an error", async ({
