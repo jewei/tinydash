@@ -88,7 +88,7 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let succeeded = unsafe {
         match command {
             SystemCommand::Lock => LockWorkStation() != 0,
-            SystemCommand::Sleep => SetSuspendState(0, 0, 0) != 0,
+            SystemCommand::Sleep => SetSuspendState(false, false, false),
             SystemCommand::EmptyTrash => {
                 let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
                 let result = SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags);
