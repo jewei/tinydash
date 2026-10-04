@@ -8,11 +8,11 @@ On macOS and Windows, TinyDash watches the application folders. It compares each
 
 Settings loads the app catalog on a blocking worker, so a competing search does not block the event thread. Settings publication waits for search before taking its brief settings write lock; launcher shortcuts, blur handling, and clipboard callbacks can still read the previous settings while publication waits. Rust contention regressions cover these lock paths; they are not native responsiveness measurements.
 
-On macOS, search returns icon keys. The launcher loads icons for visible results at the required display size. Text results and keyboard selection remain available while icons load. Hiding the launcher releases its image subscriptions and cancels pending requests. A frontend cache retains up to 64 completed icon payloads and 512 KiB of accounted string data for reuse. This limit excludes active payloads and decoded images. Rust limits its icon cache and pending work. Windows and Linux keep their existing icon behavior.
+On macOS, search returns icon keys. The launcher loads icons for visible results at a size bucket that meets the required physical resolution. Nearby row and preview sizes share one payload. Text results and keyboard selection remain available while icons load. Hiding the launcher releases its image subscriptions and cancels pending requests. A frontend cache retains up to 64 completed icon payloads and 512 KiB of accounted string data for reuse. This limit excludes active payloads and decoded images. Rust limits its icon cache and pending work. Windows and Linux keep their existing icon behavior.
 
 See [platform support](../platform-support.md) for the directories and application formats that each operating system discovers.
 
-Visible native icons can start loading when they mount. A shared observer defers clipped icons until scrolling makes them visible. CSS tokens define row and preview sizes. The launcher shares its display-scale listener and releases display observers when no active native icon needs them. Static images and fallback icons do not register native loading observers.
+Visible native icons can start loading when they mount. A shared observer defers clipped icons until scrolling makes them visible. CSS tokens define row and preview sizes. Compact mode, window resizing, and display-scale changes update the required resolution. The launcher shares its display-scale listener and releases display observers when no active native icon needs them. Static images and fallback icons do not register native loading observers.
 
 ## Verification
 
@@ -20,7 +20,7 @@ Run this browser recipe from the repository root. It retains successful traces i
 
 ```sh
 bun run verify:browser tests/launcher.spec.ts tests/settings.spec.ts
-bun run verify:browser tests/performance-regressions.spec.ts
+bun run verify:browser tests/app-icons.spec.ts tests/app-icon-cache.spec.ts tests/icon-display.spec.ts tests/performance-regressions.spec.ts
 ```
 
 For affected backend behavior:

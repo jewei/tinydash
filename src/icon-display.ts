@@ -1,6 +1,8 @@
 type Consumer = (visible: boolean, pixels: number) => void;
 const targets = new Map<HTMLElement, Consumer>();
-const buckets = [16, 24, 32, 36, 48, 64, 72, 96, 108, 128, 144, 192, 256];
+// Nearby row and preview sizes share one decoded payload. Round upward so
+// each image still has at least its required physical resolution.
+const buckets = [16, 32, 64, 128, 256];
 let intersections: IntersectionObserver | undefined;
 let appearance: MutationObserver | undefined;
 let scale: MediaQueryList | undefined;

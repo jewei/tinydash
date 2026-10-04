@@ -138,6 +138,19 @@ for (const change of ["resize", "selection"] as const) {
     expect(clipped.bottom).toBeLessThan(clipped.scrollTop);
     expect(clipped.bottom).toBeGreaterThan(clipped.outerTop);
     await expect(avatar.locator("img")).toHaveCount(0);
+    await expect(
+      page.getByRole("option").filter({ hasText: "Safari" }).locator("img"),
+    ).toBeVisible();
+    const safariRequests = () =>
+      page.evaluate(
+        () =>
+          window.__launcherTest.calls.filter(
+            (call) =>
+              call.command === "app_icon" &&
+              (call.payload as { key: string }).key === "app-icon:test:app-1",
+          ).length,
+      );
+    const before = await safariRequests();
     if (change === "resize") {
       await page.evaluate(() => window.dispatchEvent(new Event("resize")));
     } else {
@@ -151,24 +164,14 @@ for (const change of ["resize", "selection"] as const) {
         ),
     );
     await expect(avatar.locator("img")).toHaveCount(0);
-    if (change === "selection") {
-      expect(
-        await page.evaluate(
-          () =>
-            window.__launcherTest.calls.filter(
-              (call) =>
-                call.command === "app_icon" &&
-                (call.payload as { key: string }).key ===
-                  "app-icon:test:app-1" &&
-                (call.payload as { pixels: number }).pixels === 64,
-            ).length,
-        ),
-      ).toBe(0);
-    }
+    // The visible row already owns the shared image. A clipped preview must
+    // remain absent and must not create another native request.
+    expect(await safariRequests()).toBe(before);
     await page.locator(".preview-content").evaluate((content) => {
       content.scrollTop = 0;
     });
     await expect(avatar.locator("img")).toBeVisible();
+    expect(await safariRequests()).toBe(before);
   });
 }
 
