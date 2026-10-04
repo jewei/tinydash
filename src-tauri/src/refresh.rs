@@ -54,7 +54,11 @@ impl Slot {
         self.dirty.store(true, Ordering::Release);
     }
 
+    /// Dirty or old, and not already being rebuilt.
     fn needs_work(&self) -> bool {
+        if self.busy.load(Ordering::Acquire) {
+            return false;
+        }
         self.dirty.load(Ordering::Acquire)
             || self
                 .finished
