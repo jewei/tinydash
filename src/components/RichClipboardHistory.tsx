@@ -26,6 +26,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
   let previewSequence = 0;
   let unlisten: (() => void) | undefined;
   let back!: HTMLButtonElement;
+  let pasteButton!: HTMLButtonElement;
   let refreshing = false;
   let refreshAgain = false;
   let loadingPreview = false;
@@ -142,7 +143,7 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     }
   }
 
-  async function action(kind: "copy" | "delete") {
+  async function action(kind: "copy" | "paste" | "delete") {
     const id = selected();
     if (id === undefined || busy()) return;
     setBusy(true);
@@ -153,14 +154,22 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
         setMessage(
           kind === "copy"
             ? "Copied. Paste in the target application."
-            : "Deleted from history. The system clipboard is unchanged.",
+            : kind === "paste"
+              ? "Paste sent to the previous app. The receiving app decides whether to accept this format."
+              : "Deleted from history. The system clipboard is unchanged.",
         );
         if (kind === "delete") await refresh();
       }
     } catch (error) {
       if (!disposed) setMessage(String(error));
     } finally {
-      if (!disposed) setBusy(false);
+      if (!disposed) {
+        setBusy(false);
+        if (kind === "paste")
+          queueMicrotask(() => {
+            if (!disposed) pasteButton?.focus();
+          });
+      }
     }
   }
 
@@ -171,7 +180,12 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
     >
       <header>
         <h2>Clipboard images and files</h2>
-        <button ref={back} type="button" onClick={props.onClose}>
+        <button
+          ref={back}
+          type="button"
+          disabled={busy()}
+          onClick={props.onClose}
+        >
           Back
         </button>
         <button type="button" onClick={() => void refresh()} disabled={busy()}>
@@ -258,6 +272,20 @@ export default function RichClipboardHistory(props: { onClose: () => void }) {
             >
               Copy original format
             </button>
+            <Show when={value().captureSupported}>
+              <button
+                ref={pasteButton}
+                type="button"
+                disabled={busy() || !preview()}
+                onClick={() => void action("paste")}
+              >
+                Paste to previous app
+              </button>
+              <p>
+                Direct paste needs Accessibility access on macOS. If it fails,
+                use Copy original format and paste manually.
+              </p>
+            </Show>
             <button
               type="button"
               disabled={busy() || !selectedEntry()}

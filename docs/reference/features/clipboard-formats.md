@@ -18,7 +18,7 @@ Retention days defaults to zero, meaning no age expiry. A positive value expires
 
 The **Clipboard images and files** command opens a separate history view. Select an entry to preview it. **Copy original format** writes the saved image or file references to the native clipboard; paste them in the target application. **Delete saved entry** removes history without changing the system clipboard. **Pin saved entry** keeps an image or file reference during automatic cleanup and **Clear unpinned**. Pins appear first and persist across restart. **Unpin saved entry** applies the current retention and count policy immediately; an expired entry can disappear. **Clear all clipboard history** removes rich entries including pins. Pinning does not change the system clipboard.
 
-Native rich capture and copy currently support **macOS only**. Windows and Linux display an explicit unsupported notice; their text history remains available.
+Native rich capture, copy, and direct paste currently support **macOS only**. Windows and Linux display an explicit unsupported notice; their text history remains available.
 
 Supported macOS formats are native PNG and Finder-compatible file lists (`NSFilenamesPboardType`). TIFF-only images, animated PNGs, URL-only file sources, and arbitrary text that happens to look like a file path are not captured as images or files. Files are references, not backups: their contents are never saved. A file must exist when captured, previewed, and copied. Moving or deleting a referenced file makes that entry unavailable for preview and copy.
 
@@ -29,6 +29,12 @@ Limits:
 - Rich history: up to 32 entries and 16 MiB of payloads. A lower text-history count setting lowers the capture limit. Cleanup never removes existing pins, even if they exceed that lower limit. Pins still count toward the hard 32-entry and 16 MiB bounds.
 
 New captures replace the oldest unpinned entries. When pins leave too little room, the new capture is skipped and pinned payloads remain intact. The panel shows storage use, pin count, and whether pins fill the capture limit. Unpin or delete entries to make room. Unpinned rich entries use the same age-retention setting as text. Rich entries do not support text editing or text combining.
+
+## Paste to the previous app
+
+On macOS, choose **Paste to previous app** in the image and file history view. Open TinyDash from the destination app first. Direct paste needs Accessibility access. The action reads the selected saved entry again, checks its format and current file references, writes the original format to the clipboard, restores the previous app, and sends Command + V. It shares the text-paste operation lock and target identity/focus checks. Copy remains available and does not need paste permission.
+
+The destination decides whether to accept an image or file list. Successful dispatch is not a receipt confirmation. A missing file or permission error stops the action; a later focus or dispatch error restores the launcher with the history view and error available. The clipboard can already contain the saved content after a later failure. Use **Copy original format** and paste manually if needed. The text default-action setting does not affect this view.
 
 ## Local storage
 
@@ -41,10 +47,10 @@ bun run test:rust -- clipboard
 bun run verify:browser tests/rich-clipboard.spec.ts
 ```
 
-Rust tests cover age retention, pin preservation, expired-text recapture, rollback, exclusion matching, rich persistence and schema upgrade, pinned count/byte budgets, failed pin writes, format validation, byte/count bounds, missing references, and newer-schema refusal. Browser tests mount the real rich-history component with mocked IPC and exercise preview, copy failures, pin/unpin, stable selection after sorting, pin-write retry, unavailable previews, deletion, and return navigation. They do not establish native clipboard effects or launcher command routing.
+Rust tests cover age retention, pin preservation, expired-text recapture, rollback, exclusion matching, rich persistence and schema upgrade, pinned count/byte budgets, failed pin writes, format validation, byte/count bounds, missing references, and newer-schema refusal. Browser tests mount the real rich-history component with mocked IPC and exercise preview, copy failures, image/file paste dispatch, paste failure and Copy fallback, busy controls, platform gating, pin/unpin, stable selection after sorting, pin-write retry, unavailable previews, deletion, and return navigation. They do not establish native clipboard effects or launcher command routing.
 
 Session tests combine age retention with storage contention and pending sensitive cleanup. An unsuccessful capture keeps the previous entry and cleanup identity. A later successful capture can replace expired text with a new entry; retrying cleanup for the old identity cannot remove the new capture.
 
-Native proof requires an isolated macOS desktop session and an identified build. Enable capture and each rich opt-in separately; copy a small native PNG and files from another application, inspect previews, copy back, and verify the target receives an image or file references rather than text. Test a missing file, excluded source, secret markers, oversized image, restart persistence, retention, and clear. Do not use a personal clipboard for this check. Windows/Linux exclusion behavior needs separate platform checks; rich formats remain unsupported there.
+Native proof requires an isolated macOS desktop session and an identified build. Enable capture and each rich opt-in separately; copy a small native PNG and files from another application, inspect previews, copy back, and verify the target receives an image or file references rather than text. Use Paste to previous app for both a PNG and multiple files in compatible disposable destinations, and verify actual received data. Repeat with denied Accessibility access, a closed target, focus changed during dispatch, two rapid requests, and a simultaneous text-queue paste. Failures must retain the selected history entry and allow Copy; no keys may reach a different app. Test a missing file, excluded source, secret markers, oversized image, restart persistence, retention, and clear. Do not use a personal clipboard for this check. Windows/Linux exclusion behavior needs separate platform checks; rich formats remain unsupported there.
 
 Follow the [verification procedure](../../how-to/verify.md). No live clipboard changes are made by the focused unit or component tests.

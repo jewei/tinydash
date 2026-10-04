@@ -12,6 +12,11 @@ declare global {
       entries: RichClipboardEntry[];
       previewError: boolean;
       pinError: boolean;
+      supported: boolean;
+      pasteError: string | null;
+      holdPaste: boolean;
+      releasePaste?: () => void;
+      pastedIds: number[];
     };
   }
 }
@@ -34,10 +39,14 @@ window.__richClipboardTest = {
   entries,
   previewError: false,
   pinError: false,
+  supported: true,
+  pasteError: null,
+  holdPaste: false,
+  pastedIds: [],
 };
 mockWindows("main");
 mockIPC(
-  (command, args) => {
+  async (command, args) => {
     const state = window.__richClipboardTest;
     const id = args && "id" in args ? args.id : undefined;
     window.__richClipboardTest.calls.push(command);
@@ -46,7 +55,7 @@ mockIPC(
         entries: [...state.entries].sort(
           (a, b) => Number(b.pinned) - Number(a.pinned),
         ),
-        captureSupported: true,
+        captureSupported: state.supported,
         supportNotice:
           "Pinned entries survive automatic cleanup and Clear unpinned.",
         storageNotice: "Capture limit: 32 entries and 16 MiB, including pins.",
@@ -56,9 +65,31 @@ mockIPC(
         throw new Error("The saved preview cannot be read.");
       return {
         entry: state.entries.find((entry) => entry.id === id),
-        png: null,
-        files: ["/fixtures/report.pdf", "/fixtures/design.png"],
+        png:
+          state.entries.find((entry) => entry.id === id)?.kind === "image"
+            ? Array.from(
+                atob(
+                  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jO9sAAAAASUVORK5CYII=",
+                ),
+                (c) => c.charCodeAt(0),
+              )
+            : null,
+        files:
+          state.entries.find((entry) => entry.id === id)?.kind === "image"
+            ? null
+            : ["/fixtures/report.pdf", "/fixtures/design.png"],
       };
+    }
+    if (command === "paste_rich_clipboard") {
+      state.pastedIds.push(Number(id));
+      if (state.holdPaste)
+        await new Promise<void>((resolve) => {
+          state.releasePaste = resolve;
+        });
+      if (state.missing)
+        throw new Error("A referenced file is no longer available.");
+      if (state.pasteError) throw new Error(state.pasteError);
+      return;
     }
     if (command === "copy_rich_clipboard") {
       if (window.__richClipboardTest.missing)

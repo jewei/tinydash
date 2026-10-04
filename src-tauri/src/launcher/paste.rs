@@ -96,37 +96,62 @@ pub(super) async fn paste_text(
     text: String,
     saved: SavedTarget,
 ) -> Result<(), String> {
+    if text.len() > 65_536 {
+        return Err("Paste text exceeds 64 KiB.".into());
+    }
+    paste_with_clipboard(app, saved, move || {
+        super::clipboard::write_secret(&text).map_err(|error| error.to_string())
+    })
+    .await
+}
+
+/// Serialize clipboard preparation and dispatch for both text and rich content.
+/// The writer resolves live data on a worker before the launcher is dismissed.
+pub(super) async fn paste_with_clipboard(
+    app: &AppHandle,
+    saved: SavedTarget,
+    write: impl FnOnce() -> Result<(), String> + Send + 'static,
+) -> Result<(), String> {
     let state = app.state::<PasteState>();
     let _operation = state
         .1
         .try_lock()
         .map_err(|_| "A paste is already in progress. Try again.")?;
-    native::available()?;
-    validate_target(&saved)?;
-    if text.len() > 65_536 {
-        return Err("Paste text exceeds 64 KiB.".into());
+    let result = async {
+        native::available()?;
+        validate_target(&saved)?;
+        validate_foreground(saved.id)?;
+        tauri::async_runtime::spawn_blocking(write)
+            .await
+            .map_err(|error| error.to_string())??;
+        paste_current(app, saved).await
     }
-    tauri::async_runtime::spawn_blocking(move || {
-        super::clipboard::write_secret(&text).map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| error.to_string())??;
-    paste_current(app, saved).await
+    .await;
+    if result.is_err() {
+        // Blur can hide the launcher during preparation, before dispatch starts.
+        // Restore it for writer errors as well as focus/dispatch failures.
+        let _ = super::window::show_after_paste_failure(app);
+    }
+    result
+}
+
+fn validate_foreground(previous: u64) -> Result<(), String> {
+    if native::foreground()?.is_some_and(|active| active != previous && !native::is_self(active)) {
+        return Err(
+            "Focus changed. Nothing was pasted; use Copy or reopen TinyDash from the intended app."
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 async fn paste_current(app: &AppHandle, saved: SavedTarget) -> Result<(), String> {
     native::available()?;
     let previous = saved.id;
     // A click elsewhere must not send clipboard contents into an unrelated app.
-    let active = native::foreground()?;
-    if active.is_some_and(|active| active != previous && !native::is_self(active)) {
-        return Err(
-            "Focus changed. Nothing was pasted; use Copy or reopen TinyDash from the intended app."
-                .into(),
-        );
-    }
+    validate_foreground(previous)?;
     super::window::dismiss(app).map_err(|error| error.to_string())?;
-    let result = tauri::async_runtime::spawn_blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || {
         validate_target(&saved)?;
         if native::foreground()?
             .is_some_and(|active| active != previous && !native::is_self(active))
@@ -158,12 +183,7 @@ async fn paste_current(app: &AppHandle, saved: SavedTarget) -> Result<(), String
     })
     .await
     .map_err(|error| error.to_string())
-    .and_then(|result| result);
-    if result.is_err() {
-        // Surface failure instead of losing the error in a hidden launcher.
-        let _ = super::window::show_after_paste_failure(app);
-    }
-    result
+    .and_then(|result| result)
 }
 
 #[tauri::command]

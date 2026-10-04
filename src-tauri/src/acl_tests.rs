@@ -59,6 +59,7 @@ const MAIN_ONLY: &[&str] = &[
     "rich_clipboard_history",
     "rich_clipboard_preview",
     "copy_rich_clipboard",
+    "paste_rich_clipboard",
     "delete_rich_clipboard",
     "set_rich_clipboard_pinned",
     "set_launcher_appearance",

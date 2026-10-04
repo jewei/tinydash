@@ -578,7 +578,7 @@ pub async fn rich_clipboard_history(app: AppHandle) -> Result<RichHistory, Strin
         capture_supported: cfg!(target_os = "macos"),
         support_notice: if cfg!(target_os = "macos") {
             "Captures native PNG images and Finder file lists on macOS. TIFF-only images and URL-only file sources are skipped. Images: up to 4 MiB and 4 megapixels. Files: up to 64 existing paths, not file contents. Pinned entries survive retention and Clear unpinned. Unpinning applies the current retention and count limits immediately.".into()
-        } else { "Image and file capture/copy is currently supported only on macOS. Text history remains available.".into() },
+        } else { "Image and file capture, copy, and paste are currently supported only on macOS. Text history remains available.".into() },
     })).map_err(|error| error.to_string())).await.map_err(|error| error.to_string())?
 }
 
@@ -591,32 +591,45 @@ pub async fn rich_clipboard_preview(id: i64, app: AppHandle) -> Result<RichPrevi
     .map_err(|error| error.to_string())?
 }
 
+fn copy_saved(app: &AppHandle, id: i64) -> Result<(), String> {
+    with_store(app, |store| {
+        // Serialize live resolution/write with delete, prune, and capture.
+        let preview = store.preview(id)?;
+        let payload = if let Some(png) = preview.png {
+            Payload::Png(png)
+        } else {
+            Payload::Files(
+                preview
+                    .files
+                    .context("Missing file references.")?
+                    .into_iter()
+                    .map(PathBuf::from)
+                    .collect(),
+            )
+        };
+        native::write(&payload)?;
+        app.state::<LauncherState>().clipboard.invalidate();
+        Ok(())
+    })
+    .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub async fn copy_rich_clipboard(id: i64, app: AppHandle) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        with_store(&app, |store| {
-            // The store mutex serializes copies with delete/prune/capture.
-            let preview = store.preview(id)?;
-            let payload = if let Some(png) = preview.png {
-                Payload::Png(png)
-            } else {
-                Payload::Files(
-                    preview
-                        .files
-                        .context("Missing file references.")?
-                        .into_iter()
-                        .map(PathBuf::from)
-                        .collect(),
-                )
-            };
-            native::write(&payload)?;
-            app.state::<LauncherState>().clipboard.invalidate();
-            Ok(())
-        })
-        .map_err(|error| error.to_string())
-    })
-    .await
-    .map_err(|error| error.to_string())?
+    tauri::async_runtime::spawn_blocking(move || copy_saved(&app, id))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn paste_rich_clipboard(id: i64, app: AppHandle) -> Result<(), String> {
+    if !cfg!(target_os = "macos") {
+        return Err("Pasting saved images and files is currently supported only on macOS.".into());
+    }
+    let target = super::super::paste::prepare(&app)?;
+    let writer_app = app.clone();
+    super::super::paste::paste_with_clipboard(&app, target, move || copy_saved(&writer_app, id))
+        .await
 }
 
 #[tauri::command]

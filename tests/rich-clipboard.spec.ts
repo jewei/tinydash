@@ -211,3 +211,110 @@ test("unreadable pinned entries can still be unpinned and deleted", async ({
     page.getByRole("button", { name: /Missing reference/ }),
   ).toHaveCount(0);
 });
+
+test("rich paste resolves the selected file entry and prevents repeated actions while busy", async ({
+  page,
+}) => {
+  const paste = page.getByRole("button", {
+    name: "Paste to previous app",
+    exact: true,
+  });
+  await expect(paste).toBeEnabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.holdPaste = true;
+  });
+  await paste.click();
+  await expect(paste).toBeDisabled();
+  for (const name of [
+    "Back",
+    "Refresh",
+    "Copy original format",
+    "Delete saved entry",
+    "Pin saved entry",
+  ]) {
+    await expect(
+      page.getByRole("button", { name, exact: true }),
+    ).toBeDisabled();
+  }
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.pastedIds),
+  ).toEqual([1]);
+  await page.evaluate(() => window.__richClipboardTest.releasePaste?.());
+  await expect(page.getByRole("status")).toContainText(
+    "Paste sent to the previous app",
+  );
+  await expect(paste).toBeEnabled();
+});
+
+test("rich paste failures retain the preview and offer Copy and retry", async ({
+  page,
+}) => {
+  const paste = page.getByRole("button", {
+    name: "Paste to previous app",
+    exact: true,
+  });
+  await page.evaluate(() => {
+    window.__richClipboardTest.pasteError =
+      "Direct paste needs Accessibility access. Use Copy.";
+  });
+  await paste.click();
+  await expect(page.getByRole("status")).toContainText(
+    "Direct paste needs Accessibility access",
+  );
+  await expect(
+    page.getByRole("list", { name: "Saved file references" }),
+  ).toContainText("/fixtures/report.pdf");
+  await expect(paste).toBeFocused();
+  await page.getByRole("button", { name: "Copy original format" }).click();
+  await expect(page.getByRole("status")).toContainText("Copied.");
+  await page.evaluate(() => {
+    window.__richClipboardTest.pasteError = null;
+    window.__richClipboardTest.missing = true;
+  });
+  await paste.click();
+  await expect(page.getByRole("status")).toContainText(
+    "A referenced file is no longer available",
+  );
+  await expect(paste).toBeEnabled();
+  await page.evaluate(() => {
+    window.__richClipboardTest.missing = false;
+  });
+  await paste.click();
+  await expect(page.getByRole("status")).toContainText("Paste sent");
+});
+
+test("rich paste sends the selected image ID and is absent on unsupported platforms", async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const state = window.__richClipboardTest;
+    state.entries.push({
+      ...state.entries[0],
+      id: 2,
+      kind: "image",
+      title: "Saved PNG",
+    });
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.getByRole("button", { name: /Saved PNG/ }).click();
+  await expect(
+    page.getByRole("img", { name: "Saved clipboard image" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Paste to previous app", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText("Paste sent");
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.pastedIds),
+  ).toEqual([2]);
+  await page.evaluate(() => {
+    window.__richClipboardTest.supported = false;
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Paste to previous app", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeDisabled();
+});

@@ -33,6 +33,7 @@ permissions = [
   "allow-rich-clipboard-history",
   "allow-rich-clipboard-preview",
   "allow-copy-rich-clipboard",
+  "allow-paste-rich-clipboard",
   "allow-delete-rich-clipboard",
   "allow-set-rich-clipboard-pinned",
   "allow-set-launcher-appearance",
