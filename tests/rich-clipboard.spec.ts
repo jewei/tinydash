@@ -679,3 +679,141 @@ test("rich shortcuts leave filter and button behavior intact and cannot duplicat
   });
   await expect(row).toBeFocused();
 });
+
+test("pinned names save, search, keep original paths, and restore", async ({
+  page,
+}) => {
+  const nameButton = page.getByRole("button", {
+    name: "Name pinned entry",
+    exact: true,
+  });
+  await expect(nameButton).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await nameButton.click();
+  await page
+    .getByRole("textbox", { name: "Custom name" })
+    .fill("Release files");
+  await page.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(
+    page.getByRole("option", { name: /Release files/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Original title: 2 file references", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "Saved file references" }),
+  ).toContainText("/fixtures/report.pdf");
+  const search = page.getByRole("combobox", {
+    name: "Search images and files",
+  });
+  await search.fill("release");
+  await expect(page.getByRole("option")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Unpin saved entry", exact: true })
+    .click();
+  await expect(page.getByRole("option")).toContainText("Release files");
+  await expect(
+    page.getByRole("button", { name: "Rename pinned entry", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Rename pinned entry", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Restore original title", exact: true })
+    .click();
+  await expect(
+    page.getByText("No entries match these filters.", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Clear filters", exact: true })
+    .click();
+  await expect(page.getByRole("option")).toContainText("2 file references");
+});
+
+test("name editor keeps its draft on write error and can name an unavailable preview", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await page.evaluate(() => {
+    window.__richClipboardTest.previewError = true;
+    window.__richClipboardTest.nameError = true;
+  });
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Preview unavailable");
+  await page
+    .getByRole("button", { name: "Name pinned entry", exact: true })
+    .click();
+  const input = page.getByRole("textbox", { name: "Custom name" });
+  await input.fill("Find these files");
+  await input.press("Enter");
+  await expect(page.getByRole("status")).toContainText(
+    "Clipboard storage is busy",
+  );
+  await expect(input).toHaveValue("Find these files");
+  await expect(input).toBeFocused();
+  await expect(page.getByRole("option")).toContainText("2 file references");
+  await page.evaluate(() => {
+    window.__richClipboardTest.nameError = false;
+  });
+  await input.press("Enter");
+  await expect(page.getByRole("option")).toContainText("Find these files");
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.namedEntries),
+  ).toEqual([
+    { id: 1, name: "Find these files" },
+    { id: 1, name: "Find these files" },
+  ]);
+});
+
+test("name editor cancels without writes and blocks composition and result actions", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Pin saved entry", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Name pinned entry", exact: true })
+    .click();
+  const input = page.getByRole("textbox", { name: "Custom name" });
+  await input.fill("Draft name");
+  await expect(
+    page.getByRole("combobox", { name: "Search images and files" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Copy original format" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Back", exact: true }),
+  ).toBeDisabled();
+  await input.dispatchEvent("compositionstart");
+  await input.press("Enter");
+  await input.dispatchEvent("compositionend");
+  await input.dispatchEvent("keydown", { key: "Enter", repeat: true });
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__richClipboardTest.namedEntries.length),
+    )
+    .toBe(0);
+  await page
+    .getByRole("button", { name: "Cancel naming", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Name pinned entry", exact: true }),
+  ).toBeFocused();
+  await page
+    .getByRole("button", { name: "Name pinned entry", exact: true })
+    .click();
+  await expect(input).toHaveValue("");
+  await input.press("Escape");
+  await expect(input).toHaveCount(0);
+  expect(
+    await page.evaluate(() => window.__richClipboardTest.namedEntries),
+  ).toEqual([]);
+});

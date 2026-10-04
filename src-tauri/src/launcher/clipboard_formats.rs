@@ -194,6 +194,7 @@ pub struct RichEntry {
     pub source_app: Option<String>,
     pub bytes: u32,
     pub pinned: bool,
+    pub custom_name: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -244,7 +245,7 @@ impl Store {
         connection.busy_timeout(Duration::from_millis(250))?;
         let version: u32 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
         ensure!(
-            version <= 2,
+            version <= 3,
             "Rich clipboard history requires a newer TinyDash version."
         );
         connection.execute_batch("PRAGMA secure_delete = ON; PRAGMA max_page_count = 12288;")?;
@@ -262,13 +263,16 @@ impl Store {
         if version < 2 {
             transaction.execute_batch("ALTER TABLE rich_clipboard ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0,1));")?;
         }
-        transaction.pragma_update(None, "user_version", 2)?;
+        if version < 3 {
+            transaction.execute_batch("ALTER TABLE rich_clipboard ADD COLUMN custom_name TEXT CHECK(custom_name IS NULL OR (length(custom_name) <= 120 AND length(CAST(custom_name AS BLOB)) <= 480));")?;
+        }
+        transaction.pragma_update(None, "user_version", 3)?;
         transaction.commit()?;
         Ok(Self { connection })
     }
 
     fn list(&self) -> anyhow::Result<Vec<RichEntry>> {
-        let mut statement = self.connection.prepare("SELECT id,kind,title,created_at,source_app,length(payload),pinned FROM rich_clipboard ORDER BY pinned DESC,sort_order DESC")?;
+        let mut statement = self.connection.prepare("SELECT id,kind,title,created_at,source_app,length(payload),pinned,custom_name FROM rich_clipboard ORDER BY pinned DESC,sort_order DESC")?;
         Ok(statement
             .query_map([], entry)?
             .collect::<rusqlite::Result<_>>()?)
@@ -310,8 +314,9 @@ impl Store {
                 continue;
             }
             let mut text = normalize(&format!(
-                "{} {}",
+                "{} {} {}",
                 entry.title,
+                entry.custom_name.as_deref().unwrap_or_default(),
                 entry.source_app.as_deref().unwrap_or_default()
             ));
             if !terms.iter().all(|term| text.contains(term)) && entry.kind == RichKind::Files {
@@ -423,6 +428,29 @@ impl Store {
         Ok(())
     }
 
+    fn set_name(&self, id: i64, name: &str) -> anyhow::Result<()> {
+        ensure!(id > 0, "Invalid clipboard entry.");
+        ensure!(name.len() <= 4096, "Name is too long.");
+        ensure!(
+            !name.chars().any(char::is_control),
+            "Use a single-line name without control characters."
+        );
+        let name: String = name.trim().nfc().collect();
+        ensure!(
+            name.chars().count() <= 120 && name.len() <= 480,
+            "Name must have at most 120 characters (480 UTF-8 bytes)."
+        );
+        let name = (!name.is_empty()).then_some(name);
+        ensure!(
+            self.connection.execute(
+                "UPDATE rich_clipboard SET custom_name = ?1 WHERE id = ?2 AND pinned = 1",
+                rusqlite::params![name, id],
+            )? == 1,
+            "Pin an available entry before naming it."
+        );
+        Ok(())
+    }
+
     fn clear(&self, keep_pinned: bool) -> anyhow::Result<()> {
         self.connection.execute(
             "DELETE FROM rich_clipboard WHERE ?1 = 0 OR pinned = 0",
@@ -469,7 +497,7 @@ impl Store {
 
     fn preview(&self, id: i64) -> anyhow::Result<RichPreview> {
         ensure!(id > 0, "Invalid clipboard entry.");
-        let (entry, bytes): (RichEntry, Vec<u8>) = self.connection.query_row("SELECT id,kind,title,created_at,source_app,length(payload),pinned,payload FROM rich_clipboard WHERE id = ?1", [id], |row| Ok((entry(row)?, row.get(7)?))).context("This clipboard entry is no longer available.")?;
+        let (entry, bytes): (RichEntry, Vec<u8>) = self.connection.query_row("SELECT id,kind,title,created_at,source_app,length(payload),pinned,custom_name,payload FROM rich_clipboard WHERE id = ?1", [id], |row| Ok((entry(row)?, row.get(8)?))).context("This clipboard entry is no longer available.")?;
         let (png, files) = match Payload::decode(entry.kind.as_str(), bytes)? {
             Payload::Png(bytes) => (Some(bytes), None),
             Payload::Files(paths) => {
@@ -523,6 +551,7 @@ fn entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<RichEntry> {
         source_app: row.get(4)?,
         bytes: row.get(5)?,
         pinned: row.get(6)?,
+        custom_name: row.get(7)?,
     })
 }
 
@@ -727,6 +756,17 @@ pub async fn set_rich_clipboard_pinned(
             )
         })
         .map_err(|error| error.to_string())?;
+        super::changed(&app);
+        Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn set_rich_clipboard_name(id: i64, name: String, app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        with_store(&app, |store| store.set_name(id, &name)).map_err(|error| error.to_string())?;
         super::changed(&app);
         Ok(())
     })
@@ -1150,11 +1190,136 @@ mod tests {
     }
 
     #[test]
+    fn clipboard_rich_names_persist_search_and_preserve_originals() {
+        let (dir, mut store) = store();
+        let png = include_bytes!("../../icons/32x32.png").to_vec();
+        let payload = Payload::Png(png.clone());
+        store.capture(&payload, None, 1, 0, 32).unwrap();
+        let original = store.list().unwrap().remove(0);
+        assert!(store.set_name(original.id, "Logo").is_err());
+        store.set_pinned(original.id, true, 0, 2, 32).unwrap();
+        store.set_name(original.id, "  Cafe\u{301} logo  ").unwrap();
+        store.capture(&payload, None, 3, 0, 32).unwrap();
+        drop(store);
+        let mut store = Store::open(&dir.path().join("rich.sqlite3")).unwrap();
+        let renamed = store.list().unwrap().remove(0);
+        assert_eq!(renamed.custom_name.as_deref(), Some("Café logo"));
+        assert_eq!(renamed.title, original.title);
+        assert_eq!(renamed.created_at, original.created_at);
+        assert_eq!(store.preview(original.id).unwrap().png, Some(png.clone()));
+        assert_eq!(store.search("CAFÉ logo", None, None).unwrap().0.len(), 1);
+        assert_eq!(
+            store.search(&original.title, None, None).unwrap().0.len(),
+            1
+        );
+        store.set_pinned(original.id, false, 0, 4, 32).unwrap();
+        assert_eq!(
+            store.list().unwrap()[0].custom_name.as_deref(),
+            Some("Café logo")
+        );
+        assert!(store.set_name(original.id, "Changed").is_err());
+        store.set_pinned(original.id, true, 0, 5, 32).unwrap();
+        store.set_name(original.id, "   ").unwrap();
+        assert!(store.list().unwrap()[0].custom_name.is_none());
+        assert!(store.search("Café", None, None).unwrap().0.is_empty());
+        assert_eq!(store.preview(original.id).unwrap().png, Some(png));
+    }
+
+    #[test]
+    fn clipboard_rich_names_validate_and_failed_writes_keep_saved_state() {
+        let (dir, mut store) = store();
+        let path = dir.path().join("release.txt");
+        std::fs::write(&path, "fixture").unwrap();
+        store
+            .capture(&Payload::Files(vec![path.clone()]), None, 1, 0, 32)
+            .unwrap();
+        let id = store.list().unwrap()[0].id;
+        store.set_pinned(id, true, 0, 2, 32).unwrap();
+        store.set_name(id, "Release files").unwrap();
+        for name in [
+            "x".repeat(121),
+            "x".repeat(4097),
+            "line\nbreak".into(),
+            "nul\0".into(),
+            "tab\t".into(),
+        ] {
+            assert!(store.set_name(id, &name).is_err());
+        }
+        assert!(store.set_name(-1, "Invalid").is_err());
+        assert!(store.set_name(id + 1, "Missing").is_err());
+        let blocker = Connection::open(dir.path().join("rich.sqlite3")).unwrap();
+        blocker.execute_batch("BEGIN IMMEDIATE").unwrap();
+        assert!(store.set_name(id, "Lost").is_err());
+        assert_eq!(
+            store.list().unwrap()[0].custom_name.as_deref(),
+            Some("Release files")
+        );
+        assert_eq!(
+            store.preview(id).unwrap().files,
+            Some(vec![path.to_string_lossy().into_owned()])
+        );
+        blocker.execute_batch("ROLLBACK").unwrap();
+        std::fs::remove_file(path).unwrap();
+        assert!(store.preview(id).is_err());
+        store.set_name(id, "Missing release files").unwrap();
+        assert_eq!(
+            store.search("missing release", None, None).unwrap().0.len(),
+            1
+        );
+        store.set_name(id, &"😀".repeat(120)).unwrap();
+    }
+
+    #[test]
+    fn clipboard_rich_migrates_v2_names_without_changing_pins_or_order() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("rich.sqlite3");
+        let connection = Connection::open(&path).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE rich_clipboard (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, payload BLOB NOT NULL,
+            title TEXT NOT NULL, created_at INTEGER NOT NULL, source_app TEXT,
+            sort_order INTEGER NOT NULL, pinned INTEGER NOT NULL DEFAULT 0);
+            PRAGMA user_version = 2;",
+            )
+            .unwrap();
+        let png = include_bytes!("../../icons/32x32.png").to_vec();
+        connection
+            .execute(
+                "INSERT INTO rich_clipboard VALUES(7,'image',?1,'Saved image',100,'fixture',4,1)",
+                [&png],
+            )
+            .unwrap();
+        drop(connection);
+        let store = Store::open(&path).unwrap();
+        let entry = store.list().unwrap().remove(0);
+        assert!(entry.pinned);
+        assert!(entry.custom_name.is_none());
+        assert_eq!(entry.title, "Saved image");
+        assert_eq!(entry.created_at, 100);
+        assert_eq!(store.preview(7).unwrap().png, Some(png));
+        let order: i64 = store
+            .connection
+            .query_row(
+                "SELECT sort_order FROM rich_clipboard WHERE id=7",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(order, 4);
+        let version: u32 = store
+            .connection
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 3);
+    }
+
+    #[test]
     fn clipboard_rich_newer_database_is_not_replaced() {
         let (dir, store) = store();
         store
             .connection
-            .pragma_update(None, "user_version", 3)
+            .pragma_update(None, "user_version", 4)
             .unwrap();
         drop(store);
         assert!(Store::open(&dir.path().join("rich.sqlite3")).is_err());
@@ -1163,7 +1328,7 @@ mod tests {
             connection
                 .pragma_query_value::<u32, _>(None, "user_version", |row| row.get(0))
                 .unwrap(),
-            3
+            4
         );
     }
 }

@@ -30,6 +30,10 @@ export default function RichClipboardHistory(props: {
   const [message, setMessage] = createSignal<string>();
   const [previewError, setPreviewError] = createSignal<string>();
   const [busy, setBusy] = createSignal(false);
+  const [editing, setEditing] = createSignal<{ id: number; title: string }>();
+  const [nameDraft, setNameDraft] = createSignal("");
+  let nameInput!: HTMLInputElement;
+  let nameButton!: HTMLButtonElement;
   let disposed = false;
   let refreshSequence = 0;
   let previewSequence = 0;
@@ -161,7 +165,8 @@ export default function RichClipboardHistory(props: {
     },
   );
 
-  const unavailable = () => busy() || loadingHistory() || !!historyError();
+  const unavailable = () =>
+    busy() || !!editing() || loadingHistory() || !!historyError();
   const hasFilters = () => !!query().trim() || !!kind() || !!sourceApp();
   function clearFilters() {
     setQuery("");
@@ -202,6 +207,12 @@ export default function RichClipboardHistory(props: {
     if (event.key === "Escape" && busy()) {
       event.preventDefault();
       event.stopPropagation();
+      return;
+    }
+    if (editing() && event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeNameEditor();
       return;
     }
     const target = event.target as HTMLElement;
@@ -247,6 +258,53 @@ export default function RichClipboardHistory(props: {
       });
     } else if (!event.repeat && canTransfer() && !select) {
       void action(paste ? "paste" : "copy", target);
+    }
+  }
+
+  function closeNameEditor() {
+    setEditing(undefined);
+    queueMicrotask(() => {
+      if (!disposed) (nameButton?.disabled ? searchInput : nameButton).focus();
+    });
+  }
+
+  function openNameEditor() {
+    const entry = selectedEntry();
+    if (unavailable() || !entry?.pinned) return;
+    setMessage(undefined);
+    setNameDraft(entry.customName ?? "");
+    setEditing({ id: entry.id, title: entry.title });
+    queueMicrotask(() => {
+      if (!disposed) {
+        nameInput.focus();
+        nameInput.select();
+      }
+    });
+  }
+
+  async function saveName(name = nameDraft()) {
+    const target = editing();
+    if (!target || busy()) return;
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await richClipboardBackend.setName(target.id, name);
+      if (!disposed) {
+        setEditing(undefined);
+        await refresh();
+        setMessage(name.trim() ? "Name saved." : "Original title restored.");
+      }
+    } catch (error) {
+      if (!disposed) setMessage(String(error));
+    } finally {
+      if (!disposed) {
+        setBusy(false);
+        queueMicrotask(() => {
+          if (disposed) return;
+          if (editing()) nameInput.focus();
+          else searchInput.focus();
+        });
+      }
     }
   }
 
@@ -326,10 +384,18 @@ export default function RichClipboardHistory(props: {
     >
       <header>
         <h2>Clipboard images and files</h2>
-        <button type="button" disabled={busy()} onClick={props.onClose}>
+        <button
+          type="button"
+          disabled={busy() || !!editing()}
+          onClick={props.onClose}
+        >
           Back
         </button>
-        <button type="button" onClick={() => void refresh()} disabled={busy()}>
+        <button
+          type="button"
+          onClick={() => void refresh()}
+          disabled={busy() || !!editing()}
+        >
           Refresh
         </button>
       </header>
@@ -356,10 +422,10 @@ export default function RichClipboardHistory(props: {
                 : undefined
             }
             aria-describedby="rich-clipboard-shortcuts"
-            placeholder="Filename, path, title, or source app"
+            placeholder="Name, filename, path, or source app"
             maxlength={256}
             value={query()}
-            disabled={busy()}
+            disabled={busy() || !!editing()}
             onInput={(event) => {
               setQuery(event.currentTarget.value);
               void refresh();
@@ -371,7 +437,7 @@ export default function RichClipboardHistory(props: {
           <select
             aria-label="Clipboard content type"
             value={kind() ?? ""}
-            disabled={busy()}
+            disabled={busy() || !!editing()}
             onChange={(event) => {
               const value = event.currentTarget.value;
               setKind(
@@ -390,7 +456,7 @@ export default function RichClipboardHistory(props: {
           <select
             aria-label="Clipboard source app"
             value={sourceApp() ?? ""}
-            disabled={busy()}
+            disabled={busy() || !!editing()}
             onChange={(event) => {
               setSourceApp(event.currentTarget.value || undefined);
               void refresh();
@@ -411,7 +477,7 @@ export default function RichClipboardHistory(props: {
         </label>
         <button
           type="button"
-          disabled={busy() || !hasFilters()}
+          disabled={busy() || !!editing() || !hasFilters()}
           onClick={clearFilters}
         >
           Clear filters
@@ -493,7 +559,7 @@ export default function RichClipboardHistory(props: {
                       }}
                     >
                       {entry.pinned ? "Pinned · " : ""}
-                      {entry.title} ·{" "}
+                      {entry.customName ?? entry.title} ·{" "}
                       {new Date(entry.createdAt * 1000).toLocaleString()}
                     </li>
                   )}
@@ -533,6 +599,84 @@ export default function RichClipboardHistory(props: {
                 </>
               )}
             </Show>
+            <Show when={selectedEntry()?.customName && !editing()}>
+              <p>Original title: {selectedEntry()?.title}</p>
+            </Show>
+            <Show when={editing()}>
+              {(target) => (
+                <div
+                  class="rich-clipboard-name"
+                  role="region"
+                  aria-label="Name pinned entry"
+                >
+                  <p>Original title: {target().title}</p>
+                  <label>
+                    Custom name
+                    <input
+                      ref={nameInput}
+                      type="text"
+                      maxlength={120}
+                      value={nameDraft()}
+                      disabled={busy()}
+                      aria-describedby="rich-clipboard-name-help"
+                      onInput={(event) =>
+                        setNameDraft(event.currentTarget.value)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (
+                          !composing &&
+                          !event.isComposing &&
+                          event.keyCode !== 229 &&
+                          !event.repeat &&
+                          !event.metaKey &&
+                          !event.ctrlKey &&
+                          !event.altKey &&
+                          !event.shiftKey
+                        )
+                          void saveName();
+                      }}
+                    />
+                  </label>
+                  <p id="rich-clipboard-name-help">
+                    Up to 120 characters. Leave blank to use the original title.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={busy()}
+                    onClick={() => void saveName()}
+                  >
+                    Save name
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy()}
+                    onClick={() => void saveName("")}
+                  >
+                    Restore original title
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy()}
+                    onClick={closeNameEditor}
+                  >
+                    Cancel naming
+                  </button>
+                </div>
+              )}
+            </Show>
+            <button
+              ref={nameButton}
+              type="button"
+              disabled={unavailable() || !selectedEntry()?.pinned}
+              onClick={openNameEditor}
+            >
+              {selectedEntry()?.customName
+                ? "Rename pinned entry"
+                : "Name pinned entry"}
+            </button>
             <button
               class="panel-primary"
               type="button"

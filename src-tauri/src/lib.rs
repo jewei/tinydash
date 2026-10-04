@@ -307,6 +307,7 @@ pub fn run() -> anyhow::Result<()> {
             launcher::clipboard::formats::paste_rich_clipboard,
             launcher::clipboard::formats::delete_rich_clipboard,
             launcher::clipboard::formats::set_rich_clipboard_pinned,
+            launcher::clipboard::formats::set_rich_clipboard_name,
             launcher::clipboard::clear_clipboard_history,
             launcher::clipboard::edit_clipboard_history,
             launcher::clipboard::copy_clipboard_selection,

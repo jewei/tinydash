@@ -8,6 +8,7 @@ export interface RichClipboardEntry {
   sourceApp: string | null;
   bytes: number;
   pinned: boolean;
+  customName: string | null;
 }
 
 export interface RichClipboardHistory {
@@ -42,5 +43,7 @@ export const richClipboardBackend = {
   copy: (id: number) => invoke<void>("copy_rich_clipboard", { id }),
   setPinned: (id: number, pinned: boolean) =>
     invoke<void>("set_rich_clipboard_pinned", { id, pinned }),
+  setName: (id: number, name: string) =>
+    invoke<void>("set_rich_clipboard_name", { id, name }),
   delete: (id: number) => invoke<void>("delete_rich_clipboard", { id }),
 };

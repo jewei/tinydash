@@ -99,6 +99,7 @@ export const commandWrappers = {
   paste_rich_clipboard: "pasteRichClipboard",
   delete_rich_clipboard: "deleteRichClipboard",
   set_rich_clipboard_pinned: "setRichClipboardPinned",
+  set_rich_clipboard_name: "setRichClipboardName",
   file_preview: "filePreview",
   execute_file_action: "executeFileAction",
   library_list: "libraryList",

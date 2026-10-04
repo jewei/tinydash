@@ -33,6 +33,7 @@ fn main() {
         "paste_rich_clipboard",
         "delete_rich_clipboard",
         "set_rich_clipboard_pinned",
+        "set_rich_clipboard_name",
         "item_catalog",
         "set_launcher_appearance",
         "sync_appearance",

@@ -13,6 +13,7 @@ export const ipcBridges = {
   pasteRichClipboard: richClipboardBackend.paste,
   deleteRichClipboard: richClipboardBackend.delete,
   setRichClipboardPinned: richClipboardBackend.setPinned,
+  setRichClipboardName: richClipboardBackend.setName,
   filePreview: fileBackend.preview,
   executeFileAction: fileBackend.execute,
   libraryList: libraryBackend.list,
@@ -108,6 +109,7 @@ export async function probeCommands(settings: SettingsValues) {
     pasteRichClipboard: () => richClipboardBackend.paste(1),
     deleteRichClipboard: () => richClipboardBackend.delete(1),
     setRichClipboardPinned: () => richClipboardBackend.setPinned(1, true),
+    setRichClipboardName: () => richClipboardBackend.setName(1, "Company logo"),
     filePreview: () => fileBackend.preview("file:fixture"),
     executeFileAction: () =>
       fileBackend.execute("file:fixture", "openWith", {

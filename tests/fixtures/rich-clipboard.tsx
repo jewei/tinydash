@@ -12,6 +12,8 @@ declare global {
       entries: RichClipboardEntry[];
       previewError: boolean;
       pinError: boolean;
+      nameError: boolean;
+      namedEntries: { id: number; name: string }[];
       supported: boolean;
       pasteError: string | null;
       holdPaste: boolean;
@@ -38,6 +40,7 @@ const entries: RichClipboardEntry[] = [
     sourceApp: "com.apple.finder",
     bytes: 64,
     pinned: false,
+    customName: null,
   },
 ];
 window.__richClipboardTest = {
@@ -47,6 +50,8 @@ window.__richClipboardTest = {
   entries,
   previewError: false,
   pinError: false,
+  nameError: false,
+  namedEntries: [],
   supported: true,
   pasteError: null,
   holdPaste: false,
@@ -79,6 +84,7 @@ mockIPC(
           .filter((entry) => {
             const text = [
               entry.title,
+              entry.customName,
               entry.sourceApp,
               ...(state.filesById[entry.id] ?? []),
             ]
@@ -155,6 +161,21 @@ mockIPC(
       state.copiedIds.push(Number(id));
       if (window.__richClipboardTest.missing)
         throw new Error("A referenced file is no longer available.");
+      return;
+    }
+    if (command === "set_rich_clipboard_name") {
+      const name = String(args && "name" in args ? args.name : "");
+      state.namedEntries.push({ id: Number(id), name });
+      if (state.nameError)
+        throw new Error("Clipboard storage is busy. Try again.");
+      const entry = state.entries.find((entry) => entry.id === id);
+      if (!entry?.pinned)
+        throw new Error("Pin an available entry before naming it.");
+      state.entries = state.entries.map((entry) =>
+        entry.id === id
+          ? { ...entry, customName: name.trim().normalize("NFC") || null }
+          : entry,
+      );
       return;
     }
     if (command === "set_rich_clipboard_pinned") {
