@@ -9,7 +9,7 @@
     "build": "tauri build",
     "check": "vp check && cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings",
     "test": "vp test && cargo test --manifest-path src-tauri/Cargo.toml --locked",
-    "verify": "bun run check && bun run test && git diff --exit-code -- src/generated",
+    "verify": "bun run check && bun run test && bun scripts/check-generated.ts",
     "fix": "vp check --fix && cargo fmt --manifest-path src-tauri/Cargo.toml",
     "emoji-data": "bun scripts/emoji-data.ts",
     "prepare": "vp config --no-agent",
