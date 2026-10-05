@@ -29,20 +29,32 @@ export const isComposing = (event: KeyboardEvent) => event.isComposing || event.
 // AltGraph is the right Alt key on layouts that have AltGr.
 const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "AltGraph", "Meta"]);
 
-/** Accelerator names of the characters a layout may put on any key. */
-const PUNCTUATION: Record<string, string> = {
-  ",": "Comma",
-  ".": "Period",
-  "-": "Minus",
-  "=": "Equal",
-  ";": "Semicolon",
-  "'": "Quote",
-  "/": "Slash",
-  "\\": "Backslash",
-  "[": "BracketLeft",
-  "]": "BracketRight",
-  "`": "Backquote",
-};
+/**
+ * Signs that Windows and Linux find by the character on every layout
+ * (Windows names `VK_OEM_COMMA`, `PERIOD`, and `MINUS` for any country).
+ */
+const LAYOUT_SIGNS: Record<string, string> = { ",": "Comma", ".": "Period", "-": "Minus" };
+
+/**
+ * Codes of the other sign keys. Windows matches them by key codes that
+ * differ between layouts, so on Windows and Linux the recorder ignores them.
+ */
+const SIGN_CODES = new Set([
+  "Comma",
+  "Period",
+  "Minus",
+  "Equal",
+  "Semicolon",
+  "Quote",
+  "Slash",
+  "Backslash",
+  "BracketLeft",
+  "BracketRight",
+  "Backquote",
+  "IntlBackslash",
+  "IntlRo",
+  "IntlYen",
+]);
 
 const NAMED_KEYS: Record<string, string> = {
   ArrowUp: "Up",
@@ -59,19 +71,7 @@ const NAMED_KEYS: Record<string, string> = {
  */
 export function acceleratorFromEvent(event: KeyboardEvent, mac = IS_MAC): string | null {
   if (MODIFIER_KEYS.has(event.key)) return null;
-  const code = event.code;
-  // macOS reads a letter or sign by key position, but Windows and Linux
-  // read it by what the layout types (AZERTY's A key is "KeyQ", and its M
-  // key is "Semicolon"), so record what this OS will match. Digits are the
-  // number-row keys everywhere.
-  const typed = /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : PUNCTUATION[event.key];
-  const key = /^Digit\d$/.test(code)
-    ? code.slice(5)
-    : !mac && typed
-      ? typed
-      : /^Key[A-Z]$/.test(code)
-        ? code.slice(3)
-        : (NAMED_KEYS[code] ?? code);
+  const key = mac ? keyByPosition(event.code) : keyByLayout(event);
   if (!key) return null;
   const functionKey = /^F\d{1,2}$/.test(key);
   const strongModifier = event.ctrlKey || event.altKey || event.metaKey;
@@ -83,6 +83,32 @@ export function acceleratorFromEvent(event: KeyboardEvent, mac = IS_MAC): string
     event.metaKey && "Super",
   ].filter((modifier): modifier is string => Boolean(modifier));
   return [...modifiers, key].join("+");
+}
+
+/** macOS reads every key by its position. */
+function keyByPosition(code: string): string {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit\d$/.test(code)) return code.slice(5);
+  return NAMED_KEYS[code] ?? code;
+}
+
+/**
+ * Windows and Linux read a letter by what the layout types (AZERTY's A key
+ * is "KeyQ", its M key "Semicolon"), so take the typed letter. Digits and
+ * numpad keys are fixed keys everywhere. Of the signs, only the three in
+ * `LAYOUT_SIGNS` are found the same way on every layout, and only without
+ * Shift, which changes the sign; any other sign gives `undefined`.
+ */
+function keyByLayout(event: KeyboardEvent): string | undefined {
+  const code = event.code;
+  if (/^Digit\d$/.test(code)) return code.slice(5);
+  if (code.startsWith("Numpad")) return code;
+  if (/^[a-z]$/i.test(event.key)) return event.key.toUpperCase();
+  const sign = event.shiftKey ? undefined : LAYOUT_SIGNS[event.key];
+  if (sign) return sign;
+  if (SIGN_CODES.has(code)) return undefined;
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  return NAMED_KEYS[code] ?? code;
 }
 
 const MAC_SYMBOLS: Record<string, string> = {

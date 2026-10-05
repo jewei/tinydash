@@ -27,6 +27,15 @@ describe("acceleratorFromEvent", () => {
     expect(acceleratorFromEvent(press("KeyM", ",", { ctrlKey: true }), false)).toBe(
       "Control+Comma",
     );
+    // German: Shift+, types ";", which Windows would find on another key.
+    const germanShiftComma = press("Comma", ";", { ctrlKey: true, shiftKey: true });
+    expect(acceleratorFromEvent(germanShiftComma, false)).toBeNull();
+    expect(acceleratorFromEvent(germanShiftComma, true)).toBe("Control+Shift+Comma");
+    // Signs whose Windows key differs by layout are not recorded there.
+    expect(acceleratorFromEvent(press("Semicolon", ";", { ctrlKey: true }), false)).toBeNull();
+    // Numpad keys stay numpad keys.
+    const numpadMinus = press("NumpadSubtract", "-", { ctrlKey: true });
+    expect(acceleratorFromEvent(numpadMinus, false)).toBe("Control+NumpadSubtract");
     // A layout that types another script falls back to the key position.
     expect(acceleratorFromEvent(press("KeyQ", "й", { ctrlKey: true }), false)).toBe("Control+Q");
   });
