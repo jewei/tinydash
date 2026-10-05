@@ -127,7 +127,8 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             let id = search::resolve(&snapshot, &Context::none(), &id)
                 .ok_or_else(|| Error::msg("This item no longer exists."))?
                 .id;
-            if let Some(oldest) = pin_to_drop(&snapshot)? {
+            let indexed = state.freshness.apps.built() && state.freshness.files.built();
+            if let Some(oldest) = pin_to_drop(&snapshot, indexed)? {
                 state.store.set_pinned(&oldest, false)?;
                 state.pins.update(|pins| pins.remove(&oldest));
             }
@@ -170,15 +171,19 @@ fn open_path(path: &Path) -> Result<()> {
 /// A pin of a hidden item (a file outside the index, or a clipboard entry
 /// while history is off) waits for its item to return, but it cannot be
 /// unpinned, so it gives up its place when the list is full. That way no
-/// more than `MAX_PINS` pins ever show.
-fn pin_to_drop(snapshot: &Snapshot) -> Result<Option<String>> {
+/// more than `MAX_PINS` pins ever show. Until the first app and file scans
+/// finish (`indexed`), their pins only look hidden, so they stay.
+fn pin_to_drop(snapshot: &Snapshot, indexed: bool) -> Result<Option<String>> {
     let pins = snapshot.pins.ids();
     if pins.len() < MAX_PINS {
         return Ok(None);
     }
     let ctx = Context::none();
+    let scanned = |pin: &str| {
+        indexed || !Source::parse(pin).is_some_and(|(s, _)| matches!(s, Source::App | Source::File))
+    };
     pins.iter()
-        .find(|pin| search::resolve(snapshot, &ctx, pin).is_none())
+        .find(|pin| scanned(pin) && search::resolve(snapshot, &ctx, pin).is_none())
         .map(|pin| Some(pin.clone()))
         .ok_or_else(|| Error::msg(format!("You can pin up to {MAX_PINS} items.")))
 }
@@ -212,17 +217,22 @@ mod tests {
             .map(|result| result.id)
             .collect();
         assert_eq!(emoji.len(), MAX_PINS);
-        let drop_with = |pins: Vec<String>| {
+        let drop_with = |pins: Vec<String>, indexed: bool| {
             state.pins.set(Pins::new(pins));
-            pin_to_drop(&state.snapshot())
+            pin_to_drop(&state.snapshot(), indexed)
         };
 
-        assert_eq!(drop_with(emoji[1..].to_vec()).unwrap(), None);
+        assert_eq!(drop_with(emoji[1..].to_vec(), true).unwrap(), None);
         // History is off, so the clipboard pin is hidden too, but newer.
         let mut pins = vec!["file:/gone".to_owned(), "clip:7".to_owned()];
         pins.extend_from_slice(&emoji[2..]);
-        assert_eq!(drop_with(pins).unwrap().as_deref(), Some("file:/gone"));
-        assert!(drop_with(emoji).is_err());
+        assert_eq!(
+            drop_with(pins.clone(), true).unwrap().as_deref(),
+            Some("file:/gone")
+        );
+        // Before the first scan, the file pin may only look hidden.
+        assert_eq!(drop_with(pins, false).unwrap().as_deref(), Some("clip:7"));
+        assert!(drop_with(emoji, true).is_err());
     }
 
     #[test]

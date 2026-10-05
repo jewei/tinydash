@@ -54,6 +54,15 @@ impl Slot {
         self.dirty.store(true, Ordering::SeqCst);
     }
 
+    /// Whether the index was built at least once. Before that, every item
+    /// of this source looks missing.
+    pub fn built(&self) -> bool {
+        self.finished
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_some()
+    }
+
     /// Dirty or old, and not already being rebuilt.
     fn needs_work(&self) -> bool {
         if self.busy.load(Ordering::SeqCst) {
