@@ -35,8 +35,10 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
     if (event.key === "ArrowDown") setActive(Math.min(active() + 1, last));
     else if (event.key === "ArrowUp") setActive(Math.max(active() - 1, 0));
     else if (event.key === "Enter") choose(visible()[active()]);
-    else if (event.key === "Escape" || (hasMod(event) && event.key.toLowerCase() === "k"))
-      props.onClose();
+    else if (event.key === "Escape" || (hasMod(event) && event.key.toLowerCase() === "k")) {
+      // A held Mod+K opened the menu; its repeats must not close it again.
+      if (!event.repeat) props.onClose();
+    }
     // The filter is the only control; Tab must not move focus out of an open menu.
     else if (event.key !== "Tab") return;
     event.preventDefault();

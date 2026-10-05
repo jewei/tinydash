@@ -263,6 +263,17 @@ describe("Launcher", () => {
     expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
   });
 
+  it("keeps the action menu open while Mod+K is held", async () => {
+    const { press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByRole("combobox", { name: "Search actions" });
+    fireEvent.keyDown(filter, { key: "k", ctrlKey: true, repeat: true });
+    expect(screen.getByRole("dialog", { name: "Actions" })).toBeTruthy();
+    fireEvent.keyDown(filter, { key: "k", ctrlKey: true });
+    expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
+  });
+
   it("closes the action menu when focus leaves it", async () => {
     const { input, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
