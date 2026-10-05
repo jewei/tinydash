@@ -123,17 +123,24 @@ export function ListEditor(props: {
 }) {
   const [draft, setDraft] = createSignal("");
   const [notice, setNotice] = createSignal<string>();
+  const [saving, setSaving] = createSignal(false);
   const full = () => props.items.length >= props.max;
   // The field stays when the list is full, and Remove hands focus to it,
   // so keyboard focus never falls back to the page.
   let field!: HTMLInputElement;
+  // One change at a time: each list starts from the saved one, so an entry
+  // that the save refuses is never sent again with the next change.
   const change = (items: string[]) => {
+    setSaving(true);
     setNotice(undefined);
-    return props.onChange(items).then(setNotice);
+    return props.onChange(items).then((failure) => {
+      setNotice(failure);
+      setSaving(false);
+    });
   };
   const add = () => {
     const value = draft().trim();
-    if (full() || !value) return;
+    if (saving() || full() || !value) return;
     if (props.items.includes(value)) return setNotice(`“${value}” is already in the list.`);
     // The text stays until the save works, so a refused entry can be fixed.
     void change([...props.items, value]).then(() => {
@@ -152,7 +159,7 @@ export function ListEditor(props: {
                 class="link"
                 aria-label={`Remove ${item}`}
                 onClick={() => {
-                  void change(props.items.filter((other) => other !== item));
+                  if (!saving()) void change(props.items.filter((other) => other !== item));
                   field.focus();
                 }}
               >
@@ -180,7 +187,7 @@ export function ListEditor(props: {
         </button>
       </div>
       <p class="list-status" role="status">
-        {full() ? `The list is full (${props.max}). Remove one to add another.` : notice()}
+        {notice() ?? (full() ? `The list is full (${props.max}). Remove one to add another.` : "")}
       </p>
     </div>
   );

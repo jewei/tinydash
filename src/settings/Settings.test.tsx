@@ -247,6 +247,56 @@ describe("Settings", () => {
     expect(field.value).toBe("Projects");
   });
 
+  it("saves one folder change at a time, so a refused entry is not sent again", async () => {
+    let refuse!: () => void;
+    const refused = new Promise<void>((resolve) => (refuse = resolve));
+    const backend = fakeBackend({
+      update_settings: async (args) => {
+        const folders = (args.settings as typeof testSettings).fileSearchFolders;
+        if (folders.includes("Projects")) {
+          await refused;
+          throw "“Projects” is not a full folder path.";
+        }
+        return args.settings;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Files" }));
+    const field = await screen.findByRole("textbox", { name: "Folder to add" });
+    fireEvent.input(field, { target: { value: "Projects" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    fireEvent.click(await screen.findByRole("button", { name: "Remove ~/Desktop" }));
+    refuse();
+    const editor = within(field.closest(".list-editor") as HTMLElement);
+    await waitFor(() =>
+      expect(editor.getByRole("status").textContent).toContain("not a full folder path"),
+    );
+    expect(backend.called("update_settings")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Remove ~/Desktop" }));
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
+    expect(backend.called("update_settings")[1]?.args).toMatchObject({
+      settings: { fileSearchFolders: ["~/Documents", "~/Downloads"] },
+    });
+  });
+
+  it("shows a save error even when the list is full", async () => {
+    const folders = Array.from({ length: 50 }, (_, index) => `~/Folder${index}`);
+    fakeBackend({
+      get_settings: () => ({ ...testSettings, fileSearchFolders: folders }),
+      update_settings: () => {
+        throw "“Projects” is not a full folder path.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Files" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove ~/Folder3" }));
+    const field = screen.getByRole("textbox", { name: "Folder to add" });
+    const editor = within(field.closest(".list-editor") as HTMLElement);
+    await waitFor(() =>
+      expect(editor.getByRole("status").textContent).toContain("not a full folder path"),
+    );
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
