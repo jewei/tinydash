@@ -1,6 +1,7 @@
 // Regenerate src-tauri/data/emoji/*.tsv from pinned Unicode CLDR data.
-// Run with `bun run emoji-data`. To update CLDR, change the revision, run the
-// script once to see the new hashes, review the diff, and pin the hashes.
+// Run with `bun run emoji-data`. To update CLDR, change the revision and run
+// the script: it checks every source first and prints all new hashes at once,
+// writing nothing until all of them match. Review the data, then pin the hashes.
 import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 
@@ -25,34 +26,43 @@ const languages: Record<string, [string, string]> = {
 
 type Annotations = Record<string, { default?: string[]; tts?: string[] }>;
 
-async function annotations(path: string, sha256: string, key: string): Promise<Annotations> {
-  const response = await fetch(`${base}/${path}`);
-  if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`);
-  const text = await response.text();
-  const actual = createHash("sha256").update(text).digest("hex");
-  if (actual !== sha256) throw new Error(`${path}: expected ${sha256}, got ${actual}`);
-  return JSON.parse(text)[key].annotations;
+const sources = Object.entries(languages).flatMap(([language, [plain, derived]]) => [
+  {
+    language,
+    sha256: plain,
+    key: "annotations",
+    path: `cldr-annotations-full/annotations/${language}/annotations.json`,
+  },
+  {
+    language,
+    sha256: derived,
+    key: "annotationsDerived",
+    path: `cldr-annotations-derived-full/annotationsDerived/${language}/annotations.json`,
+  },
+]);
+
+const downloads = await Promise.all(
+  sources.map(async (source) => {
+    const response = await fetch(`${base}/${source.path}`);
+    if (!response.ok) throw new Error(`${source.path}: HTTP ${response.status}`);
+    const text = await response.text();
+    return { ...source, text, actual: createHash("sha256").update(text).digest("hex") };
+  }),
+);
+const mismatches = downloads.filter((download) => download.actual !== download.sha256);
+if (mismatches.length > 0) {
+  for (const { path, actual } of mismatches) console.error(`${path}\n  new SHA-256: ${actual}`);
+  throw new Error("Source hashes changed; review the data and pin the new hashes.");
 }
 
 const byCodePoint = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 const skinTone = /[\u{1f3fb}-\u{1f3ff}]/u;
 
-for (const [language, [plainHash, derivedHash]] of Object.entries(languages)) {
-  const sources = [
-    await annotations(
-      `cldr-annotations-full/annotations/${language}/annotations.json`,
-      plainHash,
-      "annotations",
-    ),
-    await annotations(
-      `cldr-annotations-derived-full/annotationsDerived/${language}/annotations.json`,
-      derivedHash,
-      "annotationsDerived",
-    ),
-  ];
+for (const language of Object.keys(languages)) {
   const rows = new Map<string, { name: string; terms: Set<string> }>();
-  for (const source of sources) {
-    for (const [emoji, { tts = [], default: keywords = [] }] of Object.entries(source)) {
+  for (const download of downloads.filter((d) => d.language === language)) {
+    const annotations: Annotations = JSON.parse(download.text)[download.key].annotations;
+    for (const [emoji, { tts = [], default: keywords = [] }] of Object.entries(annotations)) {
       // The app derives skin-tone variants itself; index base emoji only.
       if (skinTone.test(emoji)) continue;
       const row = rows.get(emoji) ?? { name: "", terms: new Set<string>() };
