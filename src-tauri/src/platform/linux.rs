@@ -147,7 +147,7 @@ pub fn clipboard_change() -> u64 {
 
 /// Text captured by the GTK handler for the latest change. Linux saves text
 /// only: GTK reads it in the same request chain that checked for secrets.
-pub fn read_clipboard(_: &mut arboard::Clipboard, _images: bool, _files: bool) -> Option<Content> {
+pub fn read_clipboard(_images: bool, _files: bool) -> Option<Content> {
     CAPTURED
         .lock()
         .unwrap_or_else(|e| e.into_inner())

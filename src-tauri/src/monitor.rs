@@ -30,7 +30,6 @@ pub fn start(app: &AppHandle) {
 
 fn capture_forever(app: &AppHandle) {
     let state = app.state::<State>();
-    let mut reader = None;
     // Content that was already on the clipboard at startup is not captured.
     let mut seen = platform::clipboard_change();
     loop {
@@ -44,16 +43,7 @@ fn capture_forever(app: &AppHandle) {
         if !settings.clipboard_history_enabled {
             continue;
         }
-        if reader.is_none() {
-            reader = arboard::Clipboard::new()
-                .inspect_err(|error| tracing::warn!(%error, "Cannot read the clipboard"))
-                .ok();
-        }
-        let Some(reader) = reader.as_mut() else {
-            continue;
-        };
         let content = platform::read_clipboard(
-            reader,
             settings.clipboard_capture_images,
             settings.clipboard_capture_files,
         );

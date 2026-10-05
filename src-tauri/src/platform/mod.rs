@@ -14,8 +14,8 @@
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
-//! - `read_clipboard(reader, images, files)`: the content for the latest
-//!   change, or `None` when its source marked it secret.
+//! - `read_clipboard(images, files)`: the content for the latest change, or
+//!   `None` when its source marked it secret or it cannot be read.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `watch_clipboard(capturing)`: start change notifications; call on the
 //!   main thread. `capturing` says whether history is on, so nothing is read
@@ -82,11 +82,10 @@ fn place_in_physical_pixels(
 /// Read what the clipboard holds, in the order apps expect: copied files
 /// first (Finder also offers their names as text), then text, then images.
 /// Kinds the user did not opt into are skipped, not saved as text.
-fn read_with_arboard(
-    reader: &mut arboard::Clipboard,
-    images: bool,
-    files: bool,
-) -> Option<Content> {
+fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
+    let mut reader = arboard::Clipboard::new()
+        .inspect_err(|error| tracing::warn!(%error, "Cannot read the clipboard"))
+        .ok()?;
     if let Ok(paths) = reader.get().file_list()
         && !paths.is_empty()
     {

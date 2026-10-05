@@ -179,15 +179,11 @@ fn clipboard_is_concealed() -> bool {
 /// Windows needs no change notifications: `clipboard_change` is a cheap counter.
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
-pub fn read_clipboard(
-    reader: &mut arboard::Clipboard,
-    images: bool,
-    files: bool,
-) -> Option<Content> {
+pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     if clipboard_is_concealed() {
         return None;
     }
-    super::read_with_arboard(reader, images, files)
+    super::read_with_arboard(images, files)
 }
 
 /// Marks a copy so clipboard managers skip it (`ExcludeClipboardContentFromMonitorProcessing`).
