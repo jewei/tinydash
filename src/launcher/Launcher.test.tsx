@@ -307,7 +307,51 @@ describe("Launcher", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
     await screen.findByText("Clipboard history is off");
     press("Enter");
+    press("Enter", { repeat: true });
+    press("Enter", { repeat: true });
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("update_settings")).toHaveLength(1);
+  });
+
+  it("shows no results of another tab while clipboard history is off", async () => {
+    fakeBackend({
+      launcher_init: () => ({
+        settings: { ...testSettings, clipboardHistoryEnabled: false },
+        platform: "macos",
+        warnings: [],
+      }),
+      // The Clipboard search never returns, so only the All results exist.
+      search: (args) => (args.category === "clipboard" ? new Promise(() => {}) : [app]),
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Safari/ });
+    fireEvent.click(screen.getByRole("tab", { name: "Clipboard" }));
+    await screen.findByText("Clipboard history is off");
+    expect(input.getAttribute("aria-activedescendant")).toBeNull();
+    expect(screen.queryByText("Open")).toBeNull();
+  });
+
+  it("keeps startup warnings when turning on clipboard history fails", async () => {
+    const { press } = setup(() => [], {
+      launcher_init: () => ({
+        settings: { ...testSettings, clipboardHistoryEnabled: false },
+        platform: "macos",
+        warnings: ["Could not register Control+Shift+Space."],
+      }),
+      update_settings: () => {
+        throw "Could not save settings.";
+      },
+    });
+    fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
+    await screen.findByText("Clipboard history is off");
+    press("Enter");
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("Could not save settings."),
+    );
+    press("Escape");
+    expect(screen.getByRole("alert").textContent).toContain("Could not register");
   });
 
   it("cancels a confirmation when the backdrop is clicked", async () => {

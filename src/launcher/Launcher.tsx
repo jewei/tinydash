@@ -83,19 +83,27 @@ export function Launcher() {
   /** Actions that belong to no result, such as opening Settings. */
   const runGeneral = (action: Action) => launcher.run({ label: "", action, confirm: null });
 
+  // While the Clipboard tab says history is off, it shows no results, even
+  // before its search returns; keys and hints must not act on hidden ones.
+  const results = () => (clipboardOff() ? [] : launcher.results());
+  const selected = () => (clipboardOff() ? undefined : launcher.selected());
+
   // Deleting cannot be undone, so it never waits for newer results: it acts
   // only on the highlighted entry the user can see.
   const deleteAction = () =>
-    launcher.selected()?.actions.find((entry) => entry.action.type === "deleteClip");
+    selected()?.actions.find((entry) => entry.action.type === "deleteClip");
   const canDelete = () => launcher.isCurrent() && deleteAction() !== undefined;
   const deleteSelected = () => {
     const action = deleteAction();
-    if (action && canDelete()) launcher.run(action, launcher.selected());
+    if (action && canDelete()) launcher.run(action, selected());
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.defaultPrevented || isComposing(event) || menuOpen() || launcher.pending()) return;
-    if (clipboardOff() && event.key === "Enter") return enableClipboard();
+    if (clipboardOff() && event.key === "Enter") {
+      if (!event.repeat) enableClipboard();
+      return;
+    }
     const command = commandFor(event);
     if (!command) {
       // Typing, deleting, and pasting go to the search field, even after a
@@ -137,7 +145,7 @@ export function Launcher() {
   };
 
   const menuItems = (): MenuItem[] => {
-    const result = launcher.selected();
+    const result = selected();
     const resultItems = (result?.actions ?? []).map((action) => ({
       label: action.label,
       keys: result && shortcutFor(result, action.action),
@@ -160,7 +168,7 @@ export function Launcher() {
     ipc
       .updateSettings({ ...current, clipboardHistoryEnabled: true })
       .then(applySettings)
-      .catch((error) => setWarnings([ipc.message(error)]));
+      .catch((error) => setWarnings((list) => [ipc.message(error), ...list]));
   };
 
   const notice = () => launcher.actionError() ?? launcher.searchError() ?? warnings()[0];
@@ -173,11 +181,9 @@ export function Launcher() {
           ref={input}
           class="search-input"
           role="combobox"
-          aria-expanded={launcher.results().length > 0}
-          aria-controls={launcher.results().length ? "results" : undefined}
-          aria-activedescendant={
-            launcher.results().length ? optionId(launcher.selectedIndex()) : undefined
-          }
+          aria-expanded={results().length > 0}
+          aria-controls={results().length ? "results" : undefined}
+          aria-activedescendant={results().length ? optionId(launcher.selectedIndex()) : undefined}
           placeholder="Search apps, files, clipboard, and more"
           value={launcher.query()}
           onInput={(event) => launcher.setQuery(event.currentTarget.value)}
@@ -275,7 +281,7 @@ export function Launcher() {
       </main>
 
       <footer class="footer">
-        <Show when={launcher.selected()?.actions[0]}>
+        <Show when={selected()?.actions[0]}>
           {(action) => (
             <span class="footer-primary">
               {action().label} <Keys keys={["↩"]} />
