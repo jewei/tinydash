@@ -73,7 +73,16 @@ export function Library(props: { kind: LibraryKind }) {
     }
   };
 
-  const save = () => write(async () => edit(await ipc.saveLibraryItem(draft())));
+  // Typing goes on while a save runs: the reply replaces the draft only if
+  // nothing changed, and otherwise gives a new item its ID. A different
+  // item chosen meanwhile stays.
+  const save = () =>
+    write(async () => {
+      const sent = draft();
+      const saved = await ipc.saveLibraryItem(sent);
+      if (draft() === sent) edit(saved);
+      else if (draft().id === sent.id) setDraft((item) => ({ ...item, id: saved.id }));
+    });
 
   const remove = () =>
     write(async () => {

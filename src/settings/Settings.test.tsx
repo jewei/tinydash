@@ -354,6 +354,29 @@ describe("Settings", () => {
     });
   });
 
+  it("keeps typing that happens while a snippet saves", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    fakeBackend({
+      library_items: () => [],
+      save_library_item: async (args) => {
+        await slow;
+        return { ...(args.item as LibraryItem), id: 9 };
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    const name = (await screen.findByRole("textbox", { name: "Name" })) as HTMLInputElement;
+    const text = screen.getByRole("textbox", { name: "Text" }) as HTMLTextAreaElement;
+    fireEvent.input(name, { target: { value: "Greeting" } });
+    fireEvent.input(text, { target: { value: "Hello" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    fireEvent.input(text, { target: { value: "Hello world" } });
+    release();
+    await screen.findByRole("button", { name: "Delete" });
+    expect(text.value).toBe("Hello world");
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
