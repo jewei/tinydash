@@ -132,13 +132,14 @@ export function Library(props: { kind: LibraryKind }) {
           void save();
         }}
       >
+        {/* No maxLength: it counts UTF-16 units, so it would cut a name of
+            emoji short. Rust checks the limits in characters on save. */}
         <label>
           Name
           <input
             ref={nameField}
             class="field"
             required
-            maxLength={100}
             value={draft().name}
             onInput={(event) => change("name", event.currentTarget.value)}
           />
@@ -147,7 +148,6 @@ export function Library(props: { kind: LibraryKind }) {
           Keyword <span class="optional">(optional, one word)</span>
           <input
             class="field"
-            maxLength={32}
             value={draft().keyword}
             onInput={(event) => change("keyword", event.currentTarget.value)}
           />

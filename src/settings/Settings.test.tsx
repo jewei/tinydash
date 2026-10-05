@@ -209,6 +209,15 @@ describe("Settings", () => {
     expect(screen.queryByRole("switch", { name: "Save copied files" })).toBeNull();
   });
 
+  it("leaves name and keyword limits to the backend, which counts characters", async () => {
+    fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    for (const name of ["Name", /Keyword/]) {
+      expect((await screen.findByRole("textbox", { name })).hasAttribute("maxlength")).toBe(false);
+    }
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
