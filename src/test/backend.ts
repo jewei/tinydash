@@ -4,13 +4,16 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import type { SearchResult } from "../generated/SearchResult";
 import type { Settings } from "../generated/Settings";
 
-/** Rust's defaults, except clipboard history is on so its views have data. */
+/**
+ * Rust's defaults on macOS, the platform this backend reports, except
+ * clipboard history is on so its views have data.
+ */
 export const testSettings: Settings = {
   shortcut: "Control+Shift+Space",
   theme: "system",
   hideOnBlur: true,
   launchAtLogin: false,
-  showTrayIcon: true,
+  showTrayIcon: false,
   clipboardHistoryEnabled: true,
   clipboardHistoryLimit: 200,
   clipboardCaptureImages: false,
