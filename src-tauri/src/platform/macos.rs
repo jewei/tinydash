@@ -116,6 +116,12 @@ pub fn prepare_app(app: &mut tauri::App) {
     app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 }
 
+/// Opening the running app from Finder or Spotlight sends this event; macOS
+/// does not start a second process.
+pub fn is_reopen(event: &tauri::RunEvent) -> bool {
+    matches!(event, tauri::RunEvent::Reopen { .. })
+}
+
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))

@@ -86,8 +86,13 @@ pub fn run() {
             commands::delete_library_item,
             commands::about,
         ])
-        .run(tauri::generate_context!())
-        .expect("TinyDash failed to start");
+        .build(tauri::generate_context!())
+        .expect("TinyDash failed to start")
+        .run(|app, event| {
+            if platform::is_reopen(&event) {
+                open(app, Launch::Launcher, true);
+            }
+        });
 }
 
 /// The database of TinyDash 0.1, which this version does not read.

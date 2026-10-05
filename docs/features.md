@@ -95,6 +95,6 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 ## Platform notes
 
-- **macOS:** app and file icons, and returning focus to the previous app after Escape or a copy. Restart, Shut Down, Log Out, and Empty Trash ask for Automation permission the first time. TinyDash has no Dock icon; the menu bar icon is off by default.
+- **macOS:** app and file icons, and returning focus to the previous app after Escape or a copy. Restart, Shut Down, Log Out, and Empty Trash ask for Automation permission the first time. TinyDash has no Dock icon; the menu bar icon is off by default, so opening TinyDash again from Finder or Spotlight shows the launcher.
 - **Windows:** the launcher uses native rounded corners. The app list comes from Start menu shortcuts (`.lnk`, `.url`, `.exe`, `.appref-ms`); Store apps without a shortcut, such as Calculator, are not listed. Results use generic icons.
 - **Linux:** apps come from desktop entries. Clipboard history saves text only. Global shortcuts need X11; on Wayland, bind a desktop shortcut to `tinydash`. Log Out and System Settings support GNOME, KDE, and Xfce.

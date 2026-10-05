@@ -80,6 +80,12 @@ pub fn prepare_app(app: &mut tauri::App) {
     let _ = app;
 }
 
+/// Opening the app again starts a second process, which the single-instance
+/// plugin hands over, so no event needs handling.
+pub fn is_reopen(_: &tauri::RunEvent) -> bool {
+    false
+}
+
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     // Files in the user's AppData folder are private to the user by default.
     let _ = path;

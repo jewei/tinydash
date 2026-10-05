@@ -83,6 +83,12 @@ pub fn prepare_app(app: &mut tauri::App) {
     let _ = app;
 }
 
+/// Opening the app again starts a second process, which the single-instance
+/// plugin hands over, so no event needs handling.
+pub fn is_reopen(_: &tauri::RunEvent) -> bool {
+    false
+}
+
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
