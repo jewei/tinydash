@@ -377,6 +377,29 @@ describe("Settings", () => {
     expect(text.value).toBe("Hello world");
   });
 
+  it("leaves a new snippet opened during a save without the saved one's ID", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    fakeBackend({
+      library_items: () => [],
+      save_library_item: async (args) => {
+        await slow;
+        return { ...(args.item as LibraryItem), id: 9 };
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.input(await screen.findByRole("textbox", { name: "Name" }), {
+      target: { value: "Greeting" },
+    });
+    fireEvent.input(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    fireEvent.click(screen.getByRole("button", { name: "New Snippet" }));
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
