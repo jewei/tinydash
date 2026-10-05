@@ -66,7 +66,12 @@ type Handler = (args: Record<string, unknown>) => unknown;
 export function fakeBackend(handlers: Record<string, Handler> = {}) {
   const calls: Call[] = [];
   const defaults: Record<string, Handler> = {
-    launcher_init: () => ({ settings: testSettings, platform: "macos", warnings: [] }),
+    launcher_init: () => ({
+      settings: testSettings,
+      platform: "macos",
+      warnings: [],
+      category: null,
+    }),
     search: () => [],
     run_action: () => null,
     preview: () => null,

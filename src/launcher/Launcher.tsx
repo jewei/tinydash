@@ -70,6 +70,7 @@ export function Launcher() {
         applySettings(init.settings);
         setPlatform(init.platform);
         setWarnings(init.warnings);
+        if (init.category) launcher.setCategory(init.category);
       })
       .catch((error) => setWarnings([ipc.message(error)]));
     void launcher.refresh();

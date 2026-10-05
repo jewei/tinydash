@@ -38,6 +38,8 @@ pub struct LauncherInit {
     pub platform: Platform,
     /// Startup problems to show once.
     pub warnings: Vec<String>,
+    /// The category of the latest show, which may predate the page.
+    pub category: Option<Category>,
 }
 
 #[derive(Clone, Copy, Serialize, TS)]
@@ -79,6 +81,10 @@ pub fn launcher_init(state: tauri::State<State>) -> LauncherInit {
         settings: Settings::clone(&state.settings.get()),
         platform: PLATFORM,
         warnings: std::mem::take(&mut *state.warnings.lock().unwrap_or_else(|e| e.into_inner())),
+        category: *state
+            .shown_category
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()),
     }
 }
 

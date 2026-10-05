@@ -27,6 +27,10 @@ pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
         tracing::debug!(%error, "Could not place the launcher");
     }
     // Reset the view before it becomes visible, so the old query never flashes.
+    *app.state::<State>()
+        .shown_category
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = category;
     events::launcher_shown(app, category);
     window.show()?;
     window.set_focus()?;

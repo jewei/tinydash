@@ -95,6 +95,22 @@ describe("Launcher", () => {
     expect(backend.called("run_action")[0]?.args.action).toEqual(app.actions[1]?.action);
   });
 
+  it("opens in the category of a show that came before the page loaded", async () => {
+    const backend = fakeBackend({
+      launcher_init: () => ({
+        settings: testSettings,
+        platform: "macos",
+        warnings: [],
+        category: "emoji",
+      }),
+    });
+    render(() => <Launcher />);
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Emoji" }).getAttribute("aria-selected")).toBe("true"),
+    );
+    expect(backend.called("search").at(-1)?.args).toEqual({ query: "", category: "emoji" });
+  });
+
   it("hides with Escape", async () => {
     const { backend, press } = setup(() => []);
     press("Escape");

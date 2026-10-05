@@ -17,7 +17,7 @@ use crate::{
     },
     refresh::Freshness,
     search::{
-        Snapshot,
+        Category, Snapshot,
         usage::{Pins, Usage},
     },
     settings::Settings,
@@ -52,6 +52,9 @@ pub struct State {
     pub settings_change: Mutex<()>,
     /// Problems found at startup, shown once in the launcher.
     pub warnings: Mutex<Vec<String>>,
+    /// The category of the latest show. A launcher page that loads after the
+    /// show event, as at startup, reads it instead.
+    pub shown_category: Mutex<Option<Category>>,
 }
 
 impl State {
@@ -95,6 +98,7 @@ impl State {
             dirs,
             settings_change: Mutex::new(()),
             warnings: Mutex::new(warnings),
+            shown_category: Mutex::new(None),
         }
     }
 
@@ -165,7 +169,7 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::search::{self, Category};
+    use crate::search;
 
     fn state_with_clip(clipboard_history_enabled: bool) -> State {
         let state = State::for_tests(Settings {
