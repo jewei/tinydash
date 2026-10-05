@@ -184,25 +184,30 @@ pub fn lists(
 }
 
 /// Drop folders whose contents a scan of another configured folder already
-/// lists, so nothing is scanned twice and nothing is missed.
+/// lists, so nothing is scanned twice and nothing is missed. Folders are
+/// compared by real path: the walk follows a root that is a link but no
+/// link inside it, so `~/Dropbox`, a link to a folder under `~/Library`, is
+/// covered by `~` while a link to another disk is not.
 fn distinct_roots(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = folders.iter().filter(|f| f.is_dir()).cloned().collect();
+    let mut roots: Vec<(PathBuf, &PathBuf)> = folders
+        .iter()
+        .filter(|folder| folder.is_dir())
+        .map(|folder| {
+            (
+                std::fs::canonicalize(folder).unwrap_or_else(|_| folder.clone()),
+                folder,
+            )
+        })
+        .collect();
     roots.sort();
-    roots.dedup();
-    let mut distinct: Vec<PathBuf> = Vec::new();
-    for root in roots {
-        // The scan does not follow links inside a folder, so a folder
-        // reached through one is not covered; as a root of its own, the
-        // walk follows it.
-        let through_link = root
-            .ancestors()
-            .take_while(|folder| !distinct.iter().any(|kept| kept == folder))
-            .any(Path::is_symlink);
-        let covered = !through_link
-            && lists(&root, true, &distinct, excluded, packages)
-            && !is_package(&root, packages);
+    roots.dedup_by(|a, b| a.0 == b.0);
+    let mut kept: Vec<PathBuf> = Vec::new();
+    let mut distinct = Vec::new();
+    for (real, folder) in roots {
+        let covered = lists(&real, true, &kept, excluded, packages) && !is_package(&real, packages);
         if !covered {
-            distinct.push(root);
+            kept.push(real);
+            distinct.push(folder.clone());
         }
     }
     distinct
@@ -397,14 +402,19 @@ mod tests {
     // Windows needs special rights to create a link.
     #[cfg(unix)]
     #[test]
-    fn a_nested_root_reached_through_a_link_is_scanned() {
+    fn a_nested_root_reached_through_a_link_is_compared_by_real_path() {
         let outer = std::env::temp_dir().join(format!("tinydash-linked-{}", std::process::id()));
         let elsewhere = outer.with_extension("target");
-        std::fs::create_dir_all(&outer).unwrap();
+        std::fs::create_dir_all(outer.join("Library/Dropbox")).unwrap();
         std::fs::create_dir_all(&elsewhere).unwrap();
-        std::os::unix::fs::symlink(&elsewhere, outer.join("Dropbox")).unwrap();
-        let folders = [outer.clone(), outer.join("Dropbox")];
-        assert_eq!(distinct_roots(&folders, &[], &[]), folders);
+        // A link to a folder the outer scan lists adds nothing; a link to a
+        // folder outside it is scanned on its own.
+        std::os::unix::fs::symlink(outer.join("Library/Dropbox"), outer.join("Dropbox")).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, outer.join("External")).unwrap();
+        let folders = [outer.clone(), outer.join("Dropbox"), outer.join("External")];
+        let mut kept = distinct_roots(&folders, &[], &[]);
+        kept.sort();
+        assert_eq!(kept, [outer.clone(), outer.join("External")]);
         std::fs::remove_dir_all(&outer).unwrap();
         std::fs::remove_dir_all(elsewhere).unwrap();
     }
