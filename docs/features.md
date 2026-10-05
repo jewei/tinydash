@@ -60,7 +60,7 @@ Every All search with text ends with a web search on the chosen engine (Settings
 
 ## Clipboard history
 
-Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash saves what you copy, newest first, up to the limit you choose (1–1000; pins do not count).
+Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash saves what you copy, newest first, up to the limit you choose (1–1000; pins do not count). Turning history off hides saved entries, and their pins, but keeps them until you clear them; turning it on again shows them.
 
 - Text up to 16 KB. Images (up to 32, each at most 8 MB and 16 megapixels) and copied files (up to 64 paths, as references) are separate opt-ins.
 - Copies marked secret by password managers are never read. On macOS, copies made while Passwords or Keychain Access is in front are skipped.

@@ -1,4 +1,7 @@
-use std::{path::PathBuf, sync::Mutex};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 use chrono::Local;
 
@@ -92,11 +95,19 @@ impl State {
     }
 
     pub fn snapshot(&self) -> Snapshot {
+        let settings = self.settings.get();
+        // While history is off, saved entries stay in the database but are
+        // hidden, so no result can act on an entry the user cannot see.
+        let clipboard = if settings.clipboard_history_enabled {
+            self.clipboard.get()
+        } else {
+            Arc::default()
+        };
         Snapshot {
-            settings: self.settings.get(),
+            settings,
             apps: self.apps.get(),
             files: self.files.get(),
-            clipboard: self.clipboard.get(),
+            clipboard,
             library: self.library.get(),
             emoji: self.emoji.get(),
             usage: self.usage.get(),
@@ -124,5 +135,55 @@ impl State {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .push(message);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        features::clipboard::Content,
+        search::{self, Category},
+    };
+
+    fn state_with_clip(clipboard_history_enabled: bool) -> State {
+        let store = Store::in_memory();
+        store
+            .save_clip(&Content::Text("secret note".into()), 1, 10)
+            .unwrap();
+        let settings = Settings {
+            clipboard_history_enabled,
+            ..Settings::default()
+        };
+        let dirs = Dirs {
+            config: PathBuf::new(),
+            data: PathBuf::new(),
+            home: PathBuf::new(),
+        };
+        State::new(settings, store, dirs, Vec::new())
+    }
+
+    fn titles(state: &State, query: &str, category: Category) -> Vec<String> {
+        search::search(&state.snapshot(), query, category)
+            .into_iter()
+            .filter(|result| result.id.starts_with("clip:"))
+            .map(|result| result.title)
+            .collect()
+    }
+
+    #[test]
+    fn hides_saved_clips_while_history_is_off() {
+        let on = state_with_clip(true);
+        assert_eq!(titles(&on, "", Category::Clipboard), ["secret note"]);
+        assert_eq!(titles(&on, "secret", Category::All), ["secret note"]);
+
+        let off = state_with_clip(false);
+        for (query, category) in [
+            ("", Category::Clipboard),
+            ("secret", Category::Clipboard),
+            ("secret", Category::All),
+        ] {
+            assert!(titles(&off, query, category).is_empty());
+        }
     }
 }
