@@ -291,26 +291,32 @@ impl Store {
         })
     }
 
-    /// Insert or update an item, returning it with its ID.
+    /// Insert or update an item, returning it with its ID. Updating an item
+    /// that was deleted meanwhile fails instead of saving nothing.
     pub fn save_library_item(&self, item: &LibraryItem) -> Result<LibraryItem> {
         let kind = match item.kind {
             LibraryKind::Snippet => "snippet",
             LibraryKind::Quicklink => "quicklink",
         };
-        let id = self.with(|db| match item.id {
+        let (id, changed) = self.with(|db| match item.id {
             Some(id) => db
                 .execute(
                     "UPDATE library SET kind = ?2, name = ?3, keyword = ?4, text = ?5 WHERE id = ?1",
                     params![id, kind, item.name, item.keyword, item.text],
                 )
-                .map(|_| id),
+                .map(|changed| (id, changed)),
             None => db
                 .execute(
                     "INSERT INTO library (kind, name, keyword, text) VALUES (?1, ?2, ?3, ?4)",
                     params![kind, item.name, item.keyword, item.text],
                 )
-                .map(|_| db.last_insert_rowid()),
+                .map(|changed| (db.last_insert_rowid(), changed)),
         })?;
+        if changed == 0 {
+            return Err(crate::error::Error::msg(
+                "This item was deleted, so it was not saved. Choose New to add it again.",
+            ));
+        }
         Ok(LibraryItem {
             id: Some(id),
             ..item.clone()
@@ -544,13 +550,15 @@ mod tests {
         store
             .save_library_item(&LibraryItem {
                 text: "Cheers".into(),
-                ..saved
+                ..saved.clone()
             })
             .unwrap();
         assert_eq!(store.library().unwrap()[0].text, "Cheers");
         store.delete_library_item(id).unwrap();
         assert!(store.library().unwrap().is_empty());
         assert!(store.pins().unwrap().ids().is_empty());
+        assert!(store.save_library_item(&saved).is_err());
+        assert!(store.library().unwrap().is_empty());
     }
 
     #[test]
