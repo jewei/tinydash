@@ -21,7 +21,8 @@ use crate::{
 pub const FILE_MANAGER: &str = "Files";
 pub const NATIVE_ICONS: bool = false;
 /// inotify needs one watch per folder from a shared per-user limit, so only
-/// the top folders are watched; deeper changes show up at the 15-minute rescan.
+/// the top folders are watched; deeper changes show up at the next rescan,
+/// when the launcher opens and the index is more than 15 minutes old.
 pub const RECURSIVE_WATCH: bool = false;
 pub const TEMPLATE_TRAY_ICON: bool = false;
 

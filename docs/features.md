@@ -25,14 +25,14 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 
 ## Categories
 
-**All** mixes everything. An empty All shows pins, then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source; its empty view is listed below.
+**All** mixes everything. An empty All shows pins, then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results.
 
 | Category  | Finds                                                                                                                    | Empty view                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
-| Apps      | Installed apps by name, bundle name, or executable                                                                       | All apps, most used first   |
+| Apps      | Installed apps by name, bundle name, or executable                                                                       | Apps, most used first       |
 | Files     | Names of files and folders in the indexed folders                                                                        | Files you opened before     |
 | Clipboard | Text, images, and file lists you copied                                                                                  | Newest first                |
-| Snippets  | Saved snippets and quicklinks by name or keyword                                                                         | All of them                 |
+| Snippets  | Saved snippets and quicklinks by name or keyword                                                                         | Snippets and quicklinks     |
 | Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                       | Most used, then the catalog |
 | System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
 
@@ -74,10 +74,11 @@ Create them in Settings > Snippets and Settings > Quicklinks.
 
 - **Snippet:** text with optional `{date}`, `{time}`, `{datetime}`, and `{clipboard}`. Enter fills the placeholders and copies the text.
 - **Quicklink:** an http, https, or mailto URL, or an absolute or `~` path. `{query}` takes the text you type after the keyword, encoded: with keyword `jira` and URL `https://jira.example.com/browse/{query}`, typing `jira ABC-12` opens that issue.
+- Limits: 500 snippets and quicklinks in all. A name has up to 100 characters, the text up to 32 KB, and the optional keyword is one word of up to 32 characters.
 
 ## Files
 
-TinyDash indexes the names of files and folders in Desktop, Documents, and Downloads (change in Settings > Files), up to 50,000 entries. It skips hidden entries, symbolic links, and folders named in the skip list (`node_modules`, `target` by default). It never reads file contents. Changes are picked up the next time the launcher opens. On Linux, only changes directly inside the chosen folders are noticed at once (each watched folder uses a system-wide watch slot); deeper changes appear within 15 minutes. One word matches names; two or more words also match paths, so `project readme` finds `project/README.md`.
+TinyDash indexes the names of files and folders in Desktop, Documents, and Downloads (change in Settings > Files), up to 50,000 entries. It skips hidden entries, symbolic links, and folders named in the skip list (`node_modules`, `target` by default). It never reads file contents. Changes are picked up the next time the launcher opens. On Linux, only changes directly inside the chosen folders are noticed at once (each watched folder uses one inotify watch from a per-user limit); deeper changes appear at the next full rescan, which starts when the launcher opens and the index is more than 15 minutes old. One word matches names; two or more words also match paths, so `project readme` finds `project/README.md`.
 
 ## Settings
 
@@ -95,5 +96,5 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 ## Platform notes
 
 - **macOS:** app and file icons, and returning focus to the previous app after Escape or a copy. Restart, Shut Down, Log Out, and Empty Trash ask for Automation permission the first time. TinyDash has no Dock icon; the menu bar icon is off by default.
-- **Windows:** the launcher uses native rounded corners. The app list comes from Start menu shortcuts (`.lnk`, `.url`, `.exe`); Store apps without a shortcut, such as Calculator, are not listed. Results use generic icons.
+- **Windows:** the launcher uses native rounded corners. The app list comes from Start menu shortcuts (`.lnk`, `.url`, `.exe`, `.appref-ms`); Store apps without a shortcut, such as Calculator, are not listed. Results use generic icons.
 - **Linux:** apps come from desktop entries. Clipboard history saves text only. Global shortcuts need X11; on Wayland, bind a desktop shortcut to `tinydash`. Log Out and System Settings support GNOME, KDE, and Xfce.
