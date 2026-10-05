@@ -1,7 +1,16 @@
 //! The global shortcut that toggles the launcher.
+//!
+//! The plugin calls the OS on the main thread and waits for it. `register`
+//! and `unregister` take the plugin's lock only after that wait, so they are
+//! safe from any thread. `unregister_all` holds the lock while it waits, and
+//! a key press needs the lock, so it is never used.
+
+use std::sync::{Mutex, MutexGuard};
 
 use tauri::{AppHandle, Manager, Wry, plugin::TauriPlugin};
-use tauri_plugin_global_shortcut::{Builder, GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{
+    Builder, Error as ShortcutError, GlobalShortcutExt, Shortcut, ShortcutState,
+};
 
 use crate::{
     error::{Error, Result},
@@ -9,13 +18,26 @@ use crate::{
     window,
 };
 
+/// The shortcut TinyDash registered, if any. Startup and the settings lock
+/// keep changes to it one at a time; it is never locked during a wait.
+static REGISTERED: Mutex<Option<Shortcut>> = Mutex::new(None);
+
 pub fn plugin() -> TauriPlugin<Wry> {
     Builder::new()
         .with_handler(|app, _, event| {
             if event.state() != ShortcutState::Pressed {
                 return;
             }
-            if let Err(error) = window::toggle(app) {
+            // On X11 this runs on the hotkey thread while the plugin holds its
+            // lock, and a shortcut change on the main thread waits for that
+            // thread. Waiting here for the main thread would freeze both.
+            let handle = app.clone();
+            let posted = app.run_on_main_thread(move || {
+                if let Err(error) = window::toggle(&handle) {
+                    tracing::warn!(%error, "Could not toggle the launcher");
+                }
+            });
+            if let Err(error) = posted {
                 tracing::warn!(%error, "Could not toggle the launcher");
             }
         })
@@ -28,40 +50,30 @@ pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
     let shortcut: Shortcut = accelerator
         .parse()
         .map_err(|error| Error::msg(format!("“{accelerator}” is not a valid shortcut: {error}")))?;
-    on_main_thread(app, move |app| {
-        let shortcuts = app.global_shortcut();
-        shortcuts.unregister_all().ok();
-        shortcuts.register(shortcut)
-    })?
-    .map_err(|error| {
+    unregister(app).ok();
+    app.global_shortcut().register(shortcut).map_err(|error| {
         let hint = if cfg!(target_os = "linux") {
             " On Wayland, assign a desktop shortcut that runs `tinydash` instead."
         } else {
             " Another app may already use it."
         };
         Error::msg(format!("Could not register {accelerator}: {error}.{hint}"))
-    })
+    })?;
+    *registered() = Some(shortcut);
+    Ok(())
 }
 
-/// Run `work` on the main thread and wait for it. The shortcut plugin locks
-/// its own state and then waits for the main thread, while the main thread
-/// takes that lock to deliver key presses; calling it from the main thread
-/// keeps the two from waiting on each other.
-fn on_main_thread<T: Send + 'static>(
-    app: &AppHandle,
-    work: impl FnOnce(&AppHandle) -> T + Send + 'static,
-) -> Result<T> {
-    if std::thread::current().name() == Some("main") {
-        return Ok(work(app));
-    }
-    let (sender, receiver) = std::sync::mpsc::channel();
-    let handle = app.clone();
-    app.run_on_main_thread(move || {
-        let _ = sender.send(work(&handle));
-    })?;
-    receiver
-        .recv()
-        .map_err(|_| Error::msg("The main thread stopped before the shortcut changed."))
+fn unregister(app: &AppHandle) -> std::result::Result<(), ShortcutError> {
+    let Some(shortcut) = *registered() else {
+        return Ok(());
+    };
+    app.global_shortcut().unregister(shortcut)?;
+    *registered() = None;
+    Ok(())
+}
+
+fn registered() -> MutexGuard<'static, Option<Shortcut>> {
+    REGISTERED.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// Pause while Settings records a new shortcut, so pressing the current
@@ -74,8 +86,7 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     if paused {
-        on_main_thread(app, |app| app.global_shortcut().unregister_all())?
-            .map_err(|error| Error::msg(error.to_string()))
+        unregister(app).map_err(|error| Error::msg(error.to_string()))
     } else {
         register(app, &state.settings.get().shortcut)
     }
