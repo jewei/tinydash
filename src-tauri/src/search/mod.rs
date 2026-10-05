@@ -243,7 +243,16 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
 
     let fallback = usize::from(!keyword_search);
     let room = ALL_LIMIT.saturating_sub(results.len() + fallback);
-    results.extend(ranked.into_iter().take(room).map(|(_, hit)| hit.result));
+    // A quicklink's keyword answer has the quicklink's own ID; keep only the
+    // answer, which carries the typed text, so no two rows share an ID.
+    let answered: Vec<String> = results.iter().map(|r| r.id.clone()).collect();
+    results.extend(
+        ranked
+            .into_iter()
+            .map(|(_, hit)| hit.result)
+            .filter(|result| !answered.contains(&result.id))
+            .take(room),
+    );
     if !keyword_search {
         results.push(web::fallback(query, s.settings.search_engine));
     }
@@ -295,6 +304,27 @@ mod tests {
         let plain = search(&snapshot, "a", Category::All);
         assert_eq!(plain.len(), ALL_LIMIT);
         assert_eq!(plain[ALL_LIMIT - 1].kind, ResultKind::WebSearch);
+    }
+
+    #[test]
+    fn a_quicklink_shows_once_when_its_keyword_answers() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings::default());
+        let item = LibraryItem {
+            id: None,
+            kind: LibraryKind::Quicklink,
+            name: "Jira".into(),
+            keyword: "jira".into(),
+            text: "https://jira.test/browse/{query}".into(),
+        };
+        state.store.save_library_item(&item).unwrap();
+        state.reload_library().unwrap();
+        let results = search(&state.snapshot(), "jira a", Category::All);
+        assert_eq!(results[0].title, "Jira: a");
+        let mut ids: Vec<_> = results.iter().map(|r| r.id.as_str()).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), results.len());
     }
 
     #[test]
