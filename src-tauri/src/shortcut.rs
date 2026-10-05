@@ -43,11 +43,16 @@ pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
 /// Pause while Settings records a new shortcut, so pressing the current
 /// one is recorded instead of toggling the launcher.
 pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
+    let state = app.state::<State>();
+    let _one_change_at_a_time = state
+        .settings_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     if paused {
         app.global_shortcut()
             .unregister_all()
             .map_err(|error| Error::msg(error.to_string()))
     } else {
-        register(app, &app.state::<State>().settings.get().shortcut)
+        register(app, &state.settings.get().shortcut)
     }
 }

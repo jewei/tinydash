@@ -72,6 +72,15 @@ pub fn discover_apps() -> Vec<App> {
 
 /// Launch through GIO, which handles field codes, terminals, and D-Bus
 /// activation. Desktop files are never run through a shell.
+pub fn prepare_app(app: &mut tauri::App) {
+    let _ = app;
+}
+
+pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+}
+
 pub fn launch_app(path: &Path) -> Result<()> {
     let app = gio::DesktopAppInfo::from_filename(path)
         .ok_or_else(|| Error::msg("The application is no longer installed."))?;
@@ -104,11 +113,13 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
             run("xfce4-session-logout", &["--logout"])
         }
         SystemCommand::OpenSystemSettings if desktop.contains("gnome") => {
-            run("gnome-control-center", &[])
+            super::launch("gnome-control-center")
         }
-        SystemCommand::OpenSystemSettings if desktop.contains("kde") => run("systemsettings", &[]),
+        SystemCommand::OpenSystemSettings if desktop.contains("kde") => {
+            super::launch("systemsettings")
+        }
         SystemCommand::OpenSystemSettings if desktop.contains("xfce") => {
-            run("xfce4-settings-manager", &[])
+            super::launch("xfce4-settings-manager")
         }
         SystemCommand::LogOut | SystemCommand::OpenSystemSettings => unsupported(),
     }

@@ -71,7 +71,10 @@ impl Store {
         std::fs::create_dir_all(dir)?;
         let path = dir.join(FILE_NAME);
         let store = Self::new(Connection::open(&path)?)?;
-        restrict_to_owner(&path);
+        // Clipboard history can hold private text.
+        if let Err(error) = crate::platform::restrict_to_owner(&path) {
+            tracing::warn!(%error, "Could not restrict database permissions");
+        }
         Ok(store)
     }
 
@@ -399,19 +402,6 @@ fn kind_from_sql(kind: &str) -> rusqlite::Result<ClipKind> {
 /// A kind column held a value this version does not know.
 fn invalid_kind(column: usize, kind: &str) -> rusqlite::Error {
     rusqlite::Error::InvalidColumnType(column, format!("kind {kind}"), rusqlite::types::Type::Text)
-}
-
-/// Clipboard history can hold private text: keep the file owner-only.
-fn restrict_to_owner(path: &Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if let Err(error) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
-            tracing::warn!(%error, "Could not restrict database permissions");
-        }
-    }
-    #[cfg(not(unix))]
-    let _ = path;
 }
 
 #[cfg(test)]

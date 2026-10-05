@@ -13,7 +13,10 @@ use crate::{
     actions,
     error::{Error, Result},
     events,
-    features::{emoji::EmojiIndex, library::LibraryItem},
+    features::{
+        emoji::EmojiIndex,
+        library::{LibraryItem, MAX_LIBRARY_ITEMS},
+    },
     preview::{self, Preview},
     refresh,
     search::{
@@ -119,10 +122,14 @@ pub fn get_settings(state: tauri::State<State>) -> Settings {
 pub async fn update_settings(app: AppHandle, settings: Settings) -> Result<Settings> {
     blocking(move || {
         let state = app.state::<State>();
+        let _one_change_at_a_time = state
+            .settings_change
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let new = settings.normalized();
         let old = state.settings.get();
         let applied = apply_to_system(&app, &old, &new)
-            .and_then(|()| settings::save(&state.config_dir, &new));
+            .and_then(|()| settings::save(&state.dirs.config, &new));
         if let Err(error) = applied {
             // Undo whatever part did apply; the original error is the one to show.
             apply_to_system(&app, &new, &old).ok();
@@ -183,6 +190,11 @@ pub fn library_items(state: tauri::State<State>) -> Vec<LibraryItem> {
 pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<LibraryItem> {
     blocking(move || {
         let state = app.state::<State>();
+        if item.id.is_none() && state.library.get().items().len() >= MAX_LIBRARY_ITEMS {
+            return Err(Error::msg(format!(
+                "The library holds up to {MAX_LIBRARY_ITEMS} snippets and quicklinks."
+            )));
+        }
         let saved = state.store.save_library_item(&item.validated()?)?;
         state.reload_library()?;
         events::results_stale(&app);
@@ -214,6 +226,6 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
 pub fn about(app: AppHandle) -> About {
     About {
         version: app.package_info().version.to_string(),
-        data_folder: app.state::<State>().data_dir.display().to_string(),
+        data_folder: app.state::<State>().dirs.data.display().to_string(),
     }
 }

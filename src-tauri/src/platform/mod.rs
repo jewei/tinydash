@@ -3,6 +3,8 @@
 //! Each OS module provides the same items:
 //!
 //! - `FILE_MANAGER`: name used in "Show in …" labels.
+//! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy.
+//! - `restrict_to_owner(path)`: make a file readable only by the user.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
 //! - `app_folders()`: folders to watch for installed or removed apps.
 //! - `discover_apps()`: installed apps.
@@ -106,6 +108,15 @@ fn read_with_arboard(
         .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
         .ok()?;
     (png.len() <= MAX_IMAGE_BYTES).then_some(Content::Image { png, width, height })
+}
+
+/// Start a GUI program and return at once; it keeps running on its own.
+#[cfg(target_os = "linux")]
+fn launch(program: &str) -> Result<()> {
+    std::process::Command::new(program)
+        .spawn()
+        .map(drop)
+        .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))
 }
 
 /// Run a helper program with fixed arguments. Never pass user text here.

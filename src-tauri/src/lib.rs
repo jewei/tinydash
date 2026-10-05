@@ -95,8 +95,7 @@ const LEGACY_DATABASE: &str = "tinydash.sqlite3";
 /// Load state and start background work. Problems become launcher warnings;
 /// only a missing app folder location stops startup.
 fn setup(app: &mut App) {
-    #[cfg(target_os = "macos")]
-    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+    platform::prepare_app(app);
 
     let paths = app.path();
     let dir = |dir: tauri::Result<std::path::PathBuf>| dir.expect("the OS reports app folders");

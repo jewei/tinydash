@@ -1,7 +1,10 @@
 //! Watches app folders and indexed folders. Events only mark an index dirty;
 //! `refresh.rs` rebuilds it the next time the launcher opens.
 
-use std::{path::PathBuf, sync::Mutex};
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _, event::ModifyKind};
 use tauri::{AppHandle, Manager};
@@ -16,9 +19,23 @@ pub struct Watcher(Mutex<Option<RecommendedWatcher>>);
 pub fn watch(app: &AppHandle) {
     let state = app.state::<State>();
     let app_folders = platform::app_folders();
-    let file_folders = state.settings.get().file_folders(&state.home_dir);
+    let settings = state.settings.get();
+    let file_folders = settings.file_folders(&state.dirs.home);
+    let excluded = settings.file_search_excluded_dirs.clone();
     let handle = app.clone();
     let (apps, files) = (app_folders.clone(), file_folders.clone());
+    // Changes in folders the index skips (hidden or excluded, such as a
+    // build's `target`) must not trigger rescans.
+    let indexed = move |path: &Path| {
+        files.iter().any(|root| {
+            path.strip_prefix(root).is_ok_and(|rest| {
+                rest.components().all(|part| {
+                    let name = part.as_os_str().to_string_lossy();
+                    !name.starts_with('.') && !excluded.iter().any(|skip| *skip == name)
+                })
+            })
+        })
+    };
     let created = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         let Ok(event) = event else {
             return;
@@ -27,16 +44,11 @@ pub fn watch(app: &AppHandle) {
             return;
         }
         let state = handle.state::<State>();
-        let under = |roots: &[PathBuf]| {
-            event
-                .paths
-                .iter()
-                .any(|path| roots.iter().any(|root| path.starts_with(root)))
-        };
-        if under(&apps) || event.need_rescan() {
+        let in_apps = |path: &PathBuf| apps.iter().any(|root| path.starts_with(root));
+        if event.need_rescan() || event.paths.iter().any(in_apps) {
             state.freshness.apps.mark_dirty();
         }
-        if under(&files) || event.need_rescan() {
+        if event.need_rescan() || event.paths.iter().any(|path| indexed(path)) {
             state.freshness.files.mark_dirty();
         }
     });

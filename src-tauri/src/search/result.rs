@@ -126,7 +126,7 @@ pub enum Action {
     Launch {
         path: String,
     },
-    /// Open an indexed or pinned file with its default app.
+    /// Open an indexed file with its default app.
     Open {
         path: String,
     },

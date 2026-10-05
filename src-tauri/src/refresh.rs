@@ -51,15 +51,15 @@ impl Default for Slot {
 
 impl Slot {
     pub fn mark_dirty(&self) {
-        self.dirty.store(true, Ordering::Release);
+        self.dirty.store(true, Ordering::SeqCst);
     }
 
     /// Dirty or old, and not already being rebuilt.
     fn needs_work(&self) -> bool {
-        if self.busy.load(Ordering::Acquire) {
+        if self.busy.load(Ordering::SeqCst) {
             return false;
         }
-        self.dirty.load(Ordering::Acquire)
+        self.dirty.load(Ordering::SeqCst)
             || self
                 .finished
                 .lock()
@@ -98,7 +98,7 @@ pub fn files(app: &AppHandle) {
         |state| &state.freshness.files,
         |state| {
             let settings = state.settings.get();
-            let folders = settings.file_folders(&state.home_dir);
+            let folders = settings.file_folders(&state.dirs.home);
             let index = FileIndex::scan(&folders, &settings.file_search_excluded_dirs);
             if index.truncated {
                 tracing::warn!(
@@ -116,8 +116,10 @@ pub fn files(app: &AppHandle) {
 /// arrives during a run marks the slot dirty, and the work runs again.
 fn rebuild(app: &AppHandle, slot: fn(&State) -> &Slot, work: fn(&State)) {
     let state = app.state::<State>();
-    if slot(&state).busy.swap(true, Ordering::AcqRel) {
-        slot(&state).mark_dirty();
+    // Ask first, then try to become the worker. A running worker checks
+    // `dirty` after it clears `busy`, so the request is never lost.
+    slot(&state).mark_dirty();
+    if slot(&state).busy.swap(true, Ordering::SeqCst) {
         return;
     }
     let app = app.clone();
@@ -125,16 +127,16 @@ fn rebuild(app: &AppHandle, slot: fn(&State) -> &Slot, work: fn(&State)) {
         let state = app.state::<State>();
         let slot = slot(&state);
         loop {
-            slot.dirty.store(false, Ordering::Release);
+            slot.dirty.store(false, Ordering::SeqCst);
             work(&state);
             *slot.finished.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
-            if slot.dirty.load(Ordering::Acquire) {
+            if slot.dirty.load(Ordering::SeqCst) {
                 continue;
             }
-            slot.busy.store(false, Ordering::Release);
+            slot.busy.store(false, Ordering::SeqCst);
             // A request that arrived after the check above saw `busy` and only
             // marked the slot dirty; take the slot back and run it.
-            if !slot.dirty.load(Ordering::Acquire) || slot.busy.swap(true, Ordering::AcqRel) {
+            if !slot.dirty.load(Ordering::SeqCst) || slot.busy.swap(true, Ordering::SeqCst) {
                 break;
             }
         }

@@ -23,6 +23,8 @@ use crate::{
     },
 };
 
+/// Most snippets and quicklinks together.
+pub const MAX_LIBRARY_ITEMS: usize = 500;
 const MAX_NAME: usize = 100;
 const MAX_KEYWORD: usize = 32;
 const MAX_TEXT: usize = 32 * 1024;

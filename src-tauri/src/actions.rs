@@ -118,10 +118,22 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             platform::run_system_command(command)?;
         }
         Action::Pin { id } => {
-            // Only items that exist can be pinned, so a pin never widens
-            // what Open and Reveal accept.
-            if search::resolve(&state.snapshot(), &Context::none(), &id).is_none() {
-                return Err(Error::msg("This item no longer exists."));
+            // Only items that exist can be pinned, and the pin stores the
+            // item's own ID, so a pin never widens what Open and Reveal accept.
+            let snapshot = state.snapshot();
+            let ctx = Context::none();
+            let id = search::resolve(&snapshot, &ctx, &id)
+                .ok_or_else(|| Error::msg("This item no longer exists."))?
+                .id;
+            // Pins of deleted items are invisible; drop them before counting.
+            for gone in snapshot
+                .pins
+                .ids()
+                .iter()
+                .filter(|pin| search::resolve(&snapshot, &ctx, pin).is_none())
+            {
+                state.store.set_pinned(gone, false)?;
+                state.pins.update(|pins| pins.remove(gone));
             }
             if state.pins.get().ids().len() >= MAX_PINS {
                 return Err(Error::msg(format!("You can pin up to {MAX_PINS} items.")));

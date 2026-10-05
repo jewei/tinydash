@@ -21,6 +21,7 @@ pub enum Source {
 }
 
 impl Source {
+    /// Every source. `parse` searches this list, so a new variant must be added here.
     const ALL: [Self; 7] = [
         Self::App,
         Self::File,

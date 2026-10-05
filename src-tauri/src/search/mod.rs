@@ -49,6 +49,8 @@ pub enum Category {
 }
 
 impl Category {
+    /// Every category, in tab order. `cli::parse` searches this list, so a
+    /// new variant must be added here.
     pub const ALL: [Self; 7] = [
         Self::All,
         Self::Apps,
@@ -202,7 +204,14 @@ pub fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
         Source::App => s.apps.get(key, ctx),
         Source::File => s.files.get(key, ctx),
         Source::Clip => s.clipboard.get(key.parse().ok()?, ctx),
-        Source::Snippet | Source::Link => s.library.get(key.parse().ok()?, ctx),
+        Source::Snippet => s
+            .library
+            .get(key.parse().ok()?, ctx)
+            .filter(|r| r.kind == ResultKind::Snippet),
+        Source::Link => s
+            .library
+            .get(key.parse().ok()?, ctx)
+            .filter(|r| r.kind == ResultKind::Quicklink),
         Source::Emoji => s.emoji.get(key, ctx),
         Source::System => system::get(key, ctx),
     }

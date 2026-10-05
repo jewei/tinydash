@@ -39,9 +39,10 @@ pub struct State {
     pub pins: Shared<Pins>,
     pub rates: Shared<Option<Rates>>,
     pub freshness: Freshness,
-    pub config_dir: PathBuf,
-    pub data_dir: PathBuf,
-    pub home_dir: PathBuf,
+    pub dirs: Dirs,
+    /// Held while settings change or the shortcut pauses, so two changes
+    /// never interleave their effects on the OS.
+    pub settings_change: Mutex<()>,
     /// Problems found at startup, shown once in the launcher.
     pub warnings: Mutex<Vec<String>>,
 }
@@ -84,9 +85,8 @@ impl State {
             pins: Shared::new(pins),
             rates: Shared::new(rates),
             freshness: Freshness::default(),
-            config_dir: dirs.config,
-            data_dir: dirs.data,
-            home_dir: dirs.home,
+            dirs,
+            settings_change: Mutex::new(()),
             warnings: Mutex::new(warnings),
         }
     }

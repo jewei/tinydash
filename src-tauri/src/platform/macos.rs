@@ -108,6 +108,16 @@ fn read_bundle(path: &Path) -> Option<App> {
     })
 }
 
+pub fn prepare_app(app: &mut tauri::App) {
+    // A launcher lives in the menu bar, not the Dock.
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+}
+
+pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+}
+
 pub fn launch_app(path: &Path) -> Result<()> {
     tauri_plugin_opener::open_path(path, None::<&str>)
         .map_err(|error| Error::msg(error.to_string()))
