@@ -92,7 +92,10 @@ export function createLauncher() {
 
   const refresh = () => request({ query: query(), category: category() });
 
+  // A waiting Enter belongs to the input it was pressed on; an edit or a
+  // tab change drops it, so it never runs on a query the user did not confirm.
   function setQuery(value: string) {
+    queued = undefined;
     batch(() => {
       setQueryValue(value);
       setActionError(undefined);
@@ -101,6 +104,7 @@ export function createLauncher() {
   }
 
   function setCategory(value: Category) {
+    queued = undefined;
     batch(() => {
       setCategoryValue(value);
       setActionError(undefined);

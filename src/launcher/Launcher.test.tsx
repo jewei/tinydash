@@ -473,6 +473,33 @@ describe("Launcher", () => {
     expect(backend.called("run_action")).toHaveLength(0);
   });
 
+  it.each([
+    [
+      "the query changes",
+      (input: HTMLElement) => fireEvent.input(input, { target: { value: "ter" } }),
+    ],
+    ["the tab changes", (input: HTMLElement) => fireEvent.keyDown(input, { key: "Tab" })],
+  ])("drops a queued Enter when %s", async (_, change) => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "term") await slow;
+        return [app];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Safari/ });
+    fireEvent.input(input, { target: { value: "term" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    change(input);
+    release();
+    await waitFor(() => expect(backend.called("search").length).toBeGreaterThanOrEqual(3));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
   it("leaves focus alone for copy shortcuts and lone modifiers", async () => {
     const { input } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
