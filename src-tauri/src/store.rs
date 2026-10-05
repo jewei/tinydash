@@ -457,6 +457,22 @@ mod tests {
     }
 
     #[test]
+    fn usage_drops_the_same_entry_in_memory_and_on_disk() {
+        let store = Store::in_memory();
+        let mut usage = Usage::default();
+        for n in 0..=MAX_USAGE {
+            let id = format!("app:/{n:04}");
+            let used = usage.record(&id, 7);
+            store.record_use(&id, used).unwrap();
+        }
+        let saved = store.usage().unwrap();
+        let (mut on_disk, mut in_memory) = (saved.ranked(7), usage.ranked(7));
+        on_disk.sort();
+        in_memory.sort();
+        assert_eq!(on_disk, in_memory);
+    }
+
+    #[test]
     fn repeats_move_to_the_top_and_pins_survive_pruning() {
         let store = Store::in_memory();
         for (now, value) in [(1, "one"), (2, "two"), (3, "three")] {

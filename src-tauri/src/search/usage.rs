@@ -20,7 +20,8 @@ impl Usage {
         Self(entries.into_iter().collect())
     }
 
-    /// Count one use. Past [`MAX_USAGE`] IDs, the least recently used goes.
+    /// Count one use. Past [`MAX_USAGE`] IDs, the least recently used goes;
+    /// of equally old ones, the largest ID, as in `Store::record_use`.
     pub fn record(&mut self, id: &str, now: i64) -> Use {
         let entry = self.0.entry(id.to_owned()).or_default();
         entry.count = entry.count.saturating_add(1);
@@ -30,7 +31,7 @@ impl Usage {
             && let Some(oldest) = self
                 .0
                 .iter()
-                .min_by_key(|(id, entry)| (entry.last_used, *id))
+                .min_by_key(|(id, entry)| (entry.last_used, std::cmp::Reverse(*id)))
                 .map(|(id, _)| id.clone())
         {
             self.0.remove(&oldest);
