@@ -517,6 +517,33 @@ describe("Settings", () => {
     expect(backend.called("save_library_item")[0]?.args).toMatchObject({ item: { id: null } });
   });
 
+  it("rereads the list after a failed save, so a deleted item can be added again", async () => {
+    let items: LibraryItem[] = [{ id: 1, kind: "snippet", name: "Alpha", keyword: "", text: "A" }];
+    const backend = fakeBackend({
+      library_items: () => items,
+      save_library_item: (args) => {
+        const item = args.item as LibraryItem;
+        if (item.id !== null) {
+          // Another window deleted it meanwhile.
+          items = [];
+          throw "This item was deleted, so it was not saved. Save again to add it as a new item.";
+        }
+        return { ...item, id: 2 };
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    await screen.findByText(/This item was deleted/);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Delete" })).toBeNull());
+    const saveButton = screen.getByRole("button", { name: "Save Snippet" }) as HTMLButtonElement;
+    await waitFor(() => expect(saveButton.disabled).toBe(false));
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(backend.called("save_library_item")).toHaveLength(2));
+    expect(backend.called("save_library_item")[1]?.args).toMatchObject({ item: { id: null } });
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
