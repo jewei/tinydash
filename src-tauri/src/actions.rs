@@ -40,6 +40,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             | Action::OpenSettings
             | Action::Quit
     );
+    let quit = matches!(action, Action::Quit);
     match action {
         Action::Launch { path } => {
             if !state.apps.get().contains(&path) {
@@ -157,12 +158,18 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             refresh::rates(app, true);
         }
         Action::OpenSettings => window::open_settings(app)?,
-        Action::Quit => app.exit(0),
+        // Exits below, once the use is saved: exit ends the process from
+        // the main thread while this worker may still be writing.
+        Action::Quit => {}
     }
     if counts_as_use && let Some(id) = result_id.filter(|id| learns_from_use(id)) {
         record_use(&state, id);
     }
-    events::results_stale(app);
+    if quit {
+        app.exit(0);
+    } else {
+        events::results_stale(app);
+    }
     Ok(())
 }
 
