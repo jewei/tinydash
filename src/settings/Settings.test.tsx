@@ -155,6 +155,18 @@ describe("Settings", () => {
     await waitFor(() => expect(steps).toEqual(["pause", "paused", "resume"]));
   });
 
+  it.each([
+    ["/data", "/data", ["Settings and saved data: /data"]],
+    ["/config", "/local", ["Settings: /config", "Saved data: /local"]],
+  ])("shows where settings (%s) and data (%s) are", async (settingsFolder, dataFolder, lines) => {
+    fakeBackend({ about: () => ({ version: "0.2.0", settingsFolder, dataFolder }) });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "About" }));
+    for (const line of lines) {
+      expect(await screen.findByText((_, node) => node?.textContent === line)).toBeTruthy();
+    }
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

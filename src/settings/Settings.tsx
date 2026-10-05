@@ -360,9 +360,21 @@ function About() {
       <p>
         <strong>TinyDash {about()?.version}</strong> — a small, keyboard-first launcher.
       </p>
-      <p>
-        Saved data: <code>{about()?.dataFolder}</code>
-      </p>
+      <Show
+        when={about()?.settingsFolder !== about()?.dataFolder}
+        fallback={
+          <p>
+            Settings and saved data: <code>{about()?.dataFolder}</code>
+          </p>
+        }
+      >
+        <p>
+          Settings: <code>{about()?.settingsFolder}</code>
+        </p>
+        <p>
+          Saved data: <code>{about()?.dataFolder}</code>
+        </p>
+      </Show>
       <p>
         Source and license: <code>github.com/jewei/tinydash</code> (MIT)
       </p>

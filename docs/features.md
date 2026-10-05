@@ -91,7 +91,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Files                | Folders to index, folder names to skip                                                                       |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages (Chinese, Malay, Spanish) |
 | Snippets, Quicklinks | Create, edit, delete                                                                                         |
-| About                | Version, data folder, credits                                                                                |
+| About                | Version, settings and data folders, credits                                                                  |
 
 ## Platform notes
 

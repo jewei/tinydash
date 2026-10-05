@@ -82,7 +82,7 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     library_items: () => [],
     save_library_item: (args) => ({ ...(args.item as object), id: 1 }),
     delete_library_item: () => null,
-    about: () => ({ version: "0.2.0", dataFolder: "/data" }),
+    about: () => ({ version: "0.2.0", settingsFolder: "/data", dataFolder: "/data" }),
   };
   clearMocks();
   mockIPC(

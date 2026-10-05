@@ -26,7 +26,7 @@ Logs go to stderr. Set `RUST_LOG=tinydash_lib=debug` for more.
 
 ## Run the app without touching your own TinyDash
 
-The app identifier decides the data folder and the single-instance lock. `bun run dev` uses `src-tauri/tauri.dev.conf.json`, which sets the identifier `dev.tinydash.dev`, so it never reads or writes an installed TinyDash's settings and history, and does not hand over to it. Its data is in the `dev.tinydash.dev` folder (on macOS, `~/Library/Application Support/dev.tinydash.dev`); delete that folder to start fresh.
+The app identifier decides the data folder and the single-instance lock. `bun run dev` uses `src-tauri/tauri.dev.conf.json`, which sets the identifier `dev.tinydash.dev`, so it never reads or writes an installed TinyDash's settings and history, and does not hand over to it. Its settings and data are in `dev.tinydash.dev` folders; delete them to start fresh. On macOS both are in `~/Library/Application Support/dev.tinydash.dev`. On Linux, settings are in `~/.config/dev.tinydash.dev` and data in `~/.local/share/dev.tinydash.dev`. On Windows, settings are in `%APPDATA%\dev.tinydash.dev` and data in `%LOCALAPPDATA%\dev.tinydash.dev`. Settings > About shows both.
 
 To try a build with the frontend bundled in, without hot reload:
 

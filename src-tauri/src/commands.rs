@@ -64,6 +64,8 @@ const PLATFORM: Platform = if cfg!(target_os = "macos") {
 #[ts(export)]
 pub struct About {
     pub version: String,
+    /// Where `settings.json` is; the same as `data_folder` on macOS only.
+    pub settings_folder: String,
     pub data_folder: String,
 }
 
@@ -242,8 +244,10 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
 
 #[tauri::command]
 pub fn about(app: AppHandle) -> About {
+    let dirs = &app.state::<State>().dirs;
     About {
         version: app.package_info().version.to_string(),
-        data_folder: app.state::<State>().dirs.data.display().to_string(),
+        settings_folder: dirs.config.display().to_string(),
+        data_folder: dirs.data.display().to_string(),
     }
 }
