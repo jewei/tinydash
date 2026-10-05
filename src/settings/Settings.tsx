@@ -281,7 +281,9 @@ export function Settings() {
                   max={50}
                   placeholder="~/Projects"
                   items={settings().fileSearchFolders}
-                  onChange={(fileSearchFolders) => save({ fileSearchFolders })}
+                  onChange={(edit) =>
+                    save((current) => ({ fileSearchFolders: edit(current.fileSearchFolders) }))
+                  }
                 />
                 <h2>Skip folders named</h2>
                 <ListEditor
@@ -289,7 +291,11 @@ export function Settings() {
                   max={50}
                   placeholder="node_modules"
                   items={settings().fileSearchExcludedDirs}
-                  onChange={(fileSearchExcludedDirs) => save({ fileSearchExcludedDirs })}
+                  onChange={(edit) =>
+                    save((current) => ({
+                      fileSearchExcludedDirs: edit(current.fileSearchExcludedDirs),
+                    }))
+                  }
                 />
               </Match>
 

@@ -110,41 +110,40 @@ export function NumberField(props: {
 }
 
 /**
- * A list of strings with Add and Remove. `onChange` saves the new list and
- * gives back its error, which shows next to the field: the page's own
- * error line may be scrolled out of view.
+ * A list of strings with Add and Remove. `onChange` saves an edit of the
+ * list and gives back its error, which shows next to the field: the page's
+ * own error line may be scrolled out of view. The edit is a function, so
+ * the save applies it to the saved list, never to one that holds another
+ * change still saving or one that failed.
  */
 export function ListEditor(props: {
   label: string;
   items: string[];
   max: number;
   placeholder: string;
-  onChange: (items: string[]) => Promise<string | undefined>;
+  onChange: (edit: (items: string[]) => string[]) => Promise<string | undefined>;
 }) {
   const [draft, setDraft] = createSignal("");
   const [notice, setNotice] = createSignal<string>();
-  const [saving, setSaving] = createSignal(false);
   const full = () => props.items.length >= props.max;
   // The field stays when the list is full, and Remove hands focus to it,
   // so keyboard focus never falls back to the page.
   let field!: HTMLInputElement;
-  // One change at a time: each list starts from the saved one, so an entry
-  // that the save refuses is never sent again with the next change.
-  const change = (items: string[]) => {
-    setSaving(true);
+  // A failure stays shown until the user types or makes another change.
+  const change = (edit: (items: string[]) => string[]) => {
     setNotice(undefined);
-    return props.onChange(items).then((failure) => {
-      setNotice(failure);
-      setSaving(false);
+    return props.onChange(edit).then((failure) => {
+      if (failure) setNotice(failure);
+      return failure;
     });
   };
   const add = () => {
     const value = draft().trim();
-    if (saving() || full() || !value) return;
+    if (full() || !value) return;
     if (props.items.includes(value)) return setNotice(`“${value}” is already in the list.`);
     // The text stays until the save works, so a refused entry can be fixed.
-    void change([...props.items, value]).then(() => {
-      if (!notice() && draft().trim() === value) setDraft("");
+    void change((items) => (items.includes(value) ? items : [...items, value])).then((failure) => {
+      if (!failure && draft().trim() === value) setDraft("");
     });
   };
   return (
@@ -159,7 +158,7 @@ export function ListEditor(props: {
                 class="link"
                 aria-label={`Remove ${item}`}
                 onClick={() => {
-                  if (!saving()) void change(props.items.filter((other) => other !== item));
+                  void change((items) => items.filter((other) => other !== item));
                   field.focus();
                 }}
               >

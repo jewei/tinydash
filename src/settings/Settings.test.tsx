@@ -247,7 +247,7 @@ describe("Settings", () => {
     expect(field.value).toBe("Projects");
   });
 
-  it("saves one folder change at a time, so a refused entry is not sent again", async () => {
+  it("applies each folder change to the saved list, so a refused entry is not sent again", async () => {
     let refuse!: () => void;
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
@@ -271,8 +271,6 @@ describe("Settings", () => {
     await waitFor(() =>
       expect(editor.getByRole("status").textContent).toContain("not a full folder path"),
     );
-    expect(backend.called("update_settings")).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "Remove ~/Desktop" }));
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toMatchObject({
       settings: { fileSearchFolders: ["~/Documents", "~/Downloads"] },
@@ -321,26 +319,39 @@ describe("Settings", () => {
     });
   });
 
-  it("ignores another folder while one is saving", async () => {
+  it("saves a folder added during a failing save on its own", async () => {
     let refuse!: () => void;
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
-      update_settings: async () => {
-        await refused;
-        throw "“Projects” is not a full folder path.";
+      update_settings: async (args) => {
+        const settings = args.settings as typeof testSettings;
+        if (settings.fileSearchFolders.includes("Projects")) {
+          await refused;
+          throw "“Projects” is not a full folder path.";
+        }
+        return settings;
       },
     });
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "Files" }));
-    const field = await screen.findByRole("textbox", { name: "Folder to add" });
+    const field = (await screen.findByRole("textbox", {
+      name: "Folder to add",
+    })) as HTMLInputElement;
     fireEvent.input(field, { target: { value: "Projects" } });
     fireEvent.keyDown(field, { key: "Enter" });
-    fireEvent.input(field, { target: { value: "~/Work" } });
-    fireEvent.keyDown(field, { key: "Enter" });
+    // Leaving the section and coming back must not change what is sent.
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    fireEvent.click(screen.getByRole("button", { name: "Files" }));
+    const again = (await screen.findByRole("textbox", {
+      name: "Folder to add",
+    })) as HTMLInputElement;
+    fireEvent.input(again, { target: { value: "~/Work" } });
+    fireEvent.keyDown(again, { key: "Enter" });
     refuse();
-    const editor = within(field.closest(".list-editor") as HTMLElement);
-    await waitFor(() => expect(editor.getByRole("status").textContent).toContain("full folder"));
-    expect(backend.called("update_settings")).toHaveLength(1);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
+    expect(backend.called("update_settings")[1]?.args).toMatchObject({
+      settings: { fileSearchFolders: [...testSettings.fileSearchFolders, "~/Work"] },
+    });
   });
 
   it("records a new shortcut while the old one is paused", async () => {
