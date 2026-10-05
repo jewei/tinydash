@@ -15,6 +15,15 @@ describe("acceleratorFromEvent", () => {
     expect(acceleratorFromEvent(press("ArrowUp", "ArrowUp", { ctrlKey: true }))).toBe("Control+Up");
   });
 
+  it("records letters as the OS will match them", () => {
+    // AZERTY: the key labeled A is in the QWERTY Q position.
+    const azertyA = press("KeyQ", "a", { ctrlKey: true, shiftKey: true });
+    expect(acceleratorFromEvent(azertyA, false)).toBe("Control+Shift+A");
+    expect(acceleratorFromEvent(azertyA, true)).toBe("Control+Shift+Q");
+    // A layout that types another script falls back to the key position.
+    expect(acceleratorFromEvent(press("KeyQ", "й", { ctrlKey: true }), false)).toBe("Control+Q");
+  });
+
   it("allows function keys and Shift+Space alone", () => {
     expect(acceleratorFromEvent(press("F5", "F5"))).toBe("F5");
     expect(acceleratorFromEvent(press("Space", " ", { shiftKey: true }))).toBe("Shift+Space");

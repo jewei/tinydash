@@ -4,7 +4,7 @@ What TinyDash does, for users and for anyone changing it. Keep this page true: u
 
 ## Open and navigate
 
-Press **Control+Shift+Space** (change it in Settings > General) from any app. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
+Press **Control+Shift+Space** (change it in Settings > General) from any app. On macOS, a letter in the shortcut is stored by its key position, so on a layout other than US, Settings may name a different letter than the key shows. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
 
 | Keys            | Action                                                                                                                         |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------ |

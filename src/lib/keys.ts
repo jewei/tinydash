@@ -41,11 +41,17 @@ const NAMED_KEYS: Record<string, string> = {
  * A shortcut needs Control, Alt, or Command/Super, except function keys and
  * Shift+Space, which do not interfere with typing.
  */
-export function acceleratorFromEvent(event: KeyboardEvent): string | null {
+export function acceleratorFromEvent(event: KeyboardEvent, mac = IS_MAC): string | null {
   if (MODIFIER_KEYS.has(event.key)) return null;
   const code = event.code;
+  // The OS reads a letter by key position on macOS, but by the letter the
+  // layout types on Windows and Linux (AZERTY's A key is "KeyQ"), so record
+  // what this OS will match. Digits are the number-row keys everywhere.
+  const typed = /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : undefined;
   const key = /^Key[A-Z]$/.test(code)
-    ? code.slice(3)
+    ? mac
+      ? code.slice(3)
+      : (typed ?? code.slice(3))
     : /^Digit\d$/.test(code)
       ? code.slice(5)
       : (NAMED_KEYS[code] ?? code);
