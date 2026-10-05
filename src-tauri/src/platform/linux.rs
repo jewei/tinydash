@@ -19,6 +19,8 @@ use crate::{
 };
 
 pub const FILE_MANAGER: &str = "Files";
+/// No folder is shown as a single file here.
+pub const PACKAGE_EXTENSIONS: &[&str] = &[];
 pub const NATIVE_ICONS: bool = false;
 /// inotify needs one watch per folder from a shared per-user limit, so only
 /// the top folders are watched; deeper changes show up at the next rescan,

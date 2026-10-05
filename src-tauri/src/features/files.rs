@@ -51,11 +51,12 @@ pub struct FileIndex {
 
 impl FileIndex {
     /// Walk `folders` without following links, skipping hidden entries and
-    /// excluded folder names. Unreadable folders are skipped.
-    pub fn scan(folders: &[PathBuf], excluded: &[String]) -> Self {
+    /// excluded folder names. Unreadable folders are skipped. A folder whose
+    /// extension is in `packages` is listed, but not its contents.
+    pub fn scan(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -> Self {
         let mut index = Self::default();
         for folder in distinct_roots(folders) {
-            let walker = walkdir::WalkDir::new(&folder)
+            let mut walker = walkdir::WalkDir::new(&folder)
                 .follow_links(false)
                 .min_depth(1)
                 .into_iter()
@@ -64,7 +65,10 @@ impl FileIndex {
                     !name.starts_with('.')
                         && !(entry.file_type().is_dir() && excluded.iter().any(|ex| *ex == name))
                 });
-            for entry in walker.flatten() {
+            while let Some(entry) = walker.next() {
+                let Ok(entry) = entry else {
+                    continue;
+                };
                 if index.entries.len() == LIMIT {
                     index.truncated = true;
                     return index;
@@ -72,6 +76,14 @@ impl FileIndex {
                 let file_type = entry.file_type();
                 if file_type.is_symlink() {
                     continue;
+                }
+                let is_package = entry.path().extension().is_some_and(|extension| {
+                    packages
+                        .iter()
+                        .any(|package| extension.eq_ignore_ascii_case(package))
+                });
+                if file_type.is_dir() && is_package {
+                    walker.skip_current_dir();
                 }
                 let Some(os_path) = entry.path().to_str() else {
                     continue;
@@ -216,7 +228,13 @@ mod tests {
 
     fn tree() -> PathBuf {
         let root = std::env::temp_dir().join(format!("tinydash-files-{}", std::process::id()));
-        for dir in ["docs/project", "node_modules/pkg", ".hidden", "notes"] {
+        for dir in [
+            "docs/project",
+            "node_modules/pkg",
+            ".hidden",
+            "notes",
+            "Tool.APP/Contents",
+        ] {
             std::fs::create_dir_all(root.join(dir)).unwrap();
         }
         for file in [
@@ -224,6 +242,7 @@ mod tests {
             "node_modules/pkg/index.js",
             ".hidden/secret.txt",
             "notes/todo.txt",
+            "Tool.APP/Contents/Info.plist",
         ] {
             std::fs::write(root.join(file), "").unwrap();
         }
@@ -236,10 +255,21 @@ mod tests {
         let index = FileIndex::scan(
             &[root.clone(), root.join("notes")],
             &["node_modules".into()],
+            &["app"],
         );
         let mut names: Vec<_> = index.entries.iter().map(Entry::name).collect();
         names.sort();
-        assert_eq!(names, ["README.md", "docs", "notes", "project", "todo.txt"]);
+        assert_eq!(
+            names,
+            [
+                "README.md",
+                "Tool.APP",
+                "docs",
+                "notes",
+                "project",
+                "todo.txt"
+            ]
+        );
         assert!(!index.truncated);
 
         let (usage, pins) = (Usage::default(), Pins::default());

@@ -3,6 +3,8 @@
 //! Each OS module provides the same items:
 //!
 //! - `FILE_MANAGER`: name used in "Show in …" labels.
+//! - `PACKAGE_EXTENSIONS`: folder extensions the OS shows as one file; the
+//!   file index lists such a folder but not its contents.
 //! - `RECURSIVE_WATCH`: whether watching a folder also watches its subfolders.
 //! - `TEMPLATE_TRAY_ICON`: the OS tints a black tray icon (macOS menu bar).
 //! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy.

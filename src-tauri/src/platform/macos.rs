@@ -22,6 +22,30 @@ use crate::{
 };
 
 pub const FILE_MANAGER: &str = "Finder";
+/// Common package types: Finder shows each as one file, and an app bundle
+/// alone can hold over 100,000 entries.
+pub const PACKAGE_EXTENSIONS: &[&str] = &[
+    "app",
+    "appex",
+    "bundle",
+    "framework",
+    "plugin",
+    "kext",
+    "xpc",
+    "photoslibrary",
+    "musiclibrary",
+    "tvlibrary",
+    "imovielibrary",
+    "fcpbundle",
+    "logicx",
+    "band",
+    "rtfd",
+    "sparsebundle",
+    "xcarchive",
+    "xcodeproj",
+    "xcworkspace",
+    "playground",
+];
 pub const NATIVE_ICONS: bool = true;
 /// FSEvents watches a whole tree with one stream.
 pub const RECURSIVE_WATCH: bool = true;

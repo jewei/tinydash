@@ -108,7 +108,11 @@ pub fn files(app: &AppHandle) {
         |state| {
             let settings = state.settings.get();
             let folders = settings.file_folders(&state.dirs.home);
-            let index = FileIndex::scan(&folders, &settings.file_search_excluded_dirs);
+            let index = FileIndex::scan(
+                &folders,
+                &settings.file_search_excluded_dirs,
+                platform::PACKAGE_EXTENSIONS,
+            );
             if index.truncated {
                 tracing::warn!(
                     limit = files::LIMIT,
