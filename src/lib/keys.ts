@@ -26,7 +26,23 @@ export function shortcutKey(event: KeyboardEvent): string {
 /** Keys pressed while an input method composes text belong to the IME. */
 export const isComposing = (event: KeyboardEvent) => event.isComposing || event.keyCode === 229;
 
-const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"]);
+// AltGraph is the right Alt key on layouts that have AltGr.
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "AltGraph", "Meta"]);
+
+/** Accelerator names of the characters a layout may put on any key. */
+const PUNCTUATION: Record<string, string> = {
+  ",": "Comma",
+  ".": "Period",
+  "-": "Minus",
+  "=": "Equal",
+  ";": "Semicolon",
+  "'": "Quote",
+  "/": "Slash",
+  "\\": "Backslash",
+  "[": "BracketLeft",
+  "]": "BracketRight",
+  "`": "Backquote",
+};
 
 const NAMED_KEYS: Record<string, string> = {
   ArrowUp: "Up",
@@ -44,17 +60,18 @@ const NAMED_KEYS: Record<string, string> = {
 export function acceleratorFromEvent(event: KeyboardEvent, mac = IS_MAC): string | null {
   if (MODIFIER_KEYS.has(event.key)) return null;
   const code = event.code;
-  // The OS reads a letter by key position on macOS, but by the letter the
-  // layout types on Windows and Linux (AZERTY's A key is "KeyQ"), so record
-  // what this OS will match. Digits are the number-row keys everywhere.
-  const typed = /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : undefined;
-  const key = /^Key[A-Z]$/.test(code)
-    ? mac
-      ? code.slice(3)
-      : (typed ?? code.slice(3))
-    : /^Digit\d$/.test(code)
-      ? code.slice(5)
-      : (NAMED_KEYS[code] ?? code);
+  // macOS reads a letter or sign by key position, but Windows and Linux
+  // read it by what the layout types (AZERTY's A key is "KeyQ", and its M
+  // key is "Semicolon"), so record what this OS will match. Digits are the
+  // number-row keys everywhere.
+  const typed = /^[a-z]$/i.test(event.key) ? event.key.toUpperCase() : PUNCTUATION[event.key];
+  const key = /^Digit\d$/.test(code)
+    ? code.slice(5)
+    : !mac && typed
+      ? typed
+      : /^Key[A-Z]$/.test(code)
+        ? code.slice(3)
+        : (NAMED_KEYS[code] ?? code);
   if (!key) return null;
   const functionKey = /^F\d{1,2}$/.test(key);
   const strongModifier = event.ctrlKey || event.altKey || event.metaKey;

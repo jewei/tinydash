@@ -20,6 +20,13 @@ describe("acceleratorFromEvent", () => {
     const azertyA = press("KeyQ", "a", { ctrlKey: true, shiftKey: true });
     expect(acceleratorFromEvent(azertyA, false)).toBe("Control+Shift+A");
     expect(acceleratorFromEvent(azertyA, true)).toBe("Control+Shift+Q");
+    // AZERTY: M is in the QWERTY ";" position, and "," in the M position.
+    const azertyM = press("Semicolon", "m", { ctrlKey: true, shiftKey: true });
+    expect(acceleratorFromEvent(azertyM, false)).toBe("Control+Shift+M");
+    expect(acceleratorFromEvent(azertyM, true)).toBe("Control+Shift+Semicolon");
+    expect(acceleratorFromEvent(press("KeyM", ",", { ctrlKey: true }), false)).toBe(
+      "Control+Comma",
+    );
     // A layout that types another script falls back to the key position.
     expect(acceleratorFromEvent(press("KeyQ", "й", { ctrlKey: true }), false)).toBe("Control+Q");
   });
@@ -33,6 +40,9 @@ describe("acceleratorFromEvent", () => {
     expect(acceleratorFromEvent(press("KeyA", "a"))).toBeNull();
     expect(acceleratorFromEvent(press("KeyA", "A", { shiftKey: true }))).toBeNull();
     expect(acceleratorFromEvent(press("ShiftLeft", "Shift", { shiftKey: true }))).toBeNull();
+    // AltGr held first: Windows reports Control and Alt with the AltGraph key.
+    const altGr = press("AltRight", "AltGraph", { ctrlKey: true, altKey: true });
+    expect(acceleratorFromEvent(altGr)).toBeNull();
   });
 });
 
