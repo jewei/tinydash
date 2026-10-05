@@ -6,18 +6,18 @@ What TinyDash does, for users and for anyone changing it. Keep this page true: u
 
 Press **Control+Shift+Space** (change it in Settings > General) from any app. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
 
-| Keys            | Action                                                                                                             |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Type            | Search                                                                                                             |
-| ↑ / ↓           | Select a result                                                                                                    |
-| Enter           | Run the selected result's main action                                                                              |
-| Mod+Enter       | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, emoji, and commands |
-| Mod+1 … Mod+9   | Run the main action of that row                                                                                    |
-| Mod+K           | All actions for the result, plus Refresh, Settings, and Quit                                                       |
-| Mod+Backspace   | Delete the selected clipboard entry                                                                                |
-| Tab / Shift+Tab | Next / previous category                                                                                           |
-| Mod+,           | Open Settings                                                                                                      |
-| Escape          | Dismiss a warning, or hide and return to the previous app                                                          |
+| Keys            | Action                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Type            | Search                                                                                                                         |
+| ↑ / ↓           | Select a result                                                                                                                |
+| Enter           | Run the selected result's main action                                                                                          |
+| Mod+Enter       | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
+| Mod+1 … Mod+9   | Run the main action of that row                                                                                                |
+| Mod+K           | All actions for the result, plus Refresh, Settings, and Quit                                                                   |
+| Mod+Backspace   | Delete the selected clipboard entry                                                                                            |
+| Tab / Shift+Tab | Next / previous category                                                                                                       |
+| Mod+,           | Open Settings                                                                                                                  |
+| Escape          | Dismiss a warning, or hide and return to the previous app                                                                      |
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens on the screen with the pointer, with an empty query, and hides when another app gets focus (optional).
 
@@ -36,7 +36,7 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 | Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                       | Most used, then the catalog |
 | System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
 
-Pin any app, file, clipboard entry, snippet, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
+Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
 
