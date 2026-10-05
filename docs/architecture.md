@@ -4,7 +4,7 @@
 
 ```
  keyboard ─▶ Launcher (Solid) ──invoke──▶ commands.rs ──▶ search::search(Snapshot) ─▶ features/*
-                 ▲                              │                                      (pure)
+                 ▲                              │                                      (read-only)
                  │                              └──▶ actions::run(Action) ─▶ platform/*, store.rs,
                  └───────── events ◀────────────────── refresh.rs, monitor.rs        system_clipboard.rs
 ```

@@ -1,7 +1,9 @@
 //! One module per launcher feature. Feature modules rank, format, and
-//! describe actions, but never call Tauri, SQLite, the clipboard, or the OS.
-//! Two indexers are the exceptions, and `refresh.rs` alone runs them:
-//! `FileIndex::scan` reads folders and `currency::fetch` downloads rates.
+//! describe actions. They never call Tauri, SQLite, the clipboard, or
+//! windows, and never change anything in the OS; they may read the home
+//! folder and, for passwords, the OS random source. Two indexers read more,
+//! and `refresh.rs` alone runs them: `FileIndex::scan` reads folders and
+//! `currency::fetch` downloads rates.
 
 pub mod apps;
 pub mod calculator;
