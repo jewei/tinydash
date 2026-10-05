@@ -80,6 +80,7 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
         id="menu-items"
         class="menu-items"
         role="listbox"
+        aria-label="Actions"
         onMouseDown={(event) => event.preventDefault()}
       >
         <For each={visible()}>
