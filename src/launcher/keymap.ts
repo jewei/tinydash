@@ -1,4 +1,4 @@
-import { hasMod, IS_MAC } from "../lib/keys";
+import { hasMod, IS_MAC, shortcutKey } from "../lib/keys";
 
 /** What a key press in the launcher means. The view decides what to do. */
 type Command =
@@ -33,9 +33,9 @@ export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
       return { type: "hide" };
   }
   if (!mod) return null;
-  if (event.key.toLowerCase() === "k") return { type: "menu" };
+  if (shortcutKey(event) === "k") return { type: "menu" };
   if (event.key === "Backspace") return { type: "delete" };
-  if (event.key === ",") return { type: "settings" };
+  if (shortcutKey(event) === ",") return { type: "settings" };
   // The physical digit key: on layouts such as AZERTY, `key` is "&" for 1.
   const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code)?.[1];
   if (digit) return { type: "runRow", index: Number(digit) - 1 };

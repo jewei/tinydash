@@ -2,9 +2,26 @@
 
 export const IS_MAC = /Mac/.test(navigator.userAgent);
 
-/** Command on macOS, Control elsewhere: the key that app shortcuts use. */
+/**
+ * Command on macOS, Control elsewhere: the key that app shortcuts use. No
+ * shortcut uses Alt, and on Windows AltGr arrives as Control+Alt, so a
+ * press with Alt types a character instead.
+ */
 export const hasMod = (event: KeyboardEvent, mac = IS_MAC) =>
-  mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  !event.altKey && (mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey);
+
+/**
+ * The character a shortcut means: the typed one, or on a layout that types
+ * another script, the letter on the physical key (Control+K gives "л" on a
+ * Russian layout).
+ */
+export function shortcutKey(event: KeyboardEvent): string {
+  const key = event.key.toLowerCase();
+  if (key.length !== 1 || /^[\x20-\x7e]$/.test(key)) return key;
+  const letter = /^Key([A-Z])$/.exec(event.code)?.[1];
+  if (letter) return letter.toLowerCase();
+  return event.code === "Comma" ? "," : key;
+}
 
 /** Keys pressed while an input method composes text belong to the IME. */
 export const isComposing = (event: KeyboardEvent) => event.isComposing || event.keyCode === 229;

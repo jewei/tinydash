@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
 
-import { hasMod, isComposing } from "../lib/keys";
+import { hasMod, isComposing, shortcutKey } from "../lib/keys";
 import { Keys } from "../ui/Keys";
 
 export interface MenuItem {
@@ -35,7 +35,7 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
     if (event.key === "ArrowDown") setActive(Math.min(active() + 1, last));
     else if (event.key === "ArrowUp") setActive(Math.max(active() - 1, 0));
     else if (event.key === "Enter") choose(visible()[active()]);
-    else if (event.key === "Escape" || (hasMod(event) && event.key.toLowerCase() === "k")) {
+    else if (event.key === "Escape" || (hasMod(event) && shortcutKey(event) === "k")) {
       // A held Mod+K opened the menu; its repeats must not close it again.
       if (!event.repeat) props.onClose();
     }
