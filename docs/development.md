@@ -12,15 +12,15 @@
 
 ## Daily commands
 
-| Command          | What it does                                                                                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `bun run dev`    | Runs the app with hot reload as "TinyDash Dev", with its own data (see below).                                            |
-| `bun run web`    | Runs only the Vite server, for styling; IPC calls fail without Tauri.                                                     |
-| `bun run check`  | `vp check` (Oxfmt, Oxlint, TypeScript), `cargo fmt --check`, Clippy.                                                      |
-| `bun run test`   | `vp test` (Vitest + jsdom) and `cargo test`. `cargo test` also writes `src/generated`.                                    |
-| `bun run verify` | `check`, `vp test`, then `scripts/bindings.ts`: Rust tests, failing if they changed `src/generated`. Run before every PR. |
-| `bun run fix`    | Formats TypeScript, CSS, JSON, Markdown, and Rust.                                                                        |
-| `bun run build`  | Builds installers for this OS into `src-tauri/target/release/bundle`.                                                     |
+| Command          | What it does                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run dev`    | Runs the app with hot reload as "TinyDash Dev", with its own data (see below).                                                        |
+| `bun run web`    | Runs only the Vite server, for styling; IPC calls fail without Tauri.                                                                 |
+| `bun run check`  | `vp check` (Oxfmt, Oxlint, TypeScript), `cargo fmt --check`, Clippy.                                                                  |
+| `bun run test`   | `vp test` (Vitest + jsdom) and `cargo test`. `cargo test` also writes `src/generated`.                                                |
+| `bun run verify` | `check`, `vp test`, `vp build`, then `scripts/bindings.ts`: Rust tests, failing if they changed `src/generated`. Run before every PR. |
+| `bun run fix`    | Formats Rust, then TypeScript, CSS, JSON, and Markdown; Rust is formatted even when TypeScript has errors.                            |
+| `bun run build`  | Builds installers for this OS into `src-tauri/target/release/bundle`.                                                                 |
 
 Logs go to stderr. Set `RUST_LOG=tinydash_lib=debug` for more.
 

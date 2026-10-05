@@ -15,7 +15,7 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The
 | One Rust test                           | `cargo test --manifest-path src-tauri/Cargo.toml <name>` |
 | One frontend test file                  | `bunx vp test src/launcher/keymap.test.ts`               |
 
-`bun run verify` runs `check`, the frontend tests, then `scripts/bindings.ts`, which runs the Rust tests and fails if that regenerated anything in `src/generated`. CI runs the frontend checks, rustfmt, and the binding check on Linux, and Clippy and the Rust tests on macOS, Windows, and Linux.
+`bun run verify` runs `check`, the frontend tests, the frontend build, then `scripts/bindings.ts`, which runs the Rust tests and fails if that regenerated anything in `src/generated`. CI runs the frontend checks, rustfmt, and the binding check on Linux, and Clippy and the Rust tests on macOS, Windows, and Linux.
 
 ## Where things are
 
