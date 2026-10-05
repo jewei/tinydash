@@ -80,6 +80,20 @@ describe("Settings", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("No data folder.");
   });
 
+  it("stops recording and says why when the shortcut cannot be paused", async () => {
+    fakeBackend({
+      pause_shortcut: (args) => {
+        if (args.paused) throw "Could not release the current shortcut.";
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    const recorder = await screen.findByRole("button", { name: /Launcher shortcut/ });
+    fireEvent.click(recorder);
+    expect((await screen.findByRole("alert")).textContent).toContain("Could not release");
+    expect(recorder.textContent).not.toContain("Press keys");
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

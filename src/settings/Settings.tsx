@@ -146,6 +146,7 @@ export function Settings() {
                   <ShortcutRecorder
                     value={settings().shortcut}
                     onChange={(shortcut) => save({ shortcut })}
+                    onError={setError}
                   />
                 </Row>
                 <Row label="Appearance">

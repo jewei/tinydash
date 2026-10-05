@@ -12,12 +12,18 @@ import { Keys } from "../ui/Keys";
 export function ShortcutRecorder(props: {
   value: string;
   onChange: (value: string) => Promise<void>;
+  onError: (message: string) => void;
 }) {
   const [recording, setRecording] = createSignal(false);
 
+  // If the current shortcut cannot be paused, pressing it would open the
+  // launcher instead of being recorded, so recording stops and says why.
   const start = () => {
     setRecording(true);
-    void ipc.pauseShortcut(true);
+    ipc.pauseShortcut(true).catch((failure: unknown) => {
+      setRecording(false);
+      props.onError(ipc.message(failure));
+    });
   };
 
   const stop = async (accelerator?: string) => {
@@ -25,7 +31,7 @@ export function ShortcutRecorder(props: {
     setRecording(false);
     if (accelerator && accelerator !== props.value) await props.onChange(accelerator);
     // Registers the saved shortcut again: the new one, or the old one on failure.
-    await ipc.pauseShortcut(false).catch(() => {});
+    await ipc.pauseShortcut(false).catch((failure: unknown) => props.onError(ipc.message(failure)));
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
