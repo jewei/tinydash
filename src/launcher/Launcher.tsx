@@ -164,7 +164,11 @@ export function Launcher() {
     return [...resultItems, ...general];
   };
 
-  const openMenu = () => setMenu(menuItems());
+  // Only results of the current input: rows on screen during a search may
+  // be gone when it returns, and the menu would keep acting on them.
+  const openMenu = () => {
+    if (launcher.isCurrent()) setMenu(menuItems());
+  };
   const closeMenu = () => {
     setMenu(undefined);
     focusInput();
@@ -217,7 +221,7 @@ export function Launcher() {
               tabIndex={-1}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
-                setMenu(undefined);
+                if (menu()) closeMenu();
                 launcher.setCategory(category.id);
               }}
             >

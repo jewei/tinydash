@@ -236,6 +236,31 @@ describe("Launcher", () => {
     expect(within(menu).queryByRole("option", { name: /Delete/ })).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Clipboard" }));
     expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+  });
+
+  it("opens the action menu only for the results of what was typed", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    fakeBackend({
+      search: async (args) => {
+        if (args.query === "x") await slow;
+        return [args.query === "x" ? { ...clip, title: "Bravo" } : { ...clip, title: "Alpha" }];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Alpha/ });
+    fireEvent.input(input, { target: { value: "x" } });
+    fireEvent.keyDown(input, { key: "k", ctrlKey: true });
+    expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
+    release();
+    await screen.findByRole("option", { name: /Bravo/ });
+    fireEvent.click(screen.getByRole("button", { name: /^Actions/ }));
+    const menu = await screen.findByRole("dialog", { name: "Actions" });
+    expect(within(menu).getByRole("listbox", { name: "Actions" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Actions/ }));
+    expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
   });
 
   it("closes the action menu when focus leaves it", async () => {
@@ -357,9 +382,9 @@ describe("Launcher", () => {
     await screen.findByText("Clipboard history is off");
     expect(input.getAttribute("aria-activedescendant")).toBeNull();
     expect(screen.queryByText("Open")).toBeNull();
+    // The Clipboard search has not returned, so the menu waits for it.
     fireEvent.keyDown(input, { key: "k", ctrlKey: true });
-    await screen.findByRole("option", { name: "Quit TinyDash" });
-    expect(screen.queryByRole("option", { name: /^Open/ })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
   });
 
   it("shows once why clipboard history did not turn on, apart from warnings", async () => {
