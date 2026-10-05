@@ -50,8 +50,11 @@ describe("Settings", () => {
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "Files" }));
     expect(await screen.findByText(/The list is full \(50\)/)).toBeTruthy();
-    expect(screen.queryByRole("textbox", { name: "Folder to add" })).toBeNull();
-    expect(screen.getByRole("textbox", { name: "Folder name to skip" })).toBeTruthy();
+    const [addFolder, addSkipName] = screen.getAllByRole("button", { name: "Add" });
+    expect((addFolder as HTMLButtonElement).disabled).toBe(true);
+    expect((addSkipName as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Remove ~/Folder0" }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Folder to add" }));
   });
 
   it("says when the snippets cannot be loaded", async () => {

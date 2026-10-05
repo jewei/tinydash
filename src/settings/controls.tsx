@@ -1,4 +1,4 @@
-import { createSignal, For, type JSX, Show } from "solid-js";
+import { createSignal, For, type JSX } from "solid-js";
 
 import { isComposing } from "../lib/keys";
 
@@ -102,9 +102,13 @@ export function ListEditor(props: {
   onChange: (items: string[]) => void;
 }) {
   const [draft, setDraft] = createSignal("");
+  const full = () => props.items.length >= props.max;
+  // The field stays when the list is full, and Remove hands focus to it,
+  // so keyboard focus never falls back to the page.
+  let field!: HTMLInputElement;
   const add = () => {
     const value = draft().trim();
-    if (!value || props.items.includes(value)) return;
+    if (full() || !value || props.items.includes(value)) return;
     props.onChange([...props.items, value]);
     setDraft("");
   };
@@ -119,7 +123,10 @@ export function ListEditor(props: {
                 type="button"
                 class="link"
                 aria-label={`Remove ${item}`}
-                onClick={() => props.onChange(props.items.filter((other) => other !== item))}
+                onClick={() => {
+                  props.onChange(props.items.filter((other) => other !== item));
+                  field.focus();
+                }}
               >
                 Remove
               </button>
@@ -127,26 +134,23 @@ export function ListEditor(props: {
           )}
         </For>
       </ul>
-      <Show
-        when={props.items.length < props.max}
-        fallback={
-          <p class="list-full">The list is full ({props.max}). Remove one to add another.</p>
-        }
-      >
-        <div class="list-add">
-          <input
-            class="field"
-            aria-label={props.label}
-            placeholder={props.placeholder}
-            value={draft()}
-            onInput={(event) => setDraft(event.currentTarget.value)}
-            onKeyDown={(event) => event.key === "Enter" && !isComposing(event) && add()}
-          />
-          <button type="button" class="button" onClick={add}>
-            Add
-          </button>
-        </div>
-      </Show>
+      <div class="list-add">
+        <input
+          ref={field}
+          class="field"
+          aria-label={props.label}
+          placeholder={props.placeholder}
+          value={draft()}
+          onInput={(event) => setDraft(event.currentTarget.value)}
+          onKeyDown={(event) => event.key === "Enter" && !isComposing(event) && add()}
+        />
+        <button type="button" class="button" disabled={full()} onClick={add}>
+          Add
+        </button>
+      </div>
+      <p class="list-full" role="status">
+        {full() ? `The list is full (${props.max}). Remove one to add another.` : ""}
+      </p>
     </div>
   );
 }
