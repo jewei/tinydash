@@ -63,6 +63,7 @@ export function Launcher() {
     const listeners = [
       ipc.onLauncherShown(({ category }) => {
         setMenu(undefined);
+        setEnableError(undefined);
         launcher.reset(category);
         focusInput();
       }),

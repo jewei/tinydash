@@ -316,6 +316,25 @@ describe("Launcher", () => {
     expect(await screen.findByRole("option", { name: "Refresh Apps and Files" })).toBeTruthy();
   });
 
+  it("forgets a failed history turn-on when the launcher opens again", async () => {
+    const { press } = setup(() => [], {
+      launcher_init: () => ({
+        settings: { ...testSettings, clipboardHistoryEnabled: false },
+        platform: "macos",
+        warnings: [],
+      }),
+      update_settings: () => {
+        throw "Could not save settings.";
+      },
+    });
+    fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
+    await screen.findByText("Clipboard history is off");
+    press("Enter");
+    await screen.findByText("Could not save settings.");
+    await emit("launcher:shown", { category: "clipboard" });
+    await waitFor(() => expect(screen.queryByText("Could not save settings.")).toBeNull());
+  });
+
   it("closes the action menu when focus leaves it", async () => {
     const { input, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
