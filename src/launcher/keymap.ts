@@ -1,7 +1,7 @@
 import { hasMod, IS_MAC } from "../lib/keys";
 
 /** What a key press in the launcher means. The view decides what to do. */
-export type Command =
+type Command =
   | { type: "move"; by: 1 | -1 }
   | { type: "run" }
   | { type: "runRow"; index: number }
