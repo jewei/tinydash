@@ -223,6 +223,21 @@ describe("Launcher", () => {
     expect(within(menu).getByRole("listbox").children).toHaveLength(0);
   });
 
+  it("keeps the action menu as it opened, and closes it on a tab click", async () => {
+    let results = [app];
+    const { press } = setup(() => results);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const menu = await screen.findByRole("dialog", { name: "Actions" });
+    results = [{ ...clip, title: "Entry" }];
+    await emit("results:stale", null);
+    await screen.findByRole("option", { name: /Entry/ });
+    expect(within(menu).getByRole("option", { name: /Show in Finder/ })).toBeTruthy();
+    expect(within(menu).queryByRole("option", { name: /Delete/ })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Clipboard" }));
+    expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
+  });
+
   it("closes the action menu when focus leaves it", async () => {
     const { input, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });

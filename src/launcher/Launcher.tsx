@@ -37,7 +37,9 @@ export function Launcher() {
   const [settings, setSettings] = createSignal<Settings>();
   const [platform, setPlatform] = createSignal<Platform>();
   const [warnings, setWarnings] = createSignal<string[]>([]);
-  const [menuOpen, setMenuOpen] = createSignal(false);
+  // The open actions menu keeps the items it showed when it opened, so a
+  // refresh or another tab cannot change what Enter runs in it.
+  const [menu, setMenu] = createSignal<MenuItem[]>();
   const [enableError, setEnableError] = createSignal<string>();
   let input!: HTMLInputElement;
 
@@ -51,7 +53,7 @@ export function Launcher() {
   onMount(() => {
     const listeners = [
       ipc.onLauncherShown(({ category }) => {
-        setMenuOpen(false);
+        setMenu(undefined);
         launcher.reset(category);
         focusInput();
       }),
@@ -100,7 +102,7 @@ export function Launcher() {
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || isComposing(event) || menuOpen() || launcher.pending()) return;
+    if (event.defaultPrevented || isComposing(event) || menu() || launcher.pending()) return;
     if (clipboardOff() && event.key === "Enter") {
       if (!event.repeat) enableClipboard();
       return;
@@ -130,7 +132,7 @@ export function Launcher() {
       case "delete":
         return deleteSelected();
       case "menu":
-        return setMenuOpen(true);
+        return openMenu();
       case "category":
         return launcher.moveCategory(command.by);
       case "settings":
@@ -158,6 +160,12 @@ export function Launcher() {
       run: () => launcher.run(action),
     }));
     return [...resultItems, ...general];
+  };
+
+  const openMenu = () => setMenu(menuItems());
+  const closeMenu = () => {
+    setMenu(undefined);
+    focusInput();
   };
 
   const clipboardOff = () =>
@@ -206,7 +214,10 @@ export function Launcher() {
               aria-selected={launcher.category() === category.id}
               tabIndex={-1}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => launcher.setCategory(category.id)}
+              onClick={() => {
+                setMenu(undefined);
+                launcher.setCategory(category.id);
+              }}
             >
               {category.label}
             </button>
@@ -304,21 +315,13 @@ export function Launcher() {
           type="button"
           class="footer-actions"
           onMouseDown={(event) => event.preventDefault()}
-          onClick={() => setMenuOpen(true)}
+          onClick={() => (menu() ? closeMenu() : openMenu())}
         >
           Actions <Keys keys={[modKey(), "K"]} />
         </button>
       </footer>
 
-      <Show when={menuOpen()}>
-        <ActionMenu
-          items={menuItems()}
-          onClose={() => {
-            setMenuOpen(false);
-            focusInput();
-          }}
-        />
-      </Show>
+      <Show when={menu()}>{(items) => <ActionMenu items={items()} onClose={closeMenu} />}</Show>
 
       <Show when={launcher.pending()}>
         {(pending) => (
