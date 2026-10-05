@@ -25,7 +25,8 @@ export default defineConfig({
   },
   lint: {
     ignorePatterns: ["dist/**", "src-tauri/**"],
-    options: { typeAware: true, typeCheck: true },
+    // A warning fails `vp check`, so it cannot pass verify or CI unseen.
+    options: { typeAware: true, typeCheck: true, denyWarnings: true },
     rules: {
       // Solid assigns `let el!: T` through `ref={el}`, which this rule cannot see.
       "no-unassigned-vars": "off",

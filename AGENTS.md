@@ -79,7 +79,7 @@ Then update `docs/features.md` and run `bun run verify`.
 - Names say what a thing is or does: `refresh::files`, `Store::save_clip`, `latestOnly`. No abbreviations except common ones (`id`, `url`).
 - Comments explain why, not what. Every `unsafe` block has a `// SAFETY:` comment.
 - User-facing text: short sentences, active voice, no jargon. Errors say what happened and what to do.
-- Rust: `cargo fmt`, Clippy with `-D warnings`. TypeScript: Oxfmt and Oxlint through `vp check`; strict mode.
+- Rust: `cargo fmt`, Clippy with `-D warnings`. TypeScript: Oxfmt and Oxlint through `vp check`, where a lint warning fails the check; strict mode.
 
 ## Commits and pull requests
 
