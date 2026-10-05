@@ -1,4 +1,4 @@
-import { createSignal, For, type JSX } from "solid-js";
+import { createSignal, For, type JSX, Show } from "solid-js";
 
 import { isComposing } from "../lib/keys";
 
@@ -97,6 +97,7 @@ export function NumberField(props: {
 export function ListEditor(props: {
   label: string;
   items: string[];
+  max: number;
   placeholder: string;
   onChange: (items: string[]) => void;
 }) {
@@ -126,19 +127,26 @@ export function ListEditor(props: {
           )}
         </For>
       </ul>
-      <div class="list-add">
-        <input
-          class="field"
-          aria-label={props.label}
-          placeholder={props.placeholder}
-          value={draft()}
-          onInput={(event) => setDraft(event.currentTarget.value)}
-          onKeyDown={(event) => event.key === "Enter" && !isComposing(event) && add()}
-        />
-        <button type="button" class="button" onClick={add}>
-          Add
-        </button>
-      </div>
+      <Show
+        when={props.items.length < props.max}
+        fallback={
+          <p class="list-full">The list is full ({props.max}). Remove one to add another.</p>
+        }
+      >
+        <div class="list-add">
+          <input
+            class="field"
+            aria-label={props.label}
+            placeholder={props.placeholder}
+            value={draft()}
+            onInput={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => event.key === "Enter" && !isComposing(event) && add()}
+          />
+          <button type="button" class="button" onClick={add}>
+            Add
+          </button>
+        </div>
+      </Show>
     </div>
   );
 }

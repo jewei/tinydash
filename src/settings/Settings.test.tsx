@@ -44,6 +44,16 @@ describe("Settings", () => {
     await waitFor(() => expect((toggle as HTMLInputElement).checked).toBe(false));
   });
 
+  it("stops adding folders when the list is full", async () => {
+    const folders = Array.from({ length: 50 }, (_, index) => `~/Folder${index}`);
+    fakeBackend({ get_settings: () => ({ ...testSettings, fileSearchFolders: folders }) });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Files" }));
+    expect(await screen.findByText(/The list is full \(50\)/)).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Folder to add" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "Folder name to skip" })).toBeTruthy();
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

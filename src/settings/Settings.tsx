@@ -234,9 +234,11 @@ export function Settings() {
                   TinyDash searches the names of files and folders here. It never reads file
                   contents. Hidden files are skipped.
                 </p>
+                {/* 50 matches FOLDER_LIST_MAX in the Rust code. */}
                 <h2>Folders</h2>
                 <ListEditor
                   label="Folder to add"
+                  max={50}
                   placeholder="~/Projects"
                   items={settings().fileSearchFolders}
                   onChange={(fileSearchFolders) => void save({ fileSearchFolders })}
@@ -244,6 +246,7 @@ export function Settings() {
                 <h2>Skip folders named</h2>
                 <ListEditor
                   label="Folder name to skip"
+                  max={50}
                   placeholder="node_modules"
                   items={settings().fileSearchExcludedDirs}
                   onChange={(fileSearchExcludedDirs) => void save({ fileSearchExcludedDirs })}

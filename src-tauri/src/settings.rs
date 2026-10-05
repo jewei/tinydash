@@ -10,6 +10,9 @@ use crate::{
 
 pub const FILE_NAME: &str = "settings.json";
 pub const CLIPBOARD_LIMIT_MAX: u32 = 1000;
+/// Most entries in each folder list. On Linux each indexed folder uses a
+/// watch from a per-user limit.
+const FOLDER_LIST_MAX: usize = 50;
 
 /// User preferences, stored as camelCase JSON in the app config folder.
 /// Missing fields take their defaults, so older and newer files both load.
@@ -74,7 +77,8 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Clamp numbers and drop blank or duplicate list entries.
+    /// Clamp numbers, drop blank or duplicate list entries, and cut lists
+    /// to their limit.
     pub fn normalized(mut self) -> Self {
         self.shortcut = self.shortcut.trim().to_owned();
         self.clipboard_history_limit = self.clipboard_history_limit.clamp(1, CLIPBOARD_LIMIT_MAX);
@@ -90,6 +94,7 @@ impl Settings {
                 *item = item.trim().to_owned();
                 !item.is_empty() && seen.insert(item.clone())
             });
+            list.truncate(FOLDER_LIST_MAX);
         }
         self
     }
@@ -187,6 +192,14 @@ mod tests {
             [EmojiLanguage::Zh, EmojiLanguage::Es]
         );
         assert_eq!(settings.file_search_folders, ["~/A"]);
+
+        let many = Settings {
+            file_search_excluded_dirs: (0..99).map(|n| format!("dir{n}")).collect(),
+            ..Settings::default()
+        }
+        .normalized();
+        assert_eq!(many.file_search_excluded_dirs.len(), FOLDER_LIST_MAX);
+        assert_eq!(many.file_search_excluded_dirs[0], "dir0");
     }
 
     #[test]
