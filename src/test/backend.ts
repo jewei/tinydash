@@ -96,7 +96,6 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     { shouldMockEvents: true },
   );
   return {
-    calls,
     called: (command: string) => calls.filter((call) => call.command === command),
   };
 }
