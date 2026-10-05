@@ -156,11 +156,13 @@ pub fn clipboard_change() -> u64 {
 
 /// Text captured by the GTK handler for the latest change. Linux saves text
 /// only: GTK reads it in the same request chain that checked for secrets.
+/// The text is kept, not taken: if a newer capture lands during a read, the
+/// monitor skips it and reads it again on the next tick.
 pub fn read_clipboard(_images: bool, _files: bool) -> Option<Content> {
     CAPTURED
         .lock()
         .unwrap_or_else(|e| e.into_inner())
-        .take()
+        .clone()
         .map(Content::Text)
 }
 
@@ -215,3 +217,15 @@ pub fn prepare_launcher(_window: &tauri::WebviewWindow) {}
 pub fn remember_frontmost_app() {}
 
 pub fn restore_frontmost_app() {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_capture_can_be_read_again() {
+        *CAPTURED.lock().unwrap() = Some("note".into());
+        assert!(read_clipboard(false, false).is_some());
+        assert!(read_clipboard(false, false).is_some());
+    }
+}
