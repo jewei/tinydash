@@ -132,6 +132,29 @@ describe("Settings", () => {
     );
   });
 
+  it("focuses the recorder on click and resumes only after the pause", async () => {
+    const steps: string[] = [];
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    fakeBackend({
+      pause_shortcut: async (args) => {
+        steps.push(args.paused ? "pause" : "resume");
+        if (args.paused) {
+          await slow;
+          steps.push("paused");
+        }
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    const recorder = await screen.findByRole("button", { name: /Launcher shortcut/ });
+    fireEvent.click(recorder);
+    expect(document.activeElement).toBe(recorder);
+    fireEvent.keyDown(recorder, { key: "Escape" });
+    release();
+    await waitFor(() => expect(steps).toEqual(["pause", "paused", "resume"]));
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

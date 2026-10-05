@@ -15,12 +15,19 @@ export function ShortcutRecorder(props: {
   onError: (message: string) => void;
 }) {
   const [recording, setRecording] = createSignal(false);
+  let button!: HTMLButtonElement;
+  // Resuming waits for the pause: the backend does not keep the two
+  // requests in order, and a late pause would leave the shortcut off.
+  let paused = Promise.resolve();
 
   // If the current shortcut cannot be paused, pressing it would open the
   // launcher instead of being recorded, so recording stops and says why.
   const start = () => {
     setRecording(true);
-    ipc.pauseShortcut(true).catch((failure: unknown) => {
+    // WebKit on macOS does not focus a clicked button, and the keys and
+    // the blur that ends recording arrive only while it has focus.
+    button.focus();
+    paused = ipc.pauseShortcut(true).catch((failure: unknown) => {
       setRecording(false);
       props.onError(ipc.message(failure));
     });
@@ -29,6 +36,7 @@ export function ShortcutRecorder(props: {
   const stop = async (accelerator?: string) => {
     if (!recording()) return;
     setRecording(false);
+    await paused;
     if (accelerator && accelerator !== props.value) await props.onChange(accelerator);
     // Registers the saved shortcut again: the new one, or the old one on failure.
     await ipc.pauseShortcut(false).catch((failure: unknown) => props.onError(ipc.message(failure)));
@@ -45,6 +53,7 @@ export function ShortcutRecorder(props: {
 
   return (
     <button
+      ref={button}
       type="button"
       class="button recorder"
       classList={{ recording: recording() }}
