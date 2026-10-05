@@ -59,7 +59,10 @@ pub fn watch(app: &AppHandle) {
     let mut watcher = match created {
         Ok(watcher) => watcher,
         Err(error) => {
-            tracing::warn!(%error, "File watching is unavailable; indexes refresh every 15 minutes");
+            tracing::warn!(
+                %error,
+                "File watching is unavailable; indexes rescan when the launcher opens and they are more than 15 minutes old"
+            );
             return;
         }
     };
