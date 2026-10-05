@@ -1,6 +1,7 @@
 //! The SQLite database: the only module that knows the schema or runs SQL.
 //! Usage, pins, clipboard history, the snippet library, and cached exchange
-//! rates live in one file in the app data folder.
+//! rates live in one file in the app's local data folder (`lib.rs`: on
+//! Windows `%LOCALAPPDATA%`, which roaming profiles do not copy).
 
 use std::{
     path::{Path, PathBuf},
