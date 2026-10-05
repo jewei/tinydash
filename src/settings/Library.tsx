@@ -52,7 +52,8 @@ export function Library(props: { kind: LibraryKind }) {
   // unsaved edit.
   const savedName = () => items()?.find((item) => item.id === draft().id)?.name ?? draft().name;
   // Each item opened in the editor, a new one included, is its own session;
-  // a save's reply changes only the session it came from.
+  // the reply to a save or delete, and its error, change only the session it
+  // came from.
   let session = 0;
   const edit = (item: LibraryItem) => {
     session += 1;
@@ -63,15 +64,21 @@ export function Library(props: { kind: LibraryKind }) {
   const change = (field: "name" | "keyword" | "text", value: string) =>
     setDraft((item) => ({ ...item, [field]: value }));
 
-  /** Run one write at a time, so a double click cannot save twice. */
-  const write = async (work: () => Promise<void>) => {
+  /**
+   * Run one write at a time, so a double click cannot save twice. `open`
+   * says whether the session the write came from is still in the editor.
+   */
+  const write = async (work: (open: () => boolean) => Promise<void>) => {
     if (busy()) return;
     setBusy(true);
+    setError(undefined);
+    const from = session;
+    const open = () => session === from;
     try {
-      await work();
+      await work(open);
       await refetch();
     } catch (failure) {
-      setError(ipc.message(failure));
+      if (open()) setError(ipc.message(failure));
     } finally {
       setBusy(false);
     }
@@ -81,19 +88,19 @@ export function Library(props: { kind: LibraryKind }) {
   // nothing changed, and otherwise gives a new item its ID. A different or
   // new item opened meanwhile stays as it is.
   const save = () =>
-    write(async () => {
+    write(async (open) => {
       const sent = draft();
-      const from = session;
       const saved = await ipc.saveLibraryItem(sent);
       if (draft() === sent) edit(saved);
-      else if (session === from) setDraft((item) => ({ ...item, id: saved.id }));
+      else if (open()) setDraft((item) => ({ ...item, id: saved.id }));
     });
 
   const remove = () =>
-    write(async () => {
+    write(async (open) => {
       const id = draft().id;
       if (id === null) return;
       await ipc.deleteLibraryItem(id);
+      if (!open()) return;
       edit(blank(props.kind));
       nameField.focus();
     });
@@ -147,7 +154,8 @@ export function Library(props: { kind: LibraryKind }) {
         }}
       >
         {/* No maxLength: it counts UTF-16 units, so it would cut a name of
-            emoji short. Rust checks the limits in characters on save. */}
+            emoji short. Rust checks the name and keyword limits in
+            characters on save. */}
         <label>
           Name
           <input

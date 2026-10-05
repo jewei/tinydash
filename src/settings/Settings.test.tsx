@@ -400,6 +400,79 @@ describe("Settings", () => {
     expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
+  it("leaves an item opened during a delete as it is", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const items: LibraryItem[] = [
+      { id: 1, kind: "snippet", name: "Alpha", keyword: "", text: "A" },
+      { id: 2, kind: "snippet", name: "Beta", keyword: "", text: "B" },
+    ];
+    fakeBackend({ library_items: () => items, delete_library_item: () => slow });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete" }).at(-1) as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: /Beta/ }));
+    const text = screen.getByRole("textbox", { name: "Text" }) as HTMLTextAreaElement;
+    fireEvent.input(text, { target: { value: "B edited" } });
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(text.value).toBe("B edited");
+  });
+
+  it("shows a failed save's error only with the item it came from", async () => {
+    let refuse!: () => void;
+    const refused = new Promise<void>((resolve) => (refuse = resolve));
+    fakeBackend({
+      library_items: () => [],
+      save_library_item: async () => {
+        await refused;
+        throw "The keyword is in use.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.input(await screen.findByRole("textbox", { name: "Name" }), {
+      target: { value: "Greeting" },
+    });
+    fireEvent.input(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    fireEvent.click(screen.getByRole("button", { name: "New Snippet" }));
+    refuse();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(screen.queryByText("The keyword is in use.")).toBeNull();
+  });
+
+  it("clears an old save error when a later save works", async () => {
+    let calls = 0;
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    fakeBackend({
+      library_items: () => [],
+      save_library_item: async (args) => {
+        calls += 1;
+        if (calls === 1) throw "The keyword is in use.";
+        await slow;
+        return { ...(args.item as LibraryItem), id: 4 };
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.input(await screen.findByRole("textbox", { name: "Name" }), {
+      target: { value: "Greeting" },
+    });
+    const text = screen.getByRole("textbox", { name: "Text" });
+    fireEvent.input(text, { target: { value: "Hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    await screen.findByText("The keyword is in use.");
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    fireEvent.input(text, { target: { value: "Hi there" } });
+    release();
+    await screen.findByRole("button", { name: "Delete" });
+    expect(screen.queryByText("The keyword is in use.")).toBeNull();
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
