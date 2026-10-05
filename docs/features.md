@@ -77,7 +77,7 @@ Create them in Settings > Snippets and Settings > Quicklinks.
 
 ## Files
 
-TinyDash indexes the names of files and folders in Desktop, Documents, and Downloads (change in Settings > Files), up to 50,000 entries. It skips hidden entries, symbolic links, and folders named in the skip list (`node_modules`, `target` by default). It never reads file contents. Changes are picked up the next time the launcher opens. One word matches names; two or more words also match paths, so `project readme` finds `project/README.md`.
+TinyDash indexes the names of files and folders in Desktop, Documents, and Downloads (change in Settings > Files), up to 50,000 entries. It skips hidden entries, symbolic links, and folders named in the skip list (`node_modules`, `target` by default). It never reads file contents. Changes are picked up the next time the launcher opens. On Linux, only changes directly inside the chosen folders are noticed at once (each watched folder uses a system-wide watch slot); deeper changes appear within 15 minutes. One word matches names; two or more words also match paths, so `project readme` finds `project/README.md`.
 
 ## Settings
 

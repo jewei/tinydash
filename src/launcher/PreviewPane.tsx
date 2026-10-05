@@ -2,6 +2,7 @@ import { createResource, For, Match, Show, Switch } from "solid-js";
 
 import type { Preview } from "../generated/Preview";
 import type { ResultAction } from "../generated/ResultAction";
+import type { ResultKind } from "../generated/ResultKind";
 import type { SearchResult } from "../generated/SearchResult";
 import { clipboardImageUrl, preview as loadPreview } from "../lib/ipc";
 import { ResultIcon } from "../ui/Icon";
@@ -9,7 +10,7 @@ import { Keys } from "../ui/Keys";
 import { FALLBACK_GLYPHS, isAnswer, KIND_LABELS, shortcutFor } from "./describe";
 
 /** Kinds whose details live in the backend and load on selection. */
-const LOADED = new Set(["app", "clipboard", "file", "folder", "snippet"]);
+const LOADED = new Set<ResultKind>(["app", "clipboard", "file", "folder", "snippet"]);
 
 export function PreviewPane(props: {
   result: SearchResult | undefined;

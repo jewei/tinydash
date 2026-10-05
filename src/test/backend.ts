@@ -4,7 +4,8 @@ import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import type { SearchResult } from "../generated/SearchResult";
 import type { Settings } from "../generated/Settings";
 
-export const defaultSettings: Settings = {
+/** Rust's defaults, except clipboard history is on so its views have data. */
+export const testSettings: Settings = {
   shortcut: "Control+Shift+Space",
   theme: "system",
   hideOnBlur: true,
@@ -62,12 +63,12 @@ type Handler = (args: Record<string, unknown>) => unknown;
 export function fakeBackend(handlers: Record<string, Handler> = {}) {
   const calls: Call[] = [];
   const defaults: Record<string, Handler> = {
-    launcher_init: () => ({ settings: defaultSettings, platform: "macos", warnings: [] }),
+    launcher_init: () => ({ settings: testSettings, platform: "macos", warnings: [] }),
     search: () => [],
     run_action: () => null,
     preview: () => null,
     hide_launcher: () => null,
-    get_settings: () => defaultSettings,
+    get_settings: () => testSettings,
     update_settings: (args) => args.settings,
     pause_shortcut: () => null,
     library_items: () => [],

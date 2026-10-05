@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { LibraryItem } from "../generated/LibraryItem";
-import { defaultSettings, fakeBackend } from "../test/backend";
+import { testSettings, fakeBackend } from "../test/backend";
 import { Settings } from "./Settings";
 
 describe("Settings", () => {
@@ -14,7 +14,7 @@ describe("Settings", () => {
     );
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
     expect(backend.called("update_settings")[0]?.args).toEqual({
-      settings: { ...defaultSettings, hideOnBlur: false },
+      settings: { ...testSettings, hideOnBlur: false },
     });
   });
 
@@ -27,7 +27,7 @@ describe("Settings", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Open at login" }));
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toEqual({
-      settings: { ...defaultSettings, hideOnBlur: false, launchAtLogin: true },
+      settings: { ...testSettings, hideOnBlur: false, launchAtLogin: true },
     });
   });
 
@@ -101,7 +101,7 @@ describe("Settings", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Hide when another app is focused" }));
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toEqual({
-      settings: { ...defaultSettings, hideOnBlur: false },
+      settings: { ...testSettings, hideOnBlur: false },
     });
   });
 

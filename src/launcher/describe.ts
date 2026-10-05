@@ -48,5 +48,5 @@ export function shortcutFor(result: SearchResult, action: Action): string[] | un
 }
 
 /** Answers the user reads and copies, shown large and selectable. */
-export const isAnswer = (kind: ResultKind) =>
-  ["calculation", "dateTime", "password", "url"].includes(kind);
+const ANSWERS: readonly ResultKind[] = ["calculation", "dateTime", "password", "url"];
+export const isAnswer = (kind: ResultKind) => ANSWERS.includes(kind);

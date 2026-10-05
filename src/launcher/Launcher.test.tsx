@@ -3,7 +3,7 @@ import { emit } from "@tauri-apps/api/event";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { SearchResult } from "../generated/SearchResult";
-import { app, defaultSettings, fakeBackend, restart } from "../test/backend";
+import { app, testSettings, fakeBackend, restart } from "../test/backend";
 import { Launcher } from "./Launcher";
 
 function setup(results: (query: string, category: string) => SearchResult[], extra = {}) {
@@ -116,7 +116,7 @@ describe("Launcher", () => {
   it("offers to turn on clipboard history", async () => {
     const { backend } = setup(() => [], {
       launcher_init: () => ({
-        settings: { ...defaultSettings, clipboardHistoryEnabled: false },
+        settings: { ...testSettings, clipboardHistoryEnabled: false },
         platform: "macos",
         warnings: [],
       }),
@@ -257,7 +257,7 @@ describe("Launcher", () => {
   it("dismisses a startup warning with Escape before hiding", async () => {
     const { backend, press } = setup(() => [], {
       launcher_init: () => ({
-        settings: defaultSettings,
+        settings: testSettings,
         platform: "macos",
         warnings: ["Could not register Control+Space."],
       }),
@@ -271,7 +271,7 @@ describe("Launcher", () => {
   it("turns on clipboard history with Enter in its empty state", async () => {
     const { backend, press } = setup(() => [], {
       launcher_init: () => ({
-        settings: { ...defaultSettings, clipboardHistoryEnabled: false },
+        settings: { ...testSettings, clipboardHistoryEnabled: false },
         platform: "macos",
         warnings: [],
       }),
@@ -354,5 +354,62 @@ describe("Launcher", () => {
     fireEvent.click(await screen.findByRole("option", { name: /Notes/ }));
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
     expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
+  });
+
+  it("drops a queued Enter when the search fails or the launcher hides", async () => {
+    let fail!: () => void;
+    let release!: () => void;
+    const failing = new Promise<void>((_, reject) => (fail = () => reject("Search failed.")));
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "x") await failing;
+        if (args.query === "y") await slow;
+        return [app];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Safari/ });
+    fireEvent.input(input, { target: { value: "x" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fail();
+    await screen.findByRole("alert");
+    fireEvent.input(input, { target: { value: "y" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.keyDown(input, { key: "Escape" });
+    release();
+    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("leaves focus alone for copy shortcuts and lone modifiers", async () => {
+    const { input } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "Meta", metaKey: true });
+    fireEvent.keyDown(document.body, { key: "c", ctrlKey: true });
+    fireEvent.keyDown(document.body, { key: "c", metaKey: true });
+    expect(document.activeElement).not.toBe(input);
+    fireEvent.keyDown(document.body, { key: "Backspace" });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("does not answer a confirmation with a held Enter", async () => {
+    const { backend, press } = setup(() => [restart]);
+    await screen.findByRole("option", { name: /Restart/ });
+    press("Enter");
+    await screen.findByRole("alertdialog");
+    // A browser turns an unblocked Enter on the focused button into a click.
+    const held = new KeyboardEvent("keydown", {
+      key: "Enter",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.activeElement?.dispatchEvent(held);
+    expect(held.defaultPrevented).toBe(true);
+    expect(backend.called("run_action")).toHaveLength(0);
   });
 });

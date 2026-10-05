@@ -14,7 +14,9 @@ export function ConfirmDialog(props: {
   // modal even when a click moved focus out of it.
   const onKeyDown = (event: KeyboardEvent) => {
     const inside = document.activeElement === cancel || document.activeElement === confirm;
-    if (event.key === "Escape") {
+    if (event.repeat) {
+      // A held Enter must not answer the dialog it just opened.
+    } else if (event.key === "Escape") {
       props.onCancel();
     } else if (event.key === "Tab") {
       (document.activeElement === cancel ? confirm : cancel).focus();

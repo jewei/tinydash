@@ -18,6 +18,13 @@ import { PreviewPane } from "./PreviewPane";
 import { optionId, ResultList } from "./ResultList";
 import { CATEGORIES, createLauncher } from "./state";
 
+/** Keys that change the query: characters (AltGr included), deletion, paste. */
+function editsQuery(event: KeyboardEvent) {
+  const mod = event.metaKey || (event.ctrlKey && !event.altKey);
+  if (event.key.length === 1) return !mod || event.key.toLowerCase() === "v";
+  return event.key === "Backspace" || event.key === "Delete";
+}
+
 /** Actions that belong to no result, listed in the actions menu. */
 const GENERAL_ACTIONS: ResultAction[] = [
   { label: "Refresh Apps and Files", action: { type: "refresh" }, confirm: null },
@@ -88,8 +95,9 @@ export function Launcher() {
     const command = commandFor(event);
     if (!command) {
       // Typing, deleting, and pasting go to the search field, even after a
-      // click moved focus away from it.
-      if (document.activeElement !== input) focusInput();
+      // click moved focus. Other keys (Mod+C on selected preview text, a
+      // lone modifier) leave focus where it is.
+      if (document.activeElement !== input && editsQuery(event)) focusInput();
       return;
     }
     // Mod+Backspace deletes a clipboard entry; anywhere else it edits the text.
