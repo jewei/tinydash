@@ -171,7 +171,7 @@ pub enum Action {
     Unpin {
         id: String,
     },
-    /// Rescan apps and files and download exchange rates now.
+    /// Rescan apps and files, and download exchange rates now when they are on.
     Refresh,
     OpenSettings,
     Quit,

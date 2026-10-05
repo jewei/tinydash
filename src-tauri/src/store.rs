@@ -314,7 +314,7 @@ impl Store {
         })?;
         if changed == 0 {
             return Err(crate::error::Error::msg(
-                "This item was deleted, so it was not saved. Choose New to add it again.",
+                "This item was deleted, so it was not saved. Save again to add it as a new item.",
             ));
         }
         Ok(LibraryItem {
