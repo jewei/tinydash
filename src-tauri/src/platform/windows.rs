@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use windows_sys::Win32::{
     Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute},
+    Storage::FileSystem::{FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_SYSTEM},
     System::{
         DataExchange::{
             CloseClipboard, GetClipboardData, GetClipboardSequenceNumber,
@@ -86,6 +87,15 @@ pub fn prepare_app(app: &mut tauri::App) {
 /// plugin hands over, so no event needs handling.
 pub fn is_reopen(_: &tauri::RunEvent) -> bool {
     false
+}
+
+/// Explorer hides files and folders with the hidden or system attribute,
+/// such as the `desktop.ini` in each user folder.
+pub fn is_hidden(entry: &walkdir::DirEntry) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    entry.metadata().is_ok_and(|metadata| {
+        metadata.file_attributes() & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0
+    })
 }
 
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {

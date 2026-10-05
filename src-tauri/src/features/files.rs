@@ -65,8 +65,14 @@ pub struct FileIndex {
 impl FileIndex {
     /// Walk `folders` without following links, skipping hidden entries and
     /// excluded folder names. Unreadable folders are skipped. A folder whose
-    /// extension is in `packages` is listed, but not its contents.
-    pub fn scan(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -> Self {
+    /// extension is in `packages` is listed, but not its contents. `hidden`
+    /// says whether the OS hides an entry by attribute.
+    pub fn scan(
+        folders: &[PathBuf],
+        excluded: &[String],
+        packages: &[&str],
+        hidden: impl Fn(&walkdir::DirEntry) -> bool,
+    ) -> Self {
         let mut index = Self::default();
         'roots: for folder in distinct_roots(folders, excluded, packages) {
             let mut walker = walkdir::WalkDir::new(&folder)
@@ -77,6 +83,7 @@ impl FileIndex {
                     let name = entry.file_name().to_string_lossy();
                     !name.starts_with('.')
                         && !(entry.file_type().is_dir() && excluded.iter().any(|ex| *ex == name))
+                        && !hidden(entry)
                 });
             while let Some(entry) = walker.next() {
                 let Ok(entry) = entry else {
@@ -172,8 +179,10 @@ impl FileIndex {
     }
 }
 
-/// Whether a scan of `roots` lists `path`: no folder on the way is hidden,
-/// excluded, or a package. The last part may be a file with an excluded
+/// Whether a scan of `roots` lists `path`: no folder on the way is hidden
+/// (a name that starts with a dot), excluded, or a package. Attributes are
+/// not read here, so on Windows a folder hidden by attribute counts as
+/// listed. The last part may be a file with an excluded
 /// name (`is_dir` is false), or a package itself. The caller reads `is_dir`,
 /// so this stays free of disk access.
 pub fn lists(
@@ -304,6 +313,7 @@ mod tests {
             "node_modules/pkg/index.js",
             ".hidden/secret.txt",
             "notes/todo.txt",
+            "notes/hidden.txt",
             "Tool.APP/Contents/Info.plist",
         ] {
             std::fs::write(root.join(file), "").unwrap();
@@ -318,6 +328,7 @@ mod tests {
             &[root.clone(), root.join("notes")],
             &["node_modules".into()],
             &["app"],
+            |entry| entry.file_name() == "hidden.txt",
         );
         let mut names: Vec<_> = index.entries.iter().map(Entry::name).collect();
         names.sort();

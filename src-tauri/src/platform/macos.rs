@@ -146,6 +146,12 @@ pub fn is_reopen(event: &tauri::RunEvent) -> bool {
     matches!(event, tauri::RunEvent::Reopen { .. })
 }
 
+/// Names that start with a dot are the hidden ones here, and the scan skips
+/// those on every OS, so nothing else is hidden.
+pub fn is_hidden(_: &walkdir::DirEntry) -> bool {
+    false
+}
+
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))

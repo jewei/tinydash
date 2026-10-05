@@ -11,6 +11,9 @@
 //! - `is_reopen(event)`: the user opened the running app again, and the OS
 //!   sent an event instead of starting a second process.
 //! - `restrict_to_owner(path)`: make a file readable only by the user.
+//! - `is_hidden(entry)`: whether the OS hides a file or folder by attribute
+//!   (Windows); the file scan skips it. Names that start with a dot are
+//!   skipped on every OS.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
 //! - `app_folders()`: folders to watch for installed or removed apps.
 //! - `discover_apps()`: installed apps.
