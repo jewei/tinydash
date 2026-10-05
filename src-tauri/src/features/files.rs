@@ -191,8 +191,16 @@ fn distinct_roots(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -
     roots.dedup();
     let mut distinct: Vec<PathBuf> = Vec::new();
     for root in roots {
-        let covered =
-            lists(&root, true, &distinct, excluded, packages) && !is_package(&root, packages);
+        // The scan does not follow links inside a folder, so a folder
+        // reached through one is not covered; as a root of its own, the
+        // walk follows it.
+        let through_link = root
+            .ancestors()
+            .take_while(|folder| !distinct.iter().any(|kept| kept == folder))
+            .any(Path::is_symlink);
+        let covered = !through_link
+            && lists(&root, true, &distinct, excluded, packages)
+            && !is_package(&root, packages);
         if !covered {
             distinct.push(root);
         }
@@ -384,5 +392,20 @@ mod tests {
         expected.sort();
         assert_eq!(kept, expected);
         std::fs::remove_dir_all(outer).unwrap();
+    }
+
+    // Windows needs special rights to create a link.
+    #[cfg(unix)]
+    #[test]
+    fn a_nested_root_reached_through_a_link_is_scanned() {
+        let outer = std::env::temp_dir().join(format!("tinydash-linked-{}", std::process::id()));
+        let elsewhere = outer.with_extension("target");
+        std::fs::create_dir_all(&outer).unwrap();
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, outer.join("Dropbox")).unwrap();
+        let folders = [outer.clone(), outer.join("Dropbox")];
+        assert_eq!(distinct_roots(&folders, &[], &[]), folders);
+        std::fs::remove_dir_all(&outer).unwrap();
+        std::fs::remove_dir_all(elsewhere).unwrap();
     }
 }

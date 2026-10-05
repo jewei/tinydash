@@ -57,7 +57,7 @@ Keep private notes, plans, and evidence in `.local/` (ignored by git).
 3. **Results carry their actions.** A `SearchResult` lists `ResultAction`s; the frontend sends the chosen `Action` back. `actions.rs` checks every action again before it runs.
 4. **One source of truth for IPC types.** Add `#[derive(TS)] #[ts(export)]` to Rust types that cross IPC. Run `bun scripts/bindings.ts` to regenerate `src/generated` (it also removes bindings of deleted types), then commit the result. Add each new command to `lib.rs`, `commands.rs`, `src/lib/ipc.ts`, and a default reply in `src/test/backend.ts`.
 5. **All SQL lives in `store.rs`.** Change the schema by appending to `MIGRATIONS`. Never edit a migration that has shipped.
-6. **Platform code lives only in `platform/`.** Add a function to all three OS files and document it in `platform/mod.rs`. Outside `platform/`, `cfg!` may choose only a label or a default value.
+6. **Platform code lives only in `platform/`.** Add a function to all three OS files and document it in `platform/mod.rs`. Outside `platform/`, `cfg!` may choose only a label or a default value, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (for example, creating a link on Windows).
 7. **Bound what you keep.** Every list, cache, and stored item has a limit (see the constants in each feature).
 8. **No new dependency without need.** Prefer the standard library and existing crates. Pin exact versions in `package.json`.
 9. **No dead code.** No commented-out code, no TODOs, no unused exports, no speculative abstractions.
