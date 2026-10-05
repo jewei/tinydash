@@ -78,7 +78,7 @@ Automated tests do not cover the OS effects. Check these by hand on a real deskt
 
 ## Release
 
-1. Bump `version` in `src-tauri/Cargo.toml`; Tauri reads the app version from it.
+1. Bump `version` in `src-tauri/Cargo.toml`; Tauri reads the app version from it. Then run `cargo update --workspace --manifest-path src-tauri/Cargo.toml`, so `Cargo.lock` matches: checks and CI run Cargo with `--locked`.
 2. Merge to `main`, then push a tag such as `v0.2.0`.
 3. The Release workflow checks that the tag matches the version, builds a universal macOS app and DMG (Apple silicon and Intel), the Windows installer, and the Debian package, and attaches them to a draft GitHub release. Builds are not code-signed; macOS uses an ad-hoc signature.
 4. Review the draft and publish it.
