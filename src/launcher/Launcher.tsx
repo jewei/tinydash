@@ -25,9 +25,16 @@ function editsQuery(event: KeyboardEvent) {
   return event.key === "Backspace" || event.key === "Delete";
 }
 
-/** Actions that belong to no result, listed in the actions menu. */
-const GENERAL_ACTIONS: ResultAction[] = [
-  { label: "Refresh Apps and Files", action: { type: "refresh" }, confirm: null },
+/**
+ * Actions that belong to no result, listed in the actions menu. Refresh also
+ * downloads exchange rates when they are on, so its label says so.
+ */
+const generalActions = (rates: boolean): ResultAction[] => [
+  {
+    label: rates ? "Refresh Apps, Files, and Rates" : "Refresh Apps and Files",
+    action: { type: "refresh" },
+    confirm: null,
+  },
   { label: "Settings", action: { type: "openSettings" }, confirm: null },
   { label: "Quit TinyDash", action: { type: "quit" }, confirm: null },
 ];
@@ -156,7 +163,7 @@ export function Launcher() {
       keys: result && shortcutFor(result, action.action),
       run: () => launcher.run(action, result),
     }));
-    const general = GENERAL_ACTIONS.map((action) => ({
+    const general = generalActions(settings()?.currencyRatesEnabled ?? false).map((action) => ({
       label: action.label,
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,
       run: () => launcher.run(action),

@@ -302,6 +302,20 @@ describe("Launcher", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("names exchange rates in Refresh only when they are on", async () => {
+    const { press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    expect(
+      await screen.findByRole("option", { name: "Refresh Apps, Files, and Rates" }),
+    ).toBeTruthy();
+    const filter = screen.getByRole("combobox", { name: "Search actions" });
+    fireEvent.keyDown(filter, { key: "Escape" });
+    await emit("settings:changed", { ...testSettings, currencyRatesEnabled: false });
+    press("k", { ctrlKey: true });
+    expect(await screen.findByRole("option", { name: "Refresh Apps and Files" })).toBeTruthy();
+  });
+
   it("closes the action menu when focus leaves it", async () => {
     const { input, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
