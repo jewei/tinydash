@@ -69,15 +69,24 @@ describe("Settings", () => {
     expect(screen.queryByText(/No snippets yet/)).toBeNull();
   });
 
-  it("says when the app details cannot be read", async () => {
-    fakeBackend({
+  it("says when the app details cannot be read, and tries again on opening About", async () => {
+    let fail = true;
+    const backend = fakeBackend({
       about: () => {
-        throw "No data folder.";
+        if (fail) throw "No data folder.";
+        return { version: "0.2.0", settingsFolder: "/d", dataFolder: "/d", richClipboard: true };
       },
     });
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "About" }));
     expect((await screen.findByRole("alert")).textContent).toContain("No data folder.");
+    expect(screen.queryByText(/Settings and saved data/)).toBeNull();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    expect(await screen.findByText(/TinyDash 0\.2\.0/)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(backend.called("about")).toHaveLength(2);
   });
 
   it("stops recording and says why when the shortcut cannot be paused", async () => {

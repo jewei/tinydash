@@ -78,7 +78,7 @@ export function Settings() {
   // Read once: About shows it, and the Clipboard section hides what this
   // OS cannot save.
   const [aboutError, setAboutError] = createSignal<string>();
-  const [about] = createResource(() =>
+  const [about, { refetch: readAbout }] = createResource(() =>
     ipc.about().catch((failure: unknown) => {
       setAboutError(ipc.message(failure));
       return undefined;
@@ -133,7 +133,14 @@ export function Settings() {
               type="button"
               class="section-link"
               aria-current={section() === entry.id ? "page" : undefined}
-              onClick={() => setSection(entry.id)}
+              onClick={() => {
+                setSection(entry.id);
+                // A failed read may have been brief: try again on opening About.
+                if (entry.id === "about" && aboutError()) {
+                  setAboutError(undefined);
+                  void readAbout();
+                }
+              }}
             >
               {entry.label}
             </button>
@@ -353,7 +360,6 @@ export function Settings() {
 }
 
 function About(props: { about: AboutInfo | undefined; error: string | undefined }) {
-  const about = () => props.about;
   return (
     <div class="about">
       <Show when={props.error}>
@@ -363,23 +369,30 @@ function About(props: { about: AboutInfo | undefined; error: string | undefined 
           </p>
         )}
       </Show>
-      <p>
-        <strong>TinyDash {about()?.version}</strong> — a small, keyboard-first launcher.
-      </p>
-      <Show
-        when={about()?.settingsFolder !== about()?.dataFolder}
-        fallback={
-          <p>
-            Settings and saved data: <code>{about()?.dataFolder}</code>
-          </p>
-        }
-      >
-        <p>
-          Settings: <code>{about()?.settingsFolder}</code>
-        </p>
-        <p>
-          Saved data: <code>{about()?.dataFolder}</code>
-        </p>
+      {/* Only what was read: no empty version or folders after a failure. */}
+      <Show when={props.about}>
+        {(about) => (
+          <>
+            <p>
+              <strong>TinyDash {about().version}</strong> — a small, keyboard-first launcher.
+            </p>
+            <Show
+              when={about().settingsFolder !== about().dataFolder}
+              fallback={
+                <p>
+                  Settings and saved data: <code>{about().dataFolder}</code>
+                </p>
+              }
+            >
+              <p>
+                Settings: <code>{about().settingsFolder}</code>
+              </p>
+              <p>
+                Saved data: <code>{about().dataFolder}</code>
+              </p>
+            </Show>
+          </>
+        )}
       </Show>
       <p>
         Source and license: <code>github.com/jewei/tinydash</code> (MIT)
