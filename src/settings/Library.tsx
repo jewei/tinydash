@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, Show } from "solid-js";
+import { createResource, createSignal, createUniqueId, For, Show } from "solid-js";
 
 import type { LibraryItem } from "../generated/LibraryItem";
 import type { LibraryKind } from "../generated/LibraryKind";
@@ -15,7 +15,7 @@ const blank = (kind: LibraryKind): LibraryItem => ({
 const HELP: Record<LibraryKind, string> = {
   snippet: "Enter copies the text. Placeholders: {date}, {time}, {datetime}, and {clipboard}.",
   quicklink:
-    "Opens an http, https, or mailto URL, or a file path. {query} is replaced by text typed after the keyword, as in “jira ABC-12”.",
+    "Opens an http, https, or mailto URL, or an absolute or ~ path. {query} is replaced by text typed after the keyword, as in “jira ABC-12”.",
 };
 
 /** Create, edit, and delete snippets or quicklinks. */
@@ -43,6 +43,8 @@ export function Library(props: { kind: LibraryKind }) {
   // to its counterpart so keyboard users keep their place.
   let deleteButton: HTMLButtonElement | undefined;
   let keepButton: HTMLButtonElement | undefined;
+  // Focus moves to Keep, so Keep carries the question for screen readers.
+  const questionId = createUniqueId();
 
   const ofKind = () => (items() ?? []).filter((item) => item.kind === props.kind);
   const noun = () => (props.kind === "snippet" ? "Snippet" : "Quicklink");
@@ -197,11 +199,12 @@ export function Library(props: { kind: LibraryKind }) {
                 </button>
               }
             >
-              <span>Delete “{savedName()}”?</span>
+              <span id={questionId}>Delete “{savedName()}”?</span>
               <button
                 ref={keepButton}
                 type="button"
                 class="button"
+                aria-describedby={questionId}
                 onClick={() => {
                   setConfirmingDelete(false);
                   deleteButton?.focus();

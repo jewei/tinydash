@@ -1,14 +1,30 @@
-import { createSignal, For, type JSX } from "solid-js";
+import { createSignal, createUniqueId, For, type JSX } from "solid-js";
 
 import { isComposing } from "../lib/keys";
 
-/** One labeled setting: text on the left, its control on the right. */
+/**
+ * One labeled setting: text on the left, its control on the right. The row
+ * is a group named and described by its text, so a screen reader reads the
+ * description with the control.
+ */
 export function Row(props: { label: string; description?: string; children: JSX.Element }) {
+  const id = createUniqueId();
   return (
-    <div class="row">
+    <div
+      class="row"
+      role="group"
+      aria-labelledby={`${id}-label`}
+      aria-describedby={props.description ? `${id}-description` : undefined}
+    >
       <div class="row-text">
-        <span class="row-label">{props.label}</span>
-        {props.description && <span class="row-description">{props.description}</span>}
+        <span id={`${id}-label`} class="row-label">
+          {props.label}
+        </span>
+        {props.description && (
+          <span id={`${id}-description`} class="row-description">
+            {props.description}
+          </span>
+        )}
       </div>
       <div class="row-control">{props.children}</div>
     </div>
@@ -127,6 +143,7 @@ export function ListEditor(props: {
                 aria-label={`Remove ${item}`}
                 onClick={() => {
                   props.onChange(props.items.filter((other) => other !== item));
+                  setRepeated(undefined);
                   field.focus();
                 }}
               >

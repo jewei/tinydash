@@ -103,6 +103,33 @@ describe("Settings", () => {
     fireEvent.keyDown(field, { key: "Enter" });
     expect(screen.getByText("“~/Desktop” is already in the list.")).toBeTruthy();
     expect(backend.called("update_settings")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Remove ~/Desktop" }));
+    expect(screen.queryByText(/is already in the list/)).toBeNull();
+  });
+
+  it("describes each setting to screen readers", async () => {
+    fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Clipboard" }));
+    const row = await screen.findByRole("group", { name: "Save clipboard history" });
+    const description = document.getElementById(row.getAttribute("aria-describedby") ?? "");
+    expect(description?.textContent).toContain("unencrypted");
+  });
+
+  it("says when the shortcut cannot be turned back on", async () => {
+    fakeBackend({
+      pause_shortcut: (args) => {
+        if (!args.paused) throw "Could not register Alt+Space.";
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    const recorder = await screen.findByRole("button", { name: /Launcher shortcut/ });
+    fireEvent.click(recorder);
+    fireEvent.keyDown(recorder, { key: " ", code: "Space", altKey: true });
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Could not register Alt+Space",
+    );
   });
 
   it("records a new shortcut while the old one is paused", async () => {
@@ -223,8 +250,9 @@ describe("Settings", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Sig/ }));
     fireEvent.input(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Other" } });
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-    expect(screen.getByText("Delete “Sig”?")).toBeTruthy();
+    const question = screen.getByText("Delete “Sig”?");
     expect(document.activeElement?.textContent).toBe("Keep");
+    expect(document.activeElement?.getAttribute("aria-describedby")).toBe(question.id);
     fireEvent.click(screen.getByRole("button", { name: "Keep" }));
     expect(document.activeElement?.textContent).toBe("Delete");
   });
