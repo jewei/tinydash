@@ -333,8 +333,8 @@ describe("Launcher", () => {
     expect(screen.queryByText("Open")).toBeNull();
   });
 
-  it("keeps startup warnings when turning on clipboard history fails", async () => {
-    const { press } = setup(() => [], {
+  it("shows once why clipboard history did not turn on, apart from warnings", async () => {
+    const { backend, press } = setup(() => [], {
       launcher_init: () => ({
         settings: { ...testSettings, clipboardHistoryEnabled: false },
         platform: "macos",
@@ -346,12 +346,16 @@ describe("Launcher", () => {
     });
     fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
     await screen.findByText("Clipboard history is off");
-    press("Enter");
-    await waitFor(() =>
-      expect(screen.getByRole("alert").textContent).toContain("Could not save settings."),
-    );
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      press("Enter");
+      await waitFor(() => expect(backend.called("update_settings")).toHaveLength(attempt));
+    }
+    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
+    expect(screen.getAllByText("Could not save settings.")).toHaveLength(1);
     press("Escape");
-    expect(screen.getByRole("alert").textContent).toContain("Could not register");
+    expect(screen.queryByText(/Could not register/)).toBeNull();
+    press("Escape");
+    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
   });
 
   it("cancels a confirmation when the backdrop is clicked", async () => {
@@ -444,6 +448,7 @@ describe("Launcher", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     fail();
     await screen.findByRole("alert");
+    expect(screen.queryByText("No results")).toBeNull();
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.input(input, { target: { value: "y" } });
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());

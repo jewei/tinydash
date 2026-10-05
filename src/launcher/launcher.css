@@ -324,6 +324,10 @@ body {
   color: var(--ink);
 }
 
+.empty-error {
+  color: var(--danger);
+}
+
 .tips {
   display: grid;
   gap: var(--space-2);

@@ -38,6 +38,7 @@ export function Launcher() {
   const [platform, setPlatform] = createSignal<Platform>();
   const [warnings, setWarnings] = createSignal<string[]>([]);
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const [enableError, setEnableError] = createSignal<string>();
   let input!: HTMLInputElement;
 
   const focusInput = () => input.focus();
@@ -165,10 +166,11 @@ export function Launcher() {
   const enableClipboard = () => {
     const current = settings();
     if (!current) return;
+    setEnableError(undefined);
     ipc
       .updateSettings({ ...current, clipboardHistoryEnabled: true })
       .then(applySettings)
-      .catch((error) => setWarnings((list) => [ipc.message(error), ...list]));
+      .catch((error) => setEnableError(ipc.message(error)));
   };
 
   const notice = () => launcher.actionError() ?? launcher.searchError() ?? warnings()[0];
@@ -245,17 +247,27 @@ export function Launcher() {
               <button type="button" class="button primary" onClick={enableClipboard}>
                 Turn On Clipboard History
               </button>
+              <Show when={enableError()}>
+                {(text) => (
+                  <p class="empty-error" role="alert">
+                    {text()}
+                  </p>
+                )}
+              </Show>
             </Empty>
           }
         >
           <Show
             when={launcher.results().length > 0}
             fallback={
-              <EmptyResults
-                query={launcher.query()}
-                category={launcher.category()}
-                onSettings={() => runGeneral({ type: "openSettings" })}
-              />
+              // After a failed search the notice explains; "No results" would not be true.
+              <Show when={!launcher.searchError()}>
+                <EmptyResults
+                  query={launcher.query()}
+                  category={launcher.category()}
+                  onSettings={() => runGeneral({ type: "openSettings" })}
+                />
+              </Show>
             }
           >
             <ResultList
