@@ -379,10 +379,14 @@ describe("Launcher", () => {
       press("Enter");
       await waitFor(() => expect(backend.called("update_settings")).toHaveLength(attempt));
     }
-    await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
+    // Let every failed attempt answer before checking.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(screen.getAllByRole("alert")).toHaveLength(2);
     expect(screen.getAllByText("Could not save settings.")).toHaveLength(1);
     press("Escape");
     expect(screen.queryByText(/Could not register/)).toBeNull();
+    await emit("settings:changed", { ...testSettings, clipboardHistoryEnabled: false });
+    await waitFor(() => expect(screen.queryByText("Could not save settings.")).toBeNull());
     press("Escape");
     await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
   });

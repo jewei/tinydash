@@ -46,6 +46,8 @@ export function Launcher() {
   const focusInput = () => input.focus();
 
   const applySettings = (next: Settings) => {
+    // A newer save happened, so an old failure to turn on history is stale.
+    setEnableError(undefined);
     setSettings(next);
     applyTheme(next.theme);
   };
