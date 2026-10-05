@@ -440,6 +440,22 @@ describe("Launcher", () => {
     expect(await screen.findByText("Cheers")).toBeTruthy();
   });
 
+  it("rounds file sizes before it picks the unit", async () => {
+    const file = { ...app, id: "file:/notes.txt", kind: "file" as const, title: "notes.txt" };
+    fakeBackend({
+      search: () => [file],
+      preview: () => ({
+        type: "file",
+        path: "/notes.txt",
+        size: 999_999,
+        modified: null,
+        isDir: false,
+      }),
+    });
+    render(() => <Launcher />);
+    expect(await screen.findByText("1.0 MB")).toBeTruthy();
+  });
+
   it("sends typing back to the search field after a click", async () => {
     const { input } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
