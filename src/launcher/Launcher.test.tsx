@@ -356,15 +356,12 @@ describe("Launcher", () => {
     expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
   });
 
-  it("drops a queued Enter when the search fails or the launcher hides", async () => {
+  it("drops a queued Enter when the search fails", async () => {
     let fail!: () => void;
-    let release!: () => void;
     const failing = new Promise<void>((_, reject) => (fail = () => reject("Search failed.")));
-    const slow = new Promise<void>((resolve) => (release = resolve));
     const backend = fakeBackend({
       search: async (args) => {
         if (args.query === "x") await failing;
-        if (args.query === "y") await slow;
         return [app];
       },
     });
@@ -375,6 +372,23 @@ describe("Launcher", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     fail();
     await screen.findByRole("alert");
+    fireEvent.input(input, { target: { value: "y" } });
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("drops a queued Enter when the launcher hides", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "y") await slow;
+        return [app];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Safari/ });
     fireEvent.input(input, { target: { value: "y" } });
     fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.keyDown(input, { key: "Escape" });
