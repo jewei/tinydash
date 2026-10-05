@@ -40,8 +40,11 @@ pub fn watch(app: &AppHandle) {
         }
         let indexed = |path: &PathBuf| {
             let packages = platform::PACKAGE_EXTENSIONS;
+            // The watcher reads the disk for `lists`, which stays free of it.
             files::lists(path, path.is_dir(), &roots, &excluded, packages, |folder| {
-                files::is_hidden(folder, platform::HIDDEN)
+                platform::HIDDEN.is_some_and(|hidden| {
+                    std::fs::symlink_metadata(folder).is_ok_and(|metadata| hidden(&metadata))
+                })
             })
         };
         if event.need_rescan() || event.paths.iter().any(indexed) {

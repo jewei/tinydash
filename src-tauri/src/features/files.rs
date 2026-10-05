@@ -20,8 +20,8 @@ use crate::{
 };
 
 /// Whether the OS hides `path`, by the platform's `hidden` check. Reads the
-/// disk only on an OS that has such a check.
-pub fn is_hidden(path: &Path, hidden: Option<fn(&std::fs::Metadata) -> bool>) -> bool {
+/// disk only on an OS that has such a check; part of the scan.
+fn is_hidden(path: &Path, hidden: Option<fn(&std::fs::Metadata) -> bool>) -> bool {
     hidden.is_some_and(|hidden| std::fs::symlink_metadata(path).is_ok_and(|m| hidden(&m)))
 }
 
