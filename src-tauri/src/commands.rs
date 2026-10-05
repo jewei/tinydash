@@ -139,6 +139,15 @@ pub async fn update_settings(app: AppHandle, settings: Settings) -> Result<Setti
             .unwrap_or_else(|e| e.into_inner());
         let new = settings.normalized();
         let old = state.settings.get();
+        // Checked only when the list changes, so an entry from a hand-edited
+        // file does not block other settings.
+        if new.file_search_folders != old.file_search_folders
+            && let Some(folder) = new.relative_folder(&state.dirs.home)
+        {
+            return Err(Error::msg(format!(
+                "“{folder}” is not a full folder path. Start it with ~ for your home folder, such as ~/{folder}."
+            )));
+        }
         let applied = apply_to_system(&app, &old, &new)
             .and_then(|()| settings::save(&state.dirs.config, &new));
         if let Err(error) = applied {

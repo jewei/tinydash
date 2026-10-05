@@ -99,6 +99,15 @@ impl Settings {
         self
     }
 
+    /// The first folder entry that is not a full path, which would never be
+    /// indexed. A hand-edited file may still hold one; `file_folders` skips it.
+    pub fn relative_folder(&self, home: &Path) -> Option<&str> {
+        self.file_search_folders
+            .iter()
+            .find(|folder| !expand_home(folder, home).is_absolute())
+            .map(String::as_str)
+    }
+
     /// Indexed folders as absolute paths. Relative entries are ignored.
     pub fn file_folders(&self, home: &Path) -> Vec<PathBuf> {
         self.file_search_folders
@@ -200,6 +209,20 @@ mod tests {
         .normalized();
         assert_eq!(many.file_search_excluded_dirs.len(), FOLDER_LIST_MAX);
         assert_eq!(many.file_search_excluded_dirs[0], "dir0");
+    }
+
+    #[test]
+    fn finds_a_folder_that_is_not_a_full_path() {
+        let home = std::env::temp_dir();
+        let settings = |folders: &[&str]| Settings {
+            file_search_folders: folders.iter().map(|f| String::from(*f)).collect(),
+            ..Settings::default()
+        };
+        assert_eq!(
+            settings(&["~/Notes", "Projects"]).relative_folder(&home),
+            Some("Projects")
+        );
+        assert_eq!(settings(&["~", "~/Notes"]).relative_folder(&home), None);
     }
 
     #[test]
