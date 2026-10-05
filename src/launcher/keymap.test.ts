@@ -17,7 +17,15 @@ describe("commandFor", () => {
     expect(commandFor(key("k", { metaKey: true }), true)).toEqual({ type: "menu" });
     expect(commandFor(key("k", { ctrlKey: true }), true)).toBeNull();
     expect(commandFor(key("k", { ctrlKey: true }), false)).toEqual({ type: "menu" });
-    expect(commandFor(key("3", { ctrlKey: true }), false)).toEqual({ type: "runRow", index: 2 });
+    expect(commandFor(key("3", { ctrlKey: true, code: "Digit3" }), false)).toEqual({
+      type: "runRow",
+      index: 2,
+    });
+    // AZERTY: the 1 key gives "&" without Shift.
+    expect(commandFor(key("&", { metaKey: true, code: "Digit1" }), true)).toEqual({
+      type: "runRow",
+      index: 0,
+    });
     expect(commandFor(key("Enter", { metaKey: true }), true)).toEqual({ type: "runSecondary" });
   });
 

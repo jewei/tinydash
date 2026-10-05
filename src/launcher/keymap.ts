@@ -36,6 +36,8 @@ export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
   if (event.key.toLowerCase() === "k") return { type: "menu" };
   if (event.key === "Backspace") return { type: "delete" };
   if (event.key === ",") return { type: "settings" };
-  if (/^[1-9]$/.test(event.key)) return { type: "runRow", index: Number(event.key) - 1 };
+  // The physical digit key: on layouts such as AZERTY, `key` is "&" for 1.
+  const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code)?.[1];
+  if (digit) return { type: "runRow", index: Number(digit) - 1 };
   return null;
 }
