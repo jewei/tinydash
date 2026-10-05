@@ -60,8 +60,11 @@ export function Launcher() {
     // Listen on the window: a click on a row or the preview moves focus to
     // <body>, and the shortcuts must keep working.
     window.addEventListener("keydown", onKeyDown);
+    // An Enter that waits for results must not run after the user left.
+    window.addEventListener("blur", launcher.cancelQueued);
     onCleanup(() => {
       window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("blur", launcher.cancelQueued);
       listeners.forEach((listener) => void listener.then((stop) => stop()));
     });
     ipc

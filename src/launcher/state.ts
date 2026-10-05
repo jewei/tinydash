@@ -77,10 +77,16 @@ export function createLauncher() {
         activate(target, position);
       }
     },
-    (error) => {
-      // A failed search must not let an earlier Enter run on a later query.
+    (error, input) => {
+      // The failed input counts as shown, with no results, so Enter does
+      // nothing now and never waits to run on a later query.
+      shown = input;
       queued = undefined;
-      setSearchError(ipc.message(error));
+      batch(() => {
+        setResults([]);
+        setSelectedIndex(0);
+        setSearchError(ipc.message(error));
+      });
     },
   );
 

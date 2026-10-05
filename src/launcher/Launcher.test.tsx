@@ -384,7 +384,7 @@ describe("Launcher", () => {
     expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
   });
 
-  it("drops a queued Enter when the search fails", async () => {
+  it("ignores Enter before and after a search fails", async () => {
     let fail!: () => void;
     const failing = new Promise<void>((_, reject) => (fail = () => reject("Search failed.")));
     const backend = fakeBackend({
@@ -400,12 +400,16 @@ describe("Launcher", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     fail();
     await screen.findByRole("alert");
+    fireEvent.keyDown(input, { key: "Enter" });
     fireEvent.input(input, { target: { value: "y" } });
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
     expect(backend.called("run_action")).toHaveLength(0);
   });
 
-  it("drops a queued Enter when the launcher hides", async () => {
+  it.each([
+    ["the launcher hides", (input: HTMLElement) => fireEvent.keyDown(input, { key: "Escape" })],
+    ["the window loses focus", () => fireEvent.blur(window)],
+  ])("drops a queued Enter when %s", async (_, leave) => {
     let release!: () => void;
     const slow = new Promise<void>((resolve) => (release = resolve));
     const backend = fakeBackend({
@@ -419,9 +423,8 @@ describe("Launcher", () => {
     await screen.findByRole("option", { name: /Safari/ });
     fireEvent.input(input, { target: { value: "y" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    fireEvent.keyDown(input, { key: "Escape" });
+    leave(input);
     release();
-    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(backend.called("run_action")).toHaveLength(0);
   });
