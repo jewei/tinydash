@@ -9,7 +9,7 @@ use std::{
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _, event::ModifyKind};
 use tauri::{AppHandle, Manager};
 
-use crate::{platform, state::State};
+use crate::{features::files, platform, state::State};
 
 /// Holds the OS watcher; dropping it stops watching.
 #[derive(Default)]
@@ -24,22 +24,6 @@ pub fn watch(app: &AppHandle) {
     let excluded = settings.file_search_excluded_dirs.clone();
     let handle = app.clone();
     let (apps, files) = (app_folders.clone(), file_folders.clone());
-    // Changes in folders the index skips (hidden or excluded, such as a
-    // build's `target`) must not trigger rescans.
-    let indexed = move |path: &Path| {
-        files.iter().any(|root| {
-            path.strip_prefix(root).is_ok_and(|rest| {
-                let parts: Vec<_> = rest.components().collect();
-                parts.iter().enumerate().all(|(i, part)| {
-                    let name = part.as_os_str().to_string_lossy();
-                    // Like the scan, skip names only for folders; the last
-                    // part may be a file with an excluded name.
-                    let folder = i + 1 < parts.len() || path.is_dir();
-                    !name.starts_with('.') && !(folder && excluded.iter().any(|skip| *skip == name))
-                })
-            })
-        })
-    };
     let created = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         let Ok(event) = event else {
             return;
@@ -52,7 +36,9 @@ pub fn watch(app: &AppHandle) {
         if event.need_rescan() || event.paths.iter().any(in_apps) {
             state.freshness.apps.mark_dirty();
         }
-        if event.need_rescan() || event.paths.iter().any(|path| indexed(path)) {
+        let indexed =
+            |path: &PathBuf| is_indexed(path, &files, &excluded, platform::PACKAGE_EXTENSIONS);
+        if event.need_rescan() || event.paths.iter().any(indexed) {
             state.freshness.files.mark_dirty();
         }
     });
@@ -86,6 +72,27 @@ pub fn watch(app: &AppHandle) {
         .unwrap_or_else(|e| e.into_inner()) = Some(watcher);
 }
 
+/// Whether the file index lists `path`. Changes in what the scan skips
+/// (hidden or excluded folders, such as a build's `target`, and package
+/// contents) must not trigger rescans.
+fn is_indexed(path: &Path, roots: &[PathBuf], excluded: &[String], packages: &[&str]) -> bool {
+    roots.iter().any(|root| {
+        path.strip_prefix(root).is_ok_and(|rest| {
+            let parts: Vec<_> = rest.components().collect();
+            parts.iter().enumerate().all(|(i, part)| {
+                let name = part.as_os_str().to_string_lossy();
+                // Like the scan, skip names only for folders; the last part
+                // may be a file with an excluded name, or a package itself.
+                let parent = i + 1 < parts.len();
+                let folder = parent || path.is_dir();
+                !name.starts_with('.')
+                    && !(folder && excluded.iter().any(|skip| *skip == name))
+                    && !(parent && files::is_package(Path::new(part.as_os_str()), packages))
+            })
+        })
+    })
+}
+
 /// Creating, removing, or renaming changes names; writing content does not.
 fn changes_names(kind: &EventKind) -> bool {
     matches!(
@@ -95,4 +102,24 @@ fn changes_names(kind: &EventKind) -> bool {
             | EventKind::Modify(ModifyKind::Name(_))
             | EventKind::Any
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ignores_what_the_scan_skips() {
+        let roots = [PathBuf::from("/nowhere/Documents")];
+        let root = &roots[0];
+        let indexed =
+            |rest: &str| is_indexed(&root.join(rest), &roots, &["target".into()], &["app"]);
+        assert!(indexed("notes/todo.txt"));
+        assert!(indexed("Tool.app"));
+        assert!(indexed("notes/target"));
+        assert!(!indexed(".git/HEAD"));
+        assert!(!indexed("target/debug/build"));
+        assert!(!indexed("Tool.app/Contents/Info.plist"));
+        assert!(!is_indexed(Path::new("/elsewhere/a.txt"), &roots, &[], &[]));
+    }
 }

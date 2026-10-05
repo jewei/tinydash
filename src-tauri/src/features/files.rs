@@ -19,6 +19,16 @@ use crate::{
     },
 };
 
+/// Whether `path` has one of the `packages` extensions, so the index lists
+/// it but not its contents.
+pub fn is_package(path: &Path, packages: &[&str]) -> bool {
+    path.extension().is_some_and(|extension| {
+        packages
+            .iter()
+            .any(|package| extension.eq_ignore_ascii_case(package))
+    })
+}
+
 /// Most entries an index holds. Larger trees are cut off, and a warning is logged.
 pub const LIMIT: usize = 50_000;
 
@@ -77,12 +87,7 @@ impl FileIndex {
                 if file_type.is_symlink() {
                     continue;
                 }
-                let is_package = entry.path().extension().is_some_and(|extension| {
-                    packages
-                        .iter()
-                        .any(|package| extension.eq_ignore_ascii_case(package))
-                });
-                if file_type.is_dir() && is_package {
+                if file_type.is_dir() && is_package(entry.path(), packages) {
                     walker.skip_current_dir();
                 }
                 let Some(os_path) = entry.path().to_str() else {
