@@ -147,10 +147,15 @@ pub fn is_reopen(event: &tauri::RunEvent) -> bool {
     matches!(event, tauri::RunEvent::Reopen { .. })
 }
 
-/// Names that start with a dot are the hidden ones here, and the scan skips
-/// those on every OS, so nothing else is hidden.
-pub fn is_hidden(_: &std::fs::Metadata) -> bool {
-    false
+/// Finder hides items with the `hidden` flag (`chflags hidden`), such as
+/// `~/Library`.
+pub const HIDDEN: Option<fn(&std::fs::Metadata) -> bool> = Some(has_hidden_flag);
+
+fn has_hidden_flag(metadata: &std::fs::Metadata) -> bool {
+    use std::os::macos::fs::MetadataExt;
+    /// `UF_HIDDEN` in `<sys/stat.h>`.
+    const UF_HIDDEN: u32 = 0x8000;
+    metadata.st_flags() & UF_HIDDEN != 0
 }
 
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {

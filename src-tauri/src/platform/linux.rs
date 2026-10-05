@@ -93,11 +93,9 @@ pub fn is_reopen(_: &tauri::RunEvent) -> bool {
     false
 }
 
-/// Names that start with a dot are the hidden ones here, and the scan skips
-/// those on every OS, so nothing else is hidden.
-pub fn is_hidden(_: &std::fs::Metadata) -> bool {
-    false
-}
+/// Only names that start with a dot are hidden here, and the scan skips
+/// those on every OS, so it reads no metadata for this.
+pub const HIDDEN: Option<fn(&std::fs::Metadata) -> bool> = None;
 
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::PermissionsExt;

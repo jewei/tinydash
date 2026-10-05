@@ -93,7 +93,9 @@ pub fn is_reopen(_: &tauri::RunEvent) -> bool {
 /// Explorer hides files and folders with the hidden attribute, such as the
 /// `desktop.ini` in each user folder and `AppData`. The system attribute
 /// alone does not hide an item.
-pub fn is_hidden(metadata: &std::fs::Metadata) -> bool {
+pub const HIDDEN: Option<fn(&std::fs::Metadata) -> bool> = Some(has_hidden_attribute);
+
+fn has_hidden_attribute(metadata: &std::fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0
 }

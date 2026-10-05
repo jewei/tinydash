@@ -11,9 +11,9 @@
 //! - `is_reopen(event)`: the user opened the running app again, and the OS
 //!   sent an event instead of starting a second process.
 //! - `restrict_to_owner(path)`: make a file readable only by the user.
-//! - `is_hidden(metadata)`: whether the OS hides a file or folder by attribute
-//!   (Windows); the file scan skips it. Names that start with a dot are
-//!   skipped on every OS.
+//! - `HIDDEN`: the OS's check for a hidden file or folder besides a name
+//!   that starts with a dot (the Windows hidden attribute, the macOS hidden
+//!   flag), or `None` when it has none, so the scan reads no metadata.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
 //! - `RICH_CLIPBOARD`: whether clipboard history can save images and copied
 //!   files; `read_clipboard` ignores both settings when it cannot.

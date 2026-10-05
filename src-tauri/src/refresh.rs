@@ -159,7 +159,7 @@ pub fn files(app: &AppHandle) {
                 &folders,
                 &settings.file_search_excluded_dirs,
                 platform::PACKAGE_EXTENSIONS,
-                platform::is_hidden,
+                platform::HIDDEN,
             );
             if index.truncated {
                 tracing::warn!(
