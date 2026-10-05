@@ -78,11 +78,11 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         }
         Action::CopyClip { id } => {
             let content = state
-                .store
                 .clip(id)?
                 .ok_or_else(|| Error::msg("This entry is no longer in the history."))?;
             copy_and_close(app, || system_clipboard::write(&content))?;
         }
+        // Deleting reveals nothing, so it works while history is off too.
         Action::DeleteClip { id } => {
             state.store.delete_clip(id)?;
             state.pins.update(|pins| pins.remove(&Source::Clip.id(id)));

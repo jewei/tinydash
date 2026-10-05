@@ -8,8 +8,12 @@ use chrono::Local;
 use crate::{
     error::Result,
     features::{
-        apps::AppIndex, clipboard::ClipboardHistory, currency::Rates, emoji::EmojiIndex,
-        files::FileIndex, library::Library,
+        apps::AppIndex,
+        clipboard::{ClipboardHistory, Content},
+        currency::Rates,
+        emoji::EmojiIndex,
+        files::FileIndex,
+        library::Library,
     },
     refresh::Freshness,
     search::{
@@ -117,6 +121,15 @@ impl State {
         }
     }
 
+    /// The full content of a saved clipboard entry, hidden like search
+    /// results while history is off.
+    pub fn clip(&self, id: i64) -> Result<Option<Content>> {
+        if !self.settings.get().clipboard_history_enabled {
+            return Ok(None);
+        }
+        self.store.clip(id)
+    }
+
     pub fn reload_clipboard(&self) -> Result<()> {
         self.clipboard
             .set(ClipboardHistory::new(self.store.clipboard_history()?));
@@ -141,10 +154,7 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        features::clipboard::Content,
-        search::{self, Category},
-    };
+    use crate::search::{self, Category};
 
     fn state_with_clip(clipboard_history_enabled: bool) -> State {
         let store = Store::in_memory();
@@ -184,6 +194,15 @@ mod tests {
             ("secret", Category::All),
         ] {
             assert!(titles(&off, query, category).is_empty());
+        }
+    }
+
+    #[test]
+    fn serves_saved_content_only_while_history_is_on() {
+        for enabled in [true, false] {
+            let state = state_with_clip(enabled);
+            let id = state.store.clipboard_history().unwrap()[0].id;
+            assert_eq!(state.clip(id).unwrap().is_some(), enabled);
         }
     }
 }

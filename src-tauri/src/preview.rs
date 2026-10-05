@@ -47,7 +47,7 @@ pub fn load(state: &State, id: &str) -> Result<Option<Preview>> {
     Ok(match source {
         Source::Clip => {
             let Ok(id) = key.parse() else { return Ok(None) };
-            state.store.clip(id)?.map(|content| match content {
+            state.clip(id)?.map(|content| match content {
                 Content::Text(text) => Preview::Text { text },
                 Content::Image { width, height, .. } => Preview::Image { id, width, height },
                 Content::Files(paths) => Preview::Files {

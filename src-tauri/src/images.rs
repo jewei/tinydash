@@ -70,7 +70,7 @@ pub fn serve_clipboard_image(
     };
     let app = context.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let response = match app.state::<State>().store.clip(id) {
+        let response = match app.state::<State>().clip(id) {
             Ok(Some(Content::Image { png, .. })) => image_response(png),
             _ => not_found(),
         };
