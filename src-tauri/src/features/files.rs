@@ -21,7 +21,7 @@ use crate::{
 
 /// Whether `path` has one of the `packages` extensions, so the index lists
 /// it but not its contents.
-pub fn is_package(path: &Path, packages: &[&str]) -> bool {
+fn is_package(path: &Path, packages: &[&str]) -> bool {
     path.extension().is_some_and(|extension| {
         packages
             .iter()
