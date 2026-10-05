@@ -104,7 +104,8 @@ impl Settings {
     }
 }
 
-fn expand_home(path: &str, home: &Path) -> PathBuf {
+/// `~` or `~/rest` relative to `home`; other paths unchanged.
+pub fn expand_home(path: &str, home: &Path) -> PathBuf {
     match path.strip_prefix('~') {
         Some("") => home.to_owned(),
         Some(rest) if rest.starts_with(['/', '\\']) => home.join(&rest[1..]),

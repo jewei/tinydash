@@ -16,6 +16,7 @@ use crate::{
 
 pub const FILE_MANAGER: &str = "Files";
 pub const NATIVE_ICONS: bool = false;
+pub const TEMPLATE_TRAY_ICON: bool = false;
 
 const OWN_DESKTOP_IDS: &[&str] = &[
     "TinyDash.desktop",
@@ -70,8 +71,6 @@ pub fn discover_apps() -> Vec<App> {
         .collect()
 }
 
-/// Launch through GIO, which handles field codes, terminals, and D-Bus
-/// activation. Desktop files are never run through a shell.
 pub fn prepare_app(app: &mut tauri::App) {
     let _ = app;
 }
@@ -81,6 +80,8 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
 }
 
+/// Launch through GIO, which handles field codes, terminals, and D-Bus
+/// activation. Desktop files are never run through a shell.
 pub fn launch_app(path: &Path) -> Result<()> {
     let app = gio::DesktopAppInfo::from_filename(path)
         .ok_or_else(|| Error::msg("The application is no longer installed."))?;

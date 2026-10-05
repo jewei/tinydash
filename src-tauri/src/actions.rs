@@ -11,7 +11,7 @@ use tauri::{AppHandle, Manager};
 use crate::{
     error::{Error, Result},
     events,
-    features::library::{self, Target},
+    features::library::{self, LibraryKind, Target},
     platform, refresh,
     search::{self, Context, id::Source, result::Action},
     state::State,
@@ -93,6 +93,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             let library = state.library.get();
             let item = library
                 .find(id)
+                .filter(|item| item.kind == LibraryKind::Snippet)
                 .ok_or_else(|| Error::msg("This snippet was deleted."))?;
             let text = library::render_snippet(
                 &item.text,
@@ -105,6 +106,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             let library = state.library.get();
             let item = library
                 .find(id)
+                .filter(|item| item.kind == LibraryKind::Quicklink)
                 .ok_or_else(|| Error::msg("This quicklink was deleted."))?;
             match library::quicklink_target(&item.text, &query)? {
                 Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
@@ -125,17 +127,16 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             let id = search::resolve(&snapshot, &ctx, &id)
                 .ok_or_else(|| Error::msg("This item no longer exists."))?
                 .id;
-            // Pins of deleted items are invisible; drop them before counting.
-            for gone in snapshot
+            // Count only pins the user can see: a pin of a file outside the
+            // index stays saved for when its folder returns, but cannot be
+            // unpinned, so it must not use up the limit.
+            let visible = snapshot
                 .pins
                 .ids()
                 .iter()
-                .filter(|pin| search::resolve(&snapshot, &ctx, pin).is_none())
-            {
-                state.store.set_pinned(gone, false)?;
-                state.pins.update(|pins| pins.remove(gone));
-            }
-            if state.pins.get().ids().len() >= MAX_PINS {
+                .filter(|pin| search::resolve(&snapshot, &ctx, pin).is_some())
+                .count();
+            if visible >= MAX_PINS {
                 return Err(Error::msg(format!("You can pin up to {MAX_PINS} items.")));
             }
             state.store.set_pinned(&id, true)?;

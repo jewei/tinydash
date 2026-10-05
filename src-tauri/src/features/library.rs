@@ -21,6 +21,7 @@ use crate::{
         result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult, Symbol},
         top,
     },
+    settings,
 };
 
 /// Most snippets and quicklinks together.
@@ -111,13 +112,8 @@ pub fn quicklink_target(template: &str, query: &str) -> Result<Target> {
     if query.contains(['/', '\\']) || query.split_whitespace().any(|part| part == "..") {
         return Err(Error::msg("A path quicklink accepts a name, not a path."));
     }
-    let path = template.replace("{query}", query);
-    let path = match path.strip_prefix('~') {
-        Some(rest) => std::env::home_dir()
-            .ok_or_else(|| Error::msg("The home folder is unknown."))?
-            .join(rest.trim_start_matches(['/', '\\'])),
-        None => PathBuf::from(path),
-    };
+    let home = std::env::home_dir().unwrap_or_default();
+    let path = settings::expand_home(&template.replace("{query}", query), &home);
     if !path.is_absolute() {
         return Err(Error::msg(
             "A quicklink opens an http, https, or mailto URL, or an absolute or ~ path.",

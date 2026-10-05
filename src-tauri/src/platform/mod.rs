@@ -3,6 +3,7 @@
 //! Each OS module provides the same items:
 //!
 //! - `FILE_MANAGER`: name used in "Show in …" labels.
+//! - `TEMPLATE_TRAY_ICON`: the OS tints a black tray icon (macOS menu bar).
 //! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy.
 //! - `restrict_to_owner(path)`: make a file readable only by the user.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
@@ -113,10 +114,12 @@ fn read_with_arboard(
 /// Start a GUI program and return at once; it keeps running on its own.
 #[cfg(target_os = "linux")]
 fn launch(program: &str) -> Result<()> {
-    std::process::Command::new(program)
+    let mut child = std::process::Command::new(program)
         .spawn()
-        .map(drop)
-        .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))
+        .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))?;
+    // Reap it when it exits, so no zombie process stays behind.
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }
 
 /// Run a helper program with fixed arguments. Never pass user text here.

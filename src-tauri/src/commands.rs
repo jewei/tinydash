@@ -176,9 +176,11 @@ fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()
     Ok(())
 }
 
+/// Runs on a worker: pausing waits for any settings change in progress,
+/// and that change may itself be waiting for the main thread.
 #[tauri::command]
-pub fn pause_shortcut(app: AppHandle, paused: bool) -> Result<()> {
-    shortcut::pause(&app, paused)
+pub async fn pause_shortcut(app: AppHandle, paused: bool) -> Result<()> {
+    blocking(move || shortcut::pause(&app, paused)).await
 }
 
 #[tauri::command]

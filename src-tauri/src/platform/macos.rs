@@ -23,6 +23,7 @@ use crate::{
 
 pub const FILE_MANAGER: &str = "Finder";
 pub const NATIVE_ICONS: bool = true;
+pub const TEMPLATE_TRAY_ICON: bool = true;
 
 /// Bundles are found up to this many folders deep.
 const APP_DEPTH: usize = 4;

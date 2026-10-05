@@ -22,6 +22,7 @@ use crate::{
 
 pub const FILE_MANAGER: &str = "File Explorer";
 pub const NATIVE_ICONS: bool = false;
+pub const TEMPLATE_TRAY_ICON: bool = false;
 
 /// Shortcuts are found up to this many folders deep.
 const APP_DEPTH: usize = 6;
@@ -194,11 +195,11 @@ pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
 
 pub fn watch_clipboard() {}
 
-/// Ask Windows 11 for rounded corners on the borderless launcher.
 pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
     super::place_in_physical_pixels(app, window)
 }
 
+/// Ask Windows 11 for rounded corners on the borderless launcher.
 pub fn prepare_launcher(window: &tauri::WebviewWindow) {
     let Ok(hwnd) = window.hwnd() else {
         return;

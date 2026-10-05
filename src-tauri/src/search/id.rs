@@ -69,13 +69,21 @@ impl Source {
     /// Running the result means the user wants it again soon. Clipboard
     /// entries already sort by recency.
     pub fn learns_from_use(self) -> bool {
-        self != Self::Clip
+        match self {
+            Self::App | Self::File | Self::Snippet | Self::Link | Self::Emoji | Self::System => {
+                true
+            }
+            Self::Clip => false,
+        }
     }
 
     /// May appear among the suggestions in an empty All. Clipboard text and
     /// system commands should never be one keystroke away by accident.
     pub fn suggestible(self) -> bool {
-        !matches!(self, Self::Clip | Self::System)
+        match self {
+            Self::App | Self::File | Self::Snippet | Self::Link | Self::Emoji => true,
+            Self::Clip | Self::System => false,
+        }
     }
 }
 

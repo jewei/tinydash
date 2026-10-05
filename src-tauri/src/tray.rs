@@ -7,7 +7,7 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
 
-use crate::{error::Result, window};
+use crate::{error::Result, platform, window};
 
 const ID: &str = "tinydash";
 
@@ -31,7 +31,7 @@ fn create(app: &AppHandle) -> Result<()> {
     )?;
     // macOS tints a black template image for the menu bar; other desktops
     // show icons as drawn, so they get the colored app icon.
-    let template = cfg!(target_os = "macos");
+    let template = platform::TEMPLATE_TRAY_ICON;
     let icon = match app.default_window_icon() {
         Some(icon) if !template => icon.clone(),
         _ => template_icon(),

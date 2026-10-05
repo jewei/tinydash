@@ -29,9 +29,13 @@ pub fn watch(app: &AppHandle) {
     let indexed = move |path: &Path| {
         files.iter().any(|root| {
             path.strip_prefix(root).is_ok_and(|rest| {
-                rest.components().all(|part| {
+                let parts: Vec<_> = rest.components().collect();
+                parts.iter().enumerate().all(|(i, part)| {
                     let name = part.as_os_str().to_string_lossy();
-                    !name.starts_with('.') && !excluded.iter().any(|skip| *skip == name)
+                    // Like the scan, skip names only for folders; the last
+                    // part may be a file with an excluded name.
+                    let folder = i + 1 < parts.len() || path.is_dir();
+                    !name.starts_with('.') && !(folder && excluded.iter().any(|skip| *skip == name))
                 })
             })
         })

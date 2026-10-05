@@ -42,6 +42,7 @@ pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
 
 /// Pause while Settings records a new shortcut, so pressing the current
 /// one is recorded instead of toggling the launcher.
+/// Takes the settings lock; never call it on the main thread.
 pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
     let state = app.state::<State>();
     let _one_change_at_a_time = state

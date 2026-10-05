@@ -101,7 +101,8 @@ fn setup(app: &mut App) {
     let dir = |dir: tauri::Result<std::path::PathBuf>| dir.expect("the OS reports app folders");
     let config_dir = dir(paths.app_config_dir());
     let data_dir = dir(paths.app_data_dir());
-    let home_dir = dir(paths.home_dir());
+    // The same source as every other home lookup (`std::env::home_dir`).
+    let home_dir = std::env::home_dir().unwrap_or_default();
 
     let mut warnings = Vec::new();
     let (settings, warning) = settings::load(&config_dir);

@@ -82,10 +82,15 @@ pub fn on_event(window: &tauri::Window, event: &WindowEvent) {
     let app = window.app_handle();
     if window.label() == SETTINGS {
         // Settings may close while it records a shortcut; turn it back on.
-        if let WindowEvent::Destroyed = event
-            && let Err(error) = shortcut::pause(app, false)
-        {
-            tracing::warn!(%error, "Could not restore the shortcut");
+        // Off the main thread: a settings change may hold the lock while it
+        // waits for the main thread.
+        if let WindowEvent::Destroyed = event {
+            let app = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(error) = shortcut::pause(&app, false) {
+                    tracing::warn!(%error, "Could not restore the shortcut");
+                }
+            });
         }
         return;
     }
