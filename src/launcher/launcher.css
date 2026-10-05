@@ -410,8 +410,7 @@ body {
   overflow-y: auto;
 }
 
-.menu-item,
-.menu-empty {
+.menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -426,4 +425,8 @@ body {
 
 .menu-empty {
   color: var(--muted);
+}
+
+.menu-empty:not(:empty) {
+  padding: 0 calc(var(--space-1) + var(--space-2)) var(--space-2);
 }

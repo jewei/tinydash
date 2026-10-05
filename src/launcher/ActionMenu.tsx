@@ -82,7 +82,7 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
         role="listbox"
         onMouseDown={(event) => event.preventDefault()}
       >
-        <For each={visible()} fallback={<li class="menu-empty">No matching actions</li>}>
+        <For each={visible()}>
           {(item, index) => (
             <li
               id={`menu-item-${index()}`}
@@ -98,6 +98,10 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
           )}
         </For>
       </ul>
+      {/* A listbox holds only options, so the empty state sits after it. */}
+      <p class="menu-empty" role="status">
+        {visible().length ? "" : "No matching actions"}
+      </p>
     </div>
   );
 }

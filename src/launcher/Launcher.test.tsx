@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { emit } from "@tauri-apps/api/event";
 import { describe, expect, it } from "vite-plus/test";
 
@@ -212,6 +212,17 @@ describe("Launcher", () => {
     );
   });
 
+  it("says when no action matches, outside the list of options", async () => {
+    const { press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByRole("combobox", { name: "Search actions" });
+    fireEvent.input(filter, { target: { value: "zzz" } });
+    expect((await screen.findByRole("status")).textContent).toBe("No matching actions");
+    const menu = screen.getByRole("dialog", { name: "Actions" });
+    expect(within(menu).getByRole("listbox").children).toHaveLength(0);
+  });
+
   it("closes the action menu when focus leaves it", async () => {
     const { input, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
@@ -331,6 +342,9 @@ describe("Launcher", () => {
     await screen.findByText("Clipboard history is off");
     expect(input.getAttribute("aria-activedescendant")).toBeNull();
     expect(screen.queryByText("Open")).toBeNull();
+    fireEvent.keyDown(input, { key: "k", ctrlKey: true });
+    await screen.findByRole("option", { name: "Quit TinyDash" });
+    expect(screen.queryByRole("option", { name: /^Open/ })).toBeNull();
   });
 
   it("shows once why clipboard history did not turn on, apart from warnings", async () => {
