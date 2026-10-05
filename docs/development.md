@@ -54,7 +54,7 @@ Automated tests do not cover the OS effects. Check these by hand on a real deskt
 ## Change the IPC contract
 
 1. Change the Rust type or command (`commands.rs`, `actions.rs`, `search/result.rs`, ...).
-2. Run `bun run test`. ts-rs rewrites `src/generated`.
+2. Run `bun scripts/bindings.ts`. It rebuilds `src/generated` from scratch (removing bindings of deleted types) and fails once to show that it changed.
 3. Fix the type errors that `bun run check` reports in the frontend, and update `src/lib/ipc.ts` for new commands.
 4. Commit the generated files with the change.
 
