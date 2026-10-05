@@ -50,6 +50,9 @@ pub struct State {
     /// Held while settings change or the shortcut pauses, so two changes
     /// never interleave their effects on the OS.
     pub settings_change: Mutex<()>,
+    /// Held while a reload reads the database and swaps in the result, so an
+    /// older read never replaces a newer one.
+    reloading: Mutex<()>,
     /// Problems found at startup, shown once in the launcher.
     pub warnings: Mutex<Vec<String>>,
     /// The category of the latest show. A launcher page that loads after the
@@ -97,6 +100,7 @@ impl State {
             freshness: Freshness::default(),
             dirs,
             settings_change: Mutex::new(()),
+            reloading: Mutex::new(()),
             warnings: Mutex::new(warnings),
             shown_category: Mutex::new(None),
         }
@@ -135,12 +139,14 @@ impl State {
     }
 
     pub fn reload_clipboard(&self) -> Result<()> {
+        let _one_at_a_time = self.reloading.lock().unwrap_or_else(|e| e.into_inner());
         self.clipboard
             .set(ClipboardHistory::new(self.store.clipboard_history()?));
         Ok(())
     }
 
     pub fn reload_library(&self) -> Result<()> {
+        let _one_at_a_time = self.reloading.lock().unwrap_or_else(|e| e.into_inner());
         self.library.set(Library::new(self.store.library()?));
         Ok(())
     }
@@ -206,6 +212,23 @@ mod tests {
         ] {
             assert!(titles(&off, query, category).is_empty());
         }
+    }
+
+    #[test]
+    fn concurrent_reloads_end_with_the_latest_history() {
+        let state = state_with_clip(true);
+        std::thread::scope(|scope| {
+            for n in 0..8 {
+                let state = &state;
+                scope.spawn(move || {
+                    let text = Content::Text(format!("copy {n}"));
+                    state.store.save_clip(&text, n, 100).unwrap();
+                    state.reload_clipboard().unwrap();
+                });
+            }
+        });
+        let shown = state.clipboard.get().browse(&search::Context::none()).len();
+        assert_eq!(shown, state.store.clipboard_history().unwrap().len());
     }
 
     #[test]
