@@ -176,7 +176,6 @@ fn clipboard_is_concealed() -> bool {
     }
 }
 
-/// Windows needs no change notifications: `clipboard_change` is a cheap counter.
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
@@ -191,6 +190,7 @@ pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
     arboard::SetExtWindows::exclude_from_cloud(arboard::SetExtWindows::exclude_from_history(set))
 }
 
+/// Windows needs no change notifications: `clipboard_change` is a cheap counter.
 pub fn watch_clipboard(_capturing: impl Fn() -> bool + 'static) {}
 
 pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
