@@ -54,7 +54,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 ## Platform layer
 
-`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection, launcher window setup, and returning focus. Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default.
+`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection, launcher window setup, and returning focus. Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (AGENTS.md rule 6).
 
 | Concern          | macOS                                 | Windows                      | Linux                                                                                                         |
 | ---------------- | ------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
