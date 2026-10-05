@@ -75,8 +75,8 @@ export function Settings() {
   });
   const [section, setSection] = createSignal<Section>("general");
   const [error, setError] = createSignal<string>();
-  // Read once: About shows it, and the Clipboard section hides what this
-  // OS cannot save.
+  // Read when Settings opens, and again on opening About after a failure:
+  // About shows it, and the Clipboard section hides what this OS cannot save.
   const [aboutError, setAboutError] = createSignal<string>();
   const [about, { refetch: readAbout }] = createResource(() =>
     ipc.about().catch((failure: unknown) => {

@@ -1,8 +1,8 @@
 //! Keeps indexes and exchange rates fresh without background polling.
 //!
-//! The file watcher only marks an index dirty. Work happens when the
-//! launcher opens (or settings change), on a blocking worker, and the new
-//! index replaces the old one in one swap.
+//! The file watcher only marks an index dirty. Work happens at startup,
+//! when the launcher opens, when settings change, and on Refresh, on a
+//! blocking worker, and the new index replaces the old one in one swap.
 
 use std::{
     sync::{
@@ -174,7 +174,8 @@ pub fn files(app: &AppHandle) {
 }
 
 /// Run `work` on a blocking worker, one run at a time. A request that
-/// arrives during a run marks the slot dirty, and the work runs again.
+/// arrives during a run makes the work run again; a watcher change
+/// (`mark_dirty`) waits for the next launcher open.
 fn rebuild(app: &AppHandle, slot: fn(&State) -> &Slot, work: fn(&State)) {
     if !slot(&app.state::<State>()).request() {
         return;
