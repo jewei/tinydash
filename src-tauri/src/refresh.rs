@@ -48,7 +48,11 @@ impl Freshness {
 }
 
 pub struct Slot {
+    /// Something changed since the last run began; the next launcher open
+    /// rebuilds.
     dirty: AtomicBool,
+    /// A rebuild was asked for while one ran; the worker runs once more.
+    requested: AtomicBool,
     busy: AtomicBool,
     finished: Mutex<Option<Instant>>,
 }
@@ -57,6 +61,7 @@ impl Default for Slot {
     fn default() -> Self {
         Self {
             dirty: AtomicBool::new(true),
+            requested: AtomicBool::new(false),
             busy: AtomicBool::new(false),
             finished: Mutex::new(None),
         }
@@ -64,8 +69,36 @@ impl Default for Slot {
 }
 
 impl Slot {
+    /// The watcher saw a change. It only waits for the next launcher open,
+    /// so a folder that changes all the time cannot keep a worker scanning.
     pub fn mark_dirty(&self) {
         self.dirty.store(true, Ordering::SeqCst);
+    }
+
+    /// Ask for a rebuild: true when the caller must start the worker. A
+    /// worker that is running already runs once more.
+    fn request(&self) -> bool {
+        self.requested.store(true, Ordering::SeqCst);
+        !self.busy.swap(true, Ordering::SeqCst)
+    }
+
+    /// A run starts and covers every change and request made so far.
+    fn begin(&self) {
+        self.requested.store(false, Ordering::SeqCst);
+        self.dirty.store(false, Ordering::SeqCst);
+    }
+
+    /// A run ended: true when a request arrived meanwhile and the worker
+    /// must run again.
+    fn end(&self) -> bool {
+        *self.finished.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
+        if self.requested.load(Ordering::SeqCst) {
+            return true;
+        }
+        self.busy.store(false, Ordering::SeqCst);
+        // A request that came after the check above saw `busy` and did not
+        // start a worker; take the slot back and run it.
+        self.requested.load(Ordering::SeqCst) && !self.busy.swap(true, Ordering::SeqCst)
     }
 
     /// Whether the index was built at least once. Before that, every item
@@ -143,11 +176,7 @@ pub fn files(app: &AppHandle) {
 /// Run `work` on a blocking worker, one run at a time. A request that
 /// arrives during a run marks the slot dirty, and the work runs again.
 fn rebuild(app: &AppHandle, slot: fn(&State) -> &Slot, work: fn(&State)) {
-    let state = app.state::<State>();
-    // Ask first, then try to become the worker. A running worker checks
-    // `dirty` after it clears `busy`, so the request is never lost.
-    slot(&state).mark_dirty();
-    if slot(&state).busy.swap(true, Ordering::SeqCst) {
+    if !slot(&app.state::<State>()).request() {
         return;
     }
     let app = app.clone();
@@ -155,16 +184,9 @@ fn rebuild(app: &AppHandle, slot: fn(&State) -> &Slot, work: fn(&State)) {
         let state = app.state::<State>();
         let slot = slot(&state);
         loop {
-            slot.dirty.store(false, Ordering::SeqCst);
+            slot.begin();
             work(&state);
-            *slot.finished.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now());
-            if slot.dirty.load(Ordering::SeqCst) {
-                continue;
-            }
-            slot.busy.store(false, Ordering::SeqCst);
-            // A request that arrived after the check above saw `busy` and only
-            // marked the slot dirty; take the slot back and run it.
-            if !slot.dirty.load(Ordering::SeqCst) || slot.busy.swap(true, Ordering::SeqCst) {
+            if !slot.end() {
                 break;
             }
         }
@@ -220,6 +242,24 @@ pub fn rates(app: &AppHandle, force: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn changes_during_a_run_wait_for_the_next_open_but_requests_run_again() {
+        let slot = Slot::default();
+        assert!(slot.request());
+        slot.begin();
+        slot.mark_dirty();
+        assert!(!slot.end());
+        assert!(slot.needs_work());
+
+        assert!(slot.request());
+        slot.begin();
+        assert!(!slot.request());
+        assert!(slot.end());
+        slot.begin();
+        assert!(!slot.end());
+        assert!(!slot.needs_work());
+    }
 
     #[test]
     fn scanned_sources_are_ready_after_their_first_scan() {
