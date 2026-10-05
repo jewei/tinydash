@@ -94,6 +94,17 @@ describe("Settings", () => {
     expect(recorder.textContent).not.toContain("Press keys");
   });
 
+  it("says when a folder is already in the list", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Files" }));
+    const field = await screen.findByRole("textbox", { name: "Folder to add" });
+    fireEvent.input(field, { target: { value: "~/Desktop" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(screen.getByText("“~/Desktop” is already in the list.")).toBeTruthy();
+    expect(backend.called("update_settings")).toHaveLength(0);
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

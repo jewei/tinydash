@@ -61,7 +61,7 @@ body {
 .row-description,
 .optional,
 .list-empty,
-.list-full {
+.list-status {
   font-size: var(--text-small);
   color: var(--muted);
 }
@@ -164,7 +164,7 @@ body {
   flex: 1;
 }
 
-.list-full:not(:empty) {
+.list-status:not(:empty) {
   margin-top: var(--space-2);
 }
 

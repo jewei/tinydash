@@ -102,13 +102,15 @@ export function ListEditor(props: {
   onChange: (items: string[]) => void;
 }) {
   const [draft, setDraft] = createSignal("");
+  const [repeated, setRepeated] = createSignal<string>();
   const full = () => props.items.length >= props.max;
   // The field stays when the list is full, and Remove hands focus to it,
   // so keyboard focus never falls back to the page.
   let field!: HTMLInputElement;
   const add = () => {
     const value = draft().trim();
-    if (full() || !value || props.items.includes(value)) return;
+    if (full() || !value) return;
+    if (props.items.includes(value)) return setRepeated(value);
     props.onChange([...props.items, value]);
     setDraft("");
   };
@@ -141,15 +143,20 @@ export function ListEditor(props: {
           aria-label={props.label}
           placeholder={props.placeholder}
           value={draft()}
-          onInput={(event) => setDraft(event.currentTarget.value)}
+          onInput={(event) => {
+            setDraft(event.currentTarget.value);
+            setRepeated(undefined);
+          }}
           onKeyDown={(event) => event.key === "Enter" && !isComposing(event) && add()}
         />
         <button type="button" class="button" disabled={full()} onClick={add}>
           Add
         </button>
       </div>
-      <p class="list-full" role="status">
-        {full() ? `The list is full (${props.max}). Remove one to add another.` : ""}
+      <p class="list-status" role="status">
+        {full()
+          ? `The list is full (${props.max}). Remove one to add another.`
+          : repeated() && `“${repeated()}” is already in the list.`}
       </p>
     </div>
   );
