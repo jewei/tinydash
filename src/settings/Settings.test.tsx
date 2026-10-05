@@ -143,4 +143,26 @@ describe("Settings", () => {
     await waitFor(() => expect(backend.called("library_items").length).toBeGreaterThan(1));
     expect(backend.called("save_library_item")).toHaveLength(1);
   });
+
+  it("returns focus to Clear History after its dialog closes", async () => {
+    fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Clipboard" }));
+    const clear = await screen.findByRole("button", { name: "Clear History…" });
+    fireEvent.click(clear);
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(document.activeElement).toBe(clear);
+  });
+
+  it("moves focus through the inline delete confirmation", async () => {
+    const item: LibraryItem = { id: 3, kind: "snippet", name: "Sig", keyword: "", text: "Hi" };
+    fakeBackend({ library_items: () => [item] });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sig/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    expect(document.activeElement?.textContent).toBe("Keep");
+    fireEvent.click(screen.getByRole("button", { name: "Keep" }));
+    expect(document.activeElement?.textContent).toBe("Delete");
+  });
 });

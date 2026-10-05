@@ -77,7 +77,11 @@ export function createLauncher() {
         activate(target, position);
       }
     },
-    (error) => setSearchError(ipc.message(error)),
+    (error) => {
+      // A failed search must not let an earlier Enter run on a later query.
+      queued = undefined;
+      setSearchError(ipc.message(error));
+    },
   );
 
   const refresh = () => request({ query: query(), category: category() });
@@ -183,6 +187,9 @@ export function createLauncher() {
     reset,
     refresh,
     isCurrent,
+    cancelQueued: () => {
+      queued = undefined;
+    },
     activate,
     run,
     confirm,

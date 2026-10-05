@@ -305,4 +305,54 @@ describe("Launcher", () => {
     await emit("results:stale", null);
     expect(await screen.findByText("Cheers")).toBeTruthy();
   });
+
+  it("sends typing back to the search field after a click", async () => {
+    const { input } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "x" });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("leaves Mod+Backspace to the text field when nothing can be deleted", async () => {
+    const { input } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    const event = new KeyboardEvent("keydown", {
+      key: "Backspace",
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    input.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("keeps a confirmation modal after focus leaves it", async () => {
+    const { backend, press } = setup(() => [restart]);
+    await screen.findByRole("option", { name: /Restart/ });
+    press("Enter");
+    await screen.findByRole("alertdialog");
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(backend.called("run_action")).toHaveLength(0);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+  });
+
+  it("opens and closes the action menu with Caps Lock on", async () => {
+    const { press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("K", { ctrlKey: true });
+    const filter = await screen.findByRole("combobox", { name: "Search actions" });
+    fireEvent.keyDown(filter, { key: "K", ctrlKey: true });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull());
+  });
+
+  it("runs the row that was clicked", async () => {
+    const notes = { ...app, id: "app:/Applications/Notes.app", title: "Notes" };
+    const { backend } = setup(() => [app, notes]);
+    fireEvent.click(await screen.findByRole("option", { name: /Notes/ }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
+  });
 });

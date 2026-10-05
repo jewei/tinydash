@@ -26,6 +26,10 @@ export function Library(props: { kind: LibraryKind }) {
   const [confirmingDelete, setConfirmingDelete] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   let nameField!: HTMLInputElement;
+  // The inline confirmation replaces the button that had focus; move focus
+  // to its counterpart so keyboard users keep their place.
+  let deleteButton: HTMLButtonElement | undefined;
+  let keepButton: HTMLButtonElement | undefined;
 
   const ofKind = () => (items() ?? []).filter((item) => item.kind === props.kind);
   const noun = () => (props.kind === "snippet" ? "Snippet" : "Quicklink");
@@ -153,13 +157,29 @@ export function Library(props: { kind: LibraryKind }) {
             <Show
               when={confirmingDelete()}
               fallback={
-                <button type="button" class="button" onClick={() => setConfirmingDelete(true)}>
+                <button
+                  ref={deleteButton}
+                  type="button"
+                  class="button"
+                  onClick={() => {
+                    setConfirmingDelete(true);
+                    keepButton?.focus();
+                  }}
+                >
                   Delete
                 </button>
               }
             >
               <span>Delete “{draft().name}”?</span>
-              <button type="button" class="button" onClick={() => setConfirmingDelete(false)}>
+              <button
+                ref={keepButton}
+                type="button"
+                class="button"
+                onClick={() => {
+                  setConfirmingDelete(false);
+                  deleteButton?.focus();
+                }}
+              >
                 Keep
               </button>
               <button type="button" class="button danger" onClick={() => void remove()}>

@@ -74,10 +74,12 @@ export function Launcher() {
 
   // Deleting cannot be undone, so it never waits for newer results: it acts
   // only on the highlighted entry the user can see.
+  const deleteAction = () =>
+    launcher.selected()?.actions.find((entry) => entry.action.type === "deleteClip");
+  const canDelete = () => launcher.isCurrent() && deleteAction() !== undefined;
   const deleteSelected = () => {
-    const result = launcher.selected();
-    const action = result?.actions.find((entry) => entry.action.type === "deleteClip");
-    if (result && action && launcher.isCurrent()) launcher.run(action, result);
+    const action = deleteAction();
+    if (action && canDelete()) launcher.run(action, launcher.selected());
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -85,10 +87,13 @@ export function Launcher() {
     if (clipboardOff() && event.key === "Enter") return enableClipboard();
     const command = commandFor(event);
     if (!command) {
-      // Typing goes to the search field, even after a click moved focus.
-      if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) focusInput();
+      // Typing, deleting, and pasting go to the search field, even after a
+      // click moved focus away from it.
+      if (document.activeElement !== input) focusInput();
       return;
     }
+    // Mod+Backspace deletes a clipboard entry; anywhere else it edits the text.
+    if (command.type === "delete" && !canDelete()) return;
     event.preventDefault();
     // Holding a key moves the selection; it never repeats an action.
     if (event.repeat && command.type !== "move") return;
@@ -114,6 +119,7 @@ export function Launcher() {
         if (warnings().length && !launcher.actionError() && !launcher.searchError()) {
           return setWarnings((list) => list.slice(1));
         }
+        launcher.cancelQueued();
         return void ipc.hideLauncher();
     }
   };

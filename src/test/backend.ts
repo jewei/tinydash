@@ -55,7 +55,7 @@ export const restart: SearchResult = {
   ],
 };
 
-export type Call = { command: string; args: Record<string, unknown> };
+type Call = { command: string; args: Record<string, unknown> };
 type Handler = (args: Record<string, unknown>) => unknown;
 
 /** Install the fake backend. `handlers` override the default replies. */
@@ -71,6 +71,8 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     update_settings: (args) => args.settings,
     pause_shortcut: () => null,
     library_items: () => [],
+    save_library_item: (args) => ({ ...(args.item as object), id: 1 }),
+    delete_library_item: () => null,
     about: () => ({ version: "0.2.0", dataFolder: "/data" }),
   };
   clearMocks();

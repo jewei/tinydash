@@ -1,4 +1,4 @@
-import { onMount } from "solid-js";
+import { onCleanup, onMount } from "solid-js";
 
 /** Asks before a destructive action. Cancel has focus, so Enter is safe. */
 export function ConfirmDialog(props: {
@@ -9,24 +9,32 @@ export function ConfirmDialog(props: {
 }) {
   let cancel!: HTMLButtonElement;
   let confirm!: HTMLButtonElement;
-  onMount(() => cancel.focus());
 
+  // Handle keys on the window before anything else, so the dialog stays
+  // modal even when a click moved focus out of it.
   const onKeyDown = (event: KeyboardEvent) => {
-    event.stopPropagation();
+    const inside = document.activeElement === cancel || document.activeElement === confirm;
     if (event.key === "Escape") {
-      event.preventDefault();
       props.onCancel();
     } else if (event.key === "Tab") {
-      // Keep focus inside the dialog.
-      event.preventDefault();
       (document.activeElement === cancel ? confirm : cancel).focus();
+    } else if (inside) {
+      // Enter and Space keep their normal meaning on the focused button.
+      event.stopPropagation();
+      return;
     }
+    event.preventDefault();
+    event.stopPropagation();
   };
+  onMount(() => {
+    cancel.focus();
+    window.addEventListener("keydown", onKeyDown, true);
+  });
+  onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
 
   return (
     <div
       class="backdrop"
-      onKeyDown={onKeyDown}
       onClick={(event) => event.target === event.currentTarget && props.onCancel()}
     >
       <div
