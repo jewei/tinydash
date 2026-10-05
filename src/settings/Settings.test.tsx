@@ -54,6 +54,29 @@ describe("Settings", () => {
     expect(screen.getByRole("textbox", { name: "Folder name to skip" })).toBeTruthy();
   });
 
+  it("says when the snippets cannot be loaded", async () => {
+    fakeBackend({
+      library_items: () => {
+        throw "The database is locked.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("The database is locked.");
+    expect(screen.queryByText(/No snippets yet/)).toBeNull();
+  });
+
+  it("says when the app details cannot be read", async () => {
+    fakeBackend({
+      about: () => {
+        throw "No data folder.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "About" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("No data folder.");
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

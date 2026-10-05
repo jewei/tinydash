@@ -334,9 +334,22 @@ export function Settings() {
 }
 
 function About() {
-  const [about] = createResource(ipc.about);
+  const [error, setError] = createSignal<string>();
+  const [about] = createResource(() =>
+    ipc.about().catch((failure: unknown) => {
+      setError(ipc.message(failure));
+      return undefined;
+    }),
+  );
   return (
     <div class="about">
+      <Show when={error()}>
+        {(text) => (
+          <p class="error" role="alert">
+            Could not read the app details: {text()}
+          </p>
+        )}
+      </Show>
       <p>
         <strong>TinyDash {about()?.version}</strong> — a small, keyboard-first launcher.
       </p>

@@ -20,7 +20,20 @@ const HELP: Record<LibraryKind, string> = {
 
 /** Create, edit, and delete snippets or quicklinks. */
 export function Library(props: { kind: LibraryKind }) {
-  const [items, { refetch }] = createResource(ipc.libraryItems);
+  // A failed read must say so, not look like an empty library.
+  const [loadError, setLoadError] = createSignal<string>();
+  const load = () =>
+    ipc.libraryItems().then(
+      (list) => {
+        setLoadError(undefined);
+        return list;
+      },
+      (failure: unknown) => {
+        setLoadError(ipc.message(failure));
+        return [];
+      },
+    );
+  const [items, { refetch }] = createResource(load);
   const [draft, setDraft] = createSignal<LibraryItem>(blank(props.kind));
   const [error, setError] = createSignal<string>();
   const [confirmingDelete, setConfirmingDelete] = createSignal(false);
@@ -72,10 +85,21 @@ export function Library(props: { kind: LibraryKind }) {
         <button type="button" class="button" onClick={() => edit(blank(props.kind))}>
           New {noun()}
         </button>
+        <Show when={loadError()}>
+          {(text) => (
+            <p class="error" role="alert">
+              Could not load the list: {text()}
+            </p>
+          )}
+        </Show>
         <ul>
           <For
             each={ofKind()}
-            fallback={<li class="list-empty">No {noun().toLowerCase()}s yet</li>}
+            fallback={
+              <Show when={!loadError()}>
+                <li class="list-empty">No {noun().toLowerCase()}s yet</li>
+              </Show>
+            }
           >
             {(item) => (
               <li>
