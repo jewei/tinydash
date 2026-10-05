@@ -71,10 +71,10 @@ impl FileIndex {
         folders: &[PathBuf],
         excluded: &[String],
         packages: &[&str],
-        hidden: impl Fn(&walkdir::DirEntry) -> bool,
+        hidden: impl Fn(&std::fs::Metadata) -> bool,
     ) -> Self {
         let mut index = Self::default();
-        'roots: for folder in distinct_roots(folders, excluded, packages) {
+        'roots: for folder in distinct_roots(folders, excluded, packages, &hidden) {
             let mut walker = walkdir::WalkDir::new(&folder)
                 .follow_links(false)
                 .min_depth(1)
@@ -83,7 +83,7 @@ impl FileIndex {
                     let name = entry.file_name().to_string_lossy();
                     !name.starts_with('.')
                         && !(entry.file_type().is_dir() && excluded.iter().any(|ex| *ex == name))
-                        && !hidden(entry)
+                        && !entry.metadata().is_ok_and(|metadata| hidden(&metadata))
                 });
             while let Some(entry) = walker.next() {
                 let Ok(entry) = entry else {
@@ -212,7 +212,12 @@ pub fn lists(
 /// compared by real path: the walk follows a root that is a link but no
 /// link inside it, so `~/Dropbox`, a link to a folder under `~/Library`, is
 /// covered by `~` while a link to another disk is not.
-fn distinct_roots(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -> Vec<PathBuf> {
+fn distinct_roots(
+    folders: &[PathBuf],
+    excluded: &[String],
+    packages: &[&str],
+    hidden: impl Fn(&std::fs::Metadata) -> bool,
+) -> Vec<PathBuf> {
     let mut roots: Vec<(PathBuf, &PathBuf)> = folders
         .iter()
         .filter(|folder| folder.is_dir())
@@ -228,7 +233,18 @@ fn distinct_roots(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -
     let mut kept: Vec<PathBuf> = Vec::new();
     let mut distinct = Vec::new();
     for (real, folder) in roots {
-        let covered = lists(&real, true, &kept, excluded, packages) && !is_package(&real, packages);
+        // `lists` reads no attributes, so check the folders that the outer
+        // scan would pass through on the way, which it skips if hidden.
+        let hidden_on_the_way = |root: &PathBuf| {
+            real.ancestors()
+                .take_while(|ancestor| ancestor != root)
+                .any(|ancestor| std::fs::symlink_metadata(ancestor).is_ok_and(|m| hidden(&m)))
+        };
+        let covered = !is_package(&real, packages)
+            && kept.iter().any(|root| {
+                lists(&real, true, std::slice::from_ref(root), excluded, packages)
+                    && !hidden_on_the_way(root)
+            });
         if !covered {
             kept.push(real);
             distinct.push(folder.clone());
@@ -318,7 +334,19 @@ mod tests {
         ] {
             std::fs::write(root.join(file), "").unwrap();
         }
+        set_readonly(&root.join("notes/hidden.txt"), true);
         root
+    }
+
+    /// Tests stand in "read-only" for "hidden": every OS can set it.
+    fn set_readonly(path: &Path, readonly: bool) {
+        let mut permissions = std::fs::metadata(path).unwrap().permissions();
+        permissions.set_readonly(readonly);
+        std::fs::set_permissions(path, permissions).unwrap();
+    }
+
+    fn readonly(metadata: &std::fs::Metadata) -> bool {
+        metadata.permissions().readonly()
     }
 
     #[test]
@@ -328,7 +356,7 @@ mod tests {
             &[root.clone(), root.join("notes")],
             &["node_modules".into()],
             &["app"],
-            |entry| entry.file_name() == "hidden.txt",
+            readonly,
         );
         let mut names: Vec<_> = index.entries.iter().map(Entry::name).collect();
         names.sort();
@@ -366,6 +394,7 @@ mod tests {
             assert!(index.contains(&entry.os_path().display().to_string()));
         }
         assert!(!index.contains(&root.join("notes/missing.txt").display().to_string()));
+        set_readonly(&root.join("notes/hidden.txt"), false);
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -416,7 +445,7 @@ mod tests {
             .into_iter()
             .chain([outer.clone()])
             .collect();
-        let mut kept = distinct_roots(&folders, &["target".into()], &["app"]);
+        let mut kept = distinct_roots(&folders, &["target".into()], &["app"], |_| false);
         kept.sort();
         let mut expected = vec![
             outer.clone(),
@@ -426,6 +455,21 @@ mod tests {
         ];
         expected.sort();
         assert_eq!(kept, expected);
+        std::fs::remove_dir_all(outer).unwrap();
+    }
+
+    #[test]
+    fn a_nested_root_under_a_hidden_folder_is_scanned() {
+        let outer = std::env::temp_dir().join(format!("tinydash-hidden-{}", std::process::id()));
+        let notes = outer.join("AppData/Roaming/Notes");
+        std::fs::create_dir_all(&notes).unwrap();
+        set_readonly(&outer.join("AppData"), true);
+        let folders = [outer.clone(), notes.clone()];
+        let mut kept = distinct_roots(&folders, &[], &[], readonly);
+        kept.sort();
+        assert_eq!(kept, folders);
+        assert_eq!(distinct_roots(&folders, &[], &[], |_| false), folders[..1]);
+        set_readonly(&outer.join("AppData"), false);
         std::fs::remove_dir_all(outer).unwrap();
     }
 
@@ -442,7 +486,7 @@ mod tests {
         std::os::unix::fs::symlink(outer.join("Library/Dropbox"), outer.join("Dropbox")).unwrap();
         std::os::unix::fs::symlink(&elsewhere, outer.join("External")).unwrap();
         let folders = [outer.clone(), outer.join("Dropbox"), outer.join("External")];
-        let mut kept = distinct_roots(&folders, &[], &[]);
+        let mut kept = distinct_roots(&folders, &[], &[], |_| false);
         kept.sort();
         assert_eq!(kept, [outer.clone(), outer.join("External")]);
         std::fs::remove_dir_all(&outer).unwrap();

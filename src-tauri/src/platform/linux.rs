@@ -95,7 +95,7 @@ pub fn is_reopen(_: &tauri::RunEvent) -> bool {
 
 /// Names that start with a dot are the hidden ones here, and the scan skips
 /// those on every OS, so nothing else is hidden.
-pub fn is_hidden(_: &walkdir::DirEntry) -> bool {
+pub fn is_hidden(_: &std::fs::Metadata) -> bool {
     false
 }
 
