@@ -8,9 +8,7 @@
 use std::sync::{Mutex, MutexGuard};
 
 use tauri::{AppHandle, Manager, Wry, plugin::TauriPlugin};
-use tauri_plugin_global_shortcut::{
-    Builder, Error as ShortcutError, GlobalShortcutExt, Shortcut, ShortcutState,
-};
+use tauri_plugin_global_shortcut::{Builder, GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::{
     error::{Error, Result},
@@ -44,13 +42,18 @@ pub fn plugin() -> TauriPlugin<Wry> {
         .build()
 }
 
-/// Replace the registered shortcut. On failure nothing is registered, and
-/// the caller can register the previous one again.
+/// Replace the registered shortcut. If the previous one cannot be removed,
+/// it stays registered and nothing changes. If the new one cannot be
+/// registered, nothing is registered, and the caller can register the
+/// previous one again.
 pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
     let shortcut: Shortcut = accelerator
         .parse()
         .map_err(|error| Error::msg(format!("“{accelerator}” is not a valid shortcut: {error}")))?;
-    unregister(app).ok();
+    if *registered() == Some(shortcut) {
+        return Ok(());
+    }
+    unregister(app)?;
     app.global_shortcut().register(shortcut).map_err(|error| {
         let hint = if cfg!(target_os = "linux") {
             " On Wayland, assign a desktop shortcut that runs `tinydash` instead."
@@ -63,11 +66,19 @@ pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
     Ok(())
 }
 
-fn unregister(app: &AppHandle) -> std::result::Result<(), ShortcutError> {
+/// The record changes only when the OS released the shortcut, so it always
+/// names the shortcut that is still active.
+fn unregister(app: &AppHandle) -> Result<()> {
     let Some(shortcut) = *registered() else {
         return Ok(());
     };
-    app.global_shortcut().unregister(shortcut)?;
+    app.global_shortcut()
+        .unregister(shortcut)
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not release the current shortcut: {error}. Restart TinyDash and try again."
+            ))
+        })?;
     *registered() = None;
     Ok(())
 }
@@ -86,7 +97,7 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     if paused {
-        unregister(app).map_err(|error| Error::msg(error.to_string()))
+        unregister(app)
     } else {
         register(app, &state.settings.get().shortcut)
     }
