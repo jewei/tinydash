@@ -421,6 +421,7 @@ body {
 .menu-item[aria-selected="true"] {
   background: var(--selected);
   color: var(--selected-ink);
+  font-weight: 600;
 }
 
 .menu-empty {

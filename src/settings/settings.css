@@ -208,6 +208,7 @@ body {
 .library-item[aria-current="true"] {
   background: var(--selected);
   color: var(--selected-ink);
+  font-weight: 600;
 }
 
 .library-editor {
