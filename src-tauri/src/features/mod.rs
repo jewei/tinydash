@@ -1,7 +1,8 @@
 //! One module per launcher feature. Feature modules rank, format, and
 //! describe actions. They never call Tauri, SQLite, the clipboard, or
-//! windows, and never change anything in the OS; they may read the home
-//! folder and, for passwords, the OS random source. Two indexers read more,
+//! windows, and never change anything in the OS; they may read cheap OS
+//! state: the home folder path, the clock and time zone, and, for
+//! passwords, the random source. Two indexers read more,
 //! and `refresh.rs` alone runs them: `FileIndex::scan` reads folders and
 //! `currency::fetch` downloads rates.
 

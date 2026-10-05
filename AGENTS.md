@@ -53,7 +53,7 @@ Keep private notes, plans, and evidence in `.local/` (ignored by git).
 ## Rules
 
 1. **Logic lives in Rust.** Search, ranking, validation, and OS work are Rust. The frontend renders results and maps keys to actions; it never decides what an action does.
-2. **Features stay out of the app's plumbing.** Files in `features/` and `search/` never call Tauri, SQLite, the clipboard, or windows, and never change anything in the OS. They may read the home folder and the OS random source (for passwords). The two indexers that read the disk or network, `FileIndex::scan` and `currency::fetch`, run only from `refresh.rs`. Glue modules at the top level do everything else.
+2. **Features stay out of the app's plumbing.** Files in `features/` and `search/` never call Tauri, SQLite, the clipboard, or windows, and never change anything in the OS. They may read cheap OS state: the home folder path, the clock and time zone, and the random source (for passwords). The two indexers that read the disk or network, `FileIndex::scan` and `currency::fetch`, run only from `refresh.rs`. Glue modules at the top level do everything else.
 3. **Results carry their actions.** A `SearchResult` lists `ResultAction`s; the frontend sends the chosen `Action` back. `actions.rs` checks every action again before it runs.
 4. **One source of truth for IPC types.** Add `#[derive(TS)] #[ts(export)]` to Rust types that cross IPC. Run `bun scripts/bindings.ts` to regenerate `src/generated` (it also removes bindings of deleted types), then commit the result. Add each new command to `lib.rs`, `commands.rs`, `src/lib/ipc.ts`, and a default reply in `src/test/backend.ts`.
 5. **All SQL lives in `store.rs`.** Change the schema by appending to `MIGRATIONS`. Never edit a migration that has shipped.
