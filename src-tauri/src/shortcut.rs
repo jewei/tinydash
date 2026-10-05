@@ -28,9 +28,12 @@ pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
     let shortcut: Shortcut = accelerator
         .parse()
         .map_err(|error| Error::msg(format!("“{accelerator}” is not a valid shortcut: {error}")))?;
-    let shortcuts = app.global_shortcut();
-    shortcuts.unregister_all().ok();
-    shortcuts.register(shortcut).map_err(|error| {
+    on_main_thread(app, move |app| {
+        let shortcuts = app.global_shortcut();
+        shortcuts.unregister_all().ok();
+        shortcuts.register(shortcut)
+    })?
+    .map_err(|error| {
         let hint = if cfg!(target_os = "linux") {
             " On Wayland, assign a desktop shortcut that runs `tinydash` instead."
         } else {
@@ -38,6 +41,27 @@ pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
         };
         Error::msg(format!("Could not register {accelerator}: {error}.{hint}"))
     })
+}
+
+/// Run `work` on the main thread and wait for it. The shortcut plugin locks
+/// its own state and then waits for the main thread, while the main thread
+/// takes that lock to deliver key presses; calling it from the main thread
+/// keeps the two from waiting on each other.
+fn on_main_thread<T: Send + 'static>(
+    app: &AppHandle,
+    work: impl FnOnce(&AppHandle) -> T + Send + 'static,
+) -> Result<T> {
+    if std::thread::current().name() == Some("main") {
+        return Ok(work(app));
+    }
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = sender.send(work(&handle));
+    })?;
+    receiver
+        .recv()
+        .map_err(|_| Error::msg("The main thread stopped before the shortcut changed."))
 }
 
 /// Pause while Settings records a new shortcut, so pressing the current
@@ -50,8 +74,7 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     if paused {
-        app.global_shortcut()
-            .unregister_all()
+        on_main_thread(app, |app| app.global_shortcut().unregister_all())?
             .map_err(|error| Error::msg(error.to_string()))
     } else {
         register(app, &state.settings.get().shortcut)

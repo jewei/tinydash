@@ -18,7 +18,10 @@ use crate::{
     system_clipboard, window,
 };
 
+/// Pins the user can see.
 const MAX_PINS: usize = 100;
+/// Pins kept in all, including pins of items that are hidden for now.
+const MAX_SAVED_PINS: usize = 300;
 
 /// Run an action. `result_id` identifies the result it came from, for usage ranking.
 pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<()> {
@@ -138,6 +141,18 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .count();
             if visible >= MAX_PINS {
                 return Err(Error::msg(format!("You can pin up to {MAX_PINS} items.")));
+            }
+            // Hidden pins wait for their item to return, but not without end:
+            // past the cap, the oldest hidden pin goes.
+            if snapshot.pins.ids().len() >= MAX_SAVED_PINS
+                && let Some(oldest) = snapshot
+                    .pins
+                    .ids()
+                    .iter()
+                    .find(|pin| search::resolve(&snapshot, &ctx, pin).is_none())
+            {
+                state.store.set_pinned(oldest, false)?;
+                state.pins.update(|pins| pins.remove(oldest));
             }
             state.store.set_pinned(&id, true)?;
             state.pins.update(|pins| pins.add(&id));

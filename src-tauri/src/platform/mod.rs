@@ -3,6 +3,7 @@
 //! Each OS module provides the same items:
 //!
 //! - `FILE_MANAGER`: name used in "Show in …" labels.
+//! - `RECURSIVE_WATCH`: whether watching a folder also watches its subfolders.
 //! - `TEMPLATE_TRAY_ICON`: the OS tints a black tray icon (macOS menu bar).
 //! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy.
 //! - `restrict_to_owner(path)`: make a file readable only by the user.
@@ -16,7 +17,9 @@
 //! - `read_clipboard(reader, images, files)`: the content for the latest
 //!   change, or `None` when its source marked it secret.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
-//! - `watch_clipboard()`: start change notifications; call on the main thread.
+//! - `watch_clipboard(capturing)`: start change notifications; call on the
+//!   main thread. `capturing` says whether history is on, so nothing is read
+//!   while it is off.
 //! - `prepare_launcher(window)`: native window tweaks; call on the main thread.
 //! - `place_launcher(app, window)`: move the launcher to the screen with the pointer.
 //! - `remember_frontmost_app()` / `restore_frontmost_app()`: return focus after Escape.

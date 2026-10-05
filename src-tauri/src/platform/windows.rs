@@ -22,6 +22,8 @@ use crate::{
 
 pub const FILE_MANAGER: &str = "File Explorer";
 pub const NATIVE_ICONS: bool = false;
+/// ReadDirectoryChangesW watches a whole tree with one handle.
+pub const RECURSIVE_WATCH: bool = true;
 pub const TEMPLATE_TRAY_ICON: bool = false;
 
 /// Shortcuts are found up to this many folders deep.
@@ -193,7 +195,7 @@ pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
     arboard::SetExtWindows::exclude_from_cloud(arboard::SetExtWindows::exclude_from_history(set))
 }
 
-pub fn watch_clipboard() {}
+pub fn watch_clipboard(_capturing: impl Fn() -> bool + 'static) {}
 
 pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
     super::place_in_physical_pixels(app, window)

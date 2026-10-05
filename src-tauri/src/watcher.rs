@@ -68,7 +68,12 @@ pub fn watch(app: &AppHandle) {
         .chain(&file_folders)
         .filter(|f| f.is_dir())
     {
-        if let Err(error) = watcher.watch(folder, RecursiveMode::Recursive) {
+        let mode = if platform::RECURSIVE_WATCH {
+            RecursiveMode::Recursive
+        } else {
+            RecursiveMode::NonRecursive
+        };
+        if let Err(error) = watcher.watch(folder, mode) {
             tracing::warn!(%error, folder = %folder.display(), "Could not watch folder");
         }
     }

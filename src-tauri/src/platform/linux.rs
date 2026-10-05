@@ -11,11 +11,18 @@ use gio::prelude::*;
 use super::{SECRET_FORMATS, run};
 use crate::{
     error::{Error, Result},
-    features::{apps::App, clipboard::Content, system::SystemCommand},
+    features::{
+        apps::App,
+        clipboard::{Content, MAX_TEXT_BYTES},
+        system::SystemCommand,
+    },
 };
 
 pub const FILE_MANAGER: &str = "Files";
 pub const NATIVE_ICONS: bool = false;
+/// inotify needs one watch per folder from a shared per-user limit, so only
+/// the top folders are watched; deeper changes show up at the 15-minute rescan.
+pub const RECURSIVE_WATCH: bool = false;
 pub const TEMPLATE_TRAY_ICON: bool = false;
 
 const OWN_DESKTOP_IDS: &[&str] = &[
@@ -151,12 +158,15 @@ pub fn read_clipboard(_: &mut arboard::Clipboard, _images: bool, _files: bool) -
 /// X11 has no change counter, so watch GTK owner changes. For each owner,
 /// first check the offered formats for a password-manager marker, then read
 /// the text, and drop both replies if a newer owner appeared meanwhile.
-pub fn watch_clipboard() {
+pub fn watch_clipboard(capturing: impl Fn() -> bool + 'static) {
     use gtk::prelude::*;
     let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
     // gtk-rs 0.18 has no typed binding for this signal.
-    clipboard.connect_local("owner-change", false, |_| {
+    clipboard.connect_local("owner-change", false, move |_| {
         let owner = OWNER.fetch_add(1, Ordering::AcqRel) + 1;
+        if !capturing() {
+            return None;
+        }
         let current = move || OWNER.load(Ordering::Acquire) == owner;
         let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
         let targets = gtk::gdk::Atom::intern("TARGETS");
@@ -171,6 +181,7 @@ pub fn watch_clipboard() {
             }
             clipboard.request_text(move |_, text| {
                 if current() {
+                    let text = text.filter(|text| text.len() <= MAX_TEXT_BYTES);
                     *CAPTURED.lock().unwrap_or_else(|e| e.into_inner()) = text.map(str::to_owned);
                     CHANGE.fetch_add(1, Ordering::AcqRel);
                 }

@@ -23,6 +23,8 @@ use crate::{
 
 pub const FILE_MANAGER: &str = "Finder";
 pub const NATIVE_ICONS: bool = true;
+/// FSEvents watches a whole tree with one stream.
+pub const RECURSIVE_WATCH: bool = true;
 pub const TEMPLATE_TRAY_ICON: bool = true;
 
 /// Bundles are found up to this many folders deep.
@@ -249,7 +251,6 @@ fn clipboard_is_concealed() -> bool {
     })
 }
 
-/// macOS needs no change notifications: `clipboard_change` is a cheap counter.
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(
@@ -268,7 +269,8 @@ pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
     arboard::SetExtApple::exclude_from_history(set)
 }
 
-pub fn watch_clipboard() {}
+/// macOS needs no change notifications: `clipboard_change` is a cheap counter.
+pub fn watch_clipboard(_capturing: impl Fn() -> bool + 'static) {}
 
 /// Center the launcher on the screen with the pointer, in points.
 ///

@@ -11,7 +11,14 @@ const INTERVAL: Duration = Duration::from_millis(500);
 
 /// Start capturing. Call on the main thread; Linux registers a GTK handler.
 pub fn start(app: &AppHandle) {
-    platform::watch_clipboard();
+    let handle = app.clone();
+    platform::watch_clipboard(move || {
+        handle
+            .state::<State>()
+            .settings
+            .get()
+            .clipboard_history_enabled
+    });
     let app = app.clone();
     let spawned = std::thread::Builder::new()
         .name("clipboard".into())
