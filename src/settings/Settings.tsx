@@ -200,7 +200,10 @@ export function Settings() {
                     onChange={(clipboardHistoryLimit) => void save({ clipboardHistoryLimit })}
                   />
                 </Row>
-                <Row label="Save images" description="Up to 32 images. Large images are skipped.">
+                <Row
+                  label="Save images"
+                  description="Up to 32 images, not counting pins. Large images are skipped."
+                >
                   <Toggle
                     label="Save images"
                     checked={settings().clipboardCaptureImages}
@@ -254,7 +257,10 @@ export function Settings() {
               </Match>
 
               <Match when={section() === "search"}>
-                <Row label="Web search" description="Used for the search at the end of every list.">
+                <Row
+                  label="Web search"
+                  description="Used for the web search at the end of All results."
+                >
                   <Select
                     label="Web search"
                     value={settings().searchEngine}
