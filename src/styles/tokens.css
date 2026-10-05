@@ -28,6 +28,8 @@
   --muted: #6f6458;
   --rule: #e4dbce;
   --border: #d7ccbc;
+  /* Edges that identify a control (fields, switches): at least 3:1. */
+  --control-edge: #8a7d6e;
   --accent: #9c4e28;
   --accent-hover: #824020;
   --accent-ink: #fff8f1;
@@ -69,6 +71,7 @@
   --muted: #c3b8a8;
   --rule: #494236;
   --border: #5f5545;
+  --control-edge: #94877a;
   --accent: #efb181;
   --accent-hover: #ffd0aa;
   --accent-ink: #382819;

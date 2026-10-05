@@ -95,7 +95,7 @@ body {
   height: 22px;
   margin: 0;
   border-radius: 999px;
-  background: var(--border);
+  background: var(--control-edge);
   cursor: pointer;
   transition: background var(--motion);
 }
