@@ -11,7 +11,7 @@ import { Keys } from "../ui/Keys";
  */
 export function ShortcutRecorder(props: {
   value: string;
-  onChange: (value: string) => Promise<void>;
+  onChange: (value: string) => Promise<unknown>;
   onError: (message: string) => void;
 }) {
   const [recording, setRecording] = createSignal(false);

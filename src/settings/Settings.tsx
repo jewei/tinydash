@@ -103,22 +103,27 @@ export function Settings() {
   });
 
   // Saves run one at a time. Each applies its change on top of the latest
-  // saved settings, so a change that failed is never sent again.
+  // saved settings, so a change that failed is never sent again. A save
+  // gives back its error, or nothing when it worked.
   let saving = Promise.resolve();
   const save = (change: Partial<Values>) => {
     setChanges((list) => [...list, change]);
-    saving = saving.then(async () => {
+    const done = saving.then(async () => {
       const base = saved();
       try {
         if (base) setSaved(await ipc.updateSettings({ ...base, ...change }));
         setError(undefined);
+        return undefined;
       } catch (failure) {
-        setError(ipc.message(failure));
+        const message = ipc.message(failure);
+        setError(message);
+        return message;
       } finally {
         setChanges((list) => list.filter((pending) => pending !== change));
       }
     });
-    return saving;
+    saving = done.then(() => {});
+    return done;
   };
 
   const clearHistory = () =>
@@ -264,7 +269,7 @@ export function Settings() {
                   max={50}
                   placeholder="~/Projects"
                   items={settings().fileSearchFolders}
-                  onChange={(fileSearchFolders) => void save({ fileSearchFolders })}
+                  onChange={(fileSearchFolders) => save({ fileSearchFolders })}
                 />
                 <h2>Skip folders named</h2>
                 <ListEditor
@@ -272,7 +277,7 @@ export function Settings() {
                   max={50}
                   placeholder="node_modules"
                   items={settings().fileSearchExcludedDirs}
-                  onChange={(fileSearchExcludedDirs) => void save({ fileSearchExcludedDirs })}
+                  onChange={(fileSearchExcludedDirs) => save({ fileSearchExcludedDirs })}
                 />
               </Match>
 

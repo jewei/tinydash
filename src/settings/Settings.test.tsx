@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@solidjs/testing-library";
+import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { LibraryItem } from "../generated/LibraryItem";
@@ -225,6 +225,26 @@ describe("Settings", () => {
     for (const name of ["Name", /Keyword/]) {
       expect((await screen.findByRole("textbox", { name })).hasAttribute("maxlength")).toBe(false);
     }
+  });
+
+  it("keeps a refused folder in the field and says why next to it", async () => {
+    fakeBackend({
+      update_settings: () => {
+        throw "“Projects” is not a full folder path.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Files" }));
+    const field = (await screen.findByRole("textbox", {
+      name: "Folder to add",
+    })) as HTMLInputElement;
+    fireEvent.input(field, { target: { value: "Projects" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    const editor = within(field.closest(".list-editor") as HTMLElement);
+    await waitFor(() =>
+      expect(editor.getByRole("status").textContent).toContain("not a full folder path"),
+    );
+    expect(field.value).toBe("Projects");
   });
 
   it("records a new shortcut while the old one is paused", async () => {

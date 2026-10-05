@@ -109,26 +109,36 @@ export function NumberField(props: {
   );
 }
 
-/** A list of strings with Add and Remove. */
+/**
+ * A list of strings with Add and Remove. `onChange` saves the new list and
+ * gives back its error, which shows next to the field: the page's own
+ * error line may be scrolled out of view.
+ */
 export function ListEditor(props: {
   label: string;
   items: string[];
   max: number;
   placeholder: string;
-  onChange: (items: string[]) => void;
+  onChange: (items: string[]) => Promise<string | undefined>;
 }) {
   const [draft, setDraft] = createSignal("");
-  const [repeated, setRepeated] = createSignal<string>();
+  const [notice, setNotice] = createSignal<string>();
   const full = () => props.items.length >= props.max;
   // The field stays when the list is full, and Remove hands focus to it,
   // so keyboard focus never falls back to the page.
   let field!: HTMLInputElement;
+  const change = (items: string[]) => {
+    setNotice(undefined);
+    return props.onChange(items).then(setNotice);
+  };
   const add = () => {
     const value = draft().trim();
     if (full() || !value) return;
-    if (props.items.includes(value)) return setRepeated(value);
-    props.onChange([...props.items, value]);
-    setDraft("");
+    if (props.items.includes(value)) return setNotice(`“${value}” is already in the list.`);
+    // The text stays until the save works, so a refused entry can be fixed.
+    void change([...props.items, value]).then(() => {
+      if (!notice() && draft().trim() === value) setDraft("");
+    });
   };
   return (
     <div class="list-editor">
@@ -142,8 +152,7 @@ export function ListEditor(props: {
                 class="link"
                 aria-label={`Remove ${item}`}
                 onClick={() => {
-                  props.onChange(props.items.filter((other) => other !== item));
-                  setRepeated(undefined);
+                  void change(props.items.filter((other) => other !== item));
                   field.focus();
                 }}
               >
@@ -162,7 +171,7 @@ export function ListEditor(props: {
           value={draft()}
           onInput={(event) => {
             setDraft(event.currentTarget.value);
-            setRepeated(undefined);
+            setNotice(undefined);
           }}
           onKeyDown={(event) => event.key === "Enter" && !isComposing(event) && add()}
         />
@@ -171,9 +180,7 @@ export function ListEditor(props: {
         </button>
       </div>
       <p class="list-status" role="status">
-        {full()
-          ? `The list is full (${props.max}). Remove one to add another.`
-          : repeated() && `“${repeated()}” is already in the list.`}
+        {full() ? `The list is full (${props.max}). Remove one to add another.` : notice()}
       </p>
     </div>
   );
