@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { emit } from "@tauri-apps/api/event";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import type { SearchResult } from "../generated/SearchResult";
 import { app, testSettings, fakeBackend, restart } from "../test/backend";
@@ -275,20 +275,18 @@ describe("Launcher", () => {
   });
 
   it("scrolls the selected row into view when new results arrive", async () => {
-    const scrolled: string[] = [];
-    const original = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function (this: Element) {
-      scrolled.push(this.id);
-    };
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
     try {
       const { input } = setup((query) => [{ ...app, title: query || "Safari" }]);
       await screen.findByRole("option", { name: /Safari/ });
-      scrolled.length = 0;
+      scroll.mockClear();
       fireEvent.input(input, { target: { value: "x" } });
       await screen.findByRole("option", { name: /^x/ });
-      await waitFor(() => expect(scrolled).toContain("result-0"));
+      await waitFor(() =>
+        expect(scroll.mock.contexts.map((row) => (row as Element).id)).toContain("result-0"),
+      );
     } finally {
-      Element.prototype.scrollIntoView = original;
+      scroll.mockRestore();
     }
   });
 
