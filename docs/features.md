@@ -52,7 +52,7 @@ Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system co
 | Clean URL  | Paste a link with `utm_*`, `fbclid`, … parameters                                       | Clean URL             |
 | Web search | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser         |
 
-Every All search with text ends with a web search on the chosen engine (Settings > Search).
+Every All search with text ends with a web search on the chosen engine (Settings > Search), unless it starts with a web keyword such as `yt`.
 
 - Currency uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded.
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
