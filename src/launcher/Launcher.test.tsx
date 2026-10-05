@@ -440,20 +440,19 @@ describe("Launcher", () => {
     expect(await screen.findByText("Cheers")).toBeTruthy();
   });
 
-  it("rounds file sizes before it picks the unit", async () => {
+  it.each([
+    [999_999, "1.0 MB"],
+    [9_960, "10 KB"],
+    [9_940, "9.9 KB"],
+    [1, "1 byte"],
+  ])("shows %i bytes as %s", async (size, text) => {
     const file = { ...app, id: "file:/notes.txt", kind: "file" as const, title: "notes.txt" };
     fakeBackend({
       search: () => [file],
-      preview: () => ({
-        type: "file",
-        path: "/notes.txt",
-        size: 999_999,
-        modified: null,
-        isDir: false,
-      }),
+      preview: () => ({ type: "file", path: "/notes.txt", size, modified: null, isDir: false }),
     });
     render(() => <Launcher />);
-    expect(await screen.findByText("1.0 MB")).toBeTruthy();
+    expect(await screen.findByText(text)).toBeTruthy();
   });
 
   it("sends typing back to the search field after a click", async () => {

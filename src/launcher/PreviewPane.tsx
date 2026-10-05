@@ -124,14 +124,19 @@ function Details(props: { preview: Preview }) {
 }
 
 function formatBytes(bytes: number) {
-  const units = ["bytes", "KB", "MB", "GB", "TB"];
-  const shown = (value: number) => value.toFixed(value < 10 ? 1 : 0);
-  let value = bytes;
+  if (bytes < 1000) return bytes === 1 ? "1 byte" : `${bytes} bytes`;
+  const units = ["KB", "MB", "GB", "TB"];
+  // One decimal below 10, judged after rounding, so 9,960 bytes reads 10 KB.
+  const shown = (value: number) => {
+    const tenths = Math.round(value * 10) / 10;
+    return tenths < 10 ? tenths.toFixed(1) : Math.round(value).toFixed(0);
+  };
+  let value = bytes / 1000;
   let unit = 0;
   // Compare the rounded value, so 999,999 bytes reads 1.0 MB, not 1000 KB.
   while (Number(shown(value)) >= 1000 && unit < units.length - 1) {
     value /= 1000;
     unit += 1;
   }
-  return unit === 0 ? `${bytes} bytes` : `${shown(value)} ${units[unit]}`;
+  return `${shown(value)} ${units[unit]}`;
 }
