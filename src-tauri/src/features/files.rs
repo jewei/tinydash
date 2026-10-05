@@ -65,7 +65,7 @@ impl FileIndex {
     /// extension is in `packages` is listed, but not its contents.
     pub fn scan(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -> Self {
         let mut index = Self::default();
-        for folder in distinct_roots(folders) {
+        for folder in distinct_roots(folders, excluded, packages) {
             let mut walker = walkdir::WalkDir::new(&folder)
                 .follow_links(false)
                 .min_depth(1)
@@ -157,14 +157,43 @@ impl FileIndex {
     }
 }
 
-/// Drop folders that sit inside another configured folder.
-fn distinct_roots(folders: &[PathBuf]) -> Vec<PathBuf> {
+/// Whether a scan of `roots` lists `path`: no folder on the way is hidden,
+/// excluded, or a package. The last part may be a file with an excluded
+/// name (`is_dir` is false), or a package itself. The caller reads `is_dir`,
+/// so this stays free of disk access.
+pub fn lists(
+    path: &Path,
+    is_dir: bool,
+    roots: &[PathBuf],
+    excluded: &[String],
+    packages: &[&str],
+) -> bool {
+    roots.iter().any(|root| {
+        path.strip_prefix(root).is_ok_and(|rest| {
+            let parts: Vec<_> = rest.components().collect();
+            parts.iter().enumerate().all(|(i, part)| {
+                let name = part.as_os_str().to_string_lossy();
+                let parent = i + 1 < parts.len();
+                let folder = parent || is_dir;
+                !name.starts_with('.')
+                    && !(folder && excluded.iter().any(|skip| *skip == name))
+                    && !(parent && is_package(Path::new(part.as_os_str()), packages))
+            })
+        })
+    })
+}
+
+/// Drop folders whose contents a scan of another configured folder already
+/// lists, so nothing is scanned twice and nothing is missed.
+fn distinct_roots(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = folders.iter().filter(|f| f.is_dir()).cloned().collect();
     roots.sort();
     roots.dedup();
     let mut distinct: Vec<PathBuf> = Vec::new();
     for root in roots {
-        if !distinct.iter().any(|kept| root.starts_with(kept)) {
+        let covered =
+            lists(&root, true, &distinct, excluded, packages) && !is_package(&root, packages);
+        if !covered {
             distinct.push(root);
         }
     }
@@ -306,11 +335,54 @@ mod tests {
     }
 
     #[test]
-    fn nested_roots_are_scanned_once() {
-        let outer = std::env::temp_dir();
-        let inner = outer.join(format!("tinydash-nested-{}", std::process::id()));
-        std::fs::create_dir_all(&inner).unwrap();
-        assert_eq!(distinct_roots(&[inner.clone(), outer.clone()]), [outer]);
-        std::fs::remove_dir_all(inner).unwrap();
+    fn lists_only_what_the_scan_walks_into() {
+        let roots = [PathBuf::from("/nowhere/Documents")];
+        let listed = |rest: &str| {
+            lists(
+                &roots[0].join(rest),
+                false,
+                &roots,
+                &["target".into()],
+                &["app"],
+            )
+        };
+        assert!(listed("notes/todo.txt"));
+        assert!(listed("Tool.app"));
+        assert!(listed("notes/target"));
+        assert!(!listed(".git/HEAD"));
+        assert!(!listed("target/debug/build"));
+        assert!(!listed("Tool.app/Contents/Info.plist"));
+        assert!(!lists(
+            Path::new("/elsewhere/a.txt"),
+            false,
+            &roots,
+            &[],
+            &[]
+        ));
+    }
+
+    #[test]
+    fn nested_roots_are_scanned_once_unless_the_outer_scan_skips_them() {
+        let outer = std::env::temp_dir().join(format!("tinydash-nested-{}", std::process::id()));
+        let inner = |name: &str| outer.join(name);
+        for name in ["docs", ".config", "target", "Tool.app"] {
+            std::fs::create_dir_all(inner(name)).unwrap();
+        }
+        let folders: Vec<PathBuf> = ["docs", ".config", "target", "Tool.app"]
+            .map(inner)
+            .into_iter()
+            .chain([outer.clone()])
+            .collect();
+        let mut kept = distinct_roots(&folders, &["target".into()], &["app"]);
+        kept.sort();
+        let mut expected = vec![
+            outer.clone(),
+            inner(".config"),
+            inner("Tool.app"),
+            inner("target"),
+        ];
+        expected.sort();
+        assert_eq!(kept, expected);
+        std::fs::remove_dir_all(outer).unwrap();
     }
 }
