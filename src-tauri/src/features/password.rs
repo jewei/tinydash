@@ -12,10 +12,14 @@ const UPPER: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const DIGITS: &str = "0123456789";
 const SYMBOLS: &str = "!@#$%^&*-_=+?";
 
+/// The EFF large wordlist, without its four hyphenated words (such as
+/// `t-shirt`): passphrases join words with hyphens, and the breaks must be
+/// clear.
 static WORDS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     include_str!("../../data/eff_large_wordlist.txt")
         .lines()
         .filter_map(|line| line.split('\t').nth(1))
+        .filter(|word| !word.contains('-'))
         .collect()
 });
 
@@ -179,8 +183,9 @@ mod tests {
     }
 
     #[test]
-    fn the_wordlist_is_complete() {
-        assert_eq!(WORDS.len(), 7776);
+    fn the_wordlist_is_complete_without_hyphenated_words() {
+        assert_eq!(WORDS.len(), 7772);
         assert_eq!(WORDS[0], "abacus");
+        assert!(WORDS.iter().all(|word| !word.contains('-')));
     }
 }

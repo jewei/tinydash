@@ -56,7 +56,7 @@ Every All search with text ends with a web search on the chosen engine (Settings
 
 - Currency uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded.
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
-- Passwords: 8–64 characters from letters, digits, and symbols (at least one of each); 3–12 EFF words; 4–12 digits. Uses the OS random source.
+- Passwords: 8–64 characters from letters, digits, and symbols (at least one of each); 3–12 words from the EFF large wordlist, without its four hyphenated words, so the hyphens between words stay clear; 4–12 digits. Uses the OS random source.
 
 ## Clipboard history
 
