@@ -106,17 +106,20 @@ fn setup(app: &mut App) {
     let paths = app.path();
     let dir = |dir: tauri::Result<std::path::PathBuf>| dir.expect("the OS reports app folders");
     let config_dir = dir(paths.app_config_dir());
-    let data_dir = dir(paths.app_data_dir());
+    // Local, not roaming: on Windows, roaming profiles would copy the
+    // clipboard history to a server. Elsewhere the two are the same folder.
+    let data_dir = dir(paths.app_local_data_dir());
+    let legacy_dir = dir(paths.app_data_dir());
     // The same source as every other home lookup (`std::env::home_dir`).
     let home_dir = std::env::home_dir().unwrap_or_default();
 
     let mut warnings = Vec::new();
     let (settings, warning) = settings::load(&config_dir);
     warnings.extend(warning);
-    if data_dir.join(LEGACY_DATABASE).exists() {
+    if legacy_dir.join(LEGACY_DATABASE).exists() {
         warnings.push(format!(
             "This version starts with new history and pins. Data from TinyDash 0.1 is still in {}: delete {LEGACY_DATABASE} and recovery.tar there if you no longer need it.",
-            data_dir.display()
+            legacy_dir.display()
         ));
     }
     let store = store::Store::open(&data_dir).unwrap_or_else(|error| {

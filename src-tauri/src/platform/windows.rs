@@ -89,7 +89,8 @@ pub fn is_reopen(_: &tauri::RunEvent) -> bool {
 }
 
 pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
-    // Files in the user's AppData folder are private to the user by default.
+    // Files in the user's local AppData folder are private to the user by
+    // default, and a roaming profile does not copy them.
     let _ = path;
     Ok(())
 }
