@@ -33,6 +33,12 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             | Action::CopySnippet { .. }
             | Action::OpenQuicklink { .. }
             | Action::System { .. }
+            // System commands that act inside TinyDash. From the actions
+            // menu they come without a result ID, so only the System
+            // results count.
+            | Action::ClearClipboard
+            | Action::OpenSettings
+            | Action::Quit
     );
     match action {
         Action::Launch { path } => {
