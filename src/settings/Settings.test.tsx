@@ -5,6 +5,19 @@ import type { LibraryItem } from "../generated/LibraryItem";
 import { testSettings, fakeBackend } from "../test/backend";
 import { Settings } from "./Settings";
 
+/** A fake library that lists what it saved, as the backend does. */
+function fakeLibrary() {
+  const items: LibraryItem[] = [];
+  return {
+    list: () => items,
+    save: (item: LibraryItem, id: number) => {
+      const saved = { ...item, id };
+      items.push(saved);
+      return saved;
+    },
+  };
+}
+
 describe("Settings", () => {
   it("saves a change at once", async () => {
     const backend = fakeBackend();
@@ -357,11 +370,12 @@ describe("Settings", () => {
   it("keeps typing that happens while a snippet saves", async () => {
     let release!: () => void;
     const slow = new Promise<void>((resolve) => (release = resolve));
+    const library = fakeLibrary();
     fakeBackend({
-      library_items: () => [],
+      library_items: library.list,
       save_library_item: async (args) => {
         await slow;
-        return { ...(args.item as LibraryItem), id: 9 };
+        return library.save(args.item as LibraryItem, 9);
       },
     });
     render(() => <Settings />);
@@ -380,11 +394,12 @@ describe("Settings", () => {
   it("leaves a new snippet opened during a save without the saved one's ID", async () => {
     let release!: () => void;
     const slow = new Promise<void>((resolve) => (release = resolve));
+    const library = fakeLibrary();
     fakeBackend({
-      library_items: () => [],
+      library_items: library.list,
       save_library_item: async (args) => {
         await slow;
-        return { ...(args.item as LibraryItem), id: 9 };
+        return library.save(args.item as LibraryItem, 9);
       },
     });
     render(() => <Settings />);
@@ -448,13 +463,14 @@ describe("Settings", () => {
     let calls = 0;
     let release!: () => void;
     const slow = new Promise<void>((resolve) => (release = resolve));
+    const library = fakeLibrary();
     fakeBackend({
-      library_items: () => [],
+      library_items: library.list,
       save_library_item: async (args) => {
         calls += 1;
         if (calls === 1) throw "The keyword is in use.";
         await slow;
-        return { ...(args.item as LibraryItem), id: 4 };
+        return library.save(args.item as LibraryItem, 4);
       },
     });
     render(() => <Settings />);
@@ -466,11 +482,39 @@ describe("Settings", () => {
     fireEvent.input(text, { target: { value: "Hi" } });
     fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
     await screen.findByText("The keyword is in use.");
-    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    const saveButton = screen.getByRole("button", { name: "Save Snippet" }) as HTMLButtonElement;
+    await waitFor(() => expect(saveButton.disabled).toBe(false));
+    fireEvent.click(saveButton);
     fireEvent.input(text, { target: { value: "Hi there" } });
     release();
     await screen.findByRole("button", { name: "Delete" });
     expect(screen.queryByText("The keyword is in use.")).toBeNull();
+  });
+
+  it("keeps an item reopened during its delete as a new one", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    let items: LibraryItem[] = [{ id: 1, kind: "snippet", name: "Alpha", keyword: "", text: "A" }];
+    const backend = fakeBackend({
+      library_items: () => items,
+      delete_library_item: async () => {
+        await slow;
+        items = [];
+      },
+      save_library_item: (args) => ({ ...(args.item as LibraryItem), id: 2 }),
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Alpha/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete" }).at(-1) as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: /Alpha/ }));
+    release();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Delete" })).toBeNull());
+    expect((screen.getByRole("textbox", { name: "Text" }) as HTMLTextAreaElement).value).toBe("A");
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    await waitFor(() => expect(backend.called("save_library_item")).toHaveLength(1));
+    expect(backend.called("save_library_item")[0]?.args).toMatchObject({ item: { id: null } });
   });
 
   it("records a new shortcut while the old one is paused", async () => {

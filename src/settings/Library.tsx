@@ -1,4 +1,12 @@
-import { createResource, createSignal, createUniqueId, For, Show } from "solid-js";
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  createUniqueId,
+  For,
+  on,
+  Show,
+} from "solid-js";
 
 import type { LibraryItem } from "../generated/LibraryItem";
 import type { LibraryKind } from "../generated/LibraryKind";
@@ -61,6 +69,21 @@ export function Library(props: { kind: LibraryKind }) {
     setError(undefined);
     setConfirmingDelete(false);
   };
+  // An open item that a delete removed stays open as a new one, with its
+  // text, so Save adds it again instead of failing. Checked only when the
+  // list changes, so a save's new ID never looks deleted before the refetch.
+  createEffect(
+    on(
+      items,
+      (list) => {
+        const id = draft().id;
+        if (list && id !== null && !list.some((item) => item.id === id)) {
+          setDraft((item) => ({ ...item, id: null }));
+        }
+      },
+      { defer: true },
+    ),
+  );
   const change = (field: "name" | "keyword" | "text", value: string) =>
     setDraft((item) => ({ ...item, [field]: value }));
 
@@ -76,10 +99,11 @@ export function Library(props: { kind: LibraryKind }) {
     const open = () => session === from;
     try {
       await work(open);
-      await refetch();
     } catch (failure) {
       if (open()) setError(ipc.message(failure));
     } finally {
+      // Also after a failure: the list shows what the backend now holds.
+      await refetch();
       setBusy(false);
     }
   };
