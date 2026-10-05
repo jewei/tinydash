@@ -27,9 +27,12 @@ interface Pending {
   resultId?: string;
 }
 
-/** A row and action to run once the results match what was typed. */
+/** Which row to run: a numbered row, or whichever row is selected then. */
+type Target = number | "selected";
+
+/** A run that waits for the results of what was typed. */
 interface Queued {
-  index: number;
+  target: Target;
   position: number;
 }
 
@@ -69,9 +72,9 @@ export function createLauncher() {
         setSearchError(undefined);
       });
       if (queued && isCurrent()) {
-        const { index, position } = queued;
+        const { target, position } = queued;
         queued = undefined;
-        activate(index, position);
+        activate(target, position);
       }
     },
     (error) => setSearchError(ipc.message(error)),
@@ -120,16 +123,16 @@ export function createLauncher() {
   }
 
   /**
-   * Run the action at `position` of the result at `index`. While a newer
-   * search is still on its way, wait for it, so Enter never runs a result
-   * of an older query.
+   * Run the action at `position` of the target row. While a newer search is
+   * on its way, wait for it, so Enter never runs a result of an older query;
+   * "selected" then means the row selected in the new results.
    */
-  function activate(index: number, position = 0) {
+  function activate(target: Target, position = 0) {
     if (!isCurrent()) {
-      queued = { index, position };
+      queued = { target, position };
       return;
     }
-    const result = results()[index];
+    const result = results()[target === "selected" ? selectedIndex() : target];
     const action = result?.actions[position];
     if (result && action) run(action, result);
   }
@@ -179,6 +182,7 @@ export function createLauncher() {
     move,
     reset,
     refresh,
+    isCurrent,
     activate,
     run,
     confirm,

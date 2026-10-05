@@ -75,6 +75,11 @@ export function Settings() {
   const [section, setSection] = createSignal<Section>("general");
   const [error, setError] = createSignal<string>();
   const [confirmClear, setConfirmClear] = createSignal(false);
+  let clearButton: HTMLButtonElement | undefined;
+  const closeClear = () => {
+    setConfirmClear(false);
+    clearButton?.focus();
+  };
 
   createEffect(() => {
     const current = values();
@@ -185,6 +190,7 @@ export function Settings() {
                     onChange={(clipboardHistoryEnabled) => void save({ clipboardHistoryEnabled })}
                   />
                 </Row>
+                {/* 1000 and 32 match CLIPBOARD_LIMIT_MAX and MAX_IMAGES in the Rust code. */}
                 <Row label="Entries to keep" description="Pinned entries do not count.">
                   <NumberField
                     label="Entries to keep"
@@ -212,7 +218,12 @@ export function Settings() {
                   />
                 </Row>
                 <Row label="Clear history" description="Deletes every entry except pinned ones.">
-                  <button type="button" class="button" onClick={() => setConfirmClear(true)}>
+                  <button
+                    ref={clearButton}
+                    type="button"
+                    class="button"
+                    onClick={() => setConfirmClear(true)}
+                  >
                     Clear History…
                   </button>
                 </Row>
@@ -309,10 +320,10 @@ export function Settings() {
           message="Delete all clipboard history except pinned entries?"
           confirmLabel="Clear History"
           onConfirm={() => {
-            setConfirmClear(false);
+            closeClear();
             void clearHistory();
           }}
-          onCancel={() => setConfirmClear(false)}
+          onCancel={closeClear}
         />
       </Show>
     </div>

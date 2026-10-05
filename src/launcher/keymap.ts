@@ -3,7 +3,8 @@ import { hasMod, IS_MAC } from "../lib/keys";
 /** What a key press in the launcher means. The view decides what to do. */
 export type Command =
   | { type: "move"; by: 1 | -1 }
-  | { type: "run"; index: number }
+  | { type: "run" }
+  | { type: "runRow"; index: number }
   | { type: "runSecondary" }
   | { type: "delete" }
   | { type: "menu" }
@@ -17,7 +18,7 @@ export type Command =
  * actions, Mod+Backspace deletes, Mod+1–9 runs that row, Tab and Shift+Tab
  * change category, Mod+, opens Settings, and Escape hides.
  */
-export function commandFor(event: KeyboardEvent, selected: number, mac = IS_MAC): Command | null {
+export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
   const mod = hasMod(event, mac);
   switch (event.key) {
     case "ArrowDown":
@@ -25,16 +26,16 @@ export function commandFor(event: KeyboardEvent, selected: number, mac = IS_MAC)
     case "ArrowUp":
       return { type: "move", by: -1 };
     case "Enter":
-      return mod ? { type: "runSecondary" } : { type: "run", index: selected };
+      return mod ? { type: "runSecondary" } : { type: "run" };
     case "Tab":
       return { type: "category", by: event.shiftKey ? -1 : 1 };
     case "Escape":
       return { type: "hide" };
   }
   if (!mod) return null;
-  if (event.key === "k" || event.key === "K") return { type: "menu" };
+  if (event.key.toLowerCase() === "k") return { type: "menu" };
   if (event.key === "Backspace") return { type: "delete" };
   if (event.key === ",") return { type: "settings" };
-  if (/^[1-9]$/.test(event.key)) return { type: "run", index: Number(event.key) - 1 };
+  if (/^[1-9]$/.test(event.key)) return { type: "runRow", index: Number(event.key) - 1 };
   return null;
 }

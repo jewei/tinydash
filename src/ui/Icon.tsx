@@ -120,16 +120,18 @@ export function Glyph(props: { name: GlyphName; size?: number }) {
 
 /** A result's icon: the system icon for a file, an emoji, or a glyph. */
 export function ResultIcon(props: { icon: Icon; size: number; fallback: GlyphName }) {
-  const [broken, setBroken] = createSignal(false);
+  // Remember which path failed, so the next result's icon still loads when
+  // this component is reused.
+  const [brokenPath, setBrokenPath] = createSignal<string>();
   const content = () => {
     const icon = props.icon;
-    if (icon.type === "file" && !broken()) {
+    if (icon.type === "file" && icon.path !== brokenPath()) {
       return (
         <img
           src={iconUrl(icon.path, props.size * window.devicePixelRatio)}
           alt=""
           decoding="async"
-          onError={() => setBroken(true)}
+          onError={() => setBrokenPath(icon.path)}
         />
       );
     }

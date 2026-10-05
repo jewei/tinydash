@@ -193,4 +193,116 @@ describe("Launcher", () => {
     fireEvent.focusOut(filter, { relatedTarget: input });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull());
   });
+
+  it("runs the row selected in the new results, not an old position", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const rows = (prefix: string) =>
+      [1, 2, 3].map((n) => ({ ...app, id: `app:/${prefix}${n}`, title: `${prefix} ${n}` }));
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "b") await slow;
+        return rows(args.query === "b" ? "Beta" : "Alpha");
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Alpha 1/ });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.input(input, { target: { value: "b" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    release();
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args.resultId).toBe("app:/Beta1");
+  });
+
+  it("deletes only an entry the user can see selected", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const clip = {
+      ...app,
+      id: "clip:1",
+      actions: [
+        { label: "Copy", action: { type: "copyClip" as const, id: 1 }, confirm: null },
+        { label: "Delete", action: { type: "deleteClip" as const, id: 1 }, confirm: null },
+      ],
+    };
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "x") await slow;
+        return [clip];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Safari/ });
+    fireEvent.input(input, { target: { value: "x" } });
+    fireEvent.keyDown(input, { key: "Backspace", ctrlKey: true });
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(0);
+    fireEvent.keyDown(input, { key: "Backspace", ctrlKey: true });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+  });
+
+  it("keeps shortcuts working after focus leaves the search field", async () => {
+    const { backend } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
+  });
+
+  it("dismisses a startup warning with Escape before hiding", async () => {
+    const { backend, press } = setup(() => [], {
+      launcher_init: () => ({
+        settings: defaultSettings,
+        platform: "macos",
+        warnings: ["Could not register Control+Space."],
+      }),
+    });
+    expect((await screen.findByRole("alert")).textContent).toContain("Could not register");
+    press("Escape");
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+  });
+
+  it("turns on clipboard history with Enter in its empty state", async () => {
+    const { backend, press } = setup(() => [], {
+      launcher_init: () => ({
+        settings: { ...defaultSettings, clipboardHistoryEnabled: false },
+        platform: "macos",
+        warnings: [],
+      }),
+    });
+    fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
+    await screen.findByText("Clipboard history is off");
+    press("Enter");
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+  });
+
+  it("cancels a confirmation when the backdrop is clicked", async () => {
+    const { backend, press } = setup(() => [restart]);
+    await screen.findByRole("option", { name: /Restart/ });
+    press("Enter");
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(dialog.parentElement as HTMLElement);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("reloads the preview when results refresh", async () => {
+    const snippet = { ...app, id: "snippet:1", kind: "snippet" as const, title: "Sig" };
+    let text = "Regards";
+    fakeBackend({
+      search: () => [snippet],
+      preview: () => ({ type: "text", text }),
+    });
+    render(() => <Launcher />);
+    expect(await screen.findByText("Regards")).toBeTruthy();
+    text = "Cheers";
+    await emit("results:stale", null);
+    expect(await screen.findByText("Cheers")).toBeTruthy();
+  });
 });

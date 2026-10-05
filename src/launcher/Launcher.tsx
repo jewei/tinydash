@@ -50,7 +50,13 @@ export function Launcher() {
       ipc.onResultsStale(() => void launcher.refresh()),
       ipc.onSettingsChanged(applySettings),
     ];
-    onCleanup(() => listeners.forEach((listener) => void listener.then((stop) => stop())));
+    // Listen on the window: a click on a row or the preview moves focus to
+    // <body>, and the shortcuts must keep working.
+    window.addEventListener("keydown", onKeyDown);
+    onCleanup(() => {
+      window.removeEventListener("keydown", onKeyDown);
+      listeners.forEach((listener) => void listener.then((stop) => stop()));
+    });
     ipc
       .launcherInit()
       .then((init) => {
@@ -66,20 +72,23 @@ export function Launcher() {
   /** Actions that belong to no result, such as opening Settings. */
   const runGeneral = (action: Action) => launcher.run({ label: "", action, confirm: null });
 
+  // Deleting cannot be undone, so it never waits for newer results: it acts
+  // only on the highlighted entry the user can see.
   const deleteSelected = () => {
-    const position = launcher
-      .selected()
-      ?.actions.findIndex((entry) => entry.action.type === "deleteClip");
-    if (position !== undefined && position >= 0) {
-      launcher.activate(launcher.selectedIndex(), position);
-    }
+    const result = launcher.selected();
+    const action = result?.actions.find((entry) => entry.action.type === "deleteClip");
+    if (result && action && launcher.isCurrent()) launcher.run(action, result);
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (isComposing(event) || menuOpen() || launcher.pending()) return;
+    if (event.defaultPrevented || isComposing(event) || menuOpen() || launcher.pending()) return;
     if (clipboardOff() && event.key === "Enter") return enableClipboard();
-    const command = commandFor(event, launcher.selectedIndex());
-    if (!command) return;
+    const command = commandFor(event);
+    if (!command) {
+      // Typing goes to the search field, even after a click moved focus.
+      if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) focusInput();
+      return;
+    }
     event.preventDefault();
     // Holding a key moves the selection; it never repeats an action.
     if (event.repeat && command.type !== "move") return;
@@ -87,9 +96,11 @@ export function Launcher() {
       case "move":
         return launcher.move(command.by);
       case "run":
+        return launcher.activate("selected");
+      case "runRow":
         return launcher.activate(command.index);
       case "runSecondary":
-        return launcher.activate(launcher.selectedIndex(), 1);
+        return launcher.activate("selected", 1);
       case "delete":
         return deleteSelected();
       case "menu":
@@ -137,7 +148,7 @@ export function Launcher() {
   const notice = () => launcher.actionError() ?? launcher.searchError() ?? warnings()[0];
 
   return (
-    <div class="launcher" data-platform={platform()} onKeyDown={onKeyDown}>
+    <div class="launcher" data-platform={platform()}>
       <header class="search">
         <Glyph name="search" size={20} />
         <input
@@ -228,8 +239,11 @@ export function Launcher() {
               selectedIndex={launcher.selectedIndex()}
               onSelect={launcher.select}
               onRun={(index) => {
+                // A click runs the row the user sees, whatever is still loading.
+                const result = launcher.results()[index];
+                const action = result?.actions[0];
                 launcher.select(index);
-                launcher.activate(index);
+                if (result && action) launcher.run(action, result);
               }}
             />
             <PreviewPane

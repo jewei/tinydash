@@ -122,4 +122,25 @@ describe("Settings", () => {
       settings: { clipboardHistoryLimit: 1000 },
     });
   });
+
+  it("saves a snippet once when Save is clicked twice", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      save_library_item: async (args) => {
+        await slow;
+        return { ...(args.item as LibraryItem), id: 1 };
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.input(await screen.findByLabelText("Name"), { target: { value: "Sig" } });
+    fireEvent.input(screen.getByLabelText("Text"), { target: { value: "Regards" } });
+    const save = screen.getByRole("button", { name: "Save Snippet" });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    release();
+    await waitFor(() => expect(backend.called("library_items").length).toBeGreaterThan(1));
+    expect(backend.called("save_library_item")).toHaveLength(1);
+  });
 });

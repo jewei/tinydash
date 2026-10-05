@@ -24,7 +24,11 @@ export function ConfirmDialog(props: {
   };
 
   return (
-    <div class="backdrop" onKeyDown={onKeyDown}>
+    <div
+      class="backdrop"
+      onKeyDown={onKeyDown}
+      onClick={(event) => event.target === event.currentTarget && props.onCancel()}
+    >
       <div
         class="dialog"
         role="alertdialog"

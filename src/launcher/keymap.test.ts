@@ -7,22 +7,22 @@ const key = (key: string, options: KeyboardEventInit = {}) =>
 
 describe("commandFor", () => {
   it("maps navigation keys", () => {
-    expect(commandFor(key("ArrowDown"), 0)).toEqual({ type: "move", by: 1 });
-    expect(commandFor(key("Tab", { shiftKey: true }), 0)).toEqual({ type: "category", by: -1 });
-    expect(commandFor(key("Enter"), 4)).toEqual({ type: "run", index: 4 });
-    expect(commandFor(key("Escape"), 0)).toEqual({ type: "hide" });
+    expect(commandFor(key("ArrowDown"))).toEqual({ type: "move", by: 1 });
+    expect(commandFor(key("Tab", { shiftKey: true }))).toEqual({ type: "category", by: -1 });
+    expect(commandFor(key("Enter"))).toEqual({ type: "run" });
+    expect(commandFor(key("Escape"))).toEqual({ type: "hide" });
   });
 
   it("uses Command on macOS and Control elsewhere", () => {
-    expect(commandFor(key("k", { metaKey: true }), 0, true)).toEqual({ type: "menu" });
-    expect(commandFor(key("k", { ctrlKey: true }), 0, true)).toBeNull();
-    expect(commandFor(key("k", { ctrlKey: true }), 0, false)).toEqual({ type: "menu" });
-    expect(commandFor(key("3", { ctrlKey: true }), 0, false)).toEqual({ type: "run", index: 2 });
-    expect(commandFor(key("Enter", { metaKey: true }), 0, true)).toEqual({ type: "runSecondary" });
+    expect(commandFor(key("k", { metaKey: true }), true)).toEqual({ type: "menu" });
+    expect(commandFor(key("k", { ctrlKey: true }), true)).toBeNull();
+    expect(commandFor(key("k", { ctrlKey: true }), false)).toEqual({ type: "menu" });
+    expect(commandFor(key("3", { ctrlKey: true }), false)).toEqual({ type: "runRow", index: 2 });
+    expect(commandFor(key("Enter", { metaKey: true }), true)).toEqual({ type: "runSecondary" });
   });
 
   it("leaves typing alone", () => {
-    expect(commandFor(key("k"), 0)).toBeNull();
-    expect(commandFor(key("3"), 0)).toBeNull();
+    expect(commandFor(key("k"))).toBeNull();
+    expect(commandFor(key("3"))).toBeNull();
   });
 });
