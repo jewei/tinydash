@@ -207,23 +207,15 @@ impl Store {
                     now
                 ],
             )?;
-            let unpinned = "'clip:' || id NOT IN (SELECT id FROM pins)";
-            transaction.execute(
-                &format!(
-                    "DELETE FROM clipboard WHERE id IN (SELECT id FROM clipboard WHERE {unpinned}
-                     ORDER BY copied_at DESC, id DESC LIMIT -1 OFFSET ?1)"
-                ),
-                [limit],
-            )?;
-            transaction.execute(
-                &format!(
-                    "DELETE FROM clipboard WHERE id IN (SELECT id FROM clipboard WHERE kind = 'image'
-                     AND {unpinned} ORDER BY copied_at DESC, id DESC LIMIT -1 OFFSET ?1)"
-                ),
-                [MAX_IMAGES as i64],
-            )?;
+            trim(&transaction, limit)?;
             transaction.commit()
         })
+    }
+
+    /// Delete the oldest unpinned entries beyond `limit`, for example after
+    /// the user lowered it.
+    pub fn trim_clipboard(&self, limit: u32) -> Result<()> {
+        self.with(|db| trim(db, limit))
     }
 
     /// The full saved content of one entry.
@@ -399,6 +391,27 @@ fn kind_from_sql(kind: &str) -> rusqlite::Result<ClipKind> {
     }
 }
 
+/// Delete the oldest unpinned entries beyond `limit`, and unpinned images
+/// beyond `MAX_IMAGES`.
+fn trim(db: &Connection, limit: u32) -> rusqlite::Result<()> {
+    let unpinned = "'clip:' || id NOT IN (SELECT id FROM pins)";
+    db.execute(
+        &format!(
+            "DELETE FROM clipboard WHERE id IN (SELECT id FROM clipboard WHERE {unpinned}
+             ORDER BY copied_at DESC, id DESC LIMIT -1 OFFSET ?1)"
+        ),
+        [limit],
+    )?;
+    db.execute(
+        &format!(
+            "DELETE FROM clipboard WHERE id IN (SELECT id FROM clipboard WHERE kind = 'image'
+             AND {unpinned} ORDER BY copied_at DESC, id DESC LIMIT -1 OFFSET ?1)"
+        ),
+        [MAX_IMAGES as i64],
+    )?;
+    Ok(())
+}
+
 /// A kind column held a value this version does not know.
 fn invalid_kind(column: usize, kind: &str) -> rusqlite::Error {
     rusqlite::Error::InvalidColumnType(column, format!("kind {kind}"), rusqlite::types::Type::Text)
@@ -455,6 +468,10 @@ mod tests {
         store.set_pinned(&format!("clip:{two}"), true).unwrap();
         store.save_clip(&text("four"), 5, 2).unwrap();
         assert_eq!(titles(&store), ["four", "one", "two"]);
+
+        store.save_clip(&text("five"), 6, 10).unwrap();
+        store.trim_clipboard(1).unwrap();
+        assert_eq!(titles(&store), ["five", "two"]);
 
         store.clear_clipboard().unwrap();
         assert_eq!(titles(&store), ["two"]);

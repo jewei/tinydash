@@ -152,6 +152,16 @@ pub async fn update_settings(app: AppHandle, settings: Settings) -> Result<Setti
             refresh::files(&app);
             watcher::watch(&app);
         }
+        // The settings are saved; a failed trim is retried by the next capture.
+        if new.clipboard_history_limit < old.clipboard_history_limit {
+            let trimmed = state
+                .store
+                .trim_clipboard(new.clipboard_history_limit)
+                .and_then(|()| state.reload_clipboard());
+            if let Err(error) = trimmed {
+                tracing::warn!(%error, "Could not remove old clipboard entries");
+            }
+        }
         if new.currency_rates_enabled && !old.currency_rates_enabled {
             refresh::rates(&app, true);
         }
