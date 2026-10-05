@@ -1,5 +1,6 @@
 //! Web searches: `g rust`, `yt lo-fi`, `gh tauri`, and a fallback search at
-//! the end of every All search. Nothing is sent until the user opens it.
+//! the end of an All search that has no such keyword search. Nothing is
+//! sent until the user opens it.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

@@ -16,7 +16,7 @@ TinyDash is one Rust process with two webview windows: the **launcher**, created
 1. The launcher calls `search(query, category)` for every keystroke. `launcher/latest.ts` keeps one request in flight; a newer query replaces the waiting one, and a stale reply is never shown.
 2. `commands::search` takes a `Snapshot`: `Arc` handles to the current indexes, usage, pins, and settings. No lock is held while it matches.
 3. `search::search` asks each feature for scored hits:
-   - **All** shows instant answers (calculator, dates and times, passwords, clean URLs, web keywords, quicklink keywords), then name matches from every source, then fuzzy matches, then a web search. Inside a tier the source order is fixed (apps, system, snippets, files, clipboard, emoji), so an app named like the query beats an emoji shortcode.
+   - **All** shows instant answers (calculator, dates and times, passwords, clean URLs, web keywords, quicklink keywords), then name matches from every source, then fuzzy matches, then a web search on the chosen engine unless a web keyword answered. Inside a tier the source order is fixed (apps, system, snippets, files, clipboard, emoji), so an app named like the query beats an emoji shortcode.
    - A **category** shows only its source, by score. An empty query lists pins first, then the category's own order.
 4. `search/matcher.rs` scores names with nucleo: exact (10,000) > prefix (2,000) > word prefix (500) > fuzzy. Paths match only when every query word appears in them. `search/usage.rs` adds up to 1,000 for frequency and recency, so usage reorders close matches but never lifts a weak match above a strong one.
 
