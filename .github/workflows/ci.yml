@@ -63,4 +63,4 @@ jobs:
           bun-version-file: package.json
       - name: Test and check generated TypeScript
         if: runner.os == 'Linux'
-        run: bun scripts/bindings.ts --ci
+        run: bun scripts/bindings.ts

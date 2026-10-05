@@ -1,40 +1,45 @@
-// Regenerate src/generated from the Rust IPC types and report what changed.
+// Check that src/generated matches the Rust IPC types. Run with
+// `bun scripts/bindings.ts`; `bun run verify` and CI run it too.
 //
-//   bun scripts/bindings.ts          fail if regenerating changed anything
-//   bun scripts/bindings.ts --ci     also fail if src/generated differs from git
-//
-// The folder is emptied first, so a binding for a deleted Rust type cannot
-// linger. `cargo test` writes the bindings (see .cargo/config.toml).
+// Runs the Rust tests with ts-rs writing to a temporary folder, so a failed
+// build never leaves src/generated half written. If the new bindings differ,
+// they replace src/generated (including removed types) and the script fails,
+// so the change is reviewed and committed.
 import { createHash } from "node:crypto";
-import { readdir, readFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
-const folder = "src/generated";
+const folder = resolve("src/generated");
 
-async function fingerprint() {
+async function fingerprint(path: string) {
   const hash = createHash("sha256");
-  const names = (await readdir(folder).catch(() => [])).sort();
-  for (const name of names) hash.update(name).update(await readFile(`${folder}/${name}`));
+  const names = (await readdir(path).catch(() => [])).sort((a, b) => a.localeCompare(b));
+  for (const name of names) hash.update(name).update(await readFile(join(path, name)));
   return hash.digest("hex");
 }
 
-function run(command: string[]) {
-  const result = Bun.spawnSync(command, { stdout: "inherit", stderr: "inherit" });
-  if (result.exitCode !== 0) process.exit(result.exitCode ?? 1);
+const fresh = await mkdtemp(join(tmpdir(), "tinydash-bindings-"));
+const test = Bun.spawnSync(
+  ["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "--locked"],
+  {
+    env: { ...process.env, TS_RS_EXPORT_DIR: fresh },
+    stdout: "inherit",
+    stderr: "inherit",
+  },
+);
+if (test.exitCode !== 0) {
+  await rm(fresh, { recursive: true, force: true });
+  process.exit(test.exitCode ?? 1);
 }
 
-const before = await fingerprint();
-await rm(folder, { recursive: true, force: true });
-run(["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "--locked"]);
-
-if ((await fingerprint()) !== before) {
-  console.error(`\n${folder} changed. Review and commit the new bindings, then run this again.`);
+const changed = (await fingerprint(fresh)) !== (await fingerprint(folder));
+if (changed) {
+  await rm(folder, { recursive: true, force: true });
+  await cp(fresh, folder, { recursive: true });
+}
+await rm(fresh, { recursive: true, force: true });
+if (changed) {
+  console.error(`\n${folder} was out of date and is now updated. Review and commit it.`);
   process.exit(1);
-}
-if (process.argv.includes("--ci")) {
-  const status = Bun.spawnSync(["git", "status", "--porcelain", "--", folder]);
-  const changes = status.stdout.toString().trim();
-  if (changes) {
-    console.error(`\n${folder} is not committed:\n${changes}`);
-    process.exit(1);
-  }
 }
