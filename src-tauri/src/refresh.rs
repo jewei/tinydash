@@ -215,3 +215,19 @@ pub fn rates(app: &AppHandle, force: bool) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scanned_sources_are_ready_after_their_first_scan() {
+        let freshness = Freshness::default();
+        let ready = freshness.ready();
+        assert!(!ready(Source::App) && !ready(Source::File) && ready(Source::Emoji));
+
+        *freshness.apps.finished.lock().unwrap() = Some(Instant::now());
+        let ready = freshness.ready();
+        assert!(ready(Source::App) && !ready(Source::File));
+    }
+}
