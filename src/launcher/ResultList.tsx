@@ -16,7 +16,10 @@ export function ResultList(props: {
 }) {
   let list!: HTMLUListElement;
 
+  // Also on new results: they often keep the same selected index, while
+  // the list may still be scrolled away from it.
   createEffect(() => {
+    void props.results;
     const row = list.children[props.selectedIndex];
     row?.scrollIntoView({ block: "nearest" });
   });

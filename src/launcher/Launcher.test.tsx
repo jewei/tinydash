@@ -274,6 +274,24 @@ describe("Launcher", () => {
     expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
   });
 
+  it("scrolls the selected row into view when new results arrive", async () => {
+    const scrolled: string[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this.id);
+    };
+    try {
+      const { input } = setup((query) => [{ ...app, title: query || "Safari" }]);
+      await screen.findByRole("option", { name: /Safari/ });
+      scrolled.length = 0;
+      fireEvent.input(input, { target: { value: "x" } });
+      await screen.findByRole("option", { name: /^x/ });
+      await waitFor(() => expect(scrolled).toContain("result-0"));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it("closes the action menu when focus leaves it", async () => {
     const { input, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
