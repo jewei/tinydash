@@ -88,6 +88,22 @@ impl EmojiIndex {
     }
 
     pub fn search(&self, matcher: &mut Matcher, ctx: &Context, limit: usize) -> Vec<Scored> {
+        // Results show shortcodes as `:rocket:`; typing that form, or just
+        // the opening colon, matches like `rocket`.
+        let shortcode = matcher
+            .query()
+            .strip_prefix(':')
+            .map(|rest| rest.strip_suffix(':').unwrap_or(rest))
+            .filter(|code| !code.is_empty())
+            .map(Matcher::new);
+        let mut own;
+        let matcher = match shortcode {
+            Some(code) => {
+                own = code;
+                &mut own
+            }
+            None => matcher,
+        };
         let hits = self
             .entries
             .iter()
@@ -218,6 +234,8 @@ mod tests {
             }
         );
         assert_eq!(first(&index, "+1", 0).id, "emoji:👍");
+        assert_eq!(first(&index, ":rocket:", 0).id, "emoji:🚀");
+        assert_eq!(first(&index, ":rocket", 0).id, "emoji:🚀");
     }
 
     #[test]
