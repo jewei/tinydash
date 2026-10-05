@@ -6,7 +6,7 @@ import type { Platform } from "../generated/Platform";
 import type { ResultAction } from "../generated/ResultAction";
 import type { Settings } from "../generated/Settings";
 import * as ipc from "../lib/ipc";
-import { isComposing, modKey } from "../lib/keys";
+import { isComposing, modKey, shortcutKey } from "../lib/keys";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Glyph } from "../ui/Icon";
@@ -21,7 +21,7 @@ import { CATEGORIES, createLauncher } from "./state";
 /** Keys that change the query: characters (AltGr included), deletion, paste. */
 function editsQuery(event: KeyboardEvent) {
   const mod = event.metaKey || (event.ctrlKey && !event.altKey);
-  if (event.key.length === 1) return !mod || event.key.toLowerCase() === "v";
+  if (event.key.length === 1) return !mod || shortcutKey(event) === "v";
   return event.key === "Backspace" || event.key === "Delete";
 }
 

@@ -290,6 +290,18 @@ describe("Launcher", () => {
     }
   });
 
+  it("reads Control+K and Control+V on a layout that types another script", async () => {
+    const { input, press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("л", { ctrlKey: true, code: "KeyK" });
+    const filter = await screen.findByRole("combobox", { name: "Search actions" });
+    fireEvent.keyDown(filter, { key: "л", ctrlKey: true, code: "KeyK" });
+    expect(screen.queryByRole("dialog", { name: "Actions" })).toBeNull();
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "м", ctrlKey: true, code: "KeyV" });
+    expect(document.activeElement).toBe(input);
+  });
+
   it("closes the action menu when focus leaves it", async () => {
     const { input, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });

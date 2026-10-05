@@ -25,6 +25,9 @@ describe("commandFor", () => {
     expect(commandFor(key("л", { ctrlKey: true, code: "KeyK" }), false)).toEqual({
       type: "menu",
     });
+    expect(commandFor(key("б", { ctrlKey: true, code: "Comma" }), false)).toEqual({
+      type: "settings",
+    });
     // Windows AltGr is Control+Alt: AltGr+7 types "{" on a German layout.
     expect(commandFor(key("{", { ctrlKey: true, altKey: true, code: "Digit7" }), false)).toBe(null);
     // AZERTY: the 1 key gives "&" without Shift.
