@@ -1,5 +1,7 @@
-//! One module per launcher feature. Feature modules are pure: they rank,
-//! format, and describe actions, but never touch Tauri or the OS directly.
+//! One module per launcher feature. Feature modules rank, format, and
+//! describe actions, but never call Tauri, SQLite, the clipboard, or the OS.
+//! Two indexers are the exceptions, and `refresh.rs` alone runs them:
+//! `FileIndex::scan` reads folders and `currency::fetch` downloads rates.
 
 pub mod apps;
 pub mod calculator;
