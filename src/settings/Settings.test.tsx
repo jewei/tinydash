@@ -167,6 +167,30 @@ describe("Settings", () => {
     }
   });
 
+  it("cancels recording on a second click, and runs each request after the last", async () => {
+    const steps: string[] = [];
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    fakeBackend({
+      pause_shortcut: async (args) => {
+        steps.push(args.paused ? "pause" : "resume");
+        if (args.paused && steps.length === 1) await slow;
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    const recorder = await screen.findByRole("button", { name: /Launcher shortcut/ });
+    fireEvent.click(recorder);
+    // The press keeps focus, so WebKit cannot blur and restart the recorder.
+    expect(fireEvent.mouseDown(recorder)).toBe(false);
+    fireEvent.click(recorder);
+    expect(recorder.textContent).not.toContain("Press keys");
+    fireEvent.click(recorder);
+    release();
+    await waitFor(() => expect(steps).toEqual(["pause", "resume", "pause"]));
+    expect(recorder.textContent).toContain("Press keys");
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

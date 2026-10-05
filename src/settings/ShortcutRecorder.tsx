@@ -16,9 +16,11 @@ export function ShortcutRecorder(props: {
 }) {
   const [recording, setRecording] = createSignal(false);
   let button!: HTMLButtonElement;
-  // Resuming waits for the pause: the backend does not keep the two
-  // requests in order, and a late pause would leave the shortcut off.
-  let paused = Promise.resolve();
+  // Pause, save, and resume run one after another: the backend does not
+  // keep them in order, and a resume that lands after a newer pause would
+  // turn the shortcut on while recording.
+  let queue = Promise.resolve();
+  const then = (work: () => Promise<void>) => (queue = queue.then(work));
 
   // If the current shortcut cannot be paused, pressing it would open the
   // launcher instead of being recorded, so recording stops and says why.
@@ -27,28 +29,34 @@ export function ShortcutRecorder(props: {
     // WebKit on macOS does not focus a clicked button, and the keys and
     // the blur that ends recording arrive only while it has focus.
     button.focus();
-    paused = ipc.pauseShortcut(true).catch((failure: unknown) => {
-      setRecording(false);
-      props.onError(ipc.message(failure));
-    });
+    void then(() =>
+      ipc.pauseShortcut(true).catch((failure: unknown) => {
+        setRecording(false);
+        props.onError(ipc.message(failure));
+      }),
+    );
   };
 
-  const stop = async (accelerator?: string) => {
+  const stop = (accelerator?: string) => {
     if (!recording()) return;
     setRecording(false);
-    await paused;
-    if (accelerator && accelerator !== props.value) await props.onChange(accelerator);
-    // Registers the saved shortcut again: the new one, or the old one on failure.
-    await ipc.pauseShortcut(false).catch((failure: unknown) => props.onError(ipc.message(failure)));
+    const changed = accelerator !== props.value ? accelerator : undefined;
+    void then(async () => {
+      if (changed) await props.onChange(changed);
+      // Registers the saved shortcut again: the new one, or the old one on failure.
+      await ipc
+        .pauseShortcut(false)
+        .catch((failure: unknown) => props.onError(ipc.message(failure)));
+    });
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (!recording()) return;
     event.preventDefault();
     event.stopPropagation();
-    if (event.key === "Escape") return void stop();
+    if (event.key === "Escape") return stop();
     const accelerator = acceleratorFromEvent(event);
-    if (accelerator) void stop(accelerator);
+    if (accelerator) stop(accelerator);
   };
 
   return (
@@ -62,9 +70,12 @@ export function ShortcutRecorder(props: {
           ? "Launcher shortcut: press the new keys, or Escape to cancel"
           : `Launcher shortcut: ${displayKeys(props.value).join(" ")}`
       }
-      onClick={() => (recording() ? void stop() : start())}
+      // A mouse press must not blur the recorder first: WebKit on macOS would
+      // stop recording on the blur, and the click would then start again.
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => (recording() ? stop() : start())}
       onKeyDown={onKeyDown}
-      onBlur={() => void stop()}
+      onBlur={() => stop()}
     >
       <Show when={!recording()} fallback="Press keys…">
         <Keys keys={displayKeys(props.value)} />
