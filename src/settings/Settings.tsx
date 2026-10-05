@@ -64,14 +64,26 @@ const LANGUAGES: ReadonlyArray<{ value: EmojiLanguage; label: string }> = [
   { value: "es", label: "Spanish" },
 ];
 
+/**
+ * Fields to set, or for a list, a function of the current values: it runs
+ * on the saved values when it is sent, so it never carries another edit
+ * that is still saving or that failed.
+ */
+type Change = Partial<Values> | ((current: Values) => Partial<Values>);
+
+const apply = (values: Values, change: Change): Values => ({
+  ...values,
+  ...(typeof change === "function" ? change(values) : change),
+});
+
 export function Settings() {
   // `saved` is what the backend holds; `changes` are edits on their way.
   // The form shows saved values with pending changes on top.
   const [saved, setSaved] = createSignal<Values>();
-  const [changes, setChanges] = createSignal<Partial<Values>[]>([]);
+  const [changes, setChanges] = createSignal<Change[]>([]);
   const values = createMemo(() => {
     const base = saved();
-    return base && changes().reduce<Values>((all, change) => ({ ...all, ...change }), base);
+    return base && changes().reduce(apply, base);
   });
   const [section, setSection] = createSignal<Section>("general");
   const [error, setError] = createSignal<string>();
@@ -106,12 +118,12 @@ export function Settings() {
   // saved settings, so a change that failed is never sent again. A save
   // gives back its error, or nothing when it worked.
   let saving = Promise.resolve();
-  const save = (change: Partial<Values>) => {
+  const save = (change: Change) => {
     setChanges((list) => [...list, change]);
     const done = saving.then(async () => {
       const base = saved();
       try {
-        if (base) setSaved(await ipc.updateSettings({ ...base, ...change }));
+        if (base) setSaved(await ipc.updateSettings(apply(base, change)));
         setError(undefined);
         return undefined;
       } catch (failure) {
@@ -321,12 +333,14 @@ export function Settings() {
                       <Toggle
                         label={language.label}
                         checked={settings().emojiLanguages.includes(language.value)}
-                        onChange={(on) => {
-                          const others = settings().emojiLanguages.filter(
-                            (value) => value !== language.value,
-                          );
-                          void save({ emojiLanguages: on ? [...others, language.value] : others });
-                        }}
+                        onChange={(on) =>
+                          void save((current) => {
+                            const others = current.emojiLanguages.filter(
+                              (value) => value !== language.value,
+                            );
+                            return { emojiLanguages: on ? [...others, language.value] : others };
+                          })
+                        }
                       />
                     </Row>
                   )}

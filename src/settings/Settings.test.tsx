@@ -297,6 +297,52 @@ describe("Settings", () => {
     );
   });
 
+  it("never sends an emoji language again after its save failed", async () => {
+    let refuse!: () => void;
+    const refused = new Promise<void>((resolve) => (refuse = resolve));
+    const backend = fakeBackend({
+      update_settings: async (args) => {
+        const settings = args.settings as typeof testSettings;
+        if (backend.called("update_settings").length === 1) {
+          await refused;
+          throw "Could not save settings.";
+        }
+        return settings;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("switch", { name: "Chinese (Simplified)" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Malay" }));
+    refuse();
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
+    expect(backend.called("update_settings")[1]?.args).toMatchObject({
+      settings: { emojiLanguages: ["ms"] },
+    });
+  });
+
+  it("ignores another folder while one is saving", async () => {
+    let refuse!: () => void;
+    const refused = new Promise<void>((resolve) => (refuse = resolve));
+    const backend = fakeBackend({
+      update_settings: async () => {
+        await refused;
+        throw "“Projects” is not a full folder path.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Files" }));
+    const field = await screen.findByRole("textbox", { name: "Folder to add" });
+    fireEvent.input(field, { target: { value: "Projects" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    fireEvent.input(field, { target: { value: "~/Work" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    refuse();
+    const editor = within(field.closest(".list-editor") as HTMLElement);
+    await waitFor(() => expect(editor.getByRole("status").textContent).toContain("full folder"));
+    expect(backend.called("update_settings")).toHaveLength(1);
+  });
+
   it("records a new shortcut while the old one is paused", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
