@@ -215,13 +215,15 @@ describe("Settings", () => {
     expect(document.activeElement).toBe(clear);
   });
 
-  it("moves focus through the inline delete confirmation", async () => {
+  it("asks with the saved name and moves focus through the inline delete confirmation", async () => {
     const item: LibraryItem = { id: 3, kind: "snippet", name: "Sig", keyword: "", text: "Hi" };
     fakeBackend({ library_items: () => [item] });
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
     fireEvent.click(await screen.findByRole("button", { name: /Sig/ }));
+    fireEvent.input(screen.getByRole("textbox", { name: "Name" }), { target: { value: "Other" } });
     fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    expect(screen.getByText("Delete “Sig”?")).toBeTruthy();
     expect(document.activeElement?.textContent).toBe("Keep");
     fireEvent.click(screen.getByRole("button", { name: "Keep" }));
     expect(document.activeElement?.textContent).toBe("Delete");

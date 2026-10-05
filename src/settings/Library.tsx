@@ -46,6 +46,9 @@ export function Library(props: { kind: LibraryKind }) {
 
   const ofKind = () => (items() ?? []).filter((item) => item.kind === props.kind);
   const noun = () => (props.kind === "snippet" ? "Snippet" : "Quicklink");
+  // Delete removes the saved item, so ask with its saved name, not an
+  // unsaved edit.
+  const savedName = () => items()?.find((item) => item.id === draft().id)?.name ?? draft().name;
   const edit = (item: LibraryItem) => {
     setDraft({ ...item });
     setError(undefined);
@@ -194,7 +197,7 @@ export function Library(props: { kind: LibraryKind }) {
                 </button>
               }
             >
-              <span>Delete “{draft().name}”?</span>
+              <span>Delete “{savedName()}”?</span>
               <button
                 ref={keepButton}
                 type="button"
