@@ -4,7 +4,7 @@ What TinyDash does, for users and for anyone changing it. Keep this page true: u
 
 ## Open and navigate
 
-Press **Control+Shift+Space** (change it in Settings > General) from any app. On macOS, a letter or sign in the shortcut is stored by its key position, so on a layout other than US, Settings may name a different key than the one pressed. On Windows and Linux, the recorder takes letters, digits, function keys, Space, arrows, numpad keys, and `,` `.` `-` without Shift; other signs sit on different keys in each layout, so it ignores them. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
+Press **Control+Shift+Space** (change it in Settings > General) from any app. On macOS, a letter or sign in the shortcut is stored by its key position, so on a layout other than US, Settings may name a different key than the one pressed. On Windows and Linux, the recorder takes letters, digits, numpad digits and + − * / ., Space, and named keys such as F5, arrows, Home, or Enter; it ignores signs, which each layout puts on different keys, and numpad Enter and =. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
 
 | Keys            | Action                                                                                                                         |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------ |

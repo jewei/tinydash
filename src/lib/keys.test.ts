@@ -24,9 +24,11 @@ describe("acceleratorFromEvent", () => {
     const azertyM = press("Semicolon", "m", { ctrlKey: true, shiftKey: true });
     expect(acceleratorFromEvent(azertyM, false)).toBe("Control+Shift+M");
     expect(acceleratorFromEvent(azertyM, true)).toBe("Control+Shift+Semicolon");
-    expect(acceleratorFromEvent(press("KeyM", ",", { ctrlKey: true }), false)).toBe(
-      "Control+Comma",
-    );
+    // Signs, even on letter keys (AZERTY ",", Dvorak "'"), are not recorded there.
+    expect(acceleratorFromEvent(press("KeyM", ",", { ctrlKey: true }), false)).toBeNull();
+    expect(acceleratorFromEvent(press("KeyQ", "'", { ctrlKey: true }), false)).toBeNull();
+    // Russian: "." is on the "Slash" key.
+    expect(acceleratorFromEvent(press("Slash", ".", { ctrlKey: true }), false)).toBeNull();
     // German: Shift+, types ";", which Windows would find on another key.
     const germanShiftComma = press("Comma", ";", { ctrlKey: true, shiftKey: true });
     expect(acceleratorFromEvent(germanShiftComma, false)).toBeNull();
@@ -36,6 +38,12 @@ describe("acceleratorFromEvent", () => {
     // Numpad keys stay numpad keys.
     const numpadMinus = press("NumpadSubtract", "-", { ctrlKey: true });
     expect(acceleratorFromEvent(numpadMinus, false)).toBe("Control+NumpadSubtract");
+    // Windows would register Numpad Enter as the main Enter key.
+    const numpadEnter = press("NumpadEnter", "Enter", { ctrlKey: true });
+    expect(acceleratorFromEvent(numpadEnter, false)).toBeNull();
+    expect(acceleratorFromEvent(press("Home", "Home", { ctrlKey: true }), false)).toBe(
+      "Control+Home",
+    );
     // A layout that types another script falls back to the key position.
     expect(acceleratorFromEvent(press("KeyQ", "й", { ctrlKey: true }), false)).toBe("Control+Q");
   });
