@@ -72,7 +72,7 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 
 Create them in Settings > Snippets and Settings > Quicklinks.
 
-- **Snippet:** text with optional `{date}`, `{time}`, `{datetime}`, and `{clipboard}`. Enter fills the placeholders and copies the text.
+- **Snippet:** text with optional `{date}`, `{time}`, `{datetime}`, and `{clipboard}`. Enter fills the placeholders and copies the text. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.
 - **Quicklink:** an http, https, or mailto URL, or an absolute or `~` path. `{query}` takes the text you type after the keyword, encoded: with keyword `jira` and URL `https://jira.example.com/browse/{query}`, typing `jira ABC-12` opens that issue.
 - Limits: 500 snippets and quicklinks in all. A name has up to 100 characters, the text up to 32 KB, and the optional keyword is one word of up to 32 characters.
 

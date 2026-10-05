@@ -96,12 +96,16 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .find(id)
                 .filter(|item| item.kind == LibraryKind::Snippet)
                 .ok_or_else(|| Error::msg("This snippet was deleted."))?;
-            let text = library::render_snippet(
-                &item.text,
-                chrono::Local::now(),
-                system_clipboard::read_text,
-            );
-            copy_and_close(app, || system_clipboard::write_text(&text, false))?;
+            // The clipboard may hold a password, so text that includes it
+            // is copied as secret and stays out of clipboard histories.
+            let read_clipboard = std::cell::Cell::new(false);
+            let text = library::render_snippet(&item.text, chrono::Local::now(), || {
+                read_clipboard.set(true);
+                system_clipboard::read_text()
+            });
+            copy_and_close(app, || {
+                system_clipboard::write_text(&text, read_clipboard.get())
+            })?;
         }
         Action::OpenQuicklink { id, query } => {
             let library = state.library.get();
