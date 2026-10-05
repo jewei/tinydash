@@ -13,15 +13,13 @@ use crate::{
     events,
     features::library::{self, LibraryKind, Target},
     platform, refresh,
-    search::{self, Context, id::Source, result::Action},
+    search::{self, Context, Snapshot, id::Source, result::Action},
     state::State,
     system_clipboard, window,
 };
 
-/// Pins the user can see.
-const MAX_PINS: usize = 100;
 /// Pins kept in all, including pins of items that are hidden for now.
-const MAX_SAVED_PINS: usize = 300;
+const MAX_PINS: usize = 100;
 
 /// Run an action. `result_id` identifies the result it came from, for usage ranking.
 pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<()> {
@@ -126,33 +124,12 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             // Only items that exist can be pinned, and the pin stores the
             // item's own ID, so a pin never widens what Open and Reveal accept.
             let snapshot = state.snapshot();
-            let ctx = Context::none();
-            let id = search::resolve(&snapshot, &ctx, &id)
+            let id = search::resolve(&snapshot, &Context::none(), &id)
                 .ok_or_else(|| Error::msg("This item no longer exists."))?
                 .id;
-            // Count only pins the user can see: a pin of a file outside the
-            // index stays saved for when its folder returns, but cannot be
-            // unpinned, so it must not use up the limit.
-            let visible = snapshot
-                .pins
-                .ids()
-                .iter()
-                .filter(|pin| search::resolve(&snapshot, &ctx, pin).is_some())
-                .count();
-            if visible >= MAX_PINS {
-                return Err(Error::msg(format!("You can pin up to {MAX_PINS} items.")));
-            }
-            // Hidden pins wait for their item to return, but not without end:
-            // past the cap, the oldest hidden pin goes.
-            if snapshot.pins.ids().len() >= MAX_SAVED_PINS
-                && let Some(oldest) = snapshot
-                    .pins
-                    .ids()
-                    .iter()
-                    .find(|pin| search::resolve(&snapshot, &ctx, pin).is_none())
-            {
-                state.store.set_pinned(oldest, false)?;
-                state.pins.update(|pins| pins.remove(oldest));
+            if let Some(oldest) = pin_to_drop(&snapshot)? {
+                state.store.set_pinned(&oldest, false)?;
+                state.pins.update(|pins| pins.remove(&oldest));
             }
             state.store.set_pinned(&id, true)?;
             state.pins.update(|pins| pins.add(&id));
@@ -189,6 +166,23 @@ fn open_path(path: &Path) -> Result<()> {
     tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| Error::msg(e.to_string()))
 }
 
+/// The pin that must go before another fits, or `None` while there is room.
+/// A pin of a hidden item (a file outside the index, or a clipboard entry
+/// while history is off) waits for its item to return, but it cannot be
+/// unpinned, so it gives up its place when the list is full. That way no
+/// more than `MAX_PINS` pins ever show.
+fn pin_to_drop(snapshot: &Snapshot) -> Result<Option<String>> {
+    let pins = snapshot.pins.ids();
+    if pins.len() < MAX_PINS {
+        return Ok(None);
+    }
+    let ctx = Context::none();
+    pins.iter()
+        .find(|pin| search::resolve(snapshot, &ctx, pin).is_none())
+        .map(|pin| Some(pin.clone()))
+        .ok_or_else(|| Error::msg(format!("You can pin up to {MAX_PINS} items.")))
+}
+
 /// Results with stable IDs learn from use; computed answers do not.
 fn learns_from_use(id: &str) -> bool {
     Source::parse(id).is_some_and(|(source, _)| source.learns_from_use())
@@ -205,6 +199,31 @@ fn record_use(state: &State, id: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        search::{Category, usage::Pins},
+        settings::Settings,
+    };
+
+    #[test]
+    fn a_full_pin_list_gives_up_its_oldest_hidden_pin() {
+        let state = State::for_tests(Settings::default());
+        let emoji: Vec<String> = search::search(&state.snapshot(), "", Category::Emoji)
+            .into_iter()
+            .map(|result| result.id)
+            .collect();
+        assert_eq!(emoji.len(), MAX_PINS);
+        let drop_with = |pins: Vec<String>| {
+            state.pins.set(Pins::new(pins));
+            pin_to_drop(&state.snapshot())
+        };
+
+        assert_eq!(drop_with(emoji[1..].to_vec()).unwrap(), None);
+        // History is off, so the clipboard pin is hidden too, but newer.
+        let mut pins = vec!["file:/gone".to_owned(), "clip:7".to_owned()];
+        pins.extend_from_slice(&emoji[2..]);
+        assert_eq!(drop_with(pins).unwrap().as_deref(), Some("file:/gone"));
+        assert!(drop_with(emoji).is_err());
+    }
 
     #[test]
     fn only_stable_results_learn_from_use() {

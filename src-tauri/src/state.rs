@@ -141,6 +141,17 @@ impl State {
         Ok(())
     }
 
+    /// A state with an empty in-memory database and no folders.
+    #[cfg(test)]
+    pub fn for_tests(settings: Settings) -> Self {
+        let dirs = Dirs {
+            config: PathBuf::new(),
+            data: PathBuf::new(),
+            home: PathBuf::new(),
+        };
+        Self::new(settings, Store::in_memory(), dirs, Vec::new())
+    }
+
     pub fn warn(&self, message: impl Into<String>) {
         let message = message.into();
         tracing::warn!("{message}");
@@ -157,20 +168,16 @@ mod tests {
     use crate::search::{self, Category};
 
     fn state_with_clip(clipboard_history_enabled: bool) -> State {
-        let store = Store::in_memory();
-        store
-            .save_clip(&Content::Text("secret note".into()), 1, 10)
-            .unwrap();
-        let settings = Settings {
+        let state = State::for_tests(Settings {
             clipboard_history_enabled,
             ..Settings::default()
-        };
-        let dirs = Dirs {
-            config: PathBuf::new(),
-            data: PathBuf::new(),
-            home: PathBuf::new(),
-        };
-        State::new(settings, store, dirs, Vec::new())
+        });
+        state
+            .store
+            .save_clip(&Content::Text("secret note".into()), 1, 10)
+            .unwrap();
+        state.reload_clipboard().unwrap();
+        state
     }
 
     fn titles(state: &State, query: &str, category: Category) -> Vec<String> {

@@ -36,7 +36,7 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 | Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                       | Most used, then the catalog |
 | System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
 
-Pin any app, file, clipboard entry, snippet, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category.
+Pin any app, file, clipboard entry, snippet, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
 
