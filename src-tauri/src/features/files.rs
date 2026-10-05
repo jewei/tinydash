@@ -55,6 +55,9 @@ impl Entry {
 #[derive(Default)]
 pub struct FileIndex {
     entries: Vec<Entry>,
+    /// Positions in `entries`, ordered by OS path, so a lookup by path (each
+    /// used file in an empty Files tab, each Open) is a binary search.
+    by_path: Vec<u32>,
     /// The scan stopped at [`LIMIT`].
     pub truncated: bool,
 }
@@ -65,7 +68,7 @@ impl FileIndex {
     /// extension is in `packages` is listed, but not its contents.
     pub fn scan(folders: &[PathBuf], excluded: &[String], packages: &[&str]) -> Self {
         let mut index = Self::default();
-        for folder in distinct_roots(folders, excluded, packages) {
+        'roots: for folder in distinct_roots(folders, excluded, packages) {
             let mut walker = walkdir::WalkDir::new(&folder)
                 .follow_links(false)
                 .min_depth(1)
@@ -81,7 +84,7 @@ impl FileIndex {
                 };
                 if index.entries.len() == LIMIT {
                     index.truncated = true;
-                    return index;
+                    break 'roots;
                 }
                 let file_type = entry.file_type();
                 if file_type.is_symlink() {
@@ -104,6 +107,14 @@ impl FileIndex {
                 });
             }
         }
+        // LIMIT fits in u32.
+        index.by_path = (0..index.entries.len() as u32).collect();
+        let entries = &index.entries;
+        index.by_path.sort_by(|&a, &b| {
+            entries[a as usize]
+                .os_path()
+                .cmp(entries[b as usize].os_path())
+        });
         index
     }
 
@@ -117,7 +128,11 @@ impl FileIndex {
 
     fn entry(&self, path: &str) -> Option<&Entry> {
         let path = Path::new(path);
-        self.entries.iter().find(|entry| entry.os_path() == path)
+        let found = self
+            .by_path
+            .binary_search_by(|&i| self.entries[i as usize].os_path().cmp(path))
+            .ok()?;
+        Some(&self.entries[self.by_path[found] as usize])
     }
 
     pub fn get(&self, path: &str, ctx: &Context) -> Option<SearchResult> {
@@ -336,6 +351,10 @@ mod tests {
         assert_eq!(titles("readme"), ["README.md"]);
         assert_eq!(titles("project readme")[0], "README.md");
         assert!(index.contains(&root.join("notes/todo.txt").display().to_string()));
+        for entry in &index.entries {
+            assert!(index.contains(&entry.os_path().display().to_string()));
+        }
+        assert!(!index.contains(&root.join("notes/missing.txt").display().to_string()));
         std::fs::remove_dir_all(root).unwrap();
     }
 
