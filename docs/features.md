@@ -6,18 +6,18 @@ What TinyDash does, for users and for anyone changing it. Keep this page true: u
 
 Press **Control+Shift+Space** (change it in Settings > General) from any app. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
 
-| Keys            | Action                                                       |
-| --------------- | ------------------------------------------------------------ |
-| Type            | Search                                                       |
-| ↑ / ↓           | Select a result                                              |
-| Enter           | Run the selected result's main action                        |
-| Mod+Enter       | Run its second action (often Show in Finder)                 |
-| Mod+1 … Mod+9   | Run the main action of that row                              |
-| Mod+K           | All actions for the result, plus Refresh, Settings, and Quit |
-| Mod+Backspace   | Delete the selected clipboard entry                          |
-| Tab / Shift+Tab | Next / previous category                                     |
-| Mod+,           | Open Settings                                                |
-| Escape          | Dismiss a warning, or hide and return to the previous app    |
+| Keys            | Action                                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Type            | Search                                                                                                             |
+| ↑ / ↓           | Select a result                                                                                                    |
+| Enter           | Run the selected result's main action                                                                              |
+| Mod+Enter       | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, emoji, and commands |
+| Mod+1 … Mod+9   | Run the main action of that row                                                                                    |
+| Mod+K           | All actions for the result, plus Refresh, Settings, and Quit                                                       |
+| Mod+Backspace   | Delete the selected clipboard entry                                                                                |
+| Tab / Shift+Tab | Next / previous category                                                                                           |
+| Mod+,           | Open Settings                                                                                                      |
+| Escape          | Dismiss a warning, or hide and return to the previous app                                                          |
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens on the screen with the pointer, with an empty query, and hides when another app gets focus (optional).
 

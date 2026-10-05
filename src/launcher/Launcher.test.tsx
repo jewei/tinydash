@@ -6,6 +6,17 @@ import type { SearchResult } from "../generated/SearchResult";
 import { app, testSettings, fakeBackend, restart } from "../test/backend";
 import { Launcher } from "./Launcher";
 
+const clip: SearchResult = {
+  ...app,
+  id: "clip:1",
+  kind: "clipboard",
+  actions: [
+    { label: "Copy", action: { type: "copyClip", id: 1 }, confirm: null },
+    { label: "Pin", action: { type: "pin", id: "clip:1" }, confirm: null },
+    { label: "Delete", action: { type: "deleteClip", id: 1 }, confirm: null },
+  ],
+};
+
 function setup(results: (query: string, category: string) => SearchResult[], extra = {}) {
   const backend = fakeBackend({
     search: (args) => results(String(args.query), String(args.category)),
@@ -220,14 +231,6 @@ describe("Launcher", () => {
   it("deletes only an entry the user can see selected", async () => {
     let release!: () => void;
     const slow = new Promise<void>((resolve) => (release = resolve));
-    const clip = {
-      ...app,
-      id: "clip:1",
-      actions: [
-        { label: "Copy", action: { type: "copyClip" as const, id: 1 }, confirm: null },
-        { label: "Delete", action: { type: "deleteClip" as const, id: 1 }, confirm: null },
-      ],
-    };
     const backend = fakeBackend({
       search: async (args) => {
         if (args.query === "x") await slow;
@@ -244,6 +247,15 @@ describe("Launcher", () => {
     expect(backend.called("run_action")).toHaveLength(0);
     fireEvent.keyDown(input, { key: "Backspace", ctrlKey: true });
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+  });
+
+  it("shows Mod+Backspace as the key for deleting a clipboard entry", async () => {
+    const { press } = setup(() => [clip]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const remove = await screen.findByRole("option", { name: /Delete/ });
+    expect(remove.textContent).toContain("⌫");
+    expect(remove.textContent).not.toContain("↩");
   });
 
   it("keeps shortcuts working after focus leaves the search field", async () => {

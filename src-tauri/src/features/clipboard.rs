@@ -202,10 +202,12 @@ fn result(entry: &Entry, ctx: &Context) -> SearchResult {
         title: entry.title.clone(),
         subtitle: format!("{label} · {}", ago(ctx.now - entry.copied_at)),
         icon: Icon::Symbol { name: symbol },
+        // Mod+Enter runs the second action and may wait for newer results,
+        // so Delete, which cannot be undone, never takes that place.
         actions: vec![
             ResultAction::new("Copy", Action::CopyClip { id: entry.id }),
-            ResultAction::new("Delete", Action::DeleteClip { id: entry.id }),
             ctx.pin_action(&id),
+            ResultAction::new("Delete", Action::DeleteClip { id: entry.id }),
         ],
         pinned: ctx.pinned(&id),
         id,
@@ -275,6 +277,15 @@ mod tests {
         let ids: Vec<_> = hits.iter().map(|hit| hit.result.id.as_str()).collect();
         assert_eq!(ids, ["clip:2", "clip:1"]);
         assert!(hits[0].score > hits[1].score);
+        let actions: Vec<_> = hits[0].result.actions.iter().map(|a| &a.action).collect();
+        assert!(matches!(
+            actions[..],
+            [
+                Action::CopyClip { .. },
+                Action::Pin { .. },
+                Action::DeleteClip { .. }
+            ]
+        ));
         assert!(
             history
                 .search(&mut Matcher::new("friday"), &Context::none(), 10)
