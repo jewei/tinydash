@@ -18,6 +18,7 @@ use crate::{
     events,
     features::{apps::AppIndex, currency, files, files::FileIndex},
     platform,
+    search::id::Source,
     state::State,
 };
 
@@ -31,6 +32,19 @@ pub struct Freshness {
     pub apps: Slot,
     pub files: Slot,
     rates_attempt: Mutex<Option<Instant>>,
+}
+
+impl Freshness {
+    /// Which sources have their items, read once. A source that a scan
+    /// fills looks empty until its first scan finishes.
+    pub fn ready(&self) -> impl Fn(Source) -> bool + use<> {
+        let (apps, files) = (self.apps.built(), self.files.built());
+        move |source| match source {
+            Source::App => apps,
+            Source::File => files,
+            Source::Clip | Source::Snippet | Source::Link | Source::Emoji | Source::System => true,
+        }
+    }
 }
 
 pub struct Slot {
@@ -56,7 +70,7 @@ impl Slot {
 
     /// Whether the index was built at least once. Before that, every item
     /// of this source looks missing.
-    pub fn built(&self) -> bool {
+    fn built(&self) -> bool {
         self.finished
             .lock()
             .unwrap_or_else(|e| e.into_inner())

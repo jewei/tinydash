@@ -123,12 +123,14 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         Action::Pin { id } => {
             // Only items that exist can be pinned, and the pin stores the
             // item's own ID, so a pin never widens what Open and Reveal accept.
+            // Read readiness first: a scan that finishes after the snapshot
+            // must not make its old, empty index count as ready.
+            let ready = state.freshness.ready();
             let snapshot = state.snapshot();
             let id = search::resolve(&snapshot, &Context::none(), &id)
                 .ok_or_else(|| Error::msg("This item no longer exists."))?
                 .id;
-            let indexed = state.freshness.apps.built() && state.freshness.files.built();
-            if let Some(oldest) = pin_to_drop(&snapshot, indexed)? {
+            if let Some(oldest) = pin_to_drop(&snapshot, ready)? {
                 state.store.set_pinned(&oldest, false)?;
                 state.pins.update(|pins| pins.remove(&oldest));
             }
@@ -171,19 +173,17 @@ fn open_path(path: &Path) -> Result<()> {
 /// A pin of a hidden item (a file outside the index, or a clipboard entry
 /// while history is off) waits for its item to return, but it cannot be
 /// unpinned, so it gives up its place when the list is full. That way no
-/// more than `MAX_PINS` pins ever show. Until the first app and file scans
-/// finish (`indexed`), their pins only look hidden, so they stay.
-fn pin_to_drop(snapshot: &Snapshot, indexed: bool) -> Result<Option<String>> {
+/// more than `MAX_PINS` pins ever show. Until a source is `ready`, its pins
+/// only look hidden, so they stay.
+fn pin_to_drop(snapshot: &Snapshot, ready: impl Fn(Source) -> bool) -> Result<Option<String>> {
     let pins = snapshot.pins.ids();
     if pins.len() < MAX_PINS {
         return Ok(None);
     }
     let ctx = Context::none();
-    let scanned = |pin: &str| {
-        indexed || !Source::parse(pin).is_some_and(|(s, _)| matches!(s, Source::App | Source::File))
-    };
+    let known = |pin: &str| Source::parse(pin).is_none_or(|(source, _)| ready(source));
     pins.iter()
-        .find(|pin| scanned(pin) && search::resolve(snapshot, &ctx, pin).is_none())
+        .find(|pin| known(pin) && search::resolve(snapshot, &ctx, pin).is_none())
         .map(|pin| Some(pin.clone()))
         .ok_or_else(|| Error::msg(format!("You can pin up to {MAX_PINS} items.")))
 }
@@ -217,9 +217,10 @@ mod tests {
             .map(|result| result.id)
             .collect();
         assert_eq!(emoji.len(), MAX_PINS);
-        let drop_with = |pins: Vec<String>, indexed: bool| {
+        let drop_with = |pins: Vec<String>, scanned: bool| {
             state.pins.set(Pins::new(pins));
-            pin_to_drop(&state.snapshot(), indexed)
+            let ready = |source| scanned || !matches!(source, Source::App | Source::File);
+            pin_to_drop(&state.snapshot(), ready)
         };
 
         assert_eq!(drop_with(emoji[1..].to_vec(), true).unwrap(), None);
