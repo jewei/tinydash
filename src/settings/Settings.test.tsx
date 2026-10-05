@@ -159,7 +159,9 @@ describe("Settings", () => {
     ["/data", "/data", ["Settings and saved data: /data"]],
     ["/config", "/local", ["Settings: /config", "Saved data: /local"]],
   ])("shows where settings (%s) and data (%s) are", async (settingsFolder, dataFolder, lines) => {
-    fakeBackend({ about: () => ({ version: "0.2.0", settingsFolder, dataFolder }) });
+    fakeBackend({
+      about: () => ({ version: "0.2.0", settingsFolder, dataFolder, richClipboard: true }),
+    });
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "About" }));
     for (const line of lines) {
@@ -189,6 +191,22 @@ describe("Settings", () => {
     release();
     await waitFor(() => expect(steps).toEqual(["pause", "resume", "pause"]));
     expect(recorder.textContent).toContain("Press keys");
+  });
+
+  it("offers image and file history only where the OS can save them", async () => {
+    fakeBackend({
+      about: () => ({
+        version: "0.2.0",
+        settingsFolder: "/c",
+        dataFolder: "/d",
+        richClipboard: false,
+      }),
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Clipboard" }));
+    await screen.findByRole("switch", { name: "Save clipboard history" });
+    await waitFor(() => expect(screen.queryByRole("switch", { name: "Save images" })).toBeNull());
+    expect(screen.queryByRole("switch", { name: "Save copied files" })).toBeNull();
   });
 
   it("records a new shortcut while the old one is paused", async () => {

@@ -17,6 +17,7 @@ use crate::{
         emoji::EmojiIndex,
         library::{LibraryItem, MAX_LIBRARY_ITEMS},
     },
+    platform,
     preview::{self, Preview},
     refresh,
     search::{
@@ -67,6 +68,8 @@ pub struct About {
     /// Where `settings.json` is; the same as `data_folder` on macOS only.
     pub settings_folder: String,
     pub data_folder: String,
+    /// Clipboard history can save images and copied files on this OS.
+    pub rich_clipboard: bool,
 }
 
 async fn blocking<T: Send + 'static>(
@@ -249,5 +252,6 @@ pub fn about(app: AppHandle) -> About {
         version: app.package_info().version.to_string(),
         settings_folder: dirs.config.display().to_string(),
         data_folder: dirs.data.display().to_string(),
+        rich_clipboard: platform::RICH_CLIPBOARD,
     }
 }

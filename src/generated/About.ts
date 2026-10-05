@@ -4,4 +4,8 @@ export type About = { version: string,
 /**
  * Where `settings.json` is; the same as `data_folder` on macOS only.
  */
-settingsFolder: string, dataFolder: string, };
+settingsFolder: string, dataFolder: string, 
+/**
+ * Clipboard history can save images and copied files on this OS.
+ */
+richClipboard: boolean, };

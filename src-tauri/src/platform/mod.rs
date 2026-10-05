@@ -15,6 +15,8 @@
 //!   (Windows); the file scan skips it. Names that start with a dot are
 //!   skipped on every OS.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
+//! - `RICH_CLIPBOARD`: whether clipboard history can save images and copied
+//!   files; `read_clipboard` ignores both settings when it cannot.
 //! - `app_folders()`: folders to watch for installed or removed apps.
 //! - `discover_apps()`: installed apps.
 //! - `launch_app(path)`: start an app found by `discover_apps`.

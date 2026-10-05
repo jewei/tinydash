@@ -24,6 +24,7 @@ use crate::{
 pub const FILE_MANAGER: &str = "File Explorer";
 /// No folder is shown as a single file here.
 pub const PACKAGE_EXTENSIONS: &[&str] = &[];
+pub const RICH_CLIPBOARD: bool = true;
 pub const NATIVE_ICONS: bool = false;
 /// ReadDirectoryChangesW watches a whole tree with one handle.
 pub const RECURSIVE_WATCH: bool = true;

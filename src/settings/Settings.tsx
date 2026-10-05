@@ -11,6 +11,7 @@ import {
   Switch,
 } from "solid-js";
 
+import type { About as AboutInfo } from "../generated/About";
 import type { EmojiLanguage } from "../generated/EmojiLanguage";
 import type { SearchEngine } from "../generated/SearchEngine";
 import type { Settings as Values } from "../generated/Settings";
@@ -74,6 +75,15 @@ export function Settings() {
   });
   const [section, setSection] = createSignal<Section>("general");
   const [error, setError] = createSignal<string>();
+  // Read once: About shows it, and the Clipboard section hides what this
+  // OS cannot save.
+  const [aboutError, setAboutError] = createSignal<string>();
+  const [about] = createResource(() =>
+    ipc.about().catch((failure: unknown) => {
+      setAboutError(ipc.message(failure));
+      return undefined;
+    }),
+  );
   const [confirmClear, setConfirmClear] = createSignal(false);
   let clearButton: HTMLButtonElement | undefined;
   const closeClear = () => {
@@ -201,26 +211,28 @@ export function Settings() {
                     onChange={(clipboardHistoryLimit) => void save({ clipboardHistoryLimit })}
                   />
                 </Row>
-                <Row
-                  label="Save images"
-                  description="Up to 32 images, not counting pins. Large images are skipped."
-                >
-                  <Toggle
+                <Show when={about()?.richClipboard !== false}>
+                  <Row
                     label="Save images"
-                    checked={settings().clipboardCaptureImages}
-                    onChange={(clipboardCaptureImages) => void save({ clipboardCaptureImages })}
-                  />
-                </Row>
-                <Row
-                  label="Save copied files"
-                  description="Saves references to files, not their contents."
-                >
-                  <Toggle
+                    description="Up to 32 images, not counting pins. Large images are skipped."
+                  >
+                    <Toggle
+                      label="Save images"
+                      checked={settings().clipboardCaptureImages}
+                      onChange={(clipboardCaptureImages) => void save({ clipboardCaptureImages })}
+                    />
+                  </Row>
+                  <Row
                     label="Save copied files"
-                    checked={settings().clipboardCaptureFiles}
-                    onChange={(clipboardCaptureFiles) => void save({ clipboardCaptureFiles })}
-                  />
-                </Row>
+                    description="Saves references to files, not their contents."
+                  >
+                    <Toggle
+                      label="Save copied files"
+                      checked={settings().clipboardCaptureFiles}
+                      onChange={(clipboardCaptureFiles) => void save({ clipboardCaptureFiles })}
+                    />
+                  </Row>
+                </Show>
                 <Row label="Clear history" description="Deletes every entry except pinned ones.">
                   <button
                     ref={clearButton}
@@ -318,7 +330,7 @@ export function Settings() {
               </Match>
 
               <Match when={section() === "about"}>
-                <About />
+                <About about={about()} error={aboutError()} />
               </Match>
             </Switch>
           )}
@@ -340,17 +352,11 @@ export function Settings() {
   );
 }
 
-function About() {
-  const [error, setError] = createSignal<string>();
-  const [about] = createResource(() =>
-    ipc.about().catch((failure: unknown) => {
-      setError(ipc.message(failure));
-      return undefined;
-    }),
-  );
+function About(props: { about: AboutInfo | undefined; error: string | undefined }) {
+  const about = () => props.about;
   return (
     <div class="about">
-      <Show when={error()}>
+      <Show when={props.error}>
         {(text) => (
           <p class="error" role="alert">
             Could not read the app details: {text()}
