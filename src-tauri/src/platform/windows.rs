@@ -185,9 +185,14 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     super::read_with_arboard(images, files)
 }
 
-/// Marks a copy so clipboard managers skip it (`ExcludeClipboardContentFromMonitorProcessing`).
+/// Marks a copy so clipboard managers skip it
+/// (`ExcludeClipboardContentFromMonitorProcessing`), and so Windows keeps it
+/// out of its own history and cloud clipboard.
 pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
-    arboard::SetExtWindows::exclude_from_cloud(arboard::SetExtWindows::exclude_from_history(set))
+    use arboard::SetExtWindows;
+    set.exclude_from_monitoring()
+        .exclude_from_history()
+        .exclude_from_cloud()
 }
 
 /// Windows needs no change notifications: `clipboard_change` is a cheap counter.
