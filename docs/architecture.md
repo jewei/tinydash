@@ -24,7 +24,7 @@ TinyDash is one Rust process with two webview windows: the **launcher**, created
 
 A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42`, `emoji:🚀`) and a list of `ResultAction`s. The first action runs on Enter, the second on Mod+Enter. The frontend sends the chosen `Action` back to `run_action`, plus the result ID when it was the main action, which counts as use.
 
-`actions.rs` checks every action against Rust's own state. It launches only indexed apps, opens and reveals only indexed apps and files, opens only http(s) URLs (a quicklink the user saved may also open a mailto URL or an absolute or `~` path), pins only items that still exist (at most 100), and reads snippets and quicklinks from its own library; a quicklink's query cannot add a path separator. Previews load only for indexed apps and files. Copies from the password generator are marked secret so clipboard managers skip them.
+`actions.rs` checks every action against Rust's own state. It launches only indexed apps, opens and reveals only indexed apps and files, opens only http(s) URLs (a quicklink the user saved may also open a mailto URL or an absolute or `~` path), pins only items that still exist (at most 100), and reads snippets and quicklinks from its own library; a quicklink's query cannot add a path separator. Previews load for indexed apps and files, saved clipboard entries (hidden while history is off), and snippets. Copies from the password generator are marked secret so clipboard managers skip them.
 
 ## State and background work
 

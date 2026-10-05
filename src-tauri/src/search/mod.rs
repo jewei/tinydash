@@ -27,8 +27,9 @@ use matcher::{Matcher, STRONG};
 use result::{Action, ResultAction, ResultKind, Scored, SearchResult};
 use usage::{Pins, Usage};
 
-/// Results in All. Instant answers and the web fallback, when there is one,
-/// count toward it.
+/// Results in an All search with text. Instant answers and the web
+/// fallback, when there is one, count toward it. The empty All view stops
+/// at `CATEGORY_LIMIT`, like a category.
 pub const ALL_LIMIT: usize = 30;
 /// Results in a single category.
 pub const CATEGORY_LIMIT: usize = 100;
