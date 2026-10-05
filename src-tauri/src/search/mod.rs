@@ -27,7 +27,8 @@ use matcher::{Matcher, STRONG};
 use result::{Action, ResultAction, ResultKind, Scored, SearchResult};
 use usage::{Pins, Usage};
 
-/// Results in All. Instant answers and the web fallback count toward it.
+/// Results in All. Instant answers and the web fallback, when there is one,
+/// count toward it.
 pub const ALL_LIMIT: usize = 30;
 /// Results in a single category.
 pub const CATEGORY_LIMIT: usize = 100;
@@ -218,8 +219,9 @@ pub fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
 }
 
 /// All: instant answers, then name matches across sources, then fuzzy
-/// matches, then a web search. Inside each tier, sources keep a fixed order
-/// so that, for example, an app named like the query beats an emoji code.
+/// matches, then a web search unless a web keyword already answered. Inside
+/// each tier, sources keep a fixed order so that, for example, an app named
+/// like the query beats an emoji code.
 fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
     let mut results = answers(s, query);
     let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
@@ -239,7 +241,8 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         .collect();
     ranked.sort_by_key(|(order, hit)| (hit.score < STRONG, *order, Reverse(hit.score)));
 
-    let room = ALL_LIMIT.saturating_sub(results.len() + 1);
+    let fallback = usize::from(!keyword_search);
+    let room = ALL_LIMIT.saturating_sub(results.len() + fallback);
     results.extend(ranked.into_iter().take(room).map(|(_, hit)| hit.result));
     if !keyword_search {
         results.push(web::fallback(query, s.settings.search_engine));
@@ -281,6 +284,18 @@ pub fn top<T>(mut hits: Vec<(u32, T)>, limit: usize) -> Vec<(u32, T)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_keyword_search_leaves_no_slot_for_the_fallback() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let snapshot = state.snapshot();
+        let keyword = search(&snapshot, "g a", Category::All);
+        assert_eq!(keyword.len(), ALL_LIMIT);
+        assert_eq!(keyword[0].kind, ResultKind::WebSearch);
+        let plain = search(&snapshot, "a", Category::All);
+        assert_eq!(plain.len(), ALL_LIMIT);
+        assert_eq!(plain[ALL_LIMIT - 1].kind, ResultKind::WebSearch);
+    }
 
     #[test]
     fn top_keeps_the_best_hits_in_order() {
