@@ -71,9 +71,12 @@ const LANGUAGES: ReadonlyArray<{ value: EmojiLanguage; label: string }> = [
  */
 type Change = Partial<Values> | ((current: Values) => Partial<Values>);
 
+const fieldsOf = (values: Values, change: Change): Partial<Values> =>
+  typeof change === "function" ? change(values) : change;
+
 const apply = (values: Values, change: Change): Values => ({
   ...values,
-  ...(typeof change === "function" ? change(values) : change),
+  ...fieldsOf(values, change),
 });
 
 export function Settings() {
@@ -123,7 +126,7 @@ export function Settings() {
     const done = saving.then(async () => {
       const base = saved();
       try {
-        if (base) setSaved(await ipc.updateSettings(apply(base, change)));
+        if (base) setSaved(await ipc.updateSettings(fieldsOf(base, change)));
         setError(undefined);
         return undefined;
       } catch (failure) {

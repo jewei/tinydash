@@ -27,7 +27,7 @@ describe("Settings", () => {
     );
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
     expect(backend.called("update_settings")[0]?.args).toEqual({
-      settings: { ...testSettings, hideOnBlur: false },
+      changes: { hideOnBlur: false },
     });
   });
 
@@ -40,7 +40,7 @@ describe("Settings", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Open at login" }));
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toEqual({
-      settings: { ...testSettings, hideOnBlur: false, launchAtLogin: true },
+      changes: { launchAtLogin: true },
     });
   });
 
@@ -265,12 +265,13 @@ describe("Settings", () => {
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
       update_settings: async (args) => {
-        const folders = (args.settings as typeof testSettings).fileSearchFolders;
+        const folders = ({ ...testSettings, ...(args.changes as object) } as typeof testSettings)
+          .fileSearchFolders;
         if (folders.includes("Projects")) {
           await refused;
           throw "“Projects” is not a full folder path.";
         }
-        return args.settings;
+        return { ...testSettings, ...(args.changes as object) };
       },
     });
     render(() => <Settings />);
@@ -286,7 +287,7 @@ describe("Settings", () => {
     );
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toMatchObject({
-      settings: { fileSearchFolders: ["~/Documents", "~/Downloads"] },
+      changes: { fileSearchFolders: ["~/Documents", "~/Downloads"] },
     });
   });
 
@@ -313,7 +314,7 @@ describe("Settings", () => {
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
       update_settings: async (args) => {
-        const settings = args.settings as typeof testSettings;
+        const settings = { ...testSettings, ...(args.changes as object) } as typeof testSettings;
         if (backend.called("update_settings").length === 1) {
           await refused;
           throw "Could not save settings.";
@@ -328,7 +329,7 @@ describe("Settings", () => {
     refuse();
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toMatchObject({
-      settings: { emojiLanguages: ["ms"] },
+      changes: { emojiLanguages: ["ms"] },
     });
   });
 
@@ -337,7 +338,7 @@ describe("Settings", () => {
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
       update_settings: async (args) => {
-        const settings = args.settings as typeof testSettings;
+        const settings = { ...testSettings, ...(args.changes as object) } as typeof testSettings;
         if (settings.fileSearchFolders.includes("Projects")) {
           await refused;
           throw "“Projects” is not a full folder path.";
@@ -363,7 +364,7 @@ describe("Settings", () => {
     refuse();
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toMatchObject({
-      settings: { fileSearchFolders: [...testSettings.fileSearchFolders, "~/Work"] },
+      changes: { fileSearchFolders: [...testSettings.fileSearchFolders, "~/Work"] },
     });
   });
 
@@ -552,7 +553,7 @@ describe("Settings", () => {
     fireEvent.keyDown(recorder, { key: " ", code: "Space", altKey: true });
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
     expect(backend.called("update_settings")[0]?.args).toMatchObject({
-      settings: { shortcut: "Alt+Space" },
+      changes: { shortcut: "Alt+Space" },
     });
     await waitFor(() =>
       expect(backend.called("pause_shortcut").map((call) => call.args.paused)).toEqual([
@@ -593,7 +594,7 @@ describe("Settings", () => {
       update_settings: (args) => {
         calls += 1;
         if (calls === 1) throw "Could not change open at login.";
-        return args.settings;
+        return { ...testSettings, ...(args.changes as object) };
       },
     });
     render(() => <Settings />);
@@ -601,7 +602,7 @@ describe("Settings", () => {
     fireEvent.click(screen.getByRole("switch", { name: "Hide when another app is focused" }));
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toEqual({
-      settings: { ...testSettings, hideOnBlur: false },
+      changes: { hideOnBlur: false },
     });
   });
 
@@ -619,7 +620,7 @@ describe("Settings", () => {
     fireEvent.blur(field);
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
     expect(backend.called("update_settings")[0]?.args).toMatchObject({
-      settings: { clipboardHistoryLimit: 1000 },
+      changes: { clipboardHistoryLimit: 1000 },
     });
   });
 

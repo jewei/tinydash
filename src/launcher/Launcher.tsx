@@ -186,11 +186,9 @@ export function Launcher() {
     launcher.category() === "clipboard" && settings()?.clipboardHistoryEnabled === false;
 
   const enableClipboard = () => {
-    const current = settings();
-    if (!current) return;
     setEnableError(undefined);
     ipc
-      .updateSettings({ ...current, clipboardHistoryEnabled: true })
+      .updateSettings({ clipboardHistoryEnabled: true })
       .then(applySettings)
       .catch((error) => setEnableError(ipc.message(error)));
   };

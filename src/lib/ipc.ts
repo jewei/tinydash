@@ -31,8 +31,9 @@ export const hideLauncher = () => invoke<void>("hide_launcher");
 export const getSettings = () => invoke<Settings>("get_settings");
 
 /** Resolves to the saved, normalized settings; rejects with the reason when nothing was saved. */
-export const updateSettings = (settings: Settings) =>
-  invoke<Settings>("update_settings", { settings });
+/** Saves only the given fields, on top of what the backend holds. */
+export const updateSettings = (changes: Partial<Settings>) =>
+  invoke<Settings>("update_settings", { changes });
 
 export const pauseShortcut = (paused: boolean) => invoke<void>("pause_shortcut", { paused });
 

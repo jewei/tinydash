@@ -127,18 +127,22 @@ pub fn get_settings(state: tauri::State<State>) -> Settings {
     Settings::clone(&state.settings.get())
 }
 
-/// Validate, apply, and save new settings. Either everything applies, or
-/// the previous settings stay in effect and the error explains why.
+/// Validate, apply, and save changed settings, given as the fields that
+/// changed. Either everything applies, or the previous settings stay in
+/// effect and the error explains why.
 #[tauri::command]
-pub async fn update_settings(app: AppHandle, settings: Settings) -> Result<Settings> {
+pub async fn update_settings(
+    app: AppHandle,
+    changes: serde_json::Map<String, serde_json::Value>,
+) -> Result<Settings> {
     blocking(move || {
         let state = app.state::<State>();
         let _one_change_at_a_time = state
             .settings_change
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let new = settings.normalized();
         let old = state.settings.get();
+        let new = old.with_changes(changes)?.normalized();
         // Checked only when the list changes, so an entry from a hand-edited
         // file does not block other settings.
         if new.file_search_folders != old.file_search_folders

@@ -1,10 +1,11 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use ts_rs::TS;
 
 use crate::{
-    error::Result,
+    error::{Error, Result},
     features::{emoji::EmojiLanguage, web::SearchEngine},
 };
 
@@ -77,6 +78,23 @@ impl Default for Settings {
 }
 
 impl Settings {
+    /// These settings with `changes`, camelCase fields as the windows send
+    /// them, on top. Each window sends only what it changed, so two windows
+    /// that save at once do not undo each other.
+    pub fn with_changes(&self, changes: Map<String, Value>) -> Result<Self> {
+        let invalid = |error: serde_json::Error| Error::msg(format!("Invalid settings: {error}"));
+        let Value::Object(mut fields) = serde_json::to_value(self).map_err(invalid)? else {
+            return Err(Error::msg("Invalid settings."));
+        };
+        for (name, value) in changes {
+            if !fields.contains_key(&name) {
+                return Err(Error::msg(format!("Unknown setting “{name}”.")));
+            }
+            fields.insert(name, value);
+        }
+        serde_json::from_value(Value::Object(fields)).map_err(invalid)
+    }
+
     /// Clamp numbers, drop blank or duplicate list entries, and cut lists
     /// to their limit.
     pub fn normalized(mut self) -> Self {
@@ -175,6 +193,30 @@ pub fn save(dir: &Path, settings: &Settings) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn changes_replace_only_their_fields() {
+        let old = Settings {
+            launch_at_login: true,
+            ..Settings::default()
+        };
+        let changes = serde_json::json!({ "clipboardHistoryEnabled": false });
+        let Value::Object(changes) = changes else {
+            unreachable!()
+        };
+        let new = old.with_changes(changes).unwrap();
+        assert!(!new.clipboard_history_enabled);
+        assert!(new.launch_at_login);
+
+        let Value::Object(unknown) = serde_json::json!({ "appearance": "sage" }) else {
+            unreachable!()
+        };
+        assert!(old.with_changes(unknown).is_err());
+        let Value::Object(wrong) = serde_json::json!({ "hideOnBlur": "no" }) else {
+            unreachable!()
+        };
+        assert!(old.with_changes(wrong).is_err());
+    }
 
     #[test]
     fn missing_fields_take_defaults_and_unknown_fields_are_ignored() {
