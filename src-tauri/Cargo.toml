@@ -53,7 +53,7 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graph
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Tauri 2 links GTK 0.18; these bindings must match it.
-gio = "0.18.4"
+gio = "0.22.10"
 gtk = "0.18.2"
 
 [profile.release]
