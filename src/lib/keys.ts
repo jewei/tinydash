@@ -1,6 +1,14 @@
 // Keyboard helpers shared by both windows.
 
+import type { Platform } from "../generated/Platform";
+
 export const IS_MAC = /Mac/.test(navigator.userAgent);
+
+const PLATFORM: Platform = IS_MAC
+  ? "macos"
+  : /Windows/.test(navigator.userAgent)
+    ? "windows"
+    : "linux";
 
 /**
  * Command on macOS, Control elsewhere: the key that app shortcuts use. No
@@ -42,14 +50,11 @@ const NAMED_KEYS: Record<string, string> = {
  * A shortcut needs Control, Alt, or Command/Super, except function keys and
  * Shift+Space, which do not interfere with typing.
  */
-export function acceleratorFromEvent(event: KeyboardEvent, mac = IS_MAC): string | null {
+export function acceleratorFromEvent(event: KeyboardEvent, platform = PLATFORM): string | null {
   if (MODIFIER_KEYS.has(event.key)) return null;
-  const key = mac ? keyByPosition(event.code) : keyByLayout(event);
+  const key = platform === "macos" ? keyByPosition(event.code) : keyByLayout(event);
   if (!key) return null;
-  // Windows treats Control+Alt as AltGr, so a shortcut on a key whose AltGr
-  // character differs (German Control+Alt+7 types "{") would block typing it.
-  const altGr = !mac && event.ctrlKey && event.altKey && key.length === 1;
-  if (altGr && event.key.toUpperCase() !== key) return null;
+  if (platform === "windows" && blocksAltGr(event, key)) return null;
   const functionKey = /^F\d{1,2}$/.test(key);
   const strongModifier = event.ctrlKey || event.altKey || event.metaKey;
   if (!strongModifier && !functionKey && !(event.shiftKey && key === "Space")) return null;
@@ -60,6 +65,19 @@ export function acceleratorFromEvent(event: KeyboardEvent, mac = IS_MAC): string
     event.metaKey && "Super",
   ].filter((modifier): modifier is string => Boolean(modifier));
   return [...modifiers, key].join("+");
+}
+
+/**
+ * Windows treats Control+Alt as AltGr, so a shortcut on a key with an AltGr
+ * character (German Control+Alt+7 types "{") would block typing it. Without
+ * Shift, such a key types something other than its own letter or digit; a
+ * letter of a non-Latin script is the layout's plain letter, not an AltGr
+ * one. With Shift, Windows has almost no AltGr characters to block.
+ */
+function blocksAltGr(event: KeyboardEvent, key: string): boolean {
+  if (!event.ctrlKey || !event.altKey || event.shiftKey || key.length !== 1) return false;
+  const typed = event.key;
+  return typed.toUpperCase() !== key && !/^(?!\p{Script=Latin})\p{L}$/u.test(typed);
 }
 
 /** macOS reads every key by its position. */
@@ -93,6 +111,9 @@ function keyByLayout(event: KeyboardEvent): string | undefined {
   if (/^Digit\d$/.test(code)) return code.slice(5);
   if (/^[a-z]$/i.test(event.key)) return event.key.toUpperCase();
   if (/^Key[A-Z]$/.test(code)) return /^\p{L}$/u.test(event.key) ? code.slice(3) : undefined;
+  // With Num Lock off, a numpad digit types End or Delete, and Windows
+  // sends that key instead, so the shortcut would not fire.
+  if (code.startsWith("Numpad") && event.key.length !== 1) return undefined;
   return FIXED_KEYS.test(code) ? (NAMED_KEYS[code] ?? code) : undefined;
 }
 
@@ -117,9 +138,6 @@ const MAC_SYMBOLS: Record<string, string> = {
 
 const OTHER_NAMES: Record<string, string> = {
   Control: "Ctrl",
-  Super: "Win",
-  Command: "Win",
-  Cmd: "Win",
   CommandOrControl: "Ctrl",
   CmdOrCtrl: "Ctrl",
   Up: "↑",
@@ -128,13 +146,19 @@ const OTHER_NAMES: Record<string, string> = {
   Right: "→",
 };
 
+const SUPER_NAMES = new Set(["Super", "Command", "Cmd"]);
+
 /** Keys of an accelerator for display, for example `["⌃", "⇧", "Space"]`. */
-export function displayKeys(accelerator: string, mac = IS_MAC): string[] {
-  const names = mac ? MAC_SYMBOLS : OTHER_NAMES;
+export function displayKeys(accelerator: string, platform = PLATFORM): string[] {
+  const names = platform === "macos" ? MAC_SYMBOLS : OTHER_NAMES;
+  // Windows calls the Super key Win; Linux desktops call it Super.
+  const superName = platform === "windows" ? "Win" : "Super";
   return accelerator
     .split("+")
     .filter(Boolean)
-    .map((part) => names[part] ?? part);
+    .map((part) =>
+      platform !== "macos" && SUPER_NAMES.has(part) ? superName : (names[part] ?? part),
+    );
 }
 
 /** The app-shortcut modifier as shown to the user. */
