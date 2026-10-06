@@ -115,6 +115,27 @@ pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
     None
 }
 
+/// Calls KDE's session manager directly: its command-line client is
+/// `qdbus`, `qdbus6`, or `qdbus-qt6` depending on the distribution.
+fn kde_log_out() -> Result<()> {
+    let failed = |error: gio::glib::Error| Error::msg(format!("Could not log out: {error}"));
+    gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>)
+        .map_err(failed)?
+        .call_sync(
+            Some("org.kde.Shutdown"),
+            "/Shutdown",
+            "org.kde.Shutdown",
+            "logout",
+            None,
+            None,
+            gio::DBusCallFlags::NONE,
+            -1,
+            None::<&gio::Cancellable>,
+        )
+        .map(drop)
+        .map_err(failed)
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")
         .unwrap_or_default()
@@ -129,9 +150,7 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         SystemCommand::LogOut if desktop.contains("gnome") => {
             run("gnome-session-quit", &["--logout", "--no-prompt"])
         }
-        SystemCommand::LogOut if desktop.contains("kde") => {
-            run("qdbus", &["org.kde.Shutdown", "/Shutdown", "logout"])
-        }
+        SystemCommand::LogOut if desktop.contains("kde") => kde_log_out(),
         SystemCommand::LogOut if desktop.contains("xfce") => {
             run("xfce4-session-logout", &["--logout"])
         }
