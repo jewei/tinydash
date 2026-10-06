@@ -61,6 +61,8 @@ describe("acceleratorFromEvent", () => {
     // No AltGr to block: Shift held, a Russian letter, or Linux.
     const shifted = press("Digit1", "!", { ctrlKey: true, altKey: true, shiftKey: true });
     expect(acceleratorFromEvent(shifted, "windows")).toBe("Control+Alt+Shift+1");
+    const germanMicro = press("KeyM", "µ", { ctrlKey: true, altKey: true });
+    expect(acceleratorFromEvent(germanMicro, "windows")).toBeNull();
     const russian = press("KeyK", "л", { ctrlKey: true, altKey: true });
     expect(acceleratorFromEvent(russian, "windows")).toBe("Control+Alt+K");
     expect(acceleratorFromEvent(germanBrace, "linux")).toBe("Control+Alt+7");

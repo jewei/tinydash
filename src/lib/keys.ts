@@ -71,13 +71,15 @@ export function acceleratorFromEvent(event: KeyboardEvent, platform = PLATFORM):
  * Windows treats Control+Alt as AltGr, so a shortcut on a key with an AltGr
  * character (German Control+Alt+7 types "{") would block typing it. Without
  * Shift, such a key types something other than its own letter or digit; a
- * letter of a non-Latin script is the layout's plain letter, not an AltGr
- * one. With Shift, Windows has almost no AltGr characters to block.
+ * letter of a script such as Cyrillic or Greek is the layout's plain letter,
+ * not an AltGr one (but "µ", whose script is Common, is AltGr+M in German). With Shift, Windows has almost no AltGr characters to block.
  */
 function blocksAltGr(event: KeyboardEvent, key: string): boolean {
   if (!event.ctrlKey || !event.altKey || event.shiftKey || key.length !== 1) return false;
   const typed = event.key;
-  return typed.toUpperCase() !== key && !/^(?!\p{Script=Latin})\p{L}$/u.test(typed);
+  return (
+    typed.toUpperCase() !== key && !/^(?!\p{Script=Latin}|\p{Script=Common})\p{L}$/u.test(typed)
+  );
 }
 
 /** macOS reads every key by its position. */
