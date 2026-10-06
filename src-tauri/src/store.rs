@@ -117,11 +117,13 @@ impl Store {
     }
 
     /// Save one result's usage, keeping only the most recently used rows.
+    /// Two uses at once may save in either order, so a row never goes back.
     pub fn record_use(&self, id: &str, used: Use) -> Result<()> {
         self.with(|db| {
             db.execute(
                 "INSERT INTO usage (id, count, last_used) VALUES (?1, ?2, ?3)
-                 ON CONFLICT (id) DO UPDATE SET count = ?2, last_used = ?3",
+                 ON CONFLICT (id) DO UPDATE
+                 SET count = max(count, ?2), last_used = max(last_used, ?3)",
                 params![id, used.count, used.last_used],
             )?;
             db.execute(
@@ -453,6 +455,11 @@ mod tests {
                 },
             )
             .unwrap();
+        let older = Use {
+            count: 2,
+            last_used: 8,
+        };
+        store.record_use("app:/a", older).unwrap();
         assert_eq!(store.usage().unwrap().bonus("app:/a", 9), 575);
         store.set_pinned("b", true).unwrap();
         store.set_pinned("a", true).unwrap();
