@@ -234,9 +234,14 @@ describe("Launcher", () => {
     press("k", { ctrlKey: true });
     const filter = await screen.findByRole("combobox", { name: "Search actions" });
     fireEvent.input(filter, { target: { value: "zzz" } });
-    expect((await screen.findByRole("status")).textContent).toBe("No matching actions");
+    const empty = await screen.findByRole("status");
+    expect(empty.textContent).toBe("No matching actions");
     const menu = screen.getByRole("dialog", { name: "Actions" });
     expect(within(menu).getByRole("listbox").children).toHaveLength(0);
+    // A click on the text keeps focus in the filter, which keeps the menu open;
+    // a click in the filter still places the cursor.
+    expect(fireEvent.mouseDown(empty)).toBe(false);
+    expect(fireEvent.mouseDown(filter)).toBe(true);
   });
 
   it("keeps the action menu as it opened, and closes it on a tab click", async () => {

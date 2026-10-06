@@ -59,6 +59,11 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
       aria-label="Actions"
       onKeyDown={onKeyDown}
       onFocusOut={onFocusOut}
+      // A click inside the menu, outside the filter, must not move focus out
+      // of the filter, which would close the menu before an item is chosen.
+      onMouseDown={(event) => {
+        if (event.target !== input) event.preventDefault();
+      }}
     >
       <input
         ref={input}
@@ -77,14 +82,7 @@ export function ActionMenu(props: { items: MenuItem[]; onClose: () => void }) {
         autocomplete="off"
         spellcheck={false}
       />
-      {/* Clicking an item must not move focus out of the filter first. */}
-      <ul
-        id="menu-items"
-        class="menu-items"
-        role="listbox"
-        aria-label="Actions"
-        onMouseDown={(event) => event.preventDefault()}
-      >
+      <ul id="menu-items" class="menu-items" role="listbox" aria-label="Actions">
         <For each={visible()}>
           {(item, index) => (
             <li
