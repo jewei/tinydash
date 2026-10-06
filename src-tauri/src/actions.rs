@@ -145,7 +145,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             let id = search::resolve(&snapshot, &Context::none(), &id)
                 .ok_or_else(|| Error::msg("This item no longer exists."))?
                 .id;
-            if let Some(oldest) = pin_to_drop(&snapshot, ready)? {
+            if let Some(oldest) = pin_to_drop(&snapshot, &id, ready)? {
                 state.store.set_pinned(&oldest, false)?;
                 state.pins.update(|pins| pins.remove(&oldest));
             }
@@ -190,15 +190,20 @@ fn open_path(path: &Path) -> Result<()> {
     tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| Error::msg(e.to_string()))
 }
 
-/// The pin that must go before another fits, or `None` while there is room.
+/// The pin that must go before `id` fits, or `None` while there is room or
+/// `id` is pinned already.
 /// A pin of a hidden item (a file outside the index, or a clipboard entry
 /// while history is off) waits for its item to return, but it cannot be
 /// unpinned, so it gives up its place when the list is full. That way no
 /// more than `MAX_PINS` pins ever show. Until a source is `ready`, its pins
 /// only look hidden, so they stay.
-fn pin_to_drop(snapshot: &Snapshot, ready: impl Fn(Source) -> bool) -> Result<Option<String>> {
+fn pin_to_drop(
+    snapshot: &Snapshot,
+    id: &str,
+    ready: impl Fn(Source) -> bool,
+) -> Result<Option<String>> {
     let pins = snapshot.pins.ids();
-    if pins.len() < MAX_PINS {
+    if pins.len() < MAX_PINS || snapshot.pins.contains(id) {
         return Ok(None);
     }
     let ctx = Context::none();
@@ -241,7 +246,7 @@ mod tests {
         let drop_with = |pins: Vec<String>, scanned: bool| {
             state.pins.set(Pins::new(pins));
             let ready = |source| scanned || !matches!(source, Source::App | Source::File);
-            pin_to_drop(&state.snapshot(), ready)
+            pin_to_drop(&state.snapshot(), "app:/New.app", ready)
         };
 
         assert_eq!(drop_with(emoji[1..].to_vec(), true).unwrap(), None);
@@ -254,7 +259,13 @@ mod tests {
         );
         // Before the first scan, the file pin may only look hidden.
         assert_eq!(drop_with(pins, false).unwrap().as_deref(), Some("clip:7"));
-        assert!(drop_with(emoji, true).is_err());
+        assert!(drop_with(emoji.clone(), true).is_err());
+        // A second Pin of a pinned item changes nothing.
+        state.pins.set(Pins::new(emoji.clone()));
+        assert_eq!(
+            pin_to_drop(&state.snapshot(), &emoji[5], |_| true).unwrap(),
+            None
+        );
     }
 
     #[test]
