@@ -244,6 +244,38 @@ describe("Launcher", () => {
     expect(fireEvent.mouseDown(filter)).toBe(true);
   });
 
+  it("moves the window from the empty parts of the tab bar and footer", async () => {
+    const { backend, input } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    const tabs = screen.getByRole("navigation", { name: "Categories" });
+    // Cancelled, so focus stays in the search field.
+    expect(fireEvent.mouseDown(tabs)).toBe(false);
+    fireEvent.mouseDown(screen.getByRole("contentinfo"));
+    await waitFor(() => expect(backend.called("drag_launcher")).toHaveLength(2));
+    // Buttons there keep their own job, and only the main button drags.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Apps" }));
+    fireEvent.mouseDown(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.mouseDown(tabs, { button: 2 });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("drag_launcher")).toHaveLength(2);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("centers the launcher from the actions menu", async () => {
+    const { backend, press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByPlaceholderText("Search actions");
+    fireEvent.input(filter, { target: { value: "center" } });
+    fireEvent.keyDown(filter, { key: "Enter" });
+    await waitFor(() =>
+      expect(backend.called("run_action")[0]?.args).toEqual({
+        action: { type: "centerLauncher" },
+        resultId: null,
+      }),
+    );
+  });
+
   it("keeps the action menu as it opened, and closes it on a tab click", async () => {
     let results = [app];
     const { press } = setup(() => results);

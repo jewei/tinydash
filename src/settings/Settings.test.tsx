@@ -130,6 +130,21 @@ describe("Settings", () => {
     expect(screen.queryByText(/is already in the list/)).toBeNull();
   });
 
+  it("centers a launcher that was dragged, and only then", async () => {
+    const backend = fakeBackend({
+      get_settings: () => ({ ...testSettings, launcherPosition: { x: 40, y: 80 } }),
+    });
+    render(() => <Settings />);
+    const center = (await screen.findByRole("button", { name: "Center" })) as HTMLButtonElement;
+    expect(screen.getByText("Opens where you last dragged it.")).toBeTruthy();
+    fireEvent.click(center);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({
+      changes: { launcherPosition: null },
+    });
+    await waitFor(() => expect(center.disabled).toBe(true));
+  });
+
   it("describes each setting to screen readers", async () => {
     fakeBackend();
     render(() => <Settings />);

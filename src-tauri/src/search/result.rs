@@ -174,5 +174,7 @@ pub enum Action {
     /// Rescan apps and files, and download exchange rates now when they are on.
     Refresh,
     OpenSettings,
+    /// Forget where the launcher was dragged, and center it.
+    CenterLauncher,
     Quit,
 }
