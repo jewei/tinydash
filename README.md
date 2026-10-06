@@ -10,7 +10,7 @@ A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut
 
 ## Install
 
-Download the latest build from [Releases](https://github.com/jewei/tinydash/releases). Builds are not code-signed. On macOS, the first time you open TinyDash, macOS blocks it: open System Settings > Privacy & Security and choose Open Anyway.
+Download the latest build from [Releases](https://github.com/jewei/tinydash/releases). The macOS app is signed with a Developer ID and notarized by Apple. The Windows and Linux builds are not signed: Windows SmartScreen may ask you to confirm.
 
 Press **Control+Shift+Space** to open TinyDash. See [all features and shortcuts](docs/features.md).
 
