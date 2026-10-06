@@ -33,7 +33,12 @@ export function ResultList(props: {
             class="result"
             role="option"
             aria-selected={index() === props.selectedIndex}
-            onMouseMove={() => index() !== props.selectedIndex && props.onSelect(index())}
+            onMouseMove={(event) => {
+              // A list that scrolls under a still pointer also sends a move,
+              // with no movement; only a real move selects the row.
+              const moved = event.movementX !== 0 || event.movementY !== 0;
+              if (moved && index() !== props.selectedIndex) props.onSelect(index());
+            }}
             onClick={() => props.onRun(index())}
           >
             <ResultIcon icon={result.icon} size={32} fallback={FALLBACK_GLYPHS[result.kind]} />

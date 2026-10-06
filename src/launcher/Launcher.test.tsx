@@ -127,6 +127,16 @@ describe("Launcher", () => {
     expect((input as HTMLInputElement).value).toBe("");
   });
 
+  it("selects a row when the pointer moves, not when the list scrolls under it", async () => {
+    const other = { ...app, id: "app:/Applications/Notes.app", title: "Notes" };
+    setup(() => [app, other]);
+    const notes = await screen.findByRole("option", { name: /Notes/ });
+    fireEvent.mouseMove(notes, { movementX: 0, movementY: 0 });
+    expect(notes.getAttribute("aria-selected")).toBe("false");
+    fireEvent.mouseMove(notes, { movementX: 2, movementY: 0 });
+    expect(notes.getAttribute("aria-selected")).toBe("true");
+  });
+
   it("keeps the selection when results refresh", async () => {
     const other = { ...app, id: "app:/Applications/Notes.app", title: "Notes" };
     const { press } = setup(() => [app, other]);
