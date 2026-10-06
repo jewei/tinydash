@@ -48,6 +48,14 @@ describe("acceleratorFromEvent", () => {
     expect(acceleratorFromEvent(press("NumLock", "NumLock", { ctrlKey: true }), false)).toBeNull();
     const mediaPause = press("MediaPause", "MediaPause", { ctrlKey: true });
     expect(acceleratorFromEvent(mediaPause, false)).toBeNull();
+    // Windows types AltGr characters with Control+Alt.
+    const germanBrace = press("Digit7", "{", { ctrlKey: true, altKey: true });
+    expect(acceleratorFromEvent(germanBrace, false)).toBeNull();
+    expect(
+      acceleratorFromEvent(press("KeyS", "ś", { ctrlKey: true, altKey: true }), false),
+    ).toBeNull();
+    const plain = press("KeyK", "k", { ctrlKey: true, altKey: true });
+    expect(acceleratorFromEvent(plain, false)).toBe("Control+Alt+K");
     // Windows turns Control+Pause into Break.
     expect(acceleratorFromEvent(press("Pause", "Pause", { ctrlKey: true }), false)).toBeNull();
     expect(acceleratorFromEvent(press("F24", "F24"), false)).toBe("F24");

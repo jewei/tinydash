@@ -46,6 +46,10 @@ export function acceleratorFromEvent(event: KeyboardEvent, mac = IS_MAC): string
   if (MODIFIER_KEYS.has(event.key)) return null;
   const key = mac ? keyByPosition(event.code) : keyByLayout(event);
   if (!key) return null;
+  // Windows treats Control+Alt as AltGr, so a shortcut on a key whose AltGr
+  // character differs (German Control+Alt+7 types "{") would block typing it.
+  const altGr = !mac && event.ctrlKey && event.altKey && key.length === 1;
+  if (altGr && event.key.toUpperCase() !== key) return null;
   const functionKey = /^F\d{1,2}$/.test(key);
   const strongModifier = event.ctrlKey || event.altKey || event.metaKey;
   if (!strongModifier && !functionKey && !(event.shiftKey && key === "Space")) return null;
