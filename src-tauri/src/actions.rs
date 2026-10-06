@@ -128,8 +128,12 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             window::hide(app)?;
         }
         Action::System { command } => {
+            // Hide first: Lock and Sleep must not leave the launcher on screen.
             window::hide(app)?;
-            platform::run_system_command(command)?;
+            if let Err(error) = platform::run_system_command(command) {
+                window::show_again(app)?;
+                return Err(error);
+            }
         }
         Action::Pin { id } => {
             let _limit = state

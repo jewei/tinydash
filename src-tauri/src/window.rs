@@ -38,6 +38,15 @@ pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
     Ok(())
 }
 
+/// Show the launcher again as it was, without a reset, so the error of an
+/// action that hid it shows where the user ran it.
+pub fn show_again(app: &AppHandle) -> Result<()> {
+    let window = launcher(app)?;
+    window.show()?;
+    window.set_focus()?;
+    Ok(())
+}
+
 /// Hide without moving focus, for example when another app was clicked.
 pub fn hide(app: &AppHandle) -> Result<()> {
     launcher(app)?.hide()?;
