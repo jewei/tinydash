@@ -53,6 +53,9 @@ pub struct State {
     /// Held while a reload reads the database and swaps in the result, so an
     /// older read never replaces a newer one.
     reloading: Mutex<()>,
+    /// Held while a change checks a limit and then writes, such as a pin or
+    /// a new library item, so two quick changes never both pass the check.
+    pub limited_change: Mutex<()>,
     /// Problems found at startup, shown once in the launcher.
     pub warnings: Mutex<Vec<String>>,
     /// The category of the latest show. A launcher page that loads after the
@@ -101,6 +104,7 @@ impl State {
             dirs,
             settings_change: Mutex::new(()),
             reloading: Mutex::new(()),
+            limited_change: Mutex::new(()),
             warnings: Mutex::new(warnings),
             shown_category: Mutex::new(None),
         }

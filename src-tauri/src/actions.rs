@@ -132,6 +132,10 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             platform::run_system_command(command)?;
         }
         Action::Pin { id } => {
+            let _limit = state
+                .limited_change
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             // Only items that exist can be pinned, and the pin stores the
             // item's own ID, so a pin never widens what Open and Reveal accept.
             // Read readiness first: a scan that finishes after the snapshot

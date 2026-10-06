@@ -226,6 +226,10 @@ pub fn library_items(state: tauri::State<State>) -> Vec<LibraryItem> {
 pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<LibraryItem> {
     blocking(move || {
         let state = app.state::<State>();
+        let _limit = state
+            .limited_change
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         if item.id.is_none() && state.library.get().items().len() >= MAX_LIBRARY_ITEMS {
             return Err(Error::msg(format!(
                 "The library holds up to {MAX_LIBRARY_ITEMS} snippets and quicklinks."
