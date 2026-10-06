@@ -12,6 +12,7 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The
 | Run all tests                           | `bun run test`                                           |
 | Fix formatting                          | `bun run fix`                                            |
 | **Before every commit or PR**           | `bun run verify`                                         |
+| Release (builds, signs, publishes)      | `bun run release 0.2.1` (see `docs/development.md`)      |
 | One Rust test                           | `cargo test --manifest-path src-tauri/Cargo.toml <name>` |
 | One frontend test file                  | `bunx vp test src/launcher/keymap.test.ts`               |
 
@@ -45,7 +46,8 @@ src/
   generated/           TypeScript types written by ts-rs. Never edit by hand.
   test/backend.ts      Fake backend for component tests.
 docs/                  architecture.md, features.md, development.md
-scripts/               emoji-data.ts (regenerates CLDR data), bindings.ts (IPC type check)
+scripts/               emoji-data.ts (regenerates CLDR data), bindings.ts (IPC type check),
+                       release.ts and set-version.ts (see docs/development.md)
 ```
 
 Keep private notes, plans, and evidence in `.local/` (ignored by git).
