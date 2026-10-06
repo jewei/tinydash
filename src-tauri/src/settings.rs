@@ -82,17 +82,22 @@ impl Settings {
     /// them, on top. Each window sends only what it changed, so two windows
     /// that save at once do not undo each other.
     pub fn with_changes(&self, changes: Map<String, Value>) -> Result<Self> {
-        let invalid = |error: serde_json::Error| Error::msg(format!("Invalid settings: {error}"));
-        let Value::Object(mut fields) = serde_json::to_value(self).map_err(invalid)? else {
+        let Ok(Value::Object(mut fields)) = serde_json::to_value(self) else {
             return Err(Error::msg("Invalid settings."));
         };
+        let mut merged = self.clone();
+        // One field at a time, so an error names the setting it is about;
+        // serde's own message does not.
         for (name, value) in changes {
             if !fields.contains_key(&name) {
                 return Err(Error::msg(format!("Unknown setting “{name}”.")));
             }
-            fields.insert(name, value);
+            fields.insert(name.clone(), value);
+            merged = serde_json::from_value(Value::Object(fields.clone())).map_err(|error| {
+                Error::msg(format!("Invalid value for the setting “{name}”: {error}"))
+            })?;
         }
-        serde_json::from_value(Value::Object(fields)).map_err(invalid)
+        Ok(merged)
     }
 
     /// Clamp numbers, drop blank or duplicate list entries, and cut lists
@@ -212,10 +217,12 @@ mod tests {
             unreachable!()
         };
         assert!(old.with_changes(unknown).is_err());
-        let Value::Object(wrong) = serde_json::json!({ "hideOnBlur": "no" }) else {
+        let Value::Object(wrong) = serde_json::json!({ "hideOnBlur": false, "theme": "sage" })
+        else {
             unreachable!()
         };
-        assert!(old.with_changes(wrong).is_err());
+        let error = old.with_changes(wrong).unwrap_err().to_string();
+        assert!(error.contains("“theme”"), "{error}");
     }
 
     #[test]
