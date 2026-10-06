@@ -68,12 +68,14 @@ function keyByPosition(code: string): string {
 /**
  * Keys that Windows and X11 register as themselves on every layout. Sign
  * keys are not here: Windows finds them by codes that differ between
- * layouts. Nor are numpad Enter and =, Num Lock, or media keys:
- * global-hotkey registers them as other keys (Num Lock as F1 on X11, Media
- * Pause as Pause on Windows) or not at all.
+ * layouts. Nor are numpad Enter and =, Num Lock, or the play and pause
+ * keys, which global-hotkey registers as other keys (Num Lock as F1 on
+ * X11, Media Pause as Pause on Windows) or not at all. Pause is not here
+ * either: Windows turns Control+Pause into Break, so it would never fire.
+ * Volume and track keys work but control playback, so they are left out.
  */
 const FIXED_KEYS =
-  /^(F([1-9]|1\d|2[0-4])|Space|Enter|Tab|Backspace|Delete|Insert|Home|End|PageUp|PageDown|Arrow(Up|Down|Left|Right)|PrintScreen|ScrollLock|Pause|Numpad(\d|Add|Subtract|Multiply|Divide|Decimal))$/;
+  /^(F([1-9]|1\d|2[0-4])|Space|Enter|Tab|Backspace|Delete|Insert|Home|End|PageUp|PageDown|Arrow(Up|Down|Left|Right)|PrintScreen|ScrollLock|Numpad(\d|Add|Subtract|Multiply|Divide|Decimal))$/;
 
 /**
  * Windows and Linux read a letter by what the layout types (AZERTY's A key

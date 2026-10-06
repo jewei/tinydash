@@ -48,6 +48,8 @@ describe("acceleratorFromEvent", () => {
     expect(acceleratorFromEvent(press("NumLock", "NumLock", { ctrlKey: true }), false)).toBeNull();
     const mediaPause = press("MediaPause", "MediaPause", { ctrlKey: true });
     expect(acceleratorFromEvent(mediaPause, false)).toBeNull();
+    // Windows turns Control+Pause into Break.
+    expect(acceleratorFromEvent(press("Pause", "Pause", { ctrlKey: true }), false)).toBeNull();
     expect(acceleratorFromEvent(press("F24", "F24"), false)).toBe("F24");
     // A layout that types another script falls back to the key position.
     expect(acceleratorFromEvent(press("KeyQ", "й", { ctrlKey: true }), false)).toBe("Control+Q");
