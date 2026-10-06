@@ -444,8 +444,9 @@ describe("Launcher", () => {
       }),
     });
     fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
-    await screen.findByText("Clipboard history is off");
-    press("Enter");
+    const button = await screen.findByRole("button", { name: "Turn On Clipboard History" });
+    // Cancelled, so a focused button does not click and save again.
+    expect(fireEvent.keyDown(button, { key: "Enter" })).toBe(false);
     press("Enter", { repeat: true });
     press("Enter", { repeat: true });
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));

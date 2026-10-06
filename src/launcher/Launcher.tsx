@@ -114,6 +114,8 @@ export function Launcher() {
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.defaultPrevented || isComposing(event) || menu() || launcher.pending()) return;
     if (clipboardOff() && event.key === "Enter") {
+      // A focused Turn On button would also click on Enter, and on each repeat.
+      event.preventDefault();
       if (!event.repeat) enableClipboard();
       return;
     }
