@@ -70,7 +70,7 @@ Automated tests do not cover the OS effects. Check these by hand on a real deskt
 
 - Pin exact versions in `package.json`. `bun install --frozen-lockfile` must pass.
 - Vite+ pins `vite` and `vitest` through `overrides`, and Dependabot ignores all three. To upgrade, set the new `vite-plus` version in `package.json`, run `bun install`, then `bunx vp migrate`; on a project already on Vite+ it only re-pins `vite` and `vitest` to match.
-- Dependabot updates the `tauri` crate and the `@tauri-apps` packages only to new patch versions, because the Tauri CLI refuses to build when their minor versions differ. To move to a new minor version, change `tauri` in `src-tauri/Cargo.toml` and both `@tauri-apps` packages in `package.json` in one commit, then run `bun install`, `cargo update --manifest-path src-tauri/Cargo.toml -p tauri`, and `bun run verify`.
+- Dependabot updates the `tauri*` crates and the `@tauri-apps` packages only to new patch versions, because the Tauri CLI refuses to build when the `tauri` crate and the packages have different minor versions, and new plugins need the newest `tauri`. To move to a new minor version, change `tauri`, `tauri-build`, and the `tauri-plugin-*` crates in `src-tauri/Cargo.toml` and both `@tauri-apps` packages in `package.json` in one commit, then run `bun install`, `cargo check --manifest-path src-tauri/Cargo.toml` (which updates `Cargo.lock`), and `bun run verify`.
 - Rust crates follow Cargo semver; commit `Cargo.lock`. Change the Rust version in `rust-toolchain.toml` and fix new Clippy findings in the same PR.
 
 ## Bundled data

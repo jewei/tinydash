@@ -6,9 +6,10 @@ updates:
     groups:
       rust: { patterns: ["*"] }
     # The Tauri CLI refuses a tauri crate and @tauri-apps packages of different
-    # minor versions, and Dependabot cannot update both in one PR.
+    # minor versions, and Dependabot cannot update both in one PR. Each plugin
+    # release needs the newest tauri, so the plugins wait too.
     ignore:
-      - dependency-name: tauri
+      - dependency-name: "tauri*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: bun
     directory: /
