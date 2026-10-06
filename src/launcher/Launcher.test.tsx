@@ -167,7 +167,7 @@ describe("Launcher", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
     fireEvent.click(await screen.findByRole("button", { name: "Turn On Clipboard History" }));
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
-    expect(backend.called("update_settings")[0]?.args).toMatchObject({
+    expect(backend.called("update_settings")[0]?.args).toEqual({
       changes: { clipboardHistoryEnabled: true },
     });
   });

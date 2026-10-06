@@ -30,8 +30,10 @@ export const hideLauncher = () => invoke<void>("hide_launcher");
 
 export const getSettings = () => invoke<Settings>("get_settings");
 
-/** Resolves to the saved, normalized settings; rejects with the reason when nothing was saved. */
-/** Saves only the given fields, on top of what the backend holds. */
+/**
+ * Saves only the given fields, on top of what the backend holds. Resolves to
+ * the saved, normalized settings; rejects with the reason when nothing was saved.
+ */
 export const updateSettings = (changes: Partial<Settings>) =>
   invoke<Settings>("update_settings", { changes });
 

@@ -34,14 +34,15 @@ describe("Settings", () => {
   it("keeps quick changes in order", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
-    fireEvent.click(
-      await screen.findByRole("switch", { name: "Hide when another app is focused" }),
-    );
+    const hide = await screen.findByRole("switch", { name: "Hide when another app is focused" });
+    fireEvent.click(hide);
     fireEvent.click(screen.getByRole("switch", { name: "Open at login" }));
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
     expect(backend.called("update_settings")[1]?.args).toEqual({
       changes: { launchAtLogin: true },
     });
+    // The second reply holds the first change too.
+    await waitFor(() => expect((hide as HTMLInputElement).checked).toBe(false));
   });
 
   it("shows why a change failed and restores the saved value", async () => {
@@ -265,13 +266,12 @@ describe("Settings", () => {
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
       update_settings: async (args) => {
-        const folders = ({ ...testSettings, ...(args.changes as object) } as typeof testSettings)
-          .fileSearchFolders;
-        if (folders.includes("Projects")) {
+        const { fileSearchFolders } = args.changes as Partial<typeof testSettings>;
+        if (fileSearchFolders?.includes("Projects")) {
           await refused;
           throw "“Projects” is not a full folder path.";
         }
-        return { ...testSettings, ...(args.changes as object) };
+        return backend.save(args.changes);
       },
     });
     render(() => <Settings />);
@@ -314,12 +314,11 @@ describe("Settings", () => {
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
       update_settings: async (args) => {
-        const settings = { ...testSettings, ...(args.changes as object) } as typeof testSettings;
         if (backend.called("update_settings").length === 1) {
           await refused;
           throw "Could not save settings.";
         }
-        return settings;
+        return backend.save(args.changes);
       },
     });
     render(() => <Settings />);
@@ -338,12 +337,12 @@ describe("Settings", () => {
     const refused = new Promise<void>((resolve) => (refuse = resolve));
     const backend = fakeBackend({
       update_settings: async (args) => {
-        const settings = { ...testSettings, ...(args.changes as object) } as typeof testSettings;
-        if (settings.fileSearchFolders.includes("Projects")) {
+        const { fileSearchFolders } = args.changes as Partial<typeof testSettings>;
+        if (fileSearchFolders?.includes("Projects")) {
           await refused;
           throw "“Projects” is not a full folder path.";
         }
-        return settings;
+        return backend.save(args.changes);
       },
     });
     render(() => <Settings />);
@@ -594,7 +593,7 @@ describe("Settings", () => {
       update_settings: (args) => {
         calls += 1;
         if (calls === 1) throw "Could not change open at login.";
-        return { ...testSettings, ...(args.changes as object) };
+        return backend.save(args.changes);
       },
     });
     render(() => <Settings />);

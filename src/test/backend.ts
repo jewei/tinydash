@@ -65,9 +65,12 @@ type Handler = (args: Record<string, unknown>) => unknown;
 /** Install the fake backend. `handlers` override the default replies. */
 export function fakeBackend(handlers: Record<string, Handler> = {}) {
   const calls: Call[] = [];
+  // Like the backend, each save merges onto what earlier saves left.
+  let settings = testSettings;
+  const save = (changes: unknown) => (settings = { ...settings, ...(changes as object) });
   const defaults: Record<string, Handler> = {
     launcher_init: () => ({
-      settings: testSettings,
+      settings,
       platform: "macos",
       warnings: [],
       category: null,
@@ -76,8 +79,8 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     run_action: () => null,
     preview: () => null,
     hide_launcher: () => null,
-    get_settings: () => testSettings,
-    update_settings: (args) => ({ ...testSettings, ...(args.changes as object) }),
+    get_settings: () => settings,
+    update_settings: (args) => save(args.changes),
     pause_shortcut: () => null,
     library_items: () => [],
     save_library_item: (args) => ({ ...(args.item as object), id: 1 }),
@@ -102,5 +105,7 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
   );
   return {
     called: (command: string) => calls.filter((call) => call.command === command),
+    /** Merges `changes` onto the stored settings, as `update_settings` does. */
+    save,
   };
 }
