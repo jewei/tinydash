@@ -145,7 +145,7 @@ pub async fn update_settings(app: AppHandle, settings: Settings) -> Result<Setti
             && let Some(folder) = new.relative_folder(&state.dirs.home)
         {
             return Err(Error::msg(format!(
-                "“{folder}” is not a full folder path. Start it with ~ for your home folder, such as ~/{folder}."
+                "“{folder}” is not a full folder path. Enter the whole path, or start it with ~ for your home folder, such as ~/Projects."
             )));
         }
         let applied = apply_to_system(&app, &old, &new)
