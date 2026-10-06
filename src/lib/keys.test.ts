@@ -33,6 +33,14 @@ describe("acceleratorFromEvent", () => {
     const germanShiftComma = press("Comma", ";", { ctrlKey: true, shiftKey: true });
     expect(acceleratorFromEvent(germanShiftComma, "windows")).toBeNull();
     expect(acceleratorFromEvent(germanShiftComma, "macos")).toBe("Control+Shift+Comma");
+    // macOS: the ISO key left of 1 and the JIS Yen key cannot be registered.
+    expect(
+      acceleratorFromEvent(press("IntlBackslash", "^", { ctrlKey: true }), "macos"),
+    ).toBeNull();
+    expect(acceleratorFromEvent(press("IntlYen", "¥", { ctrlKey: true }), "macos")).toBeNull();
+    expect(acceleratorFromEvent(press("NumpadEnter", "Enter", { ctrlKey: true }), "macos")).toBe(
+      "Control+NumpadEnter",
+    );
     // Signs whose Windows key differs by layout are not recorded there.
     expect(acceleratorFromEvent(press("Semicolon", ";", { ctrlKey: true }), "windows")).toBeNull();
     // Numpad keys stay numpad keys.

@@ -82,11 +82,20 @@ function blocksAltGr(event: KeyboardEvent, key: string): boolean {
   );
 }
 
-/** macOS reads every key by its position. */
-function keyByPosition(code: string): string {
+/**
+ * Keys besides letters and digits that global-hotkey can register on macOS.
+ * Escape is not here: it cancels recording. Nor are the ISO key left of 1
+ * (IntlBackslash) and the JIS keys, which it cannot register, Caps Lock,
+ * which changes typing, or the volume and media keys, as on Windows and Linux.
+ */
+const MAC_KEYS =
+  /^(F([1-9]|1\d|20)|Space|Enter|Tab|Backspace|Delete|Insert|Home|End|PageUp|PageDown|Arrow(Up|Down|Left|Right)|PrintScreen|Backquote|Backslash|BracketLeft|BracketRight|Comma|Equal|Minus|Period|Quote|Semicolon|Slash|NumLock|Numpad(\d|Add|Subtract|Multiply|Divide|Decimal|Enter|Equal))$/;
+
+/** macOS reads every key by its position, or `undefined` for one it cannot register. */
+function keyByPosition(code: string): string | undefined {
   if (/^Key[A-Z]$/.test(code)) return code.slice(3);
   if (/^Digit\d$/.test(code)) return code.slice(5);
-  return NAMED_KEYS[code] ?? code;
+  return MAC_KEYS.test(code) ? (NAMED_KEYS[code] ?? code) : undefined;
 }
 
 /**
