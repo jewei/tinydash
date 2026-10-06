@@ -100,8 +100,8 @@ impl Matcher {
     }
 }
 
-/// Map a fuzzy score below `MAX_FUZZY`, keeping the order of different
-/// scores, so long matches still rank by quality.
+/// Map a fuzzy score below `MAX_FUZZY`. A higher score never maps lower,
+/// so long matches still rank by quality, though close high scores may tie.
 fn squeeze(score: u32) -> u32 {
     (u64::from(MAX_FUZZY) * u64::from(score) / (u64::from(score) + 500)) as u32
 }
