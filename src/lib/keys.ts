@@ -29,27 +29,6 @@ export const isComposing = (event: KeyboardEvent) => event.isComposing || event.
 // AltGraph is the right Alt key on layouts that have AltGr.
 const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "AltGraph", "Meta"]);
 
-/**
- * Codes of the sign keys. Windows matches signs by key codes that differ
- * between layouts, so on Windows and Linux the recorder ignores them.
- */
-const SIGN_CODES = new Set([
-  "Comma",
-  "Period",
-  "Minus",
-  "Equal",
-  "Semicolon",
-  "Quote",
-  "Slash",
-  "Backslash",
-  "BracketLeft",
-  "BracketRight",
-  "Backquote",
-  "IntlBackslash",
-  "IntlRo",
-  "IntlYen",
-]);
-
 const NAMED_KEYS: Record<string, string> = {
   ArrowUp: "Up",
   ArrowDown: "Down",
@@ -87,26 +66,28 @@ function keyByPosition(code: string): string {
 }
 
 /**
- * Numpad keys that Windows and X11 register as numpad keys: global-hotkey
- * maps Numpad Enter and = to main keys on Windows and to nothing on X11.
+ * Keys that Windows and X11 register as themselves on every layout. Sign
+ * keys are not here: Windows finds them by codes that differ between
+ * layouts. Nor are numpad Enter and =, Num Lock, or media keys:
+ * global-hotkey registers them as other keys (Num Lock as F1 on X11, Media
+ * Pause as Pause on Windows) or not at all.
  */
-const NUMPAD_KEYS = /^Numpad(\d|Add|Subtract|Multiply|Divide|Decimal)$/;
+const FIXED_KEYS =
+  /^(F([1-9]|1\d|2[0-4])|Space|Enter|Tab|Backspace|Delete|Insert|Home|End|PageUp|PageDown|Arrow(Up|Down|Left|Right)|PrintScreen|ScrollLock|Pause|Numpad(\d|Add|Subtract|Multiply|Divide|Decimal))$/;
 
 /**
  * Windows and Linux read a letter by what the layout types (AZERTY's A key
  * is "KeyQ", its M key "Semicolon"), so take the typed Latin letter; a
  * letter of another script is read by its Latin key position. Digits and
- * the numpad keys in `NUMPAD_KEYS` are the same keys everywhere. Signs, on
- * whatever key, give `undefined`: each layout puts them elsewhere.
+ * `FIXED_KEYS` are read by code. Any other key, such as a sign on a letter
+ * key, gives `undefined`.
  */
 function keyByLayout(event: KeyboardEvent): string | undefined {
   const code = event.code;
   if (/^Digit\d$/.test(code)) return code.slice(5);
-  if (code.startsWith("Numpad")) return NUMPAD_KEYS.test(code) ? code : undefined;
   if (/^[a-z]$/i.test(event.key)) return event.key.toUpperCase();
   if (/^Key[A-Z]$/.test(code)) return /^\p{L}$/u.test(event.key) ? code.slice(3) : undefined;
-  if (SIGN_CODES.has(code)) return undefined;
-  return NAMED_KEYS[code] ?? code;
+  return FIXED_KEYS.test(code) ? (NAMED_KEYS[code] ?? code) : undefined;
 }
 
 const MAC_SYMBOLS: Record<string, string> = {
