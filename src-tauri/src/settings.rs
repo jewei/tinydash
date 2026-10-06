@@ -1,512 +1,198 @@
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use ts_rs::TS;
+
+use crate::{
+    error::{Error, Result},
+    features::{emoji::EmojiLanguage, web::SearchEngine},
 };
 
-use crate::launcher::query::SearchMode;
-use serde::{Deserialize, Serialize};
+pub const FILE_NAME: &str = "settings.json";
+pub const CLIPBOARD_LIMIT_MAX: u32 = 1000;
+/// Most entries in each folder list. On Linux each indexed folder uses a
+/// watch from a per-user limit.
+const FOLDER_LIST_MAX: usize = 50;
 
-pub const DEFAULT_SHORTCUT: &str = "Control+Shift+Space";
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct AppPreference {
-    pub aliases: Vec<String>,
-    pub hidden: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct CategoryShortcut {
-    pub mode: SearchMode,
-    pub shortcut: String,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct ItemPreference {
-    pub aliases: Vec<String>,
-    pub shortcut: String,
-    pub hidden: bool,
-    pub disabled: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub struct WebSearch {
-    pub name: String,
-    pub keyword: String,
-    pub template: String,
-    pub enabled: bool,
-}
-
-impl WebSearch {
-    pub fn url(&self, query: &str) -> anyhow::Result<String> {
-        use anyhow::ensure;
-        ensure!(
-            self.template.matches("{query}").count() == 1,
-            "Use {query} exactly once in the URL."
-        );
-        ensure!(
-            !self.template.chars().any(char::is_control),
-            "The URL must fit on one line."
-        );
-        let probe = self
-            .template
-            .replace("{query}", "tinydash-query-placeholder");
-        ensure!(
-            !probe.contains(['{', '}']),
-            "Only the {query} placeholder is supported."
-        );
-        let base = url::Url::parse(&probe)?;
-        ensure!(
-            matches!(base.scheme(), "http" | "https") && base.host_str().is_some(),
-            "Use an HTTP or HTTPS URL."
-        );
-        ensure!(
-            base.username().is_empty() && base.password().is_none(),
-            "Do not include a username or password in the URL."
-        );
-        ensure!(
-            !base
-                .host_str()
-                .unwrap_or_default()
-                .contains("tinydash-query-placeholder"),
-            "Put {query} in the path or search part, not the hostname."
-        );
-        // Encode the input as one URL component, including spaces and slashes.
-        let encoded: String = query
-            .as_bytes()
-            .iter()
-            .map(|&byte| {
-                if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
-                    (byte as char).to_string()
-                } else {
-                    format!("%{byte:02X}")
-                }
-            })
-            .collect();
-        let target = url::Url::parse(&self.template.replace("{query}", &encoded))?;
-        ensure!(
-            target.origin() == base.origin(),
-            "Search text must not change the website."
-        );
-        Ok(target.into())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(test, derive(ts_rs::TS))]
-pub enum ClipboardDefaultAction {
-    #[default]
-    Copy,
-    Paste,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+/// User preferences, stored as camelCase JSON in the app config folder.
+/// Missing fields take their defaults, so older and newer files both load.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(default, rename_all = "camelCase")]
-#[cfg_attr(test, derive(ts_rs::TS))]
+#[ts(export)]
 pub struct Settings {
-    pub show_suggestions: bool,
-    pub emoji_skin_tone: u8,
-    pub emoji_languages: Vec<String>,
-    pub clear_query_on_open: bool,
-    pub hide_on_blur: bool,
+    /// Global shortcut that toggles the launcher, in Tauri accelerator syntax.
     pub shortcut: String,
-    pub category_shortcuts: Vec<CategoryShortcut>,
-    pub start_at_login: bool,
-    pub show_menu_bar_icon: bool,
-    pub app_preferences: BTreeMap<String, AppPreference>,
-    pub web_searches: Vec<WebSearch>,
-    pub item_preferences: BTreeMap<String, ItemPreference>,
+    pub theme: Theme,
+    pub hide_on_blur: bool,
+    pub launch_at_login: bool,
+    pub show_tray_icon: bool,
     pub clipboard_history_enabled: bool,
-    pub clipboard_history_decided: bool,
-    pub clipboard_default_action: ClipboardDefaultAction,
-    pub clipboard_history_limit: u16,
-    pub clipboard_retention_days: u32,
-    pub clipboard_excluded_apps: Vec<String>,
+    pub clipboard_history_limit: u32,
     pub clipboard_capture_images: bool,
     pub clipboard_capture_files: bool,
-    pub file_search_roots: Option<Vec<PathBuf>>,
-    pub file_search_limit: u32,
+    /// Folders to index. A leading `~` means the home folder.
+    pub file_search_folders: Vec<String>,
+    /// Folder names that are never indexed, at any depth.
     pub file_search_excluded_dirs: Vec<String>,
-    pub file_watch_enabled: bool,
-    pub file_search_include_hidden: bool,
-    pub file_search_ignore_patterns: Vec<String>,
+    /// 0 is the default yellow; 1–5 are light to dark.
+    pub emoji_skin_tone: u8,
+    pub emoji_languages: Vec<EmojiLanguage>,
     pub currency_rates_enabled: bool,
-    pub visible_categories: Vec<SearchMode>,
+    pub search_engine: SearchEngine,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Theme {
+    #[default]
+    System,
+    Light,
+    Dark,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            show_suggestions: true,
-            emoji_skin_tone: 0,
-            emoji_languages: Vec::new(),
-            clear_query_on_open: true,
+            shortcut: "Control+Shift+Space".into(),
+            theme: Theme::System,
             hide_on_blur: true,
-            shortcut: DEFAULT_SHORTCUT.into(),
-            category_shortcuts: Vec::new(),
-            start_at_login: false,
-            show_menu_bar_icon: false,
-            app_preferences: BTreeMap::new(),
-            web_searches: Vec::new(),
-            item_preferences: BTreeMap::new(),
-            clipboard_history_enabled: true,
-            clipboard_history_decided: true,
-            clipboard_default_action: ClipboardDefaultAction::Copy,
-            clipboard_history_limit: 100,
-            clipboard_retention_days: 0,
-            clipboard_excluded_apps: Vec::new(),
+            launch_at_login: false,
+            // macOS users reach TinyDash from the shortcut; the menu bar is crowded.
+            show_tray_icon: !cfg!(target_os = "macos"),
+            clipboard_history_enabled: false,
+            clipboard_history_limit: 200,
             clipboard_capture_images: false,
             clipboard_capture_files: false,
-            file_search_roots: None,
-            file_search_limit: 50_000,
-            file_search_excluded_dirs: vec!["node_modules".into(), "target".into()],
-            file_watch_enabled: true,
-            file_search_include_hidden: false,
-            file_search_ignore_patterns: Vec::new(),
+            file_search_folders: ["~/Desktop", "~/Documents", "~/Downloads"]
+                .map(String::from)
+                .into(),
+            file_search_excluded_dirs: ["node_modules", "target"].map(String::from).into(),
+            emoji_skin_tone: 0,
+            emoji_languages: Vec::new(),
             currency_rates_enabled: true,
-            visible_categories: vec![
-                SearchMode::All,
-                SearchMode::Apps,
-                SearchMode::Files,
-                SearchMode::Clipboard,
-                SearchMode::Calculator,
-                SearchMode::System,
-                SearchMode::Emoji,
-                SearchMode::Password,
-                SearchMode::Timezone,
-                SearchMode::Url,
-                SearchMode::Web,
-            ],
+            search_engine: SearchEngine::Google,
         }
     }
 }
 
 impl Settings {
-    pub fn fresh_install() -> Self {
-        Self {
-            clipboard_history_enabled: false,
-            clipboard_history_decided: false,
-            ..Self::default()
+    /// These settings with `changes`, camelCase fields as the windows send
+    /// them, on top. Each window sends only what it changed, so two windows
+    /// that save at once do not undo each other.
+    pub fn with_changes(&self, changes: Map<String, Value>) -> Result<Self> {
+        let Ok(Value::Object(mut fields)) = serde_json::to_value(self) else {
+            return Err(Error::msg("Invalid settings."));
+        };
+        let mut merged = self.clone();
+        // One field at a time, so an error names the setting it is about;
+        // serde's own message does not.
+        for (name, value) in changes {
+            if !fields.contains_key(&name) {
+                return Err(Error::msg(format!("Unknown setting “{name}”.")));
+            }
+            fields.insert(name.clone(), value);
+            merged = serde_json::from_value(Value::Object(fields.clone())).map_err(|error| {
+                Error::msg(format!("Invalid value for the setting “{name}”: {error}"))
+            })?;
         }
+        Ok(merged)
     }
 
-    pub fn shortcuts(&self) -> Vec<&str> {
-        std::iter::once(self.shortcut.as_str())
-            .chain(
-                self.category_shortcuts
-                    .iter()
-                    .map(|binding| binding.shortcut.as_str()),
-            )
-            .chain(
-                self.item_preferences
-                    .values()
-                    .filter(|item| !item.disabled && !item.shortcut.is_empty())
-                    .map(|item| item.shortcut.as_str()),
-            )
+    /// Clamp numbers, drop blank or duplicate list entries, and cut lists
+    /// to their limit.
+    pub fn normalized(mut self) -> Self {
+        self.shortcut = self.shortcut.trim().to_owned();
+        self.clipboard_history_limit = self.clipboard_history_limit.clamp(1, CLIPBOARD_LIMIT_MAX);
+        self.emoji_skin_tone = self.emoji_skin_tone.min(5);
+        self.emoji_languages.sort();
+        self.emoji_languages.dedup();
+        for list in [
+            &mut self.file_search_folders,
+            &mut self.file_search_excluded_dirs,
+        ] {
+            let mut seen = std::collections::HashSet::new();
+            list.retain_mut(|item| {
+                *item = item.trim().to_owned();
+                !item.is_empty() && seen.insert(item.clone())
+            });
+            list.truncate(FOLDER_LIST_MAX);
+        }
+        self
+    }
+
+    /// The first folder entry that is not a full path, which would never be
+    /// indexed. A hand-edited file may still hold one; `file_folders` skips it.
+    pub fn relative_folder(&self, home: &Path) -> Option<&str> {
+        self.file_search_folders
+            .iter()
+            .find(|folder| !expand_home(folder, home).is_absolute())
+            .map(String::as_str)
+    }
+
+    /// Indexed folders as absolute paths. Relative entries are ignored.
+    pub fn file_folders(&self, home: &Path) -> Vec<PathBuf> {
+        self.file_search_folders
+            .iter()
+            .map(|folder| expand_home(folder, home))
+            .filter(|path| path.is_absolute())
             .collect()
     }
+}
 
-    pub fn validate(&self) -> anyhow::Result<()> {
-        use anyhow::ensure;
-        use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
-        ensure!(
-            self.emoji_skin_tone <= 5,
-            "Select an emoji skin tone from 0 through 5."
-        );
-        ensure!(
-            self.emoji_languages.len() <= 3
-                && self
-                    .emoji_languages
-                    .iter()
-                    .enumerate()
-                    .all(|(index, language)| {
-                        matches!(language.as_str(), "zh" | "ms" | "es")
-                            && !self.emoji_languages[..index].contains(language)
-                    }),
-            "Select each supported emoji search language only once (zh, ms, es)."
-        );
-        let allowed_shortcut = |key: &Shortcut| {
-            key.mods
-                .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER)
-                || (key.mods == Modifiers::SHIFT && key.key == Code::Space)
-        };
-        ensure!(
-            !self.visible_categories.is_empty(),
-            "Select at least one category."
-        );
-        ensure!(
-            self.visible_categories
-                .iter()
-                .enumerate()
-                .all(|(index, category)| !self.visible_categories[..index].contains(category)),
-            "Select each category only once."
-        );
-        let shortcut: Shortcut = self
-            .shortcut
-            .parse()
-            .map_err(|_| anyhow::anyhow!("Use a modifier and one key for the launch shortcut."))?;
-        ensure!(
-            allowed_shortcut(&shortcut),
-            "Use Shift+Space, or include Control, Option / Alt, or Command / Windows."
-        );
-        ensure!(
-            self.category_shortcuts.len() <= 11,
-            "Use no more than one shortcut per category."
-        );
-        let mut keys = std::collections::HashSet::from([shortcut.id()]);
-        let mut modes = std::collections::HashSet::new();
-        for binding in &self.category_shortcuts {
-            let key: Shortcut = binding.shortcut.parse().map_err(|_| {
-                anyhow::anyhow!("Use a modifier and one key for each category shortcut.")
-            })?;
-            ensure!(
-                allowed_shortcut(&key),
-                "Use Shift+Space, or include Control, Option / Alt, or Command / Windows."
-            );
-            ensure!(keys.insert(key.id()), "Each shortcut must be different.");
-            ensure!(modes.insert(binding.mode), "Use one shortcut per category.");
-            ensure!(
-                self.visible_categories.contains(&binding.mode),
-                "Show a category before assigning its shortcut."
-            );
-        }
-        ensure!(
-            self.item_preferences.len() <= 512,
-            "Configure no more than 512 items."
-        );
-        for (id, item) in &self.item_preferences {
-            ensure!(
-                id.len() <= 4100
-                    && !id.contains('\0')
-                    && ["app:", "system:", "command:", "library:"]
-                        .iter()
-                        .any(|prefix| id.starts_with(prefix)),
-                "Invalid item ID."
-            );
-            ensure!(
-                item.aliases.len() <= 16
-                    && item.aliases.iter().all(|alias| !alias.trim().is_empty()
-                        && alias.len() <= 160
-                        && !alias.chars().any(char::is_control)),
-                "Use up to 16 single-line aliases of 1–160 bytes."
-            );
-            if !item.shortcut.is_empty() {
-                let key: Shortcut = item
-                    .shortcut
-                    .parse()
-                    .map_err(|_| anyhow::anyhow!("Invalid item shortcut."))?;
-                ensure!(allowed_shortcut(&key), "Item shortcuts need a modifier.");
-                ensure!(
-                    item.disabled || keys.insert(key.id()),
-                    "Each shortcut must be different."
-                );
-            }
-        }
-        ensure!(
-            self.clipboard_retention_days <= 3650,
-            "Clipboard retention must be 0–3650 days (0 keeps entries until the count limit)."
-        );
-        ensure!(
-            self.clipboard_excluded_apps.len() <= 128
-                && self
-                    .clipboard_excluded_apps
-                    .iter()
-                    .all(|app| !app.trim().is_empty()
-                        && app.len() <= 512
-                        && !app.chars().any(char::is_control)),
-            "Use up to 128 application names or IDs."
-        );
-        ensure!(
-            crate::providers::files::valid_ignore_patterns(&self.file_search_ignore_patterns),
-            "Use up to 64 ignore patterns of 1–256 bytes, with *, ? or ** wildcards and forward slashes. Negation and character classes are not supported."
-        );
-        ensure!(
-            self.clipboard_history_decided || !self.clipboard_history_enabled,
-            "Choose whether to save clipboard history first."
-        );
-        ensure!(
-            self.app_preferences.len() <= 512,
-            "Use preferences for no more than 512 apps."
-        );
-        for (id, preference) in &self.app_preferences {
-            ensure!(
-                id.starts_with("app:") && id.len() <= 4100 && !id.contains('\0'),
-                "An app preference has an invalid app ID."
-            );
-            ensure!(
-                preference.aliases.len() <= 16,
-                "Use no more than 16 aliases per app."
-            );
-            for alias in &preference.aliases {
-                ensure!(
-                    !alias.trim().is_empty()
-                        && alias.len() <= 160
-                        && !alias.chars().any(char::is_control),
-                    "App aliases must be 1 to 160 bytes on one line."
-                );
-            }
-        }
-        ensure!(
-            self.web_searches.len() <= 24,
-            "Use no more than 24 custom web searches."
-        );
-        let mut keywords = std::collections::HashSet::new();
-        for search in &self.web_searches {
-            ensure!(
-                !search.name.trim().is_empty()
-                    && search.name.len() <= 80
-                    && !search.name.chars().any(char::is_control),
-                "Search names must be 1 to 80 bytes on one line."
-            );
-            ensure!(
-                !search.keyword.is_empty()
-                    && search.keyword.len() <= 24
-                    && search
-                        .keyword
-                        .bytes()
-                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'),
-                "Use 1 to 24 lowercase letters, digits, or hyphens for a search keyword."
-            );
-            ensure!(
-                keywords.insert(&search.keyword)
-                    && !crate::providers::tools::web::reserved_keyword(&search.keyword),
-                "Use a unique search keyword that is not a built-in command."
-            );
-            ensure!(
-                search.template.len() <= 2048,
-                "Search URLs must be no more than 2,048 bytes."
-            );
-            search.url("example")?;
-        }
-        ensure!(
-            (1..=500).contains(&self.clipboard_history_limit),
-            "Clipboard history must contain 1 to 500 entries."
-        );
-        ensure!(
-            (1..=100_000).contains(&self.file_search_limit),
-            "The file limit must be 1 to 100,000."
-        );
-        if let Some(roots) = &self.file_search_roots {
-            ensure!(roots.len() <= 64, "Use no more than 64 search folders.");
-            for root in roots {
-                let text = root.to_string_lossy();
-                ensure!(
-                    text.len() <= 4096
-                        && !text.contains('\0')
-                        && (root.is_absolute()
-                            || text == "~"
-                            || text.starts_with("~/")
-                            || text.starts_with("~\\")),
-                    "Use an absolute folder path or ~/folder: {}",
-                    root.display()
-                );
-            }
-        }
-        ensure!(
-            self.file_search_excluded_dirs.len() <= 128,
-            "Use no more than 128 excluded folder names."
-        );
-        for name in &self.file_search_excluded_dirs {
-            ensure!(
-                !name.trim().is_empty()
-                    && name.len() <= 255
-                    && !name.contains(['/', '\\', '\0'])
-                    && name != "."
-                    && name != "..",
-                "Excluded folders must be folder names, not paths or patterns."
-            );
-        }
-        Ok(())
-    }
-
-    pub fn same_file_settings(&self, other: &Self) -> bool {
-        self.file_search_roots == other.file_search_roots
-            && self.file_search_limit == other.file_search_limit
-            && self.file_search_excluded_dirs == other.file_search_excluded_dirs
-            && self.file_watch_enabled == other.file_watch_enabled
-            && self.file_search_include_hidden == other.file_search_include_hidden
-            && self.file_search_ignore_patterns == other.file_search_ignore_patterns
-    }
-
-    pub fn clipboard_limit(&self) -> usize {
-        usize::from(self.clipboard_history_limit.clamp(1, 500))
-    }
-
-    pub fn file_limit(&self) -> usize {
-        self.file_search_limit.clamp(1, 100_000) as usize
+/// `~` or `~/rest` relative to `home`; other paths unchanged.
+pub fn expand_home(path: &str, home: &Path) -> PathBuf {
+    match path.strip_prefix('~') {
+        Some("") => home.to_owned(),
+        Some(rest) if rest.starts_with(['/', '\\']) => home.join(&rest[1..]),
+        _ => PathBuf::from(path),
     }
 }
 
-pub fn save(directory: &Path, settings: &Settings) -> anyhow::Result<()> {
-    use anyhow::{Context, ensure};
-    use std::io::Write;
-    settings.validate()?;
-    std::fs::create_dir_all(directory).context("Create the settings directory")?;
-    let path = directory.join("settings.json");
-    // Preserve settings from newer versions and never overwrite a damaged file.
-    let mut document = match std::fs::read(&path) {
-        Ok(bytes) => serde_json::from_slice::<serde_json::Value>(&bytes)
-            .context("The settings file contains invalid JSON. Repair it before saving.")?,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => serde_json::json!({}),
-        Err(error) => return Err(error).context("Read the settings file before saving"),
-    };
-    ensure!(
-        document.is_object(),
-        "The settings file must contain a JSON object."
-    );
-    let object = document.as_object_mut().expect("checked object");
-    if let serde_json::Value::Object(values) = serde_json::to_value(settings)? {
-        object.extend(values);
-    }
-    let mut temporary =
-        tempfile::NamedTempFile::new_in(directory).context("Create the settings file")?;
-    serde_json::to_writer_pretty(&mut temporary, &document).context("Write settings")?;
-    temporary.write_all(b"\n")?;
-    temporary
-        .as_file()
-        .sync_all()
-        .context("Save settings to disk")?;
-    temporary
-        .persist(&path)
-        .context("Replace the settings file")?;
-    Ok(())
-}
-
-pub fn load(directory: &Path) -> anyhow::Result<Settings> {
-    use anyhow::Context;
-    let path = directory.join("settings.json");
-    match std::fs::read(&path) {
-        Ok(bytes) => {
-            let mut settings: Settings = serde_json::from_slice(&bytes)
-                .with_context(|| format!("Read settings from {}", path.display()))?;
-            // macOS 27 uses Command+Shift+Space for Siri Visual Intelligence.
-            // Upgrade only our old default. Keep custom shortcuts and the file intact.
-            if cfg!(target_os = "macos") && settings.shortcut == "CommandOrControl+Shift+Space" {
-                settings.shortcut = DEFAULT_SHORTCUT.into();
-                tracing::info!("Replaced the old macOS shortcut with Control+Shift+Space");
-            }
-            settings.validate().context(
-                "The saved settings contain invalid values. The file was kept unchanged.",
-            )?;
-            Ok(settings)
-        }
+/// Load settings. A damaged file is renamed aside, and defaults are used,
+/// so a bad edit never stops the launcher; the warning tells the user.
+pub fn load(dir: &Path) -> (Settings, Option<String>) {
+    let path = dir.join(FILE_NAME);
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            let settings = Settings::fresh_install();
-            std::fs::create_dir_all(directory).context("Create the settings directory")?;
-            std::fs::write(&path, serde_json::to_vec_pretty(&settings)?)
-                .context("Write default settings")?;
-            Ok(settings)
+            return (Settings::default(), None);
         }
-        Err(error) => Err(error).context("Read launcher settings"),
+        Err(error) => {
+            return (
+                Settings::default(),
+                Some(format!("Could not read settings: {error}")),
+            );
+        }
+    };
+    match serde_json::from_str::<Settings>(&text) {
+        Ok(settings) => (settings.normalized(), None),
+        Err(error) => {
+            let backup = dir.join("settings.invalid.json");
+            let moved = std::fs::rename(&path, &backup).is_ok();
+            let note = if moved {
+                format!(" The old file is at {}.", backup.display())
+            } else {
+                String::new()
+            };
+            (
+                Settings::default(),
+                Some(format!(
+                    "Settings were invalid ({error}), so defaults are in use.{note}"
+                )),
+            )
+        }
     }
+}
+
+pub fn save(dir: &Path, settings: &Settings) -> Result<()> {
+    std::fs::create_dir_all(dir)?;
+    let path = dir.join(FILE_NAME);
+    let temporary = dir.join(format!("{FILE_NAME}.tmp"));
+    std::fs::write(&temporary, serde_json::to_vec_pretty(settings)?)?;
+    std::fs::rename(&temporary, &path)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -514,468 +200,104 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legacy_settings_show_every_category_without_changing_other_preferences() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("settings.json");
-        let original = r#"{"shortcut":"Alt+KeyJ","hideOnBlur":false}"#;
-        std::fs::write(&path, original).unwrap();
-        let settings = load(directory.path()).unwrap();
-        assert_eq!(
-            settings.visible_categories,
-            Settings::default().visible_categories
-        );
-        assert_eq!(settings.visible_categories.len(), 11);
-        assert_eq!(settings.shortcut, "Alt+KeyJ");
-        assert!(!settings.hide_on_blur);
-        assert_eq!(std::fs::read_to_string(path).unwrap(), original);
-    }
-
-    #[test]
-    fn menu_bar_icon_is_opt_in_for_fresh_and_legacy_settings() {
-        let directory = tempfile::tempdir().unwrap();
-        assert!(!Settings::default().show_menu_bar_icon);
-        assert!(!load(directory.path()).unwrap().show_menu_bar_icon);
-        let path = directory.path().join("settings.json");
-        let legacy = r#"{"hideOnBlur":false}"#;
-        std::fs::write(&path, legacy).unwrap();
-        let mut settings = load(directory.path()).unwrap();
-        assert!(!settings.show_menu_bar_icon);
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), legacy);
-        for visible in [true, false] {
-            settings.show_menu_bar_icon = visible;
-            save(directory.path(), &settings).unwrap();
-            assert_eq!(load(directory.path()).unwrap(), settings);
-            let json: serde_json::Value =
-                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-            assert_eq!(json["showMenuBarIcon"], visible);
-        }
-    }
-
-    #[test]
-    fn invalid_categories_cannot_replace_saved_settings() {
-        let directory = tempfile::tempdir().unwrap();
-        let mut settings = Settings::default();
-        save(directory.path(), &settings).unwrap();
-        let path = directory.path().join("settings.json");
-        let original = std::fs::read(&path).unwrap();
-        for categories in [vec![], vec![SearchMode::Apps, SearchMode::Apps]] {
-            settings.visible_categories = categories;
-            assert!(save(directory.path(), &settings).is_err());
-            assert_eq!(std::fs::read(&path).unwrap(), original);
-        }
-        assert!(serde_json::from_str::<Settings>(r#"{"visibleCategories":["unknown"]}"#).is_err());
-    }
-
-    #[test]
-    fn clipboard_default_action_migrates_and_rejects_unknown_actions() {
-        let legacy: Settings = serde_json::from_str("{}").unwrap();
-        assert_eq!(
-            legacy.clipboard_default_action,
-            ClipboardDefaultAction::Copy
-        );
-        assert_eq!(
-            Settings::fresh_install().clipboard_default_action,
-            ClipboardDefaultAction::Copy
-        );
-        let paste: Settings =
-            serde_json::from_str(r#"{"clipboardDefaultAction":"paste"}"#).unwrap();
-        assert_eq!(
-            paste.clipboard_default_action,
-            ClipboardDefaultAction::Paste
-        );
-        assert_eq!(
-            serde_json::to_value(paste).unwrap()["clipboardDefaultAction"],
-            "paste"
-        );
-        for action in ["delete", "Paste", "", "launch"] {
-            assert!(
-                serde_json::from_value::<Settings>(serde_json::json!({
-                    "clipboardDefaultAction": action
-                }))
-                .is_err()
-            );
-        }
-    }
-
-    #[test]
-    fn saves_all_preferences_and_preserves_unknown_fields() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        std::fs::write(
-            dir.path().join("settings.json"),
-            r#"{"futureSetting":{"enabled":true}}"#,
-        )
-        .unwrap();
-        let settings = Settings {
-            shortcut: "Alt+Shift+KeyJ".into(),
-            visible_categories: vec![SearchMode::Apps, SearchMode::Calculator],
-            clipboard_history_enabled: false,
-            clipboard_default_action: ClipboardDefaultAction::Paste,
-            clipboard_history_limit: 42,
-            file_search_roots: Some(vec!["~/Projects".into()]),
-            file_watch_enabled: false,
-            currency_rates_enabled: false,
+    fn changes_replace_only_their_fields() {
+        let old = Settings {
+            launch_at_login: true,
             ..Settings::default()
         };
-        save(dir.path(), &settings).expect("save");
-        assert_eq!(load(dir.path()).unwrap(), settings);
-        let document: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(dir.path().join("settings.json")).unwrap())
-                .unwrap();
-        assert_eq!(document["futureSetting"]["enabled"], true);
-    }
-
-    #[test]
-    fn save_preserves_invalid_files_and_rejects_invalid_values() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("settings.json");
-        for original in ["bad json", "[]"] {
-            std::fs::write(&path, original).unwrap();
-            assert!(save(dir.path(), &Settings::default()).is_err());
-            assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
-        }
-        std::fs::write(&path, "{}").unwrap();
-        let mut settings = Settings {
-            clipboard_history_limit: 0,
-            ..Settings::default()
+        let changes = serde_json::json!({ "clipboardHistoryEnabled": false });
+        let Value::Object(changes) = changes else {
+            unreachable!()
         };
-        assert!(save(dir.path(), &settings).is_err());
-        settings.clipboard_history_limit = 100;
-        for shortcut in ["KeyA", "Shift+KeyA", "Control", "Unknown+Space"] {
-            settings.shortcut = shortcut.into();
-            assert!(save(dir.path(), &settings).is_err());
-        }
-        assert_eq!(std::fs::read_to_string(path).unwrap(), "{}");
-    }
+        let new = old.with_changes(changes).unwrap();
+        assert!(!new.clipboard_history_enabled);
+        assert!(new.launch_at_login);
 
-    #[test]
-    fn shift_space_is_allowed_without_allowing_shift_typing_shortcuts() {
-        let dir = tempfile::tempdir().unwrap();
-        let mut settings = Settings {
-            shortcut: "Shift+Space".into(),
-            ..Settings::default()
+        let Value::Object(unknown) = serde_json::json!({ "appearance": "sage" }) else {
+            unreachable!()
         };
-        save(dir.path(), &settings).expect("save Shift+Space");
-        let saved: Settings =
-            serde_json::from_slice(&std::fs::read(dir.path().join("settings.json")).unwrap())
-                .unwrap();
-        assert_eq!(saved.shortcut, "Shift+Space");
-
-        settings.category_shortcuts.push(CategoryShortcut {
-            mode: SearchMode::Clipboard,
-            shortcut: "Shift+Space".into(),
-        });
-        assert!(
-            settings
-                .validate()
-                .unwrap_err()
-                .to_string()
-                .contains("different")
-        );
-        settings.shortcut = DEFAULT_SHORTCUT.into();
-        settings.validate().expect("category Shift+Space");
-        for shortcut in ["Space", "Shift+KeyA", "Shift+Digit1", "Shift+Enter"] {
-            settings.category_shortcuts[0].shortcut = shortcut.into();
-            assert!(settings.validate().is_err(), "{shortcut}");
-            settings.category_shortcuts.clear();
-            settings.shortcut = shortcut.into();
-            assert!(settings.validate().is_err(), "{shortcut}");
-            settings.shortcut = DEFAULT_SHORTCUT.into();
-            settings.category_shortcuts.push(CategoryShortcut {
-                mode: SearchMode::Clipboard,
-                shortcut: "Shift+Space".into(),
-            });
-        }
+        assert!(old.with_changes(unknown).is_err());
+        let Value::Object(wrong) = serde_json::json!({ "hideOnBlur": false, "theme": "sage" })
+        else {
+            unreachable!()
+        };
+        let error = old.with_changes(wrong).unwrap_err().to_string();
+        assert!(error.contains("“theme”"), "{error}");
     }
 
     #[test]
-    fn validates_search_paths_and_folder_names() {
-        let mut settings = Settings::default();
-        for path in ["relative/path", "", "~/bad\0path"] {
-            settings.file_search_roots = Some(vec![path.into()]);
-            assert!(settings.validate().is_err());
-        }
-        settings.file_search_roots = Some(vec!["~/Projects".into()]);
-        assert!(settings.validate().is_ok());
-        settings.file_search_excluded_dirs = vec!["a/b".into()];
-        assert!(settings.validate().is_err());
-    }
-
-    #[test]
-    fn creates_defaults_and_preserves_user_changes() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let defaults = load(dir.path()).expect("defaults");
-        assert!(defaults.clear_query_on_open);
-        assert_eq!(defaults.shortcut, "Control+Shift+Space");
-        std::fs::write(
-            dir.path().join("settings.json"),
-            r#"{"clearQueryOnOpen":false}"#,
-        )
-        .expect("write");
-        let settings = load(dir.path()).expect("settings");
-        assert!(!settings.clear_query_on_open);
-        assert!(settings.hide_on_blur);
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn legacy_shortcut_avoids_siri_and_preserves_saved_settings() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("settings.json");
-        let saved = r#"{"shortcut":"CommandOrControl+Shift+Space","clearQueryOnOpen":false,"clipboardHistoryEnabled":false,"fileSearchRoots":[],"customSetting":true}"#;
-        std::fs::write(&path, saved).expect("write settings");
-
-        let settings = load(dir.path()).expect("load legacy settings");
-        assert_eq!(settings.shortcut, "Control+Shift+Space");
-        assert!(!settings.clear_query_on_open);
-        assert!(!settings.clipboard_history_enabled);
-        assert_eq!(settings.file_search_roots, Some(vec![]));
-        assert_eq!(std::fs::read_to_string(path).expect("read settings"), saved);
-    }
-
-    #[test]
-    fn preserves_custom_shortcuts() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        std::fs::write(
-            dir.path().join("settings.json"),
-            r#"{"shortcut":"Alt+Shift+Space"}"#,
-        )
-        .expect("write settings");
-        assert_eq!(
-            load(dir.path()).expect("custom shortcut").shortcut,
-            "Alt+Shift+Space"
-        );
-    }
-
-    #[test]
-    fn clipboard_settings_have_bounded_defaults_and_can_disable_capture() {
-        let settings = Settings::default();
-        assert!(settings.clipboard_history_enabled);
-        assert_eq!(settings.clipboard_limit(), 100);
+    fn missing_fields_take_defaults_and_unknown_fields_are_ignored() {
         let settings: Settings =
-            serde_json::from_str(r#"{"clipboardHistoryEnabled":false,"clipboardHistoryLimit":0}"#)
-                .expect("settings");
-        assert!(!settings.clipboard_history_enabled);
-        assert_eq!(settings.clipboard_limit(), 1);
+            serde_json::from_str(r#"{"hideOnBlur": false, "appearance": "sage"}"#).unwrap();
+        assert!(!settings.hide_on_blur);
+        assert_eq!(settings.shortcut, Settings::default().shortcut);
+    }
+
+    #[test]
+    fn normalizing_clamps_and_deduplicates() {
         let settings = Settings {
-            clipboard_history_limit: 1000,
-            ..settings
-        };
-        assert_eq!(settings.clipboard_limit(), 500);
-    }
-
-    #[test]
-    fn fresh_install_requires_an_explicit_clipboard_choice_but_legacy_defaults_do_not() {
-        let fresh = Settings::fresh_install();
-        assert!(!fresh.clipboard_history_enabled);
-        assert!(!fresh.clipboard_history_decided);
-        assert!(fresh.validate().is_ok());
-
-        let legacy: Settings = serde_json::from_str("{}").expect("legacy settings");
-        assert!(legacy.clipboard_history_enabled);
-        assert!(legacy.clipboard_history_decided);
-        assert!(legacy.validate().is_ok());
-
-        let undecided_enabled = Settings {
-            clipboard_history_enabled: true,
-            clipboard_history_decided: false,
+            clipboard_history_limit: 0,
+            emoji_skin_tone: 9,
+            emoji_languages: vec![EmojiLanguage::Zh, EmojiLanguage::Es, EmojiLanguage::Zh],
+            file_search_folders: vec![" ~/A ".into(), "~/A".into(), "  ".into()],
             ..Settings::default()
-        };
-        assert!(undecided_enabled.validate().is_err());
-
-        let undecided_disabled = Settings {
-            clipboard_history_enabled: false,
-            clipboard_history_decided: false,
-            ..Settings::default()
-        };
-        assert!(undecided_disabled.validate().is_ok());
-    }
-
-    #[test]
-    fn saves_and_loads_the_clipboard_choice() {
-        let directory = tempfile::tempdir().expect("tempdir");
-        let mut app_preferences = BTreeMap::new();
-        app_preferences.insert(
-            "app:/apps/editor".into(),
-            AppPreference {
-                aliases: vec!["write".into()],
-                hidden: true,
-            },
+        }
+        .normalized();
+        assert_eq!(settings.clipboard_history_limit, 1);
+        assert_eq!(settings.emoji_skin_tone, 5);
+        assert_eq!(
+            settings.emoji_languages,
+            [EmojiLanguage::Zh, EmojiLanguage::Es]
         );
-        let settings = Settings {
-            category_shortcuts: vec![CategoryShortcut {
-                mode: SearchMode::Apps,
-                shortcut: "Alt+KeyE".into(),
-            }],
-            app_preferences,
-            web_searches: vec![WebSearch {
-                name: "Docs".into(),
-                keyword: "docs".into(),
-                template: "https://example.test/?q={query}".into(),
-                enabled: true,
-            }],
-            clipboard_history_enabled: false,
-            clipboard_history_decided: false,
+        assert_eq!(settings.file_search_folders, ["~/A"]);
+
+        let many = Settings {
+            file_search_excluded_dirs: (0..99).map(|n| format!("dir{n}")).collect(),
             ..Settings::default()
-        };
-        save(directory.path(), &settings).expect("save settings");
-        let loaded = load(directory.path()).expect("load settings");
-        assert_eq!(loaded, settings);
-        let document: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(directory.path().join("settings.json")).expect("read settings"),
-        )
-        .expect("settings JSON");
-        assert_eq!(document["clipboardHistoryDecided"], false);
+        }
+        .normalized();
+        assert_eq!(many.file_search_excluded_dirs.len(), FOLDER_LIST_MAX);
+        assert_eq!(many.file_search_excluded_dirs[0], "dir0");
     }
 
     #[test]
-    fn rejects_duplicate_normalized_shortcuts_and_missing_modifiers() {
-        let mut settings = Settings {
-            shortcut: "Control+Shift+KeyA".into(),
-            category_shortcuts: vec![CategoryShortcut {
-                mode: SearchMode::Apps,
-                shortcut: "Shift+Control+KeyA".into(),
-            }],
+    fn finds_a_folder_that_is_not_a_full_path() {
+        let home = std::env::temp_dir();
+        let settings = |folders: &[&str]| Settings {
+            file_search_folders: folders.iter().map(|f| String::from(*f)).collect(),
             ..Settings::default()
-        };
-        assert!(settings.validate().is_err());
-
-        settings.shortcut = "KeyA".into();
-        settings.category_shortcuts.clear();
-        assert!(settings.validate().is_err());
-
-        settings.shortcut = DEFAULT_SHORTCUT.into();
-        settings.category_shortcuts = vec![CategoryShortcut {
-            mode: SearchMode::Apps,
-            shortcut: "KeyB".into(),
-        }];
-        assert!(settings.validate().is_err());
-    }
-
-    #[test]
-    fn validates_custom_search_templates_and_encodes_reserved_input() {
-        let search = WebSearch {
-            name: "Docs".into(),
-            keyword: "docs".into(),
-            template: "https://example.test/search?q={query}".into(),
-            enabled: true,
         };
         assert_eq!(
-            search.url("rust lang/東京 & more").unwrap(),
-            "https://example.test/search?q=rust%20lang%2F%E6%9D%B1%E4%BA%AC%20%26%20more"
+            settings(&["~/Notes", "Projects"]).relative_folder(&home),
+            Some("Projects")
         );
-        let origin_safe = WebSearch {
-            template: "https://example.test/{query}".into(),
-            ..search.clone()
-        };
-        let target = origin_safe.url("//evil.example/path?x=1#part").unwrap();
-        assert!(target.starts_with("https://example.test/"));
-        assert!(!target.contains("evil.example/path"));
-
-        let http = WebSearch {
-            template: "http://example.test/{query}".into(),
-            ..search.clone()
-        };
-        assert!(http.url("ok").is_ok());
-
-        for template in [
-            "ftp://example.test/{query}",
-            "https://user:pass@example.test/{query}",
-            "https://{query}.example.test/",
-            "https://example.test/{query}/{query}",
-            "https://example.test/search",
-            "https://example.test/{query}/{extra}",
-            "https://example.test/{query}\n",
-        ] {
-            let invalid = WebSearch {
-                template: template.into(),
-                ..search.clone()
-            };
-            assert!(invalid.url("value").is_err(), "{template}");
-        }
-
-        for keyword in ["search", "google", "date", "datetime", "clean", "url"] {
-            let invalid = Settings {
-                web_searches: vec![WebSearch {
-                    keyword: keyword.into(),
-                    ..search.clone()
-                }],
-                ..Settings::default()
-            };
-            assert!(invalid.validate().is_err(), "{keyword}");
-        }
+        assert_eq!(settings(&["~", "~/Notes"]).relative_folder(&home), None);
     }
 
     #[test]
-    fn does_not_overwrite_invalid_settings() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("settings.json");
-        std::fs::write(&path, "bad json").expect("write");
-        assert!(load(dir.path()).is_err());
-        assert_eq!(std::fs::read_to_string(path).expect("read"), "bad json");
-    }
-
-    #[test]
-    fn startup_rejects_undecided_capture_and_keeps_the_original_settings_file() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("settings.json");
-        let bytes = br#"{"clipboardHistoryEnabled":true,"clipboardHistoryDecided":false}"#;
-        std::fs::write(&path, bytes).unwrap();
-        assert!(load(directory.path()).is_err());
-        assert_eq!(std::fs::read(path).unwrap(), bytes);
-        assert!(!Settings::fresh_install().clipboard_history_enabled);
-    }
-
-    #[test]
-    fn file_defaults_allow_explicit_roots_disable_and_bounded_limits() {
-        let defaults: Settings = serde_json::from_str("{}").expect("settings");
-        assert!(defaults.file_search_roots.is_none());
-        assert!(defaults.file_watch_enabled);
-        assert!(defaults.currency_rates_enabled);
-        let offline: Settings =
-            serde_json::from_str(r#"{"fileWatchEnabled":false,"currencyRatesEnabled":false}"#)
-                .expect("offline settings");
-        assert!(!offline.file_watch_enabled);
-        assert!(!offline.currency_rates_enabled);
-        assert_eq!(defaults.file_limit(), 50_000);
-        let disabled: Settings =
-            serde_json::from_str(r#"{"fileSearchRoots":[],"fileSearchLimit":0}"#)
-                .expect("settings");
-        assert_eq!(disabled.file_search_roots, Some(vec![]));
-        assert_eq!(disabled.file_limit(), 1);
-        let custom: Settings = serde_json::from_str(r#"{"fileSearchRoots":["~/Documents"],"fileSearchLimit":999999,"fileSearchExcludedDirs":[]}"#).expect("settings");
-        assert_eq!(
-            custom.file_search_roots,
-            Some(vec![PathBuf::from("~/Documents")])
-        );
-        assert_eq!(custom.file_limit(), 100_000);
-        assert!(custom.file_search_excluded_dirs.is_empty());
-    }
-    #[test]
-    fn emoji_preferences_validate_persist_and_keep_legacy_defaults() {
-        let legacy: Settings = serde_json::from_str("{}").unwrap();
-        assert_eq!(legacy.emoji_skin_tone, 0);
-        assert!(legacy.emoji_languages.is_empty());
-        let dir = tempfile::tempdir().unwrap();
-        let mut settings = Settings {
-            emoji_skin_tone: 3,
-            emoji_languages: vec!["zh".into(), "ms".into(), "es".into()],
+    fn expands_the_home_folder_and_drops_relative_paths() {
+        let home = std::env::temp_dir();
+        let settings = Settings {
+            file_search_folders: vec!["~".into(), "~/Notes".into(), "relative".into()],
             ..Settings::default()
         };
-        save(dir.path(), &settings).unwrap();
-        assert_eq!(load(dir.path()).unwrap(), settings);
-        settings.emoji_skin_tone = 6;
-        assert!(save(dir.path(), &settings).is_err());
-        settings.emoji_skin_tone = 0;
-        for languages in [
-            vec!["zh", "zh"],
-            vec!["unknown"],
-            vec!["zh", "ms", "es", "zh"],
-        ] {
-            settings.emoji_languages = languages.into_iter().map(str::to_owned).collect();
-            assert!(save(dir.path(), &settings).is_err());
-        }
-        let saved = load(dir.path()).unwrap();
-        assert_eq!(saved.emoji_skin_tone, 3);
-        assert_eq!(saved.emoji_languages, ["zh", "ms", "es"]);
+        assert_eq!(
+            settings.file_folders(&home),
+            [home.clone(), home.join("Notes")]
+        );
+    }
+
+    #[test]
+    fn a_damaged_file_is_moved_aside_and_defaults_are_used() {
+        let dir = std::env::temp_dir().join(format!("tinydash-settings-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(FILE_NAME), "{ not json").unwrap();
+        let (settings, warning) = load(&dir);
+        assert_eq!(settings, Settings::default());
+        assert!(warning.is_some());
+        assert!(dir.join("settings.invalid.json").exists());
+        save(&dir, &settings).unwrap();
+        assert_eq!(load(&dir), (Settings::default(), None));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

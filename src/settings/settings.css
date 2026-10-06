@@ -1,0 +1,250 @@
+html,
+body {
+  background: var(--paper);
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  height: 100%;
+}
+
+.sidebar {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--rule);
+  background: var(--raised);
+}
+
+.section-link {
+  padding: 6px var(--space-3);
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.section-link:hover {
+  background: var(--hover);
+}
+
+.section-link[aria-current="page"] {
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 600;
+}
+
+.content {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.content h1 {
+  font-size: 28px;
+}
+
+.content h2 {
+  margin-top: var(--space-3);
+  font-family: var(--font-body);
+  font-size: var(--text);
+  font-weight: 600;
+}
+
+.section-intro,
+.help,
+.row-description,
+.optional,
+.list-empty,
+.list-status {
+  font-size: var(--text-small);
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.row-text {
+  display: grid;
+  gap: 2px;
+}
+
+.row-control {
+  flex: none;
+}
+
+.number {
+  width: 90px;
+}
+
+.toggle {
+  appearance: none;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--control-edge);
+  cursor: pointer;
+  transition: background var(--motion);
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--paper);
+  transition: transform var(--motion);
+}
+
+.toggle:checked {
+  background: var(--accent);
+}
+
+.toggle:checked::after {
+  transform: translateX(16px);
+}
+
+.recorder {
+  min-width: 140px;
+  justify-content: center;
+}
+
+.recorder.recording {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.error {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-small);
+  background: var(--notice);
+  color: var(--danger);
+}
+
+.list-editor ul {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.list-editor li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-small);
+  background: var(--raised);
+  overflow-wrap: anywhere;
+}
+
+.list-add {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.list-add .field {
+  flex: 1;
+}
+
+.list-status:not(:empty) {
+  margin-top: var(--space-2);
+}
+
+.library {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: var(--space-4);
+}
+
+.library-list {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+.library-list ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.library-item {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.library-item:hover {
+  background: var(--hover);
+}
+
+.library-item[aria-current="true"] {
+  background: var(--selected);
+  color: var(--selected-ink);
+  font-weight: 600;
+}
+
+.library-editor {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.library-editor label {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+
+.library-editor .field {
+  font-weight: 400;
+}
+
+.library-editor textarea {
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+}
+
+.library-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.about {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.about ul {
+  margin: 0;
+  padding-left: var(--space-4);
+  color: var(--muted);
+}

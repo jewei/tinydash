@@ -1,27 +1,33 @@
+use serde::{Serialize, Serializer};
+
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+/// Every failure that can cross the IPC boundary. The frontend receives the
+/// `Display` text, so messages are written for the user.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("The search index is unavailable. Restart TinyDash.")]
-    IndexUnavailable,
-    #[error("This application is no longer in the index. Refresh the application list.")]
-    AppNotFound,
-    #[error("This file is no longer available. Refresh the file list.")]
-    FileNotFound,
-    #[error("This action is not available for the selected result.")]
-    InvalidAction,
-    #[error("Confirm this system command before running it.")]
-    ConfirmationRequired,
-    #[error("Could not run the system command: {0}")]
-    SystemCommand(String),
-    #[error("This result has expired. Search again to copy it.")]
-    ResultExpired,
-    #[error("Use at most 256 characters for a search, or 8,192 for a URL.")]
-    QueryTooLong,
-    #[error("Could not open the application: {0}")]
-    Launch(String),
-    #[error(transparent)]
+    #[error("{0}")]
+    Message(String),
+    #[error("File error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Storage error: {0}")]
+    Database(#[from] rusqlite::Error),
+    #[error("Invalid data: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("Clipboard error: {0}")]
+    Clipboard(#[from] arboard::Error),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+impl Error {
+    pub fn msg(message: impl Into<String>) -> Self {
+        Self::Message(message.into())
+    }
+}
+
+impl Serialize for Error {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_string())
+    }
+}

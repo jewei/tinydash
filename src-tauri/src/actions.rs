@@ -1,0 +1,283 @@
+//! What happens when the user runs a result's action.
+//!
+//! The frontend sends back an [`Action`] that a search produced. Each action
+//! is checked here again before it touches the OS, so the webview can only
+//! open what TinyDash itself indexed or offered.
+
+use std::path::Path;
+
+use tauri::{AppHandle, Manager};
+
+use crate::{
+    error::{Error, Result},
+    events,
+    features::library::{self, LibraryKind, Target},
+    platform, refresh,
+    search::{self, Context, Snapshot, id::Source, result::Action},
+    state::State,
+    system_clipboard, window,
+};
+
+/// Pins kept in all, including pins of items that are hidden for now.
+const MAX_PINS: usize = 100;
+
+/// Run an action. `result_id` identifies the result it came from, for usage ranking.
+pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<()> {
+    let state = app.state::<State>();
+    let counts_as_use = matches!(
+        action,
+        Action::Launch { .. }
+            | Action::Open { .. }
+            | Action::OpenUrl { .. }
+            | Action::Copy { .. }
+            | Action::CopySnippet { .. }
+            | Action::OpenQuicklink { .. }
+            | Action::System { .. }
+            // System commands that act inside TinyDash. From the actions
+            // menu they come without a result ID, so only the System
+            // results count.
+            | Action::ClearClipboard
+            | Action::OpenSettings
+            | Action::Quit
+    );
+    let quit = matches!(action, Action::Quit);
+    match action {
+        Action::Launch { path } => {
+            if !state.apps.get().contains(&path) {
+                return Err(Error::msg("This app is no longer installed."));
+            }
+            platform::launch_app(Path::new(&path))?;
+            window::hide(app)?;
+        }
+        Action::Open { path } => {
+            if !state.files.get().contains(&path) {
+                return Err(Error::msg("This file is not in the index."));
+            }
+            open_path(Path::new(&path))?;
+            window::hide(app)?;
+        }
+        Action::Reveal { path } => {
+            if !state.apps.get().contains(&path) && !state.files.get().contains(&path) {
+                return Err(Error::msg("This item is not in the index."));
+            }
+            tauri_plugin_opener::reveal_item_in_dir(&path)
+                .map_err(|e| Error::msg(e.to_string()))?;
+            window::hide(app)?;
+        }
+        Action::OpenUrl { url } => {
+            let scheme = url
+                .split_once(':')
+                .map(|(scheme, _)| scheme.to_ascii_lowercase());
+            if !matches!(scheme.as_deref(), Some("http" | "https")) {
+                return Err(Error::msg("Only web addresses can be opened."));
+            }
+            tauri_plugin_opener::open_url(&url, None::<&str>)
+                .map_err(|e| Error::msg(e.to_string()))?;
+            window::hide(app)?;
+        }
+        Action::Copy { text } => {
+            copy_and_close(app, || system_clipboard::write_text(&text, false))?
+        }
+        Action::CopySecret { text } => {
+            copy_and_close(app, || system_clipboard::write_text(&text, true))?
+        }
+        Action::CopyClip { id } => {
+            let content = state
+                .clip(id)?
+                .ok_or_else(|| Error::msg("This entry is no longer in the history."))?;
+            copy_and_close(app, || system_clipboard::write(&content))?;
+        }
+        // Deleting reveals nothing, so it works while history is off too.
+        Action::DeleteClip { id } => {
+            state.store.delete_clip(id)?;
+            state.pins.update(|pins| pins.remove(&Source::Clip.id(id)));
+            state.reload_clipboard()?;
+        }
+        Action::ClearClipboard => {
+            state.store.clear_clipboard()?;
+            state.reload_clipboard()?;
+        }
+        Action::CopySnippet { id } => {
+            let library = state.library.get();
+            let item = library
+                .find(id)
+                .filter(|item| item.kind == LibraryKind::Snippet)
+                .ok_or_else(|| Error::msg("This snippet was deleted."))?;
+            // The clipboard may hold a password, so text that includes it
+            // is copied as secret and stays out of clipboard histories.
+            let read_clipboard = std::cell::Cell::new(false);
+            let text = library::render_snippet(&item.text, chrono::Local::now(), || {
+                read_clipboard.set(true);
+                system_clipboard::read_text()
+            });
+            copy_and_close(app, || {
+                system_clipboard::write_text(&text, read_clipboard.get())
+            })?;
+        }
+        Action::OpenQuicklink { id, query } => {
+            let library = state.library.get();
+            let item = library
+                .find(id)
+                .filter(|item| item.kind == LibraryKind::Quicklink)
+                .ok_or_else(|| Error::msg("This quicklink was deleted."))?;
+            match library::quicklink_target(&item.text, &query)? {
+                Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
+                    .map_err(|e| Error::msg(e.to_string()))?,
+                Target::Path(path) => open_path(&path)?,
+            }
+            window::hide(app)?;
+        }
+        Action::System { command } => {
+            // Hide first: Lock and Sleep must not leave the launcher on screen.
+            window::hide(app)?;
+            if let Err(error) = platform::run_system_command(command) {
+                window::show_again(app)?;
+                return Err(error);
+            }
+        }
+        Action::Pin { id } => {
+            let _limit = state
+                .limited_change
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            // Only items that exist can be pinned, and the pin stores the
+            // item's own ID, so a pin never widens what Open and Reveal accept.
+            // Read readiness first: a scan that finishes after the snapshot
+            // must not make its old, empty index count as ready.
+            let ready = state.freshness.ready();
+            let snapshot = state.snapshot();
+            let id = search::resolve(&snapshot, &Context::none(), &id)
+                .ok_or_else(|| Error::msg("This item no longer exists."))?
+                .id;
+            if let Some(oldest) = pin_to_drop(&snapshot, &id, ready)? {
+                state.store.set_pinned(&oldest, false)?;
+                state.pins.update(|pins| pins.remove(&oldest));
+            }
+            state.store.set_pinned(&id, true)?;
+            state.pins.update(|pins| pins.add(&id));
+        }
+        Action::Unpin { id } => {
+            state.store.set_pinned(&id, false)?;
+            state.pins.update(|pins| pins.remove(&id));
+        }
+        Action::Refresh => {
+            refresh::apps(app);
+            refresh::files(app);
+            refresh::rates(app, true);
+        }
+        Action::OpenSettings => window::open_settings(app)?,
+        // Exits below, once the use is saved: exit ends the process from
+        // the main thread while this worker may still be writing.
+        Action::Quit => {}
+    }
+    if counts_as_use && let Some(id) = result_id.filter(|id| learns_from_use(id)) {
+        record_use(&state, id);
+    }
+    if quit {
+        app.exit(0);
+    } else {
+        events::results_stale(app);
+    }
+    Ok(())
+}
+
+/// Copy, then hide and hand focus back so the user can paste right away.
+fn copy_and_close(app: &AppHandle, copy: impl FnOnce() -> Result<()>) -> Result<()> {
+    copy()?;
+    window::dismiss(app)
+}
+
+fn open_path(path: &Path) -> Result<()> {
+    if !path.exists() {
+        return Err(Error::msg(format!("{} no longer exists.", path.display())));
+    }
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| Error::msg(e.to_string()))
+}
+
+/// The pin that must go before `id` fits, or `None` while there is room or
+/// `id` is pinned already.
+/// A pin of a hidden item (a file outside the index, or a clipboard entry
+/// while history is off) waits for its item to return, but it cannot be
+/// unpinned, so it gives up its place when the list is full. That way no
+/// more than `MAX_PINS` pins ever show. Until a source is `ready`, its pins
+/// only look hidden, so they stay.
+fn pin_to_drop(
+    snapshot: &Snapshot,
+    id: &str,
+    ready: impl Fn(Source) -> bool,
+) -> Result<Option<String>> {
+    let pins = snapshot.pins.ids();
+    if pins.len() < MAX_PINS || snapshot.pins.contains(id) {
+        return Ok(None);
+    }
+    let ctx = Context::none();
+    let known = |pin: &str| Source::parse(pin).is_none_or(|(source, _)| ready(source));
+    pins.iter()
+        .find(|pin| known(pin) && search::resolve(snapshot, &ctx, pin).is_none())
+        .map(|pin| Some(pin.clone()))
+        .ok_or_else(|| Error::msg(format!("You can pin up to {MAX_PINS} items.")))
+}
+
+/// Results with stable IDs learn from use; computed answers do not.
+fn learns_from_use(id: &str) -> bool {
+    Source::parse(id).is_some_and(|(source, _)| source.learns_from_use())
+}
+
+fn record_use(state: &State, id: &str) {
+    let now = chrono::Utc::now().timestamp();
+    let used = state.usage.update(|usage| usage.record(id, now));
+    if let Err(error) = state.store.record_use(id, used) {
+        tracing::warn!(%error, "Could not save usage");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        search::{Category, usage::Pins},
+        settings::Settings,
+    };
+
+    #[test]
+    fn a_full_pin_list_gives_up_its_oldest_hidden_pin() {
+        let state = State::for_tests(Settings::default());
+        let emoji: Vec<String> = search::search(&state.snapshot(), "", Category::Emoji)
+            .into_iter()
+            .map(|result| result.id)
+            .collect();
+        assert_eq!(emoji.len(), MAX_PINS);
+        let drop_with = |pins: Vec<String>, scanned: bool| {
+            state.pins.set(Pins::new(pins));
+            let ready = |source| scanned || !matches!(source, Source::App | Source::File);
+            pin_to_drop(&state.snapshot(), "app:/New.app", ready)
+        };
+
+        assert_eq!(drop_with(emoji[1..].to_vec(), true).unwrap(), None);
+        // History is off, so the clipboard pin is hidden too, but newer.
+        let mut pins = vec!["file:/gone".to_owned(), "clip:7".to_owned()];
+        pins.extend_from_slice(&emoji[2..]);
+        assert_eq!(
+            drop_with(pins.clone(), true).unwrap().as_deref(),
+            Some("file:/gone")
+        );
+        // Before the first scan, the file pin may only look hidden.
+        assert_eq!(drop_with(pins, false).unwrap().as_deref(), Some("clip:7"));
+        assert!(drop_with(emoji.clone(), true).is_err());
+        // A second Pin of a pinned item changes nothing.
+        state.pins.set(Pins::new(emoji.clone()));
+        assert_eq!(
+            pin_to_drop(&state.snapshot(), &emoji[5], |_| true).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn only_stable_results_learn_from_use() {
+        assert!(learns_from_use("app:/Applications/Safari.app"));
+        assert!(learns_from_use("emoji:🚀"));
+        assert!(!learns_from_use("calc:1+1"));
+        assert!(!learns_from_use("clip:3"));
+        assert!(!learns_from_use("password:Pin:6"));
+    }
+}

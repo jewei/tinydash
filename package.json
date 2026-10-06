@@ -1,42 +1,37 @@
 {
   "name": "tinydash",
   "private": true,
-  "version": "0.1.3",
   "license": "MIT",
   "type": "module",
-  "packageManager": "bun@1.4.2",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "tauri": "tauri",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "test:ui": "playwright test",
-    "test:native": "bun tests/native/smoke.ts",
-    "verify": "bun scripts/verify/run.ts quick",
-    "verify:full": "bun scripts/verify/run.ts full",
-    "verify:browser": "bun scripts/verify/run.ts browser",
-    "verify:native": "bun scripts/verify/run.ts native",
-    "check:repo": "bun scripts/verify/repository.ts"
+    "dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "web": "vp dev",
+    "build": "tauri build",
+    "check": "vp check && cargo fmt --manifest-path src-tauri/Cargo.toml --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings",
+    "test": "vp test && cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "verify": "bun run check && vp test && vp build && bun scripts/bindings.ts",
+    "fix": "cargo fmt --manifest-path src-tauri/Cargo.toml && vp check --fix",
+    "emoji-data": "bun scripts/emoji-data.ts",
+    "prepare": "vp config --no-agent",
+    "tauri": "tauri"
   },
   "dependencies": {
-    "@solidjs/web": "2.0.0-rc.11",
-    "@tauri-apps/api": "3.0.0-alpha.2",
-    "solid-js": "2.0.0-rc.11"
+    "@tauri-apps/api": "2.12.1",
+    "solid-js": "1.9.15"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.0-alpha-1790635538000",
-    "@solidjs/vite-plugin": "3.0.0-next.46",
-    "@tauri-apps/cli": "3.0.0-alpha.3",
-    "@types/node": "26.6.3",
-    "prettier": "4.0.0-alpha.13",
-    "typescript": "7.1.0-dev.20260928.1",
-    "vite": "8.3.1"
+    "@solidjs/testing-library": "0.8.10",
+    "@tauri-apps/cli": "2.12.1",
+    "@types/bun": "1.4.2",
+    "jsdom": "30.1.2",
+    "typescript": "7.0.2",
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vite-plugin-solid": "2.11.14",
+    "vite-plus": "1.0.0"
   },
-  "patchedDependencies": {
-    "solid-js@2.0.0-rc.11": "patches/solid-js@2.0.0-rc.11.patch"
-  }
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.0.0",
+    "vitest": "5.0.1"
+  },
+  "packageManager": "bun@1.4.2"
 }

@@ -5,6 +5,6 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>TinyDash uses System Events to switch the system appearance and Finder to empty the Trash when you run those commands.</string>
+    <string>TinyDash asks Finder to empty the Trash, and System Events to restart, shut down, or log out, only when you run those commands.</string>
   </dict>
 </plist>

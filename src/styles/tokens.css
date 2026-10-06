@@ -1,0 +1,83 @@
+/* Design tokens. Colors switch on html[data-theme], set by lib/theme.ts. */
+@font-face {
+  font-family: "Figtree";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/figtree-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Caprasimo";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/caprasimo-latin.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: light;
+  --paper: #fcf8f2;
+  --raised: #f5efe6;
+  --field: #ebe5da;
+  --hover: #efe8dd;
+  --selected: #fbe4d4;
+  --selected-ink: #763f21;
+  --selected-edge: #e8bda0;
+  --ink: #302a24;
+  --muted: #6f6458;
+  --rule: #e4dbce;
+  --border: #d7ccbc;
+  /* Edges that identify a control (fields, switches): at least 3:1. */
+  --control-edge: #8a7d6e;
+  --accent: #9c4e28;
+  --accent-hover: #824020;
+  --accent-ink: #fff8f1;
+  --danger: #a33b2c;
+  --danger-ink: #fff8f1;
+  --notice: #fff2eb;
+  --shadow: #302a2433;
+  --backdrop: #302a2459;
+
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Caprasimo", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius-small: 6px;
+  --radius: 10px;
+  --radius-window: 14px;
+  --text-small: 12px;
+  --text: 14px;
+  --text-large: 22px;
+  --motion: 120ms ease-out;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #302d27;
+  --raised: #37332c;
+  --field: #403b32;
+  --hover: #3d3830;
+  --selected: #563b29;
+  --selected-ink: #ffdabc;
+  --selected-edge: #8d6444;
+  --ink: #f4eddf;
+  --muted: #c3b8a8;
+  --rule: #494236;
+  --border: #5f5545;
+  --control-edge: #94877a;
+  --accent: #efb181;
+  --accent-hover: #ffd0aa;
+  --accent-ink: #382819;
+  --danger: #ffb4a1;
+  --danger-ink: #3a1610;
+  --notice: #402310;
+  --shadow: #0c0b0a80;
+  --backdrop: #0c0b0a99;
+}

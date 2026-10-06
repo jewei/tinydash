@@ -1,47 +1,36 @@
 # TinyDash
 
-A desktop launcher for macOS, Windows, and Linux, built with Rust, Tauri, and SolidJS.
+A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut, type a few letters, and press Enter.
 
-TinyDash source is available under the [MIT license](LICENSE). TinyDash is free
-to download and use.
+- **Find** apps, files, clipboard history, snippets, quicklinks, emoji, and system commands.
+- **Answer** calculations, unit and currency conversions, dates, time zones, passwords, and clean URLs.
+- **Stay private:** everything runs on your computer. The only download is the daily currency rate table.
 
-Search applications, filenames, and clipboard history. Calculate values, convert units and currencies, find emoji, generate passwords, convert dates and times, clean URLs, and open web searches.
+![The TinyDash launcher](docs/screenshot.png)
 
-## Start
+## Install
 
-Download the [latest release](https://github.com/jewei/tinydash/releases/latest) for macOS (Apple silicon), Windows x64, or Ubuntu 24.04 x64. Read the [installation guide](docs/how-to/install.md) for package types, checksums, and signing limits. Development builds are in [GitHub Actions](https://github.com/jewei/tinydash/actions/workflows/check.yml).
+Download the latest build from [Releases](https://github.com/jewei/tinydash/releases). Builds are not code-signed. On macOS, the first time you open TinyDash, macOS blocks it: open System Settings > Privacy & Security and choose Open Anyway.
 
-To build from source, install Bun 1.4.2, Rust 1.98.1 or later, and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/).
+Press **Control+Shift+Space** to open TinyDash. See [all features and shortcuts](docs/features.md).
+
+## Build from source
+
+Install Bun 1.4.2, Node.js 24, Rust (rustup), and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), then:
 
 ```sh
-bun install --frozen-lockfile
-bun run tauri dev
+bun install
+bun run dev      # run with hot reload
+bun run build    # build installers for this OS
 ```
-
-Press **Control + Shift + Space** to show or hide the launcher. On native Wayland, assign a desktop shortcut to `tinydash`.
 
 ## Documentation
 
-- [First session](docs/tutorials/first-session.md)
-- [All features](docs/reference/features/README.md)
-- [Keyboard shortcuts](docs/reference/keyboard-shortcuts.md)
-- [Build and develop](docs/how-to/build.md)
-- [Verify a change](docs/how-to/verify.md)
-- [Architecture](docs/explanation/architecture.md)
-- [Documentation index](docs/README.md)
+- [Features](docs/features.md): what TinyDash does and its limits.
+- [Architecture](docs/architecture.md): how it works and why.
+- [Development](docs/development.md): commands, tests, and releases.
+- [AGENTS.md](AGENTS.md): rules for contributors, human or AI.
 
-## Development checks
+## License
 
-```sh
-bun run verify
-bun run verify:full
-```
-
-The fast check runs repository checks, Prettier and Rust formatting checks, type checks, and browser smoke tests. The full check also runs all browser tests, Rust tests, Clippy, and the frontend build. Native desktop checks use a separate command and test session.
-
-## Third-party material
-
-Dependencies keep their own licenses. The bundled [Figtree](public/fonts/Figtree-OFL.txt)
-and [Caprasimo](public/fonts/Caprasimo-OFL.txt) fonts use the SIL Open Font License.
-The [EFF word list](src-tauri/src/providers/tools/data/README.md) uses Creative
-Commons Attribution 4.0.
+MIT. Bundled fonts (Figtree, Caprasimo) use the SIL Open Font License; see `public/fonts`. Third-party data is listed in [`src-tauri/data/README.md`](src-tauri/data/README.md).
