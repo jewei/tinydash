@@ -1,6 +1,7 @@
 //! TinyDash: a small, keyboard-first desktop launcher.
 //!
-//! Start at [`run`]. `docs/architecture.md` maps the modules.
+//! Start at [`run`]. `AGENTS.md` maps the modules, and `docs/architecture.md`
+//! explains how they work together.
 
 mod actions;
 mod cli;

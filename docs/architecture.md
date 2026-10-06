@@ -28,7 +28,7 @@ A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42
 
 ## State and background work
 
-`State` (in `state.rs`) holds each index as a `Shared<T>`: readers clone an `Arc`; writers build a new value and swap it in. Nothing slow runs under a lock.
+`State` (in `state.rs`) holds each index as a `Shared<T>`: readers clone an `Arc`; writers build a new value and swap it in, so a search never waits for a writer. Writers that must not interleave also take a `Mutex` in `State` (`settings_change`, `reloading`, `limited_change`) and may hold it across database or OS work.
 
 | Work               | Trigger                                                                                                                      | Where                       |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
