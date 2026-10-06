@@ -138,7 +138,8 @@ export function Launcher() {
       case "run":
         return launcher.activate("selected");
       case "runRow":
-        return launcher.activate(command.index);
+        if (!clipboardOff()) launcher.activate(command.index);
+        return;
       case "runSecondary":
         return launcher.activate("selected", 1);
       case "delete":

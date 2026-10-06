@@ -505,6 +505,21 @@ describe("Launcher", () => {
     await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
   });
 
+  it("runs no hidden clipboard row with Mod+1 after history turns off", async () => {
+    const { backend, press } = setup((_query, category) =>
+      category === "clipboard" ? [clip] : [],
+    );
+    fireEvent.click(await screen.findByRole("tab", { name: "Clipboard" }));
+    await screen.findByRole("option", { name: /Safari/ });
+    press("1", { code: "Digit1", ctrlKey: true });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    await emit("settings:changed", { ...testSettings, clipboardHistoryEnabled: false });
+    await screen.findByText("Clipboard history is off");
+    press("1", { code: "Digit1", ctrlKey: true });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(1);
+  });
+
   it("cancels a confirmation when the backdrop is clicked", async () => {
     const { backend, press } = setup(() => [restart]);
     await screen.findByRole("option", { name: /Restart/ });
