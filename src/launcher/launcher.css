@@ -6,6 +6,12 @@ body {
   overflow: hidden;
 }
 
+/* Inside the rounded panel, so a dialog's backdrop leaves the window's
+   transparent corners clear. */
+.launcher .backdrop {
+  position: absolute;
+}
+
 .launcher {
   position: relative;
   display: flex;
@@ -56,6 +62,11 @@ body {
   border-bottom: 1px solid var(--rule);
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.tab-list {
+  display: flex;
+  gap: var(--space-1);
 }
 
 .tab {

@@ -216,25 +216,28 @@ export function Launcher() {
         />
       </header>
 
-      <nav class="tabs" role="tablist" aria-label="Categories">
-        <For each={CATEGORIES}>
-          {(category) => (
-            <button
-              type="button"
-              role="tab"
-              class="tab"
-              aria-selected={launcher.category() === category.id}
-              tabIndex={-1}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                if (menu()) closeMenu();
-                launcher.setCategory(category.id);
-              }}
-            >
-              {category.label}
-            </button>
-          )}
-        </For>
+      <nav class="tabs" aria-label="Categories">
+        {/* The hint stays outside the tab list, which may hold only tabs. */}
+        <div class="tab-list" role="tablist" aria-label="Categories">
+          <For each={CATEGORIES}>
+            {(category) => (
+              <button
+                type="button"
+                role="tab"
+                class="tab"
+                aria-selected={launcher.category() === category.id}
+                tabIndex={-1}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (menu()) closeMenu();
+                  launcher.setCategory(category.id);
+                }}
+              >
+                {category.label}
+              </button>
+            )}
+          </For>
+        </div>
         <span class="tabs-hint">
           <Keys keys={["Tab"]} /> next
         </span>

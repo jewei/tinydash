@@ -74,6 +74,12 @@ describe("Launcher", () => {
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
   });
 
+  it("keeps only tabs in the tab list", async () => {
+    setup(() => []);
+    const tablist = await screen.findByRole("tablist", { name: "Categories" });
+    for (const child of tablist.children) expect(child.getAttribute("role")).toBe("tab");
+  });
+
   it("moves through categories with Tab", async () => {
     const { backend, press } = setup(() => []);
     await waitFor(() => expect(backend.called("search")).toHaveLength(1));
