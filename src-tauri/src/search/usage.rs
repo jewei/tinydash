@@ -45,7 +45,7 @@ impl Usage {
     }
 
     /// Ranking bonus, at most 1,000: up to 500 for frequency and up to 500
-    /// for recency. A strong name match (2,000+) always outranks usage alone.
+    /// for recency. A strong name match (2,700+) always outranks usage alone.
     pub fn bonus(&self, id: &str, now: i64) -> u32 {
         let Some(entry) = self.0.get(id) else {
             return 0;

@@ -6,7 +6,7 @@ use ts_rs::TS;
 use crate::search::{
     CATEGORY_LIMIT, Context,
     id::Source,
-    matcher::Matcher,
+    matcher::{KEYWORD_PENALTY, Matcher},
     result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult},
     top,
 };
@@ -34,9 +34,6 @@ impl EmojiLanguage {
         }
     }
 }
-
-/// A localized keyword ranks below an equally good name match.
-const KEYWORD_PENALTY: u32 = 300;
 
 struct Entry {
     emoji: &'static emojis::Emoji,

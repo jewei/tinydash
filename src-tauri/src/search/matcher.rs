@@ -7,14 +7,19 @@ use unicode_normalization::UnicodeNormalization;
 /// Bonus for a name that equals the query, ignoring case.
 pub const EXACT: u32 = 10_000;
 /// Bonus for a name that starts with the query.
-pub const PREFIX: u32 = 2_000;
+pub const PREFIX: u32 = 3_000;
 /// Bonus for a name with a word that starts with the query.
 pub const WORD_PREFIX: u32 = 500;
-/// Scores at or above this come from a name that starts with the query.
-pub const STRONG: u32 = PREFIX;
-/// The highest fuzzy score. Fuzzy scores grow with the query's length, so
-/// without a cap a long word-prefix match with usage (up to 1,000) would
-/// reach `STRONG`; capped, it stops at 1,999.
+/// An alias ranks a little below the same match on the name.
+const ALIAS_PENALTY: u32 = 100;
+/// A localized keyword ranks below an equally good name match.
+pub const KEYWORD_PENALTY: u32 = 300;
+/// Scores at or above this come from a name, alias, or keyword that starts
+/// with the query (2,700 or more). Any other match, with the most usage
+/// (1,000), stays below: 499 + 500 + 1,000 = 1,999.
+pub const STRONG: u32 = PREFIX - KEYWORD_PENALTY;
+/// Fuzzy scores grow with the query's length; [`squeeze`] keeps them below
+/// this, so they never reach the word-prefix bonus.
 const MAX_FUZZY: u32 = WORD_PREFIX - 1;
 
 /// Fuzzy matching with name bonuses. One matcher serves one query; it keeps
@@ -67,7 +72,7 @@ impl Matcher {
     fn fuzzy(&mut self, text: &str) -> Option<u32> {
         self.pattern
             .score(Utf32Str::new(text, &mut self.buffer), &mut self.nucleo)
-            .map(|score| score.min(MAX_FUZZY))
+            .map(squeeze)
     }
 
     /// Score when every query word appears in `text` as written, for long
@@ -75,11 +80,10 @@ impl Matcher {
     pub fn words(&mut self, text: &str) -> Option<u32> {
         self.words
             .score(Utf32Str::new(text, &mut self.buffer), &mut self.nucleo)
-            .map(|score| score.min(MAX_FUZZY))
+            .map(squeeze)
     }
 
-    /// Best name score among a name and its aliases. Aliases rank a little
-    /// below the same match on the name.
+    /// Best name score among a name and its aliases.
     pub fn best<'a>(
         &mut self,
         name: &str,
@@ -87,11 +91,19 @@ impl Matcher {
     ) -> Option<u32> {
         let mut best = self.name(name);
         for alias in aliases {
-            let score = self.name(alias).map(|score| score.saturating_sub(100));
+            let score = self
+                .name(alias)
+                .map(|score| score.saturating_sub(ALIAS_PENALTY));
             best = best.max(score);
         }
         best
     }
+}
+
+/// Map a fuzzy score below `MAX_FUZZY`, keeping the order of different
+/// scores, so long matches still rank by quality.
+fn squeeze(score: u32) -> u32 {
+    (u64::from(MAX_FUZZY) * u64::from(score) / (u64::from(score) + 500)) as u32
 }
 
 /// NFC, lowercase, and single spaces: the form all matching compares.
@@ -141,6 +153,27 @@ mod tests {
         assert!(word + 1_000 < STRONG, "{word}");
         let path = "/Users/me/microsoft visual studio code insiders edition/notes.txt";
         assert!(matcher.words(path).unwrap() < WORD_PREFIX);
+    }
+
+    #[test]
+    fn a_short_alias_or_keyword_prefix_is_strong() {
+        // Short queries score little on fuzzy, so a penalty must not push a
+        // prefix match out of the strong tier, where usage could lift it back.
+        let mut matcher = Matcher::new("r");
+        assert!(matcher.best("Restart", []).unwrap() >= STRONG);
+        assert!(matcher.best("Shut Down", ["reboot"]).unwrap() >= STRONG);
+        let keyword = matcher.name("reboot").unwrap() - KEYWORD_PENALTY;
+        assert!(keyword >= STRONG);
+    }
+
+    #[test]
+    fn long_matches_keep_their_order() {
+        let scores: Vec<u32> = [36, 62, 514, 537, 5_000].map(squeeze).into();
+        assert!(
+            scores.windows(2).all(|pair| pair[0] < pair[1]),
+            "{scores:?}"
+        );
+        assert!(squeeze(u32::MAX) < WORD_PREFIX);
     }
 
     #[test]
