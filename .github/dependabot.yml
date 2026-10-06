@@ -11,6 +11,11 @@ updates:
     ignore:
       - dependency-name: "tauri*"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # Tauri 2 links GTK 0.18 on Linux, and these bindings must match it.
+      - dependency-name: gio
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: gtk
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: bun
     directory: /
     schedule: { interval: weekly }
