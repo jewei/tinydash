@@ -545,6 +545,31 @@ describe("Launcher", () => {
     expect(backend.called("run_action")).toHaveLength(0);
   });
 
+  it("clears the history from the Clipboard tab, after asking", async () => {
+    const { backend, press } = setup((_query, category) =>
+      category === "clipboard" ? [clip] : [app],
+    );
+    await screen.findByRole("option", { name: /Safari/ });
+    expect(screen.queryByRole("button", { name: /Clear History/ })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Clipboard" }));
+    await waitFor(() =>
+      expect(backend.called("search").at(-1)?.args).toMatchObject({ category: "clipboard" }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /Clear History/ }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Delete all clipboard history except pinned entries?");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Clear Clipboard History" }));
+    await waitFor(() =>
+      expect(backend.called("run_action")[0]?.args).toEqual({
+        action: { type: "clearClipboard" },
+        resultId: null,
+      }),
+    );
+    // Mod+K lists it there too.
+    press("k", { ctrlKey: true });
+    expect(await screen.findByRole("option", { name: /Clear Clipboard History/ })).toBeTruthy();
+  });
+
   it("reloads the preview when results refresh", async () => {
     const snippet = { ...app, id: "snippet:1", kind: "snippet" as const, title: "Sig" };
     let text = "Regards";
