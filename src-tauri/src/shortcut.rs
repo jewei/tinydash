@@ -56,7 +56,7 @@ pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
     unregister(app)?;
     app.global_shortcut().register(shortcut).map_err(|error| {
         let hint = if cfg!(target_os = "linux") {
-            " On Wayland, assign a desktop shortcut that runs `tinydash` instead."
+            " Another app may already use it. On Wayland, assign a desktop shortcut that runs `tinydash` instead."
         } else {
             " Another app may already use it."
         };
