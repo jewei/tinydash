@@ -12,6 +12,10 @@ pub const PREFIX: u32 = 2_000;
 pub const WORD_PREFIX: u32 = 500;
 /// Scores at or above this come from a name that starts with the query.
 pub const STRONG: u32 = PREFIX;
+/// The highest fuzzy score. Fuzzy scores grow with the query's length, so
+/// without a cap a long word-prefix match with usage (up to 1,000) would
+/// reach `STRONG`; capped, it stops at 1,999.
+const MAX_FUZZY: u32 = WORD_PREFIX - 1;
 
 /// Fuzzy matching with name bonuses. One matcher serves one query; it keeps
 /// its buffers between calls, so scoring many items does not allocate.
@@ -63,6 +67,7 @@ impl Matcher {
     fn fuzzy(&mut self, text: &str) -> Option<u32> {
         self.pattern
             .score(Utf32Str::new(text, &mut self.buffer), &mut self.nucleo)
+            .map(|score| score.min(MAX_FUZZY))
     }
 
     /// Score when every query word appears in `text` as written, for long
@@ -70,6 +75,7 @@ impl Matcher {
     pub fn words(&mut self, text: &str) -> Option<u32> {
         self.words
             .score(Utf32Str::new(text, &mut self.buffer), &mut self.nucleo)
+            .map(|score| score.min(MAX_FUZZY))
     }
 
     /// Best name score among a name and its aliases. Aliases rank a little
@@ -125,6 +131,16 @@ mod tests {
         assert!(exact > prefix && prefix > word && word > fuzzy);
         assert!(prefix >= STRONG && word < STRONG);
         assert_eq!(matcher.name("Safari"), None);
+
+        // A long query scores high on fuzzy alone; with the most usage, a
+        // word-prefix match must still stay below a prefix match.
+        let mut matcher = Matcher::new("microsoft visual studio code insiders edition");
+        let word = matcher
+            .name("The Microsoft Visual Studio Code Insiders Edition")
+            .unwrap();
+        assert!(word + 1_000 < STRONG, "{word}");
+        let path = "/Users/me/microsoft visual studio code insiders edition/notes.txt";
+        assert!(matcher.words(path).unwrap() < WORD_PREFIX);
     }
 
     #[test]
