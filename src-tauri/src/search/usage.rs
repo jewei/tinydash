@@ -25,7 +25,8 @@ impl Usage {
     pub fn record(&mut self, id: &str, now: i64) -> Use {
         let entry = self.0.entry(id.to_owned()).or_default();
         entry.count = entry.count.saturating_add(1);
-        entry.last_used = now;
+        // A clock set back must not make the entry older, as on disk.
+        entry.last_used = entry.last_used.max(now);
         let used = *entry;
         if self.0.len() > MAX_USAGE
             && let Some(oldest) = self
@@ -110,6 +111,7 @@ mod tests {
         assert_eq!(usage.bonus("once", now), 525);
         assert_eq!(usage.bonus("once", now + DAY), 275);
         assert_eq!(usage.bonus("never", now), 0);
+        assert_eq!(usage.record("once", now - DAY).last_used, now);
     }
 
     #[test]
