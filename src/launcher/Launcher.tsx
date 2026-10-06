@@ -127,8 +127,12 @@ export function Launcher() {
       if (document.activeElement !== input && editsQuery(event)) focusInput();
       return;
     }
-    // Mod+Backspace deletes a clipboard entry; anywhere else it edits the text.
-    if (command.type === "delete" && !canDelete()) return;
+    // Mod+Backspace deletes a clipboard entry; anywhere else it edits the
+    // text, in the search field even after a click moved focus.
+    if (command.type === "delete" && !canDelete()) {
+      if (document.activeElement !== input) focusInput();
+      return;
+    }
     event.preventDefault();
     // Holding a key moves the selection; it never repeats an action.
     if (event.repeat && command.type !== "move") return;

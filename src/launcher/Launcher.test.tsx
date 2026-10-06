@@ -323,6 +323,16 @@ describe("Launcher", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("returns focus to the search field for Mod+Backspace with nothing to delete", async () => {
+    const { input } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    (document.activeElement as HTMLElement).blur();
+    const event = { key: "Backspace", code: "Backspace", ctrlKey: true };
+    // Not cancelled, so the field deletes the word as usual.
+    expect(fireEvent.keyDown(document.body, event)).toBe(true);
+    expect(document.activeElement).toBe(input);
+  });
+
   it("names exchange rates in Refresh only when they are on", async () => {
     const { press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
