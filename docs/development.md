@@ -79,7 +79,18 @@ Automated tests do not cover the OS effects. Check these by hand on a real deskt
 
 ## Release
 
-1. Bump `version` in `src-tauri/Cargo.toml`; Tauri reads the app version from it. Then run `cargo update --workspace --manifest-path src-tauri/Cargo.toml`, so `Cargo.lock` matches: checks and CI run Cargo with `--locked`.
-2. Merge to `main`, then push a tag such as `v0.2.0`.
-3. The Release workflow checks that the tag matches the version, builds a universal macOS app and DMG (Apple silicon and Intel), the Windows installer, and the Debian package, and attaches them to a draft GitHub release. The macOS app is signed with the Developer ID and notarized, from the `APPLE_*` repository secrets: certificate, its password, signing identity, Apple ID, app-specific password, and team ID. Windows and Linux builds are not signed.
-4. Review the draft and publish it.
+Merge everything for the release to `main` and wait for CI to pass. Then run:
+
+```sh
+bun run release 0.2.1           # publish
+bun run release 0.2.1 --draft   # or make a draft, try the installers, then publish it on GitHub
+```
+
+The command starts the Release workflow on `main` and follows it to the end, which takes about 15 minutes. You can also start it from Actions > Release > Run workflow. The workflow:
+
+1. Stops unless it runs on `main`, the tag `vVERSION` does not exist, and CI ("Required checks") passed on that commit.
+2. Writes the version into `src-tauri/Cargo.toml` and `Cargo.lock` in each runner (`scripts/set-version.ts`). Both stay at `0.0.0` in the repository, so a release needs no commit, and a local build reports 0.0.0.
+3. Builds a universal macOS DMG (Apple silicon and Intel), the Windows installer, and the Debian package. The macOS app is signed with the Developer ID and notarized, from the `APPLE_*` repository secrets: certificate, its password, signing identity, Apple ID, app-specific password, and team ID. The build fails unless Gatekeeper accepts the app as notarized. Windows and Linux builds are not signed.
+4. Only when all three builds pass: tags the commit `vVERSION`, and publishes the release with the installers, `SHA256SUMS`, and notes made from the merged pull requests.
+
+If a build fails, nothing is tagged or published: fix the cause, merge, and run the command again. To replace a published release, release a new version.

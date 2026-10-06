@@ -1,6 +1,8 @@
 [package]
 name = "tinydash"
-version = "0.2.0"
+# 0.0.0 between releases: the Release workflow sets the real version with
+# scripts/set-version.ts, so no commit is needed to release.
+version = "0.0.0"
 description = "A small, keyboard-first desktop launcher"
 license = "MIT"
 edition = "2024"

@@ -12,6 +12,7 @@
     "verify": "bun run check && vp test && vp build && bun scripts/bindings.ts",
     "fix": "cargo fmt --manifest-path src-tauri/Cargo.toml && vp check --fix",
     "emoji-data": "bun scripts/emoji-data.ts",
+    "release": "bun scripts/release.ts",
     "prepare": "vp config --no-agent",
     "tauri": "tauri"
   },
