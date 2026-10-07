@@ -119,6 +119,25 @@ describe("Launcher", () => {
     expect(clipboard.getAttribute("aria-selected")).toBe("true");
   });
 
+  it("does nothing on Tab when only All shows", async () => {
+    const { backend, press } = setup(() => [], {
+      launcher_init: () => ({
+        settings: {
+          ...testSettings,
+          tabs: testSettings.tabs.map((tab) => ({ ...tab, shown: false })),
+        },
+        platform: "macos",
+        warnings: [],
+      }),
+    });
+    await waitFor(() => expect(screen.queryByText("next")).toBeNull());
+    await waitFor(() => expect(backend.called("search").length).toBeGreaterThan(0));
+    const searches = backend.called("search").length;
+    press("Tab");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("search")).toHaveLength(searches);
+  });
+
   it("opens the action menu with Mod+K", async () => {
     const { backend, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });

@@ -257,9 +257,11 @@ export function Launcher() {
             )}
           </For>
         </div>
-        <span class="tabs-hint">
-          <Keys keys={["Tab"]} /> next
-        </span>
+        <Show when={tabs().length > 1}>
+          <span class="tabs-hint">
+            <Keys keys={["Tab"]} /> next
+          </span>
+        </Show>
       </nav>
 
       <Show when={notice()}>

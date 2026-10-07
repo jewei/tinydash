@@ -106,7 +106,9 @@ export function createLauncher() {
   function moveCategory(by: 1 | -1, tabs: readonly Category[]) {
     const index = tabs.indexOf(category());
     const next = tabs[(index + by + tabs.length) % tabs.length];
-    if (next) setCategory(next);
+    // With one tab there is nowhere to go; starting it over would drop a
+    // waiting Enter and the error on screen.
+    if (next && next !== category()) setCategory(next);
   }
 
   function move(by: 1 | -1) {
