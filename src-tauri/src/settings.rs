@@ -40,6 +40,19 @@ pub struct Settings {
     pub emoji_languages: Vec<EmojiLanguage>,
     pub currency_rates_enabled: bool,
     pub search_engine: SearchEngine,
+    /// Where the user dragged the launcher, in the units of
+    /// `platform::launcher_position`. `None` centers it on the screen with
+    /// the pointer. A spot no longer on any screen counts as `None`.
+    pub launcher_position: Option<LauncherPosition>,
+}
+
+/// The launcher's top-left corner: logical points on macOS, physical pixels
+/// on Windows and Linux.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LauncherPosition {
+    pub x: f64,
+    pub y: f64,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -73,6 +86,7 @@ impl Default for Settings {
             emoji_languages: Vec::new(),
             currency_rates_enabled: true,
             search_engine: SearchEngine::Google,
+            launcher_position: None,
         }
     }
 }
@@ -231,6 +245,24 @@ mod tests {
             serde_json::from_str(r#"{"hideOnBlur": false, "appearance": "sage"}"#).unwrap();
         assert!(!settings.hide_on_blur);
         assert_eq!(settings.shortcut, Settings::default().shortcut);
+    }
+
+    #[test]
+    fn a_dragged_position_saves_and_clears_like_any_setting() {
+        let Value::Object(moved) =
+            serde_json::json!({ "launcherPosition": { "x": 40.5, "y": -900.0 } })
+        else {
+            unreachable!()
+        };
+        let moved = Settings::default().with_changes(moved).unwrap();
+        assert_eq!(
+            moved.launcher_position,
+            Some(LauncherPosition { x: 40.5, y: -900.0 })
+        );
+        let Value::Object(reset) = serde_json::json!({ "launcherPosition": null }) else {
+            unreachable!()
+        };
+        assert_eq!(moved.with_changes(reset).unwrap().launcher_position, None);
     }
 
     #[test]

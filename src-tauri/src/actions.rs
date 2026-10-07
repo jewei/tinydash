@@ -166,6 +166,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             refresh::rates(app, true);
         }
         Action::OpenSettings => window::open_settings(app)?,
+        Action::CenterLauncher => window::center(app)?,
         // Exits below, once the use is saved: exit ends the process from
         // the main thread while this worker may still be writing.
         Action::Quit => {}

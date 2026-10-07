@@ -35,6 +35,7 @@ const generalActions = (rates: boolean): ResultAction[] => [
     action: { type: "refresh" },
     confirm: null,
   },
+  { label: "Center Launcher", action: { type: "centerLauncher" }, confirm: null },
   { label: "Settings", action: { type: "openSettings" }, confirm: null },
   { label: "Quit TinyDash", action: { type: "quit" }, confirm: null },
 ];
@@ -214,6 +215,15 @@ export function Launcher() {
 
   const notice = () => launcher.actionError() ?? launcher.searchError() ?? warnings()[0];
 
+  // The window has no title bar, so the empty parts of the tab bar and the
+  // footer move it. Cancelled, so focus stays in the search field.
+  const dragFromEmptySpace = (event: MouseEvent) => {
+    if (event.button !== 0 || (event.target as Element).closest("button")) return;
+    event.preventDefault();
+    // A desktop may refuse a drag (some Wayland compositors); nothing to undo.
+    ipc.dragLauncher().catch(() => undefined);
+  };
+
   return (
     <div class="launcher" data-platform={platform()}>
       <header class="search">
@@ -235,7 +245,7 @@ export function Launcher() {
         />
       </header>
 
-      <nav class="tabs" aria-label="Categories">
+      <nav class="tabs" aria-label="Categories" onMouseDown={dragFromEmptySpace}>
         {/* The hint stays outside the tab list, which may hold only tabs. */}
         <div class="tab-list" role="tablist" aria-label="Categories">
           <For each={CATEGORIES}>
@@ -337,7 +347,7 @@ export function Launcher() {
         </Show>
       </main>
 
-      <footer class="footer">
+      <footer class="footer" onMouseDown={dragFromEmptySpace}>
         <Show when={selected()?.actions[0]}>
           {(action) => (
             <span class="footer-primary">

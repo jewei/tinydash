@@ -235,7 +235,10 @@ body {
 }
 
 .preview-details {
+  /* Shrinks and scrolls when space is short, so long text never runs under
+     the actions below it. */
   min-height: 0;
+  overflow: auto;
 }
 
 .preview-text {

@@ -25,7 +25,7 @@ use crate::{
         id::Source,
         result::{Action, SearchResult},
     },
-    settings::{self, Settings},
+    settings::{self, LauncherPosition, Settings},
     shortcut,
     state::State,
     tray, watcher, window,
@@ -120,6 +120,37 @@ pub async fn preview(app: AppHandle, id: String) -> Result<Option<Preview>> {
 #[tauri::command]
 pub fn hide_launcher(app: AppHandle) -> Result<()> {
     window::dismiss(&app)
+}
+
+/// Start moving the launcher with the pointer. On the main thread, which
+/// a window drag needs; it waits for nothing.
+#[tauri::command]
+pub fn drag_launcher(app: AppHandle) -> Result<()> {
+    window::drag(&app)
+}
+
+/// Save where the launcher opens, or `None` to center it. The launcher
+/// saves its spot after a drag, and Center Launcher clears it. Never call
+/// it on the main thread: a settings change may hold the lock while it
+/// waits for the main thread.
+pub fn set_launcher_position(app: &AppHandle, position: Option<LauncherPosition>) -> Result<()> {
+    let state = app.state::<State>();
+    let _one_change_at_a_time = state
+        .settings_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let old = state.settings.get();
+    if old.launcher_position == position {
+        return Ok(());
+    }
+    let new = Settings {
+        launcher_position: position,
+        ..Settings::clone(&old)
+    };
+    settings::save(&state.dirs.config, &new)?;
+    state.settings.set(new.clone());
+    events::settings_changed(app, &new);
+    Ok(())
 }
 
 #[tauri::command]
