@@ -18,7 +18,7 @@ import { commandFor } from "./keymap";
 import { PreviewPane } from "./PreviewPane";
 import { optionId, ResultList } from "./ResultList";
 import { createLauncher } from "./state";
-import { hasWidgets, WidgetPane } from "./WidgetPane";
+import { hasWidgets, inNote, type PaneControls, WidgetPane } from "./WidgetPane";
 
 /** Keys that change the query: characters (AltGr included), deletion, paste. */
 function editsQuery(event: KeyboardEvent) {
@@ -78,6 +78,8 @@ export function Launcher() {
       .finally(() => setInstalling(false));
   };
   let input!: HTMLInputElement;
+  // Set while the widget pane is on screen.
+  let pane: PaneControls | undefined;
 
   const focusInput = () => input.focus();
 
@@ -166,6 +168,12 @@ export function Launcher() {
       return;
     }
     const command = commandFor(event);
+    // Keys in the note type there; only Mod+J leaves it, as Escape does.
+    if (inNote(event.target)) {
+      if (command?.type !== "note") return;
+      event.preventDefault();
+      return focusInput();
+    }
     if (!command) {
       // Typing, deleting, and pasting go to the search field, even after a
       // click moved focus. Other keys (Mod+C on selected preview text, a
@@ -200,6 +208,9 @@ export function Launcher() {
         return launcher.moveCategory(command.by, tabs());
       case "settings":
         return runGeneral({ type: "openSettings" });
+      case "note":
+        if (!(showsWidgets() && pane?.focusNote())) focusInput();
+        return;
       case "hide":
         // Escape first dismisses a startup warning, then hides.
         if (warnings().length && !launcher.actionError() && !launcher.searchError()) {
@@ -435,7 +446,13 @@ export function Launcher() {
             </Show>
           </Show>
           <Show when={showsWidgets()}>
-            <WidgetPane />
+            <WidgetPane
+              controls={(controls) => {
+                pane = controls;
+                onCleanup(() => (pane = undefined));
+              }}
+              onLeave={focusInput}
+            />
           </Show>
         </Show>
       </main>

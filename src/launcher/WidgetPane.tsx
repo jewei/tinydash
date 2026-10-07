@@ -14,10 +14,27 @@ import type { Disk } from "../generated/Disk";
 import type { Settings } from "../generated/Settings";
 import { formatBytes } from "../lib/format";
 import * as ipc from "../lib/ipc";
+import { isComposing, modKey } from "../lib/keys";
 import { Glyph } from "../ui/Icon";
+import { Keys } from "../ui/Keys";
 
 /** Whether any widget is on, so the pane has something to show. */
-export const hasWidgets = (settings: Settings) => settings.showClocks || settings.showDiskSpace;
+export const hasWidgets = (settings: Settings) =>
+  settings.showClocks || settings.showDiskSpace || settings.showNotepad;
+
+/** What the launcher's shortcuts do in the pane. Each says whether it acted. */
+export interface PaneControls {
+  focusNote: () => boolean;
+}
+
+/** The note's field, so the launcher leaves its keys alone. */
+export const inNote = (target: EventTarget | null) =>
+  target instanceof Element && target.closest(".notepad") !== null;
+
+/** 10,000 matches MAX_NOTE_CHARS in the Rust code. */
+const MAX_NOTE_CHARS = 10_000;
+/** Typing pauses this long before the note saves. */
+const SAVE_DELAY_MS = 400;
 
 /** A signal of the current time that ticks every second while mounted. */
 function createNow() {
@@ -39,9 +56,20 @@ const hourMinute = (timeZone?: string) =>
  * The cards to the right of an empty All search. They load when the pane
  * appears, each time the launcher opens, and when settings change.
  */
-export function WidgetPane() {
+export function WidgetPane(props: {
+  controls: (controls: PaneControls) => void;
+  /** Leave the note for the search field. */
+  onLeave: () => void;
+}) {
   const [widgets, { refetch }] = createResource(ipc.widgets);
   const now = createNow();
+  let noteField: HTMLTextAreaElement | undefined;
+  props.controls({
+    focusNote: () => {
+      noteField?.focus();
+      return noteField !== undefined;
+    },
+  });
 
   onMount(() => {
     const listeners = [
@@ -53,17 +81,27 @@ export function WidgetPane() {
 
   return (
     <aside class="widgets" aria-label="Widgets">
-      <Show when={widgets.error}>
-        {(error) => (
-          <p class="widgets-error" role="alert">
-            Could not load the widgets: {ipc.message(error())}
-          </p>
-        )}
+      <div class="widget-grid">
+        <Show when={widgets.error}>
+          {(error) => (
+            <p class="widgets-error" role="alert">
+              Could not load the widgets: {ipc.message(error())}
+            </p>
+          )}
+        </Show>
+        <Show when={widgets.latest?.clocks}>
+          {(cities) => <Clocks cities={cities()} now={now()} />}
+        </Show>
+        <Show when={widgets.latest?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
+      </div>
+      {/* An empty note is still a note, so test for null. */}
+      <Show when={widgets.latest && widgets.latest.note !== null}>
+        <Notepad
+          initial={widgets.latest?.note ?? ""}
+          field={(field) => (noteField = field)}
+          onLeave={props.onLeave}
+        />
       </Show>
-      <Show when={widgets.latest?.clocks}>
-        {(cities) => <Clocks cities={cities()} now={now()} />}
-      </Show>
-      <Show when={widgets.latest?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
     </aside>
   );
 }
@@ -165,6 +203,96 @@ function DiskSpace(props: { disk: Disk }) {
           {(disk) => <p class="widget-note">Could not read the disk. {disk().message}</p>}
         </Match>
       </Switch>
+    </section>
+  );
+}
+
+/**
+ * One scratch note. It starts from the saved text and then keeps its own,
+ * since only this field edits it; a pause in typing, leaving the field,
+ * and closing the card save it.
+ */
+function Notepad(props: {
+  initial: string;
+  field: (field: HTMLTextAreaElement | undefined) => void;
+  onLeave: () => void;
+}) {
+  const [text, setText] = createSignal(props.initial);
+  // Typed text that is not saved yet, and why the last save failed.
+  const [pending, setPending] = createSignal(false);
+  const [failure, setFailure] = createSignal<string>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let unsaved = false;
+  // Saves run one at a time, in order, so an older text never lands last.
+  let saving = Promise.resolve();
+
+  const save = () => {
+    clearTimeout(timer);
+    if (!unsaved) return;
+    unsaved = false;
+    const value = text();
+    saving = saving.then(() =>
+      ipc.saveNote(value).then(
+        () => {
+          setPending(unsaved);
+        },
+        (error) => {
+          setFailure(ipc.message(error));
+          setPending(unsaved);
+        },
+      ),
+    );
+  };
+  onCleanup(() => {
+    save();
+    props.field(undefined);
+  });
+
+  const words = () => text().split(/\s+/).filter(Boolean).length;
+  const status = () => {
+    const reason = failure();
+    if (reason) return `Not saved. ${reason}`;
+    return pending() ? "Saving…" : "Saved";
+  };
+
+  return (
+    <section class="widget notepad" aria-label="Notepad">
+      <div class="notepad-head">
+        <label for="tinydash-note" class="widget-note widget-title">
+          Notepad
+        </label>
+        <Keys keys={[modKey(), "J"]} />
+        <span
+          class="widget-note notepad-status"
+          classList={{ failed: failure() !== undefined }}
+          role="status"
+        >
+          {words() === 1 ? "1 word" : `${words()} words`} · {status()}
+        </span>
+      </div>
+      <textarea
+        id="tinydash-note"
+        ref={props.field}
+        class="notepad-text"
+        placeholder="Jot something down…"
+        maxLength={MAX_NOTE_CHARS}
+        spellcheck={false}
+        value={text()}
+        onInput={(event) => {
+          setText(event.currentTarget.value);
+          setPending(true);
+          setFailure(undefined);
+          unsaved = true;
+          clearTimeout(timer);
+          timer = setTimeout(save, SAVE_DELAY_MS);
+        }}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape" || isComposing(event)) return;
+          event.preventDefault();
+          props.onLeave();
+        }}
+      />
     </section>
   );
 }

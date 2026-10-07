@@ -337,5 +337,11 @@ pub async fn install_update(app: AppHandle) -> Result<()> {
 /// What the widget pane shows now.
 #[tauri::command]
 pub async fn widgets(app: AppHandle) -> Result<Widgets> {
-    blocking(move || Ok(widgets::load(&app.state::<State>()))).await
+    blocking(move || widgets::load(&app.state::<State>())).await
+}
+
+/// Save the scratch note of the widget pane.
+#[tauri::command]
+pub async fn save_note(app: AppHandle, text: String) -> Result<()> {
+    blocking(move || widgets::save_note(&app.state::<State>(), &text)).await
 }

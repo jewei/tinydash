@@ -36,10 +36,15 @@ export const testSettings: Settings = {
   showClocks: true,
   clockCities: [],
   showDiskSpace: true,
+  showNotepad: false,
 };
 
 /** Every widget off, so an empty All search shows the preview. */
-export const noWidgets: Partial<Settings> = { showClocks: false, showDiskSpace: false };
+export const noWidgets: Partial<Settings> = {
+  showClocks: false,
+  showDiskSpace: false,
+  showNotepad: false,
+};
 
 export const app: SearchResult = {
   id: "app:/Applications/Safari.app",
@@ -110,7 +115,8 @@ export function fakeBackend(
     delete_library_item: () => null,
     check_for_update: () => null,
     install_update: () => null,
-    widgets: () => ({ clocks: [], disk: null }),
+    widgets: () => ({ clocks: [], disk: null, note: null }),
+    save_note: () => null,
     about: () => ({
       version: "0.2.0",
       settingsFolder: "/data",

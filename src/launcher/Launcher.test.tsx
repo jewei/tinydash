@@ -973,6 +973,45 @@ describe("Launcher", () => {
     expect(await within(card).findByText(/Low space/)).toBeTruthy();
   });
 
+  it("edits the note with Mod+J, saves it, and leaves with Escape", async () => {
+    const { backend, input, press } = setup(() => [app], {
+      widgets: () => ({ clocks: null, disk: null, note: "" }),
+    });
+    const card = await screen.findByRole("region", { name: "Notepad" });
+    press("j", { ctrlKey: true, code: "KeyJ" });
+    const note = screen.getByRole("textbox", { name: "Notepad" });
+    expect(document.activeElement).toBe(note);
+
+    // Keys in the note stay there: no search, no run, no hide.
+    fireEvent.input(note, { target: { value: "buy milk" } });
+    fireEvent.keyDown(note, { key: "Enter" });
+    fireEvent.keyDown(note, { key: "x" });
+    expect(document.activeElement).toBe(note);
+    expect(within(card).getByRole("status").textContent).toBe("2 words · Saving…");
+    await waitFor(() => expect(backend.called("save_note")).toHaveLength(1));
+    expect(backend.called("save_note")[0]?.args).toEqual({ text: "buy milk" });
+    expect(backend.called("run_action")).toHaveLength(0);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+
+    fireEvent.keyDown(note, { key: "Escape" });
+    expect(document.activeElement).toBe(input);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+  });
+
+  it("shows why the note was not saved", async () => {
+    setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: "draft" }),
+      save_note: () => {
+        throw "The database is locked.";
+      },
+    });
+    const note = await screen.findByRole("textbox", { name: "Notepad" });
+    expect((note as HTMLTextAreaElement).value).toBe("draft");
+    fireEvent.input(note, { target: { value: "draft 2" } });
+    fireEvent.blur(note);
+    expect(await screen.findByText(/Not saved\. The database is locked\./)).toBeTruthy();
+  });
+
   it("keeps the preview when every widget is off", async () => {
     fakeBackend({ search: () => [app] }, noWidgets);
     render(() => <Launcher />);

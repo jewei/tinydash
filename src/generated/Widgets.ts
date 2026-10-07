@@ -11,4 +11,8 @@ clocks: Array<CityClock> | null,
 /**
  * The disk that holds the home folder.
  */
-disk: Disk | null, };
+disk: Disk | null, 
+/**
+ * The scratch note.
+ */
+note: string | null, };

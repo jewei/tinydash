@@ -61,6 +61,9 @@ export const installUpdate = () => invoke<void>("install_update");
 /** What the widget pane shows now; a widget that is off is `null`. */
 export const widgets = () => invoke<Widgets>("widgets");
 
+/** Save the scratch note; rejects with the reason when it was not saved. */
+export const saveNote = (text: string) => invoke<void>("save_note", { text });
+
 /** A check finished: the newer version, or `null` when this one is the latest. */
 export const onUpdateChanged = (handler: (version: string | null) => void) =>
   listen<string | null>("update:changed", (event) => handler(event.payload));

@@ -10,13 +10,15 @@ type Command =
   | { type: "menu" }
   | { type: "category"; by: 1 | -1 }
   | { type: "settings" }
+  | { type: "note" }
   | { type: "hide" };
 
 /**
  * Shortcuts, with Mod as Command on macOS and Control elsewhere:
  * ↑/↓ move, Enter runs, Mod+Enter runs the second action, Mod+K opens
  * actions, Mod+Backspace deletes, Mod+1–9 runs that row, Tab and Shift+Tab
- * change category, Mod+, opens Settings, and Escape hides.
+ * change category, Mod+, opens Settings, Mod+J goes to the widget pane's
+ * note and back, and Escape hides.
  */
 export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
   const mod = hasMod(event, mac);
@@ -36,6 +38,7 @@ export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
   if (shortcutKey(event) === "k") return { type: "menu" };
   if (event.key === "Backspace") return { type: "delete" };
   if (shortcutKey(event) === ",") return { type: "settings" };
+  if (shortcutKey(event) === "j") return { type: "note" };
   // The physical digit key: on layouts such as AZERTY, `key` is "&" for 1.
   const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code)?.[1];
   if (digit) return { type: "runRow", index: Number(digit) - 1 };

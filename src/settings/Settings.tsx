@@ -277,6 +277,13 @@ export function Settings() {
                     onChange={(showDiskSpace) => void save({ showDiskSpace })}
                   />
                 </Row>
+                <Row label="Notepad" description="One scratch note, saved on this computer.">
+                  <Toggle
+                    label="Notepad"
+                    checked={settings().showNotepad}
+                    onChange={(showNotepad) => void save({ showNotepad })}
+                  />
+                </Row>
                 {/* 3 matches MAX_CLOCK_CITIES in the Rust code. */}
                 <h2>Clock cities</h2>
                 <ListEditor

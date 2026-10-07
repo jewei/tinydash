@@ -335,17 +335,27 @@ body {
   border-color: transparent;
 }
 
-/* Widget pane: cards in two columns, beside an empty All search. */
+/* Widget pane: cards in two columns beside an empty All search, then the
+   note, which takes the space that is left. */
 .widgets {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-2);
   min-height: 0;
   padding: var(--space-3);
   border-left: 1px solid var(--rule);
   background: var(--raised);
   overflow-y: auto;
+}
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.widget-grid:empty {
+  display: none;
 }
 
 .widget {
@@ -503,6 +513,50 @@ body {
 
 .meter.low span {
   background: var(--danger);
+}
+
+.notepad {
+  display: flex;
+  flex: 1 0 104px;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.notepad:focus-within {
+  border-color: var(--accent);
+}
+
+.notepad-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notepad-status {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.notepad-status.failed {
+  color: var(--danger);
+  white-space: normal;
+}
+
+.notepad-text {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  line-height: 20px;
+  resize: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.notepad-text::placeholder {
+  color: var(--muted);
 }
 
 /* Empty states */

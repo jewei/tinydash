@@ -17,6 +17,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. On
 | Mod+Backspace   | Delete the selected clipboard entry                                                                                            |
 | Tab / Shift+Tab | Next / previous category                                                                                                       |
 | Mod+,           | Open Settings                                                                                                                  |
+| Mod+J           | Edit the widget pane's note, and back                                                                                          |
 | Escape          | Dismiss a warning, or hide and return to the previous app                                                                      |
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens with an empty query, in the center of the screen with the pointer, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it: it then opens there, until that spot is no longer on a screen. Center Launcher in the actions menu, or Center in Settings > General, puts it back.
@@ -46,6 +47,7 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
+- **Notepad** (off): one scratch note of up to 10,000 characters, saved as you type to `tinydash.db` on this computer. Mod+J moves to the note and back; Escape returns to the search field.
 
 ## Instant answers (All only)
 

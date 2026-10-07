@@ -5,6 +5,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::{
+    error::{Error, Result},
     features::datetime::{self, CityClock},
     platform,
     state::State,
@@ -12,6 +13,8 @@ use crate::{
 
 /// Below this share of free space, the disk widget warns.
 const LOW_DISK_PERCENT: u64 = 10;
+/// The longest scratch note, in characters. The launcher's field stops here too.
+pub const MAX_NOTE_CHARS: usize = 10_000;
 
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +25,8 @@ pub struct Widgets {
     pub clocks: Option<Vec<CityClock>>,
     /// The disk that holds the home folder.
     pub disk: Option<Disk>,
+    /// The scratch note.
+    pub note: Option<String>,
 }
 
 #[derive(Serialize, TS)]
@@ -60,10 +65,22 @@ impl Disk {
     }
 }
 
-pub fn load(state: &State) -> Widgets {
+/// Save the scratch note, refusing one over the limit.
+pub fn save_note(state: &State, text: &str) -> Result<()> {
+    if text.chars().count() > MAX_NOTE_CHARS {
+        return Err(Error::msg(format!(
+            "The note holds up to {MAX_NOTE_CHARS} characters. Shorten it to save it."
+        )));
+    }
+    state.store.save_note(text)
+}
+
+/// Gather the widgets that are on. One that cannot load says so in its
+/// card, so the others still show.
+pub fn load(state: &State) -> Result<Widgets> {
     let settings = state.settings.get();
     let now = chrono::Local::now();
-    Widgets {
+    Ok(Widgets {
         clocks: settings.show_clocks.then(|| {
             settings
                 .clock_cities
@@ -74,7 +91,11 @@ pub fn load(state: &State) -> Widgets {
         disk: settings
             .show_disk_space
             .then(|| Disk::read(&state.dirs.home)),
-    }
+        note: settings
+            .show_notepad
+            .then(|| state.store.note())
+            .transpose()?,
+    })
 }
 
 #[cfg(test)]
@@ -92,6 +113,7 @@ mod tests {
             ..Settings::default()
         });
         let names: Vec<String> = load(&on)
+            .unwrap()
             .clocks
             .unwrap()
             .into_iter()
@@ -103,7 +125,20 @@ mod tests {
             show_clocks: false,
             ..Settings::default()
         });
-        assert!(load(&off).clocks.is_none());
+        assert!(load(&off).unwrap().clocks.is_none());
+    }
+
+    #[test]
+    fn saves_a_note_up_to_the_limit() {
+        let state = State::for_tests(Settings {
+            show_notepad: true,
+            ..Settings::default()
+        });
+        assert_eq!(load(&state).unwrap().note.as_deref(), Some(""));
+        let longest = "é".repeat(MAX_NOTE_CHARS);
+        save_note(&state, &longest).unwrap();
+        assert!(save_note(&state, &format!("{longest}!")).is_err());
+        assert_eq!(load(&state).unwrap().note, Some(longest));
     }
 
     #[test]

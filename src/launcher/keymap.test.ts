@@ -36,6 +36,7 @@ describe("commandFor", () => {
       index: 0,
     });
     expect(commandFor(key("Enter", { metaKey: true }), true)).toEqual({ type: "runSecondary" });
+    expect(commandFor(key("j", { ctrlKey: true, code: "KeyJ" }), false)).toEqual({ type: "note" });
   });
 
   it("leaves typing alone", () => {
