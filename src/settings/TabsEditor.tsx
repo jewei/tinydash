@@ -10,9 +10,10 @@ import { Toggle } from "./controls";
  * or out of All, and move it. A tab is never both hidden and out of All, so
  * turning one switch off while the other is off turns the other on; no
  * switch is ever disabled, so focus never drops. Each change is an edit of
- * the latest saved list, so quick clicks never undo each other. Rows are keyed by category, so a switch keeps its row. A
- * moved row loses focus, also when a failed save moves it back; focus then
- * returns to its move buttons, unless the user has put it elsewhere.
+ * the latest saved list, so quick clicks never undo each other. Rows are
+ * keyed by category, so a switch keeps its row. A moved row loses focus,
+ * also when a failed save moves it back; focus then returns to its move
+ * buttons, unless the user has put it elsewhere.
  */
 export function TabsEditor(props: {
   tabs: LauncherTab[];
