@@ -96,7 +96,11 @@ describe("Launcher", () => {
         settings: {
           ...testSettings,
           tabs: (["emoji", "apps", "files", "clipboard", "snippets", "system"] as const).map(
-            (category) => ({ category, shown: category === "emoji" || category === "apps" }),
+            (category) => ({
+              category,
+              shown: category === "emoji" || category === "apps",
+              inAll: true,
+            }),
           ),
         },
         platform: "macos",

@@ -6,7 +6,9 @@ import { CATEGORY_LABELS } from "../lib/categories";
 import { Toggle } from "./controls";
 
 /**
- * The launcher's tabs after All: show or hide each one, and move it. Each
+ * The launcher's tabs after All: show or hide each one, keep its results in
+ * or out of All, and move it. A tab cannot be both hidden and out of All,
+ * so the switch that would do that is locked on. Each
  * change is an edit of the latest saved list, so quick clicks never undo
  * each other. Rows are keyed by category, so a switch keeps its row. A
  * moved row loses focus, also when a failed save moves it back; focus then
@@ -18,8 +20,7 @@ export function TabsEditor(props: {
 }) {
   let editor!: HTMLOListElement;
   const order = () => props.tabs.map((tab) => tab.category);
-  const shown = (category: Category) =>
-    props.tabs.find((tab) => tab.category === category)?.shown ?? false;
+  const tabOf = (category: Category) => props.tabs.find((tab) => tab.category === category);
 
   // When the moved row took focus with it, focus the first enabled one of
   // its move buttons in `directions` (at the top, Up is disabled, so Down).
@@ -48,9 +49,9 @@ export function TabsEditor(props: {
     queueMicrotask(focus);
     void saved.then(focus);
   };
-  const show = (category: Category, on: boolean) =>
+  const change = (category: Category, values: Partial<LauncherTab>) =>
     void props.onChange((tabs) =>
-      tabs.map((tab) => (tab.category === category ? { ...tab, shown: on } : tab)),
+      tabs.map((tab) => (tab.category === category ? { ...tab, ...values } : tab)),
     );
 
   return (
@@ -87,8 +88,15 @@ export function TabsEditor(props: {
                 </button>
                 <Toggle
                   label={`Show ${CATEGORY_LABELS[category]}`}
-                  checked={shown(category)}
-                  onChange={(on) => show(category, on)}
+                  checked={tabOf(category)?.shown ?? false}
+                  disabled={!tabOf(category)?.inAll}
+                  onChange={(shown) => change(category, { shown })}
+                />
+                <Toggle
+                  label={`${CATEGORY_LABELS[category]} in All`}
+                  checked={tabOf(category)?.inAll ?? false}
+                  disabled={!tabOf(category)?.shown}
+                  onChange={(inAll) => change(category, { inAll })}
                 />
               </span>
             </li>

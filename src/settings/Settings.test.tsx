@@ -216,6 +216,35 @@ describe("Settings", () => {
     await waitFor(() => expect(center.disabled).toBe(true));
   });
 
+  it("keeps a tab's results out of All, but never hides it too", async () => {
+    const backend = fakeBackend({
+      get_settings: () => ({
+        ...testSettings,
+        tabs: testSettings.tabs.map((tab) =>
+          tab.category === "files" ? { ...tab, shown: false } : tab,
+        ),
+      }),
+    });
+    render(() => <Settings />);
+    const emojiInAll = (await screen.findByRole("switch", {
+      name: "Emoji in All",
+    })) as HTMLInputElement;
+    fireEvent.click(emojiInAll);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    const sent = (backend.called("update_settings")[0]?.args.changes as Partial<Values> | undefined)
+      ?.tabs;
+    expect(sent?.find((tab) => tab.category === "emoji")).toEqual({
+      category: "emoji",
+      shown: true,
+      inAll: false,
+    });
+    // Out of All, Emoji must stay shown; hidden, Files must stay in All.
+    const showEmoji = screen.getByRole("switch", { name: "Show Emoji" }) as HTMLInputElement;
+    await waitFor(() => expect(showEmoji.disabled).toBe(true));
+    const filesInAll = screen.getByRole("switch", { name: "Files in All" }) as HTMLInputElement;
+    expect(filesInAll.checked && filesInAll.disabled).toBe(true);
+  });
+
   it("describes each setting to screen readers", async () => {
     fakeBackend();
     render(() => <Settings />);
