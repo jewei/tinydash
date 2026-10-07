@@ -1,11 +1,12 @@
 //! Clipboard cards: when the clipboard holds a color, a Unix time, or JSON,
 //! the widget pane shows it decoded, with ways to copy it in other forms.
+//! A color or a Unix time typed in All is an instant answer too.
 
 use chrono::{DateTime, Local, SecondsFormat, TimeZone, Utc};
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::search::result::{Action, ResultAction};
+use crate::search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol};
 
 /// Longer text never gets a card: reading and formatting it would slow the
 /// pane down.
@@ -177,6 +178,53 @@ fn copy(label: &str, text: &str) -> ResultAction {
             text: text.to_owned(),
         },
     )
+}
+
+/// A color or a Unix time typed in All, decoded like its card.
+pub fn answer(query: &str, now: DateTime<Local>) -> Option<SearchResult> {
+    let text = query.trim();
+    let (id, kind, title, subtitle, icon, actions) =
+        match color(text).or_else(|| unix_time(text, now))? {
+            (
+                CardContent::Color {
+                    hex,
+                    rows,
+                    on_white,
+                    ..
+                },
+                actions,
+            ) => (
+                format!("color:{hex}"),
+                ResultKind::Color,
+                hex.clone(),
+                format!(
+                    "{} · {} · {} on white",
+                    rows[1].value, rows[2].value, on_white.ratio
+                ),
+                Icon::Color { hex },
+                actions,
+            ),
+            (CardContent::UnixTime { relative, rows, .. }, actions) => (
+                format!("unix:{text}"),
+                ResultKind::DateTime,
+                rows[0].value.clone(),
+                format!("{} · {relative}", rows[1].value),
+                Icon::Symbol {
+                    name: Symbol::Clock,
+                },
+                actions,
+            ),
+            (CardContent::Json { .. }, _) => return None,
+        };
+    Some(SearchResult {
+        id,
+        kind,
+        title,
+        subtitle,
+        icon,
+        actions,
+        pinned: false,
+    })
 }
 
 type Card = (CardContent, Vec<ResultAction>);
@@ -865,6 +913,38 @@ mod tests {
         assert_eq!(lines.len(), MAX_JSON_LINES);
         assert_eq!(more_lines, 3002 - MAX_JSON_LINES);
         assert!(detect(&" ".repeat(MAX_CARD_BYTES + 1), now()).is_none());
+    }
+
+    #[test]
+    fn a_typed_color_or_unix_time_is_an_answer() {
+        let color = answer(" #2f6f5e ", now()).unwrap();
+        assert_eq!(color.kind, ResultKind::Color);
+        assert_eq!(color.title, "#2F6F5E");
+        assert_eq!(
+            color.subtitle,
+            "rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white"
+        );
+        assert_eq!(
+            color.icon,
+            Icon::Color {
+                hex: "#2F6F5E".into()
+            }
+        );
+        assert_eq!(color.actions[0].label, "Copy HEX");
+
+        let time = answer("1791354301", now()).unwrap();
+        assert_eq!(time.kind, ResultKind::DateTime);
+        assert!(
+            time.subtitle
+                .starts_with("Wed 7 Oct 2026, 06:25:01 UTC · 6 hours ago"),
+            "{}",
+            time.subtitle
+        );
+        assert_eq!(time.actions[0].label, "Copy Local Time");
+
+        for query in ["{\"a\": 1}", "755", "hello", ""] {
+            assert_eq!(answer(query, now()), None, "{query}");
+        }
     }
 
     #[test]

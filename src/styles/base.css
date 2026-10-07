@@ -151,6 +151,14 @@ textarea.field {
   height: 100%;
 }
 
+/* A typed color, inset a little so it sits like the other icons. */
+.color-swatch {
+  width: 80%;
+  height: 80%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+}
+
 .emoji {
   font-family: var(--font-emoji);
   line-height: 1;

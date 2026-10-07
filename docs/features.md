@@ -56,20 +56,24 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 ## Instant answers (All only)
 
-| Type       | Examples                                                                                | Enter copies          |
-| ---------- | --------------------------------------------------------------------------------------- | --------------------- |
-| Calculator | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                   | Result                |
-| Currency   | `100 usd to eur`, `100 USD MYR`                                                         | Result, to 2 decimals |
-| Time zones | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york` | Time                  |
-| Dates      | `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`          | `YYYY-MM-DD`          |
-| Passwords  | `password`, `pw 32`, `passphrase 8`, `pin 4`                                            | Value, marked secret  |
-| Clean URL  | Paste a link with `utm_*`, `fbclid`, … parameters                                       | Clean URL             |
-| Web search | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser         |
+| Type        | Examples                                                                                | Enter copies          |
+| ----------- | --------------------------------------------------------------------------------------- | --------------------- |
+| Calculator  | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                   | Result                |
+| Currency    | `100 usd to eur`, `100 USD MYR`                                                         | Result, to 2 decimals |
+| Time zones  | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york` | Time                  |
+| Dates       | `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`          | `YYYY-MM-DD`          |
+| Passwords   | `password`, `pw 32`, `passphrase 8`, `pin 4`                                            | Value, marked secret  |
+| Clean URL   | Paste a link with `utm_*`, `fbclid`, … parameters                                       | Clean URL             |
+| Color       | `#2F6F5E`, `#fff`, `rgb(47, 111, 94)`, `hsl(164, 41%, 31%)`                             | HEX                   |
+| Unix time   | `1791354301`, `1791354301250` (seconds or milliseconds, 2001 to 2103)                   | Local time            |
+| Permissions | `chmod 755`, `chmod 4755`, `rwxr-xr-x`, `-rw-r--r--` (a bare `755` needs `chmod`)       | The other form        |
+| Web search  | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser         |
 
 Every All search with text ends with a web search on the chosen engine (Settings > Search), unless it is a web keyword followed by text, such as `yt lofi`.
 
 - Currency uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded.
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
+- Color and Unix time answers decode like clipboard cards: a color shows its RGB, HSL, and contrast on white, and Mod+K copies each form; a Unix time shows UTC and how long ago it was.
 - Passwords: 8–64 characters from letters, digits, and symbols (at least one of each); 3–12 words from the EFF large wordlist, without its four hyphenated words, so the hyphens between words stay clear; 4–12 digits. Uses the OS random source.
 
 ## Clipboard history

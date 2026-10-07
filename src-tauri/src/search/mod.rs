@@ -17,8 +17,9 @@ use ts_rs::TS;
 
 use crate::{
     features::{
-        apps::AppIndex, calculator, clipboard::ClipboardHistory, currency::Rates, datetime,
-        emoji::EmojiIndex, files::FileIndex, library::Library, password, system, url_cleaner, web,
+        apps::AppIndex, calculator, clip_card, clipboard::ClipboardHistory, currency::Rates,
+        datetime, emoji::EmojiIndex, files::FileIndex, library::Library, password, permissions,
+        system, url_cleaner, web,
     },
     settings::Settings,
 };
@@ -277,6 +278,8 @@ fn answers(s: &Snapshot, query: &str) -> Vec<SearchResult> {
     results.extend(datetime::answers(query, s.now));
     results.extend(password::answers(query));
     results.extend(url_cleaner::answer(query));
+    results.extend(clip_card::answer(query, s.now));
+    results.extend(permissions::answer(query));
     results.extend(web::answer(query));
     results.extend(s.library.quicklink_answer(query));
     results
@@ -304,6 +307,31 @@ pub fn top<T>(mut hits: Vec<(u32, T)>, limit: usize) -> Vec<(u32, T)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn colors_unix_times_and_modes_are_answers_in_all() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let answers = |query: &str| {
+            search(&state.snapshot(), query, Category::All)
+                .into_iter()
+                .filter(|result| result.kind != ResultKind::WebSearch)
+                .map(|result| (result.kind, result.title))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(answers("#2f6f5e")[0], (ResultKind::Color, "#2F6F5E".into()));
+        assert_eq!(
+            answers("chmod 755"),
+            [(ResultKind::Permissions, "rwxr-xr-x".into())]
+        );
+        let time = answers("1791354301");
+        assert_eq!(time.len(), 1, "{time:?}");
+        assert_eq!(time[0].0, ResultKind::DateTime);
+        assert!(
+            answers("755")
+                .iter()
+                .all(|(kind, _)| *kind != ResultKind::Permissions)
+        );
+    }
 
     #[test]
     fn a_source_kept_out_of_all_stays_in_its_tab() {
