@@ -244,6 +244,38 @@ describe("Launcher", () => {
     expect(fireEvent.mouseDown(filter)).toBe(true);
   });
 
+  it("moves the window from the empty parts of the tab bar and footer", async () => {
+    const { backend, input } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    const tabs = screen.getByRole("navigation", { name: "Categories" });
+    // Cancelled, so focus stays in the search field.
+    expect(fireEvent.mouseDown(tabs)).toBe(false);
+    fireEvent.mouseDown(screen.getByRole("contentinfo"));
+    await waitFor(() => expect(backend.called("drag_launcher")).toHaveLength(2));
+    // Buttons there keep their own job, and only the main button drags.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Apps" }));
+    fireEvent.mouseDown(screen.getByRole("button", { name: /Actions/ }));
+    fireEvent.mouseDown(tabs, { button: 2 });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("drag_launcher")).toHaveLength(2);
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("centers the launcher from the actions menu", async () => {
+    const { backend, press } = setup(() => [app]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByPlaceholderText("Search actions");
+    fireEvent.input(filter, { target: { value: "center" } });
+    fireEvent.keyDown(filter, { key: "Enter" });
+    await waitFor(() =>
+      expect(backend.called("run_action")[0]?.args).toEqual({
+        action: { type: "centerLauncher" },
+        resultId: null,
+      }),
+    );
+  });
+
   it("keeps the action menu as it opened, and closes it on a tab click", async () => {
     let results = [app];
     const { press } = setup(() => results);
@@ -545,6 +577,31 @@ describe("Launcher", () => {
     expect(backend.called("run_action")).toHaveLength(0);
   });
 
+  it("clears the history from the Clipboard tab, after asking", async () => {
+    const { backend, press } = setup((_query, category) =>
+      category === "clipboard" ? [clip] : [app],
+    );
+    await screen.findByRole("option", { name: /Safari/ });
+    expect(screen.queryByRole("button", { name: /Clear History/ })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Clipboard" }));
+    await waitFor(() =>
+      expect(backend.called("search").at(-1)?.args).toMatchObject({ category: "clipboard" }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /Clear History/ }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Delete all clipboard history except pinned entries?");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Clear Clipboard History" }));
+    await waitFor(() =>
+      expect(backend.called("run_action")[0]?.args).toEqual({
+        action: { type: "clearClipboard" },
+        resultId: null,
+      }),
+    );
+    // Mod+K lists it there too.
+    press("k", { ctrlKey: true });
+    expect(await screen.findByRole("option", { name: /Clear Clipboard History/ })).toBeTruthy();
+  });
+
   it("reloads the preview when results refresh", async () => {
     const snippet = { ...app, id: "snippet:1", kind: "snippet" as const, title: "Sig" };
     let text = "Regards";
@@ -557,6 +614,26 @@ describe("Launcher", () => {
     text = "Cheers";
     await emit("results:stale", null);
     expect(await screen.findByText("Cheers")).toBeTruthy();
+  });
+
+  it("shows a copied text once, without repeating its first line as a title", async () => {
+    const files = { ...clip, id: "clip:2", title: "one.txt and 1 more" };
+    fakeBackend({
+      search: () => [{ ...clip, title: "repos" }, files],
+      preview: (args) =>
+        args.id === "clip:1"
+          ? { type: "text", text: "repos" }
+          : { type: "files", paths: ["/a/one.txt", "/a/two.txt"] },
+    });
+    render(() => <Launcher />);
+    const details = await screen.findByRole("complementary", { name: "Details" });
+    await waitFor(() => expect(within(details).getByText("repos").tagName).toBe("PRE"));
+    expect(within(details).queryByRole("heading")).toBeNull();
+    // Other clips keep their title, which says what the preview does not.
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+    expect(
+      await within(details).findByRole("heading", { name: "one.txt and 1 more" }),
+    ).toBeTruthy();
   });
 
   it.each([

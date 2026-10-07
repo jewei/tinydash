@@ -79,6 +79,7 @@ pub fn run() {
             commands::run_action,
             commands::preview,
             commands::hide_launcher,
+            commands::drag_launcher,
             commands::get_settings,
             commands::update_settings,
             commands::pause_shortcut,

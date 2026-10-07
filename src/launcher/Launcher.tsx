@@ -35,9 +35,17 @@ const generalActions = (rates: boolean): ResultAction[] => [
     action: { type: "refresh" },
     confirm: null,
   },
+  { label: "Center Launcher", action: { type: "centerLauncher" }, confirm: null },
   { label: "Settings", action: { type: "openSettings" }, confirm: null },
   { label: "Quit TinyDash", action: { type: "quit" }, confirm: null },
 ];
+
+/** The System command's action, with its words (`features/system.rs`). */
+const clearHistory: ResultAction = {
+  label: "Clear Clipboard History",
+  action: { type: "clearClipboard" },
+  confirm: "Delete all clipboard history except pinned entries?",
+};
 
 export function Launcher() {
   const launcher = createLauncher();
@@ -100,6 +108,7 @@ export function Launcher() {
   // before its search returns; keys and hints must not act on hidden ones.
   const results = () => (clipboardOff() ? [] : launcher.results());
   const selected = () => (clipboardOff() ? undefined : launcher.selected());
+  const canClearHistory = () => launcher.category() === "clipboard" && !clipboardOff();
 
   // Deleting cannot be undone, so it never waits for newer results: it acts
   // only on the highlighted entry the user can see.
@@ -171,7 +180,11 @@ export function Launcher() {
       keys: result && shortcutFor(result, action.action),
       run: () => launcher.run(action, result),
     }));
-    const general = generalActions(settings()?.currencyRatesEnabled ?? false).map((action) => ({
+    // On the Clipboard tab, clearing it is one key away, not a trip to System.
+    const general = [
+      ...(canClearHistory() ? [clearHistory] : []),
+      ...generalActions(settings()?.currencyRatesEnabled ?? false),
+    ].map((action) => ({
       label: action.label,
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,
       run: () => launcher.run(action),
@@ -202,6 +215,15 @@ export function Launcher() {
 
   const notice = () => launcher.actionError() ?? launcher.searchError() ?? warnings()[0];
 
+  // The window has no title bar, so the empty parts of the tab bar and the
+  // footer move it. Cancelled, so focus stays in the search field.
+  const dragFromEmptySpace = (event: MouseEvent) => {
+    if (event.button !== 0 || (event.target as Element).closest("button")) return;
+    event.preventDefault();
+    // A desktop may refuse a drag (some Wayland compositors); nothing to undo.
+    ipc.dragLauncher().catch(() => undefined);
+  };
+
   return (
     <div class="launcher" data-platform={platform()}>
       <header class="search">
@@ -223,7 +245,7 @@ export function Launcher() {
         />
       </header>
 
-      <nav class="tabs" aria-label="Categories">
+      <nav class="tabs" aria-label="Categories" onMouseDown={dragFromEmptySpace}>
         {/* The hint stays outside the tab list, which may hold only tabs. */}
         <div class="tab-list" role="tablist" aria-label="Categories">
           <For each={CATEGORIES}>
@@ -325,13 +347,23 @@ export function Launcher() {
         </Show>
       </main>
 
-      <footer class="footer">
+      <footer class="footer" onMouseDown={dragFromEmptySpace}>
         <Show when={selected()?.actions[0]}>
           {(action) => (
             <span class="footer-primary">
               {action().label} <Keys keys={["↩"]} />
             </span>
           )}
+        </Show>
+        <Show when={canClearHistory()}>
+          <button
+            type="button"
+            class="footer-actions footer-clear"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => launcher.run(clearHistory)}
+          >
+            Clear History…
+          </button>
         </Show>
         <button
           type="button"

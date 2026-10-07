@@ -27,10 +27,13 @@ export function PreviewPane(props: {
     async ({ id }) => ({ id, preview: await loadPreview(id).catch(() => null) }),
   );
   // The resource keeps its last value; show it only for the result it belongs to.
-  const current = () => {
-    const loaded = details.latest;
-    return loaded && loaded.id === props.result?.id ? loaded.preview : null;
-  };
+  const loaded = () => details.latest?.id === props.result?.id;
+  const current = () => (loaded() ? (details.latest?.preview ?? null) : null);
+  // A copied text's title is its first line, and its preview shows all of it,
+  // so the title would say the same thing twice. Until the preview loads, it
+  // stays hidden too, so a long title never flashes and then disappears.
+  const showsTitle = (result: SearchResult) =>
+    result.kind !== "clipboard" || (loaded() && current()?.type !== "text");
 
   return (
     <Show when={props.result} fallback={<aside class="preview" />}>
@@ -39,12 +42,14 @@ export function PreviewPane(props: {
           <div class="preview-header">
             <ResultIcon icon={result().icon} size={56} fallback={FALLBACK_GLYPHS[result().kind]} />
             <span class="preview-kind">{KIND_LABELS[result().kind]}</span>
-            <h2
-              class="preview-title"
-              classList={{ answer: isAnswer(result().kind), mono: result().kind === "password" }}
-            >
-              {result().title}
-            </h2>
+            <Show when={showsTitle(result())}>
+              <h2
+                class="preview-title"
+                classList={{ answer: isAnswer(result().kind), mono: result().kind === "password" }}
+              >
+                {result().title}
+              </h2>
+            </Show>
             <p class="preview-subtitle">{result().subtitle}</p>
           </div>
           <Show when={current()}>{(preview) => <Details preview={preview()} />}</Show>
