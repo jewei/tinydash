@@ -151,7 +151,7 @@ export function Glyph(props: { name: GlyphName; size?: number }) {
   );
 }
 
-/** A result's icon: the system icon for a file, an emoji, or a glyph. */
+/** A result's icon: the system icon for a file, an emoji, a color swatch, or a glyph. */
 export function ResultIcon(props: { icon: Icon; size: number; fallback: GlyphName }) {
   // Remember which path failed, so the next result's icon still loads when
   // this component is reused.
@@ -174,6 +174,9 @@ export function ResultIcon(props: { icon: Icon; size: number; fallback: GlyphNam
           {icon.glyph}
         </span>
       );
+    }
+    if (icon.type === "color") {
+      return <span class="color-swatch" style={{ background: icon.hex }} />;
     }
     const name = icon.type === "symbol" ? icon.name : props.fallback;
     return <Glyph name={name} size={Math.round(props.size * 0.6)} />;

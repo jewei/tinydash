@@ -37,6 +37,8 @@ pub enum ResultKind {
     Url,
     WebSearch,
     System,
+    Color,
+    Permissions,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -56,6 +58,10 @@ pub enum Icon {
     },
     Symbol {
         name: Symbol,
+    },
+    /// A swatch of a color, as `#2F6F5E`.
+    Color {
+        hex: String,
     },
 }
 

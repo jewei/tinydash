@@ -16,4 +16,12 @@ describe("ResultIcon", () => {
     setIcon({ type: "file", path: "/Applications/Safari.app" });
     expect(container.querySelector("img")?.getAttribute("src")).toContain("Safari.app");
   });
+
+  it("draws a typed color as a swatch", () => {
+    const { container } = render(() => (
+      <ResultIcon icon={{ type: "color", hex: "#2F6F5E" }} size={32} fallback="image" />
+    ));
+    const swatch = container.querySelector<HTMLElement>(".color-swatch");
+    expect(swatch?.style.background).toBe("rgb(47, 111, 94)");
+  });
 });

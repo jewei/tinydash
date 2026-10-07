@@ -20,6 +20,8 @@ export const KIND_LABELS: Record<ResultKind, string> = {
   url: "Clean URL",
   webSearch: "Web Search",
   system: "Command",
+  color: "Color",
+  permissions: "Permissions",
 };
 
 export const FALLBACK_GLYPHS: Record<ResultKind, GlyphName> = {
@@ -36,6 +38,8 @@ export const FALLBACK_GLYPHS: Record<ResultKind, GlyphName> = {
   url: "link",
   webSearch: "globe",
   system: "settings",
+  color: "image",
+  permissions: "lock",
 };
 
 /** Keys that run an action of the selected result directly. */
@@ -48,5 +52,12 @@ export function shortcutFor(result: SearchResult, action: Action): string[] | un
 }
 
 /** Answers the user reads and copies, shown large and selectable. */
-const ANSWERS: readonly ResultKind[] = ["calculation", "dateTime", "password", "url"];
+const ANSWERS: readonly ResultKind[] = [
+  "calculation",
+  "dateTime",
+  "password",
+  "url",
+  "color",
+  "permissions",
+];
 export const isAnswer = (kind: ResultKind) => ANSWERS.includes(kind);
