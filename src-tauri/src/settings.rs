@@ -129,7 +129,8 @@ impl Settings {
     }
 
     /// Clamp numbers, drop blank or duplicate list entries, and cut lists
-    /// to their limit.
+    /// to their limit. `tabs` loses All, and gains any tab it lacks (such
+    /// as one added in a newer version) at the end, shown.
     pub fn normalized(mut self) -> Self {
         self.shortcut = self.shortcut.trim().to_owned();
         self.clipboard_history_limit = self.clipboard_history_limit.clamp(1, CLIPBOARD_LIMIT_MAX);
