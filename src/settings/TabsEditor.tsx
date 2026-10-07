@@ -8,9 +8,9 @@ import { Toggle } from "./controls";
 /**
  * The launcher's tabs after All: show or hide each one, and move it. Each
  * change is an edit of the latest saved list, so quick clicks never undo
- * each other. Rows are keyed by category, so a switch keeps its row; a move
- * puts focus back on the button that moved, also when a failed save moves
- * the row back.
+ * each other. Rows are keyed by category, so a switch keeps its row. A
+ * moved row loses focus, also when a failed save moves it back; focus then
+ * returns to its move buttons, unless the user has put it elsewhere.
  */
 export function TabsEditor(props: {
   tabs: LauncherTab[];
