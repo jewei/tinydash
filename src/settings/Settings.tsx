@@ -218,11 +218,12 @@ export function Settings() {
                 </Row>
                 <h2>Tabs</h2>
                 <p class="section-intro">
-                  All always comes first. A hidden tab's results still show in All.
+                  Choose which tabs show after All, and in what order. A hidden tab's results still
+                  show in All.
                 </p>
                 <TabsEditor
                   tabs={settings().tabs}
-                  onChange={(edit) => void save((current) => ({ tabs: edit(current.tabs) }))}
+                  onChange={(edit) => save((current) => ({ tabs: edit(current.tabs) }))}
                 />
               </Match>
 

@@ -93,7 +93,12 @@ describe("Launcher", () => {
   it("shows the tabs that Settings shows, in its order", async () => {
     const { backend, press } = setup(() => [], {
       launcher_init: () => ({
-        settings: { ...testSettings, tabs: ["emoji", "apps"] },
+        settings: {
+          ...testSettings,
+          tabs: (["emoji", "apps", "files", "clipboard", "snippets", "system"] as const).map(
+            (category) => ({ category, shown: category === "emoji" || category === "apps" }),
+          ),
+        },
         platform: "macos",
         warnings: [],
       }),

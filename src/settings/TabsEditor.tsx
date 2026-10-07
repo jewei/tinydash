@@ -1,72 +1,75 @@
-import { For, Show } from "solid-js";
+import { For } from "solid-js";
 
 import type { Category } from "../generated/Category";
-import { CATEGORY_LABELS, OPTIONAL_TABS } from "../lib/categories";
+import type { LauncherTab } from "../generated/LauncherTab";
+import { CATEGORY_LABELS } from "../lib/categories";
+import { Toggle } from "./controls";
 
 /**
- * The launcher's tabs after All: move, remove, and add them. Each change is
- * an edit of the latest saved list, so quick clicks never undo each other.
- * Focus follows the tab it acted on, so the keyboard never falls back to
- * the page.
+ * The launcher's tabs after All: show or hide each one, and move it. Each
+ * change is an edit of the latest saved list, so quick clicks never undo
+ * each other. Rows are keyed by category, so a switch keeps its row; a move
+ * puts focus back on the button that moved, also when a failed save moves
+ * the row back.
  */
 export function TabsEditor(props: {
-  tabs: Category[];
-  onChange: (edit: (tabs: Category[]) => Category[]) => void;
+  tabs: LauncherTab[];
+  onChange: (edit: (tabs: LauncherTab[]) => LauncherTab[]) => Promise<unknown>;
 }) {
-  let editor!: HTMLDivElement;
-  const hidden = () => OPTIONAL_TABS.filter((tab) => !props.tabs.includes(tab));
-  // The list redraws after a change; focus the first of these that is enabled.
-  const focus = (...selectors: string[]) =>
-    queueMicrotask(() => {
-      for (const selector of selectors) {
-        const button = editor.querySelector<HTMLButtonElement>(selector);
-        if (button && !button.disabled) return button.focus();
-      }
-    });
+  let editor!: HTMLOListElement;
+  const order = () => props.tabs.map((tab) => tab.category);
+  const shown = (category: Category) =>
+    props.tabs.find((tab) => tab.category === category)?.shown ?? false;
 
-  const move = (tab: Category, by: 1 | -1) => {
-    props.onChange((tabs) => {
-      const from = tabs.indexOf(tab);
+  // Focus the first enabled one of the tab's move buttons in `directions`;
+  // at the top, Up is disabled, so focus goes to Down.
+  const focusMoveButton = (category: Category, directions: string[]) => () => {
+    for (const direction of directions) {
+      const button = editor.querySelector<HTMLButtonElement>(
+        `[data-tab="${category}"] [data-move="${direction}"]`,
+      );
+      if (button && !button.disabled) return button.focus();
+    }
+  };
+
+  const move = (category: Category, by: 1 | -1) => {
+    const saved = props.onChange((tabs) => {
+      const from = tabs.findIndex((tab) => tab.category === category);
       const to = from + by;
-      if (from < 0 || to < 0 || to >= tabs.length) return tabs;
-      const next = tabs.filter((other) => other !== tab);
-      next.splice(to, 0, tab);
+      const moving = tabs[from];
+      if (!moving || to < 0 || to >= tabs.length) return tabs;
+      const next = tabs.filter((tab) => tab !== moving);
+      next.splice(to, 0, moving);
       return next;
     });
-    const [same, other] = by < 0 ? ["up", "down"] : ["down", "up"];
-    focus(
-      `[data-tab="${tab}"] [data-move="${same}"]`,
-      `[data-tab="${tab}"] [data-move="${other}"]`,
+    const focus = focusMoveButton(category, by < 0 ? ["up", "down"] : ["down", "up"]);
+    queueMicrotask(focus);
+    void saved.then(focus);
+  };
+  const show = (category: Category, on: boolean) =>
+    void props.onChange((tabs) =>
+      tabs.map((tab) => (tab.category === category ? { ...tab, shown: on } : tab)),
     );
-  };
-  const remove = (tab: Category) => {
-    props.onChange((tabs) => tabs.filter((other) => other !== tab));
-    focus(`[data-add="${tab}"]`);
-  };
-  const add = (tab: Category) => {
-    props.onChange((tabs) => (tabs.includes(tab) ? tabs : [...tabs, tab]));
-    focus(`[data-tab="${tab}"] [data-remove]`);
-  };
 
   return (
-    <div ref={editor} class="list-editor tabs-editor">
-      <ol aria-label="Tabs, in order">
+    <div class="list-editor">
+      <ol ref={editor} aria-label="Tabs, in order">
         <li>
           <span>{CATEGORY_LABELS.all}</span>
-          <span class="tabs-fixed">Always first</span>
+          <span class="tabs-fixed">Always shown, always first</span>
         </li>
-        <For each={props.tabs}>
-          {(tab, index) => (
-            <li data-tab={tab}>
-              <span>{CATEGORY_LABELS[tab]}</span>
+        <For each={order()}>
+          {(category, index) => (
+            <li data-tab={category}>
+              <span>{CATEGORY_LABELS[category]}</span>
               <span class="tabs-buttons">
                 <button
                   type="button"
                   class="link"
                   data-move="up"
-                  aria-label={`Move ${CATEGORY_LABELS[tab]} up`}
+                  aria-label={`Move ${CATEGORY_LABELS[category]} up`}
                   disabled={index() === 0}
-                  onClick={() => move(tab, -1)}
+                  onClick={() => move(category, -1)}
                 >
                   ↑
                 </button>
@@ -74,44 +77,22 @@ export function TabsEditor(props: {
                   type="button"
                   class="link"
                   data-move="down"
-                  aria-label={`Move ${CATEGORY_LABELS[tab]} down`}
-                  disabled={index() === props.tabs.length - 1}
-                  onClick={() => move(tab, 1)}
+                  aria-label={`Move ${CATEGORY_LABELS[category]} down`}
+                  disabled={index() === order().length - 1}
+                  onClick={() => move(category, 1)}
                 >
                   ↓
                 </button>
-                <button
-                  type="button"
-                  class="link"
-                  data-remove
-                  aria-label={`Remove ${CATEGORY_LABELS[tab]}`}
-                  onClick={() => remove(tab)}
-                >
-                  Remove
-                </button>
+                <Toggle
+                  label={`Show ${CATEGORY_LABELS[category]}`}
+                  checked={shown(category)}
+                  onChange={(on) => show(category, on)}
+                />
               </span>
             </li>
           )}
         </For>
       </ol>
-      <Show when={hidden().length > 0}>
-        <div class="tabs-add">
-          <span>Add:</span>
-          <For each={hidden()}>
-            {(tab) => (
-              <button
-                type="button"
-                class="button"
-                data-add={tab}
-                aria-label={`Add ${CATEGORY_LABELS[tab]} tab`}
-                onClick={() => add(tab)}
-              >
-                {CATEGORY_LABELS[tab]}
-              </button>
-            )}
-          </For>
-        </div>
-      </Show>
     </div>
   );
 }

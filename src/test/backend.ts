@@ -24,7 +24,12 @@ export const testSettings: Settings = {
   emojiLanguages: [],
   currencyRatesEnabled: true,
   searchEngine: "google",
-  tabs: ["apps", "files", "clipboard", "snippets", "emoji", "system"],
+  tabs: (["apps", "files", "clipboard", "snippets", "emoji", "system"] as const).map(
+    (category) => ({
+      category,
+      shown: true,
+    }),
+  ),
 };
 
 export const app: SearchResult = {

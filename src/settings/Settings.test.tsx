@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-lib
 import { describe, expect, it } from "vite-plus/test";
 
 import type { LibraryItem } from "../generated/LibraryItem";
+import type { Settings as Values } from "../generated/Settings";
 import { testSettings, fakeBackend } from "../test/backend";
 import { Settings } from "./Settings";
 
@@ -130,39 +131,53 @@ describe("Settings", () => {
     expect(screen.queryByText(/is already in the list/)).toBeNull();
   });
 
-  it("moves, removes, and adds launcher tabs, keeping focus on them", async () => {
-    const backend = fakeBackend();
+  it("moves and hides launcher tabs, keeping focus on them", async () => {
+    let calls = 0;
+    const backend = fakeBackend({
+      update_settings: (args) => {
+        calls += 1;
+        if (calls === 3) throw "Could not save settings.";
+        return backend.save(args.changes);
+      },
+    });
+    const order = () =>
+      (
+        backend.called("update_settings").at(-1)?.args.changes as Partial<Values> | undefined
+      )?.tabs?.map((tab) => `${tab.category}${tab.shown ? "" : " (hidden)"}`);
     render(() => <Settings />);
-    const up = (await screen.findByRole("button", { name: "Move Files up" })) as HTMLButtonElement;
+    const filesUp = await screen.findByRole("button", { name: "Move Files up" });
     expect(
       (screen.getByRole("button", { name: "Move Apps up" }) as HTMLButtonElement).disabled,
     ).toBe(true);
-    fireEvent.click(up);
-    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
-    expect(backend.called("update_settings")[0]?.args).toEqual({
-      changes: { tabs: ["files", "apps", "clipboard", "snippets", "emoji", "system"] },
-    });
+    fireEvent.click(filesUp);
+    await waitFor(() => expect(calls).toBe(1));
+    expect(order()).toEqual(["files", "apps", "clipboard", "snippets", "emoji", "system"]);
     // Files is first now, so its Up is disabled and focus moves to Down.
+    const filesDown = screen.getByRole("button", { name: "Move Files down" });
+    await waitFor(() => expect(document.activeElement).toBe(filesDown));
+
+    fireEvent.click(screen.getByRole("switch", { name: "Show Emoji" }));
+    await waitFor(() => expect(calls).toBe(2));
+    expect(order()).toEqual(["files", "apps", "clipboard", "snippets", "emoji (hidden)", "system"]);
+
+    // A failed move puts the row back, and focus stays on its button.
+    fireEvent.click(filesDown);
+    expect(await screen.findByText("Could not save settings.")).toBeTruthy();
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Files down" })),
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Remove Emoji" }));
-    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
-    expect(backend.called("update_settings")[1]?.args).toEqual({
-      changes: { tabs: ["files", "apps", "clipboard", "snippets", "system"] },
-    });
-    const addEmoji = await screen.findByRole("button", { name: "Add Emoji tab" });
-    await waitFor(() => expect(document.activeElement).toBe(addEmoji));
-
-    fireEvent.click(addEmoji);
-    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(3));
-    expect(backend.called("update_settings")[2]?.args).toEqual({
-      changes: { tabs: ["files", "apps", "clipboard", "snippets", "system", "emoji"] },
-    });
-    await waitFor(() =>
-      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Remove Emoji" })),
+    const rows = within(screen.getByRole("list", { name: "Tabs, in order" })).getAllByRole(
+      "listitem",
     );
+    expect(rows.map((row) => row.firstChild?.textContent)).toEqual([
+      "All",
+      "Files",
+      "Apps",
+      "Clipboard",
+      "Snippets",
+      "Emoji",
+      "System",
+    ]);
   });
 
   it("describes each setting to screen readers", async () => {

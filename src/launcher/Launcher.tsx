@@ -106,7 +106,10 @@ export function Launcher() {
   // hidden tab opened on purpose (`--mode clipboard`) shows while it is
   // open, so the view has a name.
   const tabs = (): Category[] => {
-    const shown: Category[] = ["all", ...(settings()?.tabs ?? OPTIONAL_TABS)];
+    const chosen = settings()
+      ?.tabs.filter((tab) => tab.shown)
+      .map((tab) => tab.category);
+    const shown: Category[] = ["all", ...(chosen ?? OPTIONAL_TABS)];
     return shown.includes(launcher.category()) ? shown : [...shown, launcher.category()];
   };
 
