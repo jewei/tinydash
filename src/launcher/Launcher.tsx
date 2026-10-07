@@ -225,7 +225,10 @@ export function Launcher() {
     const install = version
       ? [
           { label: `Install TinyDash ${version} and Restart`, keys: undefined, run: installUpdate },
-          { label: "Hide Update Notice", keys: undefined, run: () => setUpdate(undefined) },
+          // Not while it installs: hiding the bar would hide a failure.
+          ...(installing()
+            ? []
+            : [{ label: "Hide Update Notice", keys: undefined, run: () => setUpdate(undefined) }]),
         ]
       : [];
     return [...resultItems, ...install, ...general];
@@ -351,6 +354,7 @@ export function Launcher() {
             <button
               type="button"
               class="link"
+              disabled={installing()}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setUpdate(undefined)}
             >

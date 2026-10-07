@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { emit } from "@tauri-apps/api/event";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { LibraryItem } from "../generated/LibraryItem";
@@ -275,6 +276,15 @@ describe("Settings", () => {
     expect(await screen.findByRole("button", { name: "Installing…" })).toBeTruthy();
     fail();
     expect(await screen.findByText("Could not install TinyDash 0.2.1: offline.")).toBeTruthy();
+
+    // A background check updates the offer, or takes it away.
+    await emit("update:changed", "0.2.4");
+    expect(await screen.findByText("TinyDash 0.2.4 is available.")).toBeTruthy();
+    await emit("update:changed", null);
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Install and Restart" })).toBeNull(),
+    );
+    expect(screen.queryByText(/is available/)).toBeNull();
   });
 
   it("points to the Releases page where TinyDash cannot update itself", async () => {

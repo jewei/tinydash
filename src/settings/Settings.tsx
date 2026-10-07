@@ -437,6 +437,19 @@ function createUpdateCheck() {
   const [doing, setDoing] = createSignal<"check" | "install">();
   const [found, setFound] = createSignal<string | null>();
   const [result, setResult] = createSignal<string>();
+  // A background check may find a newer version, or find that the offer
+  // is gone. A "latest" message stays: the check that wrote it sends this
+  // event too.
+  const stop = ipc.onUpdateChanged((version) => {
+    if (version) {
+      setFound(version);
+      setResult(`TinyDash ${version} is available.`);
+    } else if (found()) {
+      setFound(null);
+      setResult(undefined);
+    }
+  });
+  onCleanup(() => void stop.then((unlisten) => unlisten()));
   const run = (job: "check" | "install", work: () => Promise<void>) => {
     if (doing()) return;
     setDoing(job);

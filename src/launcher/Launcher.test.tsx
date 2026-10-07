@@ -166,8 +166,14 @@ describe("Launcher", () => {
     expect(fireEvent.mouseDown(screen.getByRole("button", { name: "Later" }))).toBe(false);
     fireEvent.click(install);
     expect(await screen.findByRole("button", { name: "Installing…" })).toBeTruthy();
+    // It cannot be hidden while it runs, or a failure would show nowhere.
+    expect((screen.getByRole("button", { name: "Later" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     // A second request while it runs does nothing.
     press("k", { ctrlKey: true });
+    expect(await screen.findByRole("option", { name: /Install TinyDash/ })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /Hide Update Notice/ })).toBeNull();
     fireEvent.click(
       await screen.findByRole("option", { name: /Install TinyDash 0.2.2 and Restart/ }),
     );
