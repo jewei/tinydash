@@ -18,6 +18,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. On
 | Tab / Shift+Tab | Next / previous category                                                                                                       |
 | Mod+,           | Open Settings                                                                                                                  |
 | Mod+J           | Edit the widget pane's note, and back                                                                                          |
+| Mod+P           | Start, pause, or resume the focus timer                                                                                        |
 | Escape          | Dismiss a warning, or hide and return to the previous app                                                                      |
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens with an empty query, in the center of the screen with the pointer, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it: it then opens there, until that spot is no longer on a screen. Center Launcher in the actions menu, or Center in Settings > General, puts it back.
@@ -47,6 +48,7 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
+- **Focus timer** (off): Pomodoro sessions, 25 minutes by default, each followed by a 5-minute break, with a 15-minute break after the fourth session (change all four in Settings > Widgets). A system notification says when a session or a break ends; a break starts when you choose. Mod+P starts, pauses, or resumes it, and Mod+K lists Skip Break and Reset Timer. The timer keeps running while the launcher is hidden, but not after TinyDash quits, and turning the widget off resets it.
 - **Notepad** (off): one scratch note of up to 10,000 characters, saved as you type to `tinydash.db` on this computer. Mod+J moves to the note and back; Escape returns to the search field.
 
 ## Instant answers (All only)
@@ -96,7 +98,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs |
-| Widgets              | Each widget on or off, clock cities                                                                              |
+| Widgets              | Each widget on or off, clock cities, focus timer lengths                                                         |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
 | Files                | Folders to index, folder names to skip                                                                           |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages (Chinese, Malay, Spanish)     |

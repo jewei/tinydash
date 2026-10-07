@@ -10,6 +10,7 @@ pub const LAUNCHER_SHOWN: &str = "launcher:shown";
 pub const RESULTS_STALE: &str = "results:stale";
 pub const SETTINGS_CHANGED: &str = "settings:changed";
 pub const UPDATE_CHANGED: &str = "update:changed";
+pub const WIDGETS_CHANGED: &str = "widgets:changed";
 
 #[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +42,13 @@ pub fn results_stale(app: &AppHandle) {
 pub fn update_changed(app: &AppHandle, version: Option<&str>) {
     if let Err(error) = app.emit(UPDATE_CHANGED, version) {
         tracing::debug!(%error, "No window received the update notice");
+    }
+}
+
+/// A widget changed on its own, such as the focus timer; the pane loads again.
+pub fn widgets_changed(app: &AppHandle) {
+    if let Err(error) = app.emit_to(crate::window::LAUNCHER, WIDGETS_CHANGED, ()) {
+        tracing::debug!(%error, "The launcher did not receive the widget change");
     }
 }
 

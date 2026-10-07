@@ -208,6 +208,7 @@ pub async fn update_settings(
         }
         state.settings.set(new.clone());
 
+        state.focus.apply(&old, &new);
         if new.emoji_languages != old.emoji_languages {
             state.emoji.set(EmojiIndex::new(&new.emoji_languages));
         }

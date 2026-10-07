@@ -23,6 +23,7 @@ use crate::{
     settings::Settings,
     shared::Shared,
     store::Store,
+    timer::FocusClock,
 };
 
 /// Folders the OS assigns to the app and the user.
@@ -46,6 +47,7 @@ pub struct State {
     pub pins: Shared<Pins>,
     pub rates: Shared<Option<Rates>>,
     pub freshness: Freshness,
+    pub focus: FocusClock,
     pub dirs: Dirs,
     /// Held while settings change or the shortcut pauses, so two changes
     /// never interleave their effects on the OS.
@@ -91,6 +93,7 @@ impl State {
         });
         Self {
             emoji: Shared::new(EmojiIndex::new(&settings.emoji_languages)),
+            focus: FocusClock::new(&settings),
             settings: Shared::new(settings),
             store,
             apps: Shared::default(),

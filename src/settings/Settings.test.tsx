@@ -158,6 +158,17 @@ describe("Settings", () => {
     expect((field as HTMLInputElement).value).toBe("Atlantis");
   });
 
+  it("saves the focus timer lengths within their limits", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    const focus = await screen.findByRole("spinbutton", { name: "Focus minutes" });
+    fireEvent.input(focus, { target: { value: "500" } });
+    fireEvent.blur(focus);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({ changes: { focusMinutes: 120 } });
+  });
+
   it("moves and hides launcher tabs, keeping focus on them", async () => {
     let calls = 0;
     const backend = fakeBackend({

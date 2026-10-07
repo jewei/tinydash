@@ -15,7 +15,7 @@ use crate::{
     platform, refresh,
     search::{self, Context, Snapshot, id::Source, result::Action},
     state::State,
-    system_clipboard, window,
+    system_clipboard, timer, window,
 };
 
 /// Pins kept in all, including pins of items that are hidden for now.
@@ -167,6 +167,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         }
         Action::OpenSettings => window::open_settings(app)?,
         Action::CenterLauncher => window::center(app)?,
+        Action::Focus { control } => timer::control(app, control)?,
         // Exits below, once the use is saved: exit ends the process from
         // the main thread while this worker may still be writing.
         Action::Quit => {}

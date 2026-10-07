@@ -35,6 +35,9 @@
   --accent-ink: #fff8f1;
   --danger: #a33b2c;
   --danger-ink: #fff8f1;
+  /* Breaks of the focus timer. */
+  --calm: #4f7a63;
+  --calm-ink: #f4faf5;
   --notice: #fff2eb;
   --shadow: #302a2433;
   --backdrop: #302a2459;
@@ -77,6 +80,8 @@
   --accent-ink: #382819;
   --danger: #ffb4a1;
   --danger-ink: #3a1610;
+  --calm: #9fcfb0;
+  --calm-ink: #1f3326;
   --notice: #402310;
   --shadow: #0c0b0a80;
   --backdrop: #0c0b0a99;

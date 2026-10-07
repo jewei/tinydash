@@ -284,6 +284,16 @@ export function Settings() {
                     onChange={(showNotepad) => void save({ showNotepad })}
                   />
                 </Row>
+                <Row
+                  label="Focus timer"
+                  description="Focus sessions with breaks. A notification says when each one ends."
+                >
+                  <Toggle
+                    label="Focus timer"
+                    checked={settings().showFocusTimer}
+                    onChange={(showFocusTimer) => void save({ showFocusTimer })}
+                  />
+                </Row>
                 {/* 3 matches MAX_CLOCK_CITIES in the Rust code. */}
                 <h2>Clock cities</h2>
                 <ListEditor
@@ -295,6 +305,44 @@ export function Settings() {
                     save((current) => ({ clockCities: edit(current.clockCities) }))
                   }
                 />
+                {/* The limits match FOCUS_MINUTES_MAX, BREAK_MINUTES_MAX, and SESSIONS_MAX. */}
+                <h2>Focus timer</h2>
+                <Row label="Focus" description="Minutes in each focus session.">
+                  <NumberField
+                    label="Focus minutes"
+                    value={settings().focusMinutes}
+                    min={1}
+                    max={120}
+                    onChange={(focusMinutes) => void save({ focusMinutes })}
+                  />
+                </Row>
+                <Row label="Short break" description="Minutes after each session.">
+                  <NumberField
+                    label="Short break minutes"
+                    value={settings().shortBreakMinutes}
+                    min={1}
+                    max={60}
+                    onChange={(shortBreakMinutes) => void save({ shortBreakMinutes })}
+                  />
+                </Row>
+                <Row label="Long break" description="Minutes after the last session of a cycle.">
+                  <NumberField
+                    label="Long break minutes"
+                    value={settings().longBreakMinutes}
+                    min={1}
+                    max={60}
+                    onChange={(longBreakMinutes) => void save({ longBreakMinutes })}
+                  />
+                </Row>
+                <Row label="Sessions before a long break">
+                  <NumberField
+                    label="Sessions before a long break"
+                    value={settings().sessionsBeforeLongBreak}
+                    min={1}
+                    max={8}
+                    onChange={(sessionsBeforeLongBreak) => void save({ sessionsBeforeLongBreak })}
+                  />
+                </Row>
               </Match>
 
               <Match when={section() === "clipboard"}>

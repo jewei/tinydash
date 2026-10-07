@@ -13,6 +13,7 @@ pub mod currency;
 pub mod datetime;
 pub mod emoji;
 pub mod files;
+pub mod focus;
 pub mod library;
 pub mod password;
 pub mod system;

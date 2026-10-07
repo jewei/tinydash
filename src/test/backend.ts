@@ -37,6 +37,11 @@ export const testSettings: Settings = {
   clockCities: [],
   showDiskSpace: true,
   showNotepad: false,
+  showFocusTimer: false,
+  focusMinutes: 25,
+  shortBreakMinutes: 5,
+  longBreakMinutes: 15,
+  sessionsBeforeLongBreak: 4,
 };
 
 /** Every widget off, so an empty All search shows the preview. */
@@ -44,6 +49,11 @@ export const noWidgets: Partial<Settings> = {
   showClocks: false,
   showDiskSpace: false,
   showNotepad: false,
+  showFocusTimer: false,
+  focusMinutes: 25,
+  shortBreakMinutes: 5,
+  longBreakMinutes: 15,
+  sessionsBeforeLongBreak: 4,
 };
 
 export const app: SearchResult = {
@@ -115,7 +125,7 @@ export function fakeBackend(
     delete_library_item: () => null,
     check_for_update: () => null,
     install_update: () => null,
-    widgets: () => ({ clocks: [], disk: null, note: null }),
+    widgets: () => ({ clocks: [], disk: null, note: null, focus: null }),
     save_note: () => null,
     about: () => ({
       version: "0.2.0",

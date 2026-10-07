@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::features::system::SystemCommand;
+use crate::features::{focus::FocusControl, system::SystemCommand};
 
 /// One row in the launcher. Results carry their own actions, so the frontend
 /// renders them without knowing how each kind works.
@@ -176,5 +176,9 @@ pub enum Action {
     OpenSettings,
     /// Forget where the launcher was dragged, and center it.
     CenterLauncher,
+    /// Start, pause, skip, or reset the focus timer of the widget pane.
+    Focus {
+        control: FocusControl,
+    },
     Quit,
 }

@@ -51,4 +51,8 @@ showClocks: boolean,
 /**
  * Places the clocks widget shows next to local time, as typed.
  */
-clockCities: Array<string>, showDiskSpace: boolean, showNotepad: boolean, };
+clockCities: Array<string>, showDiskSpace: boolean, showNotepad: boolean, showFocusTimer: boolean, focusMinutes: number, shortBreakMinutes: number, longBreakMinutes: number, 
+/**
+ * Focus sessions in a cycle; the last one earns the long break.
+ */
+sessionsBeforeLongBreak: number, };

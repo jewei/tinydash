@@ -6,7 +6,10 @@ use ts_rs::TS;
 
 use crate::{
     error::{Error, Result},
-    features::datetime::{self, CityClock},
+    features::{
+        datetime::{self, CityClock},
+        focus::FocusTimer,
+    },
     platform,
     state::State,
 };
@@ -27,6 +30,7 @@ pub struct Widgets {
     pub disk: Option<Disk>,
     /// The scratch note.
     pub note: Option<String>,
+    pub focus: Option<FocusTimer>,
 }
 
 #[derive(Serialize, TS)]
@@ -95,6 +99,7 @@ pub fn load(state: &State) -> Result<Widgets> {
             .show_notepad
             .then(|| state.store.note())
             .transpose()?,
+        focus: settings.show_focus_timer.then(|| state.focus.get()),
     })
 }
 

@@ -211,6 +211,9 @@ export function Launcher() {
       case "note":
         if (!(showsWidgets() && pane?.focusNote())) focusInput();
         return;
+      case "timer":
+        if (showsWidgets()) pane?.runTimer();
+        return;
       case "hide":
         // Escape first dismisses a startup warning, then hides.
         if (warnings().length && !launcher.actionError() && !launcher.searchError()) {
@@ -237,6 +240,11 @@ export function Launcher() {
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,
       run: () => launcher.run(action),
     }));
+    const widgetItems = (showsWidgets() ? (pane?.actions() ?? []) : []).map(({ action, keys }) => ({
+      label: action.label,
+      keys,
+      run: () => launcher.run(action),
+    }));
     // The update bar's buttons take a click; the menu takes the keyboard.
     const version = update();
     const install = version
@@ -247,7 +255,7 @@ export function Launcher() {
             : [{ label: "Hide Update Notice", keys: undefined, run: hideUpdate }]),
         ]
       : [];
-    return [...resultItems, ...install, ...general];
+    return [...resultItems, ...widgetItems, ...install, ...general];
   };
 
   // Only results of the current input: rows on screen during a search may
@@ -452,6 +460,7 @@ export function Launcher() {
                 onCleanup(() => (pane = undefined));
               }}
               onLeave={focusInput}
+              onRun={(action) => launcher.run(action)}
             />
           </Show>
         </Show>

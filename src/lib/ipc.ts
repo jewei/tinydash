@@ -73,6 +73,9 @@ export const onLauncherShown = (handler: (event: LauncherShown) => void) =>
 
 export const onResultsStale = (handler: () => void) => listen("results:stale", () => handler());
 
+/** A widget changed on its own, such as the focus timer at the end of a phase. */
+export const onWidgetsChanged = (handler: () => void) => listen("widgets:changed", () => handler());
+
 export const onSettingsChanged = (handler: (settings: Settings) => void) =>
   listen<Settings>("settings:changed", (event) => handler(event.payload));
 

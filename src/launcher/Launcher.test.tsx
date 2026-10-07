@@ -1012,6 +1012,52 @@ describe("Launcher", () => {
     expect(await screen.findByText(/Not saved\. The database is locked\./)).toBeTruthy();
   });
 
+  it("counts the focus timer down and runs its actions with Mod+P and the menu", async () => {
+    const start = { type: "focus", control: "start" } as const;
+    const reset = { type: "focus", control: "reset" } as const;
+    const running = {
+      phase: "focus",
+      state: "running",
+      remainingMs: 0,
+      endsAtMs: Date.now() + 90_500,
+      totalMs: 25 * 60_000,
+      session: 2,
+      sessions: 4,
+      actions: [
+        { label: "Pause Timer", action: { type: "focus", control: "pause" }, confirm: null },
+        { label: "Reset Timer", action: reset, confirm: null },
+      ],
+    };
+    const idle = {
+      ...running,
+      state: "idle",
+      remainingMs: 25 * 60_000,
+      endsAtMs: null,
+      actions: [{ label: "Start Focus", action: start, confirm: null }],
+    };
+    let timer: object = idle;
+    const { backend, press } = setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: null, focus: timer }),
+    });
+    const card = await screen.findByRole("region", { name: "Focus timer" });
+    expect(within(card).getByRole("timer").textContent).toBe("25:00");
+    expect(within(card).getByText("Session 2 of 4")).toBeTruthy();
+
+    press("p", { ctrlKey: true, code: "KeyP" });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({ action: start, resultId: null });
+
+    timer = running;
+    await emit("widgets:changed", null);
+    await waitFor(() => expect(within(card).getByRole("timer").textContent).toBe("01:31"));
+    expect(within(card).getByText("Focus")).toBeTruthy();
+
+    press("k", { ctrlKey: true, code: "KeyK" });
+    fireEvent.click(await screen.findByRole("option", { name: /Reset Timer/ }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    expect(backend.called("run_action")[1]?.args).toEqual({ action: reset, resultId: null });
+  });
+
   it("keeps the preview when every widget is off", async () => {
     fakeBackend({ search: () => [app] }, noWidgets);
     render(() => <Launcher />);

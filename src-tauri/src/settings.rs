@@ -16,6 +16,9 @@ use crate::{
 
 pub const FILE_NAME: &str = "settings.json";
 pub const CLIPBOARD_LIMIT_MAX: u32 = 1000;
+pub const FOCUS_MINUTES_MAX: u16 = 120;
+pub const BREAK_MINUTES_MAX: u16 = 60;
+pub const SESSIONS_MAX: u8 = 8;
 /// Most entries in each folder list. On Linux each indexed folder uses a
 /// watch from a per-user limit.
 const FOLDER_LIST_MAX: usize = 50;
@@ -63,6 +66,12 @@ pub struct Settings {
     pub clock_cities: Vec<String>,
     pub show_disk_space: bool,
     pub show_notepad: bool,
+    pub show_focus_timer: bool,
+    pub focus_minutes: u16,
+    pub short_break_minutes: u16,
+    pub long_break_minutes: u16,
+    /// Focus sessions in a cycle; the last one earns the long break.
+    pub sessions_before_long_break: u8,
 }
 
 /// The launcher's top-left corner: logical points on macOS, physical pixels
@@ -148,6 +157,11 @@ impl Default for Settings {
             clock_cities: Vec::new(),
             show_disk_space: true,
             show_notepad: false,
+            show_focus_timer: false,
+            focus_minutes: 25,
+            short_break_minutes: 5,
+            long_break_minutes: 15,
+            sessions_before_long_break: 4,
         }
     }
 }
@@ -183,6 +197,10 @@ impl Settings {
         self.shortcut = self.shortcut.trim().to_owned();
         self.clipboard_history_limit = self.clipboard_history_limit.clamp(1, CLIPBOARD_LIMIT_MAX);
         self.emoji_skin_tone = self.emoji_skin_tone.min(5);
+        self.focus_minutes = self.focus_minutes.clamp(1, FOCUS_MINUTES_MAX);
+        self.short_break_minutes = self.short_break_minutes.clamp(1, BREAK_MINUTES_MAX);
+        self.long_break_minutes = self.long_break_minutes.clamp(1, BREAK_MINUTES_MAX);
+        self.sessions_before_long_break = self.sessions_before_long_break.clamp(1, SESSIONS_MAX);
         self.emoji_languages.sort();
         self.emoji_languages.dedup();
         // Each tab once, in the saved order; a tab the list lacks, such as
@@ -405,6 +423,9 @@ mod tests {
         let settings = Settings {
             clipboard_history_limit: 0,
             emoji_skin_tone: 9,
+            focus_minutes: 0,
+            long_break_minutes: 999,
+            sessions_before_long_break: 0,
             emoji_languages: vec![EmojiLanguage::Zh, EmojiLanguage::Es, EmojiLanguage::Zh],
             file_search_folders: vec![" ~/A ".into(), "~/A".into(), "  ".into()],
             ..Settings::default()
@@ -412,6 +433,9 @@ mod tests {
         .normalized();
         assert_eq!(settings.clipboard_history_limit, 1);
         assert_eq!(settings.emoji_skin_tone, 5);
+        assert_eq!(settings.focus_minutes, 1);
+        assert_eq!(settings.long_break_minutes, BREAK_MINUTES_MAX);
+        assert_eq!(settings.sessions_before_long_break, 1);
         assert_eq!(
             settings.emoji_languages,
             [EmojiLanguage::Zh, EmojiLanguage::Es]

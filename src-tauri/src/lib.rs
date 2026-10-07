@@ -21,6 +21,7 @@ mod shortcut;
 mod state;
 mod store;
 mod system_clipboard;
+mod timer;
 mod tray;
 mod updates;
 mod watcher;
@@ -67,6 +68,7 @@ pub fn run() {
         ))
         .plugin(shortcut::plugin())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .register_asynchronous_uri_scheme_protocol("icon", images::serve_icon)
         .register_asynchronous_uri_scheme_protocol("clip", images::serve_clipboard_image)
         .manage(watcher::Watcher::default())
@@ -163,6 +165,7 @@ fn setup(app: &mut App) {
         platform::prepare_launcher(&launcher);
     }
     monitor::start(handle);
+    timer::start(handle);
     watcher::watch(handle);
     refresh::apps(handle);
     refresh::files(handle);
