@@ -130,6 +130,41 @@ describe("Settings", () => {
     expect(screen.queryByText(/is already in the list/)).toBeNull();
   });
 
+  it("moves, removes, and adds launcher tabs, keeping focus on them", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    const up = (await screen.findByRole("button", { name: "Move Files up" })) as HTMLButtonElement;
+    expect(
+      (screen.getByRole("button", { name: "Move Apps up" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(up);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({
+      changes: { tabs: ["files", "apps", "clipboard", "snippets", "emoji", "system"] },
+    });
+    // Files is first now, so its Up is disabled and focus moves to Down.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Files down" })),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Emoji" }));
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
+    expect(backend.called("update_settings")[1]?.args).toEqual({
+      changes: { tabs: ["files", "apps", "clipboard", "snippets", "system"] },
+    });
+    const addEmoji = await screen.findByRole("button", { name: "Add Emoji tab" });
+    await waitFor(() => expect(document.activeElement).toBe(addEmoji));
+
+    fireEvent.click(addEmoji);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(3));
+    expect(backend.called("update_settings")[2]?.args).toEqual({
+      changes: { tabs: ["files", "apps", "clipboard", "snippets", "system", "emoji"] },
+    });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Remove Emoji" })),
+    );
+  });
+
   it("describes each setting to screen readers", async () => {
     fakeBackend();
     render(() => <Settings />);

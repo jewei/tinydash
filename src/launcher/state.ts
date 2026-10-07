@@ -6,16 +6,6 @@ import type { SearchResult } from "../generated/SearchResult";
 import * as ipc from "../lib/ipc";
 import { latestOnly } from "./latest";
 
-export const CATEGORIES: ReadonlyArray<{ id: Category; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "apps", label: "Apps" },
-  { id: "files", label: "Files" },
-  { id: "clipboard", label: "Clipboard" },
-  { id: "snippets", label: "Snippets" },
-  { id: "emoji", label: "Emoji" },
-  { id: "system", label: "System" },
-];
-
 interface Input {
   query: string;
   category: Category;
@@ -112,10 +102,11 @@ export function createLauncher() {
     void refresh();
   }
 
-  function moveCategory(by: 1 | -1) {
-    const index = CATEGORIES.findIndex((entry) => entry.id === category());
-    const next = CATEGORIES[(index + by + CATEGORIES.length) % CATEGORIES.length];
-    if (next) setCategory(next.id);
+  /** Go to the next or previous of the tabs shown, in their order. */
+  function moveCategory(by: 1 | -1, tabs: readonly Category[]) {
+    const index = tabs.indexOf(category());
+    const next = tabs[(index + by + tabs.length) % tabs.length];
+    if (next) setCategory(next);
   }
 
   function move(by: 1 | -1) {

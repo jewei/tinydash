@@ -7,6 +7,7 @@ use ts_rs::TS;
 use crate::{
     error::{Error, Result},
     features::{emoji::EmojiLanguage, web::SearchEngine},
+    search::Category,
 };
 
 pub const FILE_NAME: &str = "settings.json";
@@ -40,6 +41,9 @@ pub struct Settings {
     pub emoji_languages: Vec<EmojiLanguage>,
     pub currency_rates_enabled: bool,
     pub search_engine: SearchEngine,
+    /// The launcher's tabs after All, in order. All is always first, so it
+    /// is never listed. A tab left out still feeds All.
+    pub tabs: Vec<Category>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -73,6 +77,7 @@ impl Default for Settings {
             emoji_languages: Vec::new(),
             currency_rates_enabled: true,
             search_engine: SearchEngine::Google,
+            tabs: Category::ALL[1..].to_vec(),
         }
     }
 }
@@ -108,6 +113,9 @@ impl Settings {
         self.emoji_skin_tone = self.emoji_skin_tone.min(5);
         self.emoji_languages.sort();
         self.emoji_languages.dedup();
+        let mut tabs = std::collections::HashSet::new();
+        self.tabs
+            .retain(|tab| *tab != Category::All && tabs.insert(*tab));
         for list in [
             &mut self.file_search_folders,
             &mut self.file_search_excluded_dirs,
@@ -250,6 +258,19 @@ mod tests {
             [EmojiLanguage::Zh, EmojiLanguage::Es]
         );
         assert_eq!(settings.file_search_folders, ["~/A"]);
+
+        let tabs = Settings {
+            tabs: vec![
+                Category::Emoji,
+                Category::All,
+                Category::Apps,
+                Category::Emoji,
+            ],
+            ..Settings::default()
+        }
+        .normalized();
+        assert_eq!(tabs.tabs, [Category::Emoji, Category::Apps]);
+        assert_eq!(Settings::default().tabs.len(), Category::ALL.len() - 1);
 
         let many = Settings {
             file_search_excluded_dirs: (0..99).map(|n| format!("dir{n}")).collect(),

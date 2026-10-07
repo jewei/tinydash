@@ -24,6 +24,7 @@ export const testSettings: Settings = {
   emojiLanguages: [],
   currencyRatesEnabled: true,
   searchEngine: "google",
+  tabs: ["apps", "files", "clipboard", "snippets", "emoji", "system"],
 };
 
 export const app: SearchResult = {

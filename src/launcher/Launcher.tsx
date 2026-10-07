@@ -7,6 +7,7 @@ import type { ResultAction } from "../generated/ResultAction";
 import type { Settings } from "../generated/Settings";
 import * as ipc from "../lib/ipc";
 import { isComposing, modKey, shortcutKey } from "../lib/keys";
+import { CATEGORY_LABELS, OPTIONAL_TABS } from "../lib/categories";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Glyph } from "../ui/Icon";
@@ -16,7 +17,7 @@ import { shortcutFor } from "./describe";
 import { commandFor } from "./keymap";
 import { PreviewPane } from "./PreviewPane";
 import { optionId, ResultList } from "./ResultList";
-import { CATEGORIES, createLauncher } from "./state";
+import { createLauncher } from "./state";
 
 /** Keys that change the query: characters (AltGr included), deletion, paste. */
 function editsQuery(event: KeyboardEvent) {
@@ -101,6 +102,14 @@ export function Launcher() {
   const results = () => (clipboardOff() ? [] : launcher.results());
   const selected = () => (clipboardOff() ? undefined : launcher.selected());
 
+  // All, then the tabs that Settings shows (every tab until it loads). A
+  // hidden tab opened on purpose (`--mode clipboard`) shows while it is
+  // open, so the view has a name.
+  const tabs = (): Category[] => {
+    const shown: Category[] = ["all", ...(settings()?.tabs ?? OPTIONAL_TABS)];
+    return shown.includes(launcher.category()) ? shown : [...shown, launcher.category()];
+  };
+
   // Deleting cannot be undone, so it never waits for newer results: it acts
   // only on the highlighted entry the user can see.
   const deleteAction = () =>
@@ -151,7 +160,7 @@ export function Launcher() {
       case "menu":
         return openMenu();
       case "category":
-        return launcher.moveCategory(command.by);
+        return launcher.moveCategory(command.by, tabs());
       case "settings":
         return runGeneral({ type: "openSettings" });
       case "hide":
@@ -226,21 +235,21 @@ export function Launcher() {
       <nav class="tabs" aria-label="Categories">
         {/* The hint stays outside the tab list, which may hold only tabs. */}
         <div class="tab-list" role="tablist" aria-label="Categories">
-          <For each={CATEGORIES}>
+          <For each={tabs()}>
             {(category) => (
               <button
                 type="button"
                 role="tab"
                 class="tab"
-                aria-selected={launcher.category() === category.id}
+                aria-selected={launcher.category() === category}
                 tabIndex={-1}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   if (menu()) closeMenu();
-                  launcher.setCategory(category.id);
+                  launcher.setCategory(category);
                 }}
               >
-                {category.label}
+                {CATEGORY_LABELS[category]}
               </button>
             )}
           </For>

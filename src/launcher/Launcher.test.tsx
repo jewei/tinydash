@@ -90,6 +90,30 @@ describe("Launcher", () => {
     expect(screen.getByRole("tab", { name: "Apps" }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("shows the tabs that Settings shows, in its order", async () => {
+    const { backend, press } = setup(() => [], {
+      launcher_init: () => ({
+        settings: { ...testSettings, tabs: ["emoji", "apps"] },
+        platform: "macos",
+        warnings: [],
+      }),
+    });
+    const tablist = await screen.findByRole("tablist", { name: "Categories" });
+    await waitFor(() =>
+      expect([...tablist.children].map((tab) => tab.textContent)).toEqual(["All", "Emoji", "Apps"]),
+    );
+    for (const category of ["emoji", "apps", "all"]) {
+      press("Tab");
+      await waitFor(() =>
+        expect(backend.called("search").at(-1)?.args).toEqual({ query: "", category }),
+      );
+    }
+    // A hidden tab opened on purpose shows while it is open.
+    await emit("launcher:shown", { category: "clipboard" });
+    const clipboard = await screen.findByRole("tab", { name: "Clipboard" });
+    expect(clipboard.getAttribute("aria-selected")).toBe("true");
+  });
+
   it("opens the action menu with Mod+K", async () => {
     const { backend, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });

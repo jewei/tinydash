@@ -25,7 +25,7 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 
 ## Categories
 
-**All** mixes everything. An empty All shows pins, then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results.
+**All** mixes everything. An empty All shows pins, then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results. Settings > General shows, hides, and orders the tabs after All; a hidden tab's results still show in All, and Tab skips it. Opening a hidden tab on purpose (`--mode clipboard`) shows it while it is open.
 
 | Category  | Finds                                                                                                                    | Empty view                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
@@ -86,7 +86,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 | Section              | Settings                                                                                                     |
 | -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon            |
+| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, tabs      |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                  |
 | Files                | Folders to index, folder names to skip                                                                       |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages (Chinese, Malay, Spanish) |
