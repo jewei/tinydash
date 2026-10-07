@@ -99,6 +99,27 @@ pub fn run() {
 
 /// The database of TinyDash 0.1, which this version does not read.
 const LEGACY_DATABASE: &str = "tinydash.sqlite3";
+/// Written in this version's data folder once the 0.1 notice has shown.
+const LEGACY_NOTICE_SHOWN: &str = "old-data-notice-shown";
+
+/// Where TinyDash 0.1 left its data, the first time this version finds it.
+/// A marker in this version's own folder records that the notice showed,
+/// so it never comes back; the 0.1 files are never touched. If the marker
+/// cannot be written, the notice shows again at the next start.
+fn old_data_notice(legacy_dir: &std::path::Path, data_dir: &std::path::Path) -> Option<String> {
+    let marker = data_dir.join(LEGACY_NOTICE_SHOWN);
+    if !legacy_dir.join(LEGACY_DATABASE).exists() || marker.exists() {
+        return None;
+    }
+    let marked = std::fs::create_dir_all(data_dir).and_then(|()| std::fs::write(&marker, ""));
+    if let Err(error) = marked {
+        tracing::warn!(%error, "Could not record that the 0.1 notice showed");
+    }
+    Some(format!(
+        "This version starts with new history and pins. Data from TinyDash 0.1 is still in {}: delete {LEGACY_DATABASE} and recovery.tar there if you no longer need it.",
+        legacy_dir.display()
+    ))
+}
 
 /// Load state and start background work. Problems become launcher warnings;
 /// only a missing app folder location stops startup.
@@ -118,12 +139,7 @@ fn setup(app: &mut App) {
     let mut warnings = Vec::new();
     let (settings, warning) = settings::load(&config_dir);
     warnings.extend(warning);
-    if legacy_dir.join(LEGACY_DATABASE).exists() {
-        warnings.push(format!(
-            "This version starts with new history and pins. Data from TinyDash 0.1 is still in {}: delete {LEGACY_DATABASE} and recovery.tar there if you no longer need it.",
-            legacy_dir.display()
-        ));
-    }
+    warnings.extend(old_data_notice(&legacy_dir, &data_dir));
     let store = store::Store::open(&data_dir).unwrap_or_else(|error| {
         warnings.push(format!(
             "Could not open saved data ({error}). Changes this session will not be saved."
@@ -173,5 +189,26 @@ fn open(app: &AppHandle, launch: Launch, already_running: bool) {
     };
     if let Err(error) = result {
         tracing::warn!(%error, "Could not open a window");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_old_data_notice_shows_once() {
+        let root = std::env::temp_dir().join(format!("tinydash-notice-{}", std::process::id()));
+        let (legacy, data) = (root.join("legacy"), root.join("data"));
+        std::fs::create_dir_all(&legacy).unwrap();
+        assert_eq!(old_data_notice(&legacy, &data), None);
+        std::fs::write(legacy.join(LEGACY_DATABASE), "").unwrap();
+        let notice = old_data_notice(&legacy, &data);
+        let again = old_data_notice(&legacy, &data);
+        let kept = legacy.join(LEGACY_DATABASE).exists();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(notice.is_some_and(|text| text.contains(LEGACY_DATABASE)));
+        assert_eq!(again, None);
+        assert!(kept);
     }
 }
