@@ -11,7 +11,7 @@ use tauri::{AppHandle, Manager};
 use crate::{
     error::{Error, Result},
     events,
-    features::focus::{FocusControl, FocusTimer, Lengths},
+    features::focus::{Finished, FocusControl, FocusTimer, Lengths},
     platform,
     settings::Settings,
     state::State,
@@ -102,14 +102,30 @@ pub fn start(app: &AppHandle) {
 
 fn run_forever(app: &AppHandle) {
     let state = app.state::<State>();
-    let clock = &state.focus;
+    run(
+        &state.focus,
+        || lengths(&state.settings.get()),
+        now_ms,
+        |finished| {
+            notify(app, &finished.title, &finished.body);
+            events::widgets_changed(app);
+        },
+    );
+}
+
+/// End each phase on time and report it, forever.
+fn run(
+    clock: &FocusClock,
+    lengths: impl Fn() -> Lengths,
+    now_ms: impl Fn() -> i64,
+    mut on_finish: impl FnMut(Finished),
+) {
     let mut timer = clock.lock();
     loop {
         let now = now_ms();
-        if let Some(finished) = timer.finish_if_due(lengths(&state.settings.get()), now) {
+        if let Some(finished) = timer.finish_if_due(lengths(), now) {
             drop(timer);
-            notify(app, &finished.title, &finished.body);
-            events::widgets_changed(app);
+            on_finish(finished);
             timer = clock.lock();
             continue;
         }
@@ -164,5 +180,56 @@ mod tests {
         };
         clock.apply(&longer, &off);
         assert_eq!(clock.get(), FocusTimer::new(lengths(&off)));
+    }
+
+    #[test]
+    fn the_thread_reports_a_focus_end_and_then_a_break_end() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicI64, Ordering},
+            mpsc,
+        };
+        let settings = Settings {
+            show_focus_timer: true,
+            focus_minutes: 1,
+            short_break_minutes: 1,
+            ..Settings::default()
+        };
+        let clock = Arc::new(FocusClock::new(&settings));
+        let now = Arc::new(AtomicI64::new(0));
+        let (sent, finished) = mpsc::channel();
+        {
+            let (clock, now, lengths) = (Arc::clone(&clock), Arc::clone(&now), lengths(&settings));
+            std::thread::spawn(move || {
+                run(
+                    &clock,
+                    || lengths,
+                    || now.load(Ordering::SeqCst),
+                    |done| {
+                        sent.send(done.title).ok();
+                    },
+                );
+            });
+        }
+        let control = |control, at: i64| {
+            now.store(at, Ordering::SeqCst);
+            clock
+                .lock()
+                .control(control, lengths(&settings), at)
+                .unwrap();
+            clock.changed.notify_all();
+        };
+        let wait = || finished.recv_timeout(Duration::from_secs(5)).unwrap();
+        let pass_time = |at: i64| {
+            now.store(at, Ordering::SeqCst);
+            clock.changed.notify_all();
+        };
+
+        control(FocusControl::Start, 0);
+        pass_time(60_000);
+        assert_eq!(wait(), "Focus session done");
+        control(FocusControl::Start, 70_000);
+        pass_time(130_000);
+        assert_eq!(wait(), "Break is over");
     }
 }
