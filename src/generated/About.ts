@@ -12,4 +12,8 @@ richClipboard: boolean,
 /**
  * This build can update itself (not on Linux, not in local builds).
  */
-selfUpdate: boolean, };
+selfUpdate: boolean, 
+/**
+ * A newer version found before Settings opened, ready to install.
+ */
+pendingUpdate: string | null, };

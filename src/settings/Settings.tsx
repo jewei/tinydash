@@ -94,13 +94,13 @@ export function Settings() {
   // Read when Settings opens, and again on opening About after a failure:
   // About shows it, and the Clipboard section hides what this OS cannot save.
   const [aboutError, setAboutError] = createSignal<string>();
-  const updates = createUpdateCheck();
   const [about, { refetch: readAbout }] = createResource(() =>
     ipc.about().catch((failure: unknown) => {
       setAboutError(ipc.message(failure));
       return undefined;
     }),
   );
+  const updates = createUpdateCheck(() => about());
   const [confirmClear, setConfirmClear] = createSignal(false);
   let clearButton: HTMLButtonElement | undefined;
   const closeClear = () => {
@@ -433,10 +433,19 @@ export function Settings() {
  * the Settings window, so leaving About and coming back keeps an install
  * that is running and its result.
  */
-function createUpdateCheck() {
+function createUpdateCheck(about: () => AboutInfo | undefined) {
   const [doing, setDoing] = createSignal<"check" | "install">();
   const [found, setFound] = createSignal<string | null>();
   const [result, setResult] = createSignal<string>();
+  // An offer found before Settings opened, as the launcher shows it. Only
+  // until this window learns more from a check or an event.
+  createEffect(() => {
+    const pending = about()?.pendingUpdate;
+    if (pending && found() === undefined) {
+      setFound(pending);
+      setResult(`TinyDash ${pending} is available.`);
+    }
+  });
   // A background check may find a newer version, or find that the offer
   // is gone. A "latest" message stays: the check that wrote it sends this
   // event too.

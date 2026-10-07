@@ -287,6 +287,23 @@ describe("Settings", () => {
     expect(screen.queryByText(/is available/)).toBeNull();
   });
 
+  it("offers an update the launcher already found, as soon as About opens", async () => {
+    fakeBackend({
+      about: () => ({
+        version: "0.2.0",
+        settingsFolder: "/data",
+        dataFolder: "/data",
+        richClipboard: true,
+        selfUpdate: true,
+        pendingUpdate: "0.2.2",
+      }),
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "About" }));
+    expect(await screen.findByText("TinyDash 0.2.2 is available.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Install and Restart" })).toBeTruthy();
+  });
+
   it("points to the Releases page where TinyDash cannot update itself", async () => {
     fakeBackend({
       about: () => ({

@@ -74,6 +74,8 @@ pub struct About {
     pub rich_clipboard: bool,
     /// This build can update itself (not on Linux, not in local builds).
     pub self_update: bool,
+    /// A newer version found before Settings opened, ready to install.
+    pub pending_update: Option<String>,
 }
 
 async fn blocking<T: Send + 'static>(
@@ -307,6 +309,7 @@ pub fn about(app: AppHandle) -> About {
         data_folder: dirs.data.display().to_string(),
         rich_clipboard: platform::RICH_CLIPBOARD,
         self_update: updates::supported(),
+        pending_update: updates::pending_version(&app),
     }
 }
 

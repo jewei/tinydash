@@ -104,6 +104,7 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
       dataFolder: "/data",
       richClipboard: true,
       selfUpdate: true,
+      pendingUpdate: null,
     }),
   };
   clearMocks();

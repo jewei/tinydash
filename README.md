@@ -4,7 +4,7 @@ A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut
 
 - **Find** apps, files, clipboard history, snippets, quicklinks, emoji, and system commands.
 - **Answer** calculations, unit and currency conversions, dates, time zones, passwords, and clean URLs.
-- **Stay private:** everything runs on your computer. The only downloads are the daily currency rate table and, on macOS and Windows, a check for new versions on GitHub (you can turn it off).
+- **Stay private:** everything runs on your computer. The only downloads are the daily currency rate table and, on macOS and Windows, a check for new versions on GitHub (you can turn it off) and, when you choose to install one, the new version.
 
 ![The TinyDash launcher](docs/screenshot.png)
 

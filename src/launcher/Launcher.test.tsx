@@ -193,6 +193,27 @@ describe("Launcher", () => {
     await waitFor(() => expect(screen.queryByText(/is available/)).toBeNull());
   });
 
+  it("keeps the update bar during an install, even from a menu opened before it", async () => {
+    const { press } = setup(() => [app], {
+      launcher_init: () => ({
+        settings: testSettings,
+        platform: "macos",
+        warnings: [],
+        category: null,
+        update: "0.2.2",
+      }),
+      install_update: () => new Promise(() => {}),
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const hide = await screen.findByRole("option", { name: /Hide Update Notice/ });
+    fireEvent.click(screen.getByRole("button", { name: "Install and Restart" }));
+    await screen.findByRole("button", { name: "Installing…" });
+    fireEvent.click(hide);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(screen.getByText("TinyDash 0.2.2 is available.")).toBeTruthy();
+  });
+
   it("opens the action menu with Mod+K", async () => {
     const { backend, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
