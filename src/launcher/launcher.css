@@ -448,6 +448,63 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.widget-title {
+  font-weight: 600;
+}
+
+.disk {
+  display: grid;
+  gap: 6px;
+}
+
+.disk-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.disk-line .widget-title {
+  color: var(--ink);
+}
+
+.disk-low {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.disk-free {
+  margin-left: auto;
+  font-size: var(--text-small);
+  white-space: nowrap;
+}
+
+.disk-free strong {
+  color: var(--ink);
+}
+
+.meter {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--field);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.meter.low span {
+  background: var(--danger);
+}
+
 /* Empty states */
 .empty {
   grid-column: 1 / -1;

@@ -51,4 +51,4 @@ showClocks: boolean,
 /**
  * Places the clocks widget shows next to local time, as typed.
  */
-clockCities: Array<string>, };
+clockCities: Array<string>, showDiskSpace: boolean, };

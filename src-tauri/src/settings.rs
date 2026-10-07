@@ -61,6 +61,7 @@ pub struct Settings {
     pub show_clocks: bool,
     /// Places the clocks widget shows next to local time, as typed.
     pub clock_cities: Vec<String>,
+    pub show_disk_space: bool,
 }
 
 /// The launcher's top-left corner: logical points on macOS, physical pixels
@@ -144,6 +145,7 @@ impl Default for Settings {
                 .collect(),
             show_clocks: true,
             clock_cities: Vec::new(),
+            show_disk_space: true,
         }
     }
 }

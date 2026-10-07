@@ -270,6 +270,13 @@ export function Settings() {
                     onChange={(showClocks) => void save({ showClocks })}
                   />
                 </Row>
+                <Row label="Disk space" description="Free space on the disk of your home folder.">
+                  <Toggle
+                    label="Disk space"
+                    checked={settings().showDiskSpace}
+                    onChange={(showDiskSpace) => void save({ showDiskSpace })}
+                  />
+                </Row>
                 {/* 3 matches MAX_CLOCK_CITIES in the Rust code. */}
                 <h2>Clock cities</h2>
                 <ListEditor

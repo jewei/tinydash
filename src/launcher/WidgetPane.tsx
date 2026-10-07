@@ -1,11 +1,23 @@
-import { createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import {
+  createResource,
+  createSignal,
+  For,
+  Match,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+} from "solid-js";
 
 import type { CityClock } from "../generated/CityClock";
+import type { Disk } from "../generated/Disk";
 import type { Settings } from "../generated/Settings";
+import { formatBytes } from "../lib/format";
 import * as ipc from "../lib/ipc";
+import { Glyph } from "../ui/Icon";
 
 /** Whether any widget is on, so the pane has something to show. */
-export const hasWidgets = (settings: Settings) => settings.showClocks;
+export const hasWidgets = (settings: Settings) => settings.showClocks || settings.showDiskSpace;
 
 /** A signal of the current time that ticks every second while mounted. */
 function createNow() {
@@ -51,6 +63,7 @@ export function WidgetPane() {
       <Show when={widgets.latest?.clocks}>
         {(cities) => <Clocks cities={cities()} now={now()} />}
       </Show>
+      <Show when={widgets.latest?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
     </aside>
   );
 }
@@ -104,6 +117,54 @@ function Clocks(props: { cities: CityClock[]; now: number }) {
           </For>
         </ul>
       </Show>
+    </section>
+  );
+}
+
+function DiskSpace(props: { disk: Disk }) {
+  return (
+    <section class="widget wide disk" aria-label="Disk space">
+      <Switch>
+        <Match when={props.disk.type === "ready" && props.disk}>
+          {(disk) => {
+            const used = () =>
+              disk().totalBytes > 0
+                ? Math.round((1 - disk().freeBytes / disk().totalBytes) * 100)
+                : 0;
+            return (
+              <>
+                <div class="disk-line">
+                  <Glyph name="disk" size={14} />
+                  <span class="widget-title">{disk().name}</span>
+                  <Show when={disk().low}>
+                    <span class="disk-low">
+                      <Glyph name="warning" size={12} /> Low space
+                    </span>
+                  </Show>
+                  <span class="disk-free">
+                    <strong>{formatBytes(disk().freeBytes)}</strong> free of{" "}
+                    {formatBytes(disk().totalBytes)}
+                  </span>
+                </div>
+                <div
+                  class="meter"
+                  classList={{ low: disk().low }}
+                  role="meter"
+                  aria-label="Disk used"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={used()}
+                >
+                  <span style={{ width: `${used()}%` }} />
+                </div>
+              </>
+            );
+          }}
+        </Match>
+        <Match when={props.disk.type === "unavailable" && props.disk}>
+          {(disk) => <p class="widget-note">Could not read the disk. {disk().message}</p>}
+        </Match>
+      </Switch>
     </section>
   );
 }

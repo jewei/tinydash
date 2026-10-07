@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use windows_sys::Win32::{
     Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute},
-    Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN,
+    Storage::FileSystem::{FILE_ATTRIBUTE_HIDDEN, GetDiskFreeSpaceExW},
     System::{
         DataExchange::{
             CloseClipboard, GetClipboardData, GetClipboardSequenceNumber,
@@ -115,6 +115,38 @@ pub fn launch_app(path: &Path) -> Result<()> {
 
 pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
     None
+}
+
+/// The drive of `path` (`C:`) and the space the user may still fill there,
+/// which honors disk quotas.
+pub fn disk_space(path: &Path) -> Result<super::Volume> {
+    use std::os::windows::ffi::OsStrExt;
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain([0]).collect();
+    let (mut free_bytes, mut total_bytes) = (0u64, 0u64);
+    // SAFETY: `wide` is a NUL-terminated UTF-16 path that outlives the call,
+    // the two out pointers are valid, and the third may be null.
+    let done = unsafe {
+        GetDiskFreeSpaceExW(
+            wide.as_ptr(),
+            &mut free_bytes,
+            &mut total_bytes,
+            std::ptr::null_mut(),
+        )
+    };
+    if done == 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let name = match path.components().next() {
+        Some(std::path::Component::Prefix(prefix)) => {
+            prefix.as_os_str().to_string_lossy().into_owned()
+        }
+        _ => "Disk".into(),
+    };
+    Ok(super::Volume {
+        name,
+        total_bytes,
+        free_bytes,
+    })
 }
 
 pub fn run_system_command(command: SystemCommand) -> Result<()> {

@@ -6,8 +6,12 @@ use ts_rs::TS;
 
 use crate::{
     features::datetime::{self, CityClock},
+    platform,
     state::State,
 };
+
+/// Below this share of free space, the disk widget warns.
+const LOW_DISK_PERCENT: u64 = 10;
 
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -16,6 +20,44 @@ pub struct Widgets {
     /// The cities next to local time. A city that names no time zone, as a
     /// hand-edited file may hold, is left out.
     pub clocks: Option<Vec<CityClock>>,
+    /// The disk that holds the home folder.
+    pub disk: Option<Disk>,
+}
+
+#[derive(Serialize, TS)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(export)]
+pub enum Disk {
+    Ready {
+        name: String,
+        total_bytes: u64,
+        free_bytes: u64,
+        /// Less than a tenth is free.
+        low: bool,
+    },
+    /// The OS did not report the disk; the message says why.
+    Unavailable { message: String },
+}
+
+impl Disk {
+    fn read(home: &std::path::Path) -> Self {
+        match platform::disk_space(home) {
+            Ok(volume) => Self::Ready {
+                low: volume.free_bytes.saturating_mul(100)
+                    < volume.total_bytes.saturating_mul(LOW_DISK_PERCENT),
+                name: volume.name,
+                total_bytes: volume.total_bytes,
+                free_bytes: volume.free_bytes,
+            },
+            Err(error) => Self::Unavailable {
+                message: error.to_string(),
+            },
+        }
+    }
 }
 
 pub fn load(state: &State) -> Widgets {
@@ -29,11 +71,16 @@ pub fn load(state: &State) -> Widgets {
                 .filter_map(|city| datetime::city_clock(city, now))
                 .collect()
         }),
+        disk: settings
+            .show_disk_space
+            .then(|| Disk::read(&state.dirs.home)),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
     use crate::settings::Settings;
 
@@ -57,5 +104,23 @@ mod tests {
             ..Settings::default()
         });
         assert!(load(&off).clocks.is_none());
+    }
+
+    #[test]
+    fn reports_the_disk_of_the_home_folder() {
+        let home = std::env::temp_dir();
+        let Disk::Ready {
+            total_bytes,
+            free_bytes,
+            name,
+            ..
+        } = Disk::read(&home)
+        else {
+            panic!("the temporary folder has a disk");
+        };
+        assert!(total_bytes > 0 && free_bytes <= total_bytes, "{name}");
+        for missing in [home.join("tinydash-missing-folder"), PathBuf::new()] {
+            assert!(matches!(Disk::read(&missing), Disk::Unavailable { .. }));
+        }
     }
 }

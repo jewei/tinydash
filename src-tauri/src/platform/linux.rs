@@ -139,6 +139,27 @@ fn kde_log_out() -> Result<()> {
         .map_err(failed)
 }
 
+/// The mount point that holds `path` (`/`, or `/home` on its own disk), and
+/// the space an ordinary user may still fill there.
+pub fn disk_space(path: &Path) -> Result<super::Volume> {
+    use std::os::unix::fs::MetadataExt;
+    let info = gio::File::for_path(path)
+        .query_filesystem_info("filesystem::size,filesystem::free", gio::Cancellable::NONE)
+        .map_err(|error| Error::msg(error.to_string()))?;
+    // The mount point is the highest folder on the same device.
+    let device = std::fs::metadata(path)?.dev();
+    let mount = path
+        .ancestors()
+        .take_while(|folder| std::fs::metadata(folder).is_ok_and(|meta| meta.dev() == device))
+        .last()
+        .unwrap_or(path);
+    Ok(super::Volume {
+        name: mount.display().to_string(),
+        total_bytes: info.attribute_uint64("filesystem::size"),
+        free_bytes: info.attribute_uint64("filesystem::free"),
+    })
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")
         .unwrap_or_default()

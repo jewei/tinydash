@@ -953,6 +953,26 @@ describe("Launcher", () => {
     expect(backend.called("widgets")).toHaveLength(1);
   });
 
+  it("shows free disk space and warns when it is low", async () => {
+    const disk = (freeBytes: number) => ({
+      type: "ready",
+      name: "Macintosh HD",
+      totalBytes: 494e9,
+      freeBytes,
+      low: freeBytes < 49.4e9,
+    });
+    let reply = disk(182e9);
+    setup(() => [], { widgets: () => ({ clocks: null, disk: reply }) });
+    const card = await screen.findByRole("region", { name: "Disk space" });
+    expect(card.textContent).toContain("182 GB free of 494 GB");
+    expect(within(card).getByRole("meter").getAttribute("aria-valuenow")).toBe("63");
+    expect(within(card).queryByText(/Low space/)).toBeNull();
+
+    reply = disk(20e9);
+    await emit("launcher:shown", { category: null });
+    expect(await within(card).findByText(/Low space/)).toBeTruthy();
+  });
+
   it("keeps the preview when every widget is off", async () => {
     fakeBackend({ search: () => [app] }, noWidgets);
     render(() => <Launcher />);

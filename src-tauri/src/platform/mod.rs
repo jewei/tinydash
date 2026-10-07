@@ -24,6 +24,7 @@
 //! - `launch_app(path)`: start an app found by `discover_apps`.
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`.
+//! - `disk_space(path)`: the [`Volume`] that holds `path`.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
@@ -58,6 +59,16 @@ use crate::error::{Error, Result};
 use crate::features::clipboard::{Content, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
 #[cfg(not(target_os = "macos"))]
 use crate::settings::LauncherPosition;
+
+/// A disk, as the file manager shows it.
+pub struct Volume {
+    /// Its name: the Finder name on macOS, the drive on Windows (`C:`), the
+    /// mount point on Linux (`/`).
+    pub name: String,
+    pub total_bytes: u64,
+    /// Space left to fill. On macOS this counts purgeable space, as Finder does.
+    pub free_bytes: u64,
+}
 
 /// Clipboard formats that password managers set to ask history tools to skip
 /// a copy. See <http://nspasteboard.org> and the Windows clipboard docs.
