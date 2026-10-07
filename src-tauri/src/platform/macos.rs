@@ -320,6 +320,7 @@ fn lock_screen() -> Result<()> {
 }
 
 pub fn clipboard_change() -> u64 {
+    let _one_reader = super::one_clipboard_reader();
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
@@ -343,6 +344,7 @@ fn clipboard_is_concealed() -> bool {
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
+    let _one_reader = super::one_clipboard_reader();
     if clipboard_is_concealed() {
         return None;
     }

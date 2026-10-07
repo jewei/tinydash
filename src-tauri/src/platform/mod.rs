@@ -127,6 +127,17 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
     })
 }
 
+/// Held while reading the clipboard. AppKit's pasteboard is not safe to
+/// read from two threads at once, and Windows lets one thread open the
+/// clipboard at a time.
+#[cfg(not(target_os = "linux"))]
+static CLIPBOARD_READ: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(not(target_os = "linux"))]
+fn one_clipboard_reader() -> std::sync::MutexGuard<'static, ()> {
+    CLIPBOARD_READ.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 #[cfg(not(target_os = "linux"))]
 /// Read what the clipboard holds, in the order apps expect: copied files
 /// first (Finder also offers their names as text), then text, then images.
@@ -191,4 +202,22 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
     }
     let detail = String::from_utf8_lossy(&output.stderr);
     Err(Error::msg(format!("{program} failed: {}", detail.trim())))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn many_threads_can_read_the_clipboard_at_once() {
+        // AppKit crashes on unguarded parallel pasteboard reads.
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                scope.spawn(|| {
+                    for _ in 0..20 {
+                        super::clipboard_change();
+                        super::read_clipboard(false, false);
+                    }
+                });
+            }
+        });
+    }
 }
