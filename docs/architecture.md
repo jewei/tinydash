@@ -68,7 +68,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 - Both windows load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
 - External programs run only with fixed arguments; user text never reaches a shell.
-- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. The only network request downloads the ECB rate table.
+- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Network requests: the ECB rate table, and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
 ## Decisions
 

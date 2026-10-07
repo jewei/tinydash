@@ -94,6 +94,7 @@ export function Settings() {
   // Read when Settings opens, and again on opening About after a failure:
   // About shows it, and the Clipboard section hides what this OS cannot save.
   const [aboutError, setAboutError] = createSignal<string>();
+  const updates = createUpdateCheck();
   const [about, { refetch: readAbout }] = createResource(() =>
     ipc.about().catch((failure: unknown) => {
       setAboutError(ipc.message(failure));
@@ -405,7 +406,7 @@ export function Settings() {
               </Match>
 
               <Match when={section() === "about"}>
-                <About about={about()} error={aboutError()} />
+                <About about={about()} error={aboutError()} updates={updates} />
               </Match>
             </Switch>
           )}
@@ -427,8 +428,12 @@ export function Settings() {
   );
 }
 
-/** Check for a newer version on request, and install it. */
-function UpdateCheck(props: { version: string }) {
+/**
+ * Check for a newer version on request, and install it. The state lives in
+ * the Settings window, so leaving About and coming back keeps an install
+ * that is running and its result.
+ */
+function createUpdateCheck() {
   const [doing, setDoing] = createSignal<"check" | "install">();
   const [found, setFound] = createSignal<string | null>();
   const [result, setResult] = createSignal<string>();
@@ -440,41 +445,59 @@ function UpdateCheck(props: { version: string }) {
       .catch((failure) => setResult(ipc.message(failure)))
       .finally(() => setDoing(undefined));
   };
-  const check = () =>
-    run("check", async () => {
-      const version = await ipc.checkForUpdate();
-      setFound(version);
-      setResult(
-        version
-          ? `TinyDash ${version} is available.`
-          : `TinyDash ${props.version} is the latest version.`,
-      );
-    });
-  // On success the app restarts, so only a failure comes back.
-  const install = () => run("install", () => ipc.installUpdate());
+  return {
+    doing,
+    found,
+    result,
+    check: (current: string) =>
+      run("check", async () => {
+        const version = await ipc.checkForUpdate();
+        setFound(version);
+        setResult(
+          version
+            ? `TinyDash ${version} is available.`
+            : `TinyDash ${current} is the latest version.`,
+        );
+      }),
+    // On success the app restarts, so only a failure comes back.
+    install: () => run("install", () => ipc.installUpdate()),
+  };
+}
+
+function UpdateCheck(props: { version: string; updates: ReturnType<typeof createUpdateCheck> }) {
+  const updates = () => props.updates;
   return (
     <div class="update-check">
-      <button type="button" class="button" disabled={doing() !== undefined} onClick={check}>
-        {doing() === "check" ? "Checking…" : "Check for Updates"}
+      <button
+        type="button"
+        class="button"
+        disabled={updates().doing() !== undefined}
+        onClick={() => updates().check(props.version)}
+      >
+        {updates().doing() === "check" ? "Checking…" : "Check for Updates"}
       </button>
-      <Show when={found()}>
+      <Show when={updates().found()}>
         <button
           type="button"
           class="button primary"
-          disabled={doing() !== undefined}
-          onClick={install}
+          disabled={updates().doing() !== undefined}
+          onClick={() => updates().install()}
         >
-          {doing() === "install" ? "Installing…" : "Install and Restart"}
+          {updates().doing() === "install" ? "Installing…" : "Install and Restart"}
         </button>
       </Show>
       <p class="list-status" role="status">
-        {result() ?? ""}
+        {updates().result() ?? ""}
       </p>
     </div>
   );
 }
 
-function About(props: { about: AboutInfo | undefined; error: string | undefined }) {
+function About(props: {
+  about: AboutInfo | undefined;
+  error: string | undefined;
+  updates: ReturnType<typeof createUpdateCheck>;
+}) {
   return (
     <div class="about">
       <Show when={props.error}>
@@ -499,7 +522,7 @@ function About(props: { about: AboutInfo | undefined; error: string | undefined 
                 </p>
               }
             >
-              <UpdateCheck version={about().version} />
+              <UpdateCheck version={about().version} updates={props.updates} />
             </Show>
             <Show
               when={about().settingsFolder !== about().dataFolder}

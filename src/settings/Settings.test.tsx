@@ -246,7 +246,15 @@ describe("Settings", () => {
 
   it("checks for updates on request, and installs a newer version", async () => {
     let newer: string | null = null;
-    const backend = fakeBackend({ check_for_update: () => newer });
+    let fail!: () => void;
+    const failed = new Promise<void>((resolve) => (fail = resolve));
+    const backend = fakeBackend({
+      check_for_update: () => newer,
+      install_update: async () => {
+        await failed;
+        throw "Could not install TinyDash 0.2.1: offline.";
+      },
+    });
     render(() => <Settings />);
     expect(await screen.findByRole("switch", { name: "Check for updates" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "About" }));
@@ -261,6 +269,12 @@ describe("Settings", () => {
     expect(screen.queryByRole("button", { name: "Installing…" })).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Install and Restart" }));
     await waitFor(() => expect(backend.called("install_update")).toHaveLength(1));
+    // Leaving About and coming back keeps the install and its result.
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    expect(await screen.findByRole("button", { name: "Installing…" })).toBeTruthy();
+    fail();
+    expect(await screen.findByText("Could not install TinyDash 0.2.1: offline.")).toBeTruthy();
   });
 
   it("points to the Releases page where TinyDash cannot update itself", async () => {

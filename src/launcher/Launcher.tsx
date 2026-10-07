@@ -92,9 +92,9 @@ export function Launcher() {
       }),
       ipc.onResultsStale(() => void launcher.refresh()),
       ipc.onSettingsChanged(applySettings),
-      ipc.onUpdateAvailable((version) => {
+      ipc.onUpdateChanged((version) => {
         setUpdateError(undefined);
-        setUpdate(version);
+        setUpdate(version ?? undefined);
       }),
     ];
     // Listen on the window: a click on a row or the preview moves focus to
@@ -223,7 +223,10 @@ export function Launcher() {
     // The update bar's buttons take a click; the menu takes the keyboard.
     const version = update();
     const install = version
-      ? [{ label: `Install TinyDash ${version} and Restart`, keys: undefined, run: installUpdate }]
+      ? [
+          { label: `Install TinyDash ${version} and Restart`, keys: undefined, run: installUpdate },
+          { label: "Hide Update Notice", keys: undefined, run: () => setUpdate(undefined) },
+        ]
       : [];
     return [...resultItems, ...install, ...general];
   };

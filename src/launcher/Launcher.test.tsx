@@ -142,8 +142,10 @@ describe("Launcher", () => {
     expect(backend.called("search")).toHaveLength(searches);
   });
 
-  it("offers a found update, installs it on request, and says why an install failed", async () => {
-    const { backend, press } = setup(() => [app], {
+  it("offers a found update, installs it once on request, and says why an install failed", async () => {
+    let fail!: () => void;
+    const failed = new Promise<void>((resolve) => (fail = resolve));
+    const { backend, input, press } = setup(() => [app], {
       launcher_init: () => ({
         settings: testSettings,
         platform: "macos",
@@ -151,26 +153,38 @@ describe("Launcher", () => {
         category: null,
         update: "0.2.2",
       }),
-      install_update: () => {
+      install_update: async () => {
+        await failed;
         throw "Could not install TinyDash 0.2.2: offline.";
       },
     });
     expect(await screen.findByText("TinyDash 0.2.2 is available.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Install and Restart" }));
+    await screen.findByRole("option", { name: /Safari/ });
+    // Its buttons keep focus in the search field.
+    const install = screen.getByRole("button", { name: "Install and Restart" });
+    expect(fireEvent.mouseDown(install)).toBe(false);
+    expect(fireEvent.mouseDown(screen.getByRole("button", { name: "Later" }))).toBe(false);
+    fireEvent.click(install);
+    expect(await screen.findByRole("button", { name: "Installing…" })).toBeTruthy();
+    // A second request while it runs does nothing.
+    press("k", { ctrlKey: true });
+    fireEvent.click(
+      await screen.findByRole("option", { name: /Install TinyDash 0.2.2 and Restart/ }),
+    );
+    fail();
     expect(await screen.findByText("Could not install TinyDash 0.2.2: offline.")).toBeTruthy();
     expect(backend.called("install_update")).toHaveLength(1);
-    // The keyboard reaches it through the actions menu.
-    await screen.findByRole("option", { name: /Safari/ });
+    expect(document.activeElement).toBe(input);
+
+    // The keyboard hides it through the actions menu.
     press("k", { ctrlKey: true });
-    expect(
-      await screen.findByRole("option", { name: /Install TinyDash 0.2.2 and Restart/ }),
-    ).toBeTruthy();
-    press("Escape");
-    fireEvent.click(screen.getByRole("button", { name: "Later" }));
+    fireEvent.click(await screen.findByRole("option", { name: /Hide Update Notice/ }));
     await waitFor(() => expect(screen.queryByText(/is available|Could not install/)).toBeNull());
-    // A later check that finds one shows it again.
-    await emit("update:available", "0.2.3");
+    // A later check shows a newer one, and a check that finds none clears it.
+    await emit("update:changed", "0.2.3");
     expect(await screen.findByText("TinyDash 0.2.3 is available.")).toBeTruthy();
+    await emit("update:changed", null);
+    await waitFor(() => expect(screen.queryByText(/is available/)).toBeNull());
   });
 
   it("opens the action menu with Mod+K", async () => {

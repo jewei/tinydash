@@ -9,7 +9,7 @@ use crate::{search::Category, settings::Settings};
 pub const LAUNCHER_SHOWN: &str = "launcher:shown";
 pub const RESULTS_STALE: &str = "results:stale";
 pub const SETTINGS_CHANGED: &str = "settings:changed";
-pub const UPDATE_AVAILABLE: &str = "update:available";
+pub const UPDATE_CHANGED: &str = "update:changed";
 
 #[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -36,9 +36,10 @@ pub fn results_stale(app: &AppHandle) {
     }
 }
 
-/// A newer version is ready to install; the payload is its version.
-pub fn update_available(app: &AppHandle, version: &str) {
-    if let Err(error) = app.emit(UPDATE_AVAILABLE, version) {
+/// A check finished: the newer version that is ready to install, or `None`
+/// when this one is the latest, so an old offer goes away.
+pub fn update_changed(app: &AppHandle, version: Option<&str>) {
+    if let Err(error) = app.emit(UPDATE_CHANGED, version) {
         tracing::debug!(%error, "No window received the update notice");
     }
 }

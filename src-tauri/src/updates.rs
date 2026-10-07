@@ -1,6 +1,8 @@
 //! Updates on macOS and Windows. When the launcher opens and the last check
-//! is old, TinyDash reads a signed feed in the background; a newer version
-//! is announced to the windows and installed only when the user asks.
+//! is old, TinyDash reads the update feed in the background; a newer version
+//! is announced to the windows and installed only when the user asks. The
+//! feed itself is not signed, but each update file is, and the plugin
+//! refuses one whose signature does not match the built-in public key.
 //!
 //! The feed address and the public key come from the release build's
 //! environment (`TINYDASH_UPDATE_ENDPOINT`, `TAURI_UPDATER_PUBLIC_KEY`), so a
@@ -76,7 +78,7 @@ pub fn on_launcher_shown(app: &AppHandle) {
 }
 
 /// Check the feed now. Gives the newer version, or `None` when this one is
-/// the latest, and tells the windows about a newer one.
+/// the latest, and tells the windows either way.
 pub async fn check(app: &AppHandle) -> Result<Option<String>> {
     let _busy = Busy::start(app)?;
     let found = updater(app)?
@@ -88,9 +90,7 @@ pub async fn check(app: &AppHandle) -> Result<Option<String>> {
         .pending
         .lock()
         .unwrap_or_else(|e| e.into_inner()) = found;
-    if let Some(version) = &version {
-        events::update_available(app, version);
-    }
+    events::update_changed(app, version.as_deref());
     Ok(version)
 }
 

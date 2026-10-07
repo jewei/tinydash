@@ -57,9 +57,9 @@ export const checkForUpdate = () => invoke<string | null>("check_for_update");
 /** Installs the version the latest check found; the app then restarts. */
 export const installUpdate = () => invoke<void>("install_update");
 
-/** A newer version is ready to install; the payload is its version. */
-export const onUpdateAvailable = (handler: (version: string) => void) =>
-  listen<string>("update:available", (event) => handler(event.payload));
+/** A check finished: the newer version, or `null` when this one is the latest. */
+export const onUpdateChanged = (handler: (version: string | null) => void) =>
+  listen<string | null>("update:changed", (event) => handler(event.payload));
 
 export const onLauncherShown = (handler: (event: LauncherShown) => void) =>
   listen<LauncherShown>("launcher:shown", (event) => handler(event.payload));

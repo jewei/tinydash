@@ -95,7 +95,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 ## Updates
 
-On macOS and Windows, TinyDash looks for a new version when the launcher opens, at most every six hours (turn this off in Settings > General). It downloads only a small signed feed. A new version shows as a bar in the launcher, and as an item in the actions menu (Mod+K): Install and Restart, or Later. Nothing installs until you choose, and TinyDash checks the update's signature before it installs it. Settings > About can also check at once. On Linux, and in builds made on your own computer, TinyDash does not update itself: download new versions from the Releases page.
+On macOS and Windows, TinyDash looks for a new version when the launcher opens, at most every six hours (turn this off in Settings > General). It downloads only a small feed from GitHub. A new version shows as a bar in the launcher (Install and Restart, or Later) and in the actions menu (Mod+K: Install TinyDash … and Restart, or Hide Update Notice); a later check that finds none removes it. Nothing installs until you choose, and TinyDash refuses an update whose signature does not match its own key. Settings > About can also check at once. On Linux, and in builds made on your own computer, TinyDash does not update itself: download new versions from the Releases page.
 
 ## Platform notes
 
