@@ -8,4 +8,8 @@ settingsFolder: string, dataFolder: string,
 /**
  * Clipboard history can save images and copied files on this OS.
  */
-richClipboard: boolean, };
+richClipboard: boolean, 
+/**
+ * This build can update itself (not on Linux, not in local builds).
+ */
+selfUpdate: boolean, };

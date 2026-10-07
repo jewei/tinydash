@@ -11,4 +11,8 @@ warnings: Array<string>,
 /**
  * The category of the latest show, which may predate the page.
  */
-category: Category | null, };
+category: Category | null, 
+/**
+ * A newer version found before the page loaded, ready to install.
+ */
+update: string | null, };

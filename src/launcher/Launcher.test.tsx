@@ -142,6 +142,37 @@ describe("Launcher", () => {
     expect(backend.called("search")).toHaveLength(searches);
   });
 
+  it("offers a found update, installs it on request, and says why an install failed", async () => {
+    const { backend, press } = setup(() => [app], {
+      launcher_init: () => ({
+        settings: testSettings,
+        platform: "macos",
+        warnings: [],
+        category: null,
+        update: "0.2.2",
+      }),
+      install_update: () => {
+        throw "Could not install TinyDash 0.2.2: offline.";
+      },
+    });
+    expect(await screen.findByText("TinyDash 0.2.2 is available.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Install and Restart" }));
+    expect(await screen.findByText("Could not install TinyDash 0.2.2: offline.")).toBeTruthy();
+    expect(backend.called("install_update")).toHaveLength(1);
+    // The keyboard reaches it through the actions menu.
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    expect(
+      await screen.findByRole("option", { name: /Install TinyDash 0.2.2 and Restart/ }),
+    ).toBeTruthy();
+    press("Escape");
+    fireEvent.click(screen.getByRole("button", { name: "Later" }));
+    await waitFor(() => expect(screen.queryByText(/is available|Could not install/)).toBeNull());
+    // A later check that finds one shows it again.
+    await emit("update:available", "0.2.3");
+    expect(await screen.findByText("TinyDash 0.2.3 is available.")).toBeTruthy();
+  });
+
   it("opens the action menu with Mod+K", async () => {
     const { backend, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });

@@ -115,6 +115,19 @@ body {
   flex: 1;
 }
 
+.update-offer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--rule);
+  font-size: var(--text-small);
+}
+
+.update-offer span {
+  flex: 1;
+}
+
 /* Results and preview */
 .body {
   display: grid;

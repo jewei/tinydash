@@ -37,6 +37,7 @@ src-tauri/src/
   refresh.rs           When indexes and exchange rates rebuild.
   watcher.rs           File system events → "index is dirty".
   monitor.rs           Clipboard capture thread.
+  updates.rs           Update checks and installs (macOS and Windows release builds).
   window.rs, tray.rs, shortcut.rs, images.rs, events.rs, system_clipboard.rs, error.rs
 src/
   launcher/            Launcher window: state.ts (logic), Launcher.tsx (view), keymap.ts.

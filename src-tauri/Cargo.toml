@@ -21,6 +21,8 @@ tauri-plugin-autostart = "2.7.0"
 tauri-plugin-global-shortcut = "2.4.0"
 tauri-plugin-opener = "2.7.0"
 tauri-plugin-single-instance = "2.5.2"
+# native-tls like ureq; zip also brings the tar and gzip that macOS updates use.
+tauri-plugin-updater = { version = "2.13.1", default-features = false, features = ["native-tls", "system-proxy", "zip"] }
 arboard = { version = "3.6.1", features = ["wayland-data-control"] }
 chrono = "0.4.45"
 chrono-tz = "0.10.4"

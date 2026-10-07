@@ -22,6 +22,7 @@ pub const FILE_MANAGER: &str = "Files";
 /// No folder is shown as a single file here.
 pub const PACKAGE_EXTENSIONS: &[&str] = &[];
 /// Only text: GTK reads it in the same request chain that checks for secrets.
+pub const SELF_UPDATE: bool = false;
 pub const RICH_CLIPBOARD: bool = false;
 pub const NATIVE_ICONS: bool = false;
 /// inotify needs one watch per folder from a shared per-user limit, so only

@@ -22,6 +22,7 @@ mod state;
 mod store;
 mod system_clipboard;
 mod tray;
+mod updates;
 mod watcher;
 mod window;
 
@@ -64,9 +65,11 @@ pub fn run() {
             Some(vec!["--background"]),
         ))
         .plugin(shortcut::plugin())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol("icon", images::serve_icon)
         .register_asynchronous_uri_scheme_protocol("clip", images::serve_clipboard_image)
         .manage(watcher::Watcher::default())
+        .manage(updates::Updates::default())
         .setup(move |app| {
             setup(app);
             open(app.handle(), launch, false);
@@ -87,6 +90,8 @@ pub fn run() {
             commands::save_library_item,
             commands::delete_library_item,
             commands::about,
+            commands::check_for_update,
+            commands::install_update,
         ])
         .build(tauri::generate_context!())
         .expect("TinyDash failed to start")

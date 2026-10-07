@@ -30,12 +30,13 @@ A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42
 
 `State` (in `state.rs`) holds each index as a `Shared<T>`: readers clone an `Arc`; writers build a new value and swap it in, so a search never waits for a writer. Writers that must not interleave also take a `Mutex` in `State` (`settings_change`, `reloading`, `limited_change`) and may hold it across database or OS work.
 
-| Work               | Trigger                                                                                                                      | Where                       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| App and file scans | Startup; launcher opens and the index is dirty or 15 minutes old; Refresh; a change to the file folder settings (files only) | `refresh.rs`                |
-| Dirty marking      | File system events under app folders or indexed folders                                                                      | `watcher.rs`                |
-| Clipboard capture  | OS change counter changes (checked every 500 ms; GTK events on Linux)                                                        | `monitor.rs`                |
-| Exchange rates     | Startup and launcher opens when rates are 12 hours old (retry after 1 hour); turning rates on; Refresh                       | `refresh.rs`, `currency.rs` |
+| Work               | Trigger                                                                                                                        | Where                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| App and file scans | Startup; launcher opens and the index is dirty or 15 minutes old; Refresh; a change to the file folder settings (files only)   | `refresh.rs`                |
+| Dirty marking      | File system events under app folders or indexed folders                                                                        | `watcher.rs`                |
+| Clipboard capture  | OS change counter changes (checked every 500 ms; GTK events on Linux)                                                          | `monitor.rs`                |
+| Exchange rates     | Startup and launcher opens when rates are 12 hours old (retry after 1 hour); turning rates on; Refresh                         | `refresh.rs`, `currency.rs` |
+| Update check       | Launcher opens and the last check is 6 hours old (macOS and Windows release builds, when the setting is on); Check for Updates | `updates.rs`                |
 
 When data changes, Rust emits `results:stale` and the launcher searches again, keeping its selection.
 

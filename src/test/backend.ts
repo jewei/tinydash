@@ -24,6 +24,7 @@ export const testSettings: Settings = {
   emojiLanguages: [],
   currencyRatesEnabled: true,
   searchEngine: "google",
+  checkForUpdates: true,
   launcherPosition: null,
   tabs: (["apps", "files", "clipboard", "snippets", "emoji", "system"] as const).map(
     (category) => ({
@@ -82,6 +83,7 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
       platform: "macos",
       warnings: [],
       category: null,
+      update: null,
     }),
     search: () => [],
     run_action: () => null,
@@ -94,11 +96,14 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     library_items: () => [],
     save_library_item: (args) => ({ ...(args.item as object), id: 1 }),
     delete_library_item: () => null,
+    check_for_update: () => null,
+    install_update: () => null,
     about: () => ({
       version: "0.2.0",
       settingsFolder: "/data",
       dataFolder: "/data",
       richClipboard: true,
+      selfUpdate: true,
     }),
   };
   clearMocks();

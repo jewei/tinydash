@@ -47,6 +47,7 @@ pub const PACKAGE_EXTENSIONS: &[&str] = &[
     "xcworkspace",
     "playground",
 ];
+pub const SELF_UPDATE: bool = true;
 pub const RICH_CLIPBOARD: bool = true;
 pub const NATIVE_ICONS: bool = true;
 /// FSEvents watches a whole tree with one stream.

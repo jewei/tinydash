@@ -209,6 +209,18 @@ export function Settings() {
                     onChange={(launchAtLogin) => void save({ launchAtLogin })}
                   />
                 </Row>
+                <Show when={about()?.selfUpdate}>
+                  <Row
+                    label="Check for updates"
+                    description="Looks for a new version when the launcher opens, at most every six hours. Nothing installs until you choose."
+                  >
+                    <Toggle
+                      label="Check for updates"
+                      checked={settings().checkForUpdates}
+                      onChange={(checkForUpdates) => void save({ checkForUpdates })}
+                    />
+                  </Row>
+                </Show>
                 <Row label={IS_MAC ? "Show menu bar icon" : "Show tray icon"}>
                   <Toggle
                     label={IS_MAC ? "Show menu bar icon" : "Show tray icon"}
@@ -415,6 +427,53 @@ export function Settings() {
   );
 }
 
+/** Check for a newer version on request, and install it. */
+function UpdateCheck(props: { version: string }) {
+  const [doing, setDoing] = createSignal<"check" | "install">();
+  const [found, setFound] = createSignal<string | null>();
+  const [result, setResult] = createSignal<string>();
+  const run = (job: "check" | "install", work: () => Promise<void>) => {
+    if (doing()) return;
+    setDoing(job);
+    setResult(undefined);
+    work()
+      .catch((failure) => setResult(ipc.message(failure)))
+      .finally(() => setDoing(undefined));
+  };
+  const check = () =>
+    run("check", async () => {
+      const version = await ipc.checkForUpdate();
+      setFound(version);
+      setResult(
+        version
+          ? `TinyDash ${version} is available.`
+          : `TinyDash ${props.version} is the latest version.`,
+      );
+    });
+  // On success the app restarts, so only a failure comes back.
+  const install = () => run("install", () => ipc.installUpdate());
+  return (
+    <div class="update-check">
+      <button type="button" class="button" disabled={doing() !== undefined} onClick={check}>
+        {doing() === "check" ? "Checking…" : "Check for Updates"}
+      </button>
+      <Show when={found()}>
+        <button
+          type="button"
+          class="button primary"
+          disabled={doing() !== undefined}
+          onClick={install}
+        >
+          {doing() === "install" ? "Installing…" : "Install and Restart"}
+        </button>
+      </Show>
+      <p class="list-status" role="status">
+        {result() ?? ""}
+      </p>
+    </div>
+  );
+}
+
 function About(props: { about: AboutInfo | undefined; error: string | undefined }) {
   return (
     <div class="about">
@@ -432,6 +491,16 @@ function About(props: { about: AboutInfo | undefined; error: string | undefined 
             <p>
               <strong>TinyDash {about().version}</strong> — a small, keyboard-first launcher.
             </p>
+            <Show
+              when={about().selfUpdate}
+              fallback={
+                <p>
+                  New versions: <code>github.com/jewei/tinydash/releases</code>
+                </p>
+              }
+            >
+              <UpdateCheck version={about().version} />
+            </Show>
             <Show
               when={about().settingsFolder !== about().dataFolder}
               fallback={
