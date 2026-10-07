@@ -24,6 +24,7 @@ export const testSettings: Settings = {
   emojiLanguages: [],
   currencyRatesEnabled: true,
   searchEngine: "google",
+  launcherPosition: null,
 };
 
 export const app: SearchResult = {
@@ -79,6 +80,7 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     run_action: () => null,
     preview: () => null,
     hide_launcher: () => null,
+    drag_launcher: () => null,
     get_settings: () => settings,
     update_settings: (args) => save(args.changes),
     pause_shortcut: () => null,

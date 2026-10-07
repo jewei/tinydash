@@ -232,8 +232,18 @@ pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
     arboard::SetExtLinux::exclude_from_history(set)
 }
 
-pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
-    super::place_in_physical_pixels(app, window)
+pub fn place_launcher(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    saved: Option<crate::settings::LauncherPosition>,
+) -> tauri::Result<()> {
+    super::place_in_physical_pixels(app, window, saved)
+}
+
+pub fn launcher_position(
+    window: &tauri::WebviewWindow,
+) -> tauri::Result<crate::settings::LauncherPosition> {
+    super::physical_position(window)
 }
 
 pub fn prepare_launcher(_window: &tauri::WebviewWindow) {}

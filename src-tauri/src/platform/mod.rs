@@ -30,7 +30,11 @@
 //!   main thread. `capturing` says whether history is on, so nothing is read
 //!   while it is off.
 //! - `prepare_launcher(window)`: native window tweaks; call on the main thread.
-//! - `place_launcher(app, window)`: move the launcher to the screen with the pointer.
+//! - `place_launcher(app, window, saved)`: move the launcher to `saved` when
+//!   that spot is still on a screen, else to the center of the screen with
+//!   the pointer.
+//! - `launcher_position(window)`: where the launcher is now, in the units
+//!   `place_launcher` takes.
 //! - `remember_frontmost_app()` / `restore_frontmost_app()`: return focus after Escape.
 
 #[cfg(target_os = "linux")]
@@ -50,6 +54,8 @@ pub use windows::*;
 use crate::error::{Error, Result};
 #[cfg(not(target_os = "linux"))]
 use crate::features::clipboard::{Content, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
+#[cfg(not(target_os = "macos"))]
+use crate::settings::LauncherPosition;
 
 /// Clipboard formats that password managers set to ask history tools to skip
 /// a copy. See <http://nspasteboard.org> and the Windows clipboard docs.
@@ -63,28 +69,49 @@ pub const SECRET_FORMATS: &[&str] = &[
     "x-kde-passwordManagerHint",
 ];
 
-/// Center the launcher horizontally, a fifth of the way down the work area
-/// of the monitor under the pointer. Every value here is in physical pixels,
+/// Move the launcher to `saved` when the middle of its top edge would be on
+/// a screen, so it can still be dragged; else center it in the work area of
+/// the monitor under the pointer. Every value here is in physical pixels,
 /// which Windows and X11 use consistently across monitors.
 #[cfg(not(target_os = "macos"))]
 fn place_in_physical_pixels(
     app: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
+    saved: Option<LauncherPosition>,
 ) -> tauri::Result<()> {
+    let size = window.outer_size()?;
+    if let Some(saved) = saved
+        && app
+            .monitor_from_point(saved.x + f64::from(size.width) / 2.0, saved.y + 1.0)?
+            .is_some()
+    {
+        // `as` saturates, and the check above keeps the spot on a screen.
+        return window.set_position(tauri::PhysicalPosition::new(saved.x as i32, saved.y as i32));
+    }
     let cursor = app.cursor_position()?;
     let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y)? else {
         return Ok(());
     };
     let area = monitor.work_area();
-    let size = window.outer_size()?;
     let free_width = i64::from(area.size.width.saturating_sub(size.width));
     let free_height = i64::from(area.size.height.saturating_sub(size.height));
+    // The window has a fixed height and never grows, so it sits in the
+    // exact center rather than high up, as launchers that grow do.
     let x = i64::from(area.position.x) + free_width / 2;
-    let y = i64::from(area.position.y) + free_height / 5;
+    let y = i64::from(area.position.y) + free_height / 2;
     window.set_position(tauri::PhysicalPosition::new(
         i32::try_from(x).unwrap_or(area.position.x),
         i32::try_from(y).unwrap_or(area.position.y),
     ))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPosition> {
+    let position = window.outer_position()?;
+    Ok(LauncherPosition {
+        x: position.x.into(),
+        y: position.y.into(),
+    })
 }
 
 #[cfg(not(target_os = "linux"))]

@@ -19,6 +19,7 @@ use super::SECRET_FORMATS;
 use crate::{
     error::{Error, Result},
     features::{apps::App, clipboard::Content, system::SystemCommand},
+    settings::LauncherPosition,
 };
 
 pub const FILE_MANAGER: &str = "Finder";
@@ -310,19 +311,53 @@ pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
 /// macOS needs no change notifications: `clipboard_change` is a cheap counter.
 pub fn watch_clipboard(_capturing: impl Fn() -> bool + 'static) {}
 
-/// Center the launcher on the screen with the pointer, in points.
+/// Move the launcher to `saved` when the middle of its top edge would be on
+/// a screen, so it can still be dragged; else center it on the screen with
+/// the pointer. Everything here is in points.
 ///
 /// Tauri reports positions in physical pixels, but on macOS each value uses a
 /// different scale: the cursor uses the primary display's, each monitor its
 /// own. Converting everything to points makes mixed-DPI setups agree.
-pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
+pub fn place_launcher(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    saved: Option<LauncherPosition>,
+) -> tauri::Result<()> {
+    let monitors = app.available_monitors()?;
+    let size = window
+        .outer_size()?
+        .to_logical::<f64>(window.scale_factor()?);
+    if let Some(saved) = saved
+        && monitor_at(&monitors, saved.x + size.width / 2.0, saved.y + 1.0).is_some()
+    {
+        return window.set_position(tauri::LogicalPosition::new(saved.x, saved.y));
+    }
     let primary_scale = app
         .primary_monitor()?
         .map_or(1.0, |monitor| monitor.scale_factor());
     let cursor = app.cursor_position()?;
-    let (x, y) = (cursor.x / primary_scale, cursor.y / primary_scale);
-    let monitors = app.available_monitors()?;
-    let Some(monitor) = monitors.iter().find(|monitor| {
+    let Some(monitor) = monitor_at(
+        &monitors,
+        cursor.x / primary_scale,
+        cursor.y / primary_scale,
+    ) else {
+        return Ok(());
+    };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let free_width = (f64::from(area.size.width) / scale - size.width).max(0.0);
+    let free_height = (f64::from(area.size.height) / scale - size.height).max(0.0);
+    // The window has a fixed height and never grows, so it sits in the
+    // exact center rather than high up, as launchers that grow do.
+    window.set_position(tauri::LogicalPosition::new(
+        f64::from(area.position.x) / scale + free_width / 2.0,
+        f64::from(area.position.y) / scale + free_height / 2.0,
+    ))
+}
+
+/// The monitor that holds a point, both in points.
+fn monitor_at(monitors: &[tauri::Monitor], x: f64, y: f64) -> Option<&tauri::Monitor> {
+    monitors.iter().find(|monitor| {
         let scale = monitor.scale_factor();
         let (position, size) = (monitor.position(), monitor.size());
         let (left, top) = (f64::from(position.x) / scale, f64::from(position.y) / scale);
@@ -331,20 +366,17 @@ pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> 
             f64::from(size.height) / scale,
         );
         (left..left + width).contains(&x) && (top..top + height).contains(&y)
-    }) else {
-        return Ok(());
-    };
-    let scale = monitor.scale_factor();
-    let area = monitor.work_area();
-    let size = window
-        .outer_size()?
+    })
+}
+
+pub fn launcher_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPosition> {
+    let position = window
+        .outer_position()?
         .to_logical::<f64>(window.scale_factor()?);
-    let free_width = (f64::from(area.size.width) / scale - size.width).max(0.0);
-    let free_height = (f64::from(area.size.height) / scale - size.height).max(0.0);
-    window.set_position(tauri::LogicalPosition::new(
-        f64::from(area.position.x) / scale + free_width / 2.0,
-        f64::from(area.position.y) / scale + free_height / 5.0,
-    ))
+    Ok(LauncherPosition {
+        x: position.x,
+        y: position.y,
+    })
 }
 
 /// Open on the active Space, even over a full-screen app.

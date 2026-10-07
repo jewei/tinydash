@@ -219,8 +219,18 @@ pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
 /// Windows needs no change notifications: `clipboard_change` is a cheap counter.
 pub fn watch_clipboard(_capturing: impl Fn() -> bool + 'static) {}
 
-pub fn place_launcher(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> tauri::Result<()> {
-    super::place_in_physical_pixels(app, window)
+pub fn place_launcher(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    saved: Option<crate::settings::LauncherPosition>,
+) -> tauri::Result<()> {
+    super::place_in_physical_pixels(app, window, saved)
+}
+
+pub fn launcher_position(
+    window: &tauri::WebviewWindow,
+) -> tauri::Result<crate::settings::LauncherPosition> {
+    super::physical_position(window)
 }
 
 /// Ask Windows 11 for rounded corners on the borderless launcher.

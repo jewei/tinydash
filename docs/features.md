@@ -13,13 +13,13 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. On
 | Enter           | Run the selected result's main action                                                                                          |
 | Mod+Enter       | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
 | Mod+1 … Mod+9   | Run the main action of that row                                                                                                |
-| Mod+K           | All actions for the result, plus Refresh, Settings, and Quit                                                                   |
+| Mod+K           | All actions for the result, plus Refresh, Center Launcher, Settings, and Quit                                                  |
 | Mod+Backspace   | Delete the selected clipboard entry                                                                                            |
 | Tab / Shift+Tab | Next / previous category                                                                                                       |
 | Mod+,           | Open Settings                                                                                                                  |
 | Escape          | Dismiss a warning, or hide and return to the previous app                                                                      |
 
-Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens on the screen with the pointer, with an empty query, and hides when another app gets focus (optional).
+Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens with an empty query, in the center of the screen with the pointer, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it: it then opens there, until that spot is no longer on a screen. Center Launcher in the actions menu, or Center in Settings > General, puts it back.
 
 Command line: `tinydash` (show, or toggle if running), `--settings`, `--background` (used at login), `--mode <category>`.
 
