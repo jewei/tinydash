@@ -1,6 +1,6 @@
 //! The SQLite database: the only module that knows the schema or runs SQL.
-//! Usage, pins, clipboard history, the snippet library, and cached exchange
-//! rates live in one file in the app's local data folder (`lib.rs`: on
+//! Usage, pins, clipboard history, the snippet library, the scratch note,
+//! and cached exchange rates and weather live in one file in the app's local data folder (`lib.rs`: on
 //! Windows `%LOCALAPPDATA%`, which roaming profiles do not copy).
 
 use std::{
@@ -16,6 +16,7 @@ use crate::{
         clipboard::{ClipKind, Content, Entry, MAX_IMAGES},
         currency::Rates,
         library::{LibraryItem, LibraryKind},
+        weather::Weather,
     },
     search::{
         id::Source,
@@ -27,7 +28,8 @@ pub const FILE_NAME: &str = "tinydash.db";
 
 /// Each entry upgrades the schema by one version. Never edit a shipped entry;
 /// append a new one.
-const MIGRATIONS: &[&str] = &[r"
+const MIGRATIONS: &[&str] = &[
+    r"
     CREATE TABLE usage (
         id TEXT PRIMARY KEY,
         count INTEGER NOT NULL,
@@ -61,7 +63,14 @@ const MIGRATIONS: &[&str] = &[r"
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
     ) WITHOUT ROWID;
-"];
+",
+    r"
+    CREATE TABLE note (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        text TEXT NOT NULL
+    );
+",
+];
 
 pub struct Store {
     connection: Mutex<Connection>,
@@ -341,28 +350,63 @@ impl Store {
         })
     }
 
-    pub fn rates(&self) -> Result<Option<Rates>> {
-        let json: Option<String> = self.with(|db| {
-            db.query_row(
-                "SELECT value FROM cache WHERE key = 'currency_rates'",
-                [],
-                |row| row.get(0),
+    /// The scratch note of the widget pane; empty until it is first saved.
+    pub fn note(&self) -> Result<String> {
+        let text = self.with(|db| {
+            db.query_row("SELECT text FROM note WHERE id = 1", [], |row| row.get(0))
+                .optional()
+        })?;
+        Ok(text.unwrap_or_default())
+    }
+
+    pub fn save_note(&self, text: &str) -> Result<()> {
+        self.with(|db| {
+            db.execute(
+                "INSERT INTO note (id, text) VALUES (1, ?1)
+                 ON CONFLICT (id) DO UPDATE SET text = ?1",
+                [text],
             )
+            .map(drop)
+        })
+    }
+
+    /// The latest weather download, for the widget while offline.
+    pub fn weather(&self) -> Result<Option<Weather>> {
+        self.cached("weather")
+    }
+
+    pub fn save_weather(&self, weather: &Weather) -> Result<()> {
+        self.cache("weather", weather)
+    }
+
+    fn cached<T: serde::de::DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
+        let json: Option<String> = self.with(|db| {
+            db.query_row("SELECT value FROM cache WHERE key = ?1", [key], |row| {
+                row.get(0)
+            })
             .optional()
         })?;
         Ok(json.map(|json| serde_json::from_str(&json)).transpose()?)
     }
 
-    pub fn save_rates(&self, rates: &Rates) -> Result<()> {
-        let json = serde_json::to_string(rates)?;
+    fn cache(&self, key: &str, value: &impl serde::Serialize) -> Result<()> {
+        let json = serde_json::to_string(value)?;
         self.with(|db| {
             db.execute(
-                "INSERT INTO cache (key, value) VALUES ('currency_rates', ?1)
-                 ON CONFLICT (key) DO UPDATE SET value = ?1",
-                [json],
+                "INSERT INTO cache (key, value) VALUES (?1, ?2)
+                 ON CONFLICT (key) DO UPDATE SET value = ?2",
+                [key, json.as_str()],
             )
             .map(drop)
         })
+    }
+
+    pub fn rates(&self) -> Result<Option<Rates>> {
+        self.cached("currency_rates")
+    }
+
+    pub fn save_rates(&self, rates: &Rates) -> Result<()> {
+        self.cache("currency_rates", rates)
     }
 }
 
@@ -566,6 +610,15 @@ mod tests {
         assert!(store.pins().unwrap().ids().is_empty());
         assert!(store.save_library_item(&saved).is_err());
         assert!(store.library().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_note_saves_over_itself() {
+        let store = Store::in_memory();
+        assert_eq!(store.note().unwrap(), "");
+        store.save_note("call the bank").unwrap();
+        store.save_note("call the bank\nbuy milk").unwrap();
+        assert_eq!(store.note().unwrap(), "call the bank\nbuy milk");
     }
 
     #[test]

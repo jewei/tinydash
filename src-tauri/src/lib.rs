@@ -21,9 +21,11 @@ mod shortcut;
 mod state;
 mod store;
 mod system_clipboard;
+mod timer;
 mod tray;
 mod updates;
 mod watcher;
+mod widgets;
 mod window;
 
 use tauri::{App, AppHandle, Manager};
@@ -66,6 +68,7 @@ pub fn run() {
         ))
         .plugin(shortcut::plugin())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .register_asynchronous_uri_scheme_protocol("icon", images::serve_icon)
         .register_asynchronous_uri_scheme_protocol("clip", images::serve_clipboard_image)
         .manage(watcher::Watcher::default())
@@ -92,6 +95,8 @@ pub fn run() {
             commands::about,
             commands::check_for_update,
             commands::install_update,
+            commands::widgets,
+            commands::save_note,
         ])
         .build(tauri::generate_context!())
         .expect("TinyDash failed to start")
@@ -160,10 +165,12 @@ fn setup(app: &mut App) {
         platform::prepare_launcher(&launcher);
     }
     monitor::start(handle);
+    timer::start(handle);
     watcher::watch(handle);
     refresh::apps(handle);
     refresh::files(handle);
     refresh::rates(handle, false);
+    refresh::weather(handle, false);
 }
 
 /// Act on launch arguments. With no arguments, a second launch toggles the

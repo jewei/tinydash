@@ -13,7 +13,11 @@ use objc2_app_kit::{
     NSCompositingOperation, NSDeviceRGBColorSpace, NSGraphicsContext, NSImageInterpolation,
     NSPasteboard, NSRunningApplication, NSWindow, NSWindowCollectionBehavior, NSWorkspace,
 };
-use objc2_foundation::{NSDictionary, NSPoint, NSRect, NSSize, NSString};
+use objc2_foundation::{
+    NSArray, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
+    NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeLocalizedNameKey,
+    NSURLVolumeTotalCapacityKey,
+};
 
 use super::SECRET_FORMATS;
 use crate::{
@@ -217,6 +221,47 @@ pub fn app_icon(path: &Path, pixels: u32) -> Option<Vec<u8>> {
     })
 }
 
+/// Finder's name and numbers for the volume: free space counts purgeable
+/// files, which macOS removes when space runs short.
+pub fn disk_space(path: &Path) -> Result<super::Volume> {
+    // `fileURLWithPath:` returns null for an empty path, which would panic.
+    let path = path
+        .to_str()
+        .filter(|_| path.is_absolute())
+        .ok_or_else(|| Error::msg("TinyDash could not find your home folder."))?;
+    autoreleasepool(|_| {
+        let url = NSURL::fileURLWithPath(&NSString::from_str(path));
+        // SAFETY: Foundation defines these keys as constant strings that live
+        // as long as the process.
+        let (name_key, total_key, free_key) = unsafe {
+            (
+                NSURLVolumeLocalizedNameKey,
+                NSURLVolumeTotalCapacityKey,
+                NSURLVolumeAvailableCapacityForImportantUsageKey,
+            )
+        };
+        let values = url
+            .resourceValuesForKeys_error(&NSArray::from_slice(&[name_key, total_key, free_key]))
+            .map_err(|error| Error::msg(error.localizedDescription().to_string()))?;
+        let number = |key| {
+            values
+                .objectForKey(key)
+                .and_then(|value| value.downcast::<NSNumber>().ok())
+                .map(|number| number.unsignedLongLongValue())
+                .ok_or_else(|| Error::msg("macOS did not report the disk size."))
+        };
+        let name = values
+            .objectForKey(name_key)
+            .and_then(|value| value.downcast::<NSString>().ok())
+            .map_or_else(|| "Disk".into(), |name| name.to_string());
+        Ok(super::Volume {
+            name,
+            total_bytes: number(total_key)?,
+            free_bytes: number(free_key)?,
+        })
+    })
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     match command {
         SystemCommand::Lock => lock_screen(),
@@ -275,6 +320,7 @@ fn lock_screen() -> Result<()> {
 }
 
 pub fn clipboard_change() -> u64 {
+    let _one_reader = super::one_clipboard_reader();
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
@@ -298,10 +344,18 @@ fn clipboard_is_concealed() -> bool {
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
+    let _one_reader = super::one_clipboard_reader();
     if clipboard_is_concealed() {
         return None;
     }
     super::read_with_arboard(images, files)
+}
+
+pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
+    match read_clipboard(false, false)? {
+        Content::Text(text) => Some(text),
+        Content::Image { .. } | Content::Files(_) => None,
+    }
 }
 
 /// Marks a copy so clipboard managers skip it (`org.nspasteboard.ConcealedType`).

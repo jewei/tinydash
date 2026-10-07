@@ -18,6 +18,7 @@ import { commandFor } from "./keymap";
 import { PreviewPane } from "./PreviewPane";
 import { optionId, ResultList } from "./ResultList";
 import { createLauncher } from "./state";
+import { hasWidgets, inNote, type PaneControls, WidgetPane } from "./WidgetPane";
 
 /** Keys that change the query: characters (AltGr included), deletion, paste. */
 function editsQuery(event: KeyboardEvent) {
@@ -26,13 +27,23 @@ function editsQuery(event: KeyboardEvent) {
   return event.key === "Backspace" || event.key === "Delete";
 }
 
+/** "A and B", or "A, B, and C". */
+const listed = (words: string[]) =>
+  words.length < 3 ? words.join(" and ") : `${words.slice(0, -1).join(", ")}, and ${words.at(-1)}`;
+
 /**
  * Actions that belong to no result, listed in the actions menu. Refresh also
- * downloads exchange rates when they are on, so its label says so.
+ * downloads exchange rates and the weather when they are on, so its label
+ * says so.
  */
-const generalActions = (rates: boolean): ResultAction[] => [
+const generalActions = (settings: Settings | undefined): ResultAction[] => [
   {
-    label: rates ? "Refresh Apps, Files, and Rates" : "Refresh Apps and Files",
+    label: `Refresh ${listed([
+      "Apps",
+      "Files",
+      ...(settings?.currencyRatesEnabled ? ["Rates"] : []),
+      ...(settings?.showWeather && settings.weatherCity ? ["Weather"] : []),
+    ])}`,
     action: { type: "refresh" },
     confirm: null,
   },
@@ -77,6 +88,9 @@ export function Launcher() {
       .finally(() => setInstalling(false));
   };
   let input!: HTMLInputElement;
+  // Set while the widget pane is on screen.
+  let pane: PaneControls | undefined;
+  const [dismissedCard, setDismissedCard] = createSignal<string>();
 
   const focusInput = () => input.focus();
 
@@ -165,6 +179,12 @@ export function Launcher() {
       return;
     }
     const command = commandFor(event);
+    // Keys in the note type there; only Mod+J leaves it, as Escape does.
+    if (inNote(event.target)) {
+      if (command?.type !== "note") return;
+      event.preventDefault();
+      return focusInput();
+    }
     if (!command) {
       // Typing, deleting, and pasting go to the search field, even after a
       // click moved focus. Other keys (Mod+C on selected preview text, a
@@ -199,8 +219,19 @@ export function Launcher() {
         return launcher.moveCategory(command.by, tabs());
       case "settings":
         return runGeneral({ type: "openSettings" });
+      case "note":
+        if (!(showsWidgets() && pane?.focusNote())) focusInput();
+        return;
+      case "timer":
+        if (showsWidgets()) pane?.runTimer();
+        return;
+      case "card":
+        if (showsWidgets()) pane?.runCard();
+        return;
       case "hide":
-        // Escape first dismisses a startup warning, then hides.
+        // Escape first closes the full JSON view, then dismisses a startup
+        // warning, then hides.
+        if (showsWidgets() && pane?.closeView()) return;
         if (warnings().length && !launcher.actionError() && !launcher.searchError()) {
           return setWarnings((list) => list.slice(1));
         }
@@ -219,12 +250,13 @@ export function Launcher() {
     // On the Clipboard tab, clearing it is one key away, not a trip to System.
     const general = [
       ...(canClearHistory() ? [clearHistory] : []),
-      ...generalActions(settings()?.currencyRatesEnabled ?? false),
+      ...generalActions(settings()),
     ].map((action) => ({
       label: action.label,
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,
       run: () => launcher.run(action),
     }));
+    const widgetItems = showsWidgets() ? (pane?.actions() ?? []) : [];
     // The update bar's buttons take a click; the menu takes the keyboard.
     const version = update();
     const install = version
@@ -235,7 +267,7 @@ export function Launcher() {
             : [{ label: "Hide Update Notice", keys: undefined, run: hideUpdate }]),
         ]
       : [];
-    return [...resultItems, ...install, ...general];
+    return [...resultItems, ...widgetItems, ...install, ...general];
   };
 
   // Only results of the current input: rows on screen during a search may
@@ -246,6 +278,17 @@ export function Launcher() {
   const closeMenu = () => {
     setMenu(undefined);
     focusInput();
+  };
+
+  // The widget pane takes the preview's place while All has no query.
+  const showsWidgets = () => {
+    const current = settings();
+    return (
+      launcher.category() === "all" &&
+      launcher.query() === "" &&
+      current !== undefined &&
+      hasWidgets(current)
+    );
   };
 
   const clipboardOff = () =>
@@ -395,6 +438,7 @@ export function Launcher() {
                 <EmptyResults
                   query={launcher.query()}
                   category={launcher.category()}
+                  beside={showsWidgets()}
                   onSettings={() => runGeneral({ type: "openSettings" })}
                 />
               </Show>
@@ -412,11 +456,25 @@ export function Launcher() {
                 if (result && action) launcher.run(action, result);
               }}
             />
-            <PreviewPane
-              result={launcher.selected()}
-              revision={launcher.revision()}
-              disabled={launcher.running()}
-              onRun={(action) => launcher.run(action, launcher.selected())}
+            <Show when={!showsWidgets()}>
+              <PreviewPane
+                result={launcher.selected()}
+                revision={launcher.revision()}
+                disabled={launcher.running()}
+                onRun={(action) => launcher.run(action, launcher.selected())}
+              />
+            </Show>
+          </Show>
+          <Show when={showsWidgets()}>
+            <WidgetPane
+              controls={(controls) => {
+                pane = controls;
+                onCleanup(() => (pane = undefined));
+              }}
+              onLeave={focusInput}
+              onRun={(action) => launcher.run(action)}
+              dismissed={dismissedCard()}
+              onDismiss={setDismissedCard}
             />
           </Show>
         </Show>
@@ -472,9 +530,10 @@ export function Launcher() {
   );
 }
 
-function Empty(props: { title: string; children?: JSX.Element }) {
+/** `beside` keeps it in the left column, next to the widget pane. */
+function Empty(props: { title: string; beside?: boolean; children?: JSX.Element }) {
   return (
-    <div class="empty">
+    <div class="empty" classList={{ beside: props.beside }}>
       <h2>{props.title}</h2>
       {props.children}
     </div>
@@ -482,7 +541,12 @@ function Empty(props: { title: string; children?: JSX.Element }) {
 }
 
 /** What an empty list says, by category, before and after typing. */
-function EmptyResults(props: { query: string; category: Category; onSettings: () => void }) {
+function EmptyResults(props: {
+  query: string;
+  category: Category;
+  beside: boolean;
+  onSettings: () => void;
+}) {
   return (
     <Switch>
       <Match when={props.query.trim()}>
@@ -509,7 +573,7 @@ function EmptyResults(props: { query: string; category: Category; onSettings: ()
         </Empty>
       </Match>
       <Match when={true}>
-        <Empty title="What do you need?">
+        <Empty title="What do you need?" beside={props.beside}>
           <ul class="tips">
             <li>Type an app, file, snippet, or emoji name</li>
             <li>

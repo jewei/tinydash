@@ -10,13 +10,18 @@ type Command =
   | { type: "menu" }
   | { type: "category"; by: 1 | -1 }
   | { type: "settings" }
+  | { type: "note" }
+  | { type: "timer" }
+  | { type: "card" }
   | { type: "hide" };
 
 /**
  * Shortcuts, with Mod as Command on macOS and Control elsewhere:
  * ↑/↓ move, Enter runs, Mod+Enter runs the second action, Mod+K opens
  * actions, Mod+Backspace deletes, Mod+1–9 runs that row, Tab and Shift+Tab
- * change category, Mod+, opens Settings, and Escape hides.
+ * change category, Mod+, opens Settings, Mod+J goes to the widget pane's
+ * note and back, Mod+P runs the focus timer's main action, Mod+Shift+Enter
+ * the clipboard card's, and Escape closes the full JSON view, then hides.
  */
 export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
   const mod = hasMod(event, mac);
@@ -26,6 +31,7 @@ export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
     case "ArrowUp":
       return { type: "move", by: -1 };
     case "Enter":
+      if (mod && event.shiftKey) return { type: "card" };
       return mod ? { type: "runSecondary" } : { type: "run" };
     case "Tab":
       return { type: "category", by: event.shiftKey ? -1 : 1 };
@@ -36,6 +42,8 @@ export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
   if (shortcutKey(event) === "k") return { type: "menu" };
   if (event.key === "Backspace") return { type: "delete" };
   if (shortcutKey(event) === ",") return { type: "settings" };
+  if (shortcutKey(event) === "j") return { type: "note" };
+  if (shortcutKey(event) === "p") return { type: "timer" };
   // The physical digit key: on layouts such as AZERTY, `key` is "&" for 1.
   const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code)?.[1];
   if (digit) return { type: "runRow", index: Number(digit) - 1 };

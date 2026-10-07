@@ -1,11 +1,14 @@
 //! Daily ECB exchange rates from Frankfurter. Only the rate table is
 //! downloaded; queries and amounts never leave the machine.
 
-use std::{collections::BTreeMap, io::Read, time::Duration};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::error::{Error, Result};
+use crate::{
+    error::{Error, Result},
+    features::download,
+};
 
 const ENDPOINT: &str = "https://api.frankfurter.dev/v1/latest";
 const MAX_RESPONSE_BYTES: u64 = 64 * 1024;
@@ -76,26 +79,7 @@ impl Rates {
 
 /// Download the latest rates. Blocks for up to ten seconds.
 pub fn fetch(now: i64) -> Result<Rates> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(10)))
-        .tls_config(
-            ureq::tls::TlsConfig::builder()
-                .provider(ureq::tls::TlsProvider::NativeTls)
-                .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-                .build(),
-        )
-        .build()
-        .into();
-    let response = agent
-        .get(ENDPOINT)
-        .call()
-        .map_err(|error| Error::msg(format!("Could not download exchange rates: {error}")))?;
-    let mut body = Vec::new();
-    response
-        .into_body()
-        .into_reader()
-        .take(MAX_RESPONSE_BYTES)
-        .read_to_end(&mut body)?;
+    let body = download::get(ENDPOINT, MAX_RESPONSE_BYTES, "exchange rates")?;
     Rates::parse(&body, now)
 }
 

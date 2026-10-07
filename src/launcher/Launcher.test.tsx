@@ -3,7 +3,7 @@ import { emit } from "@tauri-apps/api/event";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import type { SearchResult } from "../generated/SearchResult";
-import { app, testSettings, fakeBackend, restart } from "../test/backend";
+import { app, testSettings, fakeBackend, noWidgets, restart } from "../test/backend";
 import { Launcher } from "./Launcher";
 
 const clip: SearchResult = {
@@ -16,6 +16,9 @@ const clip: SearchResult = {
     { label: "Delete", action: { type: "deleteClip", id: 1 }, confirm: null },
   ],
 };
+
+/** The widget pane's reply with no widgets but a card, which tests add. */
+const noCards = { clocks: null, disk: null, note: null, focus: null, weather: null };
 
 function setup(results: (query: string, category: string) => SearchResult[], extra = {}) {
   const backend = fakeBackend({
@@ -489,7 +492,7 @@ describe("Launcher", () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it("names exchange rates in Refresh only when they are on", async () => {
+  it("names exchange rates and the weather in Refresh only when they are on", async () => {
     const { press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
     press("k", { ctrlKey: true });
@@ -501,6 +504,12 @@ describe("Launcher", () => {
     await emit("settings:changed", { ...testSettings, currencyRatesEnabled: false });
     press("k", { ctrlKey: true });
     expect(await screen.findByRole("option", { name: "Refresh Apps and Files" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Search actions" }), { key: "Escape" });
+    await emit("settings:changed", { ...testSettings, showWeather: true, weatherCity: "Oslo" });
+    press("k", { ctrlKey: true });
+    expect(
+      await screen.findByRole("option", { name: "Refresh Apps, Files, Rates, and Weather" }),
+    ).toBeTruthy();
   });
 
   it("forgets a failed history turn-on when the launcher opens again", async () => {
@@ -729,10 +738,13 @@ describe("Launcher", () => {
   it("reloads the preview when results refresh", async () => {
     const snippet = { ...app, id: "snippet:1", kind: "snippet" as const, title: "Sig" };
     let text = "Regards";
-    fakeBackend({
-      search: () => [snippet],
-      preview: () => ({ type: "text", text }),
-    });
+    fakeBackend(
+      {
+        search: () => [snippet],
+        preview: () => ({ type: "text", text }),
+      },
+      noWidgets,
+    );
     render(() => <Launcher />);
     expect(await screen.findByText("Regards")).toBeTruthy();
     text = "Cheers";
@@ -742,13 +754,16 @@ describe("Launcher", () => {
 
   it("shows a copied text once, without repeating its first line as a title", async () => {
     const files = { ...clip, id: "clip:2", title: "one.txt and 1 more" };
-    fakeBackend({
-      search: () => [{ ...clip, title: "repos" }, files],
-      preview: (args) =>
-        args.id === "clip:1"
-          ? { type: "text", text: "repos" }
-          : { type: "files", paths: ["/a/one.txt", "/a/two.txt"] },
-    });
+    fakeBackend(
+      {
+        search: () => [{ ...clip, title: "repos" }, files],
+        preview: (args) =>
+          args.id === "clip:1"
+            ? { type: "text", text: "repos" }
+            : { type: "files", paths: ["/a/one.txt", "/a/two.txt"] },
+      },
+      noWidgets,
+    );
     render(() => <Launcher />);
     const details = await screen.findByRole("complementary", { name: "Details" });
     await waitFor(() => expect(within(details).getByText("repos").tagName).toBe("PRE"));
@@ -767,10 +782,13 @@ describe("Launcher", () => {
     [1, "1 byte"],
   ])("shows %i bytes as %s", async (size, text) => {
     const file = { ...app, id: "file:/notes.txt", kind: "file" as const, title: "notes.txt" };
-    fakeBackend({
-      search: () => [file],
-      preview: () => ({ type: "file", path: "/notes.txt", size, modified: null, isDir: false }),
-    });
+    fakeBackend(
+      {
+        search: () => [file],
+        preview: () => ({ type: "file", path: "/notes.txt", size, modified: null, isDir: false }),
+      },
+      noWidgets,
+    );
     render(() => <Launcher />);
     expect(await screen.findByText(text)).toBeTruthy();
   });
@@ -925,5 +943,292 @@ describe("Launcher", () => {
     document.activeElement?.dispatchEvent(held);
     expect(held.defaultPrevented).toBe(true);
     expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("shows widgets next to an empty All search, and the preview once typed", async () => {
+    const { backend, input } = setup(() => [app], {
+      widgets: () => ({
+        clocks: [{ name: "Tokyo", offsetSeconds: 9 * 3600, difference: "+8h" }],
+      }),
+    });
+    const clocks = await screen.findByRole("region", { name: "Clocks" });
+    expect(within(clocks).getByText("Tokyo")).toBeTruthy();
+    expect(within(clocks).getByText("+8h")).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
+
+    fireEvent.input(input, { target: { value: "saf" } });
+    expect(await screen.findByRole("complementary", { name: "Details" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Widgets" })).toBeNull();
+    expect(backend.called("widgets")).toHaveLength(1);
+  });
+
+  it("shows free disk space and warns when it is low", async () => {
+    const disk = (freeBytes: number) => ({
+      type: "ready",
+      name: "Macintosh HD",
+      totalBytes: 494e9,
+      freeBytes,
+      low: freeBytes < 49.4e9,
+    });
+    let reply = disk(182e9);
+    setup(() => [], { widgets: () => ({ clocks: null, disk: reply }) });
+    const card = await screen.findByRole("region", { name: "Disk space" });
+    expect(card.textContent).toContain("182 GB free of 494 GB");
+    expect(within(card).getByRole("meter").getAttribute("aria-valuenow")).toBe("63");
+    expect(within(card).queryByText(/Low space/)).toBeNull();
+
+    reply = disk(20e9);
+    await emit("launcher:shown", { category: null });
+    expect(await within(card).findByText(/Low space/)).toBeTruthy();
+  });
+
+  it("edits the note with Mod+J, saves it, and leaves with Escape", async () => {
+    const { backend, input, press } = setup(() => [app], {
+      widgets: () => ({ clocks: null, disk: null, note: "" }),
+    });
+    const card = await screen.findByRole("region", { name: "Notepad" });
+    press("j", { ctrlKey: true, code: "KeyJ" });
+    const note = screen.getByRole("textbox", { name: "Notepad" });
+    expect(document.activeElement).toBe(note);
+
+    // Keys in the note stay there: no search, no run, no hide.
+    fireEvent.input(note, { target: { value: "buy milk" } });
+    fireEvent.keyDown(note, { key: "Enter" });
+    fireEvent.keyDown(note, { key: "x" });
+    expect(document.activeElement).toBe(note);
+    expect(within(card).getByRole("status").textContent).toBe("2 words · Saving…");
+    await waitFor(() => expect(backend.called("save_note")).toHaveLength(1));
+    expect(backend.called("save_note")[0]?.args).toEqual({ text: "buy milk" });
+    expect(backend.called("run_action")).toHaveLength(0);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+
+    fireEvent.keyDown(note, { key: "Escape" });
+    expect(document.activeElement).toBe(input);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+  });
+
+  it("shows why the note was not saved", async () => {
+    setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: "draft" }),
+      save_note: () => {
+        throw "The database is locked.";
+      },
+    });
+    const note = await screen.findByRole("textbox", { name: "Notepad" });
+    expect((note as HTMLTextAreaElement).value).toBe("draft");
+    fireEvent.input(note, { target: { value: "draft 2" } });
+    fireEvent.blur(note);
+    expect(await screen.findByText(/Not saved\. The database is locked\./)).toBeTruthy();
+  });
+
+  it("counts the focus timer down and runs its actions with Mod+P and the menu", async () => {
+    const start = { type: "focus", control: "start" } as const;
+    const reset = { type: "focus", control: "reset" } as const;
+    const running = {
+      phase: "focus",
+      state: "running",
+      remainingMs: 0,
+      endsAtMs: Date.now() + 90_500,
+      totalMs: 25 * 60_000,
+      session: 2,
+      sessions: 4,
+      actions: [
+        { label: "Pause Timer", action: { type: "focus", control: "pause" }, confirm: null },
+        { label: "Reset Timer", action: reset, confirm: null },
+      ],
+    };
+    const idle = {
+      ...running,
+      state: "idle",
+      remainingMs: 25 * 60_000,
+      endsAtMs: null,
+      actions: [{ label: "Start Focus", action: start, confirm: null }],
+    };
+    let timer: object = idle;
+    const { backend, press } = setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: null, focus: timer }),
+    });
+    const card = await screen.findByRole("region", { name: "Focus timer" });
+    expect(within(card).getByRole("timer").textContent).toBe("25:00");
+    expect(within(card).getByText("Session 2 of 4")).toBeTruthy();
+
+    press("p", { ctrlKey: true, code: "KeyP" });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({ action: start, resultId: null });
+
+    timer = running;
+    await emit("widgets:changed", null);
+    await waitFor(() => expect(within(card).getByRole("timer").textContent).toBe("01:31"));
+    expect(within(card).getByText("Focus")).toBeTruthy();
+
+    press("k", { ctrlKey: true, code: "KeyK" });
+    fireEvent.click(await screen.findByRole("option", { name: /Reset Timer/ }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    expect(backend.called("run_action")[1]?.args).toEqual({ action: reset, resultId: null });
+  });
+
+  it("shows the weather, and when it is old or has no city", async () => {
+    const ready = {
+      type: "ready",
+      place: "Singapore",
+      temperature: 31,
+      high: 33,
+      low: 26,
+      unit: "celsius",
+      condition: "Partly cloudy",
+      icon: "partlyDay",
+      rainChance: 40,
+      updatedAt: Math.floor(Date.now() / 1000) - 3 * 3600,
+      offline: true,
+    };
+    let view: object = ready;
+    const { backend } = setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: null, focus: null, weather: view }),
+    });
+    const card = await screen.findByRole("region", { name: "Weather" });
+    expect(card.textContent).toContain("Singapore31°Partly cloudyH 33° · L 26° · Rain 40%");
+    expect(within(card).getByText("Offline · updated 3 h ago")).toBeTruthy();
+
+    view = { type: "noCity" };
+    await emit("widgets:changed", null);
+    fireEvent.click(await within(card).findByRole("button", { name: "Open Settings" }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "openSettings" },
+      resultId: null,
+    });
+  });
+
+  it("shows a clipboard color, copies its forms, and stays dismissed", async () => {
+    const copy = (text: string) => ({ type: "copy", text }) as const;
+    const color = {
+      id: "a1",
+      content: {
+        type: "color",
+        hex: "#2F6F5E",
+        copiedAs: "HSL",
+        rows: [
+          { label: "HEX", value: "#2F6F5E" },
+          { label: "RGB", value: "rgb(47, 111, 94)" },
+          { label: "HSL", value: "hsl(164, 41%, 31%)" },
+        ],
+        onWhite: { ratio: "6.2:1", grade: "AA" },
+        onBlack: { ratio: "3.4:1", grade: "AA large" },
+      },
+      actions: [
+        { label: "Copy HEX", action: copy("#2F6F5E"), confirm: null },
+        { label: "Copy RGB", action: copy("rgb(47, 111, 94)"), confirm: null },
+        { label: "Copy HSL", action: copy("hsl(164, 41%, 31%)"), confirm: null },
+      ],
+    };
+    const { backend, press } = setup(() => [], {
+      widgets: () => ({ ...noCards, clipCard: color }),
+    });
+    const card = await screen.findByRole("region", { name: "Color on the clipboard" });
+    expect(within(card).getByText("from HSL")).toBeTruthy();
+    expect(within(card).getByLabelText("Contrast on white").textContent).toBe("AaAA6.2:1");
+
+    fireEvent.click(within(card).getByRole("button", { name: "Copy RGB" }));
+    // One action runs at a time, so the shortcut waits for the click's.
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve));
+    press("Enter", { ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    expect(backend.called("run_action").map((call) => call.args.action)).toEqual([
+      copy("rgb(47, 111, 94)"),
+      copy("#2F6F5E"),
+    ]);
+
+    fireEvent.click(within(card).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
+    // Typing closes the pane; it comes back without the dismissed card.
+    fireEvent.input(screen.getByRole("combobox"), { target: { value: "x" } });
+    await waitFor(() =>
+      expect(screen.queryByRole("complementary", { name: "Widgets" })).toBeNull(),
+    );
+    fireEvent.input(screen.getByRole("combobox"), { target: { value: "" } });
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2));
+    expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
+  });
+
+  it("opens clipboard JSON in full, and Escape closes it before hiding", async () => {
+    const json = {
+      id: "b2",
+      content: {
+        type: "json",
+        array: false,
+        count: 2,
+        depth: 1,
+        bytes: 312,
+        keys: [
+          { name: "id", hint: "" },
+          { name: "tags", hint: "[2]" },
+        ],
+        minified: '{"id":1,"tags":[]}',
+        lines: [
+          { indent: 0, tokens: [{ kind: "punctuation", text: "{" }] },
+          {
+            indent: 1,
+            tokens: [
+              { kind: "key", text: '"id"' },
+              { kind: "punctuation", text: ": " },
+              { kind: "number", text: "1" },
+            ],
+          },
+          { indent: 0, tokens: [{ kind: "punctuation", text: "}" }] },
+        ],
+        moreLines: 0,
+      },
+      actions: [
+        {
+          label: "Copy Pretty JSON",
+          action: { type: "copyJson", pretty: true },
+          confirm: null,
+        },
+        {
+          label: "Copy Minified JSON",
+          action: { type: "copyJson", pretty: false },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [], {
+      widgets: () => ({ ...noCards, clipCard: json }),
+    });
+    const card = await screen.findByRole("region", { name: "JSON on the clipboard" });
+    expect(card.textContent).toContain("Object · 2 keys · depth 1 · 312 bytes");
+    expect(within(card).getByText("[2]")).toBeTruthy();
+
+    press("Enter", { ctrlKey: true, shiftKey: true });
+    const view = await screen.findByRole("dialog", { name: "Clipboard JSON" });
+    expect(within(view).getAllByRole("listitem")).toHaveLength(3);
+    press("Escape");
+    expect(screen.queryByRole("dialog", { name: "Clipboard JSON" })).toBeNull();
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+    press("Escape");
+    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
+
+    press("k", { ctrlKey: true });
+    const labels = (await screen.findAllByRole("option")).map((option) => option.textContent);
+    expect(labels.slice(0, 3)).toEqual([
+      expect.stringContaining("View Full JSON"),
+      "Copy Pretty JSON",
+      "Copy Minified JSON",
+    ]);
+  });
+
+  it("keeps the preview when every widget is off", async () => {
+    fakeBackend({ search: () => [app] }, noWidgets);
+    render(() => <Launcher />);
+    expect(await screen.findByRole("complementary", { name: "Details" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Widgets" })).toBeNull();
+  });
+
+  it("loads the widgets again each time the launcher opens", async () => {
+    const { backend } = setup(() => []);
+    await screen.findByRole("region", { name: "Clocks" });
+    expect(backend.called("widgets")).toHaveLength(1);
+    await emit("launcher:shown", { category: null });
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2));
   });
 });

@@ -6,12 +6,20 @@ use ts_rs::TS;
 
 use crate::{
     error::{Error, Result},
-    features::{emoji::EmojiLanguage, web::SearchEngine},
+    features::{
+        datetime::{self, MAX_CLOCK_CITIES},
+        emoji::EmojiLanguage,
+        weather::{MAX_CITY_CHARS, TemperatureUnit},
+        web::SearchEngine,
+    },
     search::Category,
 };
 
 pub const FILE_NAME: &str = "settings.json";
 pub const CLIPBOARD_LIMIT_MAX: u32 = 1000;
+pub const FOCUS_MINUTES_MAX: u16 = 120;
+pub const BREAK_MINUTES_MAX: u16 = 60;
+pub const SESSIONS_MAX: u8 = 8;
 /// Most entries in each folder list. On Linux each indexed folder uses a
 /// watch from a per-user limit.
 const FOLDER_LIST_MAX: usize = 50;
@@ -52,6 +60,27 @@ pub struct Settings {
     /// whether its results join All. All is always first, so it is never
     /// listed.
     pub tabs: Vec<LauncherTab>,
+    /// The widget pane shows to the right of an empty All search. Each
+    /// widget has its own switch.
+    pub show_clocks: bool,
+    /// Places the clocks widget shows next to local time, as typed.
+    pub clock_cities: Vec<String>,
+    pub show_disk_space: bool,
+    pub show_notepad: bool,
+    pub show_focus_timer: bool,
+    pub focus_minutes: u16,
+    pub short_break_minutes: u16,
+    pub long_break_minutes: u16,
+    /// Focus sessions in a cycle; the last one earns the long break.
+    pub sessions_before_long_break: u8,
+    pub show_weather: bool,
+    /// The city of the weather widget, as typed; empty until one is set.
+    pub weather_city: String,
+    pub temperature_unit: TemperatureUnit,
+    /// A card for a color, a Unix time, or JSON on the clipboard. The text
+    /// is read when the pane shows, never saved. Off by default, as
+    /// clipboard history is: macOS may ask before an app reads the clipboard.
+    pub show_clipboard_cards: bool,
 }
 
 /// The launcher's top-left corner: logical points on macOS, physical pixels
@@ -133,6 +162,19 @@ impl Default for Settings {
                     in_all: true,
                 })
                 .collect(),
+            show_clocks: true,
+            clock_cities: Vec::new(),
+            show_disk_space: true,
+            show_notepad: false,
+            show_focus_timer: false,
+            focus_minutes: 25,
+            short_break_minutes: 5,
+            long_break_minutes: 15,
+            sessions_before_long_break: 4,
+            show_weather: false,
+            weather_city: String::new(),
+            temperature_unit: TemperatureUnit::Celsius,
+            show_clipboard_cards: false,
         }
     }
 }
@@ -168,6 +210,10 @@ impl Settings {
         self.shortcut = self.shortcut.trim().to_owned();
         self.clipboard_history_limit = self.clipboard_history_limit.clamp(1, CLIPBOARD_LIMIT_MAX);
         self.emoji_skin_tone = self.emoji_skin_tone.min(5);
+        self.focus_minutes = self.focus_minutes.clamp(1, FOCUS_MINUTES_MAX);
+        self.short_break_minutes = self.short_break_minutes.clamp(1, BREAK_MINUTES_MAX);
+        self.long_break_minutes = self.long_break_minutes.clamp(1, BREAK_MINUTES_MAX);
+        self.sessions_before_long_break = self.sessions_before_long_break.clamp(1, SESSIONS_MAX);
         self.emoji_languages.sort();
         self.emoji_languages.dedup();
         // Each tab once, in the saved order; a tab the list lacks, such as
@@ -199,7 +245,29 @@ impl Settings {
             });
             list.truncate(FOLDER_LIST_MAX);
         }
+        let mut seen = std::collections::HashSet::new();
+        self.clock_cities.retain_mut(|city| {
+            *city = city.trim().to_owned();
+            !city.is_empty() && seen.insert(city.to_lowercase())
+        });
+        self.clock_cities.truncate(MAX_CLOCK_CITIES);
+        self.weather_city = self
+            .weather_city
+            .trim()
+            .chars()
+            .take(MAX_CITY_CHARS)
+            .collect();
         self
+    }
+
+    /// The first clock city that names no time zone. A hand-edited file may
+    /// still hold one; the widget skips it.
+    pub fn unknown_clock_city(&self) -> Option<&str> {
+        let now = chrono::Local::now();
+        self.clock_cities
+            .iter()
+            .find(|city| datetime::city_clock(city, now).is_none())
+            .map(String::as_str)
     }
 
     /// Whether a category's results and suggestions show in All. A category
@@ -374,6 +442,9 @@ mod tests {
         let settings = Settings {
             clipboard_history_limit: 0,
             emoji_skin_tone: 9,
+            focus_minutes: 0,
+            long_break_minutes: 999,
+            sessions_before_long_break: 0,
             emoji_languages: vec![EmojiLanguage::Zh, EmojiLanguage::Es, EmojiLanguage::Zh],
             file_search_folders: vec![" ~/A ".into(), "~/A".into(), "  ".into()],
             ..Settings::default()
@@ -381,11 +452,32 @@ mod tests {
         .normalized();
         assert_eq!(settings.clipboard_history_limit, 1);
         assert_eq!(settings.emoji_skin_tone, 5);
+        assert_eq!(settings.focus_minutes, 1);
+        assert_eq!(settings.long_break_minutes, BREAK_MINUTES_MAX);
+        assert_eq!(settings.sessions_before_long_break, 1);
         assert_eq!(
             settings.emoji_languages,
             [EmojiLanguage::Zh, EmojiLanguage::Es]
         );
         assert_eq!(settings.file_search_folders, ["~/A"]);
+
+        let cities = Settings {
+            clock_cities: [" Tokyo", "tokyo", "", "London", "Paris", "Lima"]
+                .map(String::from)
+                .into(),
+            ..Settings::default()
+        }
+        .normalized()
+        .clock_cities;
+        assert_eq!(cities, ["Tokyo", "London", "Paris"]);
+
+        let city = Settings {
+            weather_city: format!("  Kuala Lumpur{}", " ".repeat(200)),
+            ..Settings::default()
+        }
+        .normalized()
+        .weather_city;
+        assert_eq!(city, "Kuala Lumpur");
 
         let tab = |category, shown| LauncherTab {
             category,
@@ -458,6 +550,19 @@ mod tests {
             Some("Projects")
         );
         assert_eq!(settings(&["~", "~/Notes"]).relative_folder(&home), None);
+    }
+
+    #[test]
+    fn finds_a_clock_city_that_names_no_time_zone() {
+        let settings = |cities: &[&str]| Settings {
+            clock_cities: cities.iter().map(|city| String::from(*city)).collect(),
+            ..Settings::default()
+        };
+        assert_eq!(settings(&["Tokyo", "kl"]).unknown_clock_city(), None);
+        assert_eq!(
+            settings(&["Tokyo", "Atlantis"]).unknown_clock_city(),
+            Some("Atlantis")
+        );
     }
 
     #[test]

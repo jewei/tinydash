@@ -14,6 +14,7 @@ use crate::{
         emoji::EmojiIndex,
         files::FileIndex,
         library::Library,
+        weather::Weather,
     },
     refresh::Freshness,
     search::{
@@ -23,6 +24,7 @@ use crate::{
     settings::Settings,
     shared::Shared,
     store::Store,
+    timer::FocusClock,
 };
 
 /// Folders the OS assigns to the app and the user.
@@ -45,7 +47,10 @@ pub struct State {
     pub usage: Shared<Usage>,
     pub pins: Shared<Pins>,
     pub rates: Shared<Option<Rates>>,
+    /// The latest weather download, for the city it names.
+    pub weather: Shared<Option<Weather>>,
     pub freshness: Freshness,
+    pub focus: FocusClock,
     pub dirs: Dirs,
     /// Held while settings change or the shortcut pauses, so two changes
     /// never interleave their effects on the OS.
@@ -89,8 +94,13 @@ impl State {
             load("exchange rates", e);
             None
         });
+        let weather = store.weather().unwrap_or_else(|e| {
+            load("the weather", e);
+            None
+        });
         Self {
             emoji: Shared::new(EmojiIndex::new(&settings.emoji_languages)),
+            focus: FocusClock::new(&settings),
             settings: Shared::new(settings),
             store,
             apps: Shared::default(),
@@ -100,6 +110,7 @@ impl State {
             usage: Shared::new(usage),
             pins: Shared::new(pins),
             rates: Shared::new(rates),
+            weather: Shared::new(weather),
             freshness: Freshness::default(),
             dirs,
             settings_change: Mutex::new(()),

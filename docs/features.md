@@ -17,7 +17,10 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. On
 | Mod+Backspace   | Delete the selected clipboard entry                                                                                            |
 | Tab / Shift+Tab | Next / previous category                                                                                                       |
 | Mod+,           | Open Settings                                                                                                                  |
-| Escape          | Dismiss a warning, or hide and return to the previous app                                                                      |
+| Mod+J           | Edit the widget pane's note, and back                                                                                          |
+| Mod+P           | Start, pause, or resume the focus timer                                                                                        |
+| Mod+Shift+Enter | Run the clipboard card's main action, such as Copy HEX                                                                         |
+| Escape          | Close the full JSON view, dismiss a warning, or hide and return to the previous app                                            |
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens with an empty query, in the center of the screen with the pointer, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it: it then opens there, until that spot is no longer on a screen. Center Launcher in the actions menu, or Center in Settings > General, puts it back.
 
@@ -39,6 +42,17 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pinned clipboard entry is kept rather than launched, so it heads the Clipboard tab and is found by a search, but stays off the empty All view. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
+
+## Widgets
+
+An empty All search shows widgets to the right of the results, in place of the details. Typing, or another tab, shows the details again. Settings > Widgets turns each widget on or off; with every widget off, the details stay.
+
+- **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`.
+- **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
+- **Weather** (off): the weather now in one city (Settings > Widgets), with today's high, low, and chance of rain, in °C or °F. It comes from Open-Meteo, which receives the city name and its location and nothing else. It is downloaded when the launcher opens and the last download is 30 minutes old (after a failure, 10 minutes later), and on Refresh; the last download stays for offline use.
+- **Focus timer** (off): Pomodoro sessions, 25 minutes by default, each followed by a 5-minute break, with a 15-minute break after the fourth session (change all four in Settings > Widgets). A system notification says when a session or a break ends; a break starts when you choose. Mod+P starts, pauses, or resumes it, and Mod+K lists Skip Break and Reset Timer. The timer keeps running while the launcher is hidden, but not after TinyDash quits, and turning the widget off resets it.
+- **Clipboard cards** (off): when the clipboard holds a color (`#2F6F5E`, `#fff`, `rgb(47, 111, 94)`, `hsl(164, 41%, 31%)`), a Unix time in seconds or milliseconds from 2001 to 2103, or a JSON object or array of up to 1 MB, a card at the top shows it decoded: a color in HEX, RGB, and HSL with its contrast on white and black; a time in local time, UTC, and ISO 8601, and how long ago it was; JSON's size, top-level keys, and start, and the first 2,000 lines in full (View Full; Escape goes back). Each form has a copy button, Mod+Shift+Enter runs the card's main action, and Dismiss hides the card until you copy something new. The text is read each time widgets show, works while clipboard history is off, is never saved, and is skipped when its source marked it secret. On macOS, reading the clipboard may show a system alert that asks to allow pasting; System Settings can then always allow or deny it.
+- **Notepad** (off): one scratch note of up to 10,000 characters, saved as you type to `tinydash.db` on this computer. Mod+J moves to the note and back; Escape returns to the search field.
 
 ## Instant answers (All only)
 
@@ -87,6 +101,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs |
+| Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths              |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
 | Files                | Folders to index, folder names to skip                                                                           |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages (Chinese, Malay, Spanish)     |

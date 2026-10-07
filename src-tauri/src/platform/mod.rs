@@ -24,10 +24,14 @@
 //! - `launch_app(path)`: start an app found by `discover_apps`.
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`.
+//! - `disk_space(path)`: the [`Volume`] that holds `path`.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
+//! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
+//!   is none or its source marked it secret. History need not be on. Call
+//!   it off the main thread, which Linux waits for.
 //! - `watch_clipboard(capturing)`: start change notifications; call on the
 //!   main thread. `capturing` says whether history is on, so nothing is read
 //!   while it is off.
@@ -58,6 +62,16 @@ use crate::error::{Error, Result};
 use crate::features::clipboard::{Content, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
 #[cfg(not(target_os = "macos"))]
 use crate::settings::LauncherPosition;
+
+/// A disk, as the file manager shows it.
+pub struct Volume {
+    /// Its name: the Finder name on macOS, the drive on Windows (`C:`), the
+    /// mount point on Linux (`/`).
+    pub name: String,
+    pub total_bytes: u64,
+    /// Space left to fill. On macOS this counts purgeable space, as Finder does.
+    pub free_bytes: u64,
+}
 
 /// Clipboard formats that password managers set to ask history tools to skip
 /// a copy. See <http://nspasteboard.org> and the Windows clipboard docs.
@@ -114,6 +128,17 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
         x: position.x.into(),
         y: position.y.into(),
     })
+}
+
+/// Held while reading the clipboard. AppKit's pasteboard is not safe to
+/// read from two threads at once, and Windows lets one thread open the
+/// clipboard at a time; the capture thread and the widget pane both read.
+#[cfg(not(target_os = "linux"))]
+static CLIPBOARD_READ: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(not(target_os = "linux"))]
+fn one_clipboard_reader() -> std::sync::MutexGuard<'static, ()> {
+    CLIPBOARD_READ.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -180,4 +205,23 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
     }
     let detail = String::from_utf8_lossy(&output.stderr);
     Err(Error::msg(format!("{program} failed: {}", detail.trim())))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn many_threads_can_read_the_clipboard_at_once() {
+        // The capture thread and the widget pane read together; AppKit
+        // crashes on unguarded parallel pasteboard reads.
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                scope.spawn(|| {
+                    for _ in 0..20 {
+                        super::clipboard_change();
+                        super::read_clipboard(false, false);
+                    }
+                });
+            }
+        });
+    }
 }

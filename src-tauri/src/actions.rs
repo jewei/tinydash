@@ -11,11 +11,14 @@ use tauri::{AppHandle, Manager};
 use crate::{
     error::{Error, Result},
     events,
-    features::library::{self, LibraryKind, Target},
+    features::{
+        clip_card,
+        library::{self, LibraryKind, Target},
+    },
     platform, refresh,
     search::{self, Context, Snapshot, id::Source, result::Action},
     state::State,
-    system_clipboard, window,
+    system_clipboard, timer, window,
 };
 
 /// Pins kept in all, including pins of items that are hidden for now.
@@ -80,6 +83,12 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         }
         Action::CopySecret { text } => {
             copy_and_close(app, || system_clipboard::write_text(&text, true))?
+        }
+        Action::CopyJson { pretty } => {
+            let text = platform::clipboard_text(app)
+                .and_then(|text| clip_card::format_json(&text, pretty))
+                .ok_or_else(|| Error::msg("The clipboard no longer holds JSON."))?;
+            copy_and_close(app, || system_clipboard::write_text(&text, false))?;
         }
         Action::CopyClip { id } => {
             let content = state
@@ -164,9 +173,11 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             refresh::apps(app);
             refresh::files(app);
             refresh::rates(app, true);
+            refresh::weather(app, true);
         }
         Action::OpenSettings => window::open_settings(app)?,
         Action::CenterLauncher => window::center(app)?,
+        Action::Focus { control } => timer::control(app, control)?,
         // Exits below, once the use is saved: exit ends the process from
         // the main thread while this worker may still be writing.
         Action::Quit => {}

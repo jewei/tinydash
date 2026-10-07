@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::features::system::SystemCommand;
+use crate::features::{focus::FocusControl, system::SystemCommand};
 
 /// One row in the launcher. Results carry their own actions, so the frontend
 /// renders them without knowing how each kind works.
@@ -145,6 +145,11 @@ pub enum Action {
     CopySecret {
         text: String,
     },
+    /// Copy the JSON on the clipboard again, pretty or minified. The
+    /// clipboard is read again, so the text never crosses IPC.
+    CopyJson {
+        pretty: bool,
+    },
     /// Copy a clipboard history entry in its original format.
     CopyClip {
         id: i64,
@@ -171,10 +176,15 @@ pub enum Action {
     Unpin {
         id: String,
     },
-    /// Rescan apps and files, and download exchange rates now when they are on.
+    /// Rescan apps and files, and download exchange rates and the weather
+    /// now when they are on.
     Refresh,
     OpenSettings,
     /// Forget where the launcher was dragged, and center it.
     CenterLauncher,
+    /// Start, pause, skip, or reset the focus timer of the widget pane.
+    Focus {
+        control: FocusControl,
+    },
     Quit,
 }

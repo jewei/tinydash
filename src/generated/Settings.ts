@@ -3,6 +3,7 @@ import type { EmojiLanguage } from "./EmojiLanguage";
 import type { LauncherPosition } from "./LauncherPosition";
 import type { LauncherTab } from "./LauncherTab";
 import type { SearchEngine } from "./SearchEngine";
+import type { TemperatureUnit } from "./TemperatureUnit";
 import type { Theme } from "./Theme";
 
 /**
@@ -42,4 +43,27 @@ launcherPosition: LauncherPosition | null,
  * whether its results join All. All is always first, so it is never
  * listed.
  */
-tabs: Array<LauncherTab>, };
+tabs: Array<LauncherTab>, 
+/**
+ * The widget pane shows to the right of an empty All search. Each
+ * widget has its own switch.
+ */
+showClocks: boolean, 
+/**
+ * Places the clocks widget shows next to local time, as typed.
+ */
+clockCities: Array<string>, showDiskSpace: boolean, showNotepad: boolean, showFocusTimer: boolean, focusMinutes: number, shortBreakMinutes: number, longBreakMinutes: number, 
+/**
+ * Focus sessions in a cycle; the last one earns the long break.
+ */
+sessionsBeforeLongBreak: number, showWeather: boolean, 
+/**
+ * The city of the weather widget, as typed; empty until one is set.
+ */
+weatherCity: string, temperatureUnit: TemperatureUnit, 
+/**
+ * A card for a color, a Unix time, or JSON on the clipboard. The text
+ * is read when the pane shows, never saved. Off by default, as
+ * clipboard history is: macOS may ask before an app reads the clipboard.
+ */
+showClipboardCards: boolean, };

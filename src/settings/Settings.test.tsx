@@ -132,6 +132,59 @@ describe("Settings", () => {
     expect(screen.queryByText(/is already in the list/)).toBeNull();
   });
 
+  it("adds a clock city and shows why an unknown one is refused", async () => {
+    const backend = fakeBackend({
+      update_settings: (args) => {
+        const cities = (args.changes as Partial<Values>).clockCities ?? [];
+        if (cities.includes("Atlantis")) throw "TinyDash does not know “Atlantis”.";
+        return backend.save(args.changes);
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    const field = await screen.findByRole("textbox", { name: "City to add" });
+    fireEvent.input(field, { target: { value: "Tokyo" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(await screen.findByRole("button", { name: "Remove Tokyo" })).toBeTruthy();
+    expect(backend.called("update_settings")[0]?.args).toEqual({
+      changes: { clockCities: ["Tokyo"] },
+    });
+
+    fireEvent.input(field, { target: { value: "Atlantis" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(
+      await screen.findByText("TinyDash does not know “Atlantis”.", { selector: ".list-status" }),
+    ).toBeTruthy();
+    expect((field as HTMLInputElement).value).toBe("Atlantis");
+  });
+
+  it("saves the focus timer lengths within their limits", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    const focus = await screen.findByRole("spinbutton", { name: "Focus minutes" });
+    fireEvent.input(focus, { target: { value: "500" } });
+    fireEvent.blur(focus);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({ changes: { focusMinutes: 120 } });
+  });
+
+  it("saves the weather city when the field is left", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    const city = await screen.findByRole("textbox", { name: "Weather city" });
+    fireEvent.input(city, { target: { value: "  Oslo " } });
+    fireEvent.keyDown(city, { key: "Enter" });
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({
+      changes: { weatherCity: "Oslo" },
+    });
+    // Leaving the field without a change saves nothing more.
+    fireEvent.blur(city);
+    expect(backend.called("update_settings")).toHaveLength(1);
+  });
+
   it("moves and hides launcher tabs, keeping focus on them", async () => {
     let calls = 0;
     const backend = fakeBackend({

@@ -1,4 +1,5 @@
-//! Keeps indexes and exchange rates fresh without background polling.
+//! Keeps indexes, exchange rates, and the weather fresh without background
+//! polling.
 //!
 //! The file watcher only marks an index dirty. Work happens at startup,
 //! when the launcher opens, when settings change, and on Refresh, on a
@@ -16,7 +17,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::{
     events,
-    features::{apps::AppIndex, currency, files, files::FileIndex},
+    features::{apps::AppIndex, currency, files, files::FileIndex, weather},
     platform,
     search::id::Source,
     state::State,
@@ -26,15 +27,49 @@ use crate::{
 const MAX_INDEX_AGE: Duration = Duration::from_secs(15 * 60);
 /// Wait this long after a failed rate download before trying again.
 const RATE_RETRY: Duration = Duration::from_secs(60 * 60);
+/// Wait this long after a failed weather download before trying again.
+const WEATHER_RETRY: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Default)]
 pub struct Freshness {
     pub apps: Slot,
     pub files: Slot,
     rates_attempt: Mutex<Option<Instant>>,
+    weather_attempt: Mutex<WeatherAttempt>,
+}
+
+/// The latest weather download: its city, when it started, whether it
+/// still runs, and how it failed.
+#[derive(Default)]
+struct WeatherAttempt {
+    city: String,
+    started: Option<Instant>,
+    busy: bool,
+    failure: Option<WeatherFailure>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WeatherFailure {
+    NotFound,
+    Failed(String),
+}
+
+fn same_city(a: &str, b: &str) -> bool {
+    a.trim().to_lowercase() == b.trim().to_lowercase()
 }
 
 impl Freshness {
+    /// How the latest download for `city` failed, if it did.
+    pub fn weather_failure(&self, city: &str) -> Option<WeatherFailure> {
+        let attempt = self
+            .weather_attempt
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        same_city(&attempt.city, city)
+            .then(|| attempt.failure.clone())
+            .flatten()
+    }
+
     /// Which sources have their items, read once. A source that a scan
     /// fills looks empty until its first scan finishes.
     pub fn ready(&self) -> impl Fn(Source) -> bool + use<> {
@@ -134,6 +169,7 @@ pub fn on_launcher_shown(app: &AppHandle) {
         files(app);
     }
     rates(app, false);
+    weather(app, false);
     crate::updates::on_launcher_shown(app);
 }
 
@@ -238,6 +274,78 @@ pub fn rates(app: &AppHandle, force: bool) {
             }
             Err(error) => tracing::warn!(%error, "Could not refresh exchange rates"),
         }
+    });
+}
+
+/// Download the weather when the widget shows a city whose weather is
+/// missing or old. `force` skips the retry delay and the age check, for an
+/// explicit refresh. Each download stores its result only while its city is
+/// still the one in the settings.
+pub fn weather(app: &AppHandle, force: bool) {
+    let state = app.state::<State>();
+    let settings = state.settings.get();
+    let city = settings.weather_city.trim().to_owned();
+    if !settings.show_weather || city.is_empty() {
+        return;
+    }
+    let now = chrono::Utc::now().timestamp();
+    let fresh = state
+        .weather
+        .get()
+        .as_ref()
+        .as_ref()
+        .is_some_and(|weather| weather.is_for(&city) && !weather.is_stale(now));
+    {
+        let mut attempt = state
+            .freshness
+            .weather_attempt
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let same = same_city(&attempt.city, &city);
+        let waiting = attempt
+            .started
+            .is_some_and(|at| at.elapsed() < WEATHER_RETRY);
+        if (same && attempt.busy) || (!force && (fresh || (same && waiting))) {
+            return;
+        }
+        let failure = if same { attempt.failure.take() } else { None };
+        *attempt = WeatherAttempt {
+            city: city.clone(),
+            started: Some(Instant::now()),
+            busy: true,
+            failure,
+        };
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = weather::fetch(&city, now);
+        let state = app.state::<State>();
+        {
+            let mut attempt = state
+                .freshness
+                .weather_attempt
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if !same_city(&attempt.city, &city) {
+                return;
+            }
+            attempt.busy = false;
+            attempt.failure = match result {
+                Ok(Some(found)) => {
+                    if let Err(error) = state.store.save_weather(&found) {
+                        tracing::warn!(%error, "Could not save the weather");
+                    }
+                    state.weather.set(Some(found));
+                    None
+                }
+                Ok(None) => Some(WeatherFailure::NotFound),
+                Err(error) => {
+                    tracing::warn!(%error, "Could not refresh the weather");
+                    Some(WeatherFailure::Failed(error.to_string()))
+                }
+            };
+        }
+        events::widgets_changed(&app);
     });
 }
 

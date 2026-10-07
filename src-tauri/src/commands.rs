@@ -28,7 +28,9 @@ use crate::{
     settings::{self, LauncherPosition, Settings},
     shortcut,
     state::State,
-    tray, updates, watcher, window,
+    tray, updates, watcher,
+    widgets::{self, Widgets},
+    window,
 };
 
 #[derive(Serialize, TS)]
@@ -190,6 +192,13 @@ pub async fn update_settings(
                 "“{folder}” is not a full folder path. Enter the whole path, or start it with ~ for your home folder, such as ~/Projects."
             )));
         }
+        if new.clock_cities != old.clock_cities
+            && let Some(city) = new.unknown_clock_city()
+        {
+            return Err(Error::msg(format!(
+                "TinyDash does not know “{city}”. Enter a city or a time zone, such as Tokyo or Europe/London."
+            )));
+        }
         let applied = apply_to_system(&app, &old, &new)
             .and_then(|()| settings::save(&state.dirs.config, &new));
         if let Err(error) = applied {
@@ -199,6 +208,7 @@ pub async fn update_settings(
         }
         state.settings.set(new.clone());
 
+        state.focus.apply(&old, &new);
         if new.emoji_languages != old.emoji_languages {
             state.emoji.set(EmojiIndex::new(&new.emoji_languages));
         }
@@ -220,6 +230,9 @@ pub async fn update_settings(
         }
         if new.currency_rates_enabled && !old.currency_rates_enabled {
             refresh::rates(&app, true);
+        }
+        if new.show_weather != old.show_weather || new.weather_city != old.weather_city {
+            refresh::weather(&app, false);
         }
         events::settings_changed(&app, &new);
         events::results_stale(&app);
@@ -323,4 +336,16 @@ pub async fn check_for_update(app: AppHandle) -> Result<Option<String>> {
 #[tauri::command]
 pub async fn install_update(app: AppHandle) -> Result<()> {
     updates::install(&app).await
+}
+
+/// What the widget pane shows now.
+#[tauri::command]
+pub async fn widgets(app: AppHandle) -> Result<Widgets> {
+    blocking(move || widgets::load(&app.state::<State>(), || platform::clipboard_text(&app))).await
+}
+
+/// Save the scratch note of the widget pane.
+#[tauri::command]
+pub async fn save_note(app: AppHandle, text: String) -> Result<()> {
+    blocking(move || widgets::save_note(&app.state::<State>(), &text)).await
 }

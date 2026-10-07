@@ -14,19 +14,21 @@ import {
 import type { About as AboutInfo } from "../generated/About";
 import type { EmojiLanguage } from "../generated/EmojiLanguage";
 import type { SearchEngine } from "../generated/SearchEngine";
+import type { TemperatureUnit } from "../generated/TemperatureUnit";
 import type { Settings as Values } from "../generated/Settings";
 import type { Theme } from "../generated/Theme";
 import * as ipc from "../lib/ipc";
 import { IS_MAC } from "../lib/keys";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { ListEditor, NumberField, Row, Select, Toggle } from "./controls";
+import { ListEditor, NumberField, Row, Select, TextField, Toggle } from "./controls";
 import { Library } from "./Library";
 import { ShortcutRecorder } from "./ShortcutRecorder";
 import { TabsEditor } from "./TabsEditor";
 
 const SECTIONS = [
   { id: "general", label: "General" },
+  { id: "widgets", label: "Widgets" },
   { id: "clipboard", label: "Clipboard" },
   { id: "files", label: "Files" },
   { id: "search", label: "Search" },
@@ -48,6 +50,11 @@ const ENGINES: ReadonlyArray<{ value: SearchEngine; label: string }> = [
   { value: "duckDuckGo", label: "DuckDuckGo" },
   { value: "bing", label: "Bing" },
   { value: "brave", label: "Brave" },
+];
+
+const UNITS: ReadonlyArray<{ value: TemperatureUnit; label: string }> = [
+  { value: "celsius", label: "Celsius (°C)" },
+  { value: "fahrenheit", label: "Fahrenheit (°F)" },
 ];
 
 const SKIN_TONES = [
@@ -256,6 +263,131 @@ export function Settings() {
                   tabs={settings().tabs}
                   onChange={(edit) => save((current) => ({ tabs: edit(current.tabs) }))}
                 />
+              </Match>
+
+              <Match when={section() === "widgets"}>
+                <p class="section-intro">
+                  Widgets show next to the results of an empty All search.
+                </p>
+                <Row label="Clocks" description="Local time and up to three cities.">
+                  <Toggle
+                    label="Clocks"
+                    checked={settings().showClocks}
+                    onChange={(showClocks) => void save({ showClocks })}
+                  />
+                </Row>
+                <Row label="Disk space" description="Free space on the disk of your home folder.">
+                  <Toggle
+                    label="Disk space"
+                    checked={settings().showDiskSpace}
+                    onChange={(showDiskSpace) => void save({ showDiskSpace })}
+                  />
+                </Row>
+                <Row label="Notepad" description="One scratch note, saved on this computer.">
+                  <Toggle
+                    label="Notepad"
+                    checked={settings().showNotepad}
+                    onChange={(showNotepad) => void save({ showNotepad })}
+                  />
+                </Row>
+                <Row
+                  label="Focus timer"
+                  description="Focus sessions with breaks. A notification says when each one ends."
+                >
+                  <Toggle
+                    label="Focus timer"
+                    checked={settings().showFocusTimer}
+                    onChange={(showFocusTimer) => void save({ showFocusTimer })}
+                  />
+                </Row>
+                <Row
+                  label="Weather"
+                  description="Current weather for one city from Open-Meteo, which receives the city name and its location."
+                >
+                  <Toggle
+                    label="Weather"
+                    checked={settings().showWeather}
+                    onChange={(showWeather) => void save({ showWeather })}
+                  />
+                </Row>
+                <Row
+                  label="Clipboard cards"
+                  description="When you copy a color, a Unix time, or JSON, a card shows it decoded. The text is read when widgets show, never saved. macOS may ask you to let TinyDash paste."
+                >
+                  <Toggle
+                    label="Clipboard cards"
+                    checked={settings().showClipboardCards}
+                    onChange={(showClipboardCards) => void save({ showClipboardCards })}
+                  />
+                </Row>
+                {/* 3 matches MAX_CLOCK_CITIES in the Rust code. */}
+                <h2>Clock cities</h2>
+                <ListEditor
+                  label="City to add"
+                  max={3}
+                  placeholder="Tokyo, London, or Europe/Paris"
+                  items={settings().clockCities}
+                  onChange={(edit) =>
+                    save((current) => ({ clockCities: edit(current.clockCities) }))
+                  }
+                />
+                <h2>Weather</h2>
+                {/* 100 matches MAX_CITY_CHARS in the Rust code. */}
+                <Row label="City">
+                  <TextField
+                    label="Weather city"
+                    placeholder="Singapore"
+                    maxLength={100}
+                    value={settings().weatherCity}
+                    onChange={(weatherCity) => void save({ weatherCity })}
+                  />
+                </Row>
+                <Row label="Temperature">
+                  <Select
+                    label="Temperature"
+                    value={settings().temperatureUnit}
+                    options={UNITS}
+                    onChange={(temperatureUnit) => void save({ temperatureUnit })}
+                  />
+                </Row>
+                {/* The limits match FOCUS_MINUTES_MAX, BREAK_MINUTES_MAX, and SESSIONS_MAX. */}
+                <h2>Focus timer</h2>
+                <Row label="Focus" description="Minutes in each focus session.">
+                  <NumberField
+                    label="Focus minutes"
+                    value={settings().focusMinutes}
+                    min={1}
+                    max={120}
+                    onChange={(focusMinutes) => void save({ focusMinutes })}
+                  />
+                </Row>
+                <Row label="Short break" description="Minutes after each session.">
+                  <NumberField
+                    label="Short break minutes"
+                    value={settings().shortBreakMinutes}
+                    min={1}
+                    max={60}
+                    onChange={(shortBreakMinutes) => void save({ shortBreakMinutes })}
+                  />
+                </Row>
+                <Row label="Long break" description="Minutes after the last session of a cycle.">
+                  <NumberField
+                    label="Long break minutes"
+                    value={settings().longBreakMinutes}
+                    min={1}
+                    max={60}
+                    onChange={(longBreakMinutes) => void save({ longBreakMinutes })}
+                  />
+                </Row>
+                <Row label="Sessions before a long break">
+                  <NumberField
+                    label="Sessions before a long break"
+                    value={settings().sessionsBeforeLongBreak}
+                    min={1}
+                    max={8}
+                    onChange={(sessionsBeforeLongBreak) => void save({ sessionsBeforeLongBreak })}
+                  />
+                </Row>
               </Match>
 
               <Match when={section() === "clipboard"}>
@@ -573,6 +705,7 @@ function About(props: {
         <li>EFF Large Wordlist by the Electronic Frontier Foundation, CC BY 4.0</li>
         <li>Emoji keywords from Unicode CLDR, Unicode License V3</li>
         <li>Exchange rates from the European Central Bank through Frankfurter</li>
+        <li>Weather data by Open-Meteo.com, CC BY 4.0</li>
       </ul>
     </div>
   );

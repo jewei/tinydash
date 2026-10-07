@@ -14,6 +14,7 @@ import type { LibraryItem } from "../generated/LibraryItem";
 import type { Preview } from "../generated/Preview";
 import type { SearchResult } from "../generated/SearchResult";
 import type { Settings } from "../generated/Settings";
+import type { Widgets } from "../generated/Widgets";
 
 export const launcherInit = () => invoke<LauncherInit>("launcher_init");
 
@@ -57,6 +58,12 @@ export const checkForUpdate = () => invoke<string | null>("check_for_update");
 /** Installs the version the latest check found; the app then restarts. */
 export const installUpdate = () => invoke<void>("install_update");
 
+/** What the widget pane shows now; a widget that is off is `null`. */
+export const widgets = () => invoke<Widgets>("widgets");
+
+/** Save the scratch note; rejects with the reason when it was not saved. */
+export const saveNote = (text: string) => invoke<void>("save_note", { text });
+
 /** A check finished: the newer version, or `null` when this one is the latest. */
 export const onUpdateChanged = (handler: (version: string | null) => void) =>
   listen<string | null>("update:changed", (event) => handler(event.payload));
@@ -65,6 +72,9 @@ export const onLauncherShown = (handler: (event: LauncherShown) => void) =>
   listen<LauncherShown>("launcher:shown", (event) => handler(event.payload));
 
 export const onResultsStale = (handler: () => void) => listen("results:stale", () => handler());
+
+/** A widget changed on its own, such as the focus timer at the end of a phase. */
+export const onWidgetsChanged = (handler: () => void) => listen("widgets:changed", () => handler());
 
 export const onSettingsChanged = (handler: (settings: Settings) => void) =>
   listen<Settings>("settings:changed", (event) => handler(event.payload));
