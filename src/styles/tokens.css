@@ -38,6 +38,10 @@
   /* Breaks of the focus timer. */
   --calm: #4f7a63;
   --calm-ink: #f4faf5;
+  /* JSON in clipboard cards. */
+  --code-string: #3f6b52;
+  --code-number: #3d5a99;
+  --code-literal: #8a3a6a;
   --notice: #fff2eb;
   --shadow: #302a2433;
   --backdrop: #302a2459;
@@ -82,6 +86,9 @@
   --danger-ink: #3a1610;
   --calm: #9fcfb0;
   --calm-ink: #1f3326;
+  --code-string: #a7d3b4;
+  --code-number: #aec3f2;
+  --code-literal: #e9b0d0;
   --notice: #402310;
   --shadow: #0c0b0a80;
   --backdrop: #0c0b0a99;

@@ -60,4 +60,9 @@ sessionsBeforeLongBreak: number, showWeather: boolean,
 /**
  * The city of the weather widget, as typed; empty until one is set.
  */
-weatherCity: string, temperatureUnit: TemperatureUnit, };
+weatherCity: string, temperatureUnit: TemperatureUnit, 
+/**
+ * A card for a color, a Unix time, or JSON on the clipboard. The text
+ * is read when the pane shows, never saved.
+ */
+showClipboardCards: boolean, };

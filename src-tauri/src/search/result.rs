@@ -145,6 +145,11 @@ pub enum Action {
     CopySecret {
         text: String,
     },
+    /// Copy the JSON on the clipboard again, pretty or minified. The
+    /// clipboard is read again, so the text never crosses IPC.
+    CopyJson {
+        pretty: bool,
+    },
     /// Copy a clipboard history entry in its original format.
     CopyClip {
         id: i64,

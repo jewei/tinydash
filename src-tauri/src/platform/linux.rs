@@ -251,6 +251,39 @@ pub fn watch_clipboard(capturing: impl Fn() -> bool + 'static) {
     });
 }
 
+/// Ask GTK for the clipboard's text on the main thread, with the same
+/// secret check as capture, and wait briefly for the reply.
+pub fn clipboard_text(app: &tauri::AppHandle) -> Option<String> {
+    use gtk::prelude::*;
+    let (reply, answer) = std::sync::mpsc::channel();
+    let asked = app.run_on_main_thread(move || {
+        let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
+        let targets = gtk::gdk::Atom::intern("TARGETS");
+        clipboard.request_contents(&targets, move |clipboard, selection| {
+            let concealed = selection.targets().is_some_and(|targets| {
+                targets
+                    .iter()
+                    .any(|target| SECRET_FORMATS.contains(&target.name().as_str()))
+            });
+            if concealed {
+                reply.send(None).ok();
+                return;
+            }
+            clipboard.request_text(move |_, text| {
+                reply.send(text.map(str::to_owned)).ok();
+            });
+        });
+    });
+    if let Err(error) = asked {
+        tracing::debug!(%error, "Could not ask GTK for the clipboard");
+        return None;
+    }
+    answer
+        .recv_timeout(std::time::Duration::from_millis(500))
+        .ok()
+        .flatten()
+}
+
 /// Marks a copy so clipboard managers skip it (`x-kde-passwordManagerHint`).
 pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
     arboard::SetExtLinux::exclude_from_history(set)

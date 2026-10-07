@@ -6,7 +6,16 @@ import { iconUrl } from "../lib/ipc";
 
 /** Glyphs drawn on a 24-unit grid with round 1.75-unit strokes. */
 const GLYPHS: Record<
-  Symbol | "search" | "pin" | "warning" | "download" | "disk",
+  | Symbol
+  | "search"
+  | "pin"
+  | "warning"
+  | "download"
+  | "disk"
+  | "clipboard"
+  | "copy"
+  | "close"
+  | "back",
   () => JSX.Element
 > = {
   app: () => (
@@ -99,6 +108,20 @@ const GLYPHS: Record<
   pin: () => <path d="M12 16v5M8 3h8l-1 6 3 3v2H6v-2l3-3z" />,
   warning: () => <path d="M12 4l9 16H3zM12 10v4M12 17h.01" />,
   download: () => <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
+  clipboard: () => (
+    <>
+      <rect x="7" y="3" width="10" height="4" rx="1" />
+      <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+    </>
+  ),
+  copy: () => (
+    <>
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </>
+  ),
+  close: () => <path d="M6 6l12 12M18 6L6 18" />,
+  back: () => <path d="M15 6l-6 6 6 6" />,
   disk: () => (
     <>
       <rect x="3" y="12" width="18" height="8" rx="2" />

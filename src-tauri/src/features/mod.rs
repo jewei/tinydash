@@ -8,6 +8,7 @@
 
 pub mod apps;
 pub mod calculator;
+pub mod clip_card;
 pub mod clipboard;
 pub mod currency;
 pub mod datetime;

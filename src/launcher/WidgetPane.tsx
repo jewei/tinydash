@@ -19,6 +19,8 @@ import * as ipc from "../lib/ipc";
 import { isComposing, modKey } from "../lib/keys";
 import { Glyph } from "../ui/Icon";
 import { Keys } from "../ui/Keys";
+import type { MenuItem } from "./ActionMenu";
+import { ClipCard, JsonView, mainLabel } from "./ClipCard";
 import { Weather } from "./Weather";
 
 /** Whether any widget is on, so the pane has something to show. */
@@ -27,24 +29,24 @@ export const hasWidgets = (settings: Settings) =>
   settings.showDiskSpace ||
   settings.showNotepad ||
   settings.showFocusTimer ||
-  settings.showWeather;
-
-/** An action of a widget, for the actions menu. */
-export interface PaneAction {
-  action: ResultAction;
-  keys?: string[];
-}
+  settings.showWeather ||
+  settings.showClipboardCards;
 
 /** What the launcher's shortcuts do in the pane. Each says whether it acted. */
 export interface PaneControls {
   focusNote: () => boolean;
   /** Run the focus timer's main action. */
   runTimer: () => boolean;
+  /** Run the clipboard card's main action. */
+  runCard: () => boolean;
+  /** Close a view that covers the pane, such as the full JSON. */
+  closeView: () => boolean;
   /** Every widget action, for the actions menu. */
-  actions: () => PaneAction[];
+  actions: () => MenuItem[];
 }
 
 const timerKeys = () => [modKey(), "P"];
+const cardKeys = () => [modKey(), "⇧", "↩"];
 
 /** The note's field, so the launcher leaves its keys alone. */
 export const inNote = (target: EventTarget | null) =>
@@ -85,7 +87,25 @@ export function WidgetPane(props: {
   const [widgets, { refetch }] = createResource(ipc.widgets);
   const now = createNow();
   let noteField: HTMLTextAreaElement | undefined;
+  // A dismissed card stays away until the clipboard holds something new.
+  const [dismissed, setDismissed] = createSignal<string>();
+  const [jsonOpen, setJsonOpen] = createSignal(false);
+  const card = () => {
+    const found = widgets.latest?.clipCard;
+    return found && found.id !== dismissed() ? found : undefined;
+  };
+  const json = () => {
+    const content = card()?.content;
+    return content?.type === "json" ? content : undefined;
+  };
   const timerActions = () => widgets.latest?.focus?.actions ?? [];
+  const runCard = () => {
+    const current = card();
+    if (!current) return false;
+    if (current.content.type === "json") setJsonOpen(true);
+    else if (current.actions[0]) props.onRun(current.actions[0]);
+    return true;
+  };
   props.controls({
     focusNote: () => {
       noteField?.focus();
@@ -96,12 +116,47 @@ export function WidgetPane(props: {
       if (main) props.onRun(main);
       return main !== undefined;
     },
-    actions: () =>
-      timerActions().map((action, index) => ({
-        action,
+    runCard,
+    closeView: () => {
+      const open = jsonOpen() && json() !== undefined;
+      setJsonOpen(false);
+      return open;
+    },
+    actions: () => {
+      const current = card();
+      const cardItems: MenuItem[] = current
+        ? [
+            ...(current.content.type === "json"
+              ? [{ label: mainLabel(current), keys: cardKeys(), run: () => void runCard() }]
+              : []),
+            ...current.actions.map((action, index) => ({
+              label: action.label,
+              keys: index === 0 && current.content.type !== "json" ? cardKeys() : undefined,
+              run: () => props.onRun(action),
+            })),
+          ]
+        : [];
+      const timerItems = timerActions().map((action, index) => ({
+        label: action.label,
         keys: index === 0 ? timerKeys() : undefined,
-      })),
+        run: () => props.onRun(action),
+      }));
+      return [...cardItems, ...timerItems];
+    },
   });
+  // Nothing shows: only clipboard cards are on, and the clipboard has none.
+  const empty = () => {
+    const shown = widgets.latest;
+    return (
+      shown !== undefined &&
+      !shown.clocks &&
+      !shown.disk &&
+      shown.note === null &&
+      !shown.focus &&
+      !shown.weather &&
+      !card()
+    );
+  };
 
   onMount(() => {
     const listeners = [
@@ -115,6 +170,20 @@ export function WidgetPane(props: {
   return (
     <aside class="widgets" aria-label="Widgets">
       <div class="widget-grid">
+        <Show when={card()}>
+          {(current) => (
+            <ClipCard
+              card={current()}
+              mainKeys={cardKeys()}
+              onRun={props.onRun}
+              onOpenJson={() => setJsonOpen(true)}
+              onDismiss={() => {
+                setDismissed(current().id);
+                setJsonOpen(false);
+              }}
+            />
+          )}
+        </Show>
         <Show when={widgets.error}>
           {(error) => (
             <p class="widgets-error" role="alert">
@@ -133,6 +202,9 @@ export function WidgetPane(props: {
         </Show>
         <Show when={widgets.latest?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
       </div>
+      <Show when={empty()}>
+        <p class="widgets-empty">Copy a color, a Unix time, or JSON to see it here.</p>
+      </Show>
       {/* An empty note is still a note, so test for null. */}
       <Show when={widgets.latest && widgets.latest.note !== null}>
         <Notepad
@@ -140,6 +212,16 @@ export function WidgetPane(props: {
           field={(field) => (noteField = field)}
           onLeave={props.onLeave}
         />
+      </Show>
+      <Show when={jsonOpen() && json()}>
+        {(content) => (
+          <JsonView
+            json={content()}
+            copyPretty={card()?.actions[0]}
+            onRun={props.onRun}
+            onClose={() => setJsonOpen(false)}
+          />
+        )}
       </Show>
     </aside>
   );

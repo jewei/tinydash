@@ -224,8 +224,13 @@ export function Launcher() {
       case "timer":
         if (showsWidgets()) pane?.runTimer();
         return;
+      case "card":
+        if (showsWidgets()) pane?.runCard();
+        return;
       case "hide":
-        // Escape first dismisses a startup warning, then hides.
+        // Escape first closes the full JSON view, then dismisses a startup
+        // warning, then hides.
+        if (showsWidgets() && pane?.closeView()) return;
         if (warnings().length && !launcher.actionError() && !launcher.searchError()) {
           return setWarnings((list) => list.slice(1));
         }
@@ -250,11 +255,7 @@ export function Launcher() {
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,
       run: () => launcher.run(action),
     }));
-    const widgetItems = (showsWidgets() ? (pane?.actions() ?? []) : []).map(({ action, keys }) => ({
-      label: action.label,
-      keys,
-      run: () => launcher.run(action),
-    }));
+    const widgetItems = showsWidgets() ? (pane?.actions() ?? []) : [];
     // The update bar's buttons take a click; the menu takes the keyboard.
     const version = update();
     const install = version

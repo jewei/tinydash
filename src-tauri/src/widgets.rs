@@ -7,6 +7,7 @@ use ts_rs::TS;
 use crate::{
     error::{Error, Result},
     features::{
+        clip_card::{self, ClipCard},
         datetime::{self, CityClock},
         focus::FocusTimer,
         weather::WeatherView,
@@ -35,6 +36,8 @@ pub struct Widgets {
     pub note: Option<String>,
     pub focus: Option<FocusTimer>,
     pub weather: Option<WeatherView>,
+    /// A card for the clipboard text, when it is a format a card shows.
+    pub clip_card: Option<ClipCard>,
 }
 
 #[derive(Serialize, TS)]
@@ -84,8 +87,9 @@ pub fn save_note(state: &State, text: &str) -> Result<()> {
 }
 
 /// Gather the widgets that are on. One that cannot load says so in its
-/// card, so the others still show.
-pub fn load(state: &State) -> Result<Widgets> {
+/// card, so the others still show. `clipboard` reads the clipboard text,
+/// only when clipboard cards are on.
+pub fn load(state: &State, clipboard: impl FnOnce() -> Option<String>) -> Result<Widgets> {
     let settings = state.settings.get();
     let now = chrono::Local::now();
     Ok(Widgets {
@@ -105,6 +109,11 @@ pub fn load(state: &State) -> Result<Widgets> {
             .transpose()?,
         focus: settings.show_focus_timer.then(|| state.focus.get()),
         weather: settings.show_weather.then(|| weather(state, &settings)),
+        clip_card: settings
+            .show_clipboard_cards
+            .then(clipboard)
+            .flatten()
+            .and_then(|text| clip_card::detect(&text, now)),
     })
 }
 
@@ -145,7 +154,7 @@ mod tests {
             clock_cities: cities,
             ..Settings::default()
         });
-        let names: Vec<String> = load(&on)
+        let names: Vec<String> = load(&on, || None)
             .unwrap()
             .clocks
             .unwrap()
@@ -158,7 +167,7 @@ mod tests {
             show_clocks: false,
             ..Settings::default()
         });
-        assert!(load(&off).unwrap().clocks.is_none());
+        assert!(load(&off, || None).unwrap().clocks.is_none());
     }
 
     #[test]
@@ -167,11 +176,11 @@ mod tests {
             show_notepad: true,
             ..Settings::default()
         });
-        assert_eq!(load(&state).unwrap().note.as_deref(), Some(""));
+        assert_eq!(load(&state, || None).unwrap().note.as_deref(), Some(""));
         let longest = "é".repeat(MAX_NOTE_CHARS);
         save_note(&state, &longest).unwrap();
         assert!(save_note(&state, &format!("{longest}!")).is_err());
-        assert_eq!(load(&state).unwrap().note, Some(longest));
+        assert_eq!(load(&state, || None).unwrap().note, Some(longest));
     }
 
     #[test]
@@ -229,5 +238,27 @@ mod tests {
             weather(&state, &settings("Bergen")),
             WeatherView::Loading { .. }
         ));
+    }
+
+    #[test]
+    fn reads_the_clipboard_only_for_its_cards() {
+        let on = State::for_tests(Settings::default());
+        let card = load(&on, || Some("#2F6F5E".into())).unwrap().clip_card;
+        assert_eq!(card.unwrap().actions[0].label, "Copy HEX");
+        assert!(
+            load(&on, || Some("hello".into()))
+                .unwrap()
+                .clip_card
+                .is_none()
+        );
+
+        let off = State::for_tests(Settings {
+            show_clipboard_cards: false,
+            ..Settings::default()
+        });
+        let read = load(&off, || {
+            panic!("cards are off, so nothing reads the clipboard")
+        });
+        assert!(read.unwrap().clip_card.is_none());
     }
 }

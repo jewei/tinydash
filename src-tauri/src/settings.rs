@@ -77,6 +77,9 @@ pub struct Settings {
     /// The city of the weather widget, as typed; empty until one is set.
     pub weather_city: String,
     pub temperature_unit: TemperatureUnit,
+    /// A card for a color, a Unix time, or JSON on the clipboard. The text
+    /// is read when the pane shows, never saved.
+    pub show_clipboard_cards: bool,
 }
 
 /// The launcher's top-left corner: logical points on macOS, physical pixels
@@ -170,6 +173,7 @@ impl Default for Settings {
             show_weather: false,
             weather_city: String::new(),
             temperature_unit: TemperatureUnit::Celsius,
+            show_clipboard_cards: true,
         }
     }
 }

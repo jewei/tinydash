@@ -45,6 +45,7 @@ export const testSettings: Settings = {
   showWeather: false,
   weatherCity: "",
   temperatureUnit: "celsius",
+  showClipboardCards: true,
 };
 
 /** Every widget off, so an empty All search shows the preview. */
@@ -53,13 +54,8 @@ export const noWidgets: Partial<Settings> = {
   showDiskSpace: false,
   showNotepad: false,
   showFocusTimer: false,
-  focusMinutes: 25,
-  shortBreakMinutes: 5,
-  longBreakMinutes: 15,
-  sessionsBeforeLongBreak: 4,
   showWeather: false,
-  weatherCity: "",
-  temperatureUnit: "celsius",
+  showClipboardCards: false,
 };
 
 export const app: SearchResult = {
@@ -131,7 +127,14 @@ export function fakeBackend(
     delete_library_item: () => null,
     check_for_update: () => null,
     install_update: () => null,
-    widgets: () => ({ clocks: [], disk: null, note: null, focus: null, weather: null }),
+    widgets: () => ({
+      clocks: [],
+      disk: null,
+      note: null,
+      focus: null,
+      weather: null,
+      clipCard: null,
+    }),
     save_note: () => null,
     about: () => ({
       version: "0.2.0",

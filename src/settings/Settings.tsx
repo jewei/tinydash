@@ -310,6 +310,16 @@ export function Settings() {
                     onChange={(showWeather) => void save({ showWeather })}
                   />
                 </Row>
+                <Row
+                  label="Clipboard cards"
+                  description="When you copy a color, a Unix time, or JSON, a card shows it decoded. The text is read when widgets show, never saved."
+                >
+                  <Toggle
+                    label="Clipboard cards"
+                    checked={settings().showClipboardCards}
+                    onChange={(showClipboardCards) => void save({ showClipboardCards })}
+                  />
+                </Row>
                 {/* 3 matches MAX_CLOCK_CITIES in the Rust code. */}
                 <h2>Clock cities</h2>
                 <ListEditor

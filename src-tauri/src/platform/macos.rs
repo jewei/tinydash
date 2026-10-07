@@ -351,6 +351,13 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     super::read_with_arboard(images, files)
 }
 
+pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
+    match read_clipboard(false, false)? {
+        Content::Text(text) => Some(text),
+        Content::Image { .. } | Content::Files(_) => None,
+    }
+}
+
 /// Marks a copy so clipboard managers skip it (`org.nspasteboard.ConcealedType`).
 pub fn exclude_from_history(set: arboard::Set<'_>) -> arboard::Set<'_> {
     arboard::SetExtApple::exclude_from_history(set)

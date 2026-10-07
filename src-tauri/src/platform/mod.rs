@@ -29,6 +29,9 @@
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
+//! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
+//!   is none or its source marked it secret. History need not be on. Call
+//!   it off the main thread, which Linux waits for.
 //! - `watch_clipboard(capturing)`: start change notifications; call on the
 //!   main thread. `capturing` says whether history is on, so nothing is read
 //!   while it is off.
@@ -129,7 +132,7 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
 
 /// Held while reading the clipboard. AppKit's pasteboard is not safe to
 /// read from two threads at once, and Windows lets one thread open the
-/// clipboard at a time.
+/// clipboard at a time; the capture thread and the widget pane both read.
 #[cfg(not(target_os = "linux"))]
 static CLIPBOARD_READ: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
@@ -208,7 +211,8 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 mod tests {
     #[test]
     fn many_threads_can_read_the_clipboard_at_once() {
-        // AppKit crashes on unguarded parallel pasteboard reads.
+        // The capture thread and the widget pane read together; AppKit
+        // crashes on unguarded parallel pasteboard reads.
         std::thread::scope(|scope| {
             for _ in 0..8 {
                 scope.spawn(|| {

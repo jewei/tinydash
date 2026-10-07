@@ -12,6 +12,7 @@ type Command =
   | { type: "settings" }
   | { type: "note" }
   | { type: "timer" }
+  | { type: "card" }
   | { type: "hide" };
 
 /**
@@ -19,7 +20,8 @@ type Command =
  * ↑/↓ move, Enter runs, Mod+Enter runs the second action, Mod+K opens
  * actions, Mod+Backspace deletes, Mod+1–9 runs that row, Tab and Shift+Tab
  * change category, Mod+, opens Settings, Mod+J goes to the widget pane's
- * note and back, Mod+P runs the focus timer's main action, and Escape hides.
+ * note and back, Mod+P runs the focus timer's main action, Mod+Shift+Enter
+ * the clipboard card's, and Escape closes the full JSON view, then hides.
  */
 export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
   const mod = hasMod(event, mac);
@@ -29,6 +31,7 @@ export function commandFor(event: KeyboardEvent, mac = IS_MAC): Command | null {
     case "ArrowUp":
       return { type: "move", by: -1 };
     case "Enter":
+      if (mod && event.shiftKey) return { type: "card" };
       return mod ? { type: "runSecondary" } : { type: "run" };
     case "Tab":
       return { type: "category", by: event.shiftKey ? -1 : 1 };

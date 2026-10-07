@@ -17,6 +17,9 @@ const clip: SearchResult = {
   ],
 };
 
+/** The widget pane's reply with no widgets but a card, which tests add. */
+const noCards = { clocks: null, disk: null, note: null, focus: null, weather: null };
+
 function setup(results: (query: string, category: string) => SearchResult[], extra = {}) {
   const backend = fakeBackend({
     search: (args) => results(String(args.query), String(args.category)),
@@ -1094,6 +1097,119 @@ describe("Launcher", () => {
       action: { type: "openSettings" },
       resultId: null,
     });
+  });
+
+  it("shows a clipboard color, copies its forms, and stays dismissed", async () => {
+    const copy = (text: string) => ({ type: "copy", text }) as const;
+    const color = {
+      id: "a1",
+      content: {
+        type: "color",
+        hex: "#2F6F5E",
+        copiedAs: "HSL",
+        rows: [
+          { label: "HEX", value: "#2F6F5E" },
+          { label: "RGB", value: "rgb(47, 111, 94)" },
+          { label: "HSL", value: "hsl(164, 41%, 31%)" },
+        ],
+        onWhite: { ratio: "6.2:1", grade: "AA" },
+        onBlack: { ratio: "3.4:1", grade: "AA large" },
+      },
+      actions: [
+        { label: "Copy HEX", action: copy("#2F6F5E"), confirm: null },
+        { label: "Copy RGB", action: copy("rgb(47, 111, 94)"), confirm: null },
+        { label: "Copy HSL", action: copy("hsl(164, 41%, 31%)"), confirm: null },
+      ],
+    };
+    const { backend, press } = setup(() => [], {
+      widgets: () => ({ ...noCards, clipCard: color }),
+    });
+    const card = await screen.findByRole("region", { name: "Color on the clipboard" });
+    expect(within(card).getByText("from HSL")).toBeTruthy();
+    expect(within(card).getByLabelText("Contrast on white").textContent).toBe("AaAA6.2:1");
+
+    fireEvent.click(within(card).getByRole("button", { name: "Copy RGB" }));
+    // One action runs at a time, so the shortcut waits for the click's.
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve));
+    press("Enter", { ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    expect(backend.called("run_action").map((call) => call.args.action)).toEqual([
+      copy("rgb(47, 111, 94)"),
+      copy("#2F6F5E"),
+    ]);
+
+    fireEvent.click(within(card).getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
+    await emit("launcher:shown", { category: null });
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2));
+    expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
+  });
+
+  it("opens clipboard JSON in full, and Escape closes it before hiding", async () => {
+    const json = {
+      id: "b2",
+      content: {
+        type: "json",
+        array: false,
+        count: 2,
+        depth: 1,
+        bytes: 312,
+        keys: [
+          { name: "id", hint: "" },
+          { name: "tags", hint: "[2]" },
+        ],
+        minified: '{"id":1,"tags":[]}',
+        lines: [
+          { indent: 0, tokens: [{ kind: "punctuation", text: "{" }] },
+          {
+            indent: 1,
+            tokens: [
+              { kind: "key", text: '"id"' },
+              { kind: "punctuation", text: ": " },
+              { kind: "number", text: "1" },
+            ],
+          },
+          { indent: 0, tokens: [{ kind: "punctuation", text: "}" }] },
+        ],
+        moreLines: 0,
+      },
+      actions: [
+        {
+          label: "Copy Pretty JSON",
+          action: { type: "copyJson", pretty: true },
+          confirm: null,
+        },
+        {
+          label: "Copy Minified JSON",
+          action: { type: "copyJson", pretty: false },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [], {
+      widgets: () => ({ ...noCards, clipCard: json }),
+    });
+    const card = await screen.findByRole("region", { name: "JSON on the clipboard" });
+    expect(card.textContent).toContain("Object · 2 keys · depth 1 · 312 bytes");
+    expect(within(card).getByText("[2]")).toBeTruthy();
+
+    press("Enter", { ctrlKey: true, shiftKey: true });
+    const view = await screen.findByRole("dialog", { name: "Clipboard JSON" });
+    expect(within(view).getAllByRole("listitem")).toHaveLength(3);
+    press("Escape");
+    expect(screen.queryByRole("dialog", { name: "Clipboard JSON" })).toBeNull();
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+    press("Escape");
+    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
+
+    press("k", { ctrlKey: true });
+    const labels = (await screen.findAllByRole("option")).map((option) => option.textContent);
+    expect(labels.slice(0, 3)).toEqual([
+      expect.stringContaining("View Full JSON"),
+      "Copy Pretty JSON",
+      "Copy Minified JSON",
+    ]);
   });
 
   it("keeps the preview when every widget is off", async () => {

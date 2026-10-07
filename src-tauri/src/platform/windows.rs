@@ -240,6 +240,13 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     super::read_with_arboard(images, files)
 }
 
+pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
+    match read_clipboard(false, false)? {
+        Content::Text(text) => Some(text),
+        Content::Image { .. } | Content::Files(_) => None,
+    }
+}
+
 /// Marks a copy so clipboard managers skip it
 /// (`ExcludeClipboardContentFromMonitorProcessing`), and so Windows keeps it
 /// out of its own history and cloud clipboard.
