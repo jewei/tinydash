@@ -25,7 +25,7 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 
 ## Categories
 
-**All** mixes everything. An empty All shows pins, then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results.
+**All** mixes everything. An empty All shows pins (except pinned clipboard entries), then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results.
 
 | Category  | Finds                                                                                                                    | Empty view                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
@@ -36,7 +36,7 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 | Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                       | Most used, then the catalog |
 | System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
 
-Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
+Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pinned clipboard entry is kept rather than launched, so it heads the Clipboard tab and is found by a search, but stays off the empty All view. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
 
