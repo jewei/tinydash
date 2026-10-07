@@ -67,7 +67,8 @@ pub struct LauncherPosition {
 pub struct LauncherTab {
     pub category: Category,
     pub shown: bool,
-    /// Its search results and suggestions show in All; its pins always do.
+    /// Its search results and suggestions show in All. Out of All, its pins
+    /// still head the empty All view (pinned clips never do).
     /// Missing in files from before the switch, which meant yes.
     #[serde(default = "LauncherTab::joins_all_by_default")]
     pub in_all: bool,
@@ -197,8 +198,6 @@ impl Settings {
         self
     }
 
-    /// The first folder entry that is not a full path, which would never be
-    /// indexed. A hand-edited file may still hold one; `file_folders` skips it.
     /// Whether a category's results and suggestions show in All. A category
     /// with no entry, which only All itself is after `normalized`, does.
     pub fn in_all(&self, category: Category) -> bool {
@@ -208,6 +207,8 @@ impl Settings {
             .is_none_or(|tab| tab.in_all)
     }
 
+    /// The first folder entry that is not a full path, which would never be
+    /// indexed. A hand-edited file may still hold one; `file_folders` skips it.
     pub fn relative_folder(&self, home: &Path) -> Option<&str> {
         self.file_search_folders
             .iter()

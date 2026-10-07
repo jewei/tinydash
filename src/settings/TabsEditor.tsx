@@ -7,10 +7,10 @@ import { Toggle } from "./controls";
 
 /**
  * The launcher's tabs after All: show or hide each one, keep its results in
- * or out of All, and move it. A tab cannot be both hidden and out of All,
- * so the switch that would do that is locked on. Each
- * change is an edit of the latest saved list, so quick clicks never undo
- * each other. Rows are keyed by category, so a switch keeps its row. A
+ * or out of All, and move it. A tab is never both hidden and out of All, so
+ * turning one switch off while the other is off turns the other on; no
+ * switch is ever disabled, so focus never drops. Each change is an edit of
+ * the latest saved list, so quick clicks never undo each other. Rows are keyed by category, so a switch keeps its row. A
  * moved row loses focus, also when a failed save moves it back; focus then
  * returns to its move buttons, unless the user has put it elsewhere.
  */
@@ -49,9 +49,22 @@ export function TabsEditor(props: {
     queueMicrotask(focus);
     void saved.then(focus);
   };
-  const change = (category: Category, values: Partial<LauncherTab>) =>
+  // The same rule as the backend's `normalized`, applied here so the form
+  // shows it at once.
+  const change = (
+    category: Category,
+    values: Pick<LauncherTab, "shown"> | Pick<LauncherTab, "inAll">,
+  ) =>
     void props.onChange((tabs) =>
-      tabs.map((tab) => (tab.category === category ? { ...tab, ...values } : tab)),
+      tabs.map((tab) => {
+        if (tab.category !== category) return tab;
+        const next = { ...tab, ...values };
+        if (!next.shown && !next.inAll) {
+          if ("shown" in values) next.inAll = true;
+          else next.shown = true;
+        }
+        return next;
+      }),
     );
 
   return (
@@ -86,18 +99,22 @@ export function TabsEditor(props: {
                 >
                   ↓
                 </button>
-                <Toggle
-                  label={`Show ${CATEGORY_LABELS[category]}`}
-                  checked={tabOf(category)?.shown ?? false}
-                  disabled={!tabOf(category)?.inAll}
-                  onChange={(shown) => change(category, { shown })}
-                />
-                <Toggle
-                  label={`${CATEGORY_LABELS[category]} in All`}
-                  checked={tabOf(category)?.inAll ?? false}
-                  disabled={!tabOf(category)?.shown}
-                  onChange={(inAll) => change(category, { inAll })}
-                />
+                <label class="tabs-switch">
+                  <Toggle
+                    label={`Show ${CATEGORY_LABELS[category]}`}
+                    checked={tabOf(category)?.shown ?? false}
+                    onChange={(shown) => change(category, { shown })}
+                  />
+                  Show
+                </label>
+                <label class="tabs-switch">
+                  <Toggle
+                    label={`${CATEGORY_LABELS[category]} in All`}
+                    checked={tabOf(category)?.inAll ?? false}
+                    onChange={(inAll) => change(category, { inAll })}
+                  />
+                  In All
+                </label>
               </span>
             </li>
           )}

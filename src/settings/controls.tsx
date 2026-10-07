@@ -34,7 +34,6 @@ export function Row(props: { label: string; description?: string; children: JSX.
 export function Toggle(props: {
   label: string;
   checked: boolean;
-  disabled?: boolean;
   onChange: (on: boolean) => void;
 }) {
   return (
@@ -44,7 +43,6 @@ export function Toggle(props: {
       class="toggle"
       aria-label={props.label}
       checked={props.checked}
-      disabled={props.disabled}
       onChange={(event) => props.onChange(event.currentTarget.checked)}
     />
   );

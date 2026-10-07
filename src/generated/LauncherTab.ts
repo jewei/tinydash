@@ -6,7 +6,8 @@ import type { Category } from "./Category";
  */
 export type LauncherTab = { category: Category, shown: boolean, 
 /**
- * Its search results and suggestions show in All; its pins always do.
+ * Its search results and suggestions show in All. Out of All, its pins
+ * still head the empty All view (pinned clips never do).
  * Missing in files from before the switch, which meant yes.
  */
 inAll: boolean, };
