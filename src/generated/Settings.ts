@@ -3,6 +3,7 @@ import type { EmojiLanguage } from "./EmojiLanguage";
 import type { LauncherPosition } from "./LauncherPosition";
 import type { LauncherTab } from "./LauncherTab";
 import type { SearchEngine } from "./SearchEngine";
+import type { TemperatureUnit } from "./TemperatureUnit";
 import type { Theme } from "./Theme";
 
 /**
@@ -55,4 +56,8 @@ clockCities: Array<string>, showDiskSpace: boolean, showNotepad: boolean, showFo
 /**
  * Focus sessions in a cycle; the last one earns the long break.
  */
-sessionsBeforeLongBreak: number, };
+sessionsBeforeLongBreak: number, showWeather: boolean, 
+/**
+ * The city of the weather widget, as typed; empty until one is set.
+ */
+weatherCity: string, temperatureUnit: TemperatureUnit, };

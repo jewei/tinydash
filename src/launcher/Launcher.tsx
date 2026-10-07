@@ -27,13 +27,23 @@ function editsQuery(event: KeyboardEvent) {
   return event.key === "Backspace" || event.key === "Delete";
 }
 
+/** "A and B", or "A, B, and C". */
+const listed = (words: string[]) =>
+  words.length < 3 ? words.join(" and ") : `${words.slice(0, -1).join(", ")}, and ${words.at(-1)}`;
+
 /**
  * Actions that belong to no result, listed in the actions menu. Refresh also
- * downloads exchange rates when they are on, so its label says so.
+ * downloads exchange rates and the weather when they are on, so its label
+ * says so.
  */
-const generalActions = (rates: boolean): ResultAction[] => [
+const generalActions = (settings: Settings | undefined): ResultAction[] => [
   {
-    label: rates ? "Refresh Apps, Files, and Rates" : "Refresh Apps and Files",
+    label: `Refresh ${listed([
+      "Apps",
+      "Files",
+      ...(settings?.currencyRatesEnabled ? ["Rates"] : []),
+      ...(settings?.showWeather && settings.weatherCity ? ["Weather"] : []),
+    ])}`,
     action: { type: "refresh" },
     confirm: null,
   },
@@ -234,7 +244,7 @@ export function Launcher() {
     // On the Clipboard tab, clearing it is one key away, not a trip to System.
     const general = [
       ...(canClearHistory() ? [clearHistory] : []),
-      ...generalActions(settings()?.currencyRatesEnabled ?? false),
+      ...generalActions(settings()),
     ].map((action) => ({
       label: action.label,
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,

@@ -619,6 +619,81 @@ body {
   font-weight: 600;
 }
 
+.weather {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 132px;
+}
+
+.weather-now {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  align-self: stretch;
+}
+
+.weather-temperature {
+  font-family: var(--font-heading);
+  font-size: 34px;
+  line-height: 1.1;
+}
+
+.weather-temperature.offline {
+  color: var(--muted);
+}
+
+.weather-stamp {
+  margin-top: auto;
+}
+
+.weather-settings {
+  height: 26px;
+  margin-top: var(--space-1);
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--raised);
+  font-size: var(--text-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.weather-icon {
+  flex: none;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.weather-icon .sun {
+  stroke: var(--accent);
+}
+
+.weather-icon .thin {
+  stroke-width: 1.4;
+}
+
+.weather-icon .cloud {
+  fill: var(--paper);
+  stroke: var(--muted);
+}
+
+.weather-icon .faint {
+  fill: none;
+  opacity: 0.65;
+}
+
+.weather-icon .drop {
+  stroke: var(--calm);
+}
+
+.weather-icon .flake {
+  stroke-width: 2.4;
+}
+
 .notepad {
   display: flex;
   flex: 1 0 104px;

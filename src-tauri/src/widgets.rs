@@ -9,8 +9,11 @@ use crate::{
     features::{
         datetime::{self, CityClock},
         focus::FocusTimer,
+        weather::WeatherView,
     },
     platform,
+    refresh::WeatherFailure,
+    settings::Settings,
     state::State,
 };
 
@@ -31,6 +34,7 @@ pub struct Widgets {
     /// The scratch note.
     pub note: Option<String>,
     pub focus: Option<FocusTimer>,
+    pub weather: Option<WeatherView>,
 }
 
 #[derive(Serialize, TS)]
@@ -100,7 +104,31 @@ pub fn load(state: &State) -> Result<Widgets> {
             .then(|| state.store.note())
             .transpose()?,
         focus: settings.show_focus_timer.then(|| state.focus.get()),
+        weather: settings.show_weather.then(|| weather(state, &settings)),
     })
+}
+
+/// The latest weather for the city, or how getting it is going.
+fn weather(state: &State, settings: &Settings) -> WeatherView {
+    let city = settings.weather_city.trim().to_owned();
+    if city.is_empty() {
+        return WeatherView::NoCity;
+    }
+    let failure = state.freshness.weather_failure(&city);
+    if let Some(weather) = state
+        .weather
+        .get()
+        .as_ref()
+        .as_ref()
+        .filter(|w| w.is_for(&city))
+    {
+        return WeatherView::ready(weather, settings.temperature_unit, failure.is_some());
+    }
+    match failure {
+        None => WeatherView::Loading { city },
+        Some(WeatherFailure::NotFound) => WeatherView::NotFound { city },
+        Some(WeatherFailure::Failed(message)) => WeatherView::Failed { city, message },
+    }
 }
 
 #[cfg(test)]
@@ -162,5 +190,44 @@ mod tests {
         for missing in [home.join("tinydash-missing-folder"), PathBuf::new()] {
             assert!(matches!(Disk::read(&missing), Disk::Unavailable { .. }));
         }
+    }
+
+    #[test]
+    fn weather_shows_only_for_the_city_in_the_settings() {
+        use crate::features::weather::{TemperatureUnit, Weather};
+        let settings = |city: &str| Settings {
+            show_weather: true,
+            weather_city: city.into(),
+            ..Settings::default()
+        };
+        let state = State::for_tests(settings(""));
+        assert_eq!(weather(&state, &settings("")), WeatherView::NoCity);
+        assert_eq!(
+            weather(&state, &settings("Oslo")),
+            WeatherView::Loading {
+                city: "Oslo".into()
+            }
+        );
+
+        let oslo = Weather {
+            city: "oslo".into(),
+            place: "Oslo".into(),
+            temperature: 4.4,
+            high: 7.0,
+            low: 1.0,
+            rain_chance: None,
+            code: 3,
+            is_day: true,
+            fetched_at: 0,
+        };
+        state.weather.set(Some(oslo.clone()));
+        assert_eq!(
+            weather(&state, &settings("Oslo")),
+            WeatherView::ready(&oslo, TemperatureUnit::Celsius, false)
+        );
+        assert!(matches!(
+            weather(&state, &settings("Bergen")),
+            WeatherView::Loading { .. }
+        ));
     }
 }

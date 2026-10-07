@@ -489,7 +489,7 @@ describe("Launcher", () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it("names exchange rates in Refresh only when they are on", async () => {
+  it("names exchange rates and the weather in Refresh only when they are on", async () => {
     const { press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });
     press("k", { ctrlKey: true });
@@ -501,6 +501,12 @@ describe("Launcher", () => {
     await emit("settings:changed", { ...testSettings, currencyRatesEnabled: false });
     press("k", { ctrlKey: true });
     expect(await screen.findByRole("option", { name: "Refresh Apps and Files" })).toBeTruthy();
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Search actions" }), { key: "Escape" });
+    await emit("settings:changed", { ...testSettings, showWeather: true, weatherCity: "Oslo" });
+    press("k", { ctrlKey: true });
+    expect(
+      await screen.findByRole("option", { name: "Refresh Apps, Files, Rates, and Weather" }),
+    ).toBeTruthy();
   });
 
   it("forgets a failed history turn-on when the launcher opens again", async () => {
@@ -1056,6 +1062,38 @@ describe("Launcher", () => {
     fireEvent.click(await screen.findByRole("option", { name: /Reset Timer/ }));
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
     expect(backend.called("run_action")[1]?.args).toEqual({ action: reset, resultId: null });
+  });
+
+  it("shows the weather, and when it is old or has no city", async () => {
+    const ready = {
+      type: "ready",
+      place: "Singapore",
+      temperature: 31,
+      high: 33,
+      low: 26,
+      unit: "celsius",
+      condition: "Partly cloudy",
+      icon: "partlyDay",
+      rainChance: 40,
+      updatedAt: Math.floor(Date.now() / 1000) - 3 * 3600,
+      offline: true,
+    };
+    let view: object = ready;
+    const { backend } = setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: null, focus: null, weather: view }),
+    });
+    const card = await screen.findByRole("region", { name: "Weather" });
+    expect(card.textContent).toContain("Singapore31°Partly cloudyH 33° · L 26° · Rain 40%");
+    expect(within(card).getByText("Offline · updated 3 h ago")).toBeTruthy();
+
+    view = { type: "noCity" };
+    await emit("widgets:changed", null);
+    fireEvent.click(await within(card).findByRole("button", { name: "Open Settings" }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "openSettings" },
+      resultId: null,
+    });
   });
 
   it("keeps the preview when every widget is off", async () => {

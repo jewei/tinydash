@@ -171,7 +171,8 @@ pub enum Action {
     Unpin {
         id: String,
     },
-    /// Rescan apps and files, and download exchange rates now when they are on.
+    /// Rescan apps and files, and download exchange rates and the weather
+    /// now when they are on.
     Refresh,
     OpenSettings,
     /// Forget where the launcher was dragged, and center it.

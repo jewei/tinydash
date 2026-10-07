@@ -164,6 +164,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             refresh::apps(app);
             refresh::files(app);
             refresh::rates(app, true);
+            refresh::weather(app, true);
         }
         Action::OpenSettings => window::open_settings(app)?,
         Action::CenterLauncher => window::center(app)?,

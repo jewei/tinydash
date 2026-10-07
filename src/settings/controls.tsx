@@ -109,6 +109,34 @@ export function NumberField(props: {
   );
 }
 
+/** Text that saves when the field loses focus or Enter is pressed. */
+export function TextField(props: {
+  label: string;
+  value: string;
+  placeholder: string;
+  maxLength: number;
+  onChange: (value: string) => void;
+}) {
+  const commit = (input: HTMLInputElement) => {
+    const value = input.value.trim();
+    input.value = value;
+    if (value !== props.value) props.onChange(value);
+  };
+  return (
+    <input
+      class="field"
+      aria-label={props.label}
+      placeholder={props.placeholder}
+      maxLength={props.maxLength}
+      value={props.value}
+      onBlur={(event) => commit(event.currentTarget)}
+      onKeyDown={(event) =>
+        event.key === "Enter" && !isComposing(event) && commit(event.currentTarget)
+      }
+    />
+  );
+}
+
 /**
  * A list of strings with Add and Remove. `onChange` saves an edit of the
  * list and gives back its error, which shows next to the field: the page's

@@ -19,10 +19,15 @@ import * as ipc from "../lib/ipc";
 import { isComposing, modKey } from "../lib/keys";
 import { Glyph } from "../ui/Icon";
 import { Keys } from "../ui/Keys";
+import { Weather } from "./Weather";
 
 /** Whether any widget is on, so the pane has something to show. */
 export const hasWidgets = (settings: Settings) =>
-  settings.showClocks || settings.showDiskSpace || settings.showNotepad || settings.showFocusTimer;
+  settings.showClocks ||
+  settings.showDiskSpace ||
+  settings.showNotepad ||
+  settings.showFocusTimer ||
+  settings.showWeather;
 
 /** An action of a widget, for the actions menu. */
 export interface PaneAction {
@@ -119,6 +124,9 @@ export function WidgetPane(props: {
         </Show>
         <Show when={widgets.latest?.clocks}>
           {(cities) => <Clocks cities={cities()} now={now()} />}
+        </Show>
+        <Show when={widgets.latest?.weather}>
+          {(view) => <Weather view={view()} now={now()} onRun={props.onRun} />}
         </Show>
         <Show when={widgets.latest?.focus}>
           {(timer) => <Focus timer={timer()} now={now()} onRun={props.onRun} />}

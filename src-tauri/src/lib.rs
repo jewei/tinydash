@@ -170,6 +170,7 @@ fn setup(app: &mut App) {
     refresh::apps(handle);
     refresh::files(handle);
     refresh::rates(handle, false);
+    refresh::weather(handle, false);
 }
 
 /// Act on launch arguments. With no arguments, a second launch toggles the

@@ -1,6 +1,6 @@
 //! The SQLite database: the only module that knows the schema or runs SQL.
 //! Usage, pins, clipboard history, the snippet library, the scratch note,
-//! and cached exchange rates live in one file in the app's local data folder (`lib.rs`: on
+//! and cached exchange rates and weather live in one file in the app's local data folder (`lib.rs`: on
 //! Windows `%LOCALAPPDATA%`, which roaming profiles do not copy).
 
 use std::{
@@ -16,6 +16,7 @@ use crate::{
         clipboard::{ClipKind, Content, Entry, MAX_IMAGES},
         currency::Rates,
         library::{LibraryItem, LibraryKind},
+        weather::Weather,
     },
     search::{
         id::Source,
@@ -369,28 +370,43 @@ impl Store {
         })
     }
 
-    pub fn rates(&self) -> Result<Option<Rates>> {
+    /// The latest weather download, for the widget while offline.
+    pub fn weather(&self) -> Result<Option<Weather>> {
+        self.cached("weather")
+    }
+
+    pub fn save_weather(&self, weather: &Weather) -> Result<()> {
+        self.cache("weather", weather)
+    }
+
+    fn cached<T: serde::de::DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
         let json: Option<String> = self.with(|db| {
-            db.query_row(
-                "SELECT value FROM cache WHERE key = 'currency_rates'",
-                [],
-                |row| row.get(0),
-            )
+            db.query_row("SELECT value FROM cache WHERE key = ?1", [key], |row| {
+                row.get(0)
+            })
             .optional()
         })?;
         Ok(json.map(|json| serde_json::from_str(&json)).transpose()?)
     }
 
-    pub fn save_rates(&self, rates: &Rates) -> Result<()> {
-        let json = serde_json::to_string(rates)?;
+    fn cache(&self, key: &str, value: &impl serde::Serialize) -> Result<()> {
+        let json = serde_json::to_string(value)?;
         self.with(|db| {
             db.execute(
-                "INSERT INTO cache (key, value) VALUES ('currency_rates', ?1)
-                 ON CONFLICT (key) DO UPDATE SET value = ?1",
-                [json],
+                "INSERT INTO cache (key, value) VALUES (?1, ?2)
+                 ON CONFLICT (key) DO UPDATE SET value = ?2",
+                [key, json.as_str()],
             )
             .map(drop)
         })
+    }
+
+    pub fn rates(&self) -> Result<Option<Rates>> {
+        self.cached("currency_rates")
+    }
+
+    pub fn save_rates(&self, rates: &Rates) -> Result<()> {
+        self.cache("currency_rates", rates)
     }
 }
 

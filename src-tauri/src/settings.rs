@@ -9,6 +9,7 @@ use crate::{
     features::{
         datetime::{self, MAX_CLOCK_CITIES},
         emoji::EmojiLanguage,
+        weather::{MAX_CITY_CHARS, TemperatureUnit},
         web::SearchEngine,
     },
     search::Category,
@@ -72,6 +73,10 @@ pub struct Settings {
     pub long_break_minutes: u16,
     /// Focus sessions in a cycle; the last one earns the long break.
     pub sessions_before_long_break: u8,
+    pub show_weather: bool,
+    /// The city of the weather widget, as typed; empty until one is set.
+    pub weather_city: String,
+    pub temperature_unit: TemperatureUnit,
 }
 
 /// The launcher's top-left corner: logical points on macOS, physical pixels
@@ -162,6 +167,9 @@ impl Default for Settings {
             short_break_minutes: 5,
             long_break_minutes: 15,
             sessions_before_long_break: 4,
+            show_weather: false,
+            weather_city: String::new(),
+            temperature_unit: TemperatureUnit::Celsius,
         }
     }
 }
@@ -238,6 +246,12 @@ impl Settings {
             !city.is_empty() && seen.insert(city.to_lowercase())
         });
         self.clock_cities.truncate(MAX_CLOCK_CITIES);
+        self.weather_city = self
+            .weather_city
+            .trim()
+            .chars()
+            .take(MAX_CITY_CHARS)
+            .collect();
         self
     }
 
@@ -451,6 +465,14 @@ mod tests {
         .normalized()
         .clock_cities;
         assert_eq!(cities, ["Tokyo", "London", "Paris"]);
+
+        let city = Settings {
+            weather_city: format!("  Kuala Lumpur{}", " ".repeat(200)),
+            ..Settings::default()
+        }
+        .normalized()
+        .weather_city;
+        assert_eq!(city, "Kuala Lumpur");
 
         let tab = |category, shown| LauncherTab {
             category,

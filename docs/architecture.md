@@ -36,6 +36,7 @@ A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42
 | Dirty marking      | File system events under app folders or indexed folders                                                                                       | `watcher.rs`                    |
 | Clipboard capture  | OS change counter changes (checked every 500 ms; GTK events on Linux)                                                                         | `monitor.rs`                    |
 | Exchange rates     | Startup and launcher opens when rates are 12 hours old (retry after 1 hour); turning rates on; Refresh                                        | `refresh.rs`, `currency.rs`     |
+| Weather            | Startup and launcher opens when the weather is 30 minutes old (retry after 10 minutes); a new city; turning it on; Refresh                    | `refresh.rs`, `weather.rs`      |
 | Focus timer        | A thread wakes when the running phase ends (and at least every 30 seconds, as waits stop during sleep), notifies, and emits `widgets:changed` | `timer.rs`, `features/focus.rs` |
 | Update check       | Launcher opens and the last check is 6 hours old (macOS and Windows release builds, when the setting is on); Check for Updates                | `updates.rs`                    |
 
@@ -44,7 +45,7 @@ When data changes, Rust emits `results:stale` and the launcher searches again, k
 ## Storage
 
 - **Settings:** `settings.json` in the app config folder (`settings.rs`). Missing fields take defaults. A damaged file is renamed to `settings.invalid.json` and defaults are used.
-- **Data:** `tinydash.db`, SQLite in the app's local data folder (`store.rs`; on Windows `%LOCALAPPDATA%`, so roaming profiles do not copy it). Tables: `usage` (the 1,000 most recently used IDs), `pins`, `clipboard`, `library`, `note` (the scratch note), `cache` (exchange rates). The file is owner-only on Unix and uses `secure_delete`. Migrations are append-only and refuse a database from a newer version.
+- **Data:** `tinydash.db`, SQLite in the app's local data folder (`store.rs`; on Windows `%LOCALAPPDATA%`, so roaming profiles do not copy it). Tables: `usage` (the 1,000 most recently used IDs), `pins`, `clipboard`, `library`, `note` (the scratch note), `cache` (exchange rates and the weather). The file is owner-only on Unix and uses `secure_delete`. Migrations are append-only and refuse a database from a newer version.
 
 ## IPC contract
 
@@ -69,7 +70,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 - Both windows load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
 - External programs run only with fixed arguments; user text never reaches a shell.
-- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Network requests: the ECB rate table, and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
+- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Network requests: the ECB rate table, the weather (when the widget is on: the city name to Open-Meteo's geocoding service, then its coordinates to the forecast service), and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
 ## Decisions
 

@@ -169,6 +169,22 @@ describe("Settings", () => {
     expect(backend.called("update_settings")[0]?.args).toEqual({ changes: { focusMinutes: 120 } });
   });
 
+  it("saves the weather city when the field is left", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    const city = await screen.findByRole("textbox", { name: "Weather city" });
+    fireEvent.input(city, { target: { value: "  Oslo " } });
+    fireEvent.keyDown(city, { key: "Enter" });
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({
+      changes: { weatherCity: "Oslo" },
+    });
+    // Leaving the field without a change saves nothing more.
+    fireEvent.blur(city);
+    expect(backend.called("update_settings")).toHaveLength(1);
+  });
+
   it("moves and hides launcher tabs, keeping focus on them", async () => {
     let calls = 0;
     const backend = fakeBackend({

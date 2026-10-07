@@ -14,13 +14,14 @@ import {
 import type { About as AboutInfo } from "../generated/About";
 import type { EmojiLanguage } from "../generated/EmojiLanguage";
 import type { SearchEngine } from "../generated/SearchEngine";
+import type { TemperatureUnit } from "../generated/TemperatureUnit";
 import type { Settings as Values } from "../generated/Settings";
 import type { Theme } from "../generated/Theme";
 import * as ipc from "../lib/ipc";
 import { IS_MAC } from "../lib/keys";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { ListEditor, NumberField, Row, Select, Toggle } from "./controls";
+import { ListEditor, NumberField, Row, Select, TextField, Toggle } from "./controls";
 import { Library } from "./Library";
 import { ShortcutRecorder } from "./ShortcutRecorder";
 import { TabsEditor } from "./TabsEditor";
@@ -49,6 +50,11 @@ const ENGINES: ReadonlyArray<{ value: SearchEngine; label: string }> = [
   { value: "duckDuckGo", label: "DuckDuckGo" },
   { value: "bing", label: "Bing" },
   { value: "brave", label: "Brave" },
+];
+
+const UNITS: ReadonlyArray<{ value: TemperatureUnit; label: string }> = [
+  { value: "celsius", label: "Celsius (°C)" },
+  { value: "fahrenheit", label: "Fahrenheit (°F)" },
 ];
 
 const SKIN_TONES = [
@@ -294,6 +300,16 @@ export function Settings() {
                     onChange={(showFocusTimer) => void save({ showFocusTimer })}
                   />
                 </Row>
+                <Row
+                  label="Weather"
+                  description="Current weather for one city from Open-Meteo, which receives the city name and its location."
+                >
+                  <Toggle
+                    label="Weather"
+                    checked={settings().showWeather}
+                    onChange={(showWeather) => void save({ showWeather })}
+                  />
+                </Row>
                 {/* 3 matches MAX_CLOCK_CITIES in the Rust code. */}
                 <h2>Clock cities</h2>
                 <ListEditor
@@ -305,6 +321,25 @@ export function Settings() {
                     save((current) => ({ clockCities: edit(current.clockCities) }))
                   }
                 />
+                <h2>Weather</h2>
+                {/* 100 matches MAX_CITY_CHARS in the Rust code. */}
+                <Row label="City">
+                  <TextField
+                    label="Weather city"
+                    placeholder="Singapore"
+                    maxLength={100}
+                    value={settings().weatherCity}
+                    onChange={(weatherCity) => void save({ weatherCity })}
+                  />
+                </Row>
+                <Row label="Temperature">
+                  <Select
+                    label="Temperature"
+                    value={settings().temperatureUnit}
+                    options={UNITS}
+                    onChange={(temperatureUnit) => void save({ temperatureUnit })}
+                  />
+                </Row>
                 {/* The limits match FOCUS_MINUTES_MAX, BREAK_MINUTES_MAX, and SESSIONS_MAX. */}
                 <h2>Focus timer</h2>
                 <Row label="Focus" description="Minutes in each focus session.">
@@ -660,6 +695,7 @@ function About(props: {
         <li>EFF Large Wordlist by the Electronic Frontier Foundation, CC BY 4.0</li>
         <li>Emoji keywords from Unicode CLDR, Unicode License V3</li>
         <li>Exchange rates from the European Central Bank through Frankfurter</li>
+        <li>Weather data by Open-Meteo.com, CC BY 4.0</li>
       </ul>
     </div>
   );

@@ -231,6 +231,9 @@ pub async fn update_settings(
         if new.currency_rates_enabled && !old.currency_rates_enabled {
             refresh::rates(&app, true);
         }
+        if new.show_weather != old.show_weather || new.weather_city != old.weather_city {
+            refresh::weather(&app, false);
+        }
         events::settings_changed(&app, &new);
         events::results_stale(&app);
         Ok(new)

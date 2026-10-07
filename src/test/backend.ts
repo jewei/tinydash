@@ -42,6 +42,9 @@ export const testSettings: Settings = {
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
   sessionsBeforeLongBreak: 4,
+  showWeather: false,
+  weatherCity: "",
+  temperatureUnit: "celsius",
 };
 
 /** Every widget off, so an empty All search shows the preview. */
@@ -54,6 +57,9 @@ export const noWidgets: Partial<Settings> = {
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
   sessionsBeforeLongBreak: 4,
+  showWeather: false,
+  weatherCity: "",
+  temperatureUnit: "celsius",
 };
 
 export const app: SearchResult = {
@@ -125,7 +131,7 @@ export function fakeBackend(
     delete_library_item: () => null,
     check_for_update: () => null,
     install_update: () => null,
-    widgets: () => ({ clocks: [], disk: null, note: null, focus: null }),
+    widgets: () => ({ clocks: [], disk: null, note: null, focus: null, weather: null }),
     save_note: () => null,
     about: () => ({
       version: "0.2.0",
