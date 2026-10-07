@@ -180,6 +180,27 @@ describe("Settings", () => {
     ]);
   });
 
+  it("keeps focus on a moving tab while it saves, and leaves focus put elsewhere", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      update_settings: async (args) => {
+        await held;
+        return backend.save(args.changes);
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Move Files up" }));
+    const filesDown = screen.getByRole("button", { name: "Move Files down" });
+    await waitFor(() => expect(document.activeElement).toBe(filesDown));
+    const showEmoji = screen.getByRole("switch", { name: "Show Emoji" });
+    showEmoji.focus();
+    release();
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(document.activeElement).toBe(showEmoji);
+  });
+
   it("describes each setting to screen readers", async () => {
     fakeBackend();
     render(() => <Settings />);

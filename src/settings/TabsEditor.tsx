@@ -21,9 +21,11 @@ export function TabsEditor(props: {
   const shown = (category: Category) =>
     props.tabs.find((tab) => tab.category === category)?.shown ?? false;
 
-  // Focus the first enabled one of the tab's move buttons in `directions`;
-  // at the top, Up is disabled, so focus goes to Down.
+  // When the moved row took focus with it, focus the first enabled one of
+  // its move buttons in `directions` (at the top, Up is disabled, so Down).
+  // Focus the user has since put elsewhere stays there.
   const focusMoveButton = (category: Category, directions: string[]) => () => {
+    if (document.activeElement && document.activeElement !== document.body) return;
     for (const direction of directions) {
       const button = editor.querySelector<HTMLButtonElement>(
         `[data-tab="${category}"] [data-move="${direction}"]`,
