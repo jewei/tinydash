@@ -25,6 +25,12 @@ export const testSettings: Settings = {
   currencyRatesEnabled: true,
   searchEngine: "google",
   launcherPosition: null,
+  tabs: (["apps", "files", "clipboard", "snippets", "emoji", "system"] as const).map(
+    (category) => ({
+      category,
+      shown: true,
+    }),
+  ),
 };
 
 export const app: SearchResult = {

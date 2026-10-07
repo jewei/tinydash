@@ -23,6 +23,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ListEditor, NumberField, Row, Select, Toggle } from "./controls";
 import { Library } from "./Library";
 import { ShortcutRecorder } from "./ShortcutRecorder";
+import { TabsEditor } from "./TabsEditor";
 
 const SECTIONS = [
   { id: "general", label: "General" },
@@ -232,6 +233,15 @@ export function Settings() {
                     Center
                   </button>
                 </Row>
+                <h2>Tabs</h2>
+                <p class="section-intro">
+                  Choose which tabs show after All, and in what order. A hidden tab's results still
+                  show in All.
+                </p>
+                <TabsEditor
+                  tabs={settings().tabs}
+                  onChange={(edit) => save((current) => ({ tabs: edit(current.tabs) }))}
+                />
               </Match>
 
               <Match when={section() === "clipboard"}>

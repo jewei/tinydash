@@ -36,7 +36,7 @@ pub const CATEGORY_LIMIT: usize = 100;
 /// Usage-based suggestions below the pins in an empty All search.
 const SUGGESTIONS: usize = 8;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum Category {

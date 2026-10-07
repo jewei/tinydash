@@ -7,6 +7,7 @@ use ts_rs::TS;
 use crate::{
     error::{Error, Result},
     features::{emoji::EmojiLanguage, web::SearchEngine},
+    search::Category,
 };
 
 pub const FILE_NAME: &str = "settings.json";
@@ -44,6 +45,9 @@ pub struct Settings {
     /// `platform::launcher_position`. `None` centers it on the screen with
     /// the pointer. A spot no longer on any screen counts as `None`.
     pub launcher_position: Option<LauncherPosition>,
+    /// Every tab after All, in launcher order, and whether it shows. All is
+    /// always first, so it is never listed; a hidden tab still feeds All.
+    pub tabs: Vec<LauncherTab>,
 }
 
 /// The launcher's top-left corner: logical points on macOS, physical pixels
@@ -53,6 +57,23 @@ pub struct Settings {
 pub struct LauncherPosition {
     pub x: f64,
     pub y: f64,
+}
+
+/// One of the launcher's tabs after All.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LauncherTab {
+    pub category: Category,
+    pub shown: bool,
+}
+
+/// Drop the saved tabs this version cannot read, such as a typo or a tab
+/// from a newer version, so one bad entry never resets every setting.
+/// `normalized` then adds any tab that is missing.
+fn drop_unreadable_tabs(file: &mut Value) {
+    if let Some(Value::Array(tabs)) = file.get_mut("tabs") {
+        tabs.retain(|tab| serde_json::from_value::<LauncherTab>(tab.clone()).is_ok());
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -87,6 +108,13 @@ impl Default for Settings {
             currency_rates_enabled: true,
             search_engine: SearchEngine::Google,
             launcher_position: None,
+            tabs: Category::ALL[1..]
+                .iter()
+                .map(|&category| LauncherTab {
+                    category,
+                    shown: true,
+                })
+                .collect(),
         }
     }
 }
@@ -115,13 +143,27 @@ impl Settings {
     }
 
     /// Clamp numbers, drop blank or duplicate list entries, and cut lists
-    /// to their limit.
+    /// to their limit. `tabs` loses All, and gains any tab it lacks (such
+    /// as one added in a newer version) at the end, shown.
     pub fn normalized(mut self) -> Self {
         self.shortcut = self.shortcut.trim().to_owned();
         self.clipboard_history_limit = self.clipboard_history_limit.clamp(1, CLIPBOARD_LIMIT_MAX);
         self.emoji_skin_tone = self.emoji_skin_tone.min(5);
         self.emoji_languages.sort();
         self.emoji_languages.dedup();
+        // Each tab once, in the saved order; a tab the list lacks, such as
+        // one added in a newer version, joins at the end and shows.
+        let mut listed = std::collections::HashSet::new();
+        self.tabs
+            .retain(|tab| tab.category != Category::All && listed.insert(tab.category));
+        for &category in &Category::ALL[1..] {
+            if listed.insert(category) {
+                self.tabs.push(LauncherTab {
+                    category,
+                    shown: true,
+                });
+            }
+        }
         for list in [
             &mut self.file_search_folders,
             &mut self.file_search_excluded_dirs,
@@ -180,7 +222,11 @@ pub fn load(dir: &Path) -> (Settings, Option<String>) {
             );
         }
     };
-    match serde_json::from_str::<Settings>(&text) {
+    let parsed = serde_json::from_str::<Value>(&text).and_then(|mut file| {
+        drop_unreadable_tabs(&mut file);
+        serde_json::from_value::<Settings>(file)
+    });
+    match parsed {
         Ok(settings) => (settings.normalized(), None),
         Err(error) => {
             let backup = dir.join("settings.invalid.json");
@@ -240,6 +286,30 @@ mod tests {
     }
 
     #[test]
+    fn an_unreadable_tab_is_dropped_without_resetting_the_rest() {
+        let dir = std::env::temp_dir().join(format!("tinydash-tabs-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(FILE_NAME),
+            r#"{"hideOnBlur": false, "tabs": [{"category": "notes", "shown": true},
+                {"category": "emoji", "shown": false}, "clipbord"]}"#,
+        )
+        .unwrap();
+        let (settings, warning) = load(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(warning, None);
+        assert!(!settings.hide_on_blur);
+        assert_eq!(
+            settings.tabs[0],
+            LauncherTab {
+                category: Category::Emoji,
+                shown: false
+            }
+        );
+        assert_eq!(settings.tabs.len(), Category::ALL.len() - 1);
+    }
+
+    #[test]
     fn missing_fields_take_defaults_and_unknown_fields_are_ignored() {
         let settings: Settings =
             serde_json::from_str(r#"{"hideOnBlur": false, "appearance": "sage"}"#).unwrap();
@@ -282,6 +352,38 @@ mod tests {
             [EmojiLanguage::Zh, EmojiLanguage::Es]
         );
         assert_eq!(settings.file_search_folders, ["~/A"]);
+
+        let tab = |category, shown| LauncherTab { category, shown };
+        let tabs = Settings {
+            tabs: vec![
+                tab(Category::Emoji, false),
+                tab(Category::All, true),
+                tab(Category::Apps, true),
+                tab(Category::Emoji, true),
+            ],
+            ..Settings::default()
+        }
+        .normalized()
+        .tabs;
+        assert_eq!(
+            tabs[..2],
+            [tab(Category::Emoji, false), tab(Category::Apps, true)]
+        );
+        // The tabs the list lacked follow, shown, in their usual order.
+        let rest: Vec<_> = tabs[2..]
+            .iter()
+            .map(|tab| (tab.category, tab.shown))
+            .collect();
+        assert_eq!(
+            rest,
+            [
+                Category::Files,
+                Category::Clipboard,
+                Category::Snippets,
+                Category::System
+            ]
+            .map(|category| (category, true))
+        );
 
         let many = Settings {
             file_search_excluded_dirs: (0..99).map(|n| format!("dir{n}")).collect(),

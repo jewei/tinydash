@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-lib
 import { describe, expect, it } from "vite-plus/test";
 
 import type { LibraryItem } from "../generated/LibraryItem";
+import type { Settings as Values } from "../generated/Settings";
 import { testSettings, fakeBackend } from "../test/backend";
 import { Settings } from "./Settings";
 
@@ -128,6 +129,76 @@ describe("Settings", () => {
     expect(backend.called("update_settings")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Remove ~/Desktop" }));
     expect(screen.queryByText(/is already in the list/)).toBeNull();
+  });
+
+  it("moves and hides launcher tabs, keeping focus on them", async () => {
+    let calls = 0;
+    const backend = fakeBackend({
+      update_settings: (args) => {
+        calls += 1;
+        if (calls === 3) throw "Could not save settings.";
+        return backend.save(args.changes);
+      },
+    });
+    const order = () =>
+      (
+        backend.called("update_settings").at(-1)?.args.changes as Partial<Values> | undefined
+      )?.tabs?.map((tab) => `${tab.category}${tab.shown ? "" : " (hidden)"}`);
+    render(() => <Settings />);
+    const filesUp = await screen.findByRole("button", { name: "Move Files up" });
+    expect(
+      (screen.getByRole("button", { name: "Move Apps up" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    fireEvent.click(filesUp);
+    await waitFor(() => expect(calls).toBe(1));
+    expect(order()).toEqual(["files", "apps", "clipboard", "snippets", "emoji", "system"]);
+    // Files is first now, so its Up is disabled and focus moves to Down.
+    const filesDown = screen.getByRole("button", { name: "Move Files down" });
+    await waitFor(() => expect(document.activeElement).toBe(filesDown));
+
+    fireEvent.click(screen.getByRole("switch", { name: "Show Emoji" }));
+    await waitFor(() => expect(calls).toBe(2));
+    expect(order()).toEqual(["files", "apps", "clipboard", "snippets", "emoji (hidden)", "system"]);
+
+    // A failed move puts the row back, and focus stays on its button.
+    fireEvent.click(filesDown);
+    expect(await screen.findByText("Could not save settings.")).toBeTruthy();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move Files down" })),
+    );
+    const rows = within(screen.getByRole("list", { name: "Tabs, in order" })).getAllByRole(
+      "listitem",
+    );
+    expect(rows.map((row) => row.firstChild?.textContent)).toEqual([
+      "All",
+      "Files",
+      "Apps",
+      "Clipboard",
+      "Snippets",
+      "Emoji",
+      "System",
+    ]);
+  });
+
+  it("keeps focus on a moving tab while it saves, and leaves focus put elsewhere", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      update_settings: async (args) => {
+        await held;
+        return backend.save(args.changes);
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Move Files up" }));
+    const filesDown = screen.getByRole("button", { name: "Move Files down" });
+    await waitFor(() => expect(document.activeElement).toBe(filesDown));
+    const showEmoji = screen.getByRole("switch", { name: "Show Emoji" });
+    showEmoji.focus();
+    release();
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(document.activeElement).toBe(showEmoji);
   });
 
   it("centers a launcher that was dragged, and only then", async () => {
