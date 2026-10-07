@@ -5,7 +5,7 @@ import type { Symbol } from "../generated/Symbol";
 import { iconUrl } from "../lib/ipc";
 
 /** Glyphs drawn on a 24-unit grid with round 1.75-unit strokes. */
-const GLYPHS: Record<Symbol | "search" | "pin" | "warning", () => JSX.Element> = {
+const GLYPHS: Record<Symbol | "search" | "pin" | "warning" | "download", () => JSX.Element> = {
   app: () => (
     <>
       <rect x="4" y="4" width="7" height="7" rx="2" />
@@ -95,6 +95,7 @@ const GLYPHS: Record<Symbol | "search" | "pin" | "warning", () => JSX.Element> =
   ),
   pin: () => <path d="M12 16v5M8 3h8l-1 6 3 3v2H6v-2l3-3z" />,
   warning: () => <path d="M12 4l9 16H3zM12 10v4M12 17h.01" />,
+  download: () => <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />,
 };
 
 export type GlyphName = keyof typeof GLYPHS;

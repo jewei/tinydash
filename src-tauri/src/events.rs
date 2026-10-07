@@ -9,6 +9,7 @@ use crate::{search::Category, settings::Settings};
 pub const LAUNCHER_SHOWN: &str = "launcher:shown";
 pub const RESULTS_STALE: &str = "results:stale";
 pub const SETTINGS_CHANGED: &str = "settings:changed";
+pub const UPDATE_CHANGED: &str = "update:changed";
 
 #[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +33,14 @@ pub fn launcher_shown(app: &AppHandle, category: Option<Category>) {
 pub fn results_stale(app: &AppHandle) {
     if let Err(error) = app.emit(RESULTS_STALE, ()) {
         tracing::debug!(%error, "No window received the update");
+    }
+}
+
+/// A check finished: the newer version that is ready to install, or `None`
+/// when this one is the latest, so an old offer goes away.
+pub fn update_changed(app: &AppHandle, version: Option<&str>) {
+    if let Err(error) = app.emit(UPDATE_CHANGED, version) {
+        tracing::debug!(%error, "No window received the update notice");
     }
 }
 

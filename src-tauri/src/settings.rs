@@ -40,6 +40,9 @@ pub struct Settings {
     pub emoji_skin_tone: u8,
     pub emoji_languages: Vec<EmojiLanguage>,
     pub currency_rates_enabled: bool,
+    /// Look for a newer version when the launcher opens, at most every few
+    /// hours. Only builds that can update themselves look.
+    pub check_for_updates: bool,
     pub search_engine: SearchEngine,
     /// Where the user dragged the launcher, in the units of
     /// `platform::launcher_position`. `None` centers it on the screen with
@@ -119,6 +122,7 @@ impl Default for Settings {
             emoji_skin_tone: 0,
             emoji_languages: Vec::new(),
             currency_rates_enabled: true,
+            check_for_updates: true,
             search_engine: SearchEngine::Google,
             launcher_position: None,
             tabs: Category::ALL[1..]

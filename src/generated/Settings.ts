@@ -25,7 +25,12 @@ fileSearchExcludedDirs: Array<string>,
 /**
  * 0 is the default yellow; 1–5 are light to dark.
  */
-emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnabled: boolean, searchEngine: SearchEngine, 
+emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnabled: boolean, 
+/**
+ * Look for a newer version when the launcher opens, at most every few
+ * hours. Only builds that can update themselves look.
+ */
+checkForUpdates: boolean, searchEngine: SearchEngine, 
 /**
  * Where the user dragged the launcher, in the units of
  * `platform::launcher_position`. `None` centers it on the screen with

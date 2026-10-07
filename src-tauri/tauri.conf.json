@@ -31,6 +31,9 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: icon: clip: http://icon.localhost http://clip.localhost; font-src 'self'; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; frame-src 'none'"
     }
   },
+  "plugins": {
+    "updater": { "pubkey": "" }
+  },
   "bundle": {
     "active": true,
     "targets": [

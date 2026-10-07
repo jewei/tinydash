@@ -28,7 +28,7 @@ use crate::{
     settings::{self, LauncherPosition, Settings},
     shortcut,
     state::State,
-    tray, watcher, window,
+    tray, updates, watcher, window,
 };
 
 #[derive(Serialize, TS)]
@@ -41,6 +41,8 @@ pub struct LauncherInit {
     pub warnings: Vec<String>,
     /// The category of the latest show, which may predate the page.
     pub category: Option<Category>,
+    /// A newer version found before the page loaded, ready to install.
+    pub update: Option<String>,
 }
 
 #[derive(Clone, Copy, Serialize, TS)]
@@ -70,6 +72,10 @@ pub struct About {
     pub data_folder: String,
     /// Clipboard history can save images and copied files on this OS.
     pub rich_clipboard: bool,
+    /// This build can update itself (not on Linux, not in local builds).
+    pub self_update: bool,
+    /// A newer version found before Settings opened, ready to install.
+    pub pending_update: Option<String>,
 }
 
 async fn blocking<T: Send + 'static>(
@@ -81,7 +87,7 @@ async fn blocking<T: Send + 'static>(
 }
 
 #[tauri::command]
-pub fn launcher_init(state: tauri::State<State>) -> LauncherInit {
+pub fn launcher_init(app: AppHandle, state: tauri::State<State>) -> LauncherInit {
     LauncherInit {
         settings: Settings::clone(&state.settings.get()),
         platform: PLATFORM,
@@ -90,6 +96,7 @@ pub fn launcher_init(state: tauri::State<State>) -> LauncherInit {
             .shown_category
             .lock()
             .unwrap_or_else(|e| e.into_inner()),
+        update: updates::pending_version(&app),
     }
 }
 
@@ -301,5 +308,19 @@ pub fn about(app: AppHandle) -> About {
         settings_folder: dirs.config.display().to_string(),
         data_folder: dirs.data.display().to_string(),
         rich_clipboard: platform::RICH_CLIPBOARD,
+        self_update: updates::supported(),
+        pending_update: updates::pending_version(&app),
     }
+}
+
+/// Check for a newer version now: its version, or `None` when this is the latest.
+#[tauri::command]
+pub async fn check_for_update(app: AppHandle) -> Result<Option<String>> {
+    updates::check(&app).await
+}
+
+/// Install the version that the latest check found, and restart into it.
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<()> {
+    updates::install(&app).await
 }

@@ -84,6 +84,15 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: bun scripts/set-version.ts "$VERSION"
+      - name: Write the update build config
+        if: runner.os != 'Linux'
+        shell: bash
+        env:
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+        run: >-
+          bun -e 'await Bun.write("src-tauri/tauri.release.conf.json", JSON.stringify({
+          bundle: { createUpdaterArtifacts: true },
+          plugins: { updater: { pubkey: process.env.TAURI_UPDATER_PUBLIC_KEY } } }))'
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
           # With these, Tauri signs the macOS app with the Developer ID and
@@ -94,10 +103,20 @@ jobs:
           APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+          # Updates (not on Linux, where installing a .deb needs root): the key
+          # signs the update files, and the app is built with the feed
+          # address and the public key that checks them.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ runner.os != 'Linux' && secrets.TAURI_UPDATER_PUBLIC_KEY || '' }}
+          TINYDASH_UPDATE_ENDPOINT: ${{ runner.os != 'Linux' && vars.TINYDASH_UPDATE_ENDPOINT || '' }}
         with:
           tauriScript: bunx tauri
-          # One macOS app for Apple silicon and Intel.
-          args: ${{ runner.os == 'macOS' && '--target universal-apple-darwin' || '' }}
+          # One macOS app for Apple silicon and Intel; update files on macOS
+          # and Windows.
+          args: >-
+            ${{ runner.os == 'macOS' && '--target universal-apple-darwin' || '' }}
+            ${{ runner.os != 'Linux' && '--config src-tauri/tauri.release.conf.json' || '' }}
       - name: Check that the macOS app is signed and notarized
         if: runner.os == 'macOS'
         run: |
@@ -105,12 +124,20 @@ jobs:
           codesign --verify --deep --strict "$app"
           spctl --assess --type execute -vv "$app" 2>&1 | tee assessment.txt
           grep -q "source=Notarized Developer ID" assessment.txt
-      - name: Collect the installers
+      - name: Collect the installers and update files
         shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           mkdir installers
           find src-tauri/target -path '*/release/bundle/*' -type f \
-            \( -name '*.dmg' -o -name '*-setup.exe' -o -name '*.deb' \) -exec cp {} installers/ \;
+            \( -name '*.dmg' -o -name '*-setup.exe' -o -name '*-setup.exe.sig' -o -name '*.deb' \
+            -o -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \) -exec cp {} installers/ \;
+          # The macOS update file has no version in its name; give it one.
+          if [ -f installers/TinyDash.app.tar.gz ]; then
+            mv installers/TinyDash.app.tar.gz "installers/TinyDash_${VERSION}_universal.app.tar.gz"
+            mv installers/TinyDash.app.tar.gz.sig "installers/TinyDash_${VERSION}_universal.app.tar.gz.sig"
+          fi
           ls installers
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -134,6 +161,23 @@ jobs:
           pattern: installers-*
           merge-multiple: true
           path: installers
+      - name: Write the update feed
+        working-directory: installers
+        run: |
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION"
+          mac="TinyDash_${VERSION}_universal.app.tar.gz"
+          win="TinyDash_${VERSION}_x64-setup.exe"
+          # The macOS file is universal, so both Mac architectures use it.
+          jq -n --arg version "$VERSION" \
+            --arg notes "See https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg mac_sig "$(cat "$mac.sig")" --arg mac_url "$base/$mac" \
+            --arg win_sig "$(cat "$win.sig")" --arg win_url "$base/$win" \
+            '{version: $version, notes: $notes, pub_date: $date, platforms: {
+              "darwin-aarch64": {signature: $mac_sig, url: $mac_url},
+              "darwin-x86_64": {signature: $mac_sig, url: $mac_url},
+              "windows-x86_64": {signature: $win_sig, url: $win_url}}}' > latest.json
+          cat latest.json
       - name: Tag the commit and publish the release
         run: |
           cd installers

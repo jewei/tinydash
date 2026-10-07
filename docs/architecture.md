@@ -30,12 +30,13 @@ A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42
 
 `State` (in `state.rs`) holds each index as a `Shared<T>`: readers clone an `Arc`; writers build a new value and swap it in, so a search never waits for a writer. Writers that must not interleave also take a `Mutex` in `State` (`settings_change`, `reloading`, `limited_change`) and may hold it across database or OS work.
 
-| Work               | Trigger                                                                                                                      | Where                       |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| App and file scans | Startup; launcher opens and the index is dirty or 15 minutes old; Refresh; a change to the file folder settings (files only) | `refresh.rs`                |
-| Dirty marking      | File system events under app folders or indexed folders                                                                      | `watcher.rs`                |
-| Clipboard capture  | OS change counter changes (checked every 500 ms; GTK events on Linux)                                                        | `monitor.rs`                |
-| Exchange rates     | Startup and launcher opens when rates are 12 hours old (retry after 1 hour); turning rates on; Refresh                       | `refresh.rs`, `currency.rs` |
+| Work               | Trigger                                                                                                                        | Where                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| App and file scans | Startup; launcher opens and the index is dirty or 15 minutes old; Refresh; a change to the file folder settings (files only)   | `refresh.rs`                |
+| Dirty marking      | File system events under app folders or indexed folders                                                                        | `watcher.rs`                |
+| Clipboard capture  | OS change counter changes (checked every 500 ms; GTK events on Linux)                                                          | `monitor.rs`                |
+| Exchange rates     | Startup and launcher opens when rates are 12 hours old (retry after 1 hour); turning rates on; Refresh                         | `refresh.rs`, `currency.rs` |
+| Update check       | Launcher opens and the last check is 6 hours old (macOS and Windows release builds, when the setting is on); Check for Updates | `updates.rs`                |
 
 When data changes, Rust emits `results:stale` and the launcher searches again, keeping its selection.
 
@@ -48,7 +49,7 @@ When data changes, Rust emits `results:stale` and the launcher searches again, k
 
 Every command is listed in `lib.rs` and defined in `commands.rs`. Types that cross IPC derive `ts_rs::TS`; `cargo test` writes them to `src/generated`, and CI fails if they are stale. `src/lib/ipc.ts` is the only frontend module that calls `invoke` or `listen`.
 
-Events: `launcher:shown` (reset the query, optional category), `results:stale` (search again), `settings:changed` (apply theme and settings in every window). An event sent before a page listens is lost, so `launcher_init` also returns the category of the latest show, for example `--mode clipboard` at startup.
+Events: `launcher:shown` (reset the query, optional category), `results:stale` (search again), `settings:changed` (apply theme and settings in every window), `update:changed` (the newer version an update check found, or none). An event sent before a page listens is lost, so `launcher_init` also returns the category of the latest show, for example `--mode clipboard` at startup, and the update found so far; `about` also returns that update, for the Settings window.
 
 Images use custom protocols rather than IPC: `icon://` serves system icons (macOS; it returns only an icon image, never file contents) and `clip://` serves saved clipboard images by ID.
 
@@ -67,7 +68,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 - Both windows load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
 - External programs run only with fixed arguments; user text never reaches a shell.
-- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. The only network request downloads the ECB rate table.
+- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Network requests: the ECB rate table, and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
 ## Decisions
 

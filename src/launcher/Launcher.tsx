@@ -57,6 +57,25 @@ export function Launcher() {
   // refresh or another tab cannot change what Enter runs in it.
   const [menu, setMenu] = createSignal<MenuItem[]>();
   const [enableError, setEnableError] = createSignal<string>();
+  // A newer version that is ready to install, and how its install went.
+  const [update, setUpdate] = createSignal<string>();
+  const [updateError, setUpdateError] = createSignal<string>();
+  const [installing, setInstalling] = createSignal(false);
+  // Not while it installs, also from a menu opened earlier: hiding the bar
+  // then would hide a failure.
+  const hideUpdate = () => {
+    if (!installing()) setUpdate(undefined);
+  };
+  const installUpdate = () => {
+    if (installing()) return;
+    setInstalling(true);
+    setUpdateError(undefined);
+    // On success the app restarts, so only a failure comes back.
+    ipc
+      .installUpdate()
+      .catch((error) => setUpdateError(ipc.message(error)))
+      .finally(() => setInstalling(false));
+  };
   let input!: HTMLInputElement;
 
   const focusInput = () => input.focus();
@@ -78,6 +97,10 @@ export function Launcher() {
       }),
       ipc.onResultsStale(() => void launcher.refresh()),
       ipc.onSettingsChanged(applySettings),
+      ipc.onUpdateChanged((version) => {
+        setUpdateError(undefined);
+        setUpdate(version ?? undefined);
+      }),
     ];
     // Listen on the window: a click on a row or the preview moves focus to
     // <body>, and the shortcuts must keep working.
@@ -95,6 +118,7 @@ export function Launcher() {
         applySettings(init.settings);
         setPlatform(init.platform);
         setWarnings(init.warnings);
+        if (init.update) setUpdate(init.update);
         if (init.category) launcher.setCategory(init.category);
       })
       .catch((error) => setWarnings([ipc.message(error)]));
@@ -201,7 +225,17 @@ export function Launcher() {
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,
       run: () => launcher.run(action),
     }));
-    return [...resultItems, ...general];
+    // The update bar's buttons take a click; the menu takes the keyboard.
+    const version = update();
+    const install = version
+      ? [
+          { label: `Install TinyDash ${version} and Restart`, keys: undefined, run: installUpdate },
+          ...(installing()
+            ? []
+            : [{ label: "Hide Update Notice", keys: undefined, run: hideUpdate }]),
+        ]
+      : [];
+    return [...resultItems, ...install, ...general];
   };
 
   // Only results of the current input: rows on screen during a search may
@@ -303,6 +337,33 @@ export function Launcher() {
                 Dismiss <Keys keys={["esc"]} />
               </button>
             </Show>
+          </div>
+        )}
+      </Show>
+
+      <Show when={update()}>
+        {(version) => (
+          <div class="update-offer" role="status">
+            <Glyph name="download" size={16} />
+            <span>{updateError() ?? `TinyDash ${version()} is available.`}</span>
+            <button
+              type="button"
+              class="link"
+              disabled={installing()}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={installUpdate}
+            >
+              {installing() ? "Installing…" : "Install and Restart"}
+            </button>
+            <button
+              type="button"
+              class="link"
+              disabled={installing()}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={hideUpdate}
+            >
+              Later
+            </button>
           </div>
         )}
       </Show>

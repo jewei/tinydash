@@ -100,6 +100,7 @@ export function Settings() {
       return undefined;
     }),
   );
+  const updates = createUpdateCheck(() => about());
   const [confirmClear, setConfirmClear] = createSignal(false);
   let clearButton: HTMLButtonElement | undefined;
   const closeClear = () => {
@@ -209,6 +210,18 @@ export function Settings() {
                     onChange={(launchAtLogin) => void save({ launchAtLogin })}
                   />
                 </Row>
+                <Show when={about()?.selfUpdate}>
+                  <Row
+                    label="Check for updates"
+                    description="Looks for a new version when the launcher opens, at most every six hours. Nothing installs until you choose."
+                  >
+                    <Toggle
+                      label="Check for updates"
+                      checked={settings().checkForUpdates}
+                      onChange={(checkForUpdates) => void save({ checkForUpdates })}
+                    />
+                  </Row>
+                </Show>
                 <Row label={IS_MAC ? "Show menu bar icon" : "Show tray icon"}>
                   <Toggle
                     label={IS_MAC ? "Show menu bar icon" : "Show tray icon"}
@@ -393,7 +406,7 @@ export function Settings() {
               </Match>
 
               <Match when={section() === "about"}>
-                <About about={about()} error={aboutError()} />
+                <About about={about()} error={aboutError()} updates={updates} />
               </Match>
             </Switch>
           )}
@@ -415,7 +428,98 @@ export function Settings() {
   );
 }
 
-function About(props: { about: AboutInfo | undefined; error: string | undefined }) {
+/**
+ * Check for a newer version on request, and install it. The state lives in
+ * the Settings window, so leaving About and coming back keeps an install
+ * that is running and its result.
+ */
+function createUpdateCheck(about: () => AboutInfo | undefined) {
+  const [doing, setDoing] = createSignal<"check" | "install">();
+  const [found, setFound] = createSignal<string | null>();
+  const [result, setResult] = createSignal<string>();
+  // An offer found before Settings opened, as the launcher shows it. Only
+  // until this window learns more from a check or an event.
+  createEffect(() => {
+    const pending = about()?.pendingUpdate;
+    if (pending && found() === undefined) {
+      setFound(pending);
+      setResult(`TinyDash ${pending} is available.`);
+    }
+  });
+  // A background check may find a newer version, or find that the offer
+  // is gone. A "latest" message stays: the check that wrote it sends this
+  // event too.
+  const stop = ipc.onUpdateChanged((version) => {
+    if (version) {
+      setFound(version);
+      setResult(`TinyDash ${version} is available.`);
+    } else if (found()) {
+      setFound(null);
+      setResult(undefined);
+    }
+  });
+  onCleanup(() => void stop.then((unlisten) => unlisten()));
+  const run = (job: "check" | "install", work: () => Promise<void>) => {
+    if (doing()) return;
+    setDoing(job);
+    setResult(undefined);
+    work()
+      .catch((failure) => setResult(ipc.message(failure)))
+      .finally(() => setDoing(undefined));
+  };
+  return {
+    doing,
+    found,
+    result,
+    check: (current: string) =>
+      run("check", async () => {
+        const version = await ipc.checkForUpdate();
+        setFound(version);
+        setResult(
+          version
+            ? `TinyDash ${version} is available.`
+            : `TinyDash ${current} is the latest version.`,
+        );
+      }),
+    // On success the app restarts, so only a failure comes back.
+    install: () => run("install", () => ipc.installUpdate()),
+  };
+}
+
+function UpdateCheck(props: { version: string; updates: ReturnType<typeof createUpdateCheck> }) {
+  const updates = () => props.updates;
+  return (
+    <div class="update-check">
+      <button
+        type="button"
+        class="button"
+        disabled={updates().doing() !== undefined}
+        onClick={() => updates().check(props.version)}
+      >
+        {updates().doing() === "check" ? "Checking…" : "Check for Updates"}
+      </button>
+      <Show when={updates().found()}>
+        <button
+          type="button"
+          class="button primary"
+          disabled={updates().doing() !== undefined}
+          onClick={() => updates().install()}
+        >
+          {updates().doing() === "install" ? "Installing…" : "Install and Restart"}
+        </button>
+      </Show>
+      <p class="list-status" role="status">
+        {updates().result() ?? ""}
+      </p>
+    </div>
+  );
+}
+
+function About(props: {
+  about: AboutInfo | undefined;
+  error: string | undefined;
+  updates: ReturnType<typeof createUpdateCheck>;
+}) {
   return (
     <div class="about">
       <Show when={props.error}>
@@ -432,6 +536,16 @@ function About(props: { about: AboutInfo | undefined; error: string | undefined 
             <p>
               <strong>TinyDash {about().version}</strong> — a small, keyboard-first launcher.
             </p>
+            <Show
+              when={about().selfUpdate}
+              fallback={
+                <p>
+                  New versions: <code>github.com/jewei/tinydash/releases</code>
+                </p>
+              }
+            >
+              <UpdateCheck version={about().version} updates={props.updates} />
+            </Show>
             <Show
               when={about().settingsFolder !== about().dataFolder}
               fallback={

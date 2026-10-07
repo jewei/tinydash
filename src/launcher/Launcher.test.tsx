@@ -142,6 +142,78 @@ describe("Launcher", () => {
     expect(backend.called("search")).toHaveLength(searches);
   });
 
+  it("offers a found update, installs it once on request, and says why an install failed", async () => {
+    let fail!: () => void;
+    const failed = new Promise<void>((resolve) => (fail = resolve));
+    const { backend, input, press } = setup(() => [app], {
+      launcher_init: () => ({
+        settings: testSettings,
+        platform: "macos",
+        warnings: [],
+        category: null,
+        update: "0.2.2",
+      }),
+      install_update: async () => {
+        await failed;
+        throw "Could not install TinyDash 0.2.2: offline.";
+      },
+    });
+    expect(await screen.findByText("TinyDash 0.2.2 is available.")).toBeTruthy();
+    await screen.findByRole("option", { name: /Safari/ });
+    // Its buttons keep focus in the search field.
+    const install = screen.getByRole("button", { name: "Install and Restart" });
+    expect(fireEvent.mouseDown(install)).toBe(false);
+    expect(fireEvent.mouseDown(screen.getByRole("button", { name: "Later" }))).toBe(false);
+    fireEvent.click(install);
+    expect(await screen.findByRole("button", { name: "Installing…" })).toBeTruthy();
+    // It cannot be hidden while it runs, or a failure would show nowhere.
+    expect((screen.getByRole("button", { name: "Later" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    // A second request while it runs does nothing.
+    press("k", { ctrlKey: true });
+    expect(await screen.findByRole("option", { name: /Install TinyDash/ })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: /Hide Update Notice/ })).toBeNull();
+    fireEvent.click(
+      await screen.findByRole("option", { name: /Install TinyDash 0.2.2 and Restart/ }),
+    );
+    fail();
+    expect(await screen.findByText("Could not install TinyDash 0.2.2: offline.")).toBeTruthy();
+    expect(backend.called("install_update")).toHaveLength(1);
+    expect(document.activeElement).toBe(input);
+
+    // The keyboard hides it through the actions menu.
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Hide Update Notice/ }));
+    await waitFor(() => expect(screen.queryByText(/is available|Could not install/)).toBeNull());
+    // A later check shows a newer one, and a check that finds none clears it.
+    await emit("update:changed", "0.2.3");
+    expect(await screen.findByText("TinyDash 0.2.3 is available.")).toBeTruthy();
+    await emit("update:changed", null);
+    await waitFor(() => expect(screen.queryByText(/is available/)).toBeNull());
+  });
+
+  it("keeps the update bar during an install, even from a menu opened before it", async () => {
+    const { press } = setup(() => [app], {
+      launcher_init: () => ({
+        settings: testSettings,
+        platform: "macos",
+        warnings: [],
+        category: null,
+        update: "0.2.2",
+      }),
+      install_update: () => new Promise(() => {}),
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const hide = await screen.findByRole("option", { name: /Hide Update Notice/ });
+    fireEvent.click(screen.getByRole("button", { name: "Install and Restart" }));
+    await screen.findByRole("button", { name: "Installing…" });
+    fireEvent.click(hide);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(screen.getByText("TinyDash 0.2.2 is available.")).toBeTruthy();
+  });
+
   it("opens the action menu with Mod+K", async () => {
     const { backend, press } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });

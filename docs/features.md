@@ -84,14 +84,18 @@ TinyDash indexes the names of files and folders in Desktop, Documents, and Downl
 
 Changes save at once. If a change cannot apply (for example, the shortcut is taken), Settings shows why and keeps the previous value.
 
-| Section              | Settings                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------ |
-| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, tabs      |
-| Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                  |
-| Files                | Folders to index, folder names to skip                                                                       |
-| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages (Chinese, Malay, Spanish) |
-| Snippets, Quicklinks | Create, edit, delete                                                                                         |
-| About                | Version, settings and data folders, credits                                                                  |
+| Section              | Settings                                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs |
+| Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
+| Files                | Folders to index, folder names to skip                                                                           |
+| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages (Chinese, Malay, Spanish)     |
+| Snippets, Quicklinks | Create, edit, delete                                                                                             |
+| About                | Version, Check for Updates, settings and data folders, credits                                                   |
+
+## Updates
+
+On macOS and Windows, TinyDash looks for a new version when the launcher opens, at most every six hours (turn this off in Settings > General). It downloads only a small feed from GitHub. A new version shows as a bar in the launcher (Install and Restart, or Later) and in the actions menu (Mod+K: Install TinyDash … and Restart, or Hide Update Notice); a later check that finds none removes it. Nothing installs until you choose, and TinyDash refuses an update whose signature does not match its own key. Settings > About shows a version already found, with Install and Restart, and can also check at once. On Linux, and in builds made on your own computer, TinyDash does not update itself: download new versions from the Releases page.
 
 ## Platform notes
 

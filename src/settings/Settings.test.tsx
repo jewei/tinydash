@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
+import { emit } from "@tauri-apps/api/event";
 import { describe, expect, it } from "vite-plus/test";
 
 import type { LibraryItem } from "../generated/LibraryItem";
@@ -242,6 +243,83 @@ describe("Settings", () => {
     fireEvent.click(inAll);
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(3));
     expect(emoji()).toEqual({ category: "emoji", shown: true, inAll: false });
+  });
+
+  it("checks for updates on request, and installs a newer version", async () => {
+    let newer: string | null = null;
+    let fail!: () => void;
+    const failed = new Promise<void>((resolve) => (fail = resolve));
+    const backend = fakeBackend({
+      check_for_update: () => newer,
+      install_update: async () => {
+        await failed;
+        throw "Could not install TinyDash 0.2.1: offline.";
+      },
+    });
+    render(() => <Settings />);
+    expect(await screen.findByRole("switch", { name: "Check for updates" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Check for Updates" }));
+    expect(await screen.findByText("TinyDash 0.2.0 is the latest version.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Install and Restart" })).toBeNull();
+
+    newer = "0.2.1";
+    fireEvent.click(await screen.findByRole("button", { name: "Check for Updates" }));
+    expect(await screen.findByText("TinyDash 0.2.1 is available.")).toBeTruthy();
+    // A check is not an install.
+    expect(screen.queryByRole("button", { name: "Installing…" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Install and Restart" }));
+    await waitFor(() => expect(backend.called("install_update")).toHaveLength(1));
+    // Leaving About and coming back keeps the install and its result.
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    expect(await screen.findByRole("button", { name: "Installing…" })).toBeTruthy();
+    fail();
+    expect(await screen.findByText("Could not install TinyDash 0.2.1: offline.")).toBeTruthy();
+
+    // A background check updates the offer, or takes it away.
+    await emit("update:changed", "0.2.4");
+    expect(await screen.findByText("TinyDash 0.2.4 is available.")).toBeTruthy();
+    await emit("update:changed", null);
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Install and Restart" })).toBeNull(),
+    );
+    expect(screen.queryByText(/is available/)).toBeNull();
+  });
+
+  it("offers an update the launcher already found, as soon as About opens", async () => {
+    fakeBackend({
+      about: () => ({
+        version: "0.2.0",
+        settingsFolder: "/data",
+        dataFolder: "/data",
+        richClipboard: true,
+        selfUpdate: true,
+        pendingUpdate: "0.2.2",
+      }),
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "About" }));
+    expect(await screen.findByText("TinyDash 0.2.2 is available.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Install and Restart" })).toBeTruthy();
+  });
+
+  it("points to the Releases page where TinyDash cannot update itself", async () => {
+    fakeBackend({
+      about: () => ({
+        version: "0.2.0",
+        settingsFolder: "/data",
+        dataFolder: "/data",
+        richClipboard: false,
+        selfUpdate: false,
+      }),
+    });
+    render(() => <Settings />);
+    await screen.findByRole("switch", { name: "Open at login" });
+    expect(screen.queryByRole("switch", { name: "Check for updates" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About" }));
+    expect(await screen.findByText("github.com/jewei/tinydash/releases")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Check for Updates" })).toBeNull();
   });
 
   it("describes each setting to screen readers", async () => {

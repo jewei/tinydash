@@ -134,6 +134,7 @@ pub fn on_launcher_shown(app: &AppHandle) {
         files(app);
     }
     rates(app, false);
+    crate::updates::on_launcher_shown(app);
 }
 
 pub fn apps(app: &AppHandle) {
