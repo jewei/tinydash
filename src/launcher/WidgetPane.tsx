@@ -83,16 +83,20 @@ export function WidgetPane(props: {
   /** Leave the note for the search field. */
   onLeave: () => void;
   onRun: (action: ResultAction) => void;
+  /**
+   * The clipboard card the user dismissed. The launcher keeps it, since
+   * the pane closes while a query is typed; a new copy has a new ID.
+   */
+  dismissed: string | undefined;
+  onDismiss: (id: string) => void;
 }) {
   const [widgets, { refetch }] = createResource(ipc.widgets);
   const now = createNow();
   let noteField: HTMLTextAreaElement | undefined;
-  // A dismissed card stays away until the clipboard holds something new.
-  const [dismissed, setDismissed] = createSignal<string>();
   const [jsonOpen, setJsonOpen] = createSignal(false);
   const card = () => {
     const found = widgets.latest?.clipCard;
-    return found && found.id !== dismissed() ? found : undefined;
+    return found && found.id !== props.dismissed ? found : undefined;
   };
   const json = () => {
     const content = card()?.content;
@@ -178,7 +182,7 @@ export function WidgetPane(props: {
               onRun={props.onRun}
               onOpenJson={() => setJsonOpen(true)}
               onDismiss={() => {
-                setDismissed(current().id);
+                props.onDismiss(current().id);
                 setJsonOpen(false);
               }}
             />

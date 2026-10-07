@@ -1141,7 +1141,12 @@ describe("Launcher", () => {
 
     fireEvent.click(within(card).getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
-    await emit("launcher:shown", { category: null });
+    // Typing closes the pane; it comes back without the dismissed card.
+    fireEvent.input(screen.getByRole("combobox"), { target: { value: "x" } });
+    await waitFor(() =>
+      expect(screen.queryByRole("complementary", { name: "Widgets" })).toBeNull(),
+    );
+    fireEvent.input(screen.getByRole("combobox"), { target: { value: "" } });
     await waitFor(() => expect(backend.called("widgets")).toHaveLength(2));
     expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
   });

@@ -338,6 +338,7 @@ body {
 /* Widget pane: cards in two columns beside an empty All search, then the
    note, which takes the space that is left. */
 .widgets {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -706,10 +707,6 @@ body {
 }
 
 /* The full JSON covers the pane. */
-.widgets {
-  position: relative;
-}
-
 .json-view {
   position: absolute;
   inset: 0;

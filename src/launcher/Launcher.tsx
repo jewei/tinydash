@@ -90,6 +90,7 @@ export function Launcher() {
   let input!: HTMLInputElement;
   // Set while the widget pane is on screen.
   let pane: PaneControls | undefined;
+  const [dismissedCard, setDismissedCard] = createSignal<string>();
 
   const focusInput = () => input.focus();
 
@@ -472,6 +473,8 @@ export function Launcher() {
               }}
               onLeave={focusInput}
               onRun={(action) => launcher.run(action)}
+              dismissed={dismissedCard()}
+              onDismiss={setDismissedCard}
             />
           </Show>
         </Show>
