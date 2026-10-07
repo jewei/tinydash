@@ -87,7 +87,19 @@ pub fn discover_apps() -> Vec<App> {
 }
 
 pub fn prepare_app(app: &mut tauri::App) {
-    let _ = app;
+    if let Err(error) = app.handle().plugin(tauri_plugin_notification::init()) {
+        tracing::warn!(%error, "Notifications are unavailable");
+    }
+}
+
+pub fn notify(app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
+    use tauri_plugin_notification::NotificationExt;
+    app.notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+        .map_err(|error| Error::msg(error.to_string()))
 }
 
 /// Opening the app again starts a second process, which the single-instance

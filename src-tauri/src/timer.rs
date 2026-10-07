@@ -7,12 +7,12 @@ use std::{
 };
 
 use tauri::{AppHandle, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::{
     error::{Error, Result},
     events,
     features::focus::{FocusControl, FocusTimer, Lengths},
+    platform,
     settings::Settings,
     state::State,
 };
@@ -129,7 +129,7 @@ fn run_forever(app: &AppHandle) {
 }
 
 fn notify(app: &AppHandle, title: &str, body: &str) {
-    if let Err(error) = app.notification().builder().title(title).body(body).show() {
+    if let Err(error) = platform::notify(app, title, body) {
         tracing::warn!(%error, "Could not show the focus timer notification");
     }
 }

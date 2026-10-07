@@ -262,6 +262,52 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
     })
 }
 
+/// Show a notification through `UNUserNotificationCenter`. The first one
+/// asks the user to allow notifications; asking again after an answer shows
+/// nothing, so each one asks and is added only when allowed.
+pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
+    use objc2::runtime::Bool;
+    use objc2_foundation::{NSBundle, NSError};
+    use objc2_user_notifications::{
+        UNAuthorizationOptions, UNMutableNotificationContent, UNNotificationRequest,
+        UNNotificationSound, UNUserNotificationCenter,
+    };
+    // The notification center raises an exception outside an app bundle,
+    // as in a build made with --no-bundle.
+    if !NSBundle::mainBundle()
+        .bundlePath()
+        .to_string()
+        .ends_with(".app")
+    {
+        return Err(Error::msg("Notifications work only in the installed app."));
+    }
+    let content = UNMutableNotificationContent::new();
+    content.setTitle(&NSString::from_str(title));
+    content.setBody(&NSString::from_str(body));
+    content.setSound(Some(&UNNotificationSound::defaultSound()));
+    // A new identifier each time, so a notification never replaces the last.
+    let id = format!("focus-{}", chrono::Utc::now().timestamp_millis());
+    let request = UNNotificationRequest::requestWithIdentifier_content_trigger(
+        &NSString::from_str(&id),
+        &content,
+        None,
+    );
+    let add = block2::RcBlock::new(move |allowed: Bool, _error: *mut NSError| {
+        if allowed.as_bool() {
+            UNUserNotificationCenter::currentNotificationCenter()
+                .addNotificationRequest_withCompletionHandler(&request, None);
+        } else {
+            tracing::info!("Notifications for TinyDash are off in System Settings");
+        }
+    });
+    UNUserNotificationCenter::currentNotificationCenter()
+        .requestAuthorizationWithOptions_completionHandler(
+            UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound,
+            &add,
+        );
+    Ok(())
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     match command {
         SystemCommand::Lock => lock_screen(),

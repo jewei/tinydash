@@ -7,7 +7,8 @@
 //!   file index lists such a folder but not its contents.
 //! - `RECURSIVE_WATCH`: whether watching a folder also watches its subfolders.
 //! - `TEMPLATE_TRAY_ICON`: the OS tints a black tray icon (macOS menu bar).
-//! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy.
+//! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy
+//!   or the notification plugin.
 //! - `is_reopen(event)`: the user opened the running app again, and the OS
 //!   sent an event instead of starting a second process.
 //! - `restrict_to_owner(path)`: make a file readable only by the user.
@@ -24,6 +25,7 @@
 //! - `launch_app(path)`: start an app found by `discover_apps`.
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`.
+//! - `notify(app, title, body)`: show a system notification.
 //! - `disk_space(path)`: the [`Volume`] that holds `path`.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
