@@ -4,4 +4,9 @@ import type { Category } from "./Category";
 /**
  * One of the launcher's tabs after All.
  */
-export type LauncherTab = { category: Category, shown: boolean, };
+export type LauncherTab = { category: Category, shown: boolean, 
+/**
+ * Its search results and suggestions show in All; its pins always do.
+ * Missing in files from before the switch, which meant yes.
+ */
+inAll: boolean, };

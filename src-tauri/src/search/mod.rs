@@ -179,7 +179,10 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
             .ranked(ctx.now)
             .into_iter()
             .filter(|id| {
-                !ctx.pinned(id) && Source::parse(id).is_some_and(|(source, _)| source.suggestible())
+                !ctx.pinned(id)
+                    && Source::parse(id).is_some_and(|(source, _)| {
+                        source.suggestible() && s.settings.in_all(source.category())
+                    })
             })
             .filter_map(|id| resolve(s, ctx, id))
             .take(SUGGESTIONS)
@@ -232,18 +235,20 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     let mut results = answers(s, query);
     let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
 
+    // A source the user keeps out of All is not searched at all.
+    let wanted = |category| s.settings.in_all(category);
     let sources = [
-        s.apps.search(matcher, ctx, ALL_LIMIT),
-        system::search(matcher, ctx),
-        s.library.search(matcher, ctx, ALL_LIMIT),
-        s.files.search(matcher, ctx, ALL_LIMIT),
-        s.clipboard.search(matcher, ctx, ALL_LIMIT),
-        s.emoji.search(matcher, ctx, ALL_LIMIT),
+        wanted(Category::Apps).then(|| s.apps.search(matcher, ctx, ALL_LIMIT)),
+        wanted(Category::System).then(|| system::search(matcher, ctx)),
+        wanted(Category::Snippets).then(|| s.library.search(matcher, ctx, ALL_LIMIT)),
+        wanted(Category::Files).then(|| s.files.search(matcher, ctx, ALL_LIMIT)),
+        wanted(Category::Clipboard).then(|| s.clipboard.search(matcher, ctx, ALL_LIMIT)),
+        wanted(Category::Emoji).then(|| s.emoji.search(matcher, ctx, ALL_LIMIT)),
     ];
     let mut ranked: Vec<(usize, Scored)> = sources
         .into_iter()
         .enumerate()
-        .flat_map(|(order, scored)| scored.into_iter().map(move |hit| (order, hit)))
+        .flat_map(|(order, scored)| scored.into_iter().flatten().map(move |hit| (order, hit)))
         .collect();
     ranked.sort_by_key(|(order, hit)| (hit.score < STRONG, *order, Reverse(hit.score)));
 
@@ -299,6 +304,40 @@ pub fn top<T>(mut hits: Vec<(u32, T)>, limit: usize) -> Vec<(u32, T)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_source_kept_out_of_all_stays_in_its_tab() {
+        use usage::Use;
+
+        let mut settings = Settings::default();
+        for tab in &mut settings.tabs {
+            tab.in_all = tab.category != Category::Emoji;
+        }
+        let state = crate::state::State::for_tests(settings);
+        let rocket = "emoji:🚀".to_owned();
+        let ids = |query: &str, category| -> Vec<String> {
+            search(&state.snapshot(), query, category)
+                .into_iter()
+                .map(|result| result.id)
+                .collect()
+        };
+
+        assert!(
+            !ids("rocket", Category::All)
+                .iter()
+                .any(|id| id.starts_with("emoji:"))
+        );
+        assert!(ids("rocket", Category::Emoji).contains(&rocket));
+        // Not suggested either, but a pin is the user's own choice.
+        let used = Use {
+            count: 5,
+            last_used: 0,
+        };
+        state.usage.set(Usage::new([(rocket.clone(), used)]));
+        assert!(!ids("", Category::All).contains(&rocket));
+        state.pins.set(Pins::new(vec![rocket.clone()]));
+        assert_eq!(ids("", Category::All).first(), Some(&rocket));
+    }
 
     #[test]
     fn the_start_screen_skips_pinned_clips() {
