@@ -29,6 +29,7 @@ export const testSettings: Settings = {
     (category) => ({
       category,
       shown: true,
+      inAll: true,
     }),
   ),
 };

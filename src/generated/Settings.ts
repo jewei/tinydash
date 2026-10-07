@@ -33,7 +33,8 @@ emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnable
  */
 launcherPosition: LauncherPosition | null, 
 /**
- * Every tab after All, in launcher order, and whether it shows. All is
- * always first, so it is never listed; a hidden tab still feeds All.
+ * Every tab after All, in launcher order, whether it shows, and
+ * whether its results join All. All is always first, so it is never
+ * listed.
  */
 tabs: Array<LauncherTab>, };

@@ -235,8 +235,9 @@ export function Settings() {
                 </Row>
                 <h2>Tabs</h2>
                 <p class="section-intro">
-                  Choose which tabs show after All, and in what order. A hidden tab's results still
-                  show in All.
+                  Choose which tabs show after All, and in what order. Turn off “in All” to keep a
+                  tab's results out of All, such as emoji; its tab still finds them. A tab is never
+                  both hidden and out of All: turning one off turns the other on.
                 </p>
                 <TabsEditor
                   tabs={settings().tabs}

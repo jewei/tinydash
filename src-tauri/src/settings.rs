@@ -45,8 +45,9 @@ pub struct Settings {
     /// `platform::launcher_position`. `None` centers it on the screen with
     /// the pointer. A spot no longer on any screen counts as `None`.
     pub launcher_position: Option<LauncherPosition>,
-    /// Every tab after All, in launcher order, and whether it shows. All is
-    /// always first, so it is never listed; a hidden tab still feeds All.
+    /// Every tab after All, in launcher order, whether it shows, and
+    /// whether its results join All. All is always first, so it is never
+    /// listed.
     pub tabs: Vec<LauncherTab>,
 }
 
@@ -61,10 +62,22 @@ pub struct LauncherPosition {
 
 /// One of the launcher's tabs after All.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct LauncherTab {
     pub category: Category,
     pub shown: bool,
+    /// Its search results and suggestions show in All. Out of All, its pins
+    /// still head the empty All view (pinned clips never do).
+    /// Missing in files from before the switch, which meant yes.
+    #[serde(default = "LauncherTab::joins_all_by_default")]
+    pub in_all: bool,
+}
+
+impl LauncherTab {
+    fn joins_all_by_default() -> bool {
+        true
+    }
 }
 
 /// Drop the saved tabs this version cannot read, such as a typo or a tab
@@ -113,6 +126,7 @@ impl Default for Settings {
                 .map(|&category| LauncherTab {
                     category,
                     shown: true,
+                    in_all: true,
                 })
                 .collect(),
         }
@@ -144,7 +158,8 @@ impl Settings {
 
     /// Clamp numbers, drop blank or duplicate list entries, and cut lists
     /// to their limit. `tabs` loses All, and gains any tab it lacks (such
-    /// as one added in a newer version) at the end, shown.
+    /// as one added in a newer version) at the end, shown and in All. A tab
+    /// that is hidden stays in All.
     pub fn normalized(mut self) -> Self {
         self.shortcut = self.shortcut.trim().to_owned();
         self.clipboard_history_limit = self.clipboard_history_limit.clamp(1, CLIPBOARD_LIMIT_MAX);
@@ -161,8 +176,13 @@ impl Settings {
                 self.tabs.push(LauncherTab {
                     category,
                     shown: true,
+                    in_all: true,
                 });
             }
+        }
+        // A tab neither shown nor in All would leave its results nowhere.
+        for tab in &mut self.tabs {
+            tab.in_all |= !tab.shown;
         }
         for list in [
             &mut self.file_search_folders,
@@ -176,6 +196,15 @@ impl Settings {
             list.truncate(FOLDER_LIST_MAX);
         }
         self
+    }
+
+    /// Whether a category's results and suggestions show in All. A category
+    /// with no entry, which only All itself is after `normalized`, does.
+    pub fn in_all(&self, category: Category) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.category == category)
+            .is_none_or(|tab| tab.in_all)
     }
 
     /// The first folder entry that is not a full path, which would never be
@@ -303,7 +332,8 @@ mod tests {
             settings.tabs[0],
             LauncherTab {
                 category: Category::Emoji,
-                shown: false
+                shown: false,
+                in_all: true
             }
         );
         assert_eq!(settings.tabs.len(), Category::ALL.len() - 1);
@@ -353,7 +383,11 @@ mod tests {
         );
         assert_eq!(settings.file_search_folders, ["~/A"]);
 
-        let tab = |category, shown| LauncherTab { category, shown };
+        let tab = |category, shown| LauncherTab {
+            category,
+            shown,
+            in_all: true,
+        };
         let tabs = Settings {
             tabs: vec![
                 tab(Category::Emoji, false),
@@ -369,6 +403,20 @@ mod tests {
             tabs[..2],
             [tab(Category::Emoji, false), tab(Category::Apps, true)]
         );
+        // A tab that is neither shown nor in All would be unreachable.
+        let hidden = Settings {
+            tabs: vec![LauncherTab {
+                category: Category::Files,
+                shown: false,
+                in_all: false,
+            }],
+            ..Settings::default()
+        }
+        .normalized();
+        assert!(hidden.tabs[0].in_all && hidden.in_all(Category::Files));
+        let old: LauncherTab =
+            serde_json::from_str(r#"{"category": "apps", "shown": true}"#).unwrap();
+        assert!(old.in_all);
         // The tabs the list lacked follow, shown, in their usual order.
         let rest: Vec<_> = tabs[2..]
             .iter()

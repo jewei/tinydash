@@ -4,4 +4,10 @@ import type { Category } from "./Category";
 /**
  * One of the launcher's tabs after All.
  */
-export type LauncherTab = { category: Category, shown: boolean, };
+export type LauncherTab = { category: Category, shown: boolean, 
+/**
+ * Its search results and suggestions show in All. Out of All, its pins
+ * still head the empty All view (pinned clips never do).
+ * Missing in files from before the switch, which meant yes.
+ */
+inAll: boolean, };

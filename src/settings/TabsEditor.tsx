@@ -6,11 +6,14 @@ import { CATEGORY_LABELS } from "../lib/categories";
 import { Toggle } from "./controls";
 
 /**
- * The launcher's tabs after All: show or hide each one, and move it. Each
- * change is an edit of the latest saved list, so quick clicks never undo
- * each other. Rows are keyed by category, so a switch keeps its row. A
- * moved row loses focus, also when a failed save moves it back; focus then
- * returns to its move buttons, unless the user has put it elsewhere.
+ * The launcher's tabs after All: show or hide each one, keep its results in
+ * or out of All, and move it. A tab is never both hidden and out of All, so
+ * turning one switch off while the other is off turns the other on; no
+ * switch is ever disabled, so focus never drops. Each change is an edit of
+ * the latest saved list, so quick clicks never undo each other. Rows are
+ * keyed by category, so a switch keeps its row. A moved row loses focus,
+ * also when a failed save moves it back; focus then returns to its move
+ * buttons, unless the user has put it elsewhere.
  */
 export function TabsEditor(props: {
   tabs: LauncherTab[];
@@ -18,8 +21,7 @@ export function TabsEditor(props: {
 }) {
   let editor!: HTMLOListElement;
   const order = () => props.tabs.map((tab) => tab.category);
-  const shown = (category: Category) =>
-    props.tabs.find((tab) => tab.category === category)?.shown ?? false;
+  const tabOf = (category: Category) => props.tabs.find((tab) => tab.category === category);
 
   // When the moved row took focus with it, focus the first enabled one of
   // its move buttons in `directions` (at the top, Up is disabled, so Down).
@@ -48,9 +50,22 @@ export function TabsEditor(props: {
     queueMicrotask(focus);
     void saved.then(focus);
   };
-  const show = (category: Category, on: boolean) =>
+  // The same rule as the backend's `normalized`, applied here so the form
+  // shows it at once.
+  const change = (
+    category: Category,
+    values: Pick<LauncherTab, "shown"> | Pick<LauncherTab, "inAll">,
+  ) =>
     void props.onChange((tabs) =>
-      tabs.map((tab) => (tab.category === category ? { ...tab, shown: on } : tab)),
+      tabs.map((tab) => {
+        if (tab.category !== category) return tab;
+        const next = { ...tab, ...values };
+        if (!next.shown && !next.inAll) {
+          if ("shown" in values) next.inAll = true;
+          else next.shown = true;
+        }
+        return next;
+      }),
     );
 
   return (
@@ -85,11 +100,22 @@ export function TabsEditor(props: {
                 >
                   ↓
                 </button>
-                <Toggle
-                  label={`Show ${CATEGORY_LABELS[category]}`}
-                  checked={shown(category)}
-                  onChange={(on) => show(category, on)}
-                />
+                <label class="tabs-switch">
+                  <Toggle
+                    label={`Show ${CATEGORY_LABELS[category]}`}
+                    checked={tabOf(category)?.shown ?? false}
+                    onChange={(shown) => change(category, { shown })}
+                  />
+                  Show
+                </label>
+                <label class="tabs-switch">
+                  <Toggle
+                    label={`${CATEGORY_LABELS[category]} in All`}
+                    checked={tabOf(category)?.inAll ?? false}
+                    onChange={(inAll) => change(category, { inAll })}
+                  />
+                  In All
+                </label>
               </span>
             </li>
           )}

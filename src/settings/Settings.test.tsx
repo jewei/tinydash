@@ -216,6 +216,34 @@ describe("Settings", () => {
     await waitFor(() => expect(center.disabled).toBe(true));
   });
 
+  it("keeps a tab's results out of All, but never hides it too", async () => {
+    const backend = fakeBackend();
+    const emoji = () =>
+      (
+        backend.called("update_settings").at(-1)?.args.changes as Partial<Values> | undefined
+      )?.tabs?.find((tab) => tab.category === "emoji");
+    render(() => <Settings />);
+    const inAll = await screen.findByRole("switch", { name: "Emoji in All" });
+    fireEvent.click(inAll);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(emoji()).toEqual({ category: "emoji", shown: true, inAll: false });
+
+    // Hiding it too would leave its results nowhere, so In All turns back on,
+    // and focus stays on the switch that was clicked.
+    const show = screen.getByRole("switch", { name: "Show Emoji" });
+    show.focus();
+    fireEvent.click(show);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(2));
+    expect(emoji()).toEqual({ category: "emoji", shown: false, inAll: true });
+    await waitFor(() => expect((inAll as HTMLInputElement).checked).toBe(true));
+    expect(document.activeElement).toBe(show);
+
+    // Taking a hidden tab out of All shows it again.
+    fireEvent.click(inAll);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(3));
+    expect(emoji()).toEqual({ category: "emoji", shown: true, inAll: false });
+  });
+
   it("describes each setting to screen readers", async () => {
     fakeBackend();
     render(() => <Settings />);
