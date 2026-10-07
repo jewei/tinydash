@@ -591,6 +591,26 @@ describe("Launcher", () => {
     expect(await screen.findByText("Cheers")).toBeTruthy();
   });
 
+  it("shows a copied text once, without repeating its first line as a title", async () => {
+    const files = { ...clip, id: "clip:2", title: "one.txt and 1 more" };
+    fakeBackend({
+      search: () => [{ ...clip, title: "repos" }, files],
+      preview: (args) =>
+        args.id === "clip:1"
+          ? { type: "text", text: "repos" }
+          : { type: "files", paths: ["/a/one.txt", "/a/two.txt"] },
+    });
+    render(() => <Launcher />);
+    const details = await screen.findByRole("complementary", { name: "Details" });
+    await waitFor(() => expect(within(details).getByText("repos").tagName).toBe("PRE"));
+    expect(within(details).queryByRole("heading")).toBeNull();
+    // Other clips keep their title, which says what the preview does not.
+    fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
+    expect(
+      await within(details).findByRole("heading", { name: "one.txt and 1 more" }),
+    ).toBeTruthy();
+  });
+
   it.each([
     [999_999, "1.0 MB"],
     [9_960, "10 KB"],
