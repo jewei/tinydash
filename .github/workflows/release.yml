@@ -103,7 +103,7 @@ jobs:
           APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
           APPLE_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
-          # Updates (not on Linux, whose .deb cannot replace itself): the key
+          # Updates (not on Linux, where installing a .deb needs root): the key
           # signs the update files, and the app is built with the feed
           # address and the public key that checks them.
           TAURI_SIGNING_PRIVATE_KEY: ${{ runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}

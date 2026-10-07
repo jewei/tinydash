@@ -16,7 +16,7 @@
 //!   flag), or `None` when it has none, so the scan reads no metadata.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
 //! - `SELF_UPDATE`: whether an installed copy can replace itself with a new
-//!   version (the Linux .deb cannot).
+//!   version (not on Linux, where installing a .deb needs root).
 //! - `RICH_CLIPBOARD`: whether clipboard history can save images and copied
 //!   files; `read_clipboard` ignores both settings when it cannot.
 //! - `app_folders()`: folders to watch for installed or removed apps.

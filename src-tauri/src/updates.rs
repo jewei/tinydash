@@ -6,8 +6,8 @@
 //!
 //! The feed address and the public key come from the release build's
 //! environment (`TINYDASH_UPDATE_ENDPOINT`, `TAURI_UPDATER_PUBLIC_KEY`), so a
-//! local build never checks. Linux installs from a .deb, which the updater
-//! cannot replace, so it never checks either.
+//! local build never checks. On Linux, installing a .deb update needs root,
+//! so TinyDash leaves updates to the user and never checks.
 
 use std::{
     sync::{
