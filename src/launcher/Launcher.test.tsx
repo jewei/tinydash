@@ -1126,7 +1126,7 @@ describe("Launcher", () => {
     });
     const card = await screen.findByRole("region", { name: "Color on the clipboard" });
     expect(within(card).getByText("from HSL")).toBeTruthy();
-    expect(within(card).getByLabelText("Contrast on white").textContent).toBe("AaAA6.2:1");
+    expect(within(card).getByLabelText("Contrast on white").textContent).toBe("Aa6.2:1 on whiteAA");
 
     fireEvent.click(within(card).getByRole("button", { name: "Copy RGB" }));
     // One action runs at a time, so the shortcut waits for the click's.
