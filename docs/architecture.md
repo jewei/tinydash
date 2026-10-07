@@ -49,7 +49,7 @@ When data changes, Rust emits `results:stale` and the launcher searches again, k
 
 Every command is listed in `lib.rs` and defined in `commands.rs`. Types that cross IPC derive `ts_rs::TS`; `cargo test` writes them to `src/generated`, and CI fails if they are stale. `src/lib/ipc.ts` is the only frontend module that calls `invoke` or `listen`.
 
-Events: `launcher:shown` (reset the query, optional category), `results:stale` (search again), `settings:changed` (apply theme and settings in every window). An event sent before a page listens is lost, so `launcher_init` also returns the category of the latest show, for example `--mode clipboard` at startup.
+Events: `launcher:shown` (reset the query, optional category), `results:stale` (search again), `settings:changed` (apply theme and settings in every window), `update:changed` (the newer version an update check found, or none). An event sent before a page listens is lost, so `launcher_init` also returns the category of the latest show, for example `--mode clipboard` at startup, and the update found so far.
 
 Images use custom protocols rather than IPC: `icon://` serves system icons (macOS; it returns only an icon image, never file contents) and `clip://` serves saved clipboard images by ID.
 

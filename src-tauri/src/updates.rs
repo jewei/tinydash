@@ -38,7 +38,9 @@ pub struct Updates {
     pending: Mutex<Option<Update>>,
     /// When a background check last started; a failed one waits too.
     last_check: Mutex<Option<Instant>>,
-    /// A check or install is running, so another one waits its turn.
+    /// A check or install is running. Another one is refused at once with
+    /// an error; a refused background check still waits six hours, as one
+    /// was running anyway.
     busy: AtomicBool,
 }
 
