@@ -28,7 +28,9 @@ use crate::{
     settings::{self, LauncherPosition, Settings},
     shortcut,
     state::State,
-    tray, updates, watcher, window,
+    tray, updates, watcher,
+    widgets::{self, Widgets},
+    window,
 };
 
 #[derive(Serialize, TS)]
@@ -190,6 +192,13 @@ pub async fn update_settings(
                 "“{folder}” is not a full folder path. Enter the whole path, or start it with ~ for your home folder, such as ~/Projects."
             )));
         }
+        if new.clock_cities != old.clock_cities
+            && let Some(city) = new.unknown_clock_city()
+        {
+            return Err(Error::msg(format!(
+                "TinyDash does not know “{city}”. Enter a city or a time zone, such as Tokyo or Europe/London."
+            )));
+        }
         let applied = apply_to_system(&app, &old, &new)
             .and_then(|()| settings::save(&state.dirs.config, &new));
         if let Err(error) = applied {
@@ -323,4 +332,10 @@ pub async fn check_for_update(app: AppHandle) -> Result<Option<String>> {
 #[tauri::command]
 pub async fn install_update(app: AppHandle) -> Result<()> {
     updates::install(&app).await
+}
+
+/// What the widget pane shows now.
+#[tauri::command]
+pub async fn widgets(app: AppHandle) -> Result<Widgets> {
+    blocking(move || Ok(widgets::load(&app.state::<State>()))).await
 }

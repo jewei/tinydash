@@ -18,6 +18,7 @@ import { commandFor } from "./keymap";
 import { PreviewPane } from "./PreviewPane";
 import { optionId, ResultList } from "./ResultList";
 import { createLauncher } from "./state";
+import { hasWidgets, WidgetPane } from "./WidgetPane";
 
 /** Keys that change the query: characters (AltGr included), deletion, paste. */
 function editsQuery(event: KeyboardEvent) {
@@ -248,6 +249,17 @@ export function Launcher() {
     focusInput();
   };
 
+  // The widget pane takes the preview's place while All has no query.
+  const showsWidgets = () => {
+    const current = settings();
+    return (
+      launcher.category() === "all" &&
+      launcher.query() === "" &&
+      current !== undefined &&
+      hasWidgets(current)
+    );
+  };
+
   const clipboardOff = () =>
     launcher.category() === "clipboard" && settings()?.clipboardHistoryEnabled === false;
 
@@ -395,6 +407,7 @@ export function Launcher() {
                 <EmptyResults
                   query={launcher.query()}
                   category={launcher.category()}
+                  beside={showsWidgets()}
                   onSettings={() => runGeneral({ type: "openSettings" })}
                 />
               </Show>
@@ -412,12 +425,17 @@ export function Launcher() {
                 if (result && action) launcher.run(action, result);
               }}
             />
-            <PreviewPane
-              result={launcher.selected()}
-              revision={launcher.revision()}
-              disabled={launcher.running()}
-              onRun={(action) => launcher.run(action, launcher.selected())}
-            />
+            <Show when={!showsWidgets()}>
+              <PreviewPane
+                result={launcher.selected()}
+                revision={launcher.revision()}
+                disabled={launcher.running()}
+                onRun={(action) => launcher.run(action, launcher.selected())}
+              />
+            </Show>
+          </Show>
+          <Show when={showsWidgets()}>
+            <WidgetPane />
           </Show>
         </Show>
       </main>
@@ -472,9 +490,10 @@ export function Launcher() {
   );
 }
 
-function Empty(props: { title: string; children?: JSX.Element }) {
+/** `beside` keeps it in the left column, next to the widget pane. */
+function Empty(props: { title: string; beside?: boolean; children?: JSX.Element }) {
   return (
-    <div class="empty">
+    <div class="empty" classList={{ beside: props.beside }}>
       <h2>{props.title}</h2>
       {props.children}
     </div>
@@ -482,7 +501,12 @@ function Empty(props: { title: string; children?: JSX.Element }) {
 }
 
 /** What an empty list says, by category, before and after typing. */
-function EmptyResults(props: { query: string; category: Category; onSettings: () => void }) {
+function EmptyResults(props: {
+  query: string;
+  category: Category;
+  beside: boolean;
+  onSettings: () => void;
+}) {
   return (
     <Switch>
       <Match when={props.query.trim()}>
@@ -509,7 +533,7 @@ function EmptyResults(props: { query: string; category: Category; onSettings: ()
         </Empty>
       </Match>
       <Match when={true}>
-        <Empty title="What do you need?">
+        <Empty title="What do you need?" beside={props.beside}>
           <ul class="tips">
             <li>Type an app, file, snippet, or emoji name</li>
             <li>

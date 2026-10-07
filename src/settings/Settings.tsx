@@ -27,6 +27,7 @@ import { TabsEditor } from "./TabsEditor";
 
 const SECTIONS = [
   { id: "general", label: "General" },
+  { id: "widgets", label: "Widgets" },
   { id: "clipboard", label: "Clipboard" },
   { id: "files", label: "Files" },
   { id: "search", label: "Search" },
@@ -255,6 +256,30 @@ export function Settings() {
                 <TabsEditor
                   tabs={settings().tabs}
                   onChange={(edit) => save((current) => ({ tabs: edit(current.tabs) }))}
+                />
+              </Match>
+
+              <Match when={section() === "widgets"}>
+                <p class="section-intro">
+                  Widgets show next to the results of an empty All search.
+                </p>
+                <Row label="Clocks" description="Local time and up to three cities.">
+                  <Toggle
+                    label="Clocks"
+                    checked={settings().showClocks}
+                    onChange={(showClocks) => void save({ showClocks })}
+                  />
+                </Row>
+                {/* 3 matches MAX_CLOCK_CITIES in the Rust code. */}
+                <h2>Clock cities</h2>
+                <ListEditor
+                  label="City to add"
+                  max={3}
+                  placeholder="Tokyo, London, or Europe/Paris"
+                  items={settings().clockCities}
+                  onChange={(edit) =>
+                    save((current) => ({ clockCities: edit(current.clockCities) }))
+                  }
                 />
               </Match>
 

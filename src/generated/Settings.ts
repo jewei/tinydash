@@ -42,4 +42,13 @@ launcherPosition: LauncherPosition | null,
  * whether its results join All. All is always first, so it is never
  * listed.
  */
-tabs: Array<LauncherTab>, };
+tabs: Array<LauncherTab>, 
+/**
+ * The widget pane shows to the right of an empty All search. Each
+ * widget has its own switch.
+ */
+showClocks: boolean, 
+/**
+ * Places the clocks widget shows next to local time, as typed.
+ */
+clockCities: Array<string>, };

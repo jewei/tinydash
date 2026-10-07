@@ -33,7 +33,12 @@ export const testSettings: Settings = {
       inAll: true,
     }),
   ),
+  showClocks: true,
+  clockCities: [],
 };
+
+/** Every widget off, so an empty All search shows the preview. */
+export const noWidgets: Partial<Settings> = { showClocks: false };
 
 export const app: SearchResult = {
   id: "app:/Applications/Safari.app",
@@ -71,11 +76,17 @@ export const restart: SearchResult = {
 type Call = { command: string; args: Record<string, unknown> };
 type Handler = (args: Record<string, unknown>) => unknown;
 
-/** Install the fake backend. `handlers` override the default replies. */
-export function fakeBackend(handlers: Record<string, Handler> = {}) {
+/**
+ * Install the fake backend. `handlers` override the default replies, and
+ * `initial` changes the settings it starts with.
+ */
+export function fakeBackend(
+  handlers: Record<string, Handler> = {},
+  initial: Partial<Settings> = {},
+) {
   const calls: Call[] = [];
   // Like the backend, each save merges onto what earlier saves left.
-  let settings = testSettings;
+  let settings: Settings = { ...testSettings, ...initial };
   const save = (changes: unknown) => (settings = { ...settings, ...(changes as object) });
   const defaults: Record<string, Handler> = {
     launcher_init: () => ({
@@ -98,6 +109,7 @@ export function fakeBackend(handlers: Record<string, Handler> = {}) {
     delete_library_item: () => null,
     check_for_update: () => null,
     install_update: () => null,
+    widgets: () => ({ clocks: [] }),
     about: () => ({
       version: "0.2.0",
       settingsFolder: "/data",

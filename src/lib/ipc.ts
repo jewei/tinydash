@@ -14,6 +14,7 @@ import type { LibraryItem } from "../generated/LibraryItem";
 import type { Preview } from "../generated/Preview";
 import type { SearchResult } from "../generated/SearchResult";
 import type { Settings } from "../generated/Settings";
+import type { Widgets } from "../generated/Widgets";
 
 export const launcherInit = () => invoke<LauncherInit>("launcher_init");
 
@@ -56,6 +57,9 @@ export const checkForUpdate = () => invoke<string | null>("check_for_update");
 
 /** Installs the version the latest check found; the app then restarts. */
 export const installUpdate = () => invoke<void>("install_update");
+
+/** What the widget pane shows now; a widget that is off is `null`. */
+export const widgets = () => invoke<Widgets>("widgets");
 
 /** A check finished: the newer version, or `null` when this one is the latest. */
 export const onUpdateChanged = (handler: (version: string | null) => void) =>

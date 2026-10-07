@@ -335,6 +335,119 @@ body {
   border-color: transparent;
 }
 
+/* Widget pane: cards in two columns, beside an empty All search. */
+.widgets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: var(--space-3);
+  border-left: 1px solid var(--rule);
+  background: var(--raised);
+  overflow-y: auto;
+}
+
+.widget {
+  min-width: 0;
+  padding: 10px var(--space-3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.widget.wide,
+.widgets-error {
+  grid-column: 1 / -1;
+}
+
+.widgets-error {
+  color: var(--danger);
+  font-size: var(--text-small);
+}
+
+.widget-note {
+  font-size: var(--text-small);
+  line-height: 16px;
+  color: var(--muted);
+}
+
+.clocks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 74px;
+}
+
+.clock-local {
+  display: grid;
+  gap: var(--space-1);
+  flex: none;
+  padding-right: var(--space-3);
+  border-right: 1px solid var(--rule);
+}
+
+.clock-time {
+  font-family: var(--font-heading);
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.clock-time.large {
+  font-size: 46px;
+}
+
+.clock-alone {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.clock-day {
+  display: grid;
+  justify-items: end;
+  font-size: var(--text-small);
+  color: var(--muted);
+}
+
+.clock-day strong {
+  font-size: var(--text);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.clock-cities {
+  display: grid;
+  flex: 1;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clock-cities li {
+  display: grid;
+  min-width: 0;
+}
+
+.clock-city {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clock-city-time {
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Empty states */
 .empty {
   grid-column: 1 / -1;
@@ -349,6 +462,11 @@ body {
 .empty h2 {
   font-size: 24px;
   color: var(--ink);
+}
+
+/* Next to the widget pane, the tips keep to the left column. */
+.empty.beside {
+  grid-column: 1;
 }
 
 .empty-error {

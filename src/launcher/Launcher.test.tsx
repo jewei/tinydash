@@ -3,7 +3,7 @@ import { emit } from "@tauri-apps/api/event";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import type { SearchResult } from "../generated/SearchResult";
-import { app, testSettings, fakeBackend, restart } from "../test/backend";
+import { app, testSettings, fakeBackend, noWidgets, restart } from "../test/backend";
 import { Launcher } from "./Launcher";
 
 const clip: SearchResult = {
@@ -729,10 +729,13 @@ describe("Launcher", () => {
   it("reloads the preview when results refresh", async () => {
     const snippet = { ...app, id: "snippet:1", kind: "snippet" as const, title: "Sig" };
     let text = "Regards";
-    fakeBackend({
-      search: () => [snippet],
-      preview: () => ({ type: "text", text }),
-    });
+    fakeBackend(
+      {
+        search: () => [snippet],
+        preview: () => ({ type: "text", text }),
+      },
+      noWidgets,
+    );
     render(() => <Launcher />);
     expect(await screen.findByText("Regards")).toBeTruthy();
     text = "Cheers";
@@ -742,13 +745,16 @@ describe("Launcher", () => {
 
   it("shows a copied text once, without repeating its first line as a title", async () => {
     const files = { ...clip, id: "clip:2", title: "one.txt and 1 more" };
-    fakeBackend({
-      search: () => [{ ...clip, title: "repos" }, files],
-      preview: (args) =>
-        args.id === "clip:1"
-          ? { type: "text", text: "repos" }
-          : { type: "files", paths: ["/a/one.txt", "/a/two.txt"] },
-    });
+    fakeBackend(
+      {
+        search: () => [{ ...clip, title: "repos" }, files],
+        preview: (args) =>
+          args.id === "clip:1"
+            ? { type: "text", text: "repos" }
+            : { type: "files", paths: ["/a/one.txt", "/a/two.txt"] },
+      },
+      noWidgets,
+    );
     render(() => <Launcher />);
     const details = await screen.findByRole("complementary", { name: "Details" });
     await waitFor(() => expect(within(details).getByText("repos").tagName).toBe("PRE"));
@@ -767,10 +773,13 @@ describe("Launcher", () => {
     [1, "1 byte"],
   ])("shows %i bytes as %s", async (size, text) => {
     const file = { ...app, id: "file:/notes.txt", kind: "file" as const, title: "notes.txt" };
-    fakeBackend({
-      search: () => [file],
-      preview: () => ({ type: "file", path: "/notes.txt", size, modified: null, isDir: false }),
-    });
+    fakeBackend(
+      {
+        search: () => [file],
+        preview: () => ({ type: "file", path: "/notes.txt", size, modified: null, isDir: false }),
+      },
+      noWidgets,
+    );
     render(() => <Launcher />);
     expect(await screen.findByText(text)).toBeTruthy();
   });
@@ -925,5 +934,37 @@ describe("Launcher", () => {
     document.activeElement?.dispatchEvent(held);
     expect(held.defaultPrevented).toBe(true);
     expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("shows widgets next to an empty All search, and the preview once typed", async () => {
+    const { backend, input } = setup(() => [app], {
+      widgets: () => ({
+        clocks: [{ name: "Tokyo", offsetSeconds: 9 * 3600, difference: "+8h" }],
+      }),
+    });
+    const clocks = await screen.findByRole("region", { name: "Clocks" });
+    expect(within(clocks).getByText("Tokyo")).toBeTruthy();
+    expect(within(clocks).getByText("+8h")).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull();
+
+    fireEvent.input(input, { target: { value: "saf" } });
+    expect(await screen.findByRole("complementary", { name: "Details" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Widgets" })).toBeNull();
+    expect(backend.called("widgets")).toHaveLength(1);
+  });
+
+  it("keeps the preview when every widget is off", async () => {
+    fakeBackend({ search: () => [app] }, noWidgets);
+    render(() => <Launcher />);
+    expect(await screen.findByRole("complementary", { name: "Details" })).toBeTruthy();
+    expect(screen.queryByRole("complementary", { name: "Widgets" })).toBeNull();
+  });
+
+  it("loads the widgets again each time the launcher opens", async () => {
+    const { backend } = setup(() => []);
+    await screen.findByRole("region", { name: "Clocks" });
+    expect(backend.called("widgets")).toHaveLength(1);
+    await emit("launcher:shown", { category: null });
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2));
   });
 });

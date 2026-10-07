@@ -24,6 +24,7 @@ mod system_clipboard;
 mod tray;
 mod updates;
 mod watcher;
+mod widgets;
 mod window;
 
 use tauri::{App, AppHandle, Manager};
@@ -92,6 +93,7 @@ pub fn run() {
             commands::about,
             commands::check_for_update,
             commands::install_update,
+            commands::widgets,
         ])
         .build(tauri::generate_context!())
         .expect("TinyDash failed to start")

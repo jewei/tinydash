@@ -3,6 +3,7 @@
 //! - Current time: `now`, `time in tokyo`, `london time`
 //! - Conversion: `10am pacific`, `9:30 tokyo to london`, `tomorrow 3pm in kl`
 //! - Dates: `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`
+//! - City clocks for the widget pane: `Tokyo`, `kl`, `Europe/London`
 
 use std::{collections::HashMap, sync::LazyLock};
 
@@ -11,8 +12,54 @@ use chrono::{
     NaiveTime, TimeZone, Weekday,
 };
 use chrono_tz::Tz;
+use serde::Serialize;
+use ts_rs::TS;
 
 use crate::search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol};
+
+/// The most cities the clocks widget shows next to local time.
+pub const MAX_CLOCK_CITIES: usize = 3;
+
+/// A city's clock in the widget pane. The launcher keeps the time current
+/// from the offset; it is read again each time the pane loads, so a clock
+/// change shows by the next open.
+#[derive(Clone, Debug, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CityClock {
+    /// The place as the user typed it.
+    pub name: String,
+    /// Seconds east of UTC, now.
+    pub offset_seconds: i32,
+    /// How far it is from local time: `+8h`, `−5h 30m`, or `Same time`.
+    pub difference: String,
+}
+
+/// The clock of a place the user named, or `None` when no time zone has
+/// that name. Local time is not a city: the widget always shows it.
+pub fn city_clock(name: &str, now: DateTime<Local>) -> Option<CityClock> {
+    let zone = zone(&name.to_lowercase()).filter(|zone| !matches!(zone, Zone::Local))?;
+    let there = zone.at(now).offset().local_minus_utc();
+    let here = now.offset().local_minus_utc();
+    Some(CityClock {
+        name: name.trim().to_owned(),
+        offset_seconds: there,
+        difference: difference(there - here),
+    })
+}
+
+fn difference(seconds: i32) -> String {
+    if seconds == 0 {
+        return "Same time".into();
+    }
+    let sign = if seconds < 0 { '−' } else { '+' };
+    let minutes = seconds.abs() / 60;
+    match (minutes / 60, minutes % 60) {
+        (0, minutes) => format!("{sign}{minutes}m"),
+        (hours, 0) => format!("{sign}{hours}h"),
+        (hours, minutes) => format!("{sign}{hours}h {minutes}m"),
+    }
+}
 
 pub fn answers(query: &str, now: DateTime<Local>) -> Vec<SearchResult> {
     let query = query.trim().to_lowercase();
@@ -536,6 +583,31 @@ mod tests {
     fn posix_etc_zones_are_not_found_by_offset() {
         assert!(zone("gmt+5").is_none());
         assert!(zone("etc/gmt+5").is_some());
+    }
+
+    #[test]
+    fn city_clocks_know_their_offset_and_difference() {
+        // On 4 October 2026, Tokyo is UTC+9 and New York is UTC−4.
+        let utc = chrono::Utc.with_ymd_and_hms(2026, 10, 4, 12, 0, 0).unwrap();
+        let tokyo = city_clock(" Tokyo ", utc.with_timezone(&Local)).unwrap();
+        assert_eq!(tokyo.name, "Tokyo");
+        assert_eq!(tokyo.offset_seconds, 9 * 3600);
+        assert_eq!(city_clock("kl", now()).unwrap().offset_seconds, 8 * 3600);
+        assert_eq!(city_clock("pst", now()).unwrap().offset_seconds, -8 * 3600);
+        assert_eq!(
+            city_clock("America/New_York", now())
+                .unwrap()
+                .offset_seconds,
+            -4 * 3600
+        );
+        for unknown in ["local", "here", "Atlantis", ""] {
+            assert_eq!(city_clock(unknown, now()), None, "{unknown}");
+        }
+
+        assert_eq!(difference(0), "Same time");
+        assert_eq!(difference(8 * 3600), "+8h");
+        assert_eq!(difference(-(5 * 3600 + 30 * 60)), "−5h 30m");
+        assert_eq!(difference(45 * 60), "+45m");
     }
 
     #[test]

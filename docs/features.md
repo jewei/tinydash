@@ -40,6 +40,12 @@ Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from i
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
 
+## Widgets
+
+An empty All search shows widgets to the right of the results, in place of the details. Typing, or another tab, shows the details again. Settings > Widgets turns each widget on or off; with every widget off, the details stay.
+
+- **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`.
+
 ## Instant answers (All only)
 
 | Type       | Examples                                                                                | Enter copies          |
@@ -87,6 +93,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs |
+| Widgets              | Each widget on or off, clock cities                                                                              |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
 | Files                | Folders to index, folder names to skip                                                                           |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages (Chinese, Malay, Spanish)     |

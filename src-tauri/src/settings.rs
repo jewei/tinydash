@@ -6,7 +6,11 @@ use ts_rs::TS;
 
 use crate::{
     error::{Error, Result},
-    features::{emoji::EmojiLanguage, web::SearchEngine},
+    features::{
+        datetime::{self, MAX_CLOCK_CITIES},
+        emoji::EmojiLanguage,
+        web::SearchEngine,
+    },
     search::Category,
 };
 
@@ -52,6 +56,11 @@ pub struct Settings {
     /// whether its results join All. All is always first, so it is never
     /// listed.
     pub tabs: Vec<LauncherTab>,
+    /// The widget pane shows to the right of an empty All search. Each
+    /// widget has its own switch.
+    pub show_clocks: bool,
+    /// Places the clocks widget shows next to local time, as typed.
+    pub clock_cities: Vec<String>,
 }
 
 /// The launcher's top-left corner: logical points on macOS, physical pixels
@@ -133,6 +142,8 @@ impl Default for Settings {
                     in_all: true,
                 })
                 .collect(),
+            show_clocks: true,
+            clock_cities: Vec::new(),
         }
     }
 }
@@ -199,7 +210,23 @@ impl Settings {
             });
             list.truncate(FOLDER_LIST_MAX);
         }
+        let mut seen = std::collections::HashSet::new();
+        self.clock_cities.retain_mut(|city| {
+            *city = city.trim().to_owned();
+            !city.is_empty() && seen.insert(city.to_lowercase())
+        });
+        self.clock_cities.truncate(MAX_CLOCK_CITIES);
         self
+    }
+
+    /// The first clock city that names no time zone. A hand-edited file may
+    /// still hold one; the widget skips it.
+    pub fn unknown_clock_city(&self) -> Option<&str> {
+        let now = chrono::Local::now();
+        self.clock_cities
+            .iter()
+            .find(|city| datetime::city_clock(city, now).is_none())
+            .map(String::as_str)
     }
 
     /// Whether a category's results and suggestions show in All. A category
@@ -387,6 +414,16 @@ mod tests {
         );
         assert_eq!(settings.file_search_folders, ["~/A"]);
 
+        let cities = Settings {
+            clock_cities: [" Tokyo", "tokyo", "", "London", "Paris", "Lima"]
+                .map(String::from)
+                .into(),
+            ..Settings::default()
+        }
+        .normalized()
+        .clock_cities;
+        assert_eq!(cities, ["Tokyo", "London", "Paris"]);
+
         let tab = |category, shown| LauncherTab {
             category,
             shown,
@@ -458,6 +495,19 @@ mod tests {
             Some("Projects")
         );
         assert_eq!(settings(&["~", "~/Notes"]).relative_folder(&home), None);
+    }
+
+    #[test]
+    fn finds_a_clock_city_that_names_no_time_zone() {
+        let settings = |cities: &[&str]| Settings {
+            clock_cities: cities.iter().map(|city| String::from(*city)).collect(),
+            ..Settings::default()
+        };
+        assert_eq!(settings(&["Tokyo", "kl"]).unknown_clock_city(), None);
+        assert_eq!(
+            settings(&["Tokyo", "Atlantis"]).unknown_clock_city(),
+            Some("Atlantis")
+        );
     }
 
     #[test]
