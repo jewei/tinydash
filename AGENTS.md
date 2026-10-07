@@ -27,6 +27,7 @@ src-tauri/src/
   commands.rs          Every IPC command. TypeScript wrappers: src/lib/ipc.ts.
   actions.rs           What each Action does to the OS, after checking it.
   preview.rs           Details for the preview pane.
+  widgets.rs           The widget pane next to an empty All search; timer.rs runs its focus timer.
   search/              Query → ranked results: result.rs (SearchResult, Action),
                        id.rs (result IDs), matcher.rs, usage.rs.
   features/            One file per feature (apps, files, clipboard, emoji, ...).
@@ -34,7 +35,7 @@ src-tauri/src/
   store.rs             SQLite schema, migrations, and all SQL.
   settings.rs          settings.json model and defaults.
   state.rs             In-memory state; indexes are swapped whole (shared.rs).
-  refresh.rs           When indexes and exchange rates rebuild.
+  refresh.rs           When indexes, exchange rates, and the weather refresh.
   watcher.rs           File system events → "index is dirty".
   monitor.rs           Clipboard capture thread.
   updates.rs           Update checks and installs (macOS and Windows release builds).
@@ -56,7 +57,7 @@ Keep private notes, plans, and evidence in `.local/` (ignored by git).
 ## Rules
 
 1. **Logic lives in Rust.** Search, ranking, validation, and OS work are Rust. The frontend renders results and maps keys to actions; it never decides what an action does.
-2. **Features stay out of the app's plumbing.** Files in `features/` and `search/` never call Tauri, SQLite, the clipboard, or windows, and never change anything in the OS. They may read cheap OS state: the home folder path, the clock and time zone, and the random source (for passwords). The two indexers that read the disk or network, `FileIndex::scan` and `currency::fetch`, run only from `refresh.rs`. Glue modules at the top level do everything else.
+2. **Features stay out of the app's plumbing.** Files in `features/` and `search/` never call Tauri, SQLite, the clipboard, or windows, and never change anything in the OS. They may read cheap OS state: the home folder path, the clock and time zone, and the random source (for passwords). The indexers that read the disk or network, `FileIndex::scan`, `currency::fetch`, and `weather::fetch`, run only from `refresh.rs`. Glue modules at the top level do everything else.
 3. **Results carry their actions.** A `SearchResult` lists `ResultAction`s; the frontend sends the chosen `Action` back. `actions.rs` checks every action again before it runs.
 4. **One source of truth for IPC types.** Add `#[derive(TS)] #[ts(export)]` to Rust types that cross IPC. Run `bun scripts/bindings.ts` to regenerate `src/generated` (it also removes bindings of deleted types), then commit the result. Add each new command to `lib.rs`, `commands.rs`, `src/lib/ipc.ts`, and a default reply in `src/test/backend.ts`.
 5. **All SQL lives in `store.rs`.** Change the schema by appending to `MIGRATIONS`. Never edit a migration that has shipped.
@@ -73,6 +74,7 @@ Keep private notes, plans, and evidence in `.local/` (ignored by git).
 - **New instant answer** (computed from the query, like the calculator): add an `answer(query)` function, call it from `answers()` in `search/mod.rs`, and, for a new `ResultKind`, list it in `ANSWERS` in `src/launcher/describe.ts` if its title is the answer.
 - **New action:** add a variant to `Action`, handle it in `actions::run`, and decide whether it counts as use (`counts_as_use`).
 - **New setting:** add a field with a default in `settings.rs` and clamp or clean it in `Settings::normalized`. If it changes the OS (like the shortcut or login item), apply it in `commands::apply_to_system`, which also rolls it back on failure; otherwise apply it in `commands::update_settings`. Add a control in `src/settings/Settings.tsx` and the field to `testSettings` in `src/test/backend.ts`.
+- **New widget:** add its data to `Widgets` in `widgets.rs` (`None` while its `show_…` setting is off), with pure logic in `features/` and OS reads in `platform/`. Draw it in `src/launcher/WidgetPane.tsx`, add its switch to `hasWidgets` there and to Settings > Widgets, and turn it off in `noWidgets` in `src/test/backend.ts`. A widget that changes on its own emits `events::widgets_changed`; its actions are `ResultAction`s, like a result's.
 - **New system command:** add a `SystemCommand` variant, an entry in `features/system.rs`, and an arm in each `platform/*.rs`.
 
 Then update `docs/features.md` and run `bun run verify`.
