@@ -254,7 +254,6 @@ pub fn watch_clipboard(capturing: impl Fn() -> bool + 'static) {
 /// Ask GTK for the clipboard's text on the main thread, with the same
 /// secret check as capture, and wait briefly for the reply.
 pub fn clipboard_text(app: &tauri::AppHandle) -> Option<String> {
-    use gtk::prelude::*;
     let (reply, answer) = std::sync::mpsc::channel();
     let asked = app.run_on_main_thread(move || {
         let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
