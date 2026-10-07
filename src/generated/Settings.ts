@@ -63,6 +63,7 @@ sessionsBeforeLongBreak: number, showWeather: boolean,
 weatherCity: string, temperatureUnit: TemperatureUnit, 
 /**
  * A card for a color, a Unix time, or JSON on the clipboard. The text
- * is read when the pane shows, never saved.
+ * is read when the pane shows, never saved. Off by default, as
+ * clipboard history is: macOS may ask before an app reads the clipboard.
  */
 showClipboardCards: boolean, };

@@ -242,7 +242,10 @@ mod tests {
 
     #[test]
     fn reads_the_clipboard_only_for_its_cards() {
-        let on = State::for_tests(Settings::default());
+        let on = State::for_tests(Settings {
+            show_clipboard_cards: true,
+            ..Settings::default()
+        });
         let card = load(&on, || Some("#2F6F5E".into())).unwrap().clip_card;
         assert_eq!(card.unwrap().actions[0].label, "Copy HEX");
         assert!(
@@ -252,10 +255,7 @@ mod tests {
                 .is_none()
         );
 
-        let off = State::for_tests(Settings {
-            show_clipboard_cards: false,
-            ..Settings::default()
-        });
+        let off = State::for_tests(Settings::default());
         let read = load(&off, || {
             panic!("cards are off, so nothing reads the clipboard")
         });

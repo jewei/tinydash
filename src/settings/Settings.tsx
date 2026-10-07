@@ -312,7 +312,7 @@ export function Settings() {
                 </Row>
                 <Row
                   label="Clipboard cards"
-                  description="When you copy a color, a Unix time, or JSON, a card shows it decoded. The text is read when widgets show, never saved."
+                  description="When you copy a color, a Unix time, or JSON, a card shows it decoded. The text is read when widgets show, never saved. macOS may ask you to let TinyDash paste."
                 >
                   <Toggle
                     label="Clipboard cards"

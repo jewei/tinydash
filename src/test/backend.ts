@@ -45,7 +45,7 @@ export const testSettings: Settings = {
   showWeather: false,
   weatherCity: "",
   temperatureUnit: "celsius",
-  showClipboardCards: true,
+  showClipboardCards: false,
 };
 
 /** Every widget off, so an empty All search shows the preview. */

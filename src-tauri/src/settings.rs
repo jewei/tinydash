@@ -78,7 +78,8 @@ pub struct Settings {
     pub weather_city: String,
     pub temperature_unit: TemperatureUnit,
     /// A card for a color, a Unix time, or JSON on the clipboard. The text
-    /// is read when the pane shows, never saved.
+    /// is read when the pane shows, never saved. Off by default, as
+    /// clipboard history is: macOS may ask before an app reads the clipboard.
     pub show_clipboard_cards: bool,
 }
 
@@ -173,7 +174,7 @@ impl Default for Settings {
             show_weather: false,
             weather_city: String::new(),
             temperature_unit: TemperatureUnit::Celsius,
-            show_clipboard_cards: true,
+            show_clipboard_cards: false,
         }
     }
 }
