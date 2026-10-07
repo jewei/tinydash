@@ -57,12 +57,13 @@ export function ClipCard(props: {
     >
       <div class="clip-head">
         <Glyph name="clipboard" size={13} />
-        <span class="clip-kind">Clipboard · {KIND[props.card.content.type]}</span>
+        <span class="clip-kind">{KIND[props.card.content.type]}</span>
         <Show when={props.card.content.type === "color" && props.card.content.copiedAs}>
           {(form) => <span class="badge">from {form()}</span>}
         </Show>
         <span class="clip-main">
-          <Keys keys={props.mainKeys} /> {mainLabel(props.card)}
+          <Keys keys={props.mainKeys} />
+          <span class="clip-main-label">{mainLabel(props.card)}</span>
         </span>
         <button
           type="button"
@@ -77,14 +78,16 @@ export function ClipCard(props: {
       <Switch>
         <Match when={props.card.content.type === "color" && props.card.content}>
           {(color) => (
-            <div class="clip-color">
-              <span class="swatch" style={{ background: color().hex }} />
-              <Rows rows={color().rows} onCopy={run} />
+            <>
+              <div class="clip-color">
+                <span class="swatch" style={{ background: color().hex }} />
+                <Rows rows={color().rows} onCopy={run} />
+              </div>
               <div class="contrast">
                 <ContrastBox on="white" hex={color().hex} contrast={color().onWhite} />
                 <ContrastBox on="black" hex={color().hex} contrast={color().onBlack} />
               </div>
-            </div>
+            </>
           )}
         </Match>
         <Match when={props.card.content.type === "unixTime" && props.card.content}>
@@ -174,13 +177,13 @@ function Rows(props: { rows: CardRow[]; onCopy: (index: number) => void }) {
 function ContrastBox(props: { on: "white" | "black"; hex: string; contrast: Contrast }) {
   return (
     <div class={`contrast-box ${props.on}`} aria-label={`Contrast on ${props.on}`}>
-      <span class="contrast-line">
-        <span class="contrast-sample" style={{ color: props.hex }}>
-          Aa
-        </span>
-        <strong>{props.contrast.grade}</strong>
+      <span class="contrast-sample" style={{ color: props.hex }}>
+        Aa
       </span>
-      <span>{props.contrast.ratio}</span>
+      <span>
+        {props.contrast.ratio} on {props.on}
+      </span>
+      <strong>{props.contrast.grade}</strong>
     </div>
   );
 }

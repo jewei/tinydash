@@ -68,7 +68,6 @@ pub fn run() {
         ))
         .plugin(shortcut::plugin())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_notification::init())
         .register_asynchronous_uri_scheme_protocol("icon", images::serve_icon)
         .register_asynchronous_uri_scheme_protocol("clip", images::serve_clipboard_image)
         .manage(watcher::Watcher::default())
