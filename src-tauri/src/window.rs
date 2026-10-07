@@ -2,7 +2,10 @@
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::{
+    commands,
     error::{Error, Result},
     events, platform, refresh,
     search::Category,
@@ -18,12 +21,20 @@ fn launcher(app: &AppHandle) -> Result<WebviewWindow> {
         .ok_or_else(|| Error::msg("The launcher window is missing."))
 }
 
-/// Show the launcher on the screen with the pointer. A category opens it
-/// with an empty query in that category.
+/// Whether the user dragged the launcher since it was last shown, so its
+/// spot is saved when it hides. Only a drag counts: the app's own moves
+/// never do.
+static DRAGGED: AtomicBool = AtomicBool::new(false);
+
+/// Show the launcher where the user last dragged it, or in the center of
+/// the screen with the pointer. A category opens it with an empty query in
+/// that category.
 pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
     let window = launcher(app)?;
     platform::remember_frontmost_app();
-    if let Err(error) = platform::place_launcher(app, &window) {
+    DRAGGED.store(false, Ordering::Relaxed);
+    let saved = app.state::<State>().settings.get().launcher_position;
+    if let Err(error) = platform::place_launcher(app, &window, saved) {
         tracing::debug!(%error, "Could not place the launcher");
     }
     // Reset the view before it becomes visible, so the old query never flashes.
@@ -49,7 +60,9 @@ pub fn show_again(app: &AppHandle) -> Result<()> {
 
 /// Hide without moving focus, for example when another app was clicked.
 pub fn hide(app: &AppHandle) -> Result<()> {
-    launcher(app)?.hide()?;
+    let window = launcher(app)?;
+    remember_drag(app, &window);
+    window.hide()?;
     Ok(())
 }
 
@@ -57,9 +70,45 @@ pub fn hide(app: &AppHandle) -> Result<()> {
 pub fn dismiss(app: &AppHandle) -> Result<()> {
     let window = launcher(app)?;
     if window.is_visible()? {
+        remember_drag(app, &window);
         window.hide()?;
         platform::restore_frontmost_app();
     }
+    Ok(())
+}
+
+/// Move the launcher with the pointer until the button is released.
+pub fn drag(app: &AppHandle) -> Result<()> {
+    launcher(app)?.start_dragging()?;
+    DRAGGED.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+/// After a drag, save where the launcher is. The save runs on a worker:
+/// hiding may happen on the main thread, and saving takes the settings lock.
+fn remember_drag(app: &AppHandle, window: &WebviewWindow) {
+    if !DRAGGED.swap(false, Ordering::Relaxed) {
+        return;
+    }
+    match platform::launcher_position(window) {
+        Ok(position) => {
+            let app = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(error) = commands::set_launcher_position(&app, Some(position)) {
+                    tracing::warn!(%error, "Could not save where the launcher is");
+                }
+            });
+        }
+        Err(error) => tracing::warn!(%error, "Could not read where the launcher is"),
+    }
+}
+
+/// Forget where the launcher was dragged, and center it now. Not on the
+/// main thread: it saves the settings.
+pub fn center(app: &AppHandle) -> Result<()> {
+    DRAGGED.store(false, Ordering::Relaxed);
+    commands::set_launcher_position(app, None)?;
+    platform::place_launcher(app, &launcher(app)?, None)?;
     Ok(())
 }
 

@@ -28,6 +28,9 @@ export const preview = (id: string) => invoke<Preview | null>("preview", { id })
 
 export const hideLauncher = () => invoke<void>("hide_launcher");
 
+/** Moves the launcher with the pointer; call on a mouse-down. */
+export const dragLauncher = () => invoke<void>("drag_launcher");
+
 export const getSettings = () => invoke<Settings>("get_settings");
 
 /**

@@ -13,19 +13,19 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. On
 | Enter           | Run the selected result's main action                                                                                          |
 | Mod+Enter       | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
 | Mod+1 … Mod+9   | Run the main action of that row                                                                                                |
-| Mod+K           | All actions for the result, plus Refresh, Settings, and Quit                                                                   |
+| Mod+K           | All actions for the result, plus Refresh, Center Launcher, Settings, and Quit                                                  |
 | Mod+Backspace   | Delete the selected clipboard entry                                                                                            |
 | Tab / Shift+Tab | Next / previous category                                                                                                       |
 | Mod+,           | Open Settings                                                                                                                  |
 | Escape          | Dismiss a warning, or hide and return to the previous app                                                                      |
 
-Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens on the screen with the pointer, with an empty query, and hides when another app gets focus (optional).
+Mod is Command on macOS and Control elsewhere. Clicking a row runs it. The launcher opens with an empty query, in the center of the screen with the pointer, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it: it then opens there, until that spot is no longer on a screen. Center Launcher in the actions menu, or Center in Settings > General, puts it back.
 
 Command line: `tinydash` (show, or toggle if running), `--settings`, `--background` (used at login), `--mode <category>`.
 
 ## Categories
 
-**All** mixes everything. An empty All shows pins, then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results. Settings > General shows, hides, and orders the tabs after All; a hidden tab's results still show in All, and Tab skips it. A tab added in a later version joins the end of your list, shown. Opening a hidden tab on purpose (`--mode clipboard`) shows it while it is open.
+**All** mixes everything. An empty All shows pins (except pinned clipboard entries), then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results. Settings > General shows, hides, and orders the tabs after All; a hidden tab's results still show in All, and Tab skips it. A tab added in a later version joins the end of your list, shown. Opening a hidden tab on purpose (`--mode clipboard`) shows it while it is open.
 
 | Category  | Finds                                                                                                                    | Empty view                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
@@ -36,7 +36,7 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 | Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                       | Most used, then the catalog |
 | System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
 
-Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
+Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pinned clipboard entry is kept rather than launched, so it heads the Clipboard tab and is found by a search, but stays off the empty All view. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
 
@@ -65,7 +65,7 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 - Text up to 16 KB. Images (up to 32, not counting pins, each at most 8 MB and 16 megapixels) and copied files (up to 64 paths, as references) are separate opt-ins.
 - Copies marked secret by password managers are never read. On macOS, copies made while Passwords or Keychain Access is in front are skipped.
 - Enter copies the entry back in its original format and returns you to the previous app, ready to paste. Copying an entry again moves it to the top.
-- Clear History (in Settings, or the System command Clear Clipboard History) deletes everything except pins. Data stays on this computer in `tinydash.db`, unencrypted.
+- Clear History deletes everything except pins, after you confirm. It is in the Clipboard tab (the footer button, or Mod+K), in Settings, and in the System command Clear Clipboard History. Data stays on this computer in `tinydash.db`, unencrypted.
 - Linux saves text only, and on Wayland the desktop reports a copy only while TinyDash has focus, so copies made elsewhere are saved when the launcher next opens (the latest one only).
 
 ## Snippets and quicklinks

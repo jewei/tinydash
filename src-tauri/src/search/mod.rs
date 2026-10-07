@@ -163,8 +163,13 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
         .ids()
         .iter()
         .filter(|id| {
-            category == Category::All
-                || Source::parse(id).is_some_and(|(source, _)| source.category() == category)
+            Source::parse(id).is_some_and(|(source, _)| match category {
+                // A pinned clip is kept, not a favorite to launch: it heads
+                // the Clipboard tab, and a search still finds it, but the
+                // start screen leaves its rows to apps and other favorites.
+                Category::All => source != Source::Clip,
+                _ => source.category() == category,
+            })
         })
         .filter_map(|id| resolve(s, ctx, id))
         .collect();
@@ -294,6 +299,46 @@ pub fn top<T>(mut hits: Vec<(u32, T)>, limit: usize) -> Vec<(u32, T)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_start_screen_skips_pinned_clips() {
+        use crate::features::clipboard::{ClipKind, Entry};
+
+        let settings = Settings {
+            clipboard_history_enabled: true,
+            ..Settings::default()
+        };
+        let state = crate::state::State::for_tests(settings);
+        let clip = Entry::new(
+            7,
+            ClipKind::Text,
+            "meeting notes".into(),
+            "meeting notes",
+            0,
+        );
+        state.clipboard.set(ClipboardHistory::new(vec![clip]));
+        let command = search(&state.snapshot(), "", Category::System)[0]
+            .id
+            .clone();
+        state
+            .pins
+            .set(Pins::new(vec!["clip:7".into(), command.clone()]));
+        let ids = |query: &str, category| -> Vec<String> {
+            search(&state.snapshot(), query, category)
+                .into_iter()
+                .map(|result| result.id)
+                .collect()
+        };
+
+        let start = ids("", Category::All);
+        assert_eq!(start.first(), Some(&command), "{start:?}");
+        assert!(!start.contains(&"clip:7".to_owned()));
+        assert_eq!(
+            ids("", Category::Clipboard).first().map(String::as_str),
+            Some("clip:7")
+        );
+        assert!(ids("meeting", Category::All).contains(&"clip:7".to_owned()));
+    }
 
     #[test]
     fn a_keyword_search_leaves_no_slot_for_the_fallback() {

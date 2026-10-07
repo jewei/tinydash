@@ -216,6 +216,23 @@ export function Settings() {
                     onChange={(showTrayIcon) => void save({ showTrayIcon })}
                   />
                 </Row>
+                <Row
+                  label="Launcher position"
+                  description={
+                    settings().launcherPosition
+                      ? "Opens where you last dragged it."
+                      : "Opens in the center of the screen. Drag the tab bar or the footer to move it."
+                  }
+                >
+                  <button
+                    type="button"
+                    class="button"
+                    disabled={!settings().launcherPosition}
+                    onClick={() => void save({ launcherPosition: null })}
+                  >
+                    Center
+                  </button>
+                </Row>
                 <h2>Tabs</h2>
                 <p class="section-intro">
                   Choose which tabs show after All, and in what order. A hidden tab's results still
