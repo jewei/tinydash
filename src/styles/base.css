@@ -118,6 +118,12 @@ kbd {
   text-decoration: underline;
 }
 
+.link:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: none;
+}
+
 .field {
   height: 32px;
   padding: 0 var(--space-3);
