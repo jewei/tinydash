@@ -40,6 +40,13 @@ const generalActions = (rates: boolean): ResultAction[] => [
   { label: "Quit TinyDash", action: { type: "quit" }, confirm: null },
 ];
 
+/** The System command's action, with its words (`features/system.rs`). */
+const clearHistory: ResultAction = {
+  label: "Clear Clipboard History",
+  action: { type: "clearClipboard" },
+  confirm: "Delete all clipboard history except pinned entries?",
+};
+
 export function Launcher() {
   const launcher = createLauncher();
   const [settings, setSettings] = createSignal<Settings>();
@@ -101,6 +108,7 @@ export function Launcher() {
   // before its search returns; keys and hints must not act on hidden ones.
   const results = () => (clipboardOff() ? [] : launcher.results());
   const selected = () => (clipboardOff() ? undefined : launcher.selected());
+  const canClearHistory = () => launcher.category() === "clipboard" && !clipboardOff();
 
   // Deleting cannot be undone, so it never waits for newer results: it acts
   // only on the highlighted entry the user can see.
@@ -172,7 +180,11 @@ export function Launcher() {
       keys: result && shortcutFor(result, action.action),
       run: () => launcher.run(action, result),
     }));
-    const general = generalActions(settings()?.currencyRatesEnabled ?? false).map((action) => ({
+    // On the Clipboard tab, clearing it is one key away, not a trip to System.
+    const general = [
+      ...(canClearHistory() ? [clearHistory] : []),
+      ...generalActions(settings()?.currencyRatesEnabled ?? false),
+    ].map((action) => ({
       label: action.label,
       keys: action.action.type === "openSettings" ? [modKey(), ","] : undefined,
       run: () => launcher.run(action),
@@ -342,6 +354,16 @@ export function Launcher() {
               {action().label} <Keys keys={["↩"]} />
             </span>
           )}
+        </Show>
+        <Show when={canClearHistory()}>
+          <button
+            type="button"
+            class="footer-actions footer-clear"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => launcher.run(clearHistory)}
+          >
+            Clear History…
+          </button>
         </Show>
         <button
           type="button"

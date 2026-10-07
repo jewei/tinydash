@@ -65,7 +65,7 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 - Text up to 16 KB. Images (up to 32, not counting pins, each at most 8 MB and 16 megapixels) and copied files (up to 64 paths, as references) are separate opt-ins.
 - Copies marked secret by password managers are never read. On macOS, copies made while Passwords or Keychain Access is in front are skipped.
 - Enter copies the entry back in its original format and returns you to the previous app, ready to paste. Copying an entry again moves it to the top.
-- Clear History (in Settings, or the System command Clear Clipboard History) deletes everything except pins. Data stays on this computer in `tinydash.db`, unencrypted.
+- Clear History deletes everything except pins, after you confirm. It is in the Clipboard tab (the footer button, or Mod+K), in Settings, and in the System command Clear Clipboard History. Data stays on this computer in `tinydash.db`, unencrypted.
 - Linux saves text only, and on Wayland the desktop reports a copy only while TinyDash has focus, so copies made elsewhere are saved when the launcher next opens (the latest one only).
 
 ## Snippets and quicklinks

@@ -392,6 +392,11 @@ body {
   background: var(--hover);
 }
 
+/* Clear History sits just before Actions, at the right. */
+.footer-clear ~ .footer-actions {
+  margin-left: 0;
+}
+
 /* Action menu */
 .menu {
   position: absolute;
