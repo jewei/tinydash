@@ -9,6 +9,7 @@ mod commands;
 mod error;
 mod events;
 mod features;
+mod hud;
 mod images;
 mod monitor;
 mod platform;
@@ -164,6 +165,9 @@ fn setup(app: &mut App) {
     }
     if let Some(launcher) = handle.get_webview_window(window::LAUNCHER) {
         platform::prepare_launcher(&launcher);
+    }
+    if let Err(error) = hud::create(handle) {
+        tracing::warn!(%error, "Copy messages are unavailable");
     }
     monitor::start(handle);
     timer::start(handle);

@@ -16,7 +16,7 @@ use crate::{
         clip_card,
         library::{self, LibraryKind, Target},
     },
-    platform, refresh,
+    hud, platform, refresh,
     search::{self, Context, Snapshot, id::Source, result::Action, usage::MAX_HIDDEN},
     state::State,
     system_clipboard, timer, window,
@@ -216,10 +216,13 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
     Ok(())
 }
 
-/// Copy, then hide and hand focus back so the user can paste right away.
+/// Copy, then hide and hand focus back so the user can paste right away,
+/// and say that it worked.
 fn copy_and_close(app: &AppHandle, copy: impl FnOnce() -> Result<()>) -> Result<()> {
     copy()?;
-    window::dismiss(app)
+    window::dismiss(app)?;
+    hud::show(app, "Copied");
+    Ok(())
 }
 
 fn open_path(path: &Path) -> Result<()> {

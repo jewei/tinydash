@@ -9,7 +9,7 @@
                  └───────── events ◀────────────────── refresh.rs, monitor.rs        system_clipboard.rs
 ```
 
-TinyDash is one Rust process with two webview windows: the **launcher**, created at startup and hidden, and **Settings**, created on demand. The Rust side owns all data and all behavior. The windows render what Rust sends and send back what the user chose.
+TinyDash is one Rust process with three webview windows: the **launcher**, created at startup and hidden; **Settings**, created on demand; and the **message window** (`hud.rs`), created hidden at startup, which shows "Copied" for a moment after a copy, never takes focus, and lets the pointer pass through. The Rust side owns all data and all behavior. The windows render what Rust sends and send back what the user chose.
 
 ## Search
 

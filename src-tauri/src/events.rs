@@ -11,6 +11,7 @@ pub const RESULTS_STALE: &str = "results:stale";
 pub const SETTINGS_CHANGED: &str = "settings:changed";
 pub const UPDATE_CHANGED: &str = "update:changed";
 pub const WIDGETS_CHANGED: &str = "widgets:changed";
+pub const HUD_SHOW: &str = "hud:show";
 
 #[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +50,13 @@ pub fn update_changed(app: &AppHandle, version: Option<&str>) {
 pub fn widgets_changed(app: &AppHandle) {
     if let Err(error) = app.emit_to(crate::window::LAUNCHER, WIDGETS_CHANGED, ()) {
         tracing::debug!(%error, "The launcher did not receive the widget change");
+    }
+}
+
+/// The text for the message window to show.
+pub fn hud(app: &AppHandle, message: &str) {
+    if let Err(error) = app.emit_to(crate::hud::HUD, HUD_SHOW, message) {
+        tracing::debug!(%error, "The message window did not receive its text");
     }
 }
 

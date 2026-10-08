@@ -14,7 +14,7 @@ export default defineConfig({
     // macOS 12 ships Safari 15; Windows and Linux webviews are newer.
     target: ["es2022", "safari15"],
     rolldownOptions: {
-      input: { launcher: "index.html", settings: "settings.html" },
+      input: { launcher: "index.html", settings: "settings.html", hud: "hud.html" },
     },
   },
   test: {

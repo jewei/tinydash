@@ -14,6 +14,7 @@ const GLYPHS: Record<
   | "disk"
   | "clipboard"
   | "copy"
+  | "check"
   | "close"
   | "back",
   () => JSX.Element
@@ -122,6 +123,7 @@ const GLYPHS: Record<
   ),
   close: () => <path d="M6 6l12 12M18 6L6 18" />,
   back: () => <path d="M15 6l-6 6 6 6" />,
+  check: () => <path d="M5 12l5 5L20 7" />,
   disk: () => (
     <>
       <rect x="3" y="12" width="18" height="8" rx="2" />
