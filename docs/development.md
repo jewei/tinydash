@@ -79,7 +79,7 @@ Automated tests do not cover the OS effects. Check these by hand on a real deskt
 
 ## Release
 
-Merge everything for the release to `main` and wait for CI to pass. Then run:
+Merge everything for the release to `main`, including a change that renames Unreleased in `CHANGELOG.md` to the new version and date, and wait for CI to pass. Then run:
 
 ```sh
 bun run release 0.2.1           # publish
