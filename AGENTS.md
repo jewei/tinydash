@@ -77,7 +77,7 @@ Keep private notes, plans, and evidence in `.local/` (ignored by git).
 - **New widget:** add its data to `Widgets` in `widgets.rs` (`None` while its `show_…` setting is off), with pure logic in `features/` and OS reads in `platform/`. Draw it in `src/launcher/WidgetPane.tsx`, add its switch to `hasWidgets` there and to Settings > Widgets, and turn it off in `noWidgets` in `src/test/backend.ts`. A widget that changes on its own emits `events::widgets_changed`; its actions are `ResultAction`s, like a result's.
 - **New system command:** add a `SystemCommand` variant, an entry in `features/system.rs`, and an arm in each `platform/*.rs`.
 
-Then update `docs/features.md` and run `bun run verify`.
+Then update `docs/features.md`, add the change under Unreleased in `CHANGELOG.md`, and run `bun run verify`.
 
 ## Style
 
@@ -89,5 +89,6 @@ Then update `docs/features.md` and run `bun run verify`.
 ## Commits and pull requests
 
 - Conventional commits: `feat(search): …`, `fix(clipboard): …`, `docs: …`. One logical change per commit.
+- A change users notice gets a line under Unreleased in `CHANGELOG.md`, in plain words.
 - The pre-commit hook formats staged files (`vp staged`).
 - A PR explains the change, lists the commands you ran with their results, and includes screenshots for UI changes.
