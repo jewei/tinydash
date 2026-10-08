@@ -70,7 +70,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 - Both windows load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
 - External programs run only with fixed arguments; user text never reaches a shell.
-- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Clipboard cards read the text when the widget pane loads, skip marked secrets the same way, and keep nothing. Network requests: the ECB rate table, the weather (when the widget is on: the city name to Open-Meteo's geocoding service, then its coordinates to the forecast service), and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
+- Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Clipboard cards read the text when the widget pane loads, skip marked secrets the same way, and keep nothing. Network requests: the ECB rate table (when currency rates are on, which they are not by default), the weather (when the widget is on: the city name to Open-Meteo's geocoding service, then its coordinates to the forecast service), and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
 ## Decisions
 

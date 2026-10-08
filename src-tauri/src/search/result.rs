@@ -182,6 +182,9 @@ pub enum Action {
     Unpin {
         id: String,
     },
+    /// Turn on currency rates, which a currency query asked for while they
+    /// were off, and download them.
+    TurnOnCurrencyRates,
     /// Rescan apps and files, and download exchange rates and the weather
     /// now when they are on.
     Refresh,

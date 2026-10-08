@@ -8,6 +8,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - Right-click a result to see its actions, as Mod+K shows them.
 
+### Changed
+
+- Currency rates are off until you turn them on. A currency query asks first, and turning rates off deletes the saved table.
+
 ## [0.4.1] - 2026-10-08
 
 ### Changed

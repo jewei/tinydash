@@ -162,6 +162,30 @@ pub fn set_launcher_position(app: &AppHandle, position: Option<LauncherPosition>
     Ok(())
 }
 
+/// Turn on currency rates and download them, as a currency query offers
+/// while they are off. Never call it on the main thread, for the reason
+/// `set_launcher_position` gives.
+pub fn turn_on_currency_rates(app: &AppHandle) -> Result<()> {
+    let state = app.state::<State>();
+    let _one_change_at_a_time = state
+        .settings_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let old = state.settings.get();
+    if old.currency_rates_enabled {
+        return Ok(());
+    }
+    let new = Settings {
+        currency_rates_enabled: true,
+        ..Settings::clone(&old)
+    };
+    settings::save(&state.dirs.config, &new)?;
+    state.settings.set(new.clone());
+    events::settings_changed(app, &new);
+    refresh::rates(app, true);
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_settings(state: tauri::State<State>) -> Settings {
     Settings::clone(&state.settings.get())
@@ -230,6 +254,14 @@ pub async fn update_settings(
         }
         if new.currency_rates_enabled && !old.currency_rates_enabled {
             refresh::rates(&app, true);
+        }
+        // Rates that are off are not kept, so nothing shows when they were
+        // last downloaded.
+        if !new.currency_rates_enabled && old.currency_rates_enabled {
+            if let Err(error) = state.store.delete_rates() {
+                tracing::warn!(%error, "Could not delete the saved exchange rates");
+            }
+            state.rates.set(None);
         }
         if new.show_weather != old.show_weather || new.weather_city != old.weather_city {
             refresh::weather(&app, false);

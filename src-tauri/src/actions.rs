@@ -9,6 +9,7 @@ use std::path::Path;
 use tauri::{AppHandle, Manager};
 
 use crate::{
+    commands,
     error::{Error, Result},
     events,
     features::{
@@ -175,6 +176,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             refresh::rates(app, true);
             refresh::weather(app, true);
         }
+        Action::TurnOnCurrencyRates => commands::turn_on_currency_rates(app)?,
         Action::OpenSettings => window::open_settings(app)?,
         Action::CenterLauncher => window::center(app)?,
         Action::Focus { control } => timer::control(app, control)?,
