@@ -22,7 +22,7 @@ export const testSettings: Settings = {
   fileSearchExcludedDirs: ["node_modules", "target"],
   emojiSkinTone: 0,
   emojiLanguages: [],
-  currencyRatesEnabled: true,
+  currencyRatesEnabled: false,
   searchEngine: "google",
   checkForUpdates: true,
   launcherPosition: null,

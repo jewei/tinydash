@@ -493,7 +493,15 @@ describe("Launcher", () => {
   });
 
   it("names exchange rates and the weather in Refresh only when they are on", async () => {
-    const { press } = setup(() => [app]);
+    const { press } = setup(() => [app], {
+      launcher_init: () => ({
+        settings: { ...testSettings, currencyRatesEnabled: true },
+        platform: "macos",
+        warnings: [],
+        category: null,
+        update: null,
+      }),
+    });
     await screen.findByRole("option", { name: /Safari/ });
     press("k", { ctrlKey: true });
     expect(
@@ -505,7 +513,12 @@ describe("Launcher", () => {
     press("k", { ctrlKey: true });
     expect(await screen.findByRole("option", { name: "Refresh Apps and Files" })).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("combobox", { name: "Search actions" }), { key: "Escape" });
-    await emit("settings:changed", { ...testSettings, showWeather: true, weatherCity: "Oslo" });
+    await emit("settings:changed", {
+      ...testSettings,
+      currencyRatesEnabled: true,
+      showWeather: true,
+      weatherCity: "Oslo",
+    });
     press("k", { ctrlKey: true });
     expect(
       await screen.findByRole("option", { name: "Refresh Apps, Files, Rates, and Weather" }),

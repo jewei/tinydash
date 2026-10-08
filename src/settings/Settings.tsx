@@ -489,7 +489,7 @@ export function Settings() {
                 </Row>
                 <Row
                   label="Currency rates"
-                  description="Downloads daily ECB rates. Your amounts stay on this computer."
+                  description="Off until you turn it on. Downloads the daily ECB rate table; your amounts stay on this computer. Turning it off deletes the saved rates."
                 >
                   <Toggle
                     label="Currency rates"

@@ -38,6 +38,47 @@ pub fn answer(query: &str, rates: Option<&Rates>) -> Option<SearchResult> {
     })
 }
 
+/// While currency rates are off, a query that needs them, such as
+/// `100 usd to eur`, says so and offers to turn them on.
+pub fn rates_off_answer(query: &str) -> Option<SearchResult> {
+    if !needs_rates(query) {
+        return None;
+    }
+    Some(SearchResult {
+        id: format!("calc:{query}"),
+        kind: ResultKind::Calculation,
+        title: "Currency rates are off".into(),
+        subtitle: "Turn them on to convert. TinyDash then downloads the daily ECB rate table."
+            .into(),
+        icon: Icon::Symbol {
+            name: Symbol::Calculator,
+        },
+        actions: vec![ResultAction::new(
+            "Turn On Currency Rates",
+            Action::TurnOnCurrencyRates,
+        )],
+        pinned: false,
+    })
+}
+
+/// Whether fend asks for an exchange rate to evaluate the query, found with
+/// a stand-in rate of 1.
+fn needs_rates(query: &str) -> bool {
+    if !query.chars().any(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    let asked = Arc::new(AtomicBool::new(false));
+    let mut context = fend_core::Context::new();
+    context.disable_rng();
+    context.set_exchange_rate_handler_v2(Probe {
+        asked: asked.clone(),
+    });
+    let input = currency_shorthand(query).unwrap_or_else(|| query.to_owned());
+    let deadline = Deadline(Instant::now() + TIME_LIMIT);
+    let _ = fend_core::evaluate_preview_with_interrupt(&input, &context, &deadline);
+    asked.load(Ordering::Relaxed)
+}
+
 /// The result text and whether it needed exchange rates.
 fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if !query.chars().any(|c| c.is_ascii_digit()) && !matches!(query, "pi" | "π") {
@@ -110,6 +151,21 @@ struct RateLookup {
     used: Arc<AtomicBool>,
 }
 
+struct Probe {
+    asked: Arc<AtomicBool>,
+}
+
+impl fend_core::ExchangeRateFnV2 for Probe {
+    fn relative_to_base_currency(
+        &self,
+        _: &str,
+        _: &fend_core::ExchangeRateFnV2Options,
+    ) -> Result<f64, Box<dyn std::error::Error + Send + Sync>> {
+        self.asked.store(true, Ordering::Relaxed);
+        Ok(1.0)
+    }
+}
+
 impl fend_core::ExchangeRateFnV2 for RateLookup {
     fn relative_to_base_currency(
         &self,
@@ -145,6 +201,16 @@ mod tests {
         assert_eq!(value("42"), None);
         assert_eq!(value("1password"), None);
         assert_eq!(value("12 +"), None);
+    }
+
+    #[test]
+    fn offers_to_turn_on_rates_only_for_currency_queries() {
+        let answer = rates_off_answer("100 usd to eur").unwrap();
+        assert_eq!(answer.actions[0].action, Action::TurnOnCurrencyRates);
+        assert!(rates_off_answer("100 USD MYR").is_some());
+        for query in ["12 * 8", "5 ft to cm", "usd", "hello"] {
+            assert!(rates_off_answer(query).is_none(), "{query}");
+        }
     }
 
     #[test]

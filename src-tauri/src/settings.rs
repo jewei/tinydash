@@ -150,7 +150,9 @@ impl Default for Settings {
             file_search_excluded_dirs: ["node_modules", "target"].map(String::from).into(),
             emoji_skin_tone: 0,
             emoji_languages: Vec::new(),
-            currency_rates_enabled: true,
+            // Off until the user turns it on: it is the one search
+            // feature that downloads.
+            currency_rates_enabled: false,
             check_for_updates: true,
             search_engine: SearchEngine::Google,
             launcher_position: None,

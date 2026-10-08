@@ -275,6 +275,9 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
 fn answers(s: &Snapshot, query: &str) -> Vec<SearchResult> {
     let mut results = Vec::new();
     results.extend(calculator::answer(query, Option::as_ref(&s.rates)));
+    if !s.settings.currency_rates_enabled {
+        results.extend(calculator::rates_off_answer(query));
+    }
     results.extend(datetime::answers(query, s.now));
     results.extend(password::answers(query));
     results.extend(url_cleaner::answer(query));
@@ -307,6 +310,19 @@ pub fn top<T>(mut hits: Vec<(u32, T)>, limit: usize) -> Vec<(u32, T)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_currency_query_asks_for_rates_while_they_are_off() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let results = search(&state.snapshot(), "100 usd to eur", Category::All);
+        assert_eq!(results[0].title, "Currency rates are off");
+        assert_eq!(results[0].actions[0].action, Action::TurnOnCurrencyRates);
+        let math = search(&state.snapshot(), "12 * 8", Category::All);
+        assert!(
+            math.iter()
+                .all(|result| result.title != "Currency rates are off")
+        );
+    }
 
     #[test]
     fn colors_unix_times_and_modes_are_answers_in_all() {

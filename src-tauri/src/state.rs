@@ -90,10 +90,18 @@ impl State {
             load("snippets", e);
             Vec::new()
         });
-        let rates = store.rates().unwrap_or_else(|e| {
-            load("exchange rates", e);
+        // Rates that are off are not kept, even from a version that did.
+        let rates = if settings.currency_rates_enabled {
+            store.rates().unwrap_or_else(|e| {
+                load("exchange rates", e);
+                None
+            })
+        } else {
+            if let Err(error) = store.delete_rates() {
+                tracing::warn!(%error, "Could not delete the saved exchange rates");
+            }
             None
-        });
+        };
         let weather = store.weather().unwrap_or_else(|e| {
             load("the weather", e);
             None

@@ -266,6 +266,15 @@ pub fn rates(app: &AppHandle, force: bool) {
         let state = app.state::<State>();
         match currency::fetch(now) {
             Ok(rates) => {
+                // Turning rates off deletes them under this lock, so a
+                // download that ends after that keeps nothing.
+                let _one_change_at_a_time = state
+                    .settings_change
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner());
+                if !state.settings.get().currency_rates_enabled {
+                    return;
+                }
                 if let Err(error) = state.store.save_rates(&rates) {
                     tracing::warn!(%error, "Could not save exchange rates");
                 }

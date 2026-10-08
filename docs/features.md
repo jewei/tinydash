@@ -71,7 +71,7 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 Every All search with text ends with a web search on the chosen engine (Settings > Search), unless it is a web keyword followed by text, such as `yt lofi`.
 
-- Currency uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded.
+- Currency rates are off until you turn them on (Settings > Search, or Turn On Currency Rates on the answer that a currency query shows while they are off). TinyDash then uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded. Turning rates off deletes the saved table.
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
 - Color and Unix time answers decode like clipboard cards: a color shows its RGB, HSL, and contrast on white, and Mod+K copies each form; a Unix time shows UTC and how long ago it was.
 - Passwords: 8–64 characters from letters, digits, and symbols (at least one of each); 3–12 words from the EFF large wordlist, without its four hyphenated words, so the hyphens between words stay clear; 4–12 digits. Uses the OS random source.

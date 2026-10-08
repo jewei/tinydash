@@ -408,6 +408,13 @@ impl Store {
     pub fn save_rates(&self, rates: &Rates) -> Result<()> {
         self.cache("currency_rates", rates)
     }
+
+    pub fn delete_rates(&self) -> Result<()> {
+        self.with(|db| {
+            db.execute("DELETE FROM cache WHERE key = 'currency_rates'", [])
+                .map(drop)
+        })
+    }
 }
 
 fn migrate(connection: &mut Connection) -> Result<()> {
@@ -627,6 +634,8 @@ mod tests {
         assert_eq!(store.rates().unwrap(), None);
         store.save_rates(&Rates::fixture()).unwrap();
         assert_eq!(store.rates().unwrap(), Some(Rates::fixture()));
+        store.delete_rates().unwrap();
+        assert_eq!(store.rates().unwrap(), None);
 
         let mut connection = Connection::open_in_memory().unwrap();
         connection.pragma_update(None, "user_version", 99).unwrap();
