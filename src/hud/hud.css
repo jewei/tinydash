@@ -1,0 +1,27 @@
+/* The window is transparent; the pill is the only thing drawn. It keeps
+   one dark look in both themes, as system messages do. */
+html,
+body {
+  background: transparent;
+  overflow: hidden;
+}
+
+#root {
+  display: grid;
+  place-items: center;
+}
+
+.hud {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: 999px;
+  background: rgb(36 32 28 / 0.9);
+  color: #f4eddf;
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}

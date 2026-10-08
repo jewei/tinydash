@@ -142,6 +142,10 @@ pub fn open_settings(app: &AppHandle) -> Result<()> {
 
 pub fn on_event(window: &tauri::Window, event: &WindowEvent) {
     let app = window.app_handle();
+    // The message window never has focus and hides itself.
+    if window.label() == crate::hud::HUD {
+        return;
+    }
     if window.label() == SETTINGS {
         // Settings may close while it records a shortcut; turn it back on.
         // Off the main thread: a settings change may hold the lock while it

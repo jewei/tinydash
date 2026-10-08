@@ -82,6 +82,10 @@ export const onResultsStale = (handler: () => void) => listen("results:stale", (
 /** A widget changed on its own, such as the focus timer at the end of a phase. */
 export const onWidgetsChanged = (handler: () => void) => listen("widgets:changed", () => handler());
 
+/** The text for the message window, such as "Copied". */
+export const onHudMessage = (handler: (message: string) => void) =>
+  listen<string>("hud:show", (event) => handler(event.payload));
+
 export const onSettingsChanged = (handler: (settings: Settings) => void) =>
   listen<Settings>("settings:changed", (event) => handler(event.payload));
 
