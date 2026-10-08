@@ -77,10 +77,17 @@ pub fn discover_apps() -> Vec<App> {
             if let Some(executable) = desktop.executable().file_name() {
                 aliases.push(executable.to_string_lossy().into_owned());
             }
+            // A generic name ("Web Browser") is short; a comment says more.
+            let description = desktop
+                .generic_name()
+                .map(|name| name.to_string())
+                .or_else(|| desktop.description().map(|comment| comment.to_string()))
+                .filter(|words| !words.trim().is_empty());
             Some(App {
                 name: desktop.display_name().to_string(),
                 path: desktop.filename()?.to_str()?.to_owned(),
                 aliases,
+                description,
             })
         })
         .collect()
