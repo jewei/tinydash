@@ -11,12 +11,12 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The
 | Format, lint, and type-check everything | `bun run check`                                          |
 | Run all tests                           | `bun run test`                                           |
 | Fix formatting                          | `bun run fix`                                            |
-| **Before every commit or PR**           | `bun run verify`                                         |
+| **Before every commit or PR**           | `bun run verify` (docs only: `bunx vp check`)            |
 | Release (builds, signs, publishes)      | `bun run release 0.2.1` (see `docs/development.md`)      |
 | One Rust test                           | `cargo test --manifest-path src-tauri/Cargo.toml <name>` |
 | One frontend test file                  | `bunx vp test src/launcher/keymap.test.ts`               |
 
-`bun run verify` runs `check`, the frontend tests, the frontend build, then `scripts/bindings.ts`, which runs the Rust tests and fails if that regenerated anything in `src/generated`. CI runs the frontend checks, rustfmt, and the binding check on Linux, and Clippy and the Rust tests on macOS, Windows, and Linux. Branch protection requires only the `Required checks` job, which passes when every other job passed; keep its name.
+`bun run verify` runs `check`, the frontend tests, the frontend build, then `scripts/bindings.ts`, which runs the Rust tests and fails if that regenerated anything in `src/generated`. CI runs the frontend checks, rustfmt, and the binding check on Linux, and Clippy and the Rust tests on macOS, Windows, and Linux. A change to Markdown files, `docs/`, or `LICENSE` alone needs only `bunx vp check`, which formats and checks them; CI skips the rest for it. Branch protection requires only the `Required checks` job, which passes when every other job passed; keep its name.
 
 ## Where things are
 
