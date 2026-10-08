@@ -37,6 +37,28 @@ fn is_package(path: &Path, packages: &[&str]) -> bool {
 
 /// Most entries an index holds. Larger trees are cut off, and a warning is logged.
 pub const LIMIT: usize = 50_000;
+/// Most paths outside the index that Open and Reveal accept: those that
+/// Spotlight returned most recently.
+pub const FOUND_LIMIT: usize = 500;
+
+/// Paths that a Spotlight search returned, newest last. TinyDash offered
+/// them, so Open and Reveal accept them like indexed ones.
+#[derive(Default)]
+pub struct FoundPaths(std::collections::VecDeque<String>);
+
+impl FoundPaths {
+    pub fn remember(&mut self, path: &str) {
+        self.0.retain(|known| known != path);
+        if self.0.len() >= FOUND_LIMIT {
+            self.0.pop_front();
+        }
+        self.0.push_back(path.to_owned());
+    }
+
+    pub fn contains(&self, path: &str) -> bool {
+        self.0.iter().any(|known| known == path)
+    }
+}
 
 struct Entry {
     /// NFC path for matching. macOS can return decomposed accents.
@@ -276,6 +298,15 @@ fn id(path: &Path) -> String {
 }
 
 fn result(path: &Path, is_dir: bool, ctx: &Context) -> SearchResult {
+    let mut result = found_result(path, is_dir);
+    result.actions.push(ctx.pin_action(&result.id));
+    result.pinned = ctx.pinned(&result.id);
+    result
+}
+
+/// A file or folder that Spotlight found outside the index. It has no Pin:
+/// a pin resolves only through the index.
+pub fn found_result(path: &Path, is_dir: bool) -> SearchResult {
     let id = id(path);
     let text = path.display().to_string();
     let name = path.file_name().map_or_else(
@@ -305,9 +336,8 @@ fn result(path: &Path, is_dir: bool, ctx: &Context) -> SearchResult {
                 Action::Reveal { path: text.clone() },
             ),
             ResultAction::new("Copy Path", Action::Copy { text }),
-            ctx.pin_action(&id),
         ],
-        pinned: ctx.pinned(&id),
+        pinned: false,
         id,
     }
 }
@@ -315,6 +345,19 @@ fn result(path: &Path, is_dir: bool, ctx: &Context) -> SearchResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn found_paths_keep_the_newest_and_no_repeats() {
+        let mut found = FoundPaths::default();
+        for n in 0..FOUND_LIMIT + 2 {
+            found.remember(&format!("/f{n}"));
+        }
+        assert!(!found.contains("/f0") && !found.contains("/f1"));
+        assert!(found.contains("/f2") && found.contains(&format!("/f{}", FOUND_LIMIT + 1)));
+        found.remember("/f2");
+        assert_eq!(found.0.back().map(String::as_str), Some("/f2"));
+        assert_eq!(found.0.len(), FOUND_LIMIT);
+    }
     use crate::search::usage::{Pins, Usage};
 
     fn tree() -> PathBuf {

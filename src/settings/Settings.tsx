@@ -474,6 +474,19 @@ export function Settings() {
                     }))
                   }
                 />
+                <Show when={IS_MAC}>
+                  <h2>Spotlight</h2>
+                  <Row
+                    label="Also search with Spotlight"
+                    description="The Files tab also finds names anywhere in your home folder, from the Spotlight index, below the results from these folders. Hidden files and the folder names above are skipped."
+                  >
+                    <Toggle
+                      label="Also search with Spotlight"
+                      checked={settings().spotlightFiles}
+                      onChange={(spotlightFiles) => void save({ spotlightFiles })}
+                    />
+                  </Row>
+                </Show>
               </Match>
 
               <Match when={section() === "search"}>

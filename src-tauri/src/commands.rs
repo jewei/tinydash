@@ -26,7 +26,7 @@ use crate::{
         result::{Action, SearchResult},
     },
     settings::{self, LauncherPosition, Settings},
-    shortcut,
+    shortcut, spotlight,
     state::State,
     tray, updates, watcher,
     widgets::{self, Widgets},
@@ -116,6 +116,13 @@ pub async fn search(
 }
 
 /// `result_id` is sent with a result's primary action so usage can be ranked.
+/// More Files tab results from Spotlight, which the launcher adds after the
+/// index's own; empty while the setting is off.
+#[tauri::command]
+pub async fn spotlight_files(app: AppHandle, query: String) -> Result<Vec<SearchResult>> {
+    blocking(move || Ok(spotlight::search(&app.state::<State>(), &query))).await
+}
+
 #[tauri::command]
 pub async fn run_action(app: AppHandle, action: Action, result_id: Option<String>) -> Result<()> {
     blocking(move || actions::run(&app, action, result_id.as_deref())).await

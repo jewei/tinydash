@@ -26,8 +26,14 @@ interface Queued {
   position: number;
 }
 
-/** Launcher state and behavior, without any rendering. */
-export function createLauncher() {
+/** Spotlight answers only queries this long, as Rust does. */
+const SPOTLIGHT_MIN_CHARS = 2;
+
+/**
+ * Launcher state and behavior, without any rendering. `spotlight` says
+ * whether the Files tab also asks Spotlight, after the index has answered.
+ */
+export function createLauncher(spotlight: () => boolean = () => false) {
   const [query, setQueryValue] = createSignal("");
   const [category, setCategoryValue] = createSignal<Category>("all");
   const [results, setResults] = createSignal<SearchResult[]>([]);
@@ -46,6 +52,19 @@ export function createLauncher() {
   let queued: Queued | undefined;
   const isCurrent = () => shown?.query === query() && shown?.category === category();
 
+  // Spotlight is slower than the index, so its results come after, for
+  // the same input only. A failure leaves the index's results as they are.
+  const extras = latestOnly(
+    (input: Input) => ipc.spotlightFiles(input.query),
+    (found, input) => {
+      if (shown?.query !== input.query || shown?.category !== input.category) return;
+      const known = new Set(results().map((result) => result.id));
+      const more = found.filter((result) => !known.has(result.id));
+      if (more.length > 0) setResults([...results(), ...more]);
+    },
+    () => {},
+  );
+
   const request = latestOnly(
     (input: Input) => ipc.search(input.query, input.category),
     (found, input) => {
@@ -61,6 +80,14 @@ export function createLauncher() {
         setRevision((value) => value + 1);
         setSearchError(undefined);
       });
+      if (
+        input.category === "files" &&
+        // Code points, as Rust's `chars().count()` counts them.
+        Array.from(input.query.trim()).length >= SPOTLIGHT_MIN_CHARS &&
+        spotlight()
+      ) {
+        void extras(input);
+      }
       if (queued && isCurrent()) {
         const { target, position } = queued;
         queued = undefined;

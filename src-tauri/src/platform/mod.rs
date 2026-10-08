@@ -27,6 +27,9 @@
 //! - `run_system_command(command)`.
 //! - `notify(app, title, body)`: show a system notification.
 //! - `disk_space(path)`: the [`Volume`] that holds `path`.
+//! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`
+//!   whose names contain `name`, from the OS's own file index (Spotlight on
+//!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.

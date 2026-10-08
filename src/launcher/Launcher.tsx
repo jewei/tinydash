@@ -60,8 +60,8 @@ const clearHistory: ResultAction = {
 };
 
 export function Launcher() {
-  const launcher = createLauncher();
   const [settings, setSettings] = createSignal<Settings>();
+  const launcher = createLauncher(() => settings()?.spotlightFiles ?? false);
   const [platform, setPlatform] = createSignal<Platform>();
   const [warnings, setWarnings] = createSignal<string[]>([]);
   // The open actions menu keeps the items it showed when it opened, so a

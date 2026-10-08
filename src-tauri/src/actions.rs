@@ -54,14 +54,14 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             window::hide(app)?;
         }
         Action::Open { path } => {
-            if !state.files.get().contains(&path) {
+            if !offered_file(&state, &path) {
                 return Err(Error::msg("This file is not in the index."));
             }
             open_path(Path::new(&path))?;
             window::hide(app)?;
         }
         Action::Reveal { path } => {
-            if !state.apps.get().contains(&path) && !state.files.get().contains(&path) {
+            if !state.apps.get().contains(&path) && !offered_file(&state, &path) {
                 return Err(Error::msg("This item is not in the index."));
             }
             tauri_plugin_opener::reveal_item_in_dir(&path)
@@ -216,6 +216,16 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
     Ok(())
 }
 
+/// An indexed file, or one a Spotlight search returned: TinyDash offered it.
+fn offered_file(state: &State, path: &str) -> bool {
+    state.files.get().contains(path)
+        || state
+            .found
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(path)
+}
+
 /// Copy, then hide and hand focus back so the user can paste right away,
 /// and say that it worked.
 fn copy_and_close(app: &AppHandle, copy: impl FnOnce() -> Result<()>) -> Result<()> {
@@ -308,6 +318,15 @@ mod tests {
             pin_to_drop(&state.snapshot(), &emoji[5], |_| true).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn opens_only_indexed_files_or_ones_spotlight_returned() {
+        let state = State::for_tests(Settings::default());
+        assert!(!offered_file(&state, "/Users/me/notes.txt"));
+        state.found.lock().unwrap().remember("/Users/me/notes.txt");
+        assert!(offered_file(&state, "/Users/me/notes.txt"));
+        assert!(!offered_file(&state, "/Users/me/other.txt"));
     }
 
     #[test]

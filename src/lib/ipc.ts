@@ -22,6 +22,10 @@ export const launcherInit = () => invoke<LauncherInit>("launcher_init");
 export const search = (query: string, category: Category) =>
   invoke<SearchResult[]>("search", { query, category });
 
+/** More Files tab results from Spotlight (macOS), after the index's own. */
+export const spotlightFiles = (query: string) =>
+  invoke<SearchResult[]>("spotlight_files", { query });
+
 /** Pass `resultId` only with a result's primary action; it feeds usage ranking. */
 export const runAction = (action: Action, resultId?: string) =>
   invoke<void>("run_action", { action, resultId: resultId ?? null });

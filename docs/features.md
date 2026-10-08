@@ -100,6 +100,8 @@ Create them in Settings > Snippets and Settings > Quicklinks.
 
 TinyDash indexes the names of files and folders in Desktop, Documents, and Downloads (change in Settings > Files, as full paths such as `~/Projects`; up to 50 folders and 50 names to skip), up to 50,000 entries. It skips hidden entries (names that start with a dot, and items that macOS or Windows marks hidden, such as `~/Library` and `desktop.ini`), symbolic links, and folders named in the skip list (`node_modules`, `target` by default). It never reads file contents. On macOS, packages such as apps and photo libraries are listed as one item, without their contents. Changes are picked up the next time the launcher opens. On Linux, only changes directly inside the chosen folders are noticed at once (each watched folder uses one inotify watch from a per-user limit); deeper changes appear at the next full rescan, which starts when the launcher opens and the index is more than 15 minutes old. One word matches names; two or more words also match paths, so `project readme` finds `project/README.md`.
 
+On macOS, **Also search with Spotlight** (Settings > Files, off by default) makes the Files tab also find names anywhere in your home folder, from the Spotlight index, below the results from your folders. It starts at two characters, skips hidden files and the folder names to skip, and adds up to 100 results. Spotlight finds only what it has indexed, and follows its own privacy settings. These results open, show in Finder, and copy their path; they cannot be pinned.
+
 ## Settings
 
 Changes save at once. If a change cannot apply (for example, the shortcut is taken), Settings shows why and keeps the previous value.
@@ -109,7 +111,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs |
 | Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths              |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
-| Files                | Folders to index, folder names to skip                                                                           |
+| Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                        |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, hidden results               |
 | Snippets, Quicklinks | Create, edit, delete                                                                                             |
 | About                | Version, Check for Updates, settings and data folders, credits                                                   |

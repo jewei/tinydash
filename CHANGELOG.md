@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Added
 
+- On macOS, the Files tab can also search your whole home folder with Spotlight (Settings > Files, off by default).
 - Right-click a result to see its actions, as Mod+K shows them.
 - Hide a result from search for good (Hide from Results in its actions). Settings > Search shows hidden results again.
 - A short "Copied" message confirms a copy after the launcher hides.
