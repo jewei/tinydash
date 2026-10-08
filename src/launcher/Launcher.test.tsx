@@ -1217,6 +1217,16 @@ describe("Launcher", () => {
     ]);
   });
 
+  it("opens the actions of a row on right-click", async () => {
+    setup(() => [app, restart]);
+    const row = await screen.findByRole("option", { name: /Restart/ });
+    const opened = fireEvent.contextMenu(row);
+    // Cancelled, so the webview shows no menu of its own.
+    expect(opened).toBe(false);
+    expect(row.getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByRole("option", { name: /^Run/ })).toBeTruthy();
+  });
+
   it("keeps the preview when every widget is off", async () => {
     fakeBackend({ search: () => [app] }, noWidgets);
     render(() => <Launcher />);

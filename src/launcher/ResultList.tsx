@@ -13,6 +13,8 @@ export function ResultList(props: {
   selectedIndex: number;
   onSelect: (index: number) => void;
   onRun: (index: number) => void;
+  /** Right-click: the actions menu for that row, as Mod+K opens it. */
+  onMenu: (index: number) => void;
 }) {
   let list!: HTMLUListElement;
 
@@ -40,6 +42,10 @@ export function ResultList(props: {
               if (moved && index() !== props.selectedIndex) props.onSelect(index());
             }}
             onClick={() => props.onRun(index())}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              props.onMenu(index());
+            }}
           >
             <ResultIcon icon={result.icon} size={32} fallback={FALLBACK_GLYPHS[result.kind]} />
             <span class="result-text">
