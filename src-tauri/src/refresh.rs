@@ -42,6 +42,9 @@ pub struct Freshness {
 /// still runs, and how it failed.
 #[derive(Default)]
 struct WeatherAttempt {
+    /// Counts downloads, so only the latest one may report, even when an
+    /// older one was for the same city (A, then B, then A again).
+    number: u64,
     city: String,
     started: Option<Instant>,
     busy: bool,
@@ -52,6 +55,26 @@ struct WeatherAttempt {
 pub enum WeatherFailure {
     NotFound,
     Failed(String),
+}
+
+impl WeatherAttempt {
+    /// Start a download for `city` and return its number. A failure for the
+    /// same city stays shown until this one ends.
+    fn start(&mut self, city: &str) -> u64 {
+        let failure = if same_city(&self.city, city) {
+            self.failure.take()
+        } else {
+            None
+        };
+        *self = Self {
+            number: self.number + 1,
+            city: city.to_owned(),
+            started: Some(Instant::now()),
+            busy: true,
+            failure,
+        };
+        self.number
+    }
 }
 
 fn same_city(a: &str, b: &str) -> bool {
@@ -288,8 +311,7 @@ pub fn rates(app: &AppHandle, force: bool) {
 
 /// Download the weather when the widget shows a city whose weather is
 /// missing or old. `force` skips the retry delay and the age check, for an
-/// explicit refresh. Each download stores its result only while its city is
-/// still the one in the settings.
+/// explicit refresh. Only the latest download stores its result.
 pub fn weather(app: &AppHandle, force: bool) {
     let state = app.state::<State>();
     let settings = state.settings.get();
@@ -304,7 +326,7 @@ pub fn weather(app: &AppHandle, force: bool) {
         .as_ref()
         .as_ref()
         .is_some_and(|weather| weather.is_for(&city) && !weather.is_stale(now));
-    {
+    let number = {
         let mut attempt = state
             .freshness
             .weather_attempt
@@ -317,14 +339,8 @@ pub fn weather(app: &AppHandle, force: bool) {
         if (same && attempt.busy) || (!force && (fresh || (same && waiting))) {
             return;
         }
-        let failure = if same { attempt.failure.take() } else { None };
-        *attempt = WeatherAttempt {
-            city: city.clone(),
-            started: Some(Instant::now()),
-            busy: true,
-            failure,
-        };
-    }
+        attempt.start(&city)
+    };
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let result = weather::fetch(&city, now);
@@ -335,7 +351,7 @@ pub fn weather(app: &AppHandle, force: bool) {
                 .weather_attempt
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
-            if !same_city(&attempt.city, &city) {
+            if attempt.number != number {
                 return;
             }
             attempt.busy = false;
@@ -378,6 +394,17 @@ mod tests {
         slot.begin();
         assert!(!slot.end());
         assert!(!slot.needs_work());
+    }
+
+    #[test]
+    fn only_the_latest_weather_download_reports() {
+        let mut attempt = WeatherAttempt::default();
+        let first_a = attempt.start("Oslo");
+        let b = attempt.start("Bergen");
+        let second_a = attempt.start("Oslo");
+        assert!(first_a != second_a && b != second_a);
+        assert_eq!(attempt.number, second_a);
+        assert!(attempt.busy);
     }
 
     #[test]
