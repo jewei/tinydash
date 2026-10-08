@@ -4,6 +4,8 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-08
+
 ### Changed
 
 - App results say what an app is for, such as "Web browser", instead of its folder (macOS and Linux). The details still show the path.
@@ -81,7 +83,8 @@ A rewrite: the same keyboard-first launcher, with much less code.
 
 The first public release: search apps, files, folders, and clipboard history; calculate, convert units, currencies, dates, and times; find emoji; generate passwords; clean URLs; and search the web.
 
-[Unreleased]: https://github.com/jewei/tinydash/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jewei/tinydash/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/jewei/tinydash/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jewei/tinydash/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/jewei/tinydash/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/jewei/tinydash/compare/v0.2.1...v0.3.0
