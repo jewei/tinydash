@@ -17,7 +17,7 @@ use crate::{
         library::{self, LibraryKind, Target},
     },
     platform, refresh,
-    search::{self, Context, Snapshot, id::Source, result::Action},
+    search::{self, Context, Snapshot, id::Source, result::Action, usage::MAX_HIDDEN},
     state::State,
     system_clipboard, timer, window,
 };
@@ -165,6 +165,27 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             }
             state.store.set_pinned(&id, true)?;
             state.pins.update(|pins| pins.add(&id));
+        }
+        Action::Hide { id } => {
+            let _limit = state
+                .limited_change
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if !Source::parse(&id).is_some_and(|(source, _)| source.hideable()) {
+                return Err(Error::msg("This result cannot be hidden."));
+            }
+            if state.hidden.get().len() >= MAX_HIDDEN {
+                return Err(Error::msg(format!(
+                    "You can hide up to {MAX_HIDDEN} results. Show some again in Settings > Search."
+                )));
+            }
+            state
+                .store
+                .set_hidden(&id, true, chrono::Utc::now().timestamp())?;
+            state.hidden.update(|hidden| hidden.add(&id));
+            // A hidden pin would hold a place in the list no one can see.
+            state.store.set_pinned(&id, false)?;
+            state.pins.update(|pins| pins.remove(&id));
         }
         Action::Unpin { id } => {
             state.store.set_pinned(&id, false)?;

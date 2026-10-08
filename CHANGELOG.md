@@ -11,6 +11,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Changed
 
 - Currency rates are off until you turn them on. A currency query asks first, and turning rates off deletes the saved table.
+- Hide a result from search for good (Hide from Results in its actions). Settings > Search shows hidden results again.
 
 ## [0.4.1] - 2026-10-08
 

@@ -70,6 +70,12 @@ const MIGRATIONS: &[&str] = &[
         text TEXT NOT NULL
     );
 ",
+    r"
+    CREATE TABLE hidden (
+        id TEXT PRIMARY KEY,
+        hidden_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+",
 ];
 
 pub struct Store {
@@ -350,6 +356,30 @@ impl Store {
         })
     }
 
+    /// Result IDs the user hid, oldest first.
+    pub fn hidden(&self) -> Result<Vec<String>> {
+        self.with(|db| {
+            let mut statement = db.prepare("SELECT id FROM hidden ORDER BY hidden_at, id")?;
+            let rows = statement.query_map([], |row| row.get(0))?;
+            rows.collect()
+        })
+    }
+
+    pub fn set_hidden(&self, id: &str, hidden: bool, now: i64) -> Result<()> {
+        self.with(|db| {
+            if hidden {
+                db.execute(
+                    "INSERT INTO hidden (id, hidden_at) VALUES (?1, ?2)
+                     ON CONFLICT (id) DO NOTHING",
+                    params![id, now],
+                )
+            } else {
+                db.execute("DELETE FROM hidden WHERE id = ?1", [id])
+            }
+            .map(drop)
+        })
+    }
+
     /// The scratch note of the widget pane; empty until it is first saved.
     pub fn note(&self) -> Result<String> {
         let text = self.with(|db| {
@@ -617,6 +647,17 @@ mod tests {
         assert!(store.pins().unwrap().ids().is_empty());
         assert!(store.save_library_item(&saved).is_err());
         assert!(store.library().unwrap().is_empty());
+    }
+
+    #[test]
+    fn hides_and_shows_results_again() {
+        let store = Store::in_memory();
+        store.set_hidden("app:/b", true, 2).unwrap();
+        store.set_hidden("app:/a", true, 1).unwrap();
+        store.set_hidden("app:/a", true, 3).unwrap();
+        assert_eq!(store.hidden().unwrap(), ["app:/a", "app:/b"]);
+        store.set_hidden("app:/a", false, 4).unwrap();
+        assert_eq!(store.hidden().unwrap(), ["app:/b"]);
     }
 
     #[test]

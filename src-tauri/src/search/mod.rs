@@ -26,7 +26,7 @@ use crate::{
 use id::Source;
 use matcher::{Matcher, STRONG};
 use result::{Action, ResultAction, ResultKind, Scored, SearchResult};
-use usage::{Pins, Usage};
+use usage::{Hidden, Pins, Usage};
 
 /// Results in an All search with text. Instant answers and the web
 /// fallback, when there is one, count toward it. The empty All view stops
@@ -87,6 +87,7 @@ pub struct Snapshot {
     pub emoji: Arc<EmojiIndex>,
     pub usage: Arc<Usage>,
     pub pins: Arc<Pins>,
+    pub hidden: Arc<Hidden>,
     pub rates: Arc<Option<Rates>>,
     pub now: DateTime<Local>,
 }
@@ -131,7 +132,25 @@ impl Context<'_> {
     }
 }
 
+/// The results for a query in a category, without the ones the user hid,
+/// and with a way to hide each of the others.
 pub fn search(snapshot: &Snapshot, query: &str, category: Category) -> Vec<SearchResult> {
+    let mut results = find(snapshot, query, category);
+    results.retain(|result| !snapshot.hidden.contains(&result.id));
+    for result in &mut results {
+        if Source::parse(&result.id).is_some_and(|(source, _)| source.hideable()) {
+            result.actions.push(ResultAction::new(
+                "Hide from Results",
+                Action::Hide {
+                    id: result.id.clone(),
+                },
+            ));
+        }
+    }
+    results
+}
+
+fn find(snapshot: &Snapshot, query: &str, category: Category) -> Vec<SearchResult> {
     let context = Context {
         usage: &snapshot.usage,
         pins: &snapshot.pins,

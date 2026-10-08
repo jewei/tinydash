@@ -8,6 +8,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { About } from "../generated/About";
 import type { Action } from "../generated/Action";
 import type { Category } from "../generated/Category";
+import type { HiddenResult } from "../generated/HiddenResult";
 import type { LauncherInit } from "../generated/LauncherInit";
 import type { LauncherShown } from "../generated/LauncherShown";
 import type { LibraryItem } from "../generated/LibraryItem";
@@ -51,6 +52,11 @@ export const saveLibraryItem = (item: LibraryItem) =>
 export const deleteLibraryItem = (id: number) => invoke<void>("delete_library_item", { id });
 
 export const about = () => invoke<About>("about");
+
+/** Results the user hid, by name. */
+export const hiddenResults = () => invoke<HiddenResult[]>("hidden_results");
+
+export const unhideResult = (id: string) => invoke<void>("unhide_result", { id });
 
 /** Resolves to the newer version, or `null` when this one is the latest. */
 export const checkForUpdate = () => invoke<string | null>("check_for_update");
