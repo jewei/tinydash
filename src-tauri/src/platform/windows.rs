@@ -70,10 +70,12 @@ pub fn discover_apps() -> Vec<App> {
                 continue;
             }
             if let Some(path) = path.to_str() {
+                // Reading a shortcut's comment needs COM; the folder shows instead.
                 apps.push(App {
                     name,
                     path: path.to_owned(),
                     aliases: Vec::new(),
+                    description: None,
                 });
             }
         }

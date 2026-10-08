@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+
+- App results say what an app is for, such as "Web browser", instead of its folder (macOS and Linux). The details still show the path.
+
 ### Fixed
 
 - On macOS, the launcher has one thin edge instead of a thick double line.

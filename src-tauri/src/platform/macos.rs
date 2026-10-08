@@ -139,6 +139,141 @@ fn read_bundle(path: &Path) -> Option<App> {
         name,
         path: path.to_str()?.to_owned(),
         aliases,
+        description: describe(
+            string("CFBundleIdentifier"),
+            string("LSApplicationCategoryType"),
+        )
+        .map(String::from),
+    })
+}
+
+/// What common apps are for, by bundle ID, so a renamed or localized app
+/// still gets its words. Bundles rarely describe themselves.
+const DESCRIPTIONS: &[(&str, &str)] = &[
+    ("com.apple.Safari", "Web browser"),
+    ("com.google.Chrome", "Web browser"),
+    ("org.mozilla.firefox", "Web browser"),
+    ("com.brave.Browser", "Web browser"),
+    ("company.thebrowser.Browser", "Web browser"),
+    ("com.microsoft.edgemac", "Web browser"),
+    ("com.apple.finder", "Files and folders"),
+    ("com.apple.Notes", "Notes and checklists"),
+    ("com.apple.iCal", "Events and reminders"),
+    ("com.apple.reminders", "Tasks and reminders"),
+    ("com.apple.mail", "Email"),
+    ("com.apple.MobileSMS", "Messages and conversations"),
+    ("com.apple.FaceTime", "Voice and video calls"),
+    ("com.apple.AddressBook", "Contacts"),
+    ("com.apple.Preview", "Images and PDF documents"),
+    ("com.apple.Photos", "Photo library"),
+    ("com.apple.Music", "Music library and player"),
+    ("com.apple.TV", "Movies and TV shows"),
+    ("com.apple.podcasts", "Podcasts"),
+    ("com.apple.Maps", "Maps and directions"),
+    ("com.apple.weather", "Weather forecasts"),
+    ("com.apple.calculator", "Calculations and conversions"),
+    ("com.apple.TextEdit", "Text documents"),
+    ("com.apple.Passwords", "Passwords and passkeys"),
+    ("com.apple.systempreferences", "System preferences"),
+    ("com.apple.AppStore", "App downloads and updates"),
+    ("com.apple.ActivityMonitor", "System activity"),
+    ("com.apple.DiskUtility", "Disk management"),
+    (
+        "com.apple.airport.airportutility",
+        "Wi-Fi base station setup",
+    ),
+    ("com.apple.audio.AudioMIDISetup", "Audio and MIDI devices"),
+    (
+        "com.apple.BluetoothFileExchange",
+        "Send files over Bluetooth",
+    ),
+    ("com.apple.ColorSyncUtility", "Color profiles"),
+    ("com.apple.Console", "System logs"),
+    ("com.apple.DigitalColorMeter", "Screen color picker"),
+    ("com.apple.MigrateAssistant", "Move data from another Mac"),
+    ("com.apple.printcenter", "Printers and print jobs"),
+    ("com.apple.ScreenSharing", "Control another Mac"),
+    (
+        "com.apple.screenshot.launcher",
+        "Screenshots and screen recordings",
+    ),
+    ("com.apple.ScriptEditor2", "AppleScript editor"),
+    ("com.apple.SystemProfiler", "Hardware and software details"),
+    ("com.apple.VoiceOverUtility", "VoiceOver settings"),
+    ("com.apple.Automator", "Workflows"),
+    ("com.apple.shortcuts", "Automations"),
+    ("com.apple.FontBook", "Fonts"),
+    ("com.apple.Image_Capture", "Import photos and scans"),
+    ("com.apple.backup.launcher", "Backups"),
+    ("com.apple.apps.launcher", "All apps"),
+    ("com.apple.siri.launcher", "Voice assistant"),
+    ("com.apple.exposelauncher", "Windows and desktops"),
+    ("com.apple.VoiceMemos", "Voice recordings"),
+    ("com.apple.archiveutility", "Zip archives"),
+    ("com.apple.keychainaccess", "Passwords and certificates"),
+    ("com.apple.Terminal", "Terminal emulator"),
+    ("com.mitchellh.ghostty", "Terminal emulator"),
+    ("com.googlecode.iterm2", "Terminal emulator"),
+    ("dev.warp.Warp-Stable", "Terminal emulator"),
+    ("com.apple.dt.Xcode", "App development"),
+    ("com.microsoft.VSCode", "Code editor"),
+    ("com.todesktop.230313mzl4w4u92", "Code editor"),
+    ("dev.zed.Zed", "Code editor"),
+    ("com.google.android.studio", "Android development"),
+    ("com.tinyapp.TablePlus", "Database client"),
+    ("com.github.GitHubClient", "Git repositories"),
+    ("dev.kdrag0n.MacVirt", "Containers and Linux machines"),
+    ("com.usebruno.app", "API client"),
+    ("com.spotify.client", "Music streaming"),
+    ("org.videolan.vlc", "Video player"),
+    ("com.apple.QuickTimePlayerX", "Video player"),
+    ("com.larksuite.larkApp", "Team chat and collaboration"),
+    ("com.tinyspeck.slackmacgap", "Team chat"),
+    ("com.hnc.Discord", "Voice and text chat"),
+    ("net.whatsapp.WhatsApp", "Messages and calls"),
+    ("us.zoom.xos", "Video meetings"),
+    ("notion.id", "Notes and docs"),
+    ("com.figma.Desktop", "Interface design"),
+    ("com.anthropic.claudefordesktop", "AI assistant"),
+    ("com.apple.iWork.Pages", "Documents"),
+    ("com.apple.iWork.Numbers", "Spreadsheets"),
+    ("com.apple.iWork.Keynote", "Presentations"),
+];
+
+/// The words for an app: its entry in [`DESCRIPTIONS`], else its App Store
+/// category, else none.
+fn describe(bundle_id: Option<&str>, category: Option<&str>) -> Option<&'static str> {
+    if let Some(&(_, words)) = DESCRIPTIONS.iter().find(|(id, _)| Some(*id) == bundle_id) {
+        return Some(words);
+    }
+    Some(match category?.strip_prefix("public.app-category.")? {
+        "business" => "Business",
+        "developer-tools" => "Developer tools",
+        "education" => "Education",
+        "entertainment" => "Entertainment",
+        "finance" => "Finance",
+        "games" | "action-games" | "adventure-games" | "arcade-games" | "board-games"
+        | "card-games" | "casino-games" | "dice-games" | "educational-games" | "family-games"
+        | "kids-games" | "music-games" | "puzzle-games" | "racing-games" | "role-playing-games"
+        | "simulation-games" | "sports-games" | "strategy-games" | "trivia-games"
+        | "word-games" => "Game",
+        "graphics-design" => "Graphics and design",
+        "healthcare-fitness" => "Health and fitness",
+        "lifestyle" => "Lifestyle",
+        "medical" => "Medical",
+        "music" => "Music",
+        "news" => "News",
+        "photography" => "Photography",
+        "productivity" => "Productivity",
+        "reference" => "Reference",
+        "social-networking" => "Social networking",
+        "sports" => "Sports",
+        "travel" => "Travel",
+        "utilities" => "Utility",
+        "video" => "Video",
+        "weather" => "Weather",
+        "books" => "Books",
+        _ => return None,
     })
 }
 
@@ -527,6 +662,37 @@ pub fn restore_frontmost_app() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn describes_known_apps_then_by_category() {
+        use super::describe;
+        assert_eq!(
+            describe(
+                Some("com.apple.Safari"),
+                Some("public.app-category.productivity")
+            ),
+            Some("Web browser")
+        );
+        assert_eq!(
+            describe(
+                Some("eu.exelban.Stats"),
+                Some("public.app-category.utilities")
+            ),
+            Some("Utility")
+        );
+        assert_eq!(
+            describe(
+                Some("com.apple.Chess"),
+                Some("public.app-category.board-games")
+            ),
+            Some("Game")
+        );
+        assert_eq!(
+            describe(Some("com.example"), Some("public.app-category.new-kind")),
+            None
+        );
+        assert_eq!(describe(None, None), None);
+    }
+
     use super::*;
 
     #[test]

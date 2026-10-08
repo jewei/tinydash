@@ -24,6 +24,8 @@ pub struct App {
     pub path: String,
     /// Other names that should find the app, such as its executable.
     pub aliases: Vec<String>,
+    /// What the app is for, such as `Web browser`, when the OS can say.
+    pub description: Option<String>,
 }
 
 #[derive(Default)]
@@ -97,10 +99,13 @@ fn result(app: &App, ctx: &Context) -> SearchResult {
     SearchResult {
         kind: ResultKind::App,
         title: app.name.clone(),
-        subtitle: Path::new(&app.path)
-            .parent()
-            .map(files::display_path)
-            .unwrap_or_default(),
+        // Its folder when the OS does not say; the details show the path.
+        subtitle: app.description.clone().unwrap_or_else(|| {
+            Path::new(&app.path)
+                .parent()
+                .map(files::display_path)
+                .unwrap_or_default()
+        }),
         icon: if platform::NATIVE_ICONS {
             Icon::File {
                 path: app.path.clone(),
@@ -144,6 +149,7 @@ mod tests {
             name: name.into(),
             path: path.into(),
             aliases: vec![],
+            description: None,
         }
     }
 
@@ -173,5 +179,17 @@ mod tests {
         let hits = index.search(&mut Matcher::new("no"), &ctx, 10);
         assert_eq!(hits[0].result.title, "Notion");
         assert_eq!(index.browse(&ctx)[0].title, "Notion");
+    }
+
+    #[test]
+    fn says_what_an_app_is_for_or_where_it_is() {
+        let ctx = Context::none();
+        let described = App {
+            description: Some("Web browser".into()),
+            ..app("Safari", "/Applications/Safari.app")
+        };
+        assert_eq!(result(&described, &ctx).subtitle, "Web browser");
+        let plain = app("Tool", "/Applications/Tool.app");
+        assert_eq!(result(&plain, &ctx).subtitle, "/Applications");
     }
 }
