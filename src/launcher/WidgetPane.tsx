@@ -414,7 +414,8 @@ function DiskSpace(props: { disk: Disk }) {
 /**
  * One scratch note. It starts from the saved text and then keeps its own,
  * since only this field edits it; a pause in typing, leaving the field,
- * and closing the card save it.
+ * and closing the card save it. A failed save stays unsaved, so the next
+ * of those tries again.
  */
 function Notepad(props: {
   initial: string;
@@ -438,11 +439,14 @@ function Notepad(props: {
     saving = saving.then(() =>
       ipc.saveNote(value).then(
         () => {
+          setFailure(undefined);
           setPending(unsaved);
         },
         (error) => {
+          // Still unsaved: leaving the field or closing the card tries again.
+          unsaved = true;
           setFailure(ipc.message(error));
-          setPending(unsaved);
+          setPending(true);
         },
       ),
     );
