@@ -19,7 +19,7 @@ use crate::{
     refresh::Freshness,
     search::{
         Category, Snapshot,
-        usage::{Pins, Usage},
+        usage::{Hidden, Pins, Usage},
     },
     settings::Settings,
     shared::Shared,
@@ -46,6 +46,7 @@ pub struct State {
     pub emoji: Shared<EmojiIndex>,
     pub usage: Shared<Usage>,
     pub pins: Shared<Pins>,
+    pub hidden: Shared<Hidden>,
     pub rates: Shared<Option<Rates>>,
     /// The latest weather download, for the city it names.
     pub weather: Shared<Option<Weather>>,
@@ -82,6 +83,10 @@ impl State {
             load("pins", e);
             Pins::default()
         });
+        let hidden = store.hidden().map(Hidden::new).unwrap_or_else(|e| {
+            load("hidden results", e);
+            Hidden::default()
+        });
         let clipboard = store.clipboard_history().unwrap_or_else(|e| {
             load("clipboard history", e);
             Vec::new()
@@ -117,6 +122,7 @@ impl State {
             library: Shared::new(Library::new(library)),
             usage: Shared::new(usage),
             pins: Shared::new(pins),
+            hidden: Shared::new(hidden),
             rates: Shared::new(rates),
             weather: Shared::new(weather),
             freshness: Freshness::default(),
@@ -147,6 +153,7 @@ impl State {
             emoji: self.emoji.get(),
             usage: self.usage.get(),
             pins: self.pins.get(),
+            hidden: self.hidden.get(),
             rates: self.rates.get(),
             now: Local::now(),
         }

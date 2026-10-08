@@ -182,6 +182,10 @@ pub enum Action {
     Unpin {
         id: String,
     },
+    /// Leave the result out of search for good, until Settings shows it again.
+    Hide {
+        id: String,
+    },
     /// Turn on currency rates, which a currency query asked for while they
     /// were off, and download them.
     TurnOnCurrencyRates,

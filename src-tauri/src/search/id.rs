@@ -77,6 +77,17 @@ impl Source {
         }
     }
 
+    /// The user may hide it from results for good. A clipboard entry is
+    /// deleted instead.
+    pub fn hideable(self) -> bool {
+        match self {
+            Self::App | Self::File | Self::Snippet | Self::Link | Self::Emoji | Self::System => {
+                true
+            }
+            Self::Clip => false,
+        }
+    }
+
     /// May appear among the suggestions in an empty All. Clipboard text and
     /// system commands should never be one keystroke away by accident.
     pub fn suggestible(self) -> bool {

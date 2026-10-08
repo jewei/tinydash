@@ -96,6 +96,8 @@ pub fn run() {
             commands::install_update,
             commands::widgets,
             commands::save_note,
+            commands::hidden_results,
+            commands::unhide_result,
         ])
         .build(tauri::generate_context!())
         .expect("TinyDash failed to start")

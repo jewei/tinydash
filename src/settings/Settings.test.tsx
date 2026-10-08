@@ -185,6 +185,25 @@ describe("Settings", () => {
     expect(backend.called("update_settings")).toHaveLength(1);
   });
 
+  it("lists hidden results and shows one again", async () => {
+    let hidden = [{ id: "app:/Applications/Helper.app", title: "Helper", subtitle: "Utility" }];
+    const backend = fakeBackend({
+      hidden_results: () => hidden,
+      unhide_result: (args) => {
+        hidden = hidden.filter((result) => result.id !== args.id);
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Show Helper again" }));
+    await waitFor(() => expect(backend.called("unhide_result")).toHaveLength(1));
+    expect(backend.called("unhide_result")[0]?.args).toEqual({
+      id: "app:/Applications/Helper.app",
+    });
+    expect(await screen.findByText(/None\. To hide one/)).toBeTruthy();
+  });
+
   it("moves and hides launcher tabs, keeping focus on them", async () => {
     let calls = 0;
     const backend = fakeBackend({

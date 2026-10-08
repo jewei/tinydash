@@ -95,6 +95,39 @@ impl Pins {
     }
 }
 
+/// The most results the user may hide.
+pub const MAX_HIDDEN: usize = 500;
+
+/// Result IDs the user hid; search leaves them out.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Hidden(std::collections::BTreeSet<String>);
+
+impl Hidden {
+    pub fn new(ids: impl IntoIterator<Item = String>) -> Self {
+        Self(ids.into_iter().collect())
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.0.contains(id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn ids(&self) -> impl Iterator<Item = &str> {
+        self.0.iter().map(String::as_str)
+    }
+
+    pub fn add(&mut self, id: &str) {
+        self.0.insert(id.to_owned());
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        self.0.remove(id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

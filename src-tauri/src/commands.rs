@@ -338,6 +338,12 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
         state
             .usage
             .update(|usage| ids.iter().for_each(|id| usage.remove(id)));
+        for id in &ids {
+            state.store.set_hidden(id, false, 0)?;
+        }
+        state
+            .hidden
+            .update(|hidden| ids.iter().for_each(|id| hidden.remove(id)));
         state.reload_library()?;
         events::results_stale(&app);
         Ok(())
@@ -380,4 +386,55 @@ pub async fn widgets(app: AppHandle) -> Result<Widgets> {
 #[tauri::command]
 pub async fn save_note(app: AppHandle, text: String) -> Result<()> {
     blocking(move || widgets::save_note(&app.state::<State>(), &text)).await
+}
+
+/// A hidden result, as Settings lists it.
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct HiddenResult {
+    pub id: String,
+    pub title: String,
+    pub subtitle: String,
+}
+
+/// The results the user hid, by name. One whose item is gone, such as an
+/// uninstalled app, shows its ID.
+#[tauri::command]
+pub fn hidden_results(state: tauri::State<State>) -> Vec<HiddenResult> {
+    let snapshot = state.snapshot();
+    let ctx = search::Context::none();
+    let mut results: Vec<HiddenResult> = snapshot
+        .hidden
+        .ids()
+        .map(|id| match search::resolve(&snapshot, &ctx, id) {
+            Some(found) => HiddenResult {
+                id: id.to_owned(),
+                title: found.title,
+                subtitle: found.subtitle,
+            },
+            None => HiddenResult {
+                id: id.to_owned(),
+                title: Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
+                subtitle: "No longer found".into(),
+            },
+        })
+        .collect();
+    results.sort_by_cached_key(|result| result.title.to_lowercase());
+    results
+}
+
+/// Show a hidden result in search again.
+#[tauri::command]
+pub async fn unhide_result(app: AppHandle, id: String) -> Result<()> {
+    blocking(move || {
+        let state = app.state::<State>();
+        state
+            .store
+            .set_hidden(&id, false, chrono::Utc::now().timestamp())?;
+        state.hidden.update(|hidden| hidden.remove(&id));
+        events::results_stale(&app);
+        Ok(())
+    })
+    .await
 }

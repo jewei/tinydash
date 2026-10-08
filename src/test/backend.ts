@@ -136,6 +136,8 @@ export function fakeBackend(
       clipCard: null,
     }),
     save_note: () => null,
+    hidden_results: () => [],
+    unhide_result: () => null,
     about: () => ({
       version: "0.2.0",
       settingsFolder: "/data",
