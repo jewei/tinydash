@@ -7,12 +7,20 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Added
 
 - Right-click a result to see its actions, as Mod+K shows them.
+- Hide a result from search for good (Hide from Results in its actions). Settings > Search shows hidden results again.
+- A short "Copied" message confirms a copy after the launcher hides.
 
 ### Changed
 
 - Currency rates are off until you turn them on. A currency query asks first, and turning rates off deletes the saved table.
-- Hide a result from search for good (Hide from Results in its actions). Settings > Search shows hidden results again.
-- A short "Copied" message confirms a copy after the launcher hides.
+
+### Fixed
+
+- A note that failed to save is saved again when you leave it, instead of waiting for more typing.
+- Copied images in clipboard history are no longer kept in the window's cache after you delete them.
+- On Linux, a clipboard card never shows text copied during its secret check.
+- An older weather download no longer interrupts a newer one for the same city.
+- The launcher warns when your saved data cannot be made private to your user account.
 
 ## [0.4.1] - 2026-10-08
 

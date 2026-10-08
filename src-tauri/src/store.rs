@@ -83,15 +83,21 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn open(dir: &Path) -> Result<Self> {
+    /// Open the database, and a warning for the user when it could not be
+    /// made private to their account. It still opens: losing every pin and
+    /// snippet would be worse, and the user can fix the permissions.
+    pub fn open(dir: &Path) -> Result<(Self, Option<String>)> {
         std::fs::create_dir_all(dir)?;
         let path = dir.join(FILE_NAME);
         let store = Self::new(Connection::open(&path)?)?;
         // Clipboard history can hold private text.
-        if let Err(error) = crate::platform::restrict_to_owner(&path) {
-            tracing::warn!(%error, "Could not restrict database permissions");
-        }
-        Ok(store)
+        let warning = crate::platform::restrict_to_owner(&path).err().map(|error| {
+            format!(
+                "TinyDash could not make {} private to your user account ({error}). Other accounts on this computer may read your clipboard history and snippets: make the file readable only by you.",
+                path.display()
+            )
+        });
+        Ok((store, warning))
     }
 
     /// A private database for tests, or when the real one cannot open.
@@ -658,6 +664,15 @@ mod tests {
         assert_eq!(store.hidden().unwrap(), ["app:/a", "app:/b"]);
         store.set_hidden("app:/a", false, 4).unwrap();
         assert_eq!(store.hidden().unwrap(), ["app:/b"]);
+    }
+
+    #[test]
+    fn a_private_database_opens_without_a_warning() {
+        let dir = std::env::temp_dir().join(format!("tinydash-store-{}", std::process::id()));
+        let (store, warning) = Store::open(&dir).unwrap();
+        drop(store);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(warning, None);
     }
 
     #[test]

@@ -271,10 +271,14 @@ pub fn watch_clipboard(capturing: impl Fn() -> bool + 'static) {
 }
 
 /// Ask GTK for the clipboard's text on the main thread, with the same
-/// secret check as capture, and wait briefly for the reply.
+/// secret check as capture, and wait briefly for the reply. A newer owner
+/// during the two requests drops both, so the text read is always the text
+/// whose markers were checked.
 pub fn clipboard_text(app: &tauri::AppHandle) -> Option<String> {
     let (reply, answer) = std::sync::mpsc::channel();
     let asked = app.run_on_main_thread(move || {
+        let owner = OWNER.load(Ordering::Acquire);
+        let current = move || OWNER.load(Ordering::Acquire) == owner;
         let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
         let targets = gtk::gdk::Atom::intern("TARGETS");
         clipboard.request_contents(&targets, move |clipboard, selection| {
@@ -283,12 +287,13 @@ pub fn clipboard_text(app: &tauri::AppHandle) -> Option<String> {
                     .iter()
                     .any(|target| SECRET_FORMATS.contains(&target.name().as_str()))
             });
-            if concealed {
+            if concealed || !current() {
                 reply.send(None).ok();
                 return;
             }
             clipboard.request_text(move |_, text| {
-                reply.send(text.map(str::to_owned)).ok();
+                let text = text.filter(|_| current()).map(str::to_owned);
+                reply.send(text).ok();
             });
         });
     });

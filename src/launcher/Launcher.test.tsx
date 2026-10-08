@@ -1020,11 +1020,13 @@ describe("Launcher", () => {
     expect(backend.called("hide_launcher")).toHaveLength(0);
   });
 
-  it("shows why the note was not saved", async () => {
-    setup(() => [], {
+  it("shows why the note was not saved, and saves it on the next try", async () => {
+    let failures = 1;
+    const { backend } = setup(() => [], {
       widgets: () => ({ clocks: null, disk: null, note: "draft" }),
       save_note: () => {
-        throw "The database is locked.";
+        if (failures-- > 0) throw "The database is locked.";
+        return null;
       },
     });
     const note = await screen.findByRole("textbox", { name: "Notepad" });
@@ -1032,6 +1034,12 @@ describe("Launcher", () => {
     fireEvent.input(note, { target: { value: "draft 2" } });
     fireEvent.blur(note);
     expect(await screen.findByText(/Not saved\. The database is locked\./)).toBeTruthy();
+
+    // No new typing: leaving the field again saves the same text.
+    fireEvent.blur(note);
+    await waitFor(() => expect(backend.called("save_note")).toHaveLength(2));
+    expect(backend.called("save_note")[1]?.args).toEqual({ text: "draft 2" });
+    expect(await screen.findByText(/· Saved$/)).toBeTruthy();
   });
 
   it("counts the focus timer down and runs its actions with Mod+P and the menu", async () => {

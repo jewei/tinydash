@@ -136,12 +136,18 @@ fn setup(app: &mut App) {
             legacy_dir.display()
         ));
     }
-    let store = store::Store::open(&data_dir).unwrap_or_else(|error| {
-        warnings.push(format!(
-            "Could not open saved data ({error}). Changes this session will not be saved."
-        ));
-        store::Store::in_memory()
-    });
+    let store = match store::Store::open(&data_dir) {
+        Ok((store, warning)) => {
+            warnings.extend(warning);
+            store
+        }
+        Err(error) => {
+            warnings.push(format!(
+                "Could not open saved data ({error}). Changes this session will not be saved."
+            ));
+            store::Store::in_memory()
+        }
+    };
     let shortcut = settings.shortcut.clone();
     let tray_visible = settings.show_tray_icon;
     app.manage(State::new(

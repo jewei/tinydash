@@ -71,7 +71,7 @@ pub fn serve_clipboard_image(
     let app = context.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let response = match app.state::<State>().clip(id) {
-            Ok(Some(Content::Image { png, .. })) => image_response(png),
+            Ok(Some(Content::Image { png, .. })) => clip_response(png),
             _ => not_found(),
         };
         responder.respond(response);
@@ -90,10 +90,21 @@ fn decoded_path(request: &Request<Vec<u8>>) -> Option<String> {
     (!decoded.is_empty()).then(|| Cow::into_owned(decoded))
 }
 
+/// An icon: the same for an hour, so the webview may keep it.
 fn image_response(png: Vec<u8>) -> Response<Vec<u8>> {
+    png_response(png, "max-age=3600")
+}
+
+/// A copied image, which may be private: the webview must not keep it on
+/// disk, where it would outlive a deleted entry or cleared history.
+fn clip_response(png: Vec<u8>) -> Response<Vec<u8>> {
+    png_response(png, "no-store")
+}
+
+fn png_response(png: Vec<u8>, cache: &'static str) -> Response<Vec<u8>> {
     Response::builder()
         .header(header::CONTENT_TYPE, "image/png")
-        .header(header::CACHE_CONTROL, "max-age=3600")
+        .header(header::CACHE_CONTROL, cache)
         .body(png)
         .expect("static headers are valid")
 }
@@ -103,4 +114,21 @@ fn not_found() -> Response<Vec<u8>> {
         .status(StatusCode::NOT_FOUND)
         .body(Vec::new())
         .expect("static headers are valid")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn copied_images_are_never_cached_but_icons_are() {
+        let cache = |response: Response<Vec<u8>>| {
+            response.headers()[header::CACHE_CONTROL]
+                .to_str()
+                .unwrap()
+                .to_owned()
+        };
+        assert_eq!(cache(clip_response(vec![1])), "no-store");
+        assert_eq!(cache(image_response(vec![1])), "max-age=3600");
+    }
 }
