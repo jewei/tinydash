@@ -448,6 +448,10 @@ export function Launcher() {
               results={launcher.results()}
               selectedIndex={launcher.selectedIndex()}
               onSelect={launcher.select}
+              onMenu={(index) => {
+                launcher.select(index);
+                openMenu();
+              }}
               onRun={(index) => {
                 // A click runs the row the user sees, whatever is still loading.
                 const result = launcher.results()[index];

@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Right-click a result to see its actions, as Mod+K shows them.
+
 ## [0.4.1] - 2026-10-08
 
 ### Changed
