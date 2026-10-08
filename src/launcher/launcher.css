@@ -1,5 +1,6 @@
 /* The launcher window is transparent; .launcher draws the rounded panel.
- * On Windows the OS draws the frame and corners instead. */
+ * On Windows the OS draws the frame and corners instead, and on macOS the
+ * window shadow draws a thin edge, which a border would double. */
 html,
 body {
   background: transparent;
@@ -28,6 +29,10 @@ body {
 .launcher[data-platform="windows"] {
   border: 0;
   border-radius: 0;
+}
+
+.launcher[data-platform="macos"] {
+  border: 0;
 }
 
 /* Search */
