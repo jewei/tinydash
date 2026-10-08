@@ -13,8 +13,35 @@ permissions:
   contents: read
 
 jobs:
+  # A change to Markdown or docs/ alone has no code to build or test, so the
+  # other jobs skip their slow steps. Unknown history counts as code.
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ! changed=$(git diff --name-only "$BASE" "$GITHUB_SHA"); then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$changed"
+          if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '(\.md$|^docs/|^LICENSE$)'; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
   frontend:
     name: Frontend
+    needs: changes
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -25,12 +52,17 @@ jobs:
         with:
           node-version: 24
       - run: bun install --frozen-lockfile
+      # Also checks Markdown formatting, so it runs for docs too.
       - run: bunx vp check
       - run: bunx vp test
+        if: needs.changes.outputs.code == 'true'
       - run: bunx vp build
+        if: needs.changes.outputs.code == 'true'
 
   rust:
     name: Rust (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -67,18 +99,22 @@ jobs:
 
   # Branch protection on main requires this one name, so the job list can
   # change without a settings change. It runs even when a job fails, and
-  # passes only when every job passed (a skipped or cancelled job fails it).
+  # passes only when every job passed. A skipped job counts only for a
+  # docs-only change; otherwise it fails, as a cancelled one does.
   required:
     name: Required checks
     if: always()
-    needs: [frontend, rust]
+    needs: [changes, frontend, rust]
     runs-on: ubuntu-24.04
     steps:
       - name: Fail unless every job passed
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          CODE: ${{ needs.changes.outputs.code }}
         run: |
-          echo "Results: $RESULTS"
+          echo "Results: $RESULTS (code changed: $CODE)"
           for result in $RESULTS; do
-            [ "$result" = success ] || exit 1
+            [ "$result" = success ] && continue
+            [ "$result" = skipped ] && [ "$CODE" = false ] && continue
+            exit 1
           done
