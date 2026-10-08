@@ -163,6 +163,11 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
     })
 }
 
+/// No system file index here: Windows Search is not used yet. Search uses TinyDash's own index.
+pub fn find_files(_name: &str, _folder: &Path, _limit: usize) -> Vec<PathBuf> {
+    Vec::new()
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let failed = |what: &str| {
         Error::msg(format!(

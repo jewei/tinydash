@@ -24,6 +24,11 @@ fileSearchFolders: Array<string>,
  */
 fileSearchExcludedDirs: Array<string>, 
 /**
+ * The Files tab also asks the OS's file index (Spotlight on macOS) for
+ * names under the home folder. Off by default.
+ */
+spotlightFiles: boolean, 
+/**
  * 0 is the default yellow; 1–5 are light to dark.
  */
 emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnabled: boolean, 

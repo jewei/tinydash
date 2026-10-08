@@ -443,6 +443,47 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
     Ok(())
 }
 
+/// Ask Spotlight for names that contain `name`, with fixed arguments and no
+/// shell. Stops after `limit` paths or a second, whichever comes first.
+pub fn find_files(name: &str, folder: &Path, limit: usize) -> Vec<PathBuf> {
+    use std::io::BufRead;
+    let spawned = Command::new("/usr/bin/mdfind")
+        .arg("-onlyin")
+        .arg(folder)
+        .arg("-name")
+        .arg(name)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+    let mut child = match spawned {
+        Ok(child) => child,
+        Err(error) => {
+            tracing::warn!(%error, "Could not run Spotlight");
+            return Vec::new();
+        }
+    };
+    let Some(output) = child.stdout.take() else {
+        return Vec::new();
+    };
+    let (send, receive) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let paths: Vec<PathBuf> = std::io::BufReader::new(output)
+            .lines()
+            .map_while(std::io::Result::ok)
+            .take(limit)
+            .map(PathBuf::from)
+            .collect();
+        send.send(paths).ok();
+    });
+    let paths = receive
+        .recv_timeout(std::time::Duration::from_secs(1))
+        .unwrap_or_default();
+    // Spotlight may still be writing after `limit` paths; stop it either way.
+    child.kill().ok();
+    child.wait().ok();
+    paths
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     match command {
         SystemCommand::Lock => lock_screen(),

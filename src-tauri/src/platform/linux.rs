@@ -179,6 +179,11 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
     })
 }
 
+/// No system file index here: desktops use different file indexes, none of them yet. Search uses TinyDash's own index.
+pub fn find_files(_name: &str, _folder: &Path, _limit: usize) -> Vec<PathBuf> {
+    Vec::new()
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")
         .unwrap_or_default()

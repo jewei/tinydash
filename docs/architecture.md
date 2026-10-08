@@ -24,7 +24,7 @@ TinyDash is one Rust process with three webview windows: the **launcher**, creat
 
 A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42`, `emoji:🚀`) and a list of `ResultAction`s. The first action runs on Enter, the second on Mod+Enter. The frontend sends the chosen `Action` back to `run_action`, plus the result ID when it was the main action, which counts as use.
 
-`actions.rs` checks every action against Rust's own state. It launches only indexed apps, opens and reveals only indexed apps and files, opens only http(s) URLs (a quicklink the user saved may also open a mailto URL or an absolute or `~` path), pins only items that still exist (at most 100), and reads snippets and quicklinks from its own library; a quicklink's query cannot add a path separator. Previews load for indexed apps and files, saved clipboard entries (hidden while history is off), and snippets. Copies from the password generator are marked secret so clipboard managers skip them.
+`actions.rs` checks every action against Rust's own state. It launches only indexed apps, opens and reveals only indexed apps and files (and the paths a Spotlight search returned most recently, up to 500), opens only http(s) URLs (a quicklink the user saved may also open a mailto URL or an absolute or `~` path), pins only items that still exist (at most 100), and reads snippets and quicklinks from its own library; a quicklink's query cannot add a path separator. Previews load for indexed apps and files, saved clipboard entries (hidden while history is off), and snippets. Copies from the password generator are marked secret so clipboard managers skip them.
 
 ## State and background work
 
@@ -57,7 +57,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 ## Platform layer
 
-`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection and reads (one thread at a time), disk space, launcher window setup, and returning focus. Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (AGENTS.md rule 6).
+`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection and reads (one thread at a time), disk space, a search of the OS's file index (Spotlight on macOS), launcher window setup, and returning focus. Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (AGENTS.md rule 6).
 
 | Concern          | macOS                                 | Windows                      | Linux                                                                                                         |
 | ---------------- | ------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------- |

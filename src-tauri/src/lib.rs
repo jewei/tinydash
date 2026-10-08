@@ -19,6 +19,7 @@ mod search;
 mod settings;
 mod shared;
 mod shortcut;
+mod spotlight;
 mod state;
 mod store;
 mod system_clipboard;
@@ -82,6 +83,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::launcher_init,
             commands::search,
+            commands::spotlight_files,
             commands::run_action,
             commands::preview,
             commands::hide_launcher,

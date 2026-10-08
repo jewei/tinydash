@@ -1248,6 +1248,48 @@ describe("Launcher", () => {
     expect(await screen.findByRole("option", { name: /^Run/ })).toBeTruthy();
   });
 
+  it("adds Spotlight results after the Files tab's own, without repeats", async () => {
+    const file = (path: string) => ({
+      ...app,
+      id: `file:${path}`,
+      kind: "file" as const,
+      title: path.split("/").pop() ?? path,
+    });
+    const indexed = file("/Users/me/Documents/readme.md");
+    const found = file("/Users/me/Projects/readme.txt");
+    const run = (spotlightFiles: boolean) => {
+      const backend = fakeBackend(
+        {
+          search: () => [indexed],
+          spotlight_files: () => [indexed, found],
+        },
+        { spotlightFiles },
+      );
+      render(() => <Launcher />);
+      return backend;
+    };
+
+    const on = run(true);
+    const input = screen.getByRole("combobox");
+    await emit("launcher:shown", { category: "files" });
+    fireEvent.input(input, { target: { value: "r" } });
+    await screen.findByRole("option", { name: /readme\.md/ });
+    expect(on.called("spotlight_files")).toHaveLength(0);
+    fireEvent.input(input, { target: { value: "readme" } });
+    expect(await screen.findByRole("option", { name: /readme\.txt/ })).toBeTruthy();
+    expect(screen.getAllByRole("option", { name: /readme\.md/ })).toHaveLength(1);
+    expect(on.called("spotlight_files").at(-1)?.args).toEqual({ query: "readme" });
+  });
+
+  it("asks Spotlight nothing while it is off", async () => {
+    const backend = fakeBackend({ search: () => [app] }, { spotlightFiles: false });
+    render(() => <Launcher />);
+    await emit("launcher:shown", { category: "files" });
+    fireEvent.input(screen.getByRole("combobox"), { target: { value: "readme" } });
+    await screen.findByRole("option", { name: /Safari/ });
+    expect(backend.called("spotlight_files")).toHaveLength(0);
+  });
+
   it("keeps the preview when every widget is off", async () => {
     fakeBackend({ search: () => [app] }, noWidgets);
     render(() => <Launcher />);
