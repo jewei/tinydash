@@ -32,7 +32,7 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 
 | Category  | Finds                                                                                                                    | Empty view                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
-| Apps      | Installed apps by name, bundle name, or executable                                                                       | Apps, most used first       |
+| Apps      | Installed apps by name, bundle name, or executable; each says what it is for (macOS, Linux) or where it is               | Apps, most used first       |
 | Files     | Names of files and folders in the indexed folders                                                                        | Files you opened before     |
 | Clipboard | Text, images, and file lists you copied                                                                                  | Newest first                |
 | Snippets  | Saved snippets and quicklinks by name or keyword                                                                         | Snippets and quicklinks     |
