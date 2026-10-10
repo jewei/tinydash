@@ -352,10 +352,12 @@ fn clipboard_is_concealed() -> bool {
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     let _one_reader = super::one_clipboard_reader();
+    let before = clipboard_change();
     if clipboard_is_concealed() {
         return None;
     }
-    super::read_with_arboard(images, files)
+    // A copy that replaced the checked one during the read was not checked.
+    super::read_with_arboard(images, files).filter(|_| clipboard_change() == before)
 }
 
 pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {

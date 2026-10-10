@@ -603,10 +603,13 @@ fn clipboard_is_concealed() -> bool {
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     let _one_reader = super::one_clipboard_reader();
+    let change = || NSPasteboard::generalPasteboard().changeCount();
+    let before = change();
     if clipboard_is_concealed() {
         return None;
     }
-    super::read_with_arboard(images, files)
+    // A copy that replaced the checked one during the read was not checked.
+    super::read_with_arboard(images, files).filter(|_| change() == before)
 }
 
 pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
@@ -711,8 +714,11 @@ static PREVIOUS_APP: Mutex<Option<Retained<NSRunningApplication>>> = Mutex::new(
 
 pub fn remember_frontmost_app() {
     // A copy made in a password app just before the shortcut may be newer
-    // than the clipboard monitor's last look; it must stay secret too.
-    note_clipboard_change(clipboard_change());
+    // than the clipboard monitor's last look; it must stay secret too. The
+    // counter waits for the reader lock, so it is read only then.
+    if password_app_in_front() {
+        note_clipboard_change(clipboard_change());
+    }
     let Some(app) = NSWorkspace::sharedWorkspace().frontmostApplication() else {
         return;
     };
