@@ -32,7 +32,7 @@ export function AliasList() {
       </Show>
       <ul>
         <For
-          each={aliases.latest ?? []}
+          each={aliases.error ? [] : (aliases.latest ?? [])}
           fallback={
             <li class="list-empty">
               None. To add one, choose Add Alias in a result's actions ({modKey()} K).

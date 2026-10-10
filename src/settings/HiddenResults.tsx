@@ -32,7 +32,7 @@ export function HiddenResults() {
       </Show>
       <ul>
         <For
-          each={hidden.latest ?? []}
+          each={hidden.error ? [] : (hidden.latest ?? [])}
           fallback={
             <li class="list-empty">
               None. To hide one, choose Hide from Results in its actions ({modKey()} K).

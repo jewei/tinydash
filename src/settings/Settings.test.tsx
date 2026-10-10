@@ -226,6 +226,19 @@ describe("Settings", () => {
     expect(await screen.findByText(/None\. To add one/)).toBeTruthy();
   });
 
+  it("says when the aliases cannot be read", async () => {
+    fakeBackend({
+      aliases: () => {
+        throw "The database is locked.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    expect(
+      await screen.findByText("Could not read the aliases: The database is locked."),
+    ).toBeTruthy();
+  });
+
   it("moves and hides launcher tabs, keeping focus on them", async () => {
     let calls = 0;
     const backend = fakeBackend({
