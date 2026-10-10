@@ -1225,3 +1225,7 @@ body {
   font-size: var(--text-small);
   color: var(--muted);
 }
+
+.dialog-error {
+  color: var(--danger);
+}

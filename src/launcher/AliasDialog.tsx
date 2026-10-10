@@ -1,30 +1,56 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, createUniqueId, onCleanup, onMount, Show } from "solid-js";
 
-/** Asks for a result's alias: one word that finds it first. Empty removes it. */
+import { isComposing } from "../lib/keys";
+
+/**
+ * Asks for a result's alias: one word that finds it first. Empty removes
+ * it. A failed save keeps the dialog open with the reason.
+ */
 export function AliasDialog(props: {
   title: string;
   alias: string;
+  error?: string;
+  busy: boolean;
   onSave: (alias: string) => void;
   onCancel: () => void;
 }) {
   const [alias, setAlias] = createSignal(props.alias);
+  const helpId = createUniqueId();
+  const errorId = createUniqueId();
+  let form!: HTMLFormElement;
   let field!: HTMLInputElement;
+
+  // Handle keys on the window before anything else, so the dialog stays
+  // modal even when a click moved focus out of it, and the launcher's keys
+  // never act behind it.
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (isComposing(event)) return;
+    const controls = Array.from(form.querySelectorAll<HTMLElement>("input, button"));
+    const index = controls.indexOf(document.activeElement as HTMLElement);
+    if (event.key === "Escape") {
+      props.onCancel();
+    } else if (event.key === "Tab") {
+      const step = event.shiftKey ? -1 : 1;
+      const next = index < 0 ? 0 : (index + step + controls.length) % controls.length;
+      controls[next]?.focus();
+    } else if (index < 0) {
+      // Focus left the dialog; typing goes back to the field.
+      field.focus();
+    } else if (!(event.key === "Enter" && event.repeat)) {
+      // Keys keep their normal meaning in the field and on the buttons. A
+      // held Enter opened the dialog; its repeats must not save it.
+      event.stopPropagation();
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
   onMount(() => {
     field.focus();
     field.select();
+    window.addEventListener("keydown", onKeyDown, true);
   });
-
-  const onKeyDown = (event: KeyboardEvent) => {
-    // The launcher's keys do not act while the dialog is open.
-    event.stopPropagation();
-    if (event.key === "Escape") {
-      event.preventDefault();
-      props.onCancel();
-    } else if (event.key === "Enter" && event.repeat) {
-      // A held Enter opened the dialog; its repeats must not save it.
-      event.preventDefault();
-    }
-  };
+  onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
 
   return (
     <div
@@ -32,14 +58,14 @@ export function AliasDialog(props: {
       onClick={(event) => event.target === event.currentTarget && props.onCancel()}
     >
       <form
+        ref={form}
         class="dialog"
         role="dialog"
         aria-modal="true"
         aria-label={`Alias for ${props.title}`}
-        onKeyDown={onKeyDown}
         onSubmit={(event) => {
           event.preventDefault();
-          props.onSave(alias());
+          if (!props.busy) props.onSave(alias());
         }}
       >
         <label class="dialog-field">
@@ -48,6 +74,8 @@ export function AliasDialog(props: {
             ref={field}
             class="field"
             value={alias()}
+            aria-describedby={props.error ? `${errorId} ${helpId}` : helpId}
+            aria-invalid={props.error ? true : undefined}
             onInput={(event) => setAlias(event.currentTarget.value)}
             autocomplete="off"
             autocorrect="off"
@@ -55,14 +83,21 @@ export function AliasDialog(props: {
             spellcheck={false}
           />
         </label>
-        <p class="dialog-help">
+        <Show when={props.error}>
+          {(text) => (
+            <p id={errorId} class="dialog-error" role="alert">
+              {text()}
+            </p>
+          )}
+        </Show>
+        <p id={helpId} class="dialog-help">
           One word. Typing it puts this result first. Leave it empty to remove the alias.
         </p>
         <div class="dialog-buttons">
           <button type="button" class="button" onClick={() => props.onCancel()}>
             Cancel
           </button>
-          <button type="submit" class="button primary">
+          <button type="submit" class="button primary" disabled={props.busy}>
             Save Alias
           </button>
         </div>

@@ -217,7 +217,7 @@ describe("Settings", () => {
     });
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "Search" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Remove the alias vsc" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove the alias vsc of Code" }));
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
     expect(backend.called("run_action")[0]?.args).toEqual({
       action: { type: "setAlias", id: "app:/Applications/Code.app", alias: "" },

@@ -528,9 +528,12 @@ export function Launcher() {
           <AliasDialog
             title={naming().title}
             alias={naming().alias}
+            error={launcher.aliasError()}
+            busy={launcher.running()}
             onSave={(alias) => {
-              launcher.saveAlias(alias);
-              focusInput();
+              void launcher.saveAlias(alias).then(() => {
+                if (!launcher.naming()) focusInput();
+              });
             }}
             onCancel={() => {
               launcher.cancelAlias();

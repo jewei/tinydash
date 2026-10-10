@@ -51,6 +51,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   const [actionError, setActionError] = createSignal<string>();
   const [pending, setPending] = createSignal<Pending>();
   const [naming, setNaming] = createSignal<Naming>();
+  const [aliasError, setAliasError] = createSignal<string>();
   const [running, setRunning] = createSignal(false);
 
   const selected = () => results()[selectedIndex()];
@@ -162,6 +163,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       setActionError(undefined);
       setPending(undefined);
       setNaming(undefined);
+      setAliasError(undefined);
     });
     void refresh();
   }
@@ -189,6 +191,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     // Usage ranking learns only from a result's main action.
     const resultId = result && result.actions[0] === action ? result.id : undefined;
     if (action.action.type === "setAlias") {
+      setAliasError(undefined);
       setNaming({ action, title: result?.title ?? "", alias: action.action.alias });
     } else if (action.confirm) {
       setPending({ action, resultId });
@@ -197,12 +200,29 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     }
   }
 
-  /** Save the alias the user typed; an empty one removes it. */
-  function saveAlias(alias: string) {
+  /**
+   * Save the alias the user typed; an empty one removes it. The dialog
+   * closes once it is saved, and shows the reason when it is not.
+   */
+  async function saveAlias(alias: string) {
     const waiting = naming();
+    if (waiting?.action.action.type !== "setAlias" || running()) return;
+    setRunning(true);
+    setAliasError(undefined);
+    try {
+      await ipc.runAction({ ...waiting.action.action, alias });
+      // The launcher may have been shown again meanwhile, with a new start.
+      if (naming() === waiting) setNaming(undefined);
+    } catch (error) {
+      if (naming() === waiting) setAliasError(ipc.message(error));
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  function cancelAlias() {
     setNaming(undefined);
-    if (waiting?.action.action.type !== "setAlias") return;
-    void perform({ ...waiting.action, action: { ...waiting.action.action, alias } });
+    setAliasError(undefined);
   }
 
   function confirm() {
@@ -236,6 +256,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     actionError,
     pending,
     naming,
+    aliasError,
     running,
     setQuery,
     setCategory,
@@ -252,6 +273,6 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     confirm,
     cancel: () => setPending(undefined),
     saveAlias,
-    cancelAlias: () => setNaming(undefined),
+    cancelAlias,
   };
 }

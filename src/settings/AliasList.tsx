@@ -50,7 +50,7 @@ export function AliasList() {
               <button
                 type="button"
                 class="link"
-                aria-label={`Remove the alias ${entry.alias}`}
+                aria-label={`Remove the alias ${entry.alias} of ${entry.title}`}
                 onClick={() => remove(entry.id)}
               >
                 Remove
