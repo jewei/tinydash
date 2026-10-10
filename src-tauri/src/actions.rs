@@ -113,14 +113,17 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .ok_or_else(|| Error::msg("An image has no text to copy."))?;
             copy_and_close(app, || system_clipboard::write_text(&text, false))?;
         }
-        // Reads as widgets do, so a copy marked secret stays as it is.
+        // Reads as widgets do, so a copy marked secret stays as it is. The
+        // new copy is secret too: on macOS a password copied in Passwords is
+        // known only by the app that was in front, so history skipped it, and
+        // must not save it now. The original copy stays in history if saved.
         Action::CopyPlainText => {
             let text = platform::clipboard_text(app).ok_or_else(|| {
                 Error::msg(
                     "The clipboard holds no text, or the app that copied it marked it secret.",
                 )
             })?;
-            copy_and_close(app, || system_clipboard::write_text(&text, false))?;
+            copy_and_close(app, || system_clipboard::write_text(&text, true))?;
         }
         // Deleting reveals nothing, so it works while history is off too.
         Action::DeleteClip { id } => {
