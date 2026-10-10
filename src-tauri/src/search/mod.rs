@@ -362,7 +362,8 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     // A keyword answer has its snippet's or quicklink's own ID, and a result
     // may match by name and by alias; keep only the first of each ID, so no
     // two rows share one. A keyword answer carries the typed text.
-    let mut seen: HashSet<String> = results.iter().map(|r| r.id.clone()).collect();
+    let answered: HashSet<String> = results.iter().map(|r| r.id.clone()).collect();
+    let mut seen = answered.clone();
     let ranked: Vec<SearchResult> = ranked
         .into_iter()
         .map(|(_, hit)| hit.result)
@@ -370,25 +371,41 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         .collect();
     // Quicklinks that can open the query, unless the user already chose a
     // keyword, such as `g` or a quicklink's own, or keeps snippets out of
-    // All. A quicklink the query found by name is not offered again.
+    // All. A quicklink that shows as a name match is not offered again.
     let chose = results.iter().any(|r| {
         matches!(
             r.kind,
             ResultKind::WebSearch | ResultKind::Quicklink | ResultKind::Snippet
         )
     });
-    let links: Vec<SearchResult> = if chose || !s.settings.in_all(Category::Snippets) {
+    let candidates: Vec<SearchResult> = if chose || !s.settings.in_all(Category::Snippets) {
         Vec::new()
     } else {
         s.library
             .fallbacks(query, ctx, s.now)
             .into_iter()
-            .filter(|link| !s.hidden.contains(&link.id) && !seen.contains(&link.id))
-            .take(QUICKLINK_FALLBACKS)
+            .filter(|link| !s.hidden.contains(&link.id) && !answered.contains(&link.id))
             .collect()
     };
     let fallback = usize::from(!keyword_search);
-    let room = ALL_LIMIT.saturating_sub(results.len() + fallback + links.len());
+    let room = |links: usize| ALL_LIMIT.saturating_sub(results.len() + fallback + links);
+    // The links take room from the name matches, and the name matches that
+    // show decide which links are left; fewer links leave more room, so
+    // this settles within a few steps.
+    let mut links = QUICKLINK_FALLBACKS.min(candidates.len());
+    let (room, links) = loop {
+        let room = room(links);
+        let shown: HashSet<&str> = ranked.iter().take(room).map(|r| r.id.as_str()).collect();
+        let offered: Vec<&SearchResult> = candidates
+            .iter()
+            .filter(|link| !shown.contains(link.id.as_str()))
+            .take(QUICKLINK_FALLBACKS)
+            .collect();
+        if offered.len() == links {
+            break (room, offered.into_iter().cloned().collect::<Vec<_>>());
+        }
+        links = offered.len();
+    };
     results.extend(ranked.into_iter().take(room));
     if !keyword_search {
         results.push(web::fallback(query, s.settings.search_engine));
@@ -677,8 +694,9 @@ mod tests {
     fn a_full_list_keeps_room_for_every_quicklink_it_offers() {
         use crate::features::library::{LibraryItem, LibraryKind};
         let state = crate::state::State::for_tests(Settings::default());
-        // "a" matches more than a full list of emoji, and two quicklinks
-        // also match it by name, so they show there instead.
+        // "a" matches more than a full list of emoji. "A Wiki" shows as a
+        // name match; "Maps" matches by name too, below the cut, so it is
+        // offered as a fallback instead.
         for name in ["A Wiki", "Docs", "Maps", "Notes"] {
             let item = LibraryItem {
                 id: None,
@@ -696,7 +714,10 @@ mod tests {
             .iter()
             .map(|result| result.title.as_str())
             .collect();
-        assert_eq!(tail, ["Search Google for “a”", "Docs: a", "Notes: a"]);
+        assert_eq!(tail, ["Docs: a", "Maps: a", "Notes: a"]);
+        let titles: Vec<&str> = results.iter().map(|r| r.title.as_str()).collect();
+        assert!(titles.contains(&"A Wiki"), "{titles:?}");
+        assert!(!titles.contains(&"A Wiki: a"));
     }
 
     #[test]

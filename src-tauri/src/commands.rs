@@ -461,12 +461,15 @@ pub struct AliasedResult {
 /// The aliases the user set, in alphabetical order.
 #[tauri::command]
 pub fn aliases(state: tauri::State<State>) -> Vec<AliasedResult> {
-    let snapshot = state.snapshot();
+    aliased(&state.snapshot())
+}
+
+fn aliased(snapshot: &search::Snapshot) -> Vec<AliasedResult> {
     let mut results: Vec<AliasedResult> = snapshot
         .aliases
         .iter()
         .map(|(id, alias)| {
-            let (title, subtitle) = describe(&snapshot, id);
+            let (title, subtitle) = describe(snapshot, id);
             AliasedResult {
                 id: id.to_owned(),
                 alias: alias.to_owned(),
@@ -492,4 +495,34 @@ pub async fn unhide_result(app: AppHandle, id: String) -> Result<()> {
         Ok(())
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::search::usage::Aliases;
+
+    #[test]
+    fn lists_aliases_by_word_and_names_gone_items_by_id() {
+        let state = State::for_tests(Settings::default());
+        state.aliases.set(Aliases::new([
+            ("system:lock".into(), "lk".into()),
+            ("app:/Gone.app".into(), "gn".into()),
+        ]));
+        let listed: Vec<(String, String, String)> = aliased(&state.snapshot())
+            .into_iter()
+            .map(|entry| (entry.alias, entry.title, entry.subtitle))
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                ("gn".into(), "/Gone.app".into(), "No longer found".into()),
+                (
+                    "lk".into(),
+                    "Lock Screen".into(),
+                    "Lock this computer".into()
+                ),
+            ]
+        );
+    }
 }

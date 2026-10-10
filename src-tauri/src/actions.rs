@@ -159,7 +159,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .filter(|item| item.kind == LibraryKind::Quicklink)
                 .ok_or_else(|| Error::msg("This quicklink was deleted."))?;
             // Read the way widgets read it: a copy its source marked
-            // secret, such as a password, never goes into a link.
+            // secret, as password managers do, never goes into a link.
             let clipboard = || platform::clipboard_text(app);
             match library::quicklink_target(&item.text, &query, chrono::Local::now(), clipboard)? {
                 Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
