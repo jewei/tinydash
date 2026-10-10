@@ -52,8 +52,10 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   const [pending, setPending] = createSignal<Pending>();
   const [naming, setNaming] = createSignal<Naming>();
   const [aliasError, setAliasError] = createSignal<string>();
-  // Only the alias's own save; another action that runs leaves the dialog free.
-  const [saving, setSaving] = createSignal(false);
+  // The dialog whose save runs: only it waits; another action that runs, or
+  // a dialog opened after a re-show, stays free.
+  const [savingFor, setSavingFor] = createSignal<Naming>();
+  const saving = () => naming() !== undefined && savingFor() === naming();
   const [running, setRunning] = createSignal(false);
 
   const selected = () => results()[selectedIndex()];
@@ -208,13 +210,13 @@ export function createLauncher(spotlight: () => boolean = () => false) {
    */
   async function saveAlias(alias: string) {
     const waiting = naming();
-    if (waiting?.action.action.type !== "setAlias" || saving()) return;
+    if (waiting?.action.action.type !== "setAlias" || savingFor() === waiting) return;
     if (running()) {
       setAliasError("Another action is still running. Save again when it ends.");
       return;
     }
     setRunning(true);
-    setSaving(true);
+    setSavingFor(waiting);
     setAliasError(undefined);
     try {
       await ipc.runAction({ ...waiting.action.action, alias });
@@ -224,7 +226,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       if (naming() === waiting) setAliasError(ipc.message(error));
     } finally {
       setRunning(false);
-      setSaving(false);
+      setSavingFor(undefined);
     }
   }
 

@@ -89,7 +89,6 @@ export function AliasDialog(props: {
             class="field"
             value={alias()}
             aria-describedby={props.error ? `${errorId} ${helpId}` : helpId}
-            aria-invalid={props.error ? true : undefined}
             onInput={(event) => setAlias(event.currentTarget.value)}
             autocomplete="off"
             autocorrect="off"

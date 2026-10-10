@@ -213,6 +213,16 @@ describe("Launcher", () => {
     await waitFor(() =>
       expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull(),
     );
+    // A dialog opened meanwhile is free, and says the old save still runs.
+    press("Enter");
+    const next = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const cancel = within(next).getByRole("button", { name: "Cancel" }) as HTMLButtonElement;
+    expect(cancel.disabled).toBe(false);
+    fireEvent.submit(next);
+    expect((await within(next).findByRole("alert")).textContent).toContain(
+      "Another action is still running",
+    );
+    fireEvent.click(cancel);
     // The late reply neither reopens the dialog nor shows its error.
     finish("Could not save.");
     await new Promise((resolve) => setTimeout(resolve, 0));
