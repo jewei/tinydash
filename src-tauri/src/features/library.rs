@@ -133,11 +133,15 @@ pub fn quicklink_target(
     let home = std::env::home_dir().unwrap_or_default();
     let path = settings::expand_home(&fill(template, query, now, clipboard, name)?, &home);
     // Values next to each other, such as `.{query}` with `.`, can still
-    // make a `..` that no single value holds.
-    if path
-        .components()
-        .any(|part| part == std::path::Component::ParentDir)
-    {
+    // make a `..` that no single value holds. A `..` the template itself
+    // has is the user's own choice.
+    let parents = |path: &std::path::Path| {
+        path.components()
+            .filter(|part| *part == std::path::Component::ParentDir)
+            .count()
+    };
+    let empty = fill(template, "", now, || None, |_| Ok(String::new()))?;
+    if parents(&path) > parents(&settings::expand_home(&empty, &home)) {
         return Err(Error::msg(
             "A path quicklink cannot climb out of its folder with “..”.",
         ));
@@ -306,7 +310,7 @@ fn result(item: &LibraryItem, query: &str, ctx: &Context) -> SearchResult {
                 .lines()
                 .next()
                 .unwrap_or_default()
-                .replace("{query}", query)
+                .replace("{query}", if query.is_empty() { "{query}" } else { query })
                 .chars()
                 .take(80)
                 .collect(),
@@ -321,7 +325,11 @@ fn result(item: &LibraryItem, query: &str, ctx: &Context) -> SearchResult {
         LibraryKind::Quicklink => (
             ResultKind::Quicklink,
             Symbol::Link,
-            item.text.replace("{query}", query),
+            if query.is_empty() {
+                item.text.clone()
+            } else {
+                item.text.replace("{query}", query)
+            },
             ResultAction::new(
                 "Open Quicklink",
                 Action::OpenQuicklink {
@@ -407,6 +415,7 @@ mod tests {
         assert!(quicklink_target("~/Projects/.{clipboard}", "", now, dot).is_err());
         assert!(target("~/Projects/{query}{query}", ".").is_err());
         assert!(target("~/Projects/{query}", ".notes").is_ok());
+        assert!(target("~/Projects/../Downloads/{query}", "x").is_ok());
     }
 
     #[test]
@@ -495,6 +504,9 @@ mod tests {
             }
         );
         assert_eq!(hello.actions.len(), 1);
+        // Its own row shows where the text goes.
+        let own = library.get(2, &Context::none()).unwrap();
+        assert_eq!(own.subtitle, "Hello {query},");
         // Without {query}, a snippet keyword takes no text.
         assert!(library.keyword_answer("sig Sam").is_none());
     }
