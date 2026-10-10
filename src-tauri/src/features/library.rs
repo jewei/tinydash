@@ -245,6 +245,23 @@ impl Library {
         self.find(id).map(|item| result(item, "", ctx))
     }
 
+    /// Quicklinks with `{query}` that can open the whole query, most used
+    /// first, for the end of an All search.
+    pub fn fallbacks(&self, query: &str, ctx: &Context, now: DateTime<Local>) -> Vec<SearchResult> {
+        let mut links: Vec<&LibraryItem> = self
+            .items
+            .iter()
+            .filter(|item| {
+                item.kind == LibraryKind::Quicklink
+                    && item.text.contains("{query}")
+                    && quicklink_target(&item.text, query, now, || None).is_ok()
+            })
+            .collect();
+        // Stable, so equally used links keep their name order.
+        links.sort_by_key(|item| std::cmp::Reverse(ctx.boost(&item.result_id())));
+        links.into_iter().map(|item| answer(item, query)).collect()
+    }
+
     /// `keyword text` for a quicklink, or a snippet with `{query}`, whose
     /// keyword is the first word.
     pub fn keyword_answer(&self, query: &str) -> Option<SearchResult> {
@@ -466,5 +483,37 @@ mod tests {
         assert_eq!(hello.actions.len(), 1);
         // Without {query}, a snippet keyword takes no text.
         assert!(library.keyword_answer("sig Sam").is_none());
+    }
+
+    #[test]
+    fn fallbacks_are_quicklinks_that_can_open_the_query() {
+        let link = |id, name: &str, text: &str| LibraryItem {
+            id: Some(id),
+            ..item(LibraryKind::Quicklink, name, "", text)
+        };
+        let library = Library::new(vec![
+            link(1, "Jira", "https://jira.test/browse/{query}"),
+            link(2, "Docs", "https://docs.test/"),
+            link(3, "Notes", "~/Notes/{query}"),
+            item(LibraryKind::Snippet, "Hi", "", "Hello {query}"),
+        ]);
+        let now = Local::now();
+        let titles = |query: &str| -> Vec<String> {
+            library
+                .fallbacks(query, &Context::none(), now)
+                .into_iter()
+                .map(|result| result.title)
+                .collect()
+        };
+        assert_eq!(titles("ABC-12"), ["Jira: ABC-12", "Notes: ABC-12"]);
+        // A path quicklink takes a name, not a path.
+        assert_eq!(titles("a/b"), ["Jira: a/b"]);
+        let jira = &library.fallbacks("x", &Context::none(), now)[0];
+        assert!(
+            !jira
+                .actions
+                .iter()
+                .any(|a| matches!(a.action, Action::Pin { .. }))
+        );
     }
 }

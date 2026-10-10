@@ -35,6 +35,8 @@ use usage::{Aliases, Hidden, Pins, Usage};
 pub const ALL_LIMIT: usize = 30;
 /// Results in a single category.
 pub const CATEGORY_LIMIT: usize = 100;
+/// Quicklinks offered after the web search at the end of an All search.
+const QUICKLINK_FALLBACKS: usize = 3;
 /// Usage-based suggestions below the pins in an empty All search.
 const SUGGESTIONS: usize = 8;
 
@@ -344,8 +346,26 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         .collect();
     ranked.sort_by_key(|(order, hit)| (hit.score < STRONG, *order, Reverse(hit.score)));
 
+    // Quicklinks that can open the query, unless the user already chose a
+    // keyword, such as `g` or a quicklink's own, or keeps snippets out of All.
+    let chose = results.iter().any(|r| {
+        matches!(
+            r.kind,
+            ResultKind::WebSearch | ResultKind::Quicklink | ResultKind::Snippet
+        )
+    });
+    let links: Vec<SearchResult> = if chose || !s.settings.in_all(Category::Snippets) {
+        Vec::new()
+    } else {
+        s.library
+            .fallbacks(query, ctx, s.now)
+            .into_iter()
+            .filter(|link| !s.hidden.contains(&link.id))
+            .take(QUICKLINK_FALLBACKS)
+            .collect()
+    };
     let fallback = usize::from(!keyword_search);
-    let room = ALL_LIMIT.saturating_sub(results.len() + fallback);
+    let room = ALL_LIMIT.saturating_sub(results.len() + fallback + links.len());
     // A keyword answer has its snippet's or quicklink's own ID, and a result
     // may match by name and by alias; keep only the first of each ID, so no
     // two rows share one. A keyword answer carries the typed text.
@@ -360,6 +380,12 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     if !keyword_search {
         results.push(web::fallback(query, s.settings.search_engine));
     }
+    // A quicklink that matched by name shows once, where it matched.
+    results.extend(
+        links
+            .into_iter()
+            .filter(|link| seen.insert(link.id.clone())),
+    );
     results
 }
 
@@ -576,6 +602,60 @@ mod tests {
         assert!(labels.contains(&"Change Alias “lo”…"), "{labels:?}");
         state.hidden.set(Hidden::new(["system:sleep".to_owned()]));
         assert!(!ids("lo", Category::All).contains(&"system:sleep".to_owned()));
+    }
+
+    #[test]
+    fn quicklinks_that_take_the_query_follow_the_web_search() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings::default());
+        for (name, keyword) in [("Jira", "jira"), ("Maps", ""), ("Wiki", ""), ("Docs", "")] {
+            let item = LibraryItem {
+                id: None,
+                kind: LibraryKind::Quicklink,
+                name: name.into(),
+                keyword: keyword.into(),
+                text: format!("https://{name}.test/{{query}}"),
+            };
+            state.store.save_library_item(&item).unwrap();
+        }
+        state.reload_library().unwrap();
+        let titles = |query: &str| -> Vec<String> {
+            search(&state.snapshot(), query, Category::All)
+                .into_iter()
+                .map(|result| result.title)
+                .collect()
+        };
+        let found = titles("rust");
+        assert_eq!(
+            found[found.len() - 4..],
+            [
+                "Search Google for “rust”",
+                "Docs: rust",
+                "Jira: rust",
+                "Maps: rust"
+            ]
+        );
+        // A keyword chose where the text goes.
+        assert!(
+            !titles("g rust")
+                .iter()
+                .any(|title| title.ends_with(": rust"))
+        );
+        assert!(
+            !titles("jira rust")
+                .iter()
+                .any(|title| title == "Maps: jira rust")
+        );
+        // A link that matched by name shows once, as itself.
+        let wiki = titles("wiki");
+        assert!(wiki.contains(&"Wiki".to_owned()));
+        assert!(!wiki.contains(&"Wiki: wiki".to_owned()));
+        let docs = search(&state.snapshot(), "", Category::Snippets)[0]
+            .id
+            .clone();
+        state.hidden.set(Hidden::new([docs]));
+        assert!(!titles("rust").contains(&"Docs: rust".to_owned()));
+        assert!(titles("rust").contains(&"Wiki: rust".to_owned()));
     }
 
     #[test]
