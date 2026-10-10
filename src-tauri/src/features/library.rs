@@ -146,14 +146,20 @@ pub fn quicklink_target(
     // A value holds no separator, so the parts of the template and of the
     // filled path line up. A part a value changed must not move up or stay
     // put, as `.{query}` with `.` would; Windows also drops trailing dots
-    // and spaces. A `..` the template itself has is the user's own choice.
+    // and spaces. An empty part also stays put, which matters only before
+    // a `..` of the template: that `..` would then climb higher than the
+    // user wrote. A `..` the template itself has is the user's own choice.
     let separators = ['/', '\\'];
-    let moves = template
+    let parts: Vec<(&str, &str)> = template
         .split(separators)
         .zip(filled.split(separators))
-        .any(|(part, done)| {
-            part != done && !done.is_empty() && done.trim_end_matches(['.', ' ']).is_empty()
-        });
+        .collect();
+    let moves = parts.iter().enumerate().any(|(index, (part, done))| {
+        let climbs_after = || parts[index + 1..].iter().any(|(later, _)| *later == "..");
+        part != done
+            && (done.trim_end_matches(['.', ' ']).is_empty() && !done.is_empty()
+                || done.is_empty() && climbs_after())
+    });
     if moves {
         return Err(Error::msg(
             "A path quicklink accepts a name, not “.” or “..”.",
@@ -453,6 +459,11 @@ mod tests {
         assert!(target("~/Notes/{query}", "...").is_err());
         assert!(target("~/Notes/{query}", ". ").is_err());
         assert!(target("~/Notes/{query}", "").is_ok());
+        assert!(target("~/x/{query}/y", "").is_ok());
+        // An empty value before the template's own `..` would climb higher.
+        assert!(target("/a/b/{query}/../c", "").is_err());
+        assert!(target("/a/b/{query}/../c", "n").is_ok());
+        assert!(quicklink_target("/a/b/{clipboard}/../../c", "", now, || None).is_err());
         assert!(
             item(LibraryKind::Quicklink, "a", "", "{query}/x")
                 .validated()
