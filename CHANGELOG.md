@@ -13,6 +13,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Copied files in clipboard history have Copy as Plain Text, which copies their paths.
 - Quicklinks can use `{clipboard}`, `{date}`, `{time}`, and `{datetime}`, as snippets do.
 
+### Changed
+
+- A row that carries typed text, such as `Jira: ABC-12`, no longer has Hide from Results, so Mod+Enter cannot hide the quicklink by accident. Hide it from its own row.
+
 ### Fixed
 
 - On macOS, a copy made in Passwords or Keychain Access just before you open the launcher no longer goes into clipboard history.
