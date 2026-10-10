@@ -130,22 +130,37 @@ pub fn quicklink_target(
         }
         Ok(value.to_owned())
     };
+    // `~` comes from the template alone, so no value can pick the home folder.
     let home = std::env::home_dir().unwrap_or_default();
-    let path = settings::expand_home(&fill(template, query, now, clipboard, name)?, &home);
-    // Values next to each other, such as `.{query}` with `.`, can still
-    // make a `..` that no single value holds. A `..` the template itself
-    // has is the user's own choice.
-    let parents = |path: &std::path::Path| {
-        path.components()
-            .filter(|part| *part == std::path::Component::ParentDir)
-            .count()
-    };
-    let empty = fill(template, "", now, || None, |_| Ok(String::new()))?;
-    if parents(&path) > parents(&settings::expand_home(&empty, &home)) {
-        return Err(Error::msg(
-            "A path quicklink cannot climb out of its folder with “..”.",
-        ));
+    let template = settings::expand_home(template, &home)
+        .to_string_lossy()
+        .into_owned();
+    let filled = fill(&template, query, now, clipboard, name)?;
+    // A value holds no separator, so the parts of the template and of the
+    // filled path line up. A part a value changed must not pick the root
+    // (the first part) or move up or stay put, as `.{query}` with `.` would;
+    // a `..` the template itself has is the user's own choice.
+    let separators = ['/', '\\'];
+    for (index, (part, done)) in template
+        .split(separators)
+        .zip(filled.split(separators))
+        .enumerate()
+    {
+        if part == done {
+            continue;
+        }
+        if index == 0 {
+            return Err(Error::msg(
+                "A path quicklink starts with a fixed folder, such as ~/ or /.",
+            ));
+        }
+        if done == "." || done == ".." {
+            return Err(Error::msg(
+                "A path quicklink accepts a name, not “.” or “..”.",
+            ));
+        }
     }
+    let path = PathBuf::from(filled);
     if !path.is_absolute() {
         return Err(Error::msg(
             "A quicklink opens an http, https, or mailto URL, or an absolute or ~ path.",
@@ -416,6 +431,16 @@ mod tests {
         assert!(target("~/Projects/{query}{query}", ".").is_err());
         assert!(target("~/Projects/{query}", ".notes").is_ok());
         assert!(target("~/Projects/../Downloads/{query}", "x").is_ok());
+        // Values cannot cancel the template's own `..` to climb higher.
+        let template = "/root/{clipboard}{clipboard}/x/{query}..";
+        assert!(quicklink_target(template, "q", now, dot).is_err());
+        // Nor can a value pick the root, such as the home folder.
+        assert!(target("{query}/x", "~").is_err());
+        assert!(
+            item(LibraryKind::Quicklink, "a", "", "{query}/x")
+                .validated()
+                .is_err()
+        );
     }
 
     #[test]
