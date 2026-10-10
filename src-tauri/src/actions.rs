@@ -15,6 +15,7 @@ use crate::{
     features::{
         clip_card,
         library::{self, LibraryKind, Target},
+        system::SystemCommand,
     },
     hud, platform, refresh,
     search::{
@@ -148,6 +149,10 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         Action::System { command } => {
             // Hide first: Lock and Sleep must not leave the launcher on screen.
             window::hide(app)?;
+            if command == SystemCommand::SleepDisplays {
+                // Releasing the key that ran it would wake the displays again.
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
             if let Err(error) = platform::run_system_command(command) {
                 window::show_again(app)?;
                 return Err(error);

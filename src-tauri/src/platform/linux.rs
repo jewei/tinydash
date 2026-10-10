@@ -211,8 +211,39 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         SystemCommand::OpenSystemSettings if desktop.contains("xfce") => {
             super::launch("xfce4-settings-manager")
         }
-        SystemCommand::LogOut | SystemCommand::OpenSystemSettings => unsupported(),
+        SystemCommand::OpenTrash => run("gio", &["open", "trash:///"]),
+        SystemCommand::SleepDisplays
+            if std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("x11") =>
+        {
+            run("xset", &["dpms", "force", "off"])
+        }
+        SystemCommand::SleepDisplays if desktop.contains("kde") => {
+            run("kscreen-doctor", &["--dpms", "off"])
+        }
+        SystemCommand::ToggleDarkMode if desktop.contains("gnome") => toggle_gnome_dark_mode(),
+        SystemCommand::LogOut
+        | SystemCommand::OpenSystemSettings
+        | SystemCommand::SleepDisplays
+        | SystemCommand::ToggleDarkMode => unsupported(),
     }
+}
+
+/// Switch GNOME's color scheme between dark and the default, as its quick
+/// settings do.
+fn toggle_gnome_dark_mode() -> Result<()> {
+    const SCHEMA: &str = "org.gnome.desktop.interface";
+    let output = std::process::Command::new("gsettings")
+        .args(["get", SCHEMA, "color-scheme"])
+        .output()
+        .map_err(|error| Error::msg(format!("Could not run gsettings: {error}")))?;
+    if !output.status.success() {
+        return Err(Error::msg(
+            "This desktop has no dark mode setting that TinyDash can change.",
+        ));
+    }
+    let dark = String::from_utf8_lossy(&output.stdout).contains("prefer-dark");
+    let next = if dark { "default" } else { "prefer-dark" };
+    run("gsettings", &["set", SCHEMA, "color-scheme", next])
 }
 
 /// Bumped on every owner change, before any request, so a callback can tell

@@ -90,6 +90,8 @@ pub enum Symbol {
     Trash,
     Settings,
     Quit,
+    Display,
+    Contrast,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, TS)]

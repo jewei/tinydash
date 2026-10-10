@@ -497,6 +497,17 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         SystemCommand::OpenSystemSettings => {
             super::run("/usr/bin/open", &["-b", "com.apple.systempreferences"])
         }
+        SystemCommand::SleepDisplays => super::run("/usr/bin/pmset", &["displaysleepnow"]),
+        SystemCommand::ToggleDarkMode => apple_script(
+            r#"tell application "System Events" to tell appearance preferences to set dark mode to not dark mode"#,
+        ),
+        // Opening the folder needs no Automation permission, unlike asking Finder.
+        SystemCommand::OpenTrash => {
+            let trash = std::env::home_dir()
+                .ok_or_else(|| Error::msg("Could not find your home folder."))?
+                .join(".Trash");
+            super::run("/usr/bin/open", &[&trash.to_string_lossy()])
+        }
     }
 }
 

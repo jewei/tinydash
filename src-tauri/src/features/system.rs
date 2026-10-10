@@ -22,6 +22,9 @@ pub enum SystemCommand {
     LogOut,
     EmptyTrash,
     OpenSystemSettings,
+    SleepDisplays,
+    ToggleDarkMode,
+    OpenTrash,
 }
 
 struct Command {
@@ -40,6 +43,18 @@ const TRASH: &str = if cfg!(windows) {
     "Empty Recycle Bin"
 } else {
     "Empty Trash"
+};
+
+const OPEN_TRASH: &str = if cfg!(windows) {
+    "Open Recycle Bin"
+} else {
+    "Open Trash"
+};
+
+const SLEEP_DISPLAYS: &str = if cfg!(target_os = "macos") {
+    "Sleep Displays"
+} else {
+    "Turn Off Displays"
 };
 
 const fn system(command: SystemCommand) -> Action {
@@ -100,6 +115,33 @@ const COMMANDS: &[Command] = &[
         symbol: Symbol::Trash,
         action: system(SystemCommand::EmptyTrash),
         confirm: Some("Permanently delete everything in the trash? This cannot be undone."),
+    },
+    Command {
+        key: "open-trash",
+        name: OPEN_TRASH,
+        description: "Show the items in the trash",
+        aliases: &["trash", "recycle bin", "bin"],
+        symbol: Symbol::Trash,
+        action: system(SystemCommand::OpenTrash),
+        confirm: None,
+    },
+    Command {
+        key: "sleep-displays",
+        name: SLEEP_DISPLAYS,
+        description: "Turn off the screens; the computer keeps running",
+        aliases: &["display off", "screen off", "monitor off", "sleep displays"],
+        symbol: Symbol::Display,
+        action: system(SystemCommand::SleepDisplays),
+        confirm: None,
+    },
+    Command {
+        key: "toggle-dark-mode",
+        name: "Toggle Dark Mode",
+        description: "Switch the system between light and dark",
+        aliases: &["dark mode", "light mode", "appearance", "theme"],
+        symbol: Symbol::Contrast,
+        action: system(SystemCommand::ToggleDarkMode),
+        confirm: None,
     },
     Command {
         key: "clear-clipboard",
@@ -206,6 +248,8 @@ mod tests {
         assert_eq!(titles("reboot")[0], "Restart");
         assert_eq!(titles("suspend")[0], "Sleep");
         assert_eq!(titles("sign out")[0], "Log Out");
+        assert_eq!(titles("dark mode")[0], "Toggle Dark Mode");
+        assert_eq!(titles("screen off")[0], SLEEP_DISPLAYS);
     }
 
     #[test]
