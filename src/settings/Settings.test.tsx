@@ -210,7 +210,7 @@ describe("Settings", () => {
     ];
     const backend = fakeBackend({
       aliases: () => aliases,
-      run_action: () => {
+      remove_alias: () => {
         aliases = [];
         return null;
       },
@@ -218,10 +218,9 @@ describe("Settings", () => {
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "Search" }));
     fireEvent.click(await screen.findByRole("button", { name: "Remove the alias vsc of Code" }));
-    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
-    expect(backend.called("run_action")[0]?.args).toEqual({
-      action: { type: "setAlias", id: "app:/Applications/Code.app", alias: "" },
-      resultId: null,
+    await waitFor(() => expect(backend.called("remove_alias")).toHaveLength(1));
+    expect(backend.called("remove_alias")[0]?.args).toEqual({
+      id: "app:/Applications/Code.app",
     });
     expect(await screen.findByText(/None\. To add one/)).toBeTruthy();
   });

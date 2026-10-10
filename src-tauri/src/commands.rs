@@ -497,6 +497,17 @@ pub async fn unhide_result(app: AppHandle, id: String) -> Result<()> {
     .await
 }
 
+/// Remove a result's alias, also when its item is gone.
+#[tauri::command]
+pub async fn remove_alias(app: AppHandle, id: String) -> Result<()> {
+    blocking(move || {
+        actions::set_alias(&app.state::<State>(), &id, "")?;
+        events::results_stale(&app);
+        Ok(())
+    })
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

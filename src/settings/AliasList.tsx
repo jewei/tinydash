@@ -16,7 +16,7 @@ export function AliasList() {
   const remove = (id: string) => {
     setFailure(undefined);
     ipc
-      .runAction({ type: "setAlias", id, alias: "" })
+      .removeAlias(id)
       .then(() => refetch())
       .catch((error) => setFailure(ipc.message(error)));
   };

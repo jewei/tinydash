@@ -141,6 +141,7 @@ export function fakeBackend(
     hidden_results: () => [],
     unhide_result: () => null,
     aliases: () => [],
+    remove_alias: () => null,
     about: () => ({
       version: "0.2.0",
       settingsFolder: "/data",

@@ -248,7 +248,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
 /// Give a result an alias, or remove its alias when `alias` is empty. Only
 /// a result that exists gets one, under its own ID, as a pin does, and an
 /// alias names one result.
-fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
+pub fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
     let _limit = state
         .limited_change
         .lock()

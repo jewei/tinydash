@@ -66,6 +66,8 @@ export const unhideResult = (id: string) => invoke<void>("unhide_result", { id }
 /** The aliases the user set, with the results they name. */
 export const aliases = () => invoke<AliasedResult[]>("aliases");
 
+export const removeAlias = (id: string) => invoke<void>("remove_alias", { id });
+
 /** Resolves to the newer version, or `null` when this one is the latest. */
 export const checkForUpdate = () => invoke<string | null>("check_for_update");
 

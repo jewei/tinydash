@@ -22,6 +22,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Fixed
 
 - On macOS, a copy made in Passwords or Keychain Access just before you open the launcher no longer goes into clipboard history.
+- When Settings cannot read your hidden results, it no longer also says there are none.
 
 ## [0.5.0] - 2026-10-08
 
