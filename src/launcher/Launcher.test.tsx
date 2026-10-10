@@ -175,6 +175,50 @@ describe("Launcher", () => {
     expect(backend.called("hide_launcher")).toHaveLength(0);
   });
 
+  it("closes the alias dialog when the launcher opens again, even during a save", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    let finish: (error?: string) => void = () => undefined;
+    const { press } = setup(() => [named], {
+      run_action: () =>
+        new Promise((resolve, reject) => {
+          finish = (error) => (error ? reject(error) : resolve(null));
+        }),
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const field = within(dialog).getByRole("textbox");
+    // A held Enter does not save.
+    const held = new KeyboardEvent("keydown", {
+      key: "Enter",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    field.dispatchEvent(held);
+    expect(held.defaultPrevented).toBe(true);
+    fireEvent.input(field, { target: { value: "sf" } });
+    fireEvent.submit(dialog);
+    // While it saves, Escape does not pretend to cancel it.
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.getByRole("dialog", { name: "Alias for Safari" })).toBeTruthy();
+    await emit("launcher:shown", { category: null });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull(),
+    );
+    // The late reply neither reopens the dialog nor shows its error.
+    finish("Could not save.");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText("Could not save.")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+  });
+
   it("closes the alias dialog with Escape and saves nothing", async () => {
     const named: SearchResult = {
       ...app,

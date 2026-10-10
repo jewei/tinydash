@@ -25,17 +25,20 @@ export function AliasDialog(props: {
   // never act behind it.
   const onKeyDown = (event: KeyboardEvent) => {
     if (isComposing(event)) return;
-    const controls = Array.from(form.querySelectorAll<HTMLElement>("input, button"));
+    const controls = Array.from(form.querySelectorAll<HTMLElement>("input, button:not(:disabled)"));
     const index = controls.indexOf(document.activeElement as HTMLElement);
     if (event.key === "Escape") {
-      props.onCancel();
+      // A save already sent cannot be taken back, so it is not cancelled.
+      if (!props.busy) props.onCancel();
     } else if (event.key === "Tab") {
       const step = event.shiftKey ? -1 : 1;
       const next = index < 0 ? 0 : (index + step + controls.length) % controls.length;
       controls[next]?.focus();
     } else if (index < 0) {
-      // Focus left the dialog; typing goes back to the field.
+      // Focus left the dialog; the key goes to the field, as if typed there.
       field.focus();
+      event.stopPropagation();
+      return;
     } else if (!(event.key === "Enter" && event.repeat)) {
       // Keys keep their normal meaning in the field and on the buttons. A
       // held Enter opened the dialog; its repeats must not save it.
@@ -55,7 +58,7 @@ export function AliasDialog(props: {
   return (
     <div
       class="backdrop"
-      onClick={(event) => event.target === event.currentTarget && props.onCancel()}
+      onClick={(event) => event.target === event.currentTarget && !props.busy && props.onCancel()}
     >
       <form
         ref={form}
