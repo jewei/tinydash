@@ -34,7 +34,9 @@
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
 //! - `note_clipboard_change(change)`: the monitor saw a new change; remember
 //!   what makes it secret but the content does not show (on macOS, a copy
-//!   made in Passwords or Keychain Access). Reads no content.
+//!   made in Passwords or Keychain Access). Reads no content. On macOS,
+//!   `remember_frontmost_app` also calls it, for a copy made just before
+//!   the launcher opened.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.

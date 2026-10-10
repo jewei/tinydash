@@ -710,6 +710,9 @@ pub fn prepare_launcher(window: &tauri::WebviewWindow) {
 static PREVIOUS_APP: Mutex<Option<Retained<NSRunningApplication>>> = Mutex::new(None);
 
 pub fn remember_frontmost_app() {
+    // A copy made in a password app just before the shortcut may be newer
+    // than the clipboard monitor's last look; it must stay secret too.
+    note_clipboard_change(clipboard_change());
     let Some(app) = NSWorkspace::sharedWorkspace().frontmostApplication() else {
         return;
     };

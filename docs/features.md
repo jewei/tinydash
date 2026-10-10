@@ -85,10 +85,10 @@ Every All search with text ends with a web search on the chosen engine (Settings
 Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash saves what you copy, newest first, up to the limit you choose (1–1000; pins do not count). Lowering the limit deletes the oldest entries at once. Turning history off hides saved entries, and their pins, but keeps them until you clear them; turning it on again shows them.
 
 - Text up to 16 KB. Images (up to 32, not counting pins, each at most 8 MB and 16 megapixels) and copied files (up to 64 paths, as references) are separate opt-ins.
-- Copies marked secret by password managers are never read. On macOS, copies made while Passwords or Keychain Access is in front are skipped.
+- Copies marked secret by password managers are never read. On macOS, Passwords and Keychain Access mark nothing, so a copy made there is skipped when TinyDash notices it while the app is still in front: within half a second, or when you open the launcher from that app. Switching apps faster than that can let the copy through.
 - Enter copies the entry back in its original format and returns you to the previous app, ready to paste. Copying an entry again moves it to the top.
 - Text is saved as plain text. A list of copied files also has Copy as Plain Text, which copies its paths, one per line.
-- The System command Make Clipboard Plain Text puts the clipboard's text back without its formatting, such as fonts and links from a web page or a document, so it pastes as plain text. It works while history is off, and leaves a copy that its app marked secret as it is. The plain copy is marked secret, so clipboard histories, TinyDash's included, do not save it again; a copy already in history stays there.
+- The System command Make Clipboard Plain Text puts the clipboard's text back without its formatting, such as fonts and links from a web page or a document, so it pastes as plain text. It works while history is off, and leaves a copy that its app marked secret as it is. With history on, the plain copy moves the entry to the top.
 - Clear History deletes everything except pins, after you confirm. It is in the Clipboard tab (the footer button, or Mod+K), in Settings, and in the System command Clear Clipboard History. Data stays on this computer in `tinydash.db`, unencrypted.
 - Linux saves text only, and on Wayland the desktop reports a copy only while TinyDash has focus, so copies made elsewhere are saved when the launcher next opens (the latest one only).
 
