@@ -52,6 +52,8 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   const [pending, setPending] = createSignal<Pending>();
   const [naming, setNaming] = createSignal<Naming>();
   const [aliasError, setAliasError] = createSignal<string>();
+  // Only the alias's own save; another action that runs leaves the dialog free.
+  const [saving, setSaving] = createSignal(false);
   const [running, setRunning] = createSignal(false);
 
   const selected = () => results()[selectedIndex()];
@@ -206,8 +208,13 @@ export function createLauncher(spotlight: () => boolean = () => false) {
    */
   async function saveAlias(alias: string) {
     const waiting = naming();
-    if (waiting?.action.action.type !== "setAlias" || running()) return;
+    if (waiting?.action.action.type !== "setAlias" || saving()) return;
+    if (running()) {
+      setAliasError("Another action is still running. Save again when it ends.");
+      return;
+    }
     setRunning(true);
+    setSaving(true);
     setAliasError(undefined);
     try {
       await ipc.runAction({ ...waiting.action.action, alias });
@@ -217,6 +224,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       if (naming() === waiting) setAliasError(ipc.message(error));
     } finally {
       setRunning(false);
+      setSaving(false);
     }
   }
 
@@ -257,6 +265,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     pending,
     naming,
     aliasError,
+    saving,
     running,
     setQuery,
     setCategory,

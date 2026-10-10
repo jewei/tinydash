@@ -221,6 +221,32 @@ describe("Launcher", () => {
     expect(document.activeElement).toBe(screen.getByRole("combobox"));
   });
 
+  it("leaves the alias dialog free while another action runs", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        app.actions[0]!,
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    const { backend, press } = setup(() => [named], {
+      run_action: () => new Promise(() => undefined),
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Add Alias/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    fireEvent.submit(dialog);
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "Another action is still running",
+    );
+    expect(backend.called("run_action")).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
+  });
+
   it("closes the alias dialog with Escape and saves nothing", async () => {
     const named: SearchResult = {
       ...app,

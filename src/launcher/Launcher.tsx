@@ -529,7 +529,7 @@ export function Launcher() {
             title={naming().title}
             alias={naming().alias}
             error={launcher.aliasError()}
-            busy={launcher.running()}
+            busy={launcher.saving()}
             onSave={(alias) => {
               void launcher.saveAlias(alias).then(() => {
                 if (!launcher.naming()) focusInput();
