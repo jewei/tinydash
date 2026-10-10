@@ -271,7 +271,13 @@ describe("Launcher", () => {
     await screen.findByRole("option", { name: /Safari/ });
     press("Enter");
     const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
-    fireEvent.keyDown(within(dialog).getByRole("textbox"), { key: "Escape" });
+    // A text selection that ends on the backdrop keeps the dialog.
+    const field = within(dialog).getByRole("textbox");
+    const backdrop = dialog.parentElement!;
+    fireEvent.mouseDown(field);
+    fireEvent.click(backdrop);
+    expect(screen.getByRole("dialog", { name: "Alias for Safari" })).toBeTruthy();
+    fireEvent.keyDown(field, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
     expect(backend.called("run_action")).toHaveLength(0);
     expect(backend.called("hide_launcher")).toHaveLength(0);

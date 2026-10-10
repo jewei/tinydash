@@ -18,6 +18,9 @@ export function AliasDialog(props: {
   const helpId = createUniqueId();
   const errorId = createUniqueId();
   let form!: HTMLFormElement;
+  // A press that started in the field, such as a text selection, may end on
+  // the backdrop; only a click that starts there too closes the dialog.
+  let pressedBackdrop = false;
   let field!: HTMLInputElement;
 
   // Handle keys on the window before anything else, so the dialog stays
@@ -69,7 +72,12 @@ export function AliasDialog(props: {
   return (
     <div
       class="backdrop"
-      onClick={(event) => event.target === event.currentTarget && !props.busy && props.onCancel()}
+      onMouseDown={(event) => (pressedBackdrop = event.target === event.currentTarget)}
+      onClick={(event) => {
+        if (pressedBackdrop && event.target === event.currentTarget && !props.busy) {
+          props.onCancel();
+        }
+      }}
     >
       <form
         ref={form}

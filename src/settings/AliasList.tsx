@@ -13,11 +13,18 @@ export function AliasList() {
   const stop = ipc.onResultsStale(() => void refetch());
   onCleanup(() => void stop.then((unlisten) => unlisten()));
 
-  const remove = (id: string) => {
+  let list!: HTMLUListElement;
+  // The removed row's button had focus; the row now in its place, or the
+  // list when it is empty, takes it, so keyboard users keep their place.
+  const remove = (id: string, index: number) => {
     setFailure(undefined);
     ipc
       .removeAlias(id)
       .then(() => refetch())
+      .then(() => {
+        const buttons = list.querySelectorAll<HTMLButtonElement>("button");
+        (buttons[Math.min(index, buttons.length - 1)] ?? list).focus();
+      })
       .catch((error) => setFailure(ipc.message(error)));
   };
 
@@ -31,7 +38,7 @@ export function AliasList() {
         )}
       </Show>
       <Show when={!aliases.error}>
-        <ul>
+        <ul ref={list} tabIndex={-1} aria-label="Aliases">
           <For
             each={aliases.latest ?? []}
             fallback={
@@ -40,7 +47,7 @@ export function AliasList() {
               </li>
             }
           >
-            {(entry) => (
+            {(entry, index) => (
               <li>
                 <span class="hidden-result">
                   <span>
@@ -52,7 +59,7 @@ export function AliasList() {
                   type="button"
                   class="link"
                   aria-label={`Remove the alias ${entry.alias} of ${entry.title}`}
-                  onClick={() => remove(entry.id)}
+                  onClick={() => remove(entry.id, index())}
                 >
                   Remove
                 </button>

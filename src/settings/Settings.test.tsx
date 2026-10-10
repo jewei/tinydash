@@ -204,7 +204,7 @@ describe("Settings", () => {
     expect(await screen.findByText(/None\. To hide one/)).toBeTruthy();
   });
 
-  it("lists aliases and removes one", async () => {
+  it("lists aliases and removes one, keeping keyboard focus in the list", async () => {
     let aliases = [
       { id: "app:/Applications/Code.app", alias: "vsc", title: "Code", subtitle: "Editor" },
     ];
@@ -223,6 +223,9 @@ describe("Settings", () => {
       id: "app:/Applications/Code.app",
     });
     expect(await screen.findByText(/None\. To add one/)).toBeTruthy();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("list", { name: "Aliases" })),
+    );
   });
 
   it("says when the aliases cannot be read", async () => {
