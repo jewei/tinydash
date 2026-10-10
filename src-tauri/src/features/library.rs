@@ -136,29 +136,28 @@ pub fn quicklink_target(
         .to_string_lossy()
         .into_owned();
     let filled = fill(&template, query, now, clipboard, name)?;
+    // The root (a drive, a UNC server and share, or `/`) comes from the
+    // template alone: a value must not pick another disk or server.
+    if root(&template) != root(&filled) {
+        return Err(Error::msg(
+            "A path quicklink starts with a fixed folder, such as ~/ or /.",
+        ));
+    }
     // A value holds no separator, so the parts of the template and of the
-    // filled path line up. A part a value changed must not pick the root
-    // (the first part) or move up or stay put, as `.{query}` with `.` would;
-    // a `..` the template itself has is the user's own choice.
+    // filled path line up. A part a value changed must not move up or stay
+    // put, as `.{query}` with `.` would; Windows also drops trailing dots
+    // and spaces. A `..` the template itself has is the user's own choice.
     let separators = ['/', '\\'];
-    for (index, (part, done)) in template
+    let moves = template
         .split(separators)
         .zip(filled.split(separators))
-        .enumerate()
-    {
-        if part == done {
-            continue;
-        }
-        if index == 0 {
-            return Err(Error::msg(
-                "A path quicklink starts with a fixed folder, such as ~/ or /.",
-            ));
-        }
-        if done == "." || done == ".." {
-            return Err(Error::msg(
-                "A path quicklink accepts a name, not “.” or “..”.",
-            ));
-        }
+        .any(|(part, done)| {
+            part != done && !done.is_empty() && done.trim_end_matches(['.', ' ']).is_empty()
+        });
+    if moves {
+        return Err(Error::msg(
+            "A path quicklink accepts a name, not “.” or “..”.",
+        ));
     }
     let path = PathBuf::from(filled);
     if !path.is_absolute() {
@@ -167,6 +166,19 @@ pub fn quicklink_target(
         ));
     }
     Ok(Target::Path(path))
+}
+
+/// The drive or UNC prefix and the root folder that start a path.
+fn root(path: &str) -> Vec<std::path::Component<'_>> {
+    std::path::Path::new(path)
+        .components()
+        .take_while(|part| {
+            matches!(
+                part,
+                std::path::Component::Prefix(_) | std::path::Component::RootDir
+            )
+        })
+        .collect()
 }
 
 /// Fill snippet placeholders. The clipboard is read only when needed.
@@ -434,8 +446,13 @@ mod tests {
         // Values cannot cancel the template's own `..` to climb higher.
         let template = "/root/{clipboard}{clipboard}/x/{query}..";
         assert!(quicklink_target(template, "q", now, dot).is_err());
-        // Nor can a value pick the root, such as the home folder.
+        // Nor can a value pick the root, such as the home folder or a
+        // network server, or stay put with dots Windows drops.
         assert!(target("{query}/x", "~").is_err());
+        assert!(target(r"\\{query}\share", "attacker").is_err());
+        assert!(target("~/Notes/{query}", "...").is_err());
+        assert!(target("~/Notes/{query}", ". ").is_err());
+        assert!(target("~/Notes/{query}", "").is_ok());
         assert!(
             item(LibraryKind::Quicklink, "a", "", "{query}/x")
                 .validated()
