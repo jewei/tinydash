@@ -203,15 +203,17 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
             run("xfce4-session-logout", &["--logout"])
         }
         SystemCommand::OpenSystemSettings if desktop.contains("gnome") => {
-            super::launch("gnome-control-center")
+            super::launch("gnome-control-center", &[])
         }
         SystemCommand::OpenSystemSettings if desktop.contains("kde") => {
-            super::launch("systemsettings")
+            super::launch("systemsettings", &[])
         }
         SystemCommand::OpenSystemSettings if desktop.contains("xfce") => {
-            super::launch("xfce4-settings-manager")
+            super::launch("xfce4-settings-manager", &[])
         }
-        SystemCommand::OpenTrash => run("gio", &["open", "trash:///"]),
+        // Not awaited: a file manager that GLib starts directly keeps the
+        // output pipes open until its window closes.
+        SystemCommand::OpenTrash => super::launch("gio", &["open", "trash:///"]),
         SystemCommand::SleepDisplays
             if std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("x11") =>
         {

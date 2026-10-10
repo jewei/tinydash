@@ -182,9 +182,11 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
 }
 
 /// Start a GUI program and return at once; it keeps running on its own.
+/// Never pass user text in `args`.
 #[cfg(target_os = "linux")]
-fn launch(program: &str) -> Result<()> {
+fn launch(program: &str, args: &[&str]) -> Result<()> {
     let mut child = std::process::Command::new(program)
+        .args(args)
         .spawn()
         .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))?;
     // Reap it when it exits, so no zombie process stays behind.
