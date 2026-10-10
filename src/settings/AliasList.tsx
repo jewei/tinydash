@@ -30,35 +30,37 @@ export function AliasList() {
           </p>
         )}
       </Show>
-      <ul>
-        <For
-          each={aliases.error ? [] : (aliases.latest ?? [])}
-          fallback={
-            <li class="list-empty">
-              None. To add one, choose Add Alias in a result's actions ({modKey()} K).
-            </li>
-          }
-        >
-          {(entry) => (
-            <li>
-              <span class="hidden-result">
-                <span>
-                  <code>{entry.alias}</code> {entry.title}
+      <Show when={!aliases.error}>
+        <ul>
+          <For
+            each={aliases.latest ?? []}
+            fallback={
+              <li class="list-empty">
+                None. To add one, choose Add Alias in a result's actions ({modKey()} K).
+              </li>
+            }
+          >
+            {(entry) => (
+              <li>
+                <span class="hidden-result">
+                  <span>
+                    <code>{entry.alias}</code> {entry.title}
+                  </span>
+                  <span class="row-description">{entry.subtitle}</span>
                 </span>
-                <span class="row-description">{entry.subtitle}</span>
-              </span>
-              <button
-                type="button"
-                class="link"
-                aria-label={`Remove the alias ${entry.alias} of ${entry.title}`}
-                onClick={() => remove(entry.id)}
-              >
-                Remove
-              </button>
-            </li>
-          )}
-        </For>
-      </ul>
+                <button
+                  type="button"
+                  class="link"
+                  aria-label={`Remove the alias ${entry.alias} of ${entry.title}`}
+                  onClick={() => remove(entry.id)}
+                >
+                  Remove
+                </button>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
       <p class="list-status" role="status">
         {failure() ?? ""}
       </p>

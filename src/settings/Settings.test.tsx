@@ -237,6 +237,21 @@ describe("Settings", () => {
     expect(
       await screen.findByText("Could not read the aliases: The database is locked."),
     ).toBeTruthy();
+    expect(screen.queryByText(/None\. To add one/)).toBeNull();
+  });
+
+  it("says when the hidden results cannot be read", async () => {
+    fakeBackend({
+      hidden_results: () => {
+        throw "The database is locked.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    expect(
+      await screen.findByText("Could not read the hidden results: The database is locked."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/None\. To hide one/)).toBeNull();
   });
 
   it("moves and hides launcher tabs, keeping focus on them", async () => {
