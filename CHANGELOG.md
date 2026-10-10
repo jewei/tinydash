@@ -13,6 +13,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Copied files in clipboard history have Copy as Plain Text, which copies their paths.
 - Quicklinks can use `{clipboard}`, `{date}`, `{time}`, and `{datetime}`, as snippets do.
 
+### Fixed
+
+- On macOS, a copy made in Passwords or Keychain Access just before you open the launcher no longer goes into clipboard history.
+
 ## [0.5.0] - 2026-10-08
 
 ### Added
