@@ -95,6 +95,22 @@ impl Content {
         hash as i64
     }
 
+    /// The content as plain text: text as it is, a file list as its paths,
+    /// one per line. An image has none.
+    pub fn plain_text(&self) -> Option<String> {
+        match self {
+            Self::Text(text) => Some(text.clone()),
+            Self::Files(paths) => Some(
+                paths
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            Self::Image { .. } => None,
+        }
+    }
+
     /// One line that names the entry in the list.
     pub fn title(&self) -> String {
         match self {
@@ -204,11 +220,21 @@ fn result(entry: &Entry, ctx: &Context) -> SearchResult {
         icon: Icon::Symbol { name: symbol },
         // Mod+Enter runs the second action and may wait for newer results,
         // so Delete, which cannot be undone, never takes that place.
-        actions: vec![
-            ResultAction::new("Copy", Action::CopyClip { id: entry.id }),
-            ctx.pin_action(&id),
-            ResultAction::new("Delete", Action::DeleteClip { id: entry.id }),
-        ],
+        actions: [
+            Some(ResultAction::new("Copy", Action::CopyClip { id: entry.id })),
+            Some(ctx.pin_action(&id)),
+            // Text is saved plain already.
+            (entry.kind == ClipKind::Files).then(|| {
+                ResultAction::new("Copy as Plain Text", Action::CopyClipText { id: entry.id })
+            }),
+            Some(ResultAction::new(
+                "Delete",
+                Action::DeleteClip { id: entry.id },
+            )),
+        ]
+        .into_iter()
+        .flatten()
+        .collect(),
         pinned: ctx.pinned(&id),
         id,
     }
@@ -291,6 +317,36 @@ mod tests {
                 .search(&mut Matcher::new("friday"), &Context::none(), 10)
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn plain_text_is_the_text_or_one_path_per_line() {
+        let files = Content::Files(vec!["/a/one.txt".into(), "/b/two words.txt".into()]);
+        assert_eq!(
+            files.plain_text().as_deref(),
+            Some("/a/one.txt\n/b/two words.txt")
+        );
+        assert_eq!(
+            Content::Text("hi".into()).plain_text().as_deref(),
+            Some("hi")
+        );
+        let image = Content::Image {
+            png: vec![],
+            width: 1,
+            height: 1,
+        };
+        assert_eq!(image.plain_text(), None);
+    }
+
+    #[test]
+    fn copied_files_also_copy_as_plain_text() {
+        let content = Content::Files(vec!["/a/one.txt".into()]);
+        let files = Entry::new(3, content.kind(), content.title(), "/a/one.txt", 0);
+        let history = ClipboardHistory::new(vec![files]);
+        let result = history.get(3, &Context::none()).unwrap();
+        let labels: Vec<_> = result.actions.iter().map(|a| a.label.as_str()).collect();
+        assert_eq!(labels, ["Copy", "Pin", "Copy as Plain Text", "Delete"]);
+        assert_eq!(result.actions[2].action, Action::CopyClipText { id: 3 });
     }
 
     #[test]

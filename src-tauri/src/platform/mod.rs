@@ -24,13 +24,19 @@
 //! - `discover_apps()`: installed apps.
 //! - `launch_app(path)`: start an app found by `discover_apps`.
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
-//! - `run_system_command(command)`.
+//! - `run_system_command(command)`. Sleep Displays calls
+//!   `wait_for_key_release` first, only where it is supported.
 //! - `notify(app, title, body)`: show a system notification.
 //! - `disk_space(path)`: the [`Volume`] that holds `path`.
 //! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
+//! - `note_clipboard_change(change)`: the monitor saw a new change; remember
+//!   what makes it secret but the content does not show (on macOS, a copy
+//!   made in Passwords or Keychain Access). Reads no content. On macOS,
+//!   `remember_frontmost_app` also calls it, for a copy made just before
+//!   the launcher opened.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
@@ -190,6 +196,12 @@ fn launch(program: &str) -> Result<()> {
     // Reap it when it exits, so no zombie process stays behind.
     std::thread::spawn(move || child.wait());
     Ok(())
+}
+
+/// Wait until the user lets go of the key that ran Sleep Displays, which
+/// would wake the displays again.
+fn wait_for_key_release() {
+    std::thread::sleep(std::time::Duration::from_secs(1));
 }
 
 /// Run a helper program with fixed arguments. Never pass user text here.

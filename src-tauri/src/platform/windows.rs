@@ -10,9 +10,16 @@ use windows_sys::Win32::{
         },
         Memory::{GlobalLock, GlobalSize, GlobalUnlock},
         Power::SetSuspendState,
+        Registry::{HKEY_CURRENT_USER, REG_DWORD, RRF_RT_REG_DWORD, RegGetValueW, RegSetKeyValueW},
         Shutdown::LockWorkStation,
     },
-    UI::Shell::{SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW},
+    UI::{
+        Shell::{SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW},
+        WindowsAndMessaging::{
+            HWND_BROADCAST, PostMessageW, SC_MONITORPOWER, SMTO_ABORTIFHUNG, SendMessageTimeoutW,
+            WM_SETTINGCHANGE, WM_SYSCOMMAND,
+        },
+    },
 };
 
 use super::SECRET_FORMATS;
@@ -176,7 +183,8 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         ))
     };
     // SAFETY: These Win32 calls take no pointers except the documented null
-    // window handle and root path, meaning "no owner" and "all drives".
+    // window handle and root path, meaning "no owner" and "all drives", and
+    // the documented HWND_BROADCAST handle, meaning "every top-level window".
     unsafe {
         match command {
             SystemCommand::Lock if LockWorkStation() == 0 => Err(failed("lock the screen")),
@@ -202,9 +210,100 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
                 tauri_plugin_opener::open_url("ms-settings:", None::<&str>)
                     .map_err(|error| Error::msg(error.to_string()))
             }
+            // Posted, not sent: sending to every window could wait on a hung one.
+            // 2 means "off" for SC_MONITORPOWER.
+            SystemCommand::SleepDisplays => {
+                super::wait_for_key_release();
+                if PostMessageW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER as usize, 2) == 0 {
+                    Err(failed("turn off the displays"))
+                } else {
+                    Ok(())
+                }
+            }
+            SystemCommand::ToggleDarkMode => toggle_dark_mode(),
+            // Explorer's exit code says nothing about success, so it is not awaited.
+            SystemCommand::OpenTrash => std::process::Command::new("explorer.exe")
+                .arg("shell:RecycleBinFolder")
+                .spawn()
+                .map(drop)
+                .map_err(|error| Error::msg(format!("Could not open the Recycle Bin: {error}"))),
         }
     }
 }
+
+/// Switch apps and the taskbar between light and dark, as Settings >
+/// Personalization > Colors does. A custom mix of the two becomes one mode,
+/// the opposite of the apps' mode.
+fn toggle_dark_mode() -> Result<()> {
+    let wide = |text: &str| -> Vec<u16> { text.encode_utf16().chain([0]).collect() };
+    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+    let failed = |status: u32| {
+        Error::msg(format!(
+            "Windows could not change the color mode: {}",
+            std::io::Error::from_raw_os_error(status as i32)
+        ))
+    };
+    const DWORD_BYTES: u32 = 4;
+    let mut light: u32 = 1;
+    let mut size = DWORD_BYTES;
+    let apps = wide("AppsUseLightTheme");
+    // SAFETY: The strings are NUL-terminated and outlive the call, and
+    // `light` has room for the `size` bytes of the DWORD asked for.
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            key.as_ptr(),
+            apps.as_ptr(),
+            RRF_RT_REG_DWORD,
+            std::ptr::null_mut(),
+            (&raw mut light).cast(),
+            &raw mut size,
+        )
+    };
+    // No value yet means the default, light.
+    let next = u32::from(status == 0 && light == 0);
+    for name in ["AppsUseLightTheme", "SystemUsesLightTheme"] {
+        let name = wide(name);
+        // SAFETY: The strings are NUL-terminated, and `next` holds the four
+        // bytes of the DWORD written.
+        let status = unsafe {
+            RegSetKeyValueW(
+                HKEY_CURRENT_USER,
+                key.as_ptr(),
+                name.as_ptr(),
+                REG_DWORD,
+                (&raw const next).cast(),
+                DWORD_BYTES,
+            )
+        };
+        if status != 0 {
+            return Err(failed(status));
+        }
+    }
+    // Windows open now repaint in the new colors, as after Settings. Each
+    // busy window may take the whole timeout, so the action does not wait.
+    std::thread::spawn(move || {
+        let area = wide("ImmersiveColorSet");
+        // SAFETY: `area` is NUL-terminated and outlives the call; no result
+        // is read.
+        unsafe {
+            SendMessageTimeoutW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                area.as_ptr() as isize,
+                SMTO_ABORTIFHUNG,
+                1000,
+                std::ptr::null_mut(),
+            )
+        };
+    });
+    Ok(())
+}
+
+/// Copies that should stay out of histories are marked here, so there is
+/// nothing to remember.
+pub fn note_clipboard_change(_change: u64) {}
 
 pub fn clipboard_change() -> u64 {
     // SAFETY: Takes no arguments and only reads a counter.
@@ -253,10 +352,12 @@ fn clipboard_is_concealed() -> bool {
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     let _one_reader = super::one_clipboard_reader();
+    let before = clipboard_change();
     if clipboard_is_concealed() {
         return None;
     }
-    super::read_with_arboard(images, files)
+    // A copy that replaced the checked one during the read was not checked.
+    super::read_with_arboard(images, files).filter(|_| clipboard_change() == before)
 }
 
 pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {

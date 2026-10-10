@@ -19,7 +19,7 @@ use crate::{
     refresh::Freshness,
     search::{
         Category, Snapshot,
-        usage::{Hidden, Pins, Usage},
+        usage::{Aliases, Hidden, Pins, Usage},
     },
     settings::Settings,
     shared::Shared,
@@ -49,6 +49,7 @@ pub struct State {
     pub usage: Shared<Usage>,
     pub pins: Shared<Pins>,
     pub hidden: Shared<Hidden>,
+    pub aliases: Shared<Aliases>,
     pub rates: Shared<Option<Rates>>,
     /// The latest weather download, for the city it names.
     pub weather: Shared<Option<Weather>>,
@@ -89,6 +90,10 @@ impl State {
             load("hidden results", e);
             Hidden::default()
         });
+        let aliases = store.aliases().unwrap_or_else(|e| {
+            load("aliases", e);
+            Aliases::default()
+        });
         let clipboard = store.clipboard_history().unwrap_or_else(|e| {
             load("clipboard history", e);
             Vec::new()
@@ -126,6 +131,7 @@ impl State {
             usage: Shared::new(usage),
             pins: Shared::new(pins),
             hidden: Shared::new(hidden),
+            aliases: Shared::new(aliases),
             rates: Shared::new(rates),
             weather: Shared::new(weather),
             freshness: Freshness::default(),
@@ -157,6 +163,7 @@ impl State {
             usage: self.usage.get(),
             pins: self.pins.get(),
             hidden: self.hidden.get(),
+            aliases: self.aliases.get(),
             rates: self.rates.get(),
             now: Local::now(),
         }

@@ -1,5 +1,5 @@
 //! Clipboard capture. A background thread checks the OS change counter
-//! twice a second and reads content only when it changes.
+//! twice a second and reads content only when it changes and history is on.
 
 use std::time::Duration;
 
@@ -39,6 +39,9 @@ fn capture_forever(app: &AppHandle) {
             continue;
         }
         seen = change;
+        // Also while history is off: a later read, such as a quicklink's
+        // {clipboard}, must still know the copy is secret.
+        platform::note_clipboard_change(change);
         let settings = state.settings.get();
         if !settings.clipboard_history_enabled {
             continue;

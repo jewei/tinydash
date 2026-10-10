@@ -30,33 +30,35 @@ export function HiddenResults() {
           </p>
         )}
       </Show>
-      <ul>
-        <For
-          each={hidden.latest ?? []}
-          fallback={
-            <li class="list-empty">
-              None. To hide one, choose Hide from Results in its actions ({modKey()} K).
-            </li>
-          }
-        >
-          {(result) => (
-            <li>
-              <span class="hidden-result">
-                <span>{result.title}</span>
-                <span class="row-description">{result.subtitle}</span>
-              </span>
-              <button
-                type="button"
-                class="link"
-                aria-label={`Show ${result.title} again`}
-                onClick={() => showAgain(result.id)}
-              >
-                Show Again
-              </button>
-            </li>
-          )}
-        </For>
-      </ul>
+      <Show when={!hidden.error}>
+        <ul>
+          <For
+            each={hidden.latest ?? []}
+            fallback={
+              <li class="list-empty">
+                None. To hide one, choose Hide from Results in its actions ({modKey()} K).
+              </li>
+            }
+          >
+            {(result) => (
+              <li>
+                <span class="hidden-result">
+                  <span>{result.title}</span>
+                  <span class="row-description">{result.subtitle}</span>
+                </span>
+                <button
+                  type="button"
+                  class="link"
+                  aria-label={`Show ${result.title} again`}
+                  onClick={() => showAgain(result.id)}
+                >
+                  Show Again
+                </button>
+              </li>
+            )}
+          </For>
+        </ul>
+      </Show>
       <p class="list-status" role="status">
         {failure() ?? ""}
       </p>

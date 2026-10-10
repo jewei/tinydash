@@ -4,6 +4,26 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Give any app, indexed file, snippet, quicklink, emoji, or command an alias, such as `vsc` (Add Alias in its actions). Typing the alias puts that result first, after any instant answer. Settings > Search lists your aliases.
+- A snippet with a keyword and `{query}` takes the text typed after the keyword, as quicklinks do: `hi Sam` copies `Hello Sam,`.
+- After the web search, All offers up to three quicklinks that take `{query}`, filled with what you typed.
+- New system commands: Open Trash, Sleep Displays, Toggle Dark Mode, and Make Clipboard Plain Text, which removes the formatting from copied text.
+- Copied files in clipboard history have Copy as Plain Text, which copies their paths.
+- Quicklinks can use `{clipboard}`, `{date}`, `{time}`, and `{datetime}`, as snippets do.
+
+### Changed
+
+- A row that carries typed text, such as `Jira: ABC-12`, no longer has Hide from Results, so Mod+Enter cannot hide the quicklink by accident. Hide it from its own row.
+- In a snippet, `{query}` is now a placeholder: run from the snippet's own row, it is filled with nothing.
+- A path quicklink takes a name as its text: `.` and `..` are refused, and its root, such as `~`, a drive, or a network share, must be written in the quicklink, not filled in.
+
+### Fixed
+
+- On macOS, a copy made in Passwords or Keychain Access just before you open the launcher no longer goes into clipboard history.
+- When Settings cannot read your hidden results, it no longer also says there are none.
+
 ## [0.5.0] - 2026-10-08
 
 ### Added

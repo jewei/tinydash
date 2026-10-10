@@ -77,6 +77,212 @@ describe("Launcher", () => {
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
   });
 
+  it("asks for an alias and sends the one typed", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Change Alias “saf”…",
+          action: { type: "setAlias", id: app.id, alias: "saf" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [named]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Change Alias/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const field = within(dialog).getByRole("textbox") as HTMLInputElement;
+    expect(field.value).toBe("saf");
+    expect(document.activeElement).toBe(field);
+    // Keys in the dialog do not reach the launcher.
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(backend.called("run_action")).toHaveLength(0);
+    fireEvent.input(field, { target: { value: "sf" } });
+    fireEvent.submit(dialog);
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "setAlias", id: app.id, alias: "sf" },
+      resultId: null,
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull(),
+    );
+    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+  });
+
+  it("keeps the alias dialog open with the reason when saving fails", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    let fail = true;
+    const { backend, press } = setup(() => [named], {
+      run_action: () => {
+        if (fail) throw "“sf” is already the alias of Shortcuts. Choose another word.";
+        return null;
+      },
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const field = within(dialog).getByRole("textbox") as HTMLInputElement;
+    fireEvent.input(field, { target: { value: "sf" } });
+    fireEvent.submit(dialog);
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "already the alias of Shortcuts",
+    );
+    expect(field.value).toBe("sf");
+    expect(document.activeElement).toBe(field);
+    fail = false;
+    fireEvent.input(field, { target: { value: "sfr" } });
+    fireEvent.submit(dialog);
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull(),
+    );
+    expect(backend.called("run_action").at(-1)?.args).toEqual({
+      action: { type: "setAlias", id: app.id, alias: "sfr" },
+      resultId: null,
+    });
+  });
+
+  it("keeps the keyboard in the alias dialog after focus leaves it", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    const { backend, input, press } = setup(() => [named]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const save = within(dialog).getByRole("button", { name: "Save Alias" });
+    // Tab goes around the dialog's own controls.
+    save.focus();
+    fireEvent.keyDown(save, { key: "Tab" });
+    expect(document.activeElement).toBe(within(dialog).getByRole("textbox"));
+    // A key pressed with focus outside goes back to the field.
+    input.focus();
+    fireEvent.keyDown(input, { key: "a" });
+    expect(document.activeElement).toBe(within(dialog).getByRole("textbox"));
+    (document.activeElement as HTMLElement).blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+  });
+
+  it("closes the alias dialog when the launcher opens again, even during a save", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    let finish: (error?: string) => void = () => undefined;
+    const { press } = setup(() => [named], {
+      run_action: () =>
+        new Promise((resolve, reject) => {
+          finish = (error) => (error ? reject(error) : resolve(null));
+        }),
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const field = within(dialog).getByRole("textbox");
+    // A held Enter does not save.
+    const held = new KeyboardEvent("keydown", {
+      key: "Enter",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    field.dispatchEvent(held);
+    expect(held.defaultPrevented).toBe(true);
+    fireEvent.input(field, { target: { value: "sf" } });
+    fireEvent.submit(dialog);
+    // While it saves, Escape and Cancel do not pretend to cancel it.
+    fireEvent.keyDown(field, { key: "Escape" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("dialog", { name: "Alias for Safari" })).toBeTruthy();
+    await emit("launcher:shown", { category: null });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull(),
+    );
+    // A dialog opened meanwhile is free, and says the old save still runs.
+    press("Enter");
+    const next = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const cancel = within(next).getByRole("button", { name: "Cancel" }) as HTMLButtonElement;
+    expect(cancel.disabled).toBe(false);
+    fireEvent.submit(next);
+    expect((await within(next).findByRole("alert")).textContent).toContain(
+      "Another action is still running",
+    );
+    fireEvent.click(cancel);
+    // The late reply neither reopens the dialog, shows its error, nor
+    // takes focus from a menu opened since.
+    press("k", { ctrlKey: true });
+    expect(await screen.findByRole("dialog", { name: "Actions" })).toBeTruthy();
+    finish("Could not save.");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
+    expect(screen.queryByText("Could not save.")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Actions" })).toBeTruthy();
+  });
+
+  it("leaves the alias dialog free while another action runs", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        app.actions[0]!,
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    const { backend, press } = setup(() => [named], {
+      run_action: () => new Promise(() => undefined),
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Add Alias/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    fireEvent.submit(dialog);
+    expect((await within(dialog).findByRole("alert")).textContent).toContain(
+      "Another action is still running",
+    );
+    expect(backend.called("run_action")).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
+  });
+
+  it("closes the alias dialog with Escape and saves nothing", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    const { backend, press } = setup(() => [named]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    // A text selection that ends on the backdrop keeps the dialog.
+    const field = within(dialog).getByRole("textbox");
+    const backdrop = dialog.parentElement!;
+    fireEvent.mouseDown(field);
+    fireEvent.click(backdrop);
+    expect(screen.getByRole("dialog", { name: "Alias for Safari" })).toBeTruthy();
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
+    expect(backend.called("run_action")).toHaveLength(0);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+  });
+
   it("keeps only tabs in the tab list", async () => {
     setup(() => []);
     const tablist = await screen.findByRole("tablist", { name: "Categories" });
