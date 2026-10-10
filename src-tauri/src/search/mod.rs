@@ -145,7 +145,7 @@ pub fn search(snapshot: &Snapshot, query: &str, category: Category) -> Vec<Searc
         let Some((source, _)) = Source::parse(&result.id) else {
             continue;
         };
-        if source.aliasable() {
+        if source.aliasable() && !carries_text(result) {
             let alias = snapshot.aliases.get(&result.id).unwrap_or_default();
             let label = if alias.is_empty() {
                 "Add Alias…".to_owned()
@@ -170,6 +170,19 @@ pub fn search(snapshot: &Snapshot, query: &str, category: Category) -> Vec<Searc
         }
     }
     results
+}
+
+/// A keyword answer or a fallback, which runs its item with typed text,
+/// such as `Jira: ABC-12`. An alias names the item, so it is set on the
+/// item's own row.
+fn carries_text(result: &SearchResult) -> bool {
+    result.actions.first().is_some_and(|first| {
+        matches!(
+            &first.action,
+            Action::OpenQuicklink { query, .. } | Action::CopySnippet { query, .. }
+                if !query.is_empty()
+        )
+    })
 }
 
 fn find(snapshot: &Snapshot, query: &str, category: Category) -> Vec<SearchResult> {
@@ -346,8 +359,18 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         .collect();
     ranked.sort_by_key(|(order, hit)| (hit.score < STRONG, *order, Reverse(hit.score)));
 
+    // A keyword answer has its snippet's or quicklink's own ID, and a result
+    // may match by name and by alias; keep only the first of each ID, so no
+    // two rows share one. A keyword answer carries the typed text.
+    let mut seen: HashSet<String> = results.iter().map(|r| r.id.clone()).collect();
+    let ranked: Vec<SearchResult> = ranked
+        .into_iter()
+        .map(|(_, hit)| hit.result)
+        .filter(|result| seen.insert(result.id.clone()))
+        .collect();
     // Quicklinks that can open the query, unless the user already chose a
-    // keyword, such as `g` or a quicklink's own, or keeps snippets out of All.
+    // keyword, such as `g` or a quicklink's own, or keeps snippets out of
+    // All. A quicklink the query found by name is not offered again.
     let chose = results.iter().any(|r| {
         matches!(
             r.kind,
@@ -360,32 +383,17 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         s.library
             .fallbacks(query, ctx, s.now)
             .into_iter()
-            .filter(|link| !s.hidden.contains(&link.id))
+            .filter(|link| !s.hidden.contains(&link.id) && !seen.contains(&link.id))
             .take(QUICKLINK_FALLBACKS)
             .collect()
     };
     let fallback = usize::from(!keyword_search);
     let room = ALL_LIMIT.saturating_sub(results.len() + fallback + links.len());
-    // A keyword answer has its snippet's or quicklink's own ID, and a result
-    // may match by name and by alias; keep only the first of each ID, so no
-    // two rows share one. A keyword answer carries the typed text.
-    let mut seen: HashSet<String> = results.iter().map(|r| r.id.clone()).collect();
-    results.extend(
-        ranked
-            .into_iter()
-            .map(|(_, hit)| hit.result)
-            .filter(|result| seen.insert(result.id.clone()))
-            .take(room),
-    );
+    results.extend(ranked.into_iter().take(room));
     if !keyword_search {
         results.push(web::fallback(query, s.settings.search_engine));
     }
-    // A quicklink that matched by name shows once, where it matched.
-    results.extend(
-        links
-            .into_iter()
-            .filter(|link| seen.insert(link.id.clone())),
-    );
+    results.extend(links);
     results
 }
 
@@ -650,12 +658,45 @@ mod tests {
         let wiki = titles("wiki");
         assert!(wiki.contains(&"Wiki".to_owned()));
         assert!(!wiki.contains(&"Wiki: wiki".to_owned()));
+        // Rows with typed text leave aliases to the item's own row.
+        let jira = search(&state.snapshot(), "rust", Category::All)
+            .into_iter()
+            .find(|result| result.title == "Jira: rust")
+            .unwrap();
+        let alias_action = |a: &ResultAction| matches!(a.action, Action::SetAlias { .. });
+        assert!(!jira.actions.iter().any(alias_action));
         let docs = search(&state.snapshot(), "", Category::Snippets)[0]
             .id
             .clone();
         state.hidden.set(Hidden::new([docs]));
         assert!(!titles("rust").contains(&"Docs: rust".to_owned()));
         assert!(titles("rust").contains(&"Wiki: rust".to_owned()));
+    }
+
+    #[test]
+    fn a_full_list_keeps_room_for_every_quicklink_it_offers() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings::default());
+        // "a" matches more than a full list of emoji, and two quicklinks
+        // also match it by name, so they show there instead.
+        for name in ["A Wiki", "Docs", "Maps", "Notes"] {
+            let item = LibraryItem {
+                id: None,
+                kind: LibraryKind::Quicklink,
+                name: name.into(),
+                keyword: String::new(),
+                text: "https://x.test/{query}".into(),
+            };
+            state.store.save_library_item(&item).unwrap();
+        }
+        state.reload_library().unwrap();
+        let results = search(&state.snapshot(), "a", Category::All);
+        assert_eq!(results.len(), ALL_LIMIT);
+        let tail: Vec<&str> = results[ALL_LIMIT - 3..]
+            .iter()
+            .map(|result| result.title.as_str())
+            .collect();
+        assert_eq!(tail, ["Search Google for “a”", "Docs: a", "Notes: a"]);
     }
 
     #[test]

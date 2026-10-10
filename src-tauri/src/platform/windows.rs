@@ -231,7 +231,8 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
 }
 
 /// Switch apps and the taskbar between light and dark, as Settings >
-/// Personalization > Colors does.
+/// Personalization > Colors does. A custom mix of the two becomes one mode,
+/// the opposite of the apps' mode.
 fn toggle_dark_mode() -> Result<()> {
     let wide = |text: &str| -> Vec<u16> { text.encode_utf16().chain([0]).collect() };
     let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
@@ -278,20 +279,24 @@ fn toggle_dark_mode() -> Result<()> {
             return Err(failed(status));
         }
     }
-    let area = wide("ImmersiveColorSet");
-    // SAFETY: `area` is NUL-terminated and outlives the call; no result is
-    // read. Windows open now repaint in the new colors, as after Settings.
-    unsafe {
-        SendMessageTimeoutW(
-            HWND_BROADCAST,
-            WM_SETTINGCHANGE,
-            0,
-            area.as_ptr() as isize,
-            SMTO_ABORTIFHUNG,
-            1000,
-            std::ptr::null_mut(),
-        )
-    };
+    // Windows open now repaint in the new colors, as after Settings. Each
+    // busy window may take the whole timeout, so the action does not wait.
+    std::thread::spawn(move || {
+        let area = wide("ImmersiveColorSet");
+        // SAFETY: `area` is NUL-terminated and outlives the call; no result
+        // is read.
+        unsafe {
+            SendMessageTimeoutW(
+                HWND_BROADCAST,
+                WM_SETTINGCHANGE,
+                0,
+                area.as_ptr() as isize,
+                SMTO_ABORTIFHUNG,
+                1000,
+                std::ptr::null_mut(),
+            )
+        };
+    });
     Ok(())
 }
 

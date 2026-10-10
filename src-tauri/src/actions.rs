@@ -14,7 +14,6 @@ use crate::{
     events,
     features::{
         clip_card,
-        clipboard::Content,
         library::{self, LibraryKind, Target},
         system::SystemCommand,
     },
@@ -106,18 +105,12 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             copy_and_close(app, || system_clipboard::write(&content))?;
         }
         Action::CopyClipText { id } => {
-            let text = match state.clip(id)? {
-                Some(Content::Text(text)) => text,
-                Some(Content::Files(paths)) => paths
-                    .iter()
-                    .map(|path| path.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                Some(Content::Image { .. }) => {
-                    return Err(Error::msg("An image has no text to copy."));
-                }
-                None => return Err(Error::msg("This entry is no longer in the history.")),
-            };
+            let content = state
+                .clip(id)?
+                .ok_or_else(|| Error::msg("This entry is no longer in the history."))?;
+            let text = content
+                .plain_text()
+                .ok_or_else(|| Error::msg("An image has no text to copy."))?;
             copy_and_close(app, || system_clipboard::write_text(&text, false))?;
         }
         // Reads as widgets do, so a copy marked secret stays as it is.
@@ -257,7 +250,8 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
 }
 
 /// Give a result an alias, or remove its alias when `alias` is empty. Only
-/// a result that exists gets one, and an alias names one result.
+/// a result that exists gets one, under its own ID, as a pin does, and an
+/// alias names one result.
 fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
     let _limit = state
         .limited_change
@@ -267,16 +261,19 @@ fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
         return Err(Error::msg("This result cannot have an alias."));
     }
     let alias = usage::clean_alias(alias)?;
-    if alias.is_empty() {
-        state.store.set_alias(id, None)?;
-        state.aliases.update(|aliases| aliases.remove(id));
-        return Ok(());
-    }
     let snapshot = state.snapshot();
     let ctx = Context::none();
-    if search::resolve(&snapshot, &ctx, id).is_none() {
-        return Err(Error::msg("This item no longer exists."));
+    let found = search::resolve(&snapshot, &ctx, id);
+    if alias.is_empty() {
+        // The item may be gone; its alias can still be removed.
+        let id = found.map_or_else(|| id.to_owned(), |found| found.id);
+        state.store.set_alias(&id, None)?;
+        state.aliases.update(|aliases| aliases.remove(&id));
+        return Ok(());
     }
+    let id = found
+        .ok_or_else(|| Error::msg("This item no longer exists."))?
+        .id;
     let aliases = &snapshot.aliases;
     if let Some(owner) = aliases.owner(&alias).filter(|owner| *owner != id) {
         let name = search::resolve(&snapshot, &ctx, owner).map_or(owner.to_owned(), |r| r.title);
@@ -284,13 +281,13 @@ fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
             "“{alias}” is already the alias of {name}. Choose another word."
         )));
     }
-    if aliases.get(id).is_none() && aliases.len() >= MAX_ALIASES {
+    if aliases.get(&id).is_none() && aliases.len() >= MAX_ALIASES {
         return Err(Error::msg(format!(
             "You can set up to {MAX_ALIASES} aliases. Remove some in Settings > Search."
         )));
     }
-    state.store.set_alias(id, Some(&alias))?;
-    state.aliases.update(|aliases| aliases.set(id, &alias));
+    state.store.set_alias(&id, Some(&alias))?;
+    state.aliases.update(|aliases| aliases.set(&id, &alias));
     Ok(())
 }
 
@@ -408,6 +405,21 @@ mod tests {
         assert!(taken.to_string().contains("Lock Screen"), "{taken}");
         assert!(set_alias(&state, "system:gone", "x").is_err());
         assert!(set_alias(&state, "clip:1", "x").is_err());
+        // Another spelling of an ID resolves to the item's own.
+        let item = crate::features::library::LibraryItem {
+            id: None,
+            kind: LibraryKind::Snippet,
+            name: "Sig".into(),
+            keyword: String::new(),
+            text: "Regards".into(),
+        };
+        let saved = state.store.save_library_item(&item).unwrap().id.unwrap();
+        state.reload_library().unwrap();
+        set_alias(&state, &format!("snippet:0{saved}"), "sg").unwrap();
+        let own = Source::Snippet.id(saved);
+        assert_eq!(state.aliases.get().owner("sg"), Some(own.as_str()));
+        set_alias(&state, &format!("snippet:+{saved}"), "").unwrap();
+        assert_eq!(state.aliases.get().owner("sg"), None);
         assert_eq!(
             search::search(&state.snapshot(), "lk", search::Category::All)[0].id,
             lock

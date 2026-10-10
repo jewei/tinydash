@@ -337,6 +337,12 @@ pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<Libr
 pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
     blocking(move || {
         let state = app.state::<State>();
+        // A pin or alias that checked the item before the delete must not
+        // write after it, or its row would outlive the item.
+        let _limit = state
+            .limited_change
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         state.store.delete_library_item(id)?;
         let ids = [Source::Snippet.id(id), Source::Link.id(id)];
         state

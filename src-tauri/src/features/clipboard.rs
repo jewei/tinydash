@@ -95,6 +95,22 @@ impl Content {
         hash as i64
     }
 
+    /// The content as plain text: text as it is, a file list as its paths,
+    /// one per line. An image has none.
+    pub fn plain_text(&self) -> Option<String> {
+        match self {
+            Self::Text(text) => Some(text.clone()),
+            Self::Files(paths) => Some(
+                paths
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+            Self::Image { .. } => None,
+        }
+    }
+
     /// One line that names the entry in the list.
     pub fn title(&self) -> String {
         match self {
@@ -301,6 +317,25 @@ mod tests {
                 .search(&mut Matcher::new("friday"), &Context::none(), 10)
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn plain_text_is_the_text_or_one_path_per_line() {
+        let files = Content::Files(vec!["/a/one.txt".into(), "/b/two words.txt".into()]);
+        assert_eq!(
+            files.plain_text().as_deref(),
+            Some("/a/one.txt\n/b/two words.txt")
+        );
+        assert_eq!(
+            Content::Text("hi".into()).plain_text().as_deref(),
+            Some("hi")
+        );
+        let image = Content::Image {
+            png: vec![],
+            width: 1,
+            height: 1,
+        };
+        assert_eq!(image.plain_text(), None);
     }
 
     #[test]
