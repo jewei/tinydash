@@ -137,6 +137,7 @@ describe("Launcher", () => {
       "already the alias of Shortcuts",
     );
     expect(field.value).toBe("sf");
+    expect(document.activeElement).toBe(field);
     fail = false;
     fireEvent.input(field, { target: { value: "sfr" } });
     fireEvent.submit(dialog);
@@ -204,8 +205,9 @@ describe("Launcher", () => {
     expect(held.defaultPrevented).toBe(true);
     fireEvent.input(field, { target: { value: "sf" } });
     fireEvent.submit(dialog);
-    // While it saves, Escape does not pretend to cancel it.
+    // While it saves, Escape and Cancel do not pretend to cancel it.
     fireEvent.keyDown(field, { key: "Escape" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("dialog", { name: "Alias for Safari" })).toBeTruthy();
     await emit("launcher:shown", { category: null });
     await waitFor(() =>

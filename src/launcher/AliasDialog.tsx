@@ -1,4 +1,4 @@
-import { createSignal, createUniqueId, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, createUniqueId, on, onCleanup, onMount, Show } from "solid-js";
 
 import { isComposing } from "../lib/keys";
 
@@ -54,6 +54,17 @@ export function AliasDialog(props: {
     window.addEventListener("keydown", onKeyDown, true);
   });
   onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
+  // The Save button is disabled while it saves, which drops its focus; the
+  // field, which the reason describes, takes it back.
+  createEffect(
+    on(
+      () => props.error,
+      (error) => {
+        if (error) field.focus();
+      },
+      { defer: true },
+    ),
+  );
 
   return (
     <div
@@ -97,7 +108,12 @@ export function AliasDialog(props: {
           One word. Typing it puts this result first. Leave it empty to remove the alias.
         </p>
         <div class="dialog-buttons">
-          <button type="button" class="button" onClick={() => props.onCancel()}>
+          <button
+            type="button"
+            class="button"
+            disabled={props.busy}
+            onClick={() => props.onCancel()}
+          >
             Cancel
           </button>
           <button type="submit" class="button primary" disabled={props.busy}>
