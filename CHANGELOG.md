@@ -16,12 +16,12 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Changed
 
 - A row that carries typed text, such as `Jira: ABC-12`, no longer has Hide from Results, so Mod+Enter cannot hide the quicklink by accident. Hide it from its own row.
+- In a snippet, `{query}` is now a placeholder: run from the snippet's own row, it is filled with nothing.
 - A path quicklink takes a name as its text: `.` and `..` are refused, and its root, such as `~`, a drive, or a network share, must be written in the quicklink, not filled in.
 
 ### Fixed
 
 - On macOS, a copy made in Passwords or Keychain Access just before you open the launcher no longer goes into clipboard history.
-- Settings > Search says why it could not read your hidden results, instead of failing.
 
 ## [0.5.0] - 2026-10-08
 

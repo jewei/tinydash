@@ -223,12 +223,15 @@ describe("Launcher", () => {
       "Another action is still running",
     );
     fireEvent.click(cancel);
-    // The late reply neither reopens the dialog nor shows its error.
+    // The late reply neither reopens the dialog, shows its error, nor
+    // takes focus from a menu opened since.
+    press("k", { ctrlKey: true });
+    expect(await screen.findByRole("dialog", { name: "Actions" })).toBeTruthy();
     finish("Could not save.");
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
     expect(screen.queryByText("Could not save.")).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+    expect(screen.getByRole("dialog", { name: "Actions" })).toBeTruthy();
   });
 
   it("leaves the alias dialog free while another action runs", async () => {

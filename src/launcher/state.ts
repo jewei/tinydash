@@ -206,14 +206,15 @@ export function createLauncher(spotlight: () => boolean = () => false) {
 
   /**
    * Save the alias the user typed; an empty one removes it. The dialog
-   * closes once it is saved, and shows the reason when it is not.
+   * closes once it is saved, and shows the reason when it is not. Resolves
+   * to whether this save closed the dialog that is open.
    */
-  async function saveAlias(alias: string) {
+  async function saveAlias(alias: string): Promise<boolean> {
     const waiting = naming();
-    if (waiting?.action.action.type !== "setAlias" || savingFor() === waiting) return;
+    if (waiting?.action.action.type !== "setAlias" || savingFor() === waiting) return false;
     if (running()) {
       setAliasError("Another action is still running. Save again when it ends.");
-      return;
+      return false;
     }
     setRunning(true);
     setSavingFor(waiting);
@@ -221,9 +222,12 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     try {
       await ipc.runAction({ ...waiting.action.action, alias });
       // The launcher may have been shown again meanwhile, with a new start.
-      if (naming() === waiting) setNaming(undefined);
+      if (naming() !== waiting) return false;
+      setNaming(undefined);
+      return true;
     } catch (error) {
       if (naming() === waiting) setAliasError(ipc.message(error));
+      return false;
     } finally {
       setRunning(false);
       setSavingFor(undefined);

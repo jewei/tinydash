@@ -531,8 +531,10 @@ export function Launcher() {
             error={launcher.aliasError()}
             busy={launcher.saving()}
             onSave={(alias) => {
-              void launcher.saveAlias(alias).then(() => {
-                if (!launcher.naming()) focusInput();
+              // Only this dialog's own close moves focus: a late save must
+              // not take it from a menu opened after a re-show.
+              void launcher.saveAlias(alias).then((closed) => {
+                if (closed) focusInput();
               });
             }}
             onCancel={() => {
