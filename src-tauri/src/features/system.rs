@@ -153,6 +153,20 @@ const COMMANDS: &[Command] = &[
         confirm: Some("Delete all clipboard history except pinned entries?"),
     },
     Command {
+        key: "plain-text",
+        name: "Make Clipboard Plain Text",
+        description: "Remove the formatting from the copied text",
+        aliases: &[
+            "plain text",
+            "paste as plain text",
+            "remove formatting",
+            "clear formatting",
+        ],
+        symbol: Symbol::Text,
+        action: Action::CopyPlainText,
+        confirm: None,
+    },
+    Command {
         key: "settings",
         name: "System Settings",
         description: "Open the operating system settings",
@@ -249,6 +263,7 @@ mod tests {
         assert_eq!(titles("suspend")[0], "Sleep");
         assert_eq!(titles("sign out")[0], "Log Out");
         assert_eq!(titles("dark mode")[0], "Toggle Dark Mode");
+        assert_eq!(titles("remove formatting")[0], "Make Clipboard Plain Text");
         assert_eq!(titles("screen off")[0], SLEEP_DISPLAYS);
     }
 

@@ -14,6 +14,7 @@ use crate::{
     events,
     features::{
         clip_card,
+        clipboard::Content,
         library::{self, LibraryKind, Target},
         system::SystemCommand,
     },
@@ -43,6 +44,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             | Action::CopySnippet { .. }
             | Action::OpenQuicklink { .. }
             | Action::System { .. }
+            | Action::CopyPlainText
             // System commands that act inside TinyDash. From the actions
             // menu they come without a result ID, so only the System
             // results count.
@@ -102,6 +104,30 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .clip(id)?
                 .ok_or_else(|| Error::msg("This entry is no longer in the history."))?;
             copy_and_close(app, || system_clipboard::write(&content))?;
+        }
+        Action::CopyClipText { id } => {
+            let text = match state.clip(id)? {
+                Some(Content::Text(text)) => text,
+                Some(Content::Files(paths)) => paths
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                Some(Content::Image { .. }) => {
+                    return Err(Error::msg("An image has no text to copy."));
+                }
+                None => return Err(Error::msg("This entry is no longer in the history.")),
+            };
+            copy_and_close(app, || system_clipboard::write_text(&text, false))?;
+        }
+        // Reads as widgets do, so a copy marked secret stays as it is.
+        Action::CopyPlainText => {
+            let text = platform::clipboard_text(app).ok_or_else(|| {
+                Error::msg(
+                    "The clipboard holds no text, or the app that copied it marked it secret.",
+                )
+            })?;
+            copy_and_close(app, || system_clipboard::write_text(&text, false))?;
         }
         // Deleting reveals nothing, so it works while history is off too.
         Action::DeleteClip { id } => {

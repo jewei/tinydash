@@ -162,9 +162,17 @@ pub enum Action {
     CopyClip {
         id: i64,
     },
+    /// Copy a clipboard history entry as plain text: a file list as its
+    /// paths, one per line.
+    CopyClipText {
+        id: i64,
+    },
     DeleteClip {
         id: i64,
     },
+    /// Put the clipboard's text back on it alone, without the formatting
+    /// that came with it.
+    CopyPlainText,
     /// Delete every unpinned clipboard history entry.
     ClearClipboard,
     /// Copy a snippet with its placeholders filled; `query` is the text
