@@ -450,7 +450,7 @@ mod tests {
         assert!(target("~/Projects/{query}", ".notes").is_ok());
         assert!(target("~/Projects/../Downloads/{query}", "x").is_ok());
         // Values cannot cancel the template's own `..` to climb higher.
-        let template = "/root/{clipboard}{clipboard}/x/{query}..";
+        let template = "~/root/{clipboard}{clipboard}/x/{query}..";
         assert!(quicklink_target(template, "q", now, dot).is_err());
         // Nor can a value pick the root, such as the home folder or a
         // network server, or stay put with dots Windows drops.
@@ -461,9 +461,9 @@ mod tests {
         assert!(target("~/Notes/{query}", "").is_ok());
         assert!(target("~/x/{query}/y", "").is_ok());
         // An empty value before the template's own `..` would climb higher.
-        assert!(target("/a/b/{query}/../c", "").is_err());
-        assert!(target("/a/b/{query}/../c", "n").is_ok());
-        assert!(quicklink_target("/a/b/{clipboard}/../../c", "", now, || None).is_err());
+        assert!(target("~/a/b/{query}/../c", "").is_err());
+        assert!(target("~/a/b/{query}/../c", "n").is_ok());
+        assert!(quicklink_target("~/a/b/{clipboard}/../../c", "", now, || None).is_err());
         assert!(
             item(LibraryKind::Quicklink, "a", "", "{query}/x")
                 .validated()
