@@ -228,6 +228,36 @@ describe("Settings", () => {
     );
   });
 
+  it("moves focus to the next alias after Remove, or the one before at the end", async () => {
+    let aliases = ["aa", "bb", "cc"].map((alias) => ({
+      id: `system:${alias}`,
+      alias,
+      title: alias.toUpperCase(),
+      subtitle: "Command",
+    }));
+    fakeBackend({
+      aliases: () => aliases,
+      remove_alias: (args) => {
+        aliases = aliases.filter((entry) => entry.id !== args.id);
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove the alias aa of AA" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Remove the alias bb of BB" }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Remove the alias cc of CC" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Remove the alias bb of BB" }),
+      ),
+    );
+  });
+
   it("says when the aliases cannot be read", async () => {
     fakeBackend({
       aliases: () => {
