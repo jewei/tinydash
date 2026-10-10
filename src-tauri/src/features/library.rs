@@ -132,6 +132,16 @@ pub fn quicklink_target(
     };
     let home = std::env::home_dir().unwrap_or_default();
     let path = settings::expand_home(&fill(template, query, now, clipboard, name)?, &home);
+    // Values next to each other, such as `.{query}` with `.`, can still
+    // make a `..` that no single value holds.
+    if path
+        .components()
+        .any(|part| part == std::path::Component::ParentDir)
+    {
+        return Err(Error::msg(
+            "A path quicklink cannot climb out of its folder with “..”.",
+        ));
+    }
     if !path.is_absolute() {
         return Err(Error::msg(
             "A quicklink opens an http, https, or mailto URL, or an absolute or ~ path.",
@@ -393,6 +403,10 @@ mod tests {
         assert!(target("~/Projects/{query}", "notes").is_ok());
         let clipboard = || Some("../secret".to_owned());
         assert!(quicklink_target("~/Projects/{clipboard}", "", now, clipboard).is_err());
+        let dot = || Some(".".to_owned());
+        assert!(quicklink_target("~/Projects/.{clipboard}", "", now, dot).is_err());
+        assert!(target("~/Projects/{query}{query}", ".").is_err());
+        assert!(target("~/Projects/{query}", ".notes").is_ok());
     }
 
     #[test]

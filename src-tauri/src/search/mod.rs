@@ -142,10 +142,12 @@ pub fn search(snapshot: &Snapshot, query: &str, category: Category) -> Vec<Searc
     let mut results = find(snapshot, query, category);
     results.retain(|result| !snapshot.hidden.contains(&result.id));
     for result in &mut results {
-        let Some((source, _)) = Source::parse(&result.id) else {
+        // A row with typed text leaves both to the item's own row; there,
+        // Hide would also be its second action, one Mod+Enter away.
+        let Some((source, _)) = Source::parse(&result.id).filter(|_| !carries_text(result)) else {
             continue;
         };
-        if source.aliasable() && !carries_text(result) {
+        if source.aliasable() {
             let alias = snapshot.aliases.get(&result.id).unwrap_or_default();
             let label = if alias.is_empty() {
                 "Add Alias…".to_owned()
@@ -173,8 +175,8 @@ pub fn search(snapshot: &Snapshot, query: &str, category: Category) -> Vec<Searc
 }
 
 /// A keyword answer or a fallback, which runs its item with typed text,
-/// such as `Jira: ABC-12`. An alias names the item, so it is set on the
-/// item's own row.
+/// such as `Jira: ABC-12`. An alias or a hide is for the item, so it is
+/// set on the item's own row.
 fn carries_text(result: &SearchResult) -> bool {
     result.actions.first().is_some_and(|first| {
         matches!(
@@ -707,8 +709,8 @@ mod tests {
             .into_iter()
             .find(|result| result.title == "Jira: rust")
             .unwrap();
-        let alias_action = |a: &ResultAction| matches!(a.action, Action::SetAlias { .. });
-        assert!(!jira.actions.iter().any(alias_action));
+        let labels: Vec<&str> = jira.actions.iter().map(|a| a.label.as_str()).collect();
+        assert_eq!(labels, ["Open Quicklink"]);
         let docs = search(&state.snapshot(), "", Category::Snippets)[0]
             .id
             .clone();
