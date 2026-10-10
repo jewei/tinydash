@@ -128,9 +128,83 @@ impl Hidden {
     }
 }
 
+/// The most aliases the user may set.
+pub const MAX_ALIASES: usize = 500;
+/// The longest alias, in characters.
+const MAX_ALIAS: usize = 32;
+
+/// The user's own short names for results, by result ID. Each result has at
+/// most one alias, and each alias names one result.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Aliases(std::collections::BTreeMap<String, String>);
+
+impl Aliases {
+    pub fn new(pairs: impl IntoIterator<Item = (String, String)>) -> Self {
+        Self(pairs.into_iter().collect())
+    }
+
+    pub fn get(&self, id: &str) -> Option<&str> {
+        self.0.get(id).map(String::as_str)
+    }
+
+    /// The result ID that has this alias.
+    pub fn owner(&self, alias: &str) -> Option<&str> {
+        self.0
+            .iter()
+            .find(|(_, own)| *own == alias)
+            .map(|(id, _)| id.as_str())
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Pairs of result ID and alias.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0
+            .iter()
+            .map(|(id, alias)| (id.as_str(), alias.as_str()))
+    }
+
+    pub fn set(&mut self, id: &str, alias: &str) {
+        self.0.insert(id.to_owned(), alias.to_owned());
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        self.0.remove(id);
+    }
+}
+
+/// An alias in the form search compares: one lowercase word of up to
+/// [`MAX_ALIAS`] characters. Empty means "no alias".
+pub fn clean_alias(text: &str) -> crate::error::Result<String> {
+    let alias = super::matcher::normalize(text);
+    if alias.contains(' ') || alias.chars().count() > MAX_ALIAS {
+        return Err(crate::error::Error::msg(format!(
+            "An alias is one word of up to {MAX_ALIAS} characters."
+        )));
+    }
+    Ok(alias)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn aliases_are_one_clean_word() {
+        assert_eq!(clean_alias("  VSC ").unwrap(), "vsc");
+        assert_eq!(clean_alias("").unwrap(), "");
+        assert!(clean_alias("two words").is_err());
+        assert!(clean_alias(&"a".repeat(MAX_ALIAS + 1)).is_err());
+        let mut aliases = Aliases::new([("app:/Code.app".into(), "vsc".into())]);
+        assert_eq!(aliases.owner("vsc"), Some("app:/Code.app"));
+        aliases.set("app:/Code.app", "code");
+        assert_eq!(aliases.owner("vsc"), None);
+        assert_eq!(aliases.get("app:/Code.app"), Some("code"));
+        aliases.remove("app:/Code.app");
+        assert_eq!(aliases.len(), 0);
+    }
 
     #[test]
     fn frequency_and_recency_are_bounded() {

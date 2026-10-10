@@ -41,6 +41,8 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 
 Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pinned clipboard entry is kept rather than launched, so it heads the Clipboard tab and is found by a search, but stays off the empty All view. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
 
+Give any app, file, snippet, quicklink, emoji, or command an alias from its actions (Add Alias): one word of up to 32 characters, such as `vsc` for Visual Studio Code. Typing the whole alias puts its result first, above any name match; typing its start ranks the result like a name that starts with the query. This works in All (while its tab is in All) and in its tab. Each alias names one result. Change Alias shows the current one; saving it empty removes it. Settings > Search lists aliases, with Remove (up to 500). An alias stays when its item is gone for now, such as an app being reinstalled, and goes with a deleted snippet or quicklink.
+
 Hide any app, file, snippet, quicklink, emoji, or command from its actions (Hide from Results): search leaves it out for good, and hiding a pinned item unpins it. Settings > Search lists hidden results, with Show Again (up to 500 hidden). Clipboard entries are deleted instead.
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
@@ -112,7 +114,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths              |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
 | Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                        |
-| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, hidden results               |
+| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, aliases, hidden results      |
 | Snippets, Quicklinks | Create, edit, delete                                                                                             |
 | About                | Version, Check for Updates, settings and data folders, credits                                                   |
 

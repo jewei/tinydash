@@ -7,6 +7,7 @@ import { listen } from "@tauri-apps/api/event";
 
 import type { About } from "../generated/About";
 import type { Action } from "../generated/Action";
+import type { AliasedResult } from "../generated/AliasedResult";
 import type { Category } from "../generated/Category";
 import type { HiddenResult } from "../generated/HiddenResult";
 import type { LauncherInit } from "../generated/LauncherInit";
@@ -61,6 +62,9 @@ export const about = () => invoke<About>("about");
 export const hiddenResults = () => invoke<HiddenResult[]>("hidden_results");
 
 export const unhideResult = (id: string) => invoke<void>("unhide_result", { id });
+
+/** The aliases the user set, with the results they name. */
+export const aliases = () => invoke<AliasedResult[]>("aliases");
 
 /** Resolves to the newer version, or `null` when this one is the latest. */
 export const checkForUpdate = () => invoke<string | null>("check_for_update");

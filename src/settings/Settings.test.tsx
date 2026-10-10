@@ -204,6 +204,28 @@ describe("Settings", () => {
     expect(await screen.findByText(/None\. To hide one/)).toBeTruthy();
   });
 
+  it("lists aliases and removes one", async () => {
+    let aliases = [
+      { id: "app:/Applications/Code.app", alias: "vsc", title: "Code", subtitle: "Editor" },
+    ];
+    const backend = fakeBackend({
+      aliases: () => aliases,
+      run_action: () => {
+        aliases = [];
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove the alias vsc" }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "setAlias", id: "app:/Applications/Code.app", alias: "" },
+      resultId: null,
+    });
+    expect(await screen.findByText(/None\. To add one/)).toBeTruthy();
+  });
+
   it("moves and hides launcher tabs, keeping focus on them", async () => {
     let calls = 0;
     const backend = fakeBackend({

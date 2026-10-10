@@ -351,6 +351,9 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
         state
             .hidden
             .update(|hidden| ids.iter().for_each(|id| hidden.remove(id)));
+        state
+            .aliases
+            .update(|aliases| ids.iter().for_each(|id| aliases.remove(id)));
         state.reload_library()?;
         events::results_stale(&app);
         Ok(())
@@ -410,24 +413,63 @@ pub struct HiddenResult {
 #[tauri::command]
 pub fn hidden_results(state: tauri::State<State>) -> Vec<HiddenResult> {
     let snapshot = state.snapshot();
-    let ctx = search::Context::none();
     let mut results: Vec<HiddenResult> = snapshot
         .hidden
         .ids()
-        .map(|id| match search::resolve(&snapshot, &ctx, id) {
-            Some(found) => HiddenResult {
+        .map(|id| {
+            let (title, subtitle) = describe(&snapshot, id);
+            HiddenResult {
                 id: id.to_owned(),
-                title: found.title,
-                subtitle: found.subtitle,
-            },
-            None => HiddenResult {
-                id: id.to_owned(),
-                title: Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
-                subtitle: "No longer found".into(),
-            },
+                title,
+                subtitle,
+            }
         })
         .collect();
     results.sort_by_cached_key(|result| result.title.to_lowercase());
+    results
+}
+
+/// A result's title and subtitle for a Settings list, or its ID when the
+/// item is gone.
+fn describe(snapshot: &search::Snapshot, id: &str) -> (String, String) {
+    match search::resolve(snapshot, &search::Context::none(), id) {
+        Some(found) => (found.title, found.subtitle),
+        None => (
+            Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
+            "No longer found".into(),
+        ),
+    }
+}
+
+/// An alias the user set, as Settings lists it.
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AliasedResult {
+    pub id: String,
+    pub alias: String,
+    pub title: String,
+    pub subtitle: String,
+}
+
+/// The aliases the user set, in alphabetical order.
+#[tauri::command]
+pub fn aliases(state: tauri::State<State>) -> Vec<AliasedResult> {
+    let snapshot = state.snapshot();
+    let mut results: Vec<AliasedResult> = snapshot
+        .aliases
+        .iter()
+        .map(|(id, alias)| {
+            let (title, subtitle) = describe(&snapshot, id);
+            AliasedResult {
+                id: id.to_owned(),
+                alias: alias.to_owned(),
+                title,
+                subtitle,
+            }
+        })
+        .collect();
+    results.sort_by(|a, b| a.alias.cmp(&b.alias));
     results
 }
 

@@ -17,7 +17,12 @@ use crate::{
         library::{self, LibraryKind, Target},
     },
     hud, platform, refresh,
-    search::{self, Context, Snapshot, id::Source, result::Action, usage::MAX_HIDDEN},
+    search::{
+        self, Context, Snapshot,
+        id::Source,
+        result::Action,
+        usage::{self, MAX_ALIASES, MAX_HIDDEN},
+    },
     state::State,
     system_clipboard, timer, window,
 };
@@ -187,6 +192,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             state.store.set_pinned(&id, false)?;
             state.pins.update(|pins| pins.remove(&id));
         }
+        Action::SetAlias { id, alias } => set_alias(&state, &id, &alias)?,
         Action::Unpin { id } => {
             state.store.set_pinned(&id, false)?;
             state.pins.update(|pins| pins.remove(&id));
@@ -213,6 +219,44 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
     } else {
         events::results_stale(app);
     }
+    Ok(())
+}
+
+/// Give a result an alias, or remove its alias when `alias` is empty. Only
+/// a result that exists gets one, and an alias names one result.
+fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
+    let _limit = state
+        .limited_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if !Source::parse(id).is_some_and(|(source, _)| source.aliasable()) {
+        return Err(Error::msg("This result cannot have an alias."));
+    }
+    let alias = usage::clean_alias(alias)?;
+    if alias.is_empty() {
+        state.store.set_alias(id, None)?;
+        state.aliases.update(|aliases| aliases.remove(id));
+        return Ok(());
+    }
+    let snapshot = state.snapshot();
+    let ctx = Context::none();
+    if search::resolve(&snapshot, &ctx, id).is_none() {
+        return Err(Error::msg("This item no longer exists."));
+    }
+    let aliases = &snapshot.aliases;
+    if let Some(owner) = aliases.owner(&alias).filter(|owner| *owner != id) {
+        let name = search::resolve(&snapshot, &ctx, owner).map_or(owner.to_owned(), |r| r.title);
+        return Err(Error::msg(format!(
+            "“{alias}” is already the alias of {name}. Choose another word."
+        )));
+    }
+    if aliases.get(id).is_none() && aliases.len() >= MAX_ALIASES {
+        return Err(Error::msg(format!(
+            "You can set up to {MAX_ALIASES} aliases. Remove some in Settings > Search."
+        )));
+    }
+    state.store.set_alias(id, Some(&alias))?;
+    state.aliases.update(|aliases| aliases.set(id, &alias));
     Ok(())
 }
 
@@ -318,6 +362,25 @@ mod tests {
             pin_to_drop(&state.snapshot(), &emoji[5], |_| true).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn an_alias_names_one_existing_result() {
+        let state = State::for_tests(Settings::default());
+        let lock = "system:lock";
+        set_alias(&state, lock, " Lk ").unwrap();
+        assert_eq!(state.aliases.get().get(lock), Some("lk"));
+        let taken = set_alias(&state, "system:sleep", "lk").unwrap_err();
+        assert!(taken.to_string().contains("Lock Screen"), "{taken}");
+        assert!(set_alias(&state, "system:gone", "x").is_err());
+        assert!(set_alias(&state, "clip:1", "x").is_err());
+        assert_eq!(
+            search::search(&state.snapshot(), "lk", search::Category::All)[0].id,
+            lock
+        );
+        set_alias(&state, lock, "").unwrap();
+        assert_eq!(state.store.aliases().unwrap().len(), 0);
+        assert_eq!(state.aliases.get().len(), 0);
     }
 
     #[test]

@@ -186,6 +186,12 @@ pub enum Action {
     Hide {
         id: String,
     },
+    /// Give a result an alias, or remove it with an empty one. The launcher
+    /// asks for the alias first; the result offers the one it has now.
+    SetAlias {
+        id: String,
+        alias: String,
+    },
     /// Turn on currency rates, which a currency query asked for while they
     /// were off, and download them.
     TurnOnCurrencyRates,

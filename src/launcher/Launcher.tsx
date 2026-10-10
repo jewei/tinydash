@@ -13,6 +13,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { Glyph } from "../ui/Icon";
 import { Keys } from "../ui/Keys";
 import { ActionMenu, type MenuItem } from "./ActionMenu";
+import { AliasDialog } from "./AliasDialog";
 import { shortcutFor } from "./describe";
 import { commandFor } from "./keymap";
 import { PreviewPane } from "./PreviewPane";
@@ -171,7 +172,15 @@ export function Launcher() {
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || isComposing(event) || menu() || launcher.pending()) return;
+    if (
+      event.defaultPrevented ||
+      isComposing(event) ||
+      menu() ||
+      launcher.pending() ||
+      launcher.naming()
+    ) {
+      return;
+    }
     if (clipboardOff() && event.key === "Enter") {
       // A focused Turn On button would also click on Enter, and on each repeat.
       event.preventDefault();
@@ -513,6 +522,23 @@ export function Launcher() {
       </footer>
 
       <Show when={menu()}>{(items) => <ActionMenu items={items()} onClose={closeMenu} />}</Show>
+
+      <Show when={launcher.naming()}>
+        {(naming) => (
+          <AliasDialog
+            title={naming().title}
+            alias={naming().alias}
+            onSave={(alias) => {
+              launcher.saveAlias(alias);
+              focusInput();
+            }}
+            onCancel={() => {
+              launcher.cancelAlias();
+              focusInput();
+            }}
+          />
+        )}
+      </Show>
 
       <Show when={launcher.pending()}>
         {(pending) => (

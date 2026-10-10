@@ -77,6 +77,56 @@ describe("Launcher", () => {
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
   });
 
+  it("asks for an alias and sends the one typed", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Change Alias “saf”…",
+          action: { type: "setAlias", id: app.id, alias: "saf" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [named]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Change Alias/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    const field = within(dialog).getByRole("textbox") as HTMLInputElement;
+    expect(field.value).toBe("saf");
+    expect(document.activeElement).toBe(field);
+    // Keys in the dialog do not reach the launcher.
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(backend.called("run_action")).toHaveLength(0);
+    fireEvent.input(field, { target: { value: "sf" } });
+    fireEvent.submit(dialog);
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "setAlias", id: app.id, alias: "sf" },
+      resultId: null,
+    });
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
+  });
+
+  it("closes the alias dialog with Escape and saves nothing", async () => {
+    const named: SearchResult = {
+      ...app,
+      actions: [
+        { label: "Add Alias…", action: { type: "setAlias", id: app.id, alias: "" }, confirm: null },
+      ],
+    };
+    const { backend, press } = setup(() => [named]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    const dialog = await screen.findByRole("dialog", { name: "Alias for Safari" });
+    fireEvent.keyDown(within(dialog).getByRole("textbox"), { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Alias for Safari" })).toBeNull();
+    expect(backend.called("run_action")).toHaveLength(0);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+  });
+
   it("keeps only tabs in the tab list", async () => {
     setup(() => []);
     const tablist = await screen.findByRole("tablist", { name: "Categories" });

@@ -17,6 +17,14 @@ interface Pending {
   resultId?: string;
 }
 
+/** An alias action, waiting for the user to type the alias. */
+interface Naming {
+  action: ResultAction;
+  title: string;
+  /** The alias the result has now, or "". */
+  alias: string;
+}
+
 /** Which row to run: a numbered row, or whichever row is selected then. */
 type Target = number | "selected";
 
@@ -42,6 +50,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   const [searchError, setSearchError] = createSignal<string>();
   const [actionError, setActionError] = createSignal<string>();
   const [pending, setPending] = createSignal<Pending>();
+  const [naming, setNaming] = createSignal<Naming>();
   const [running, setRunning] = createSignal(false);
 
   const selected = () => results()[selectedIndex()];
@@ -152,6 +161,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       setCategoryValue(next ?? "all");
       setActionError(undefined);
       setPending(undefined);
+      setNaming(undefined);
     });
     void refresh();
   }
@@ -171,12 +181,28 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     if (result && action) run(action, result);
   }
 
-  /** Run an action, or ask first when it needs confirmation. */
+  /**
+   * Run an action, or ask first when it needs confirmation or, to set an
+   * alias, the alias itself.
+   */
   function run(action: ResultAction, result?: SearchResult) {
     // Usage ranking learns only from a result's main action.
     const resultId = result && result.actions[0] === action ? result.id : undefined;
-    if (action.confirm) setPending({ action, resultId });
-    else void perform(action, resultId);
+    if (action.action.type === "setAlias") {
+      setNaming({ action, title: result?.title ?? "", alias: action.action.alias });
+    } else if (action.confirm) {
+      setPending({ action, resultId });
+    } else {
+      void perform(action, resultId);
+    }
+  }
+
+  /** Save the alias the user typed; an empty one removes it. */
+  function saveAlias(alias: string) {
+    const waiting = naming();
+    setNaming(undefined);
+    if (waiting?.action.action.type !== "setAlias") return;
+    void perform({ ...waiting.action, action: { ...waiting.action.action, alias } });
   }
 
   function confirm() {
@@ -209,6 +235,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     searchError,
     actionError,
     pending,
+    naming,
     running,
     setQuery,
     setCategory,
@@ -224,5 +251,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     run,
     confirm,
     cancel: () => setPending(undefined),
+    saveAlias,
+    cancelAlias: () => setNaming(undefined),
   };
 }

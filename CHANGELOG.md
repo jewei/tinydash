@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Give any app, file, snippet, quicklink, emoji, or command an alias, such as `vsc` (Add Alias in its actions). Typing the alias puts that result first. Settings > Search lists your aliases.
+
 ## [0.5.0] - 2026-10-08
 
 ### Added
