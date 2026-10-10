@@ -527,6 +527,33 @@ mod tests {
         assert!(!ids("", Category::All).contains(&rocket));
         state.pins.set(Pins::new(vec![rocket.clone()]));
         assert_eq!(ids("", Category::All).first(), Some(&rocket));
+        // Its alias works in its tab only, too.
+        state
+            .aliases
+            .set(Aliases::new([(rocket.clone(), "rk".to_owned())]));
+        assert!(!ids("rk", Category::All).contains(&rocket));
+        assert_eq!(ids("rk", Category::Emoji).first(), Some(&rocket));
+    }
+
+    #[test]
+    fn quicklinks_stay_out_of_all_with_their_tab() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let mut settings = Settings::default();
+        for tab in &mut settings.tabs {
+            tab.in_all = tab.category != Category::Snippets;
+        }
+        let state = crate::state::State::for_tests(settings);
+        let item = LibraryItem {
+            id: None,
+            kind: LibraryKind::Quicklink,
+            name: "Jira".into(),
+            keyword: String::new(),
+            text: "https://jira.test/{query}".into(),
+        };
+        state.store.save_library_item(&item).unwrap();
+        state.reload_library().unwrap();
+        let results = search(&state.snapshot(), "rust", Category::All);
+        assert!(!results.iter().any(|result| result.title == "Jira: rust"));
     }
 
     #[test]
