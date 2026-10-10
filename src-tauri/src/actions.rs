@@ -15,7 +15,6 @@ use crate::{
     features::{
         clip_card,
         library::{self, LibraryKind, Target},
-        system::SystemCommand,
     },
     hud, platform, refresh,
     search::{
@@ -158,8 +157,8 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .find(id)
                 .filter(|item| item.kind == LibraryKind::Quicklink)
                 .ok_or_else(|| Error::msg("This quicklink was deleted."))?;
-            // Read the way widgets read it: a copy its source marked
-            // secret, as password managers do, never goes into a link.
+            // Read the way widgets read it: a secret copy, marked by its
+            // source or made in a password app, never goes into a link.
             let clipboard = || platform::clipboard_text(app);
             match library::quicklink_target(&item.text, &query, chrono::Local::now(), clipboard)? {
                 Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
@@ -171,10 +170,6 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         Action::System { command } => {
             // Hide first: Lock and Sleep must not leave the launcher on screen.
             window::hide(app)?;
-            if command == SystemCommand::SleepDisplays {
-                // Releasing the key that ran it would wake the displays again.
-                std::thread::sleep(std::time::Duration::from_secs(1));
-            }
             if let Err(error) = platform::run_system_command(command) {
                 window::show_again(app)?;
                 return Err(error);

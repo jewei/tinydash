@@ -203,23 +203,23 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
             run("xfce4-session-logout", &["--logout"])
         }
         SystemCommand::OpenSystemSettings if desktop.contains("gnome") => {
-            super::launch("gnome-control-center", &[])
+            super::launch("gnome-control-center")
         }
         SystemCommand::OpenSystemSettings if desktop.contains("kde") => {
-            super::launch("systemsettings", &[])
+            super::launch("systemsettings")
         }
         SystemCommand::OpenSystemSettings if desktop.contains("xfce") => {
-            super::launch("xfce4-settings-manager", &[])
+            super::launch("xfce4-settings-manager")
         }
-        // Not awaited: a file manager that GLib starts directly keeps the
-        // output pipes open until its window closes.
-        SystemCommand::OpenTrash => super::launch("gio", &["open", "trash:///"]),
+        SystemCommand::OpenTrash => open_trash(),
         SystemCommand::SleepDisplays
             if std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("x11") =>
         {
+            super::wait_for_key_release();
             run("xset", &["dpms", "force", "off"])
         }
         SystemCommand::SleepDisplays if desktop.contains("kde") => {
+            super::wait_for_key_release();
             run("kscreen-doctor", &["--dpms", "off"])
         }
         SystemCommand::ToggleDarkMode if desktop.contains("gnome") => toggle_gnome_dark_mode(),
@@ -227,6 +227,28 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         | SystemCommand::OpenSystemSettings
         | SystemCommand::SleepDisplays
         | SystemCommand::ToggleDarkMode => unsupported(),
+    }
+}
+
+/// Show the trash in the file manager. The output is discarded, not
+/// captured: a file manager that GLib starts directly inherits it, and a
+/// captured pipe would stay open until its window closes. `gio open` itself
+/// exits once the launch is done.
+fn open_trash() -> Result<()> {
+    use std::process::Stdio;
+    let status = std::process::Command::new("gio")
+        .args(["open", "trash:///"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|error| Error::msg(format!("Could not run gio: {error}")))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(Error::msg(
+            "No file manager could open the trash. Install one, such as Files.",
+        ))
     }
 }
 
@@ -255,6 +277,10 @@ static OWNER: AtomicU64 = AtomicU64::new(0);
 static CHANGE: AtomicU64 = AtomicU64::new(0);
 /// Text from the last checked owner, waiting for the monitor.
 static CAPTURED: Mutex<Option<String>> = Mutex::new(None);
+
+/// Copies that should stay out of histories are marked here, so there is
+/// nothing to remember.
+pub fn note_clipboard_change(_change: u64) {}
 
 pub fn clipboard_change() -> u64 {
     CHANGE.load(Ordering::Acquire)

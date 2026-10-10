@@ -1,7 +1,10 @@
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    sync::Mutex,
+    sync::{
+        Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use objc2::{
@@ -497,7 +500,10 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         SystemCommand::OpenSystemSettings => {
             super::run("/usr/bin/open", &["-b", "com.apple.systempreferences"])
         }
-        SystemCommand::SleepDisplays => super::run("/usr/bin/pmset", &["displaysleepnow"]),
+        SystemCommand::SleepDisplays => {
+            super::wait_for_key_release();
+            super::run("/usr/bin/pmset", &["displaysleepnow"])
+        }
         SystemCommand::ToggleDarkMode => apple_script(
             r#"tell application "System Events" to tell appearance preferences to set dark mode to not dark mode"#,
         ),
@@ -557,20 +563,39 @@ pub fn clipboard_change() -> u64 {
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
+/// The latest change made while a password app was in front, as
+/// `note_clipboard_change` saw it, or `u64::MAX` for none.
+static PASSWORD_COPY: AtomicU64 = AtomicU64::new(u64::MAX);
+
+fn password_app_in_front() -> bool {
+    autoreleasepool(|_| {
+        NSWorkspace::sharedWorkspace()
+            .frontmostApplication()
+            .and_then(|app| app.bundleIdentifier())
+            .is_some_and(|id| PASSWORD_APPS.contains(&id.to_string().as_str()))
+    })
+}
+
+/// Remember a change made in a password app, which marks nothing, so its
+/// copy stays secret after the user leaves the app. Reads no content.
+pub fn note_clipboard_change(change: u64) {
+    if password_app_in_front() {
+        PASSWORD_COPY.store(change, Ordering::Release);
+    }
+}
+
+/// Call with the reader lock held; it reads the change counter directly.
 fn clipboard_is_concealed() -> bool {
     autoreleasepool(|_| {
-        let marked = NSPasteboard::generalPasteboard()
-            .types()
-            .is_some_and(|types| {
-                types
-                    .iter()
-                    .any(|kind| SECRET_FORMATS.contains(&kind.to_string().as_str()))
-            });
+        let pasteboard = NSPasteboard::generalPasteboard();
+        let marked = pasteboard.types().is_some_and(|types| {
+            types
+                .iter()
+                .any(|kind| SECRET_FORMATS.contains(&kind.to_string().as_str()))
+        });
         marked
-            || NSWorkspace::sharedWorkspace()
-                .frontmostApplication()
-                .and_then(|app| app.bundleIdentifier())
-                .is_some_and(|id| PASSWORD_APPS.contains(&id.to_string().as_str()))
+            || PASSWORD_COPY.load(Ordering::Acquire) == pasteboard.changeCount() as u64
+            || password_app_in_front()
     })
 }
 

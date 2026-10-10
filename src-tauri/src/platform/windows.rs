@@ -212,13 +212,14 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
             }
             // Posted, not sent: sending to every window could wait on a hung one.
             // 2 means "off" for SC_MONITORPOWER.
-            SystemCommand::SleepDisplays
-                if PostMessageW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER as usize, 2)
-                    == 0 =>
-            {
-                Err(failed("turn off the displays"))
+            SystemCommand::SleepDisplays => {
+                super::wait_for_key_release();
+                if PostMessageW(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER as usize, 2) == 0 {
+                    Err(failed("turn off the displays"))
+                } else {
+                    Ok(())
+                }
             }
-            SystemCommand::SleepDisplays => Ok(()),
             SystemCommand::ToggleDarkMode => toggle_dark_mode(),
             // Explorer's exit code says nothing about success, so it is not awaited.
             SystemCommand::OpenTrash => std::process::Command::new("explorer.exe")
@@ -299,6 +300,10 @@ fn toggle_dark_mode() -> Result<()> {
     });
     Ok(())
 }
+
+/// Copies that should stay out of histories are marked here, so there is
+/// nothing to remember.
+pub fn note_clipboard_change(_change: u64) {}
 
 pub fn clipboard_change() -> u64 {
     // SAFETY: Takes no arguments and only reads a counter.
