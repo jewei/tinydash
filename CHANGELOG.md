@@ -7,6 +7,8 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Added
 
 - Give any app, file, snippet, quicklink, emoji, or command an alias, such as `vsc` (Add Alias in its actions). Typing the alias puts that result first. Settings > Search lists your aliases.
+- A snippet with a keyword and `{query}` takes the text typed after the keyword, as quicklinks do: `hi Sam` copies `Hello Sam,`.
+- Quicklinks can use `{clipboard}`, `{date}`, `{time}`, and `{datetime}`, as snippets do.
 
 ## [0.5.0] - 2026-10-08
 

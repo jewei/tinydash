@@ -165,9 +165,11 @@ pub enum Action {
     },
     /// Delete every unpinned clipboard history entry.
     ClearClipboard,
-    /// Copy a snippet with its placeholders filled.
+    /// Copy a snippet with its placeholders filled; `query` is the text
+    /// typed after its keyword, or empty.
     CopySnippet {
         id: i64,
+        query: String,
     },
     OpenQuicklink {
         id: i64,

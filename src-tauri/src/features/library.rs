@@ -1,9 +1,9 @@
 //! Snippets (text templates) and quicklinks (URL or path templates) that the
 //! user saves in Settings.
 //!
-//! - Snippet placeholders: `{date}`, `{time}`, `{datetime}`, `{clipboard}`.
-//! - Quicklink placeholder: `{query}`, filled from text typed after the
-//!   keyword, for example `jira ABC-12`.
+//! Both take the placeholders `{query}`, filled from text typed after the
+//! keyword (`jira ABC-12`), `{clipboard}`, `{date}`, `{time}`, and
+//! `{datetime}`.
 
 use std::path::PathBuf;
 
@@ -83,9 +83,16 @@ impl LibraryItem {
             return Err(Error::msg("Enter the text, up to 32 KB."));
         }
         if self.kind == LibraryKind::Quicklink {
-            quicklink_target(&self.text, "")?;
+            quicklink_target(&self.text, "", Local::now(), || None)?;
         }
         Ok(self)
+    }
+
+    /// Text typed after its keyword fills it: a quicklink, or a snippet
+    /// with `{query}`.
+    fn takes_query(&self) -> bool {
+        !self.keyword.is_empty()
+            && (self.kind == LibraryKind::Quicklink || self.text.contains("{query}"))
     }
 }
 
@@ -98,22 +105,33 @@ pub enum Target {
 
 /// Fill a quicklink template. Only web and mail URLs and absolute or `~`
 /// paths are allowed, so a quicklink cannot start a program by URL scheme.
-pub fn quicklink_target(template: &str, query: &str) -> Result<Target> {
+/// The clipboard is read only when the template has `{clipboard}`.
+pub fn quicklink_target(
+    template: &str,
+    query: &str,
+    now: DateTime<Local>,
+    clipboard: impl FnOnce() -> Option<String>,
+) -> Result<Target> {
     let lower = template.to_ascii_lowercase();
     if ["http://", "https://", "mailto:"]
         .iter()
         .any(|s| lower.starts_with(s))
     {
-        let url = web::fill(template, query);
+        let url = fill(template, query, now, clipboard, |value| {
+            Ok(web::encode(value))
+        })?;
         url::Url::parse(&url).map_err(|e| Error::msg(format!("Invalid quicklink URL: {e}")))?;
         return Ok(Target::Url(url));
     }
-    // The query fills in a name; it must not climb out of the folder.
-    if query.contains(['/', '\\']) || query.split_whitespace().any(|part| part == "..") {
-        return Err(Error::msg("A path quicklink accepts a name, not a path."));
-    }
+    // A value fills in a name; it must not climb out of the folder.
+    let name = |value: &str| {
+        if value.contains(['/', '\\']) || value.split_whitespace().any(|part| part == "..") {
+            return Err(Error::msg("A path quicklink accepts a name, not a path."));
+        }
+        Ok(value.to_owned())
+    };
     let home = std::env::home_dir().unwrap_or_default();
-    let path = settings::expand_home(&template.replace("{query}", query), &home);
+    let path = settings::expand_home(&fill(template, query, now, clipboard, name)?, &home);
     if !path.is_absolute() {
         return Err(Error::msg(
             "A quicklink opens an http, https, or mailto URL, or an absolute or ~ path.",
@@ -125,17 +143,52 @@ pub fn quicklink_target(template: &str, query: &str) -> Result<Target> {
 /// Fill snippet placeholders. The clipboard is read only when needed.
 pub fn render_snippet(
     text: &str,
+    query: &str,
     now: DateTime<Local>,
     clipboard: impl FnOnce() -> Option<String>,
 ) -> String {
-    let mut text = text
-        .replace("{datetime}", &now.format("%Y-%m-%d %H:%M").to_string())
-        .replace("{date}", &now.format("%Y-%m-%d").to_string())
-        .replace("{time}", &now.format("%H:%M").to_string());
-    if text.contains("{clipboard}") {
-        text = text.replace("{clipboard}", &clipboard().unwrap_or_default());
+    fill(text, query, now, clipboard, |value| Ok(value.to_owned()))
+        .expect("a snippet value is never refused")
+}
+
+/// Replace each placeholder in one pass, so that a value never fills in
+/// turn: a query of `{clipboard}` stays that text. Unknown names stay as
+/// written. `value` encodes or checks each value before it goes in.
+fn fill(
+    template: &str,
+    query: &str,
+    now: DateTime<Local>,
+    clipboard: impl FnOnce() -> Option<String>,
+    mut value: impl FnMut(&str) -> Result<String>,
+) -> Result<String> {
+    let mut clipboard = Some(clipboard);
+    let mut copied = None;
+    let mut filled = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(start) = rest.find('{') {
+        filled.push_str(&rest[..start]);
+        rest = &rest[start..];
+        let name = rest[1..].split_once('}').map(|(name, _)| name);
+        let text = match name {
+            Some("query") => query.to_owned(),
+            Some("date") => now.format("%Y-%m-%d").to_string(),
+            Some("time") => now.format("%H:%M").to_string(),
+            Some("datetime") => now.format("%Y-%m-%d %H:%M").to_string(),
+            Some("clipboard") => copied
+                .get_or_insert_with(|| clipboard.take().and_then(|read| read()).unwrap_or_default())
+                .clone(),
+            _ => {
+                filled.push('{');
+                rest = &rest[1..];
+                continue;
+            }
+        };
+        filled.push_str(&value(&text)?);
+        // The name and its two braces.
+        rest = &rest[name.map_or(0, str::len) + 2..];
     }
-    text
+    filled.push_str(rest);
+    Ok(filled)
 }
 
 #[derive(Default)]
@@ -192,21 +245,27 @@ impl Library {
         self.find(id).map(|item| result(item, "", ctx))
     }
 
-    /// `keyword text` for a quicklink whose keyword is the first word.
-    pub fn quicklink_answer(&self, query: &str) -> Option<SearchResult> {
+    /// `keyword text` for a quicklink, or a snippet with `{query}`, whose
+    /// keyword is the first word.
+    pub fn keyword_answer(&self, query: &str) -> Option<SearchResult> {
         let (keyword, text) = query.split_once(char::is_whitespace)?;
         let keyword = keyword.to_lowercase();
-        let item = self.items.iter().find(|item| {
-            item.kind == LibraryKind::Quicklink
-                && !item.keyword.is_empty()
-                && item.keyword == keyword
-        })?;
-        let mut result = result(item, text.trim(), &Context::none());
-        result
-            .actions
-            .retain(|action| !matches!(action.action, Action::Pin { .. }));
-        Some(result)
+        let item = self
+            .items
+            .iter()
+            .find(|item| item.takes_query() && item.keyword == keyword)?;
+        Some(answer(item, text.trim()))
     }
+}
+
+/// A result that runs `item` with the typed text. It has no Pin: a pin
+/// keeps the item, not the text.
+fn answer(item: &LibraryItem, query: &str) -> SearchResult {
+    let mut result = result(item, query, &Context::none());
+    result
+        .actions
+        .retain(|action| !matches!(action.action, Action::Pin { .. }));
+    result
 }
 
 fn result(item: &LibraryItem, query: &str, ctx: &Context) -> SearchResult {
@@ -220,10 +279,17 @@ fn result(item: &LibraryItem, query: &str, ctx: &Context) -> SearchResult {
                 .lines()
                 .next()
                 .unwrap_or_default()
+                .replace("{query}", query)
                 .chars()
                 .take(80)
                 .collect(),
-            ResultAction::new("Copy Snippet", Action::CopySnippet { id: item_id }),
+            ResultAction::new(
+                "Copy Snippet",
+                Action::CopySnippet {
+                    id: item_id,
+                    query: query.into(),
+                },
+            ),
         ),
         LibraryKind::Quicklink => (
             ResultKind::Quicklink,
@@ -304,23 +370,32 @@ mod tests {
                 .validated()
                 .is_ok()
         );
-        assert!(quicklink_target("~/Projects/{query}", "../../Downloads/x.app").is_err());
-        assert!(quicklink_target("~/Projects/{query}", "notes").is_ok());
+        let now = Local.with_ymd_and_hms(2026, 10, 4, 9, 5, 0).unwrap();
+        let target = |template: &str, query: &str| quicklink_target(template, query, now, || None);
+        assert!(target("~/Projects/{query}", "../../Downloads/x.app").is_err());
+        assert!(target("~/Projects/{query}", "notes").is_ok());
+        let clipboard = || Some("../secret".to_owned());
+        assert!(quicklink_target("~/Projects/{clipboard}", "", now, clipboard).is_err());
     }
 
     #[test]
     fn fills_quicklinks_and_snippets() {
-        assert_eq!(
-            quicklink_target("https://x.test/?q={query}", "a b").unwrap(),
-            Target::Url("https://x.test/?q=a%20b".into())
-        );
         let now = Local.with_ymd_and_hms(2026, 10, 4, 9, 5, 0).unwrap();
         assert_eq!(
-            render_snippet("{date} {time} {clipboard}", now, || Some("clip".into())),
-            "2026-10-04 09:05 clip"
+            quicklink_target("https://x.test/?q={query}&d={date}", "a b", now, || None).unwrap(),
+            Target::Url("https://x.test/?q=a%20b&d=2026-10-04".into())
+        );
+        assert_eq!(
+            quicklink_target("https://x.test/{clipboard}", "", now, || Some("a/b".into())).unwrap(),
+            Target::Url("https://x.test/a%2Fb".into())
+        );
+        let clip = || Some("clip".into());
+        assert_eq!(
+            render_snippet("{date} {time} {clipboard} {query}", "Sam", now, clip),
+            "2026-10-04 09:05 clip Sam"
         );
         let mut read = false;
-        render_snippet("no placeholders", now, || {
+        render_snippet("no placeholders", "", now, || {
             read = true;
             None
         });
@@ -328,14 +403,44 @@ mod tests {
     }
 
     #[test]
-    fn quicklink_keywords_take_the_rest_of_the_query() {
-        let library = Library::new(vec![item(
-            LibraryKind::Quicklink,
-            "Jira",
-            "jira",
-            "https://jira.test/browse/{query}",
-        )]);
-        let answer = library.quicklink_answer("jira ABC-12").unwrap();
+    fn values_never_fill_in_turn() {
+        let now = Local.with_ymd_and_hms(2026, 10, 4, 9, 5, 0).unwrap();
+        let mut reads = 0;
+        let text = render_snippet(
+            "{query} {clipboard}{clipboard} {x} {",
+            "{clipboard}",
+            now,
+            || {
+                reads += 1;
+                Some("{date}".into())
+            },
+        );
+        assert_eq!(text, "{clipboard} {date}{date} {x} {");
+        assert_eq!(reads, 1);
+        assert_eq!(render_snippet("{{query}}", "a", now, || None), "{a}");
+    }
+
+    #[test]
+    fn keywords_take_the_rest_of_the_query() {
+        let greeting = LibraryItem {
+            id: Some(2),
+            ..item(LibraryKind::Snippet, "Greeting", "hi", "Hello {query},")
+        };
+        let signature = LibraryItem {
+            id: Some(3),
+            ..item(LibraryKind::Snippet, "Sig", "sig", "Regards")
+        };
+        let library = Library::new(vec![
+            item(
+                LibraryKind::Quicklink,
+                "Jira",
+                "jira",
+                "https://jira.test/browse/{query}",
+            ),
+            greeting,
+            signature,
+        ]);
+        let answer = library.keyword_answer("jira ABC-12").unwrap();
         assert_eq!(answer.title, "Jira: ABC-12");
         assert_eq!(
             answer.actions[0].action,
@@ -344,7 +449,22 @@ mod tests {
                 query: "ABC-12".into()
             }
         );
-        assert!(library.quicklink_answer("jira").is_none());
-        assert!(library.quicklink_answer("jiraa x").is_none());
+        assert!(library.keyword_answer("jira").is_none());
+        assert!(library.keyword_answer("jiraa x").is_none());
+        let hello = library.keyword_answer("HI Sam").unwrap();
+        assert_eq!(
+            (hello.title.as_str(), hello.subtitle.as_str()),
+            ("Greeting: Sam", "Hello Sam,")
+        );
+        assert_eq!(
+            hello.actions[0].action,
+            Action::CopySnippet {
+                id: 2,
+                query: "Sam".into()
+            }
+        );
+        assert_eq!(hello.actions.len(), 1);
+        // Without {query}, a snippet keyword takes no text.
+        assert!(library.keyword_answer("sig Sam").is_none());
     }
 }

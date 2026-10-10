@@ -346,7 +346,7 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
 
     let fallback = usize::from(!keyword_search);
     let room = ALL_LIMIT.saturating_sub(results.len() + fallback);
-    // A quicklink's keyword answer has the quicklink's own ID, and a result
+    // A keyword answer has its snippet's or quicklink's own ID, and a result
     // may match by name and by alias; keep only the first of each ID, so no
     // two rows share one. A keyword answer carries the typed text.
     let mut seen: HashSet<String> = results.iter().map(|r| r.id.clone()).collect();
@@ -376,7 +376,7 @@ fn answers(s: &Snapshot, query: &str) -> Vec<SearchResult> {
     results.extend(clip_card::answer(query, s.now));
     results.extend(permissions::answer(query));
     results.extend(web::answer(query));
-    results.extend(s.library.quicklink_answer(query));
+    results.extend(s.library.keyword_answer(query));
     results
 }
 

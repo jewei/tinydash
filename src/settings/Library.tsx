@@ -21,9 +21,10 @@ const blank = (kind: LibraryKind): LibraryItem => ({
 });
 
 const HELP: Record<LibraryKind, string> = {
-  snippet: "Enter copies the text. Placeholders: {date}, {time}, {datetime}, and {clipboard}.",
+  snippet:
+    "Enter copies the text. Placeholders: {date}, {time}, {datetime}, {clipboard}, and {query}, the text typed after the keyword, as in “hi Sam”.",
   quicklink:
-    "Opens an http, https, or mailto URL, or an absolute or ~ path. {query} is replaced by text typed after the keyword, as in “jira ABC-12”.",
+    "Opens an http, https, or mailto URL, or an absolute or ~ path. {query} is replaced by text typed after the keyword, as in “jira ABC-12”. Also: {clipboard}, {date}, {time}, and {datetime}.",
 };
 
 /** Create, edit, and delete snippets or quicklinks. */

@@ -113,16 +113,21 @@ fn result(engine: &Engine, text: &str) -> SearchResult {
     }
 }
 
-/// Replace `{query}` with the text, percent-encoded so it stays one value in
-/// a path or a query string (a space becomes `%20`, never `+`).
-pub fn fill(template: &str, text: &str) -> String {
+/// Replace `{query}` with the text, encoded with [`encode`].
+fn fill(template: &str, text: &str) -> String {
+    template.replace("{query}", &encode(text))
+}
+
+/// Percent-encode text so it stays one value in a URL path or query string
+/// (a space becomes `%20`, never `+`).
+pub fn encode(text: &str) -> String {
     use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
     const VALUE: &AsciiSet = &NON_ALPHANUMERIC
         .remove(b'-')
         .remove(b'.')
         .remove(b'_')
         .remove(b'~');
-    template.replace("{query}", &utf8_percent_encode(text, VALUE).to_string())
+    utf8_percent_encode(text, VALUE).to_string()
 }
 
 #[cfg(test)]

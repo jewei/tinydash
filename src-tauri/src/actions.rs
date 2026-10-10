@@ -112,7 +112,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             state.store.clear_clipboard()?;
             state.reload_clipboard()?;
         }
-        Action::CopySnippet { id } => {
+        Action::CopySnippet { id, query } => {
             let library = state.library.get();
             let item = library
                 .find(id)
@@ -121,7 +121,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             // The clipboard may hold a password, so text that includes it
             // is copied as secret and stays out of clipboard histories.
             let read_clipboard = std::cell::Cell::new(false);
-            let text = library::render_snippet(&item.text, chrono::Local::now(), || {
+            let text = library::render_snippet(&item.text, &query, chrono::Local::now(), || {
                 read_clipboard.set(true);
                 system_clipboard::read_text()
             });
@@ -135,7 +135,10 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .find(id)
                 .filter(|item| item.kind == LibraryKind::Quicklink)
                 .ok_or_else(|| Error::msg("This quicklink was deleted."))?;
-            match library::quicklink_target(&item.text, &query)? {
+            // Read the way widgets read it: a copy its source marked
+            // secret, such as a password, never goes into a link.
+            let clipboard = || platform::clipboard_text(app);
+            match library::quicklink_target(&item.text, &query, chrono::Local::now(), clipboard)? {
                 Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
                     .map_err(|e| Error::msg(e.to_string()))?,
                 Target::Path(path) => open_path(&path)?,

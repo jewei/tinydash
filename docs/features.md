@@ -94,8 +94,9 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 
 Create them in Settings > Snippets and Settings > Quicklinks.
 
-- **Snippet:** text with optional `{date}`, `{time}`, `{datetime}`, and `{clipboard}`. Enter fills the placeholders and copies the text. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.
-- **Quicklink:** an http, https, or mailto URL, or an absolute or `~` path. `{query}` takes the text you type after the keyword, encoded: with keyword `jira` and URL `https://jira.example.com/browse/{query}`, typing `jira ABC-12` opens that issue.
+- **Placeholders** work in both: `{query}` (the text you type after the keyword), `{clipboard}` (the text on the clipboard), `{date}` (`2026-10-11`), `{time}` (`09:05`), and `{datetime}`. They are filled in one pass, so a value that looks like a placeholder, such as typed text `{clipboard}`, stays as it is. Other text in braces stays too.
+- **Snippet:** text. Enter fills the placeholders and copies the text. A snippet with a keyword and `{query}` takes the text typed after its keyword: with keyword `hi` and text `Hello {query},`, typing `hi Sam` copies `Hello Sam,`. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.
+- **Quicklink:** an http, https, or mailto URL, or an absolute or `~` path. Placeholder values are encoded for a URL: with keyword `jira` and URL `https://jira.example.com/browse/{query}`, typing `jira ABC-12` opens that issue. In a path, a value must be a name, not a path. `{clipboard}` is empty when the app that copied marked the copy secret, as password managers do.
 - Limits: 500 snippets and quicklinks in all. A name has up to 100 characters, the text up to 32 KB, and the optional keyword is one word of up to 32 characters.
 
 ## Files
