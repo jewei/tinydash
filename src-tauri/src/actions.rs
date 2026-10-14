@@ -13,7 +13,7 @@ use crate::{
     error::{Error, Result},
     events,
     features::{
-        clip_card,
+        calculator, clip_card,
         library::{self, LibraryKind, Target},
     },
     hud, platform, refresh,
@@ -39,6 +39,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             | Action::Open { .. }
             | Action::OpenUrl { .. }
             | Action::Copy { .. }
+            | Action::CopyCalculation { .. }
             | Action::CopySnippet { .. }
             | Action::OpenQuicklink { .. }
             | Action::System { .. }
@@ -47,6 +48,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             // menu they come without a result ID, so only the System
             // results count.
             | Action::ClearClipboard
+            | Action::ClearCalculations
             | Action::OpenSettings
             | Action::Quit
     );
@@ -87,6 +89,29 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         }
         Action::Copy { text } => {
             copy_and_close(app, || system_clipboard::write_text(&text, false))?
+        }
+        // Computed again, so the history keeps only what the calculator
+        // itself answers.
+        Action::CopyCalculation { query } => {
+            let value = calculator::result(&query, Option::as_ref(&state.rates.get()))
+                .ok_or_else(|| Error::msg("This calculation no longer has an answer."))?;
+            copy_and_close(app, || system_clipboard::write_text(&value, false))?;
+            // The copy worked; a failed save only costs the history entry.
+            let saved = state
+                .store
+                .save_calculation(&query, &value, chrono::Utc::now().timestamp())
+                .and_then(|()| state.reload_calculations());
+            if let Err(error) = saved {
+                tracing::warn!(%error, "Could not save the calculation");
+            }
+        }
+        Action::DeleteCalculation { id } => {
+            state.store.delete_calculation(id)?;
+            state.reload_calculations()?;
+        }
+        Action::ClearCalculations => {
+            state.store.clear_calculations()?;
+            state.reload_calculations()?;
         }
         Action::CopySecret { text } => {
             copy_and_close(app, || system_clipboard::write_text(&text, true))?

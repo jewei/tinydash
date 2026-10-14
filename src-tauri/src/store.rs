@@ -13,6 +13,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use crate::{
     error::Result,
     features::{
+        calculator::{Calculation, MAX_CALCULATIONS},
         clipboard::{ClipKind, Content, Entry, MAX_IMAGES},
         currency::Rates,
         library::{LibraryItem, LibraryKind},
@@ -81,6 +82,14 @@ const MIGRATIONS: &[&str] = &[
         id TEXT PRIMARY KEY,
         alias TEXT NOT NULL UNIQUE
     ) WITHOUT ROWID;
+",
+    r"
+    CREATE TABLE calculations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        expression TEXT NOT NULL UNIQUE,
+        result TEXT NOT NULL,
+        used_at INTEGER NOT NULL
+    );
 ",
 ];
 
@@ -420,6 +429,53 @@ impl Store {
         })
     }
 
+    /// Copied calculations, newest first.
+    pub fn calculations(&self) -> Result<Vec<Calculation>> {
+        self.with(|db| {
+            let mut statement = db.prepare(
+                "SELECT id, expression, result FROM calculations ORDER BY used_at DESC, id DESC",
+            )?;
+            let rows = statement.query_map([], |row| {
+                Ok(Calculation {
+                    id: row.get(0)?,
+                    expression: row.get(1)?,
+                    result: row.get(2)?,
+                })
+            })?;
+            rows.collect()
+        })
+    }
+
+    /// Keep a copied calculation. A repeat moves to the top with its new
+    /// result; the oldest beyond [`MAX_CALCULATIONS`] go.
+    pub fn save_calculation(&self, expression: &str, result: &str, now: i64) -> Result<()> {
+        self.with(|db| {
+            let transaction = db.transaction()?;
+            transaction.execute(
+                "INSERT INTO calculations (expression, result, used_at) VALUES (?1, ?2, ?3)
+                 ON CONFLICT (expression) DO UPDATE SET result = ?2, used_at = ?3",
+                params![expression, result, now],
+            )?;
+            transaction.execute(
+                "DELETE FROM calculations WHERE id IN (SELECT id FROM calculations
+                 ORDER BY used_at DESC, id DESC LIMIT -1 OFFSET ?1)",
+                [MAX_CALCULATIONS as i64],
+            )?;
+            transaction.commit()
+        })
+    }
+
+    pub fn delete_calculation(&self, id: i64) -> Result<()> {
+        self.with(|db| {
+            db.execute("DELETE FROM calculations WHERE id = ?1", [id])
+                .map(drop)
+        })
+    }
+
+    pub fn clear_calculations(&self) -> Result<()> {
+        self.with(|db| db.execute("DELETE FROM calculations", []).map(drop))
+    }
+
     /// The scratch note of the widget pane; empty until it is first saved.
     pub fn note(&self) -> Result<String> {
         let text = self.with(|db| {
@@ -723,6 +779,36 @@ mod tests {
             .unwrap();
         store.delete_library_item(id).unwrap();
         assert_eq!(store.aliases().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn calculations_move_up_on_repeat_and_stay_bounded() {
+        let store = Store::in_memory();
+        store.save_calculation("1+1", "2", 1).unwrap();
+        store.save_calculation("2*3", "6", 2).unwrap();
+        store.save_calculation("1+1", "2", 3).unwrap();
+        let expressions = |store: &Store| -> Vec<String> {
+            store
+                .calculations()
+                .unwrap()
+                .into_iter()
+                .map(|entry| entry.expression)
+                .collect()
+        };
+        assert_eq!(expressions(&store), ["1+1", "2*3"]);
+        for n in 0..MAX_CALCULATIONS as i64 {
+            store
+                .save_calculation(&format!("{n}+0"), &n.to_string(), 10 + n)
+                .unwrap();
+        }
+        let kept = expressions(&store);
+        assert_eq!(kept.len(), MAX_CALCULATIONS);
+        assert!(!kept.contains(&"1+1".to_owned()));
+        let newest = store.calculations().unwrap()[0].id;
+        store.delete_calculation(newest).unwrap();
+        assert_eq!(store.calculations().unwrap().len(), MAX_CALCULATIONS - 1);
+        store.clear_calculations().unwrap();
+        assert!(store.calculations().unwrap().is_empty());
     }
 
     #[test]

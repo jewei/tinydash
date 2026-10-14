@@ -612,7 +612,8 @@ function EmptyResults(props: {
           <ul class="tips">
             <li>Type an app, file, snippet, or emoji name</li>
             <li>
-              Calculate <code>12 * 8</code>, <code>5 ft to cm</code>, <code>100 usd to eur</code>
+              Calculate <code>12 * 8</code>, <code>5 ft to cm</code>, <code>100 usd to eur</code>;{" "}
+              <code>=</code> lists past results
             </li>
             <li>
               Ask <code>time in tokyo</code> or <code>next friday + 2 weeks</code>

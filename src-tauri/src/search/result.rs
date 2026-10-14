@@ -149,6 +149,16 @@ pub enum Action {
     Copy {
         text: String,
     },
+    /// Copy a calculator answer, computed again from `query`, and keep it
+    /// in the calculation history.
+    CopyCalculation {
+        query: String,
+    },
+    DeleteCalculation {
+        id: i64,
+    },
+    /// Delete every calculation in the history.
+    ClearCalculations,
     /// Copy text marked secret, so clipboard managers skip it.
     CopySecret {
         text: String,
