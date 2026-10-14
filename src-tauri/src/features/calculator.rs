@@ -17,6 +17,8 @@ use crate::{
 const TIME_LIMIT: Duration = Duration::from_millis(100);
 /// Most calculations kept in history.
 pub const MAX_CALCULATIONS: usize = 50;
+/// Longer expressions are copied but not kept.
+pub const MAX_EXPRESSION: usize = 500;
 /// Most history rows one search shows.
 const HISTORY_ROWS: usize = 20;
 
@@ -69,9 +71,14 @@ impl CalculationHistory {
     }
 
     /// `=` lists the history; `= words` lists the calculations whose
-    /// expression or result holds every word. `None` for any other query.
+    /// expression or result holds every word. `None` for any other query,
+    /// such as `=5+3`, which a spreadsheet user means as a calculation.
     pub fn answer(&self, query: &str) -> Option<Vec<SearchResult>> {
-        let filter = query.trim().strip_prefix('=')?.to_lowercase();
+        let rest = query.trim().strip_prefix('=')?;
+        if !rest.is_empty() && !rest.starts_with(char::is_whitespace) {
+            return None;
+        }
+        let filter = rest.to_lowercase();
         let words: Vec<&str> = filter.split_whitespace().collect();
         Some(
             self.entries
@@ -285,6 +292,7 @@ mod tests {
         assert_eq!(titles("= 12 8"), Some(vec!["96".into()]));
         assert_eq!(titles("= nothing"), Some(vec![]));
         assert_eq!(titles("12 * 8"), None);
+        assert_eq!(titles("=12*8"), None);
         let row = &history.answer("= 96").unwrap()[0];
         let labels: Vec<_> = row.actions.iter().map(|a| a.label.as_str()).collect();
         assert_eq!(

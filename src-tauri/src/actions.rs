@@ -97,12 +97,14 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .ok_or_else(|| Error::msg("This calculation no longer has an answer."))?;
             copy_and_close(app, || system_clipboard::write_text(&value, false))?;
             // The copy worked; a failed save only costs the history entry.
-            let saved = state
-                .store
-                .save_calculation(&query, &value, chrono::Utc::now().timestamp())
-                .and_then(|()| state.reload_calculations());
-            if let Err(error) = saved {
-                tracing::warn!(%error, "Could not save the calculation");
+            if query.chars().count() <= calculator::MAX_EXPRESSION {
+                let saved = state
+                    .store
+                    .save_calculation(&query, &value, chrono::Utc::now().timestamp())
+                    .and_then(|()| state.reload_calculations());
+                if let Err(error) = saved {
+                    tracing::warn!(%error, "Could not save the calculation");
+                }
             }
         }
         Action::DeleteCalculation { id } => {
