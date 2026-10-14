@@ -204,6 +204,88 @@ describe("Settings", () => {
     expect(await screen.findByText(/None\. To hide one/)).toBeTruthy();
   });
 
+  it("lists aliases and removes one, keeping keyboard focus in the list", async () => {
+    let aliases = [
+      { id: "app:/Applications/Code.app", alias: "vsc", title: "Code", subtitle: "Editor" },
+    ];
+    const backend = fakeBackend({
+      aliases: () => aliases,
+      remove_alias: () => {
+        aliases = [];
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove the alias vsc of Code" }));
+    await waitFor(() => expect(backend.called("remove_alias")).toHaveLength(1));
+    expect(backend.called("remove_alias")[0]?.args).toEqual({
+      id: "app:/Applications/Code.app",
+    });
+    expect(await screen.findByText(/None\. To add one/)).toBeTruthy();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("list", { name: "Aliases" })),
+    );
+  });
+
+  it("moves focus to the next alias after Remove, or the one before at the end", async () => {
+    let aliases = ["aa", "bb", "cc"].map((alias) => ({
+      id: `system:${alias}`,
+      alias,
+      title: alias.toUpperCase(),
+      subtitle: "Command",
+    }));
+    fakeBackend({
+      aliases: () => aliases,
+      remove_alias: (args) => {
+        aliases = aliases.filter((entry) => entry.id !== args.id);
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove the alias aa of AA" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Remove the alias bb of BB" }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Remove the alias cc of CC" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Remove the alias bb of BB" }),
+      ),
+    );
+  });
+
+  it("says when the aliases cannot be read", async () => {
+    fakeBackend({
+      aliases: () => {
+        throw "The database is locked.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    expect(
+      await screen.findByText("Could not read the aliases: The database is locked."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/None\. To add one/)).toBeNull();
+  });
+
+  it("says when the hidden results cannot be read", async () => {
+    fakeBackend({
+      hidden_results: () => {
+        throw "The database is locked.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    expect(
+      await screen.findByText("Could not read the hidden results: The database is locked."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/None\. To hide one/)).toBeNull();
+  });
+
   it("moves and hides launcher tabs, keeping focus on them", async () => {
     let calls = 0;
     const backend = fakeBackend({

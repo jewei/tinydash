@@ -90,6 +90,8 @@ pub enum Symbol {
     Trash,
     Settings,
     Quit,
+    Display,
+    Contrast,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, TS)]
@@ -160,14 +162,24 @@ pub enum Action {
     CopyClip {
         id: i64,
     },
+    /// Copy a clipboard history entry as plain text: a file list as its
+    /// paths, one per line.
+    CopyClipText {
+        id: i64,
+    },
     DeleteClip {
         id: i64,
     },
+    /// Put the clipboard's text back on it alone, without the formatting
+    /// that came with it.
+    CopyPlainText,
     /// Delete every unpinned clipboard history entry.
     ClearClipboard,
-    /// Copy a snippet with its placeholders filled.
+    /// Copy a snippet with its placeholders filled; `query` is the text
+    /// typed after its keyword, or empty.
     CopySnippet {
         id: i64,
+        query: String,
     },
     OpenQuicklink {
         id: i64,
@@ -185,6 +197,12 @@ pub enum Action {
     /// Leave the result out of search for good, until Settings shows it again.
     Hide {
         id: String,
+    },
+    /// Give a result an alias, or remove it with an empty one. The launcher
+    /// asks for the alias first; the result offers the one it has now.
+    SetAlias {
+        id: String,
+        alias: String,
     },
     /// Turn on currency rates, which a currency query asked for while they
     /// were off, and download them.

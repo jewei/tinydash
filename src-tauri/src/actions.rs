@@ -17,7 +17,12 @@ use crate::{
         library::{self, LibraryKind, Target},
     },
     hud, platform, refresh,
-    search::{self, Context, Snapshot, id::Source, result::Action, usage::MAX_HIDDEN},
+    search::{
+        self, Context, Snapshot,
+        id::Source,
+        result::Action,
+        usage::{self, MAX_ALIASES, MAX_HIDDEN},
+    },
     state::State,
     system_clipboard, timer, window,
 };
@@ -37,6 +42,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             | Action::CopySnippet { .. }
             | Action::OpenQuicklink { .. }
             | Action::System { .. }
+            | Action::CopyPlainText
             // System commands that act inside TinyDash. From the actions
             // menu they come without a result ID, so only the System
             // results count.
@@ -97,6 +103,25 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .ok_or_else(|| Error::msg("This entry is no longer in the history."))?;
             copy_and_close(app, || system_clipboard::write(&content))?;
         }
+        Action::CopyClipText { id } => {
+            let content = state
+                .clip(id)?
+                .ok_or_else(|| Error::msg("This entry is no longer in the history."))?;
+            let text = content
+                .plain_text()
+                .ok_or_else(|| Error::msg("An image has no text to copy."))?;
+            copy_and_close(app, || system_clipboard::write_text(&text, false))?;
+        }
+        // Reads as widgets do, so a secret copy stays as it is; any copy it
+        // can read is one that history and links may use too.
+        Action::CopyPlainText => {
+            let text = platform::clipboard_text(app).ok_or_else(|| {
+                Error::msg(
+                    "The clipboard holds no text, or its text is secret, such as a copied password.",
+                )
+            })?;
+            copy_and_close(app, || system_clipboard::write_text(&text, false))?;
+        }
         // Deleting reveals nothing, so it works while history is off too.
         Action::DeleteClip { id } => {
             state.store.delete_clip(id)?;
@@ -107,7 +132,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             state.store.clear_clipboard()?;
             state.reload_clipboard()?;
         }
-        Action::CopySnippet { id } => {
+        Action::CopySnippet { id, query } => {
             let library = state.library.get();
             let item = library
                 .find(id)
@@ -116,7 +141,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             // The clipboard may hold a password, so text that includes it
             // is copied as secret and stays out of clipboard histories.
             let read_clipboard = std::cell::Cell::new(false);
-            let text = library::render_snippet(&item.text, chrono::Local::now(), || {
+            let text = library::render_snippet(&item.text, &query, chrono::Local::now(), || {
                 read_clipboard.set(true);
                 system_clipboard::read_text()
             });
@@ -130,7 +155,10 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 .find(id)
                 .filter(|item| item.kind == LibraryKind::Quicklink)
                 .ok_or_else(|| Error::msg("This quicklink was deleted."))?;
-            match library::quicklink_target(&item.text, &query)? {
+            // Read the way widgets read it: a secret copy, marked by its
+            // source or made in a password app, never goes into a link.
+            let clipboard = || platform::clipboard_text(app);
+            match library::quicklink_target(&item.text, &query, chrono::Local::now(), clipboard)? {
                 Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
                     .map_err(|e| Error::msg(e.to_string()))?,
                 Target::Path(path) => open_path(&path)?,
@@ -187,6 +215,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             state.store.set_pinned(&id, false)?;
             state.pins.update(|pins| pins.remove(&id));
         }
+        Action::SetAlias { id, alias } => set_alias(&state, &id, &alias)?,
         Action::Unpin { id } => {
             state.store.set_pinned(&id, false)?;
             state.pins.update(|pins| pins.remove(&id));
@@ -213,6 +242,48 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
     } else {
         events::results_stale(app);
     }
+    Ok(())
+}
+
+/// Give a result an alias, or remove its alias when `alias` is empty. Only
+/// a result that exists gets one, under its own ID, as a pin does, and an
+/// alias names one result.
+pub fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
+    let _limit = state
+        .limited_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if !Source::parse(id).is_some_and(|(source, _)| source.aliasable()) {
+        return Err(Error::msg("This result cannot have an alias."));
+    }
+    let alias = usage::clean_alias(alias)?;
+    let snapshot = state.snapshot();
+    let ctx = Context::none();
+    let found = search::resolve(&snapshot, &ctx, id);
+    if alias.is_empty() {
+        // The item may be gone; its alias can still be removed.
+        let id = found.map_or_else(|| id.to_owned(), |found| found.id);
+        state.store.set_alias(&id, None)?;
+        state.aliases.update(|aliases| aliases.remove(&id));
+        return Ok(());
+    }
+    let id = found
+        .ok_or_else(|| Error::msg("This item no longer exists."))?
+        .id;
+    let aliases = &snapshot.aliases;
+    if let Some(owner) = aliases.owner(&alias).filter(|owner| *owner != id) {
+        let name = search::resolve(&snapshot, &ctx, owner).map_or(owner.to_owned(), |r| r.title);
+        return Err(Error::msg(format!(
+            "“{alias}” is already the alias of {name}. Choose another word."
+        )));
+    }
+    if aliases.get(&id).is_none() && aliases.len() >= MAX_ALIASES {
+        return Err(Error::msg(format!(
+            "You can set up to {MAX_ALIASES} aliases. Remove some in Settings > Search."
+        )));
+    }
+    state.store.set_alias(&id, Some(&alias))?;
+    state.aliases.update(|aliases| aliases.set(&id, &alias));
     Ok(())
 }
 
@@ -318,6 +389,40 @@ mod tests {
             pin_to_drop(&state.snapshot(), &emoji[5], |_| true).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn an_alias_names_one_existing_result() {
+        let state = State::for_tests(Settings::default());
+        let lock = "system:lock";
+        set_alias(&state, lock, " Lk ").unwrap();
+        assert_eq!(state.aliases.get().get(lock), Some("lk"));
+        let taken = set_alias(&state, "system:sleep", "lk").unwrap_err();
+        assert!(taken.to_string().contains("Lock Screen"), "{taken}");
+        assert!(set_alias(&state, "system:gone", "x").is_err());
+        assert!(set_alias(&state, "clip:1", "x").is_err());
+        // Another spelling of an ID resolves to the item's own.
+        let item = crate::features::library::LibraryItem {
+            id: None,
+            kind: LibraryKind::Snippet,
+            name: "Sig".into(),
+            keyword: String::new(),
+            text: "Regards".into(),
+        };
+        let saved = state.store.save_library_item(&item).unwrap().id.unwrap();
+        state.reload_library().unwrap();
+        set_alias(&state, &format!("snippet:0{saved}"), "sg").unwrap();
+        let own = Source::Snippet.id(saved);
+        assert_eq!(state.aliases.get().owner("sg"), Some(own.as_str()));
+        set_alias(&state, &format!("snippet:+{saved}"), "").unwrap();
+        assert_eq!(state.aliases.get().owner("sg"), None);
+        assert_eq!(
+            search::search(&state.snapshot(), "lk", search::Category::All)[0].id,
+            lock
+        );
+        set_alias(&state, lock, "").unwrap();
+        assert_eq!(state.store.aliases().unwrap().len(), 0);
+        assert_eq!(state.aliases.get().len(), 0);
     }
 
     #[test]

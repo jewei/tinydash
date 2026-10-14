@@ -1,7 +1,10 @@
 use std::{
     path::{Path, PathBuf},
     process::Command,
-    sync::Mutex,
+    sync::{
+        Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use objc2::{
@@ -497,6 +500,20 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         SystemCommand::OpenSystemSettings => {
             super::run("/usr/bin/open", &["-b", "com.apple.systempreferences"])
         }
+        SystemCommand::SleepDisplays => {
+            super::wait_for_key_release();
+            super::run("/usr/bin/pmset", &["displaysleepnow"])
+        }
+        SystemCommand::ToggleDarkMode => apple_script(
+            r#"tell application "System Events" to tell appearance preferences to set dark mode to not dark mode"#,
+        ),
+        // Opening the folder needs no Automation permission, unlike asking Finder.
+        SystemCommand::OpenTrash => {
+            let trash = std::env::home_dir()
+                .ok_or_else(|| Error::msg("Could not find your home folder."))?
+                .join(".Trash");
+            super::run("/usr/bin/open", &[&trash.to_string_lossy()])
+        }
     }
 }
 
@@ -546,20 +563,39 @@ pub fn clipboard_change() -> u64 {
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
+/// The latest change made while a password app was in front, as
+/// `note_clipboard_change` saw it, or `u64::MAX` for none.
+static PASSWORD_COPY: AtomicU64 = AtomicU64::new(u64::MAX);
+
+fn password_app_in_front() -> bool {
+    autoreleasepool(|_| {
+        NSWorkspace::sharedWorkspace()
+            .frontmostApplication()
+            .and_then(|app| app.bundleIdentifier())
+            .is_some_and(|id| PASSWORD_APPS.contains(&id.to_string().as_str()))
+    })
+}
+
+/// Remember a change made in a password app, which marks nothing, so its
+/// copy stays secret after the user leaves the app. Reads no content.
+pub fn note_clipboard_change(change: u64) {
+    if password_app_in_front() {
+        PASSWORD_COPY.store(change, Ordering::Release);
+    }
+}
+
+/// Call with the reader lock held; it reads the change counter directly.
 fn clipboard_is_concealed() -> bool {
     autoreleasepool(|_| {
-        let marked = NSPasteboard::generalPasteboard()
-            .types()
-            .is_some_and(|types| {
-                types
-                    .iter()
-                    .any(|kind| SECRET_FORMATS.contains(&kind.to_string().as_str()))
-            });
+        let pasteboard = NSPasteboard::generalPasteboard();
+        let marked = pasteboard.types().is_some_and(|types| {
+            types
+                .iter()
+                .any(|kind| SECRET_FORMATS.contains(&kind.to_string().as_str()))
+        });
         marked
-            || NSWorkspace::sharedWorkspace()
-                .frontmostApplication()
-                .and_then(|app| app.bundleIdentifier())
-                .is_some_and(|id| PASSWORD_APPS.contains(&id.to_string().as_str()))
+            || PASSWORD_COPY.load(Ordering::Acquire) == pasteboard.changeCount() as u64
+            || password_app_in_front()
     })
 }
 
@@ -567,10 +603,13 @@ fn clipboard_is_concealed() -> bool {
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     let _one_reader = super::one_clipboard_reader();
+    let change = || NSPasteboard::generalPasteboard().changeCount();
+    let before = change();
     if clipboard_is_concealed() {
         return None;
     }
-    super::read_with_arboard(images, files)
+    // A copy that replaced the checked one during the read was not checked.
+    super::read_with_arboard(images, files).filter(|_| change() == before)
 }
 
 pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
@@ -674,6 +713,12 @@ pub fn prepare_launcher(window: &tauri::WebviewWindow) {
 static PREVIOUS_APP: Mutex<Option<Retained<NSRunningApplication>>> = Mutex::new(None);
 
 pub fn remember_frontmost_app() {
+    // A copy made in a password app just before the shortcut may be newer
+    // than the clipboard monitor's last look; it must stay secret too. The
+    // counter waits for the reader lock, so it is read only then.
+    if password_app_in_front() {
+        note_clipboard_change(clipboard_change());
+    }
     let Some(app) = NSWorkspace::sharedWorkspace().frontmostApplication() else {
         return;
     };

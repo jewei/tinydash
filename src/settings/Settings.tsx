@@ -22,6 +22,7 @@ import { IS_MAC } from "../lib/keys";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ListEditor, NumberField, Row, Select, TextField, Toggle } from "./controls";
+import { AliasList } from "./AliasList";
 import { HiddenResults } from "./HiddenResults";
 import { Library } from "./Library";
 import { ShortcutRecorder } from "./ShortcutRecorder";
@@ -541,6 +542,10 @@ export function Settings() {
                     </Row>
                   )}
                 </For>
+                {/* 500 matches MAX_ALIASES in the Rust code. */}
+                <h2>Aliases</h2>
+                <p class="section-intro">Type an alias to put its result first. Up to 500.</p>
+                <AliasList />
                 {/* 500 matches MAX_HIDDEN in the Rust code. */}
                 <h2>Hidden results</h2>
                 <p class="section-intro">Search leaves these out. Up to 500.</p>

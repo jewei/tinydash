@@ -20,7 +20,7 @@ use crate::{
     },
     search::{
         id::Source,
-        usage::{MAX_USAGE, Pins, Usage, Use},
+        usage::{Aliases, MAX_USAGE, Pins, Usage, Use},
     },
 };
 
@@ -74,6 +74,12 @@ const MIGRATIONS: &[&str] = &[
     CREATE TABLE hidden (
         id TEXT PRIMARY KEY,
         hidden_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+",
+    r"
+    CREATE TABLE aliases (
+        id TEXT PRIMARY KEY,
+        alias TEXT NOT NULL UNIQUE
     ) WITHOUT ROWID;
 ",
 ];
@@ -358,6 +364,10 @@ impl Store {
                 "DELETE FROM usage WHERE id IN (?1, ?2)",
                 [Source::Snippet.id(id), Source::Link.id(id)],
             )?;
+            transaction.execute(
+                "DELETE FROM aliases WHERE id IN (?1, ?2)",
+                [Source::Snippet.id(id), Source::Link.id(id)],
+            )?;
             transaction.commit()
         })
     }
@@ -381,6 +391,30 @@ impl Store {
                 )
             } else {
                 db.execute("DELETE FROM hidden WHERE id = ?1", [id])
+            }
+            .map(drop)
+        })
+    }
+
+    pub fn aliases(&self) -> Result<Aliases> {
+        self.with(|db| {
+            let mut statement = db.prepare("SELECT id, alias FROM aliases")?;
+            let rows = statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+            Ok(Aliases::new(rows.collect::<rusqlite::Result<Vec<_>>>()?))
+        })
+    }
+
+    /// Give a result an alias, replacing its old one, or remove it with
+    /// `None`. Fails when another result has the alias.
+    pub fn set_alias(&self, id: &str, alias: Option<&str>) -> Result<()> {
+        self.with(|db| {
+            match alias {
+                Some(alias) => db.execute(
+                    "INSERT INTO aliases (id, alias) VALUES (?1, ?2)
+                     ON CONFLICT (id) DO UPDATE SET alias = ?2",
+                    [id, alias],
+                ),
+                None => db.execute("DELETE FROM aliases WHERE id = ?1", [id]),
             }
             .map(drop)
         })
@@ -664,6 +698,31 @@ mod tests {
         assert_eq!(store.hidden().unwrap(), ["app:/a", "app:/b"]);
         store.set_hidden("app:/a", false, 4).unwrap();
         assert_eq!(store.hidden().unwrap(), ["app:/b"]);
+    }
+
+    #[test]
+    fn aliases_save_replace_and_go_with_their_item() {
+        let store = Store::in_memory();
+        store.set_alias("app:/a", Some("aa")).unwrap();
+        store.set_alias("app:/a", Some("ab")).unwrap();
+        assert!(store.set_alias("app:/b", Some("ab")).is_err());
+        assert_eq!(store.aliases().unwrap().get("app:/a"), Some("ab"));
+        store.set_alias("app:/a", None).unwrap();
+        assert_eq!(store.aliases().unwrap().len(), 0);
+
+        let item = LibraryItem {
+            id: None,
+            kind: LibraryKind::Snippet,
+            name: "Sig".into(),
+            keyword: String::new(),
+            text: "Regards".into(),
+        };
+        let id = store.save_library_item(&item).unwrap().id.unwrap();
+        store
+            .set_alias(&Source::Snippet.id(id), Some("sig"))
+            .unwrap();
+        store.delete_library_item(id).unwrap();
+        assert_eq!(store.aliases().unwrap().len(), 0);
     }
 
     #[test]

@@ -28,18 +28,20 @@ Command line: `tinydash` (show, or toggle if running), `--settings`, `--backgrou
 
 ## Categories
 
-**All** mixes everything. An empty All shows pins (except pinned clipboard entries), then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results. Settings > General shows, hides, and orders the tabs after All; a hidden tab's results still show in All, and Tab skips it. Each tab also has an "in All" switch: turned off, its search results and suggestions leave All (its pins stay on the empty All view, a quicklink keyword still answers there, and its tab still finds them), so a source such as emoji cannot fill the list. A tab is never both hidden and out of All: turning one switch off while the other is off turns the other on. A tab added in a later version joins the end of your list, shown. Opening a hidden tab on purpose (`--mode clipboard`) shows it while it is open.
+**All** mixes everything. An empty All shows pins (except pinned clipboard entries), then up to eight things you use often (not clipboard text or system commands). Each other tab searches one source. Its empty view, listed below, shows pins first and stops at 100 results. Settings > General shows, hides, and orders the tabs after All; a hidden tab's results still show in All, and Tab skips it. Each tab also has an "in All" switch: turned off, its search results and suggestions leave All (its pins stay on the empty All view, a snippet or quicklink keyword still answers there, and its tab still finds them), so a source such as emoji cannot fill the list. A tab is never both hidden and out of All: turning one switch off while the other is off turns the other on. A tab added in a later version joins the end of your list, shown. Opening a hidden tab on purpose (`--mode clipboard`) shows it while it is open.
 
-| Category  | Finds                                                                                                                    | Empty view                  |
-| --------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
-| Apps      | Installed apps by name, bundle name, or executable; each says what it is for (macOS, Linux) or where it is               | Apps, most used first       |
-| Files     | Names of files and folders in the indexed folders                                                                        | Files you opened before     |
-| Clipboard | Text, images, and file lists you copied                                                                                  | Newest first                |
-| Snippets  | Saved snippets and quicklinks by name or keyword                                                                         | Snippets and quicklinks     |
-| Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                       | Most used, then the catalog |
-| System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
+| Category  | Finds                                                                                                                                                                                             | Empty view                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Apps      | Installed apps by name, bundle name, or executable; each says what it is for (macOS, Linux) or where it is                                                                                        | Apps, most used first       |
+| Files     | Names of files and folders in the indexed folders                                                                                                                                                 | Files you opened before     |
+| Clipboard | Text, images, and file lists you copied                                                                                                                                                           | Newest first                |
+| Snippets  | Saved snippets and quicklinks by name or keyword                                                                                                                                                  | Snippets and quicklinks     |
+| Emoji     | Name, :shortcode:, or keywords in chosen languages                                                                                                                                                | Most used, then the catalog |
+| System    | Lock, Sleep, Restart, Shut Down, Log Out, Empty Trash, Open Trash, Sleep Displays, Toggle Dark Mode, Make Clipboard Plain Text, Clear Clipboard History, System Settings, TinyDash Settings, Quit | All commands                |
 
 Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from its actions (up to 100 pins). Pins stay at the top of the empty All view and of their category. A pinned clipboard entry is kept rather than launched, so it heads the Clipboard tab and is found by a search, but stays off the empty All view. A pin of an item that is hidden for now (a file outside the indexed folders, or a clipboard entry while history is off) is kept for when the item returns; when the list is full, the oldest such pin makes room for a new one.
+
+Give any app, indexed file, snippet, quicklink, emoji, or command an alias from its actions (Add Alias): one word of up to 32 characters, such as `vsc` for Visual Studio Code. Typing the whole alias puts its result first, after any instant answer and above any name match; typing its start ranks the result like a name that starts with the query. This works in All (while its tab is in All) and in its tab. Each alias names one result. Change Alias shows the current one; saving it empty removes it. A row that carries typed text, such as `Jira: ABC-12`, has no Add Alias or Hide from Results: use the item's own row. Settings > Search lists aliases, with Remove (up to 500). An alias stays when its item is gone for now, such as an app being reinstalled, and goes with a deleted snippet or quicklink.
 
 Hide any app, file, snippet, quicklink, emoji, or command from its actions (Hide from Results): search leaves it out for good, and hiding a pinned item unpins it. Settings > Search lists hidden results, with Show Again (up to 500 hidden). Clipboard entries are deleted instead.
 
@@ -71,7 +73,7 @@ An empty All search shows widgets to the right of the results, in place of the d
 | Permissions | `chmod 755`, `chmod 4755`, `rwxr-xr-x`, `-rw-r--r--` (a bare `755` needs `chmod`)       | The other form        |
 | Web search  | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser         |
 
-Every All search with text ends with a web search on the chosen engine (Settings > Search), unless it is a web keyword followed by text, such as `yt lofi`.
+Every All search with text ends with a web search on the chosen engine (Settings > Search), unless it is a web keyword followed by text, such as `yt lofi`. After it come up to three quicklinks whose URL or path has `{query}`, most used first, each filled with the whole text: `Jira: ABC-12`. They do not show after a keyword search (`g rust`, or a snippet or quicklink keyword), when snippets are out of All, for a hidden quicklink, or for a quicklink that already shows because the text matches its name. A path quicklink shows only for text that is a name.
 
 - Currency rates are off until you turn them on (Settings > Search, or Turn On Currency Rates on the answer that a currency query shows while they are off). TinyDash then uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded. Turning rates off deletes the saved table.
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
@@ -83,8 +85,10 @@ Every All search with text ends with a web search on the chosen engine (Settings
 Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash saves what you copy, newest first, up to the limit you choose (1–1000; pins do not count). Lowering the limit deletes the oldest entries at once. Turning history off hides saved entries, and their pins, but keeps them until you clear them; turning it on again shows them.
 
 - Text up to 16 KB. Images (up to 32, not counting pins, each at most 8 MB and 16 megapixels) and copied files (up to 64 paths, as references) are separate opt-ins.
-- Copies marked secret by password managers are never read. On macOS, copies made while Passwords or Keychain Access is in front are skipped.
+- Copies marked secret by password managers are never read. On macOS, Passwords and Keychain Access mark nothing, so a copy made there is skipped when TinyDash notices it while the app is still in front: within half a second, or when you open the launcher from that app. Switching apps faster than that can let the copy through.
 - Enter copies the entry back in its original format and returns you to the previous app, ready to paste. Copying an entry again moves it to the top.
+- Text is saved as plain text. A list of copied files also has Copy as Plain Text, which copies its paths, one per line.
+- The System command Make Clipboard Plain Text puts the clipboard's text back without its formatting, such as fonts and links from a web page or a document, so it pastes as plain text. It works while history is off, and leaves a copy that its app marked secret as it is. With history on, the plain copy moves the entry to the top.
 - Clear History deletes everything except pins, after you confirm. It is in the Clipboard tab (the footer button, or Mod+K), in Settings, and in the System command Clear Clipboard History. Data stays on this computer in `tinydash.db`, unencrypted.
 - Linux saves text only, and on Wayland the desktop reports a copy only while TinyDash has focus, so copies made elsewhere are saved when the launcher next opens (the latest one only).
 
@@ -92,8 +96,9 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 
 Create them in Settings > Snippets and Settings > Quicklinks.
 
-- **Snippet:** text with optional `{date}`, `{time}`, `{datetime}`, and `{clipboard}`. Enter fills the placeholders and copies the text. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.
-- **Quicklink:** an http, https, or mailto URL, or an absolute or `~` path. `{query}` takes the text you type after the keyword, encoded: with keyword `jira` and URL `https://jira.example.com/browse/{query}`, typing `jira ABC-12` opens that issue.
+- **Placeholders** work in both: `{query}` (the text you type after the keyword), `{clipboard}` (the text on the clipboard), `{date}` (`2026-10-11`), `{time}` (`09:05`), and `{datetime}`. They are filled in one pass, so a value that looks like a placeholder, such as typed text `{clipboard}`, stays as it is. Other text in braces stays too.
+- **Snippet:** text. Enter fills the placeholders and copies the text. A snippet with a keyword and `{query}` takes the text typed after its keyword: with keyword `hi` and text `Hello {query},`, typing `hi Sam` copies `Hello Sam,`. Run from its own row, a placeholder with no value, such as `{query}`, is filled with nothing. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.
+- **Quicklink:** an http, https, or mailto URL, or an absolute or `~` path. Placeholder values are encoded for a URL: with keyword `jira` and URL `https://jira.example.com/browse/{query}`, typing `jira ABC-12` opens that issue. In a path, the root (`~`, `/`, a drive, or a network share) comes from the quicklink, and a value must be a name: not a path, `.`, or `..`. `{clipboard}` is empty when the copy is secret: marked so by its app, as password managers do, or, on macOS, made in Passwords or Keychain Access.
 - Limits: 500 snippets and quicklinks in all. A name has up to 100 characters, the text up to 32 KB, and the optional keyword is one word of up to 32 characters.
 
 ## Files
@@ -112,7 +117,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths              |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
 | Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                        |
-| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, hidden results               |
+| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, aliases, hidden results      |
 | Snippets, Quicklinks | Create, edit, delete                                                                                             |
 | About                | Version, Check for Updates, settings and data folders, credits                                                   |
 
@@ -122,6 +127,6 @@ On macOS and Windows, TinyDash looks for a new version when the launcher opens, 
 
 ## Platform notes
 
-- **macOS:** app and file icons, and returning focus to the previous app after Escape or a copy. Restart, Shut Down, Log Out, and Empty Trash ask for Automation permission the first time. TinyDash has no Dock icon; the menu bar icon is off by default, so opening TinyDash again from Finder or Spotlight shows the launcher.
-- **Windows:** the launcher uses native rounded corners. The app list comes from Start menu shortcuts (`.lnk`, `.url`, `.exe`, `.appref-ms`); Store apps without a shortcut, such as Calculator, are not listed. Results use generic icons.
-- **Linux:** apps come from desktop entries. Clipboard history saves text only. Global shortcuts need X11; on Wayland, bind a desktop shortcut to `tinydash`. Log Out and System Settings support GNOME, KDE, and Xfce.
+- **macOS:** app and file icons, and returning focus to the previous app after Escape or a copy. Restart, Shut Down, Log Out, Empty Trash, and Toggle Dark Mode ask for Automation permission the first time. TinyDash has no Dock icon; the menu bar icon is off by default, so opening TinyDash again from Finder or Spotlight shows the launcher.
+- **Windows:** the launcher uses native rounded corners. Sleep Displays is named Turn Off Displays, and Open Trash and Empty Trash name the Recycle Bin. Toggle Dark Mode switches both apps and Windows, as Settings > Personalization > Colors does; a custom mix becomes one mode, the opposite of the apps' mode. The app list comes from Start menu shortcuts (`.lnk`, `.url`, `.exe`, `.appref-ms`); Store apps without a shortcut, such as Calculator, are not listed. Results use generic icons.
+- **Linux:** apps come from desktop entries. Clipboard history saves text only. Global shortcuts need X11; on Wayland, bind a desktop shortcut to `tinydash`. Log Out and System Settings support GNOME, KDE, and Xfce. Toggle Dark Mode supports GNOME. Turn Off Displays (Sleep Displays) works on X11 and on KDE Plasma with Wayland.

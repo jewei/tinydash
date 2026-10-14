@@ -3,4 +3,4 @@
 /**
  * Built-in glyphs that the frontend draws.
  */
-export type Symbol = "app" | "file" | "folder" | "text" | "image" | "files" | "snippet" | "link" | "calculator" | "clock" | "key" | "globe" | "lock" | "moon" | "restart" | "power" | "logOut" | "trash" | "settings" | "quit";
+export type Symbol = "app" | "file" | "folder" | "text" | "image" | "files" | "snippet" | "link" | "calculator" | "clock" | "key" | "globe" | "lock" | "moon" | "restart" | "power" | "logOut" | "trash" | "settings" | "quit" | "display" | "contrast";

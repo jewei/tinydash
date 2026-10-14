@@ -211,8 +211,63 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         SystemCommand::OpenSystemSettings if desktop.contains("xfce") => {
             super::launch("xfce4-settings-manager")
         }
-        SystemCommand::LogOut | SystemCommand::OpenSystemSettings => unsupported(),
+        SystemCommand::OpenTrash => open_trash(),
+        SystemCommand::SleepDisplays
+            if std::env::var("XDG_SESSION_TYPE").as_deref() == Ok("x11") =>
+        {
+            super::wait_for_key_release();
+            run("xset", &["dpms", "force", "off"])
+        }
+        SystemCommand::SleepDisplays if desktop.contains("kde") => {
+            super::wait_for_key_release();
+            run("kscreen-doctor", &["--dpms", "off"])
+        }
+        SystemCommand::ToggleDarkMode if desktop.contains("gnome") => toggle_gnome_dark_mode(),
+        SystemCommand::LogOut
+        | SystemCommand::OpenSystemSettings
+        | SystemCommand::SleepDisplays
+        | SystemCommand::ToggleDarkMode => unsupported(),
     }
+}
+
+/// Show the trash in the file manager. The output is discarded, not
+/// captured: a file manager that GLib starts directly inherits it, and a
+/// captured pipe would stay open until its window closes. `gio open` itself
+/// exits once the launch is done.
+fn open_trash() -> Result<()> {
+    use std::process::Stdio;
+    let status = std::process::Command::new("gio")
+        .args(["open", "trash:///"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|error| Error::msg(format!("Could not run gio: {error}")))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(Error::msg(
+            "No file manager could open the trash. Install one, such as Files.",
+        ))
+    }
+}
+
+/// Switch GNOME's color scheme between dark and the default, as its quick
+/// settings do.
+fn toggle_gnome_dark_mode() -> Result<()> {
+    const SCHEMA: &str = "org.gnome.desktop.interface";
+    let output = std::process::Command::new("gsettings")
+        .args(["get", SCHEMA, "color-scheme"])
+        .output()
+        .map_err(|error| Error::msg(format!("Could not run gsettings: {error}")))?;
+    if !output.status.success() {
+        return Err(Error::msg(
+            "This desktop has no dark mode setting that TinyDash can change.",
+        ));
+    }
+    let dark = String::from_utf8_lossy(&output.stdout).contains("prefer-dark");
+    let next = if dark { "default" } else { "prefer-dark" };
+    run("gsettings", &["set", SCHEMA, "color-scheme", next])
 }
 
 /// Bumped on every owner change, before any request, so a callback can tell
@@ -222,6 +277,10 @@ static OWNER: AtomicU64 = AtomicU64::new(0);
 static CHANGE: AtomicU64 = AtomicU64::new(0);
 /// Text from the last checked owner, waiting for the monitor.
 static CAPTURED: Mutex<Option<String>> = Mutex::new(None);
+
+/// Copies that should stay out of histories are marked here, so there is
+/// nothing to remember.
+pub fn note_clipboard_change(_change: u64) {}
 
 pub fn clipboard_change() -> u64 {
     CHANGE.load(Ordering::Acquire)

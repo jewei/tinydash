@@ -17,6 +17,14 @@ interface Pending {
   resultId?: string;
 }
 
+/** An alias action, waiting for the user to type the alias. */
+interface Naming {
+  action: ResultAction;
+  title: string;
+  /** The alias the result has now, or "". */
+  alias: string;
+}
+
 /** Which row to run: a numbered row, or whichever row is selected then. */
 type Target = number | "selected";
 
@@ -42,6 +50,12 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   const [searchError, setSearchError] = createSignal<string>();
   const [actionError, setActionError] = createSignal<string>();
   const [pending, setPending] = createSignal<Pending>();
+  const [naming, setNaming] = createSignal<Naming>();
+  const [aliasError, setAliasError] = createSignal<string>();
+  // The dialog whose save runs: only it waits; another action that runs, or
+  // a dialog opened after a re-show, stays free.
+  const [savingFor, setSavingFor] = createSignal<Naming>();
+  const saving = () => naming() !== undefined && savingFor() === naming();
   const [running, setRunning] = createSignal(false);
 
   const selected = () => results()[selectedIndex()];
@@ -152,6 +166,8 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       setCategoryValue(next ?? "all");
       setActionError(undefined);
       setPending(undefined);
+      setNaming(undefined);
+      setAliasError(undefined);
     });
     void refresh();
   }
@@ -171,12 +187,56 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     if (result && action) run(action, result);
   }
 
-  /** Run an action, or ask first when it needs confirmation. */
+  /**
+   * Run an action, or ask first when it needs confirmation or, to set an
+   * alias, the alias itself.
+   */
   function run(action: ResultAction, result?: SearchResult) {
     // Usage ranking learns only from a result's main action.
     const resultId = result && result.actions[0] === action ? result.id : undefined;
-    if (action.confirm) setPending({ action, resultId });
-    else void perform(action, resultId);
+    if (action.action.type === "setAlias") {
+      setAliasError(undefined);
+      setNaming({ action, title: result?.title ?? "", alias: action.action.alias });
+    } else if (action.confirm) {
+      setPending({ action, resultId });
+    } else {
+      void perform(action, resultId);
+    }
+  }
+
+  /**
+   * Save the alias the user typed; an empty one removes it. The dialog
+   * closes once it is saved, and shows the reason when it is not. Resolves
+   * to whether this save closed the dialog that is open.
+   */
+  async function saveAlias(alias: string): Promise<boolean> {
+    const waiting = naming();
+    if (waiting?.action.action.type !== "setAlias" || savingFor() === waiting) return false;
+    if (running()) {
+      setAliasError("Another action is still running. Save again when it ends.");
+      return false;
+    }
+    setRunning(true);
+    setSavingFor(waiting);
+    setAliasError(undefined);
+    try {
+      await ipc.runAction({ ...waiting.action.action, alias });
+      // The launcher may have been shown again meanwhile, with a new start.
+      if (naming() !== waiting) return false;
+      setNaming(undefined);
+      return true;
+    } catch (error) {
+      if (naming() === waiting) setAliasError(ipc.message(error));
+      return false;
+    } finally {
+      setRunning(false);
+      setSavingFor(undefined);
+    }
+  }
+
+  function cancelAlias() {
+    setNaming(undefined);
+    setAliasError(undefined);
   }
 
   function confirm() {
@@ -209,6 +269,9 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     searchError,
     actionError,
     pending,
+    naming,
+    aliasError,
+    saving,
     running,
     setQuery,
     setCategory,
@@ -224,5 +287,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     run,
     confirm,
     cancel: () => setPending(undefined),
+    saveAlias,
+    cancelAlias,
   };
 }

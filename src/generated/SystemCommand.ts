@@ -3,4 +3,4 @@
 /**
  * Commands the platform layer runs. See `platform::run_system_command`.
  */
-export type SystemCommand = "lock" | "sleep" | "restart" | "shutDown" | "logOut" | "emptyTrash" | "openSystemSettings";
+export type SystemCommand = "lock" | "sleep" | "restart" | "shutDown" | "logOut" | "emptyTrash" | "openSystemSettings" | "sleepDisplays" | "toggleDarkMode" | "openTrash";

@@ -6,6 +6,8 @@ use unicode_normalization::UnicodeNormalization;
 
 /// Bonus for a name that equals the query, ignoring case.
 pub const EXACT: u32 = 10_000;
+/// Scores at or above this come only from an alias that equals the query.
+pub const EXACT_ALIAS: u32 = 2 * EXACT;
 /// Bonus for a name that starts with the query.
 pub const PREFIX: u32 = 3_000;
 /// Bonus for a name with a word that starts with the query.
@@ -81,6 +83,17 @@ impl Matcher {
         self.words
             .score(Utf32Str::new(text, &mut self.buffer), &mut self.nucleo)
             .map(squeeze)
+    }
+
+    /// Score an alias the user chose. Only an alias that starts with the
+    /// query matches, and one that equals it ranks above any name match.
+    pub fn alias(&mut self, alias: &str) -> Option<u32> {
+        let score = self.name(alias)?;
+        if eq_ignore_case(alias, &self.query) {
+            Some(score + EXACT)
+        } else {
+            starts_with_ignore_case(alias, &self.query).then_some(score)
+        }
     }
 
     /// Best name score among a name and its aliases.
@@ -194,6 +207,18 @@ mod tests {
         let alias = matcher.best("Visual Studio Code", ["vsc"]).unwrap();
         let name = matcher.name("vsc").unwrap();
         assert_eq!(alias, name - 100);
+    }
+
+    #[test]
+    fn an_exact_user_alias_beats_an_exact_name() {
+        let mut matcher = Matcher::new("co");
+        let alias = matcher.alias("co").unwrap();
+        assert!(alias >= EXACT_ALIAS);
+        assert!(matcher.name("Co").unwrap() + 1_000 < EXACT_ALIAS);
+        let prefix = matcher.alias("code").unwrap();
+        assert!(prefix >= STRONG && prefix + 1_000 < EXACT_ALIAS);
+        assert_eq!(matcher.alias("deco"), None);
+        assert_eq!(matcher.alias("c"), None);
     }
 
     #[test]

@@ -337,6 +337,12 @@ pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<Libr
 pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
     blocking(move || {
         let state = app.state::<State>();
+        // A pin or alias that checked the item before the delete must not
+        // write after it, or its row would outlive the item.
+        let _limit = state
+            .limited_change
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         state.store.delete_library_item(id)?;
         let ids = [Source::Snippet.id(id), Source::Link.id(id)];
         state
@@ -351,6 +357,9 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
         state
             .hidden
             .update(|hidden| ids.iter().for_each(|id| hidden.remove(id)));
+        state
+            .aliases
+            .update(|aliases| ids.iter().for_each(|id| aliases.remove(id)));
         state.reload_library()?;
         events::results_stale(&app);
         Ok(())
@@ -410,24 +419,66 @@ pub struct HiddenResult {
 #[tauri::command]
 pub fn hidden_results(state: tauri::State<State>) -> Vec<HiddenResult> {
     let snapshot = state.snapshot();
-    let ctx = search::Context::none();
     let mut results: Vec<HiddenResult> = snapshot
         .hidden
         .ids()
-        .map(|id| match search::resolve(&snapshot, &ctx, id) {
-            Some(found) => HiddenResult {
+        .map(|id| {
+            let (title, subtitle) = describe(&snapshot, id);
+            HiddenResult {
                 id: id.to_owned(),
-                title: found.title,
-                subtitle: found.subtitle,
-            },
-            None => HiddenResult {
-                id: id.to_owned(),
-                title: Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
-                subtitle: "No longer found".into(),
-            },
+                title,
+                subtitle,
+            }
         })
         .collect();
     results.sort_by_cached_key(|result| result.title.to_lowercase());
+    results
+}
+
+/// A result's title and subtitle for a Settings list, or its ID when the
+/// item is gone.
+fn describe(snapshot: &search::Snapshot, id: &str) -> (String, String) {
+    match search::resolve(snapshot, &search::Context::none(), id) {
+        Some(found) => (found.title, found.subtitle),
+        None => (
+            Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
+            "No longer found".into(),
+        ),
+    }
+}
+
+/// An alias the user set, as Settings lists it.
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AliasedResult {
+    pub id: String,
+    pub alias: String,
+    pub title: String,
+    pub subtitle: String,
+}
+
+/// The aliases the user set, in alphabetical order.
+#[tauri::command]
+pub fn aliases(state: tauri::State<State>) -> Vec<AliasedResult> {
+    aliased(&state.snapshot())
+}
+
+fn aliased(snapshot: &search::Snapshot) -> Vec<AliasedResult> {
+    let mut results: Vec<AliasedResult> = snapshot
+        .aliases
+        .iter()
+        .map(|(id, alias)| {
+            let (title, subtitle) = describe(snapshot, id);
+            AliasedResult {
+                id: id.to_owned(),
+                alias: alias.to_owned(),
+                title,
+                subtitle,
+            }
+        })
+        .collect();
+    results.sort_by(|a, b| a.alias.cmp(&b.alias));
     results
 }
 
@@ -444,4 +495,45 @@ pub async fn unhide_result(app: AppHandle, id: String) -> Result<()> {
         Ok(())
     })
     .await
+}
+
+/// Remove a result's alias, also when its item is gone.
+#[tauri::command]
+pub async fn remove_alias(app: AppHandle, id: String) -> Result<()> {
+    blocking(move || {
+        actions::set_alias(&app.state::<State>(), &id, "")?;
+        events::results_stale(&app);
+        Ok(())
+    })
+    .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::search::usage::Aliases;
+
+    #[test]
+    fn lists_aliases_by_word_and_names_gone_items_by_id() {
+        let state = State::for_tests(Settings::default());
+        state.aliases.set(Aliases::new([
+            ("system:lock".into(), "lk".into()),
+            ("app:/Gone.app".into(), "gn".into()),
+        ]));
+        let listed: Vec<(String, String, String)> = aliased(&state.snapshot())
+            .into_iter()
+            .map(|entry| (entry.alias, entry.title, entry.subtitle))
+            .collect();
+        assert_eq!(
+            listed,
+            [
+                ("gn".into(), "/Gone.app".into(), "No longer found".into()),
+                (
+                    "lk".into(),
+                    "Lock Screen".into(),
+                    "Lock this computer".into()
+                ),
+            ]
+        );
+    }
 }
