@@ -15,6 +15,12 @@ use crate::{
 
 /// fend checks this deadline while it works, so huge inputs cannot hang search.
 const TIME_LIMIT: Duration = Duration::from_millis(100);
+/// Most calculations kept in history.
+pub const MAX_CALCULATIONS: usize = 50;
+/// Longer expressions are copied but not kept.
+pub const MAX_EXPRESSION: usize = 500;
+/// Most history rows one search shows.
+const HISTORY_ROWS: usize = 20;
 
 pub fn answer(query: &str, rates: Option<&Rates>) -> Option<SearchResult> {
     let (value, used_rates) = evaluate(query, rates)?;
@@ -32,10 +38,92 @@ pub fn answer(query: &str, rates: Option<&Rates>) -> Option<SearchResult> {
         },
         actions: vec![ResultAction::new(
             "Copy Result",
-            Action::Copy { text: value },
+            Action::CopyCalculation {
+                query: query.to_owned(),
+            },
         )],
         pinned: false,
     })
+}
+
+/// The result of `query` as the calculator answers it, for copying.
+pub fn result(query: &str, rates: Option<&Rates>) -> Option<String> {
+    evaluate(query, rates).map(|(value, _)| value)
+}
+
+/// A calculation the user copied.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Calculation {
+    pub id: i64,
+    pub expression: String,
+    pub result: String,
+}
+
+/// Copied calculations, newest first.
+#[derive(Default)]
+pub struct CalculationHistory {
+    entries: Vec<Calculation>,
+}
+
+impl CalculationHistory {
+    pub fn new(entries: Vec<Calculation>) -> Self {
+        Self { entries }
+    }
+
+    /// `=` lists the history; `= words` lists the calculations whose
+    /// expression or result holds every word. `None` for any other query,
+    /// such as `=5+3`, which a spreadsheet user means as a calculation.
+    pub fn answer(&self, query: &str) -> Option<Vec<SearchResult>> {
+        let rest = query.trim().strip_prefix('=')?;
+        if !rest.is_empty() && !rest.starts_with(char::is_whitespace) {
+            return None;
+        }
+        let filter = rest.to_lowercase();
+        let words: Vec<&str> = filter.split_whitespace().collect();
+        Some(
+            self.entries
+                .iter()
+                .filter(|entry| {
+                    let text = format!("{} {}", entry.expression, entry.result).to_lowercase();
+                    words.iter().all(|word| text.contains(word))
+                })
+                .take(HISTORY_ROWS)
+                .map(history_result)
+                .collect(),
+        )
+    }
+}
+
+fn history_result(entry: &Calculation) -> SearchResult {
+    SearchResult {
+        id: format!("calc-history:{}", entry.id),
+        kind: ResultKind::Calculation,
+        title: entry.result.clone(),
+        subtitle: format!("= {}", entry.expression),
+        icon: Icon::Symbol {
+            name: Symbol::Calculator,
+        },
+        // The saved result, as copied then; rates may have changed since.
+        actions: vec![
+            ResultAction::new(
+                "Copy Result",
+                Action::Copy {
+                    text: entry.result.clone(),
+                },
+            ),
+            ResultAction::new(
+                "Copy Expression",
+                Action::Copy {
+                    text: entry.expression.clone(),
+                },
+            ),
+            ResultAction::new(
+                "Delete from History",
+                Action::DeleteCalculation { id: entry.id },
+            ),
+        ],
+        pinned: false,
+    }
 }
 
 /// While currency rates are off, a query that needs them, such as
@@ -182,6 +270,49 @@ impl fend_core::ExchangeRateFnV2 for RateLookup {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn history_lists_and_filters_copied_calculations() {
+        let entry = |id, expression: &str, result: &str| Calculation {
+            id,
+            expression: expression.into(),
+            result: result.into(),
+        };
+        let history = CalculationHistory::new(vec![
+            entry(2, "5 ft to cm", "152.4 cm"),
+            entry(1, "12 * 8", "96"),
+        ]);
+        let titles = |query: &str| -> Option<Vec<String>> {
+            history
+                .answer(query)
+                .map(|results| results.into_iter().map(|r| r.title).collect())
+        };
+        assert_eq!(titles("="), Some(vec!["152.4 cm".into(), "96".into()]));
+        assert_eq!(titles("= CM"), Some(vec!["152.4 cm".into()]));
+        assert_eq!(titles("= 12 8"), Some(vec!["96".into()]));
+        assert_eq!(titles("= nothing"), Some(vec![]));
+        assert_eq!(titles("12 * 8"), None);
+        assert_eq!(titles("=12*8"), None);
+        let row = &history.answer("= 96").unwrap()[0];
+        let labels: Vec<_> = row.actions.iter().map(|a| a.label.as_str()).collect();
+        assert_eq!(
+            labels,
+            ["Copy Result", "Copy Expression", "Delete from History"]
+        );
+    }
+
+    #[test]
+    fn copying_an_answer_evaluates_it_again() {
+        let answer = answer("12 * 8", None).unwrap();
+        assert_eq!(
+            answer.actions[0].action,
+            Action::CopyCalculation {
+                query: "12 * 8".into()
+            }
+        );
+        assert_eq!(result("12 * 8", None).as_deref(), Some("96"));
+        assert_eq!(result("hello", None), None);
+    }
 
     fn value(query: &str) -> Option<String> {
         evaluate(query, None).map(|(value, _)| value)

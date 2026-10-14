@@ -18,9 +18,16 @@ use ts_rs::TS;
 
 use crate::{
     features::{
-        apps::AppIndex, calculator, clip_card, clipboard::ClipboardHistory, currency::Rates,
-        datetime, emoji::EmojiIndex, files::FileIndex, library::Library, password, permissions,
-        system, url_cleaner, web,
+        apps::AppIndex,
+        calculator::{self, CalculationHistory},
+        clip_card,
+        clipboard::ClipboardHistory,
+        currency::Rates,
+        datetime,
+        emoji::EmojiIndex,
+        files::FileIndex,
+        library::Library,
+        password, permissions, system, url_cleaner, web,
     },
     settings::Settings,
 };
@@ -87,6 +94,7 @@ pub struct Snapshot {
     pub files: Arc<FileIndex>,
     pub clipboard: Arc<ClipboardHistory>,
     pub library: Arc<Library>,
+    pub calculations: Arc<CalculationHistory>,
     pub emoji: Arc<EmojiIndex>,
     pub usage: Arc<Usage>,
     pub pins: Arc<Pins>,
@@ -316,6 +324,10 @@ pub fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
 /// each tier, sources keep a fixed order so that, for example, an app named
 /// like the query beats an emoji code.
 fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
+    // `=` asks for the calculation history and nothing else.
+    if let Some(history) = s.calculations.answer(query) {
+        return history;
+    }
     let mut results = answers(s, query);
     let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
 
@@ -747,6 +759,19 @@ mod tests {
         let titles: Vec<&str> = results.iter().map(|r| r.title.as_str()).collect();
         assert!(titles.contains(&"A Wiki"), "{titles:?}");
         assert!(!titles.contains(&"A Wiki: a"));
+    }
+
+    #[test]
+    fn an_equals_sign_lists_only_the_calculation_history() {
+        let state = crate::state::State::for_tests(Settings::default());
+        state.store.save_calculation("12 * 8", "96", 1).unwrap();
+        state.reload_calculations().unwrap();
+        let titles: Vec<String> = search(&state.snapshot(), "=", Category::All)
+            .into_iter()
+            .map(|result| result.title)
+            .collect();
+        assert_eq!(titles, ["96"]);
+        assert!(search(&state.snapshot(), "=", Category::Apps).is_empty());
     }
 
     #[test]

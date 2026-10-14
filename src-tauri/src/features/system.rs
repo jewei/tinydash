@@ -153,6 +153,15 @@ const COMMANDS: &[Command] = &[
         confirm: Some("Delete all clipboard history except pinned entries?"),
     },
     Command {
+        key: "clear-calculations",
+        name: "Clear Calculator History",
+        description: "Delete the calculations you copied",
+        aliases: &["clear calculations", "delete calculator history"],
+        symbol: Symbol::Trash,
+        action: Action::ClearCalculations,
+        confirm: Some("Delete all calculator history?"),
+    },
+    Command {
         key: "plain-text",
         name: "Make Clipboard Plain Text",
         description: "Remove the formatting from the copied text",

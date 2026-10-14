@@ -9,6 +9,7 @@ use crate::{
     error::Result,
     features::{
         apps::AppIndex,
+        calculator::CalculationHistory,
         clipboard::{ClipboardHistory, Content},
         currency::Rates,
         emoji::EmojiIndex,
@@ -45,6 +46,7 @@ pub struct State {
     pub found: Mutex<FoundPaths>,
     pub clipboard: Shared<ClipboardHistory>,
     pub library: Shared<Library>,
+    pub calculations: Shared<CalculationHistory>,
     pub emoji: Shared<EmojiIndex>,
     pub usage: Shared<Usage>,
     pub pins: Shared<Pins>,
@@ -98,6 +100,10 @@ impl State {
             load("clipboard history", e);
             Vec::new()
         });
+        let calculations = store.calculations().unwrap_or_else(|e| {
+            load("calculator history", e);
+            Vec::new()
+        });
         let library = store.library().unwrap_or_else(|e| {
             load("snippets", e);
             Vec::new()
@@ -128,6 +134,7 @@ impl State {
             found: Mutex::default(),
             clipboard: Shared::new(ClipboardHistory::new(clipboard)),
             library: Shared::new(Library::new(library)),
+            calculations: Shared::new(CalculationHistory::new(calculations)),
             usage: Shared::new(usage),
             pins: Shared::new(pins),
             hidden: Shared::new(hidden),
@@ -159,6 +166,7 @@ impl State {
             files: self.files.get(),
             clipboard,
             library: self.library.get(),
+            calculations: self.calculations.get(),
             emoji: self.emoji.get(),
             usage: self.usage.get(),
             pins: self.pins.get(),
@@ -182,6 +190,13 @@ impl State {
         let _one_at_a_time = self.reloading.lock().unwrap_or_else(|e| e.into_inner());
         self.clipboard
             .set(ClipboardHistory::new(self.store.clipboard_history()?));
+        Ok(())
+    }
+
+    pub fn reload_calculations(&self) -> Result<()> {
+        let _one_at_a_time = self.reloading.lock().unwrap_or_else(|e| e.into_inner());
+        self.calculations
+            .set(CalculationHistory::new(self.store.calculations()?));
         Ok(())
     }
 

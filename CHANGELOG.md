@@ -12,6 +12,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - New system commands: Open Trash, Sleep Displays, Toggle Dark Mode, and Make Clipboard Plain Text, which removes the formatting from copied text.
 - Copied files in clipboard history have Copy as Plain Text, which copies their paths.
 - Quicklinks can use `{clipboard}`, `{date}`, `{time}`, and `{datetime}`, as snippets do.
+- Calculator history: copying an answer keeps it. Type `=` to see past results, or `= cm` to find one. Clear Calculator History (System) deletes them.
 
 ### Changed
 
