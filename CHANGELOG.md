@@ -10,6 +10,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
 - On Linux, the launcher opens in the center of the screen again when its saved spot was on a monitor that is gone, and it centers on the screen with the pointer when the display is scaled.
+- On Windows, the launcher opens in the center of the screen with the pointer when that screen has another display scale than the one it was last on.
 
 ## [0.6.0] - 2026-10-14
 
