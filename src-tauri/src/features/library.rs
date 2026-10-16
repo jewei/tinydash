@@ -262,6 +262,25 @@ impl Library {
         self.items.iter().find(|item| item.id == Some(id))
     }
 
+    /// Refuse a keyword that another item already has: only one of them
+    /// could answer it.
+    pub fn check_keyword(&self, item: &LibraryItem) -> Result<()> {
+        if item.keyword.is_empty() {
+            return Ok(());
+        }
+        match self
+            .items
+            .iter()
+            .find(|other| other.id != item.id && other.keyword == item.keyword)
+        {
+            Some(other) => Err(Error::msg(format!(
+                "The keyword “{}” is used by {}. Choose another keyword.",
+                item.keyword, other.name
+            ))),
+            None => Ok(()),
+        }
+    }
+
     pub fn search(&self, matcher: &mut Matcher, ctx: &Context, limit: usize) -> Vec<Scored> {
         let hits = self
             .items
@@ -511,6 +530,39 @@ mod tests {
         assert_eq!(text, "{clipboard} {date}{date} {x} {");
         assert_eq!(reads, 1);
         assert_eq!(render_snippet("{{query}}", "a", now, || None), "{a}");
+    }
+
+    #[test]
+    fn a_keyword_belongs_to_one_item() {
+        let library = Library::new(vec![item(
+            LibraryKind::Quicklink,
+            "Jira",
+            "j",
+            "https://jira.test/browse/{query}",
+        )]);
+        let jest = LibraryItem {
+            id: None,
+            ..item(LibraryKind::Snippet, "Jest template", "j", "test({query})")
+        };
+        let error = library.check_keyword(&jest).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "The keyword “j” is used by Jira. Choose another keyword."
+        );
+        let saved = LibraryItem {
+            id: Some(2),
+            ..jest.clone()
+        };
+        assert!(library.check_keyword(&saved).is_err());
+        // Jira keeps its own keyword when it is saved again.
+        assert!(library.check_keyword(&library.items()[0]).is_ok());
+        for keyword in ["jt", ""] {
+            let free = LibraryItem {
+                keyword: keyword.into(),
+                ..jest.clone()
+            };
+            assert!(library.check_keyword(&free).is_ok(), "{keyword}");
+        }
     }
 
     #[test]
