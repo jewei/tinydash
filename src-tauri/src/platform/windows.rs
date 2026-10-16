@@ -310,20 +310,25 @@ pub fn clipboard_change() -> u64 {
     u64::from(unsafe { GetClipboardSequenceNumber() })
 }
 
+/// The ID of a registered clipboard format, or 0 when Windows has none.
+fn clipboard_format(name: &str) -> u32 {
+    let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
+    // SAFETY: `wide` is a NUL-terminated UTF-16 string that outlives the call.
+    unsafe { RegisterClipboardFormatW(wide.as_ptr()) }
+}
+
 /// The source asked history tools to skip this copy, either with a marker
 /// format or with `CanIncludeInClipboardHistory` set to 0.
 fn clipboard_is_concealed() -> bool {
-    let format = |name: &str| {
-        let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
-        // SAFETY: `wide` is a NUL-terminated UTF-16 string that outlives the call.
-        unsafe { RegisterClipboardFormatW(wide.as_ptr()) }
-    };
     // SAFETY: Format IDs come from RegisterClipboardFormatW; 0 is never available.
     let available = |id: u32| id != 0 && unsafe { IsClipboardFormatAvailable(id) } != 0;
-    if SECRET_FORMATS.iter().any(|name| available(format(name))) {
+    if SECRET_FORMATS
+        .iter()
+        .any(|name| available(clipboard_format(name)))
+    {
         return true;
     }
-    let history = format("CanIncludeInClipboardHistory");
+    let history = clipboard_format("CanIncludeInClipboardHistory");
     if !available(history) {
         return false;
     }
@@ -358,6 +363,73 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     }
     // A copy that replaced the checked one during the read was not checked.
     super::read_with_arboard(images, files).filter(|_| clipboard_change() == before)
+}
+
+/// The standard format for a bitmap with a `BITMAPV5HEADER`.
+const CF_DIBV5: u32 = 17;
+
+/// Reads the size from the header of the format arboard decodes: PNG when
+/// the source offers it, else `CF_DIBV5`.
+pub fn clipboard_image_size() -> Option<(u32, u32)> {
+    let png = clipboard_format("PNG");
+    // SAFETY: The clipboard stays open until CloseClipboard. Format IDs come
+    // from RegisterClipboardFormatW or are standard; 0 is never available.
+    unsafe {
+        if OpenClipboard(std::ptr::null_mut()) == 0 {
+            return None;
+        }
+        let size = if png != 0 && IsClipboardFormatAvailable(png) != 0 {
+            read_clipboard_bytes(png, png_size)
+        } else {
+            read_clipboard_bytes(CF_DIBV5, dib_size)
+        };
+        CloseClipboard();
+        size
+    }
+}
+
+/// Pass the bytes of one clipboard format to `read` in place, without a copy.
+///
+/// # Safety
+///
+/// The caller must have the clipboard open.
+unsafe fn read_clipboard_bytes(
+    format: u32,
+    read: impl FnOnce(&[u8]) -> Option<(u32, u32)>,
+) -> Option<(u32, u32)> {
+    // SAFETY: The clipboard is open, so the handle stays valid, and the
+    // memory stays locked, at its full GlobalSize, while `read` runs.
+    unsafe {
+        let handle = GetClipboardData(format);
+        if handle.is_null() {
+            return None;
+        }
+        let pointer = GlobalLock(handle);
+        if pointer.is_null() {
+            return None;
+        }
+        let bytes = std::slice::from_raw_parts(pointer.cast::<u8>(), GlobalSize(handle));
+        let size = read(bytes);
+        GlobalUnlock(handle);
+        size
+    }
+}
+
+fn png_size(bytes: &[u8]) -> Option<(u32, u32)> {
+    image::ImageReader::with_format(std::io::Cursor::new(bytes), image::ImageFormat::Png)
+        .into_dimensions()
+        .ok()
+}
+
+/// The size in a `BITMAPINFOHEADER` or a later version. The height is
+/// negative when the rows run from the top down.
+fn dib_size(bytes: &[u8]) -> Option<(u32, u32)> {
+    let field = |at: usize| Some(i32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?));
+    // The older BITMAPCOREHEADER is 12 bytes, with 16-bit sizes.
+    if field(0)? < 40 {
+        return None;
+    }
+    Some((field(4)?.unsigned_abs(), field(8)?.unsigned_abs()))
 }
 
 pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
@@ -417,3 +489,28 @@ pub fn prepare_launcher(window: &tauri::WebviewWindow) {
 pub fn remember_frontmost_app() {}
 
 pub fn restore_frontmost_app() {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn reads_the_png_size_from_its_header() {
+        let mut png = Vec::new();
+        image::RgbaImage::new(3, 2)
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        assert_eq!(super::png_size(&png), Some((3, 2)));
+        assert_eq!(super::png_size(&png[..8]), None);
+    }
+
+    #[test]
+    fn reads_the_bitmap_size_from_its_header() {
+        let mut header = [0u8; 124];
+        header[0..4].copy_from_slice(&124i32.to_le_bytes());
+        header[4..8].copy_from_slice(&12_000i32.to_le_bytes());
+        header[8..12].copy_from_slice(&(-9_000i32).to_le_bytes());
+        assert_eq!(super::dib_size(&header), Some((12_000, 9_000)));
+        assert_eq!(super::dib_size(&header[..8]), None);
+        header[0..4].copy_from_slice(&12i32.to_le_bytes());
+        assert_eq!(super::dib_size(&header), None);
+    }
+}

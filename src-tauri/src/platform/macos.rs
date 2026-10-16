@@ -14,7 +14,8 @@ use objc2::{
 use objc2_app_kit::{
     NSApplicationActivationOptions, NSBitmapImageFileType, NSBitmapImageRep,
     NSCompositingOperation, NSDeviceRGBColorSpace, NSGraphicsContext, NSImageInterpolation,
-    NSPasteboard, NSRunningApplication, NSWindow, NSWindowCollectionBehavior, NSWorkspace,
+    NSPasteboard, NSPasteboardTypeTIFF, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
+    NSWorkspace,
 };
 use objc2_foundation::{
     NSArray, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
@@ -612,6 +613,23 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     super::read_with_arboard(images, files).filter(|_| change() == before)
 }
 
+/// arboard reads images as TIFF, so this reads the size from that header.
+pub fn clipboard_image_size() -> Option<(u32, u32)> {
+    autoreleasepool(|_| {
+        // SAFETY: AppKit sets the type constant up before any code runs.
+        let tiff = unsafe { NSPasteboardTypeTIFF };
+        let data = NSPasteboard::generalPasteboard().dataForType(tiff)?;
+        // SAFETY: Nothing changes the data while the slice is read.
+        tiff_size(unsafe { data.as_bytes_unchecked() })
+    })
+}
+
+fn tiff_size(bytes: &[u8]) -> Option<(u32, u32)> {
+    image::ImageReader::with_format(std::io::Cursor::new(bytes), image::ImageFormat::Tiff)
+        .into_dimensions()
+        .ok()
+}
+
 pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
     match read_clipboard(false, false)? {
         Content::Text(text) => Some(text),
@@ -748,6 +766,20 @@ pub fn restore_frontmost_app() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn reads_the_tiff_size_from_its_header() {
+        let mut tiff = Vec::new();
+        image::RgbaImage::new(3, 2)
+            .write_to(
+                &mut std::io::Cursor::new(&mut tiff),
+                image::ImageFormat::Tiff,
+            )
+            .unwrap();
+        assert_eq!(super::tiff_size(&tiff), Some((3, 2)));
+        assert_eq!(super::tiff_size(&tiff[..4]), None);
+        assert_eq!(super::tiff_size(b"not an image"), None);
+    }
+
     #[test]
     fn describes_known_apps_then_by_category() {
         use super::describe;
