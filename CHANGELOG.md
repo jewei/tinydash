@@ -9,7 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
-- On macOS, the Files tab keeps the Spotlight matches found in the first second, even when the Spotlight search takes longer.
+- On macOS, the Files tab now shows Spotlight results when Spotlight takes more than a second to answer. Before, such a search showed no Spotlight results.
 
 ## [0.6.0] - 2026-10-14
 
