@@ -362,6 +362,15 @@ fn clock(words: &[&str]) -> Option<(NaiveTime, usize)> {
     Some((NaiveTime::from_hms_opt(hour, minute, 0)?, used))
 }
 
+/// Whether the whole query is an ISO date or a clock time, such as
+/// `2026-10-17` or `3pm`. The calculator leaves these alone: fend reads them
+/// as a subtraction or a length.
+pub fn is_date_or_clock(query: &str) -> bool {
+    let query = query.trim().to_lowercase();
+    let words: Vec<&str> = query.split_whitespace().collect();
+    iso_date(&query).is_some() || clock(&words).is_some_and(|(_, used)| used == words.len())
+}
+
 fn iso_date(word: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(word, "%Y-%m-%d").ok()
 }
