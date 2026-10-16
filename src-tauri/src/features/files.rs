@@ -459,6 +459,10 @@ mod tests {
         assert!(Matcher::new("docs/readme").words(path).is_none());
         assert!(path_matcher("docs/readme", '\\').words(path).is_some());
         assert!(path_matcher(r"docs\readme", '\\').words(path).is_some());
+        assert!(path_matcher("docs/ readme", '\\').words(path).is_some());
+        let path = r"C:\Users\café\文档\readme.md";
+        assert!(path_matcher("café/文档", '\\').words(path).is_some());
+        assert!(path_matcher("文档/readme", '\\').words(path).is_some());
         assert!(
             path_matcher("docs/readme", '/')
                 .words("/Users/me/docs/readme.md")
