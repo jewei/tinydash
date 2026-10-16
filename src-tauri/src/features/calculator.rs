@@ -213,10 +213,23 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if value == query.trim() {
         return None;
     }
+    if is_capped_rounding(query, &value) {
+        return None;
+    }
     if !used_rates.load(Ordering::Relaxed) {
         return Some((value, false));
     }
     Some((money(&value).unwrap_or(value), true))
+}
+
+/// fend 1.5.8 rounds through an f64 that it caps at 2^64, so `floor(1e20)`
+/// gives 18446744073709551616. A wrong exact answer is worse than none.
+fn is_capped_rounding(query: &str, value: &str) -> bool {
+    let query = query.to_ascii_lowercase();
+    ["floor", "ceil", "round"]
+        .iter()
+        .any(|name| query.contains(name))
+        && value.contains("18446744073709551616")
 }
 
 /// `approx. 401.7094 MYR` as `401.71 MYR`. The subtitle already says the
@@ -407,5 +420,23 @@ mod tests {
         );
         assert_eq!(money("400 MYR").as_deref(), Some("400.00 MYR"));
         assert_eq!(money("MYR"), None);
+    }
+
+    #[test]
+    fn drops_rounding_that_fend_caps_at_two_to_the_64() {
+        for query in [
+            "floor(1e20)",
+            "ceil(1e25)",
+            "round(123456789012345678901.4)",
+            "floor(-1e20)",
+            "FLOOR(1e20 m)",
+        ] {
+            assert_eq!(value(query), None, "{query}");
+        }
+        assert_eq!(
+            value("round(1e19)").as_deref(),
+            Some("10000000000000000000")
+        );
+        assert_eq!(value("2^64").as_deref(), Some("18446744073709551616"));
     }
 }
