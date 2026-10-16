@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- A currency result below 1, such as `1 JPY to USD`, shows 3 significant digits instead of `0.01`. An exact result, such as `100 USD to MYR in exact`, shows its fraction correctly.
 
 ## [0.6.0] - 2026-10-14
 
