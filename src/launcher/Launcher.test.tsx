@@ -812,6 +812,30 @@ describe("Launcher", () => {
     expect(remove.textContent).not.toContain("↩");
   });
 
+  it("deletes a calculation history entry with Mod+Backspace", async () => {
+    const calculation: SearchResult = {
+      ...app,
+      id: "calc-history:3",
+      kind: "calculation",
+      actions: [
+        { label: "Copy Result", action: { type: "copySavedCalculation", id: 3 }, confirm: null },
+        {
+          label: "Delete from History",
+          action: { type: "deleteCalculation", id: 3 },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [calculation]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Backspace", { ctrlKey: true });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args.action).toEqual({
+      type: "deleteCalculation",
+      id: 3,
+    });
+  });
+
   it("keeps shortcuts working after focus leaves the search field", async () => {
     const { backend } = setup(() => [app]);
     await screen.findByRole("option", { name: /Safari/ });

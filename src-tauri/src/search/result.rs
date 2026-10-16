@@ -154,6 +154,10 @@ pub enum Action {
     CopyCalculation {
         query: String,
     },
+    /// Copy the saved result of a history entry and move it to the top.
+    CopySavedCalculation {
+        id: i64,
+    },
     DeleteCalculation {
         id: i64,
     },
