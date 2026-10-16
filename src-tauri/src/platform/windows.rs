@@ -25,7 +25,11 @@ use windows_sys::Win32::{
 use super::SECRET_FORMATS;
 use crate::{
     error::{Error, Result},
-    features::{apps::App, clipboard::Content, system::SystemCommand},
+    features::{
+        apps::App,
+        clipboard::{Content, pixels_fit},
+        system::SystemCommand,
+    },
 };
 
 pub const FILE_MANAGER: &str = "File Explorer";
@@ -368,9 +372,26 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
 /// The standard format for a bitmap with a `BITMAPV5HEADER`.
 const CF_DIBV5: u32 = 17;
 
+/// arboard decodes the whole image, so a huge one is skipped, from its
+/// header, before that.
+pub fn clipboard_image() -> Option<image::RgbaImage> {
+    if clipboard_image_size().is_some_and(|(width, height)| !pixels_fit(width, height)) {
+        return None;
+    }
+    let image = arboard::Clipboard::new().ok()?.get_image().ok()?;
+    let (width, height) = (
+        u32::try_from(image.width).ok()?,
+        u32::try_from(image.height).ok()?,
+    );
+    if !pixels_fit(width, height) {
+        return None;
+    }
+    image::RgbaImage::from_raw(width, height, image.bytes.into_owned())
+}
+
 /// Reads the size from the header of the format arboard decodes: PNG when
 /// the source offers it, else `CF_DIBV5`.
-pub fn clipboard_image_size() -> Option<(u32, u32)> {
+fn clipboard_image_size() -> Option<(u32, u32)> {
     let png = clipboard_format("PNG");
     // SAFETY: The clipboard stays open until CloseClipboard. Format IDs come
     // from RegisterClipboardFormatW or are standard; 0 is never available.

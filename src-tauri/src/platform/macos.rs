@@ -26,7 +26,11 @@ use objc2_foundation::{
 use super::SECRET_FORMATS;
 use crate::{
     error::{Error, Result},
-    features::{apps::App, clipboard::Content, system::SystemCommand},
+    features::{
+        apps::App,
+        clipboard::{Content, pixels_fit},
+        system::SystemCommand,
+    },
     settings::LauncherPosition,
 };
 
@@ -613,21 +617,26 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
     super::read_with_arboard(images, files).filter(|_| change() == before)
 }
 
-/// arboard reads images as TIFF, so this reads the size from that header.
-pub fn clipboard_image_size() -> Option<(u32, u32)> {
+/// Reads the TIFF that AppKit offers once, checks its size from the header,
+/// then decodes those same bytes. arboard would fetch them a second time.
+pub fn clipboard_image() -> Option<image::RgbaImage> {
     autoreleasepool(|_| {
         // SAFETY: AppKit sets the type constant up before any code runs.
         let tiff = unsafe { NSPasteboardTypeTIFF };
         let data = NSPasteboard::generalPasteboard().dataForType(tiff)?;
         // SAFETY: Nothing changes the data while the slice is read.
-        tiff_size(unsafe { data.as_bytes_unchecked() })
+        decode_tiff(unsafe { data.as_bytes_unchecked() })
     })
 }
 
-fn tiff_size(bytes: &[u8]) -> Option<(u32, u32)> {
-    image::ImageReader::with_format(std::io::Cursor::new(bytes), image::ImageFormat::Tiff)
-        .into_dimensions()
-        .ok()
+fn decode_tiff(bytes: &[u8]) -> Option<image::RgbaImage> {
+    let reader =
+        || image::ImageReader::with_format(std::io::Cursor::new(bytes), image::ImageFormat::Tiff);
+    let (width, height) = reader().into_dimensions().ok()?;
+    if !pixels_fit(width, height) {
+        return None;
+    }
+    Some(reader().decode().ok()?.into_rgba8())
 }
 
 pub fn clipboard_text(_app: &tauri::AppHandle) -> Option<String> {
@@ -767,7 +776,7 @@ pub fn restore_frontmost_app() {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn reads_the_tiff_size_from_its_header() {
+    fn decodes_a_tiff_that_fits() {
         let mut tiff = Vec::new();
         image::RgbaImage::new(3, 2)
             .write_to(
@@ -775,9 +784,10 @@ mod tests {
                 image::ImageFormat::Tiff,
             )
             .unwrap();
-        assert_eq!(super::tiff_size(&tiff), Some((3, 2)));
-        assert_eq!(super::tiff_size(&tiff[..4]), None);
-        assert_eq!(super::tiff_size(b"not an image"), None);
+        let image = super::decode_tiff(&tiff).unwrap();
+        assert_eq!(image.dimensions(), (3, 2));
+        assert!(super::decode_tiff(&tiff[..4]).is_none());
+        assert!(super::decode_tiff(b"not an image").is_none());
     }
 
     #[test]

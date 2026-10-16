@@ -9,7 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
-- Clipboard history skips an image over 16 megapixels before it reads it, so copying a very large image no longer makes TinyDash use a lot of memory for a moment.
+- Clipboard history skips an image over 16 megapixels before it decodes it, so copying a very large image uses much less memory.
 
 ## [0.6.0] - 2026-10-14
 

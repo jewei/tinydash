@@ -50,7 +50,8 @@ walkdir = "2.5.0"
 # Focus timer notifications. The plugin's NSUserNotificationCenter path
 # shows only the first of several, so macOS uses UNUserNotificationCenter.
 block2 = "0.6.2"
-# arboard already builds the TIFF decoder; TinyDash reads only the header.
+# arboard already builds the TIFF decoder; TinyDash decodes the clipboard TIFF
+# itself, so it can check the size first and fetch the bytes once.
 image = { version = "0.25.10", default-features = false, features = ["tiff"] }
 libc = "0.2.190"
 objc2 = "0.6.5"

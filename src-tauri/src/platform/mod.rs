@@ -39,10 +39,12 @@
 //!   the launcher opened.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
-//! - `clipboard_image_size()`: the width and height of the clipboard image,
-//!   read from its header without decoding it, or `None` when unknown. Only
-//!   macOS and Windows, where `read_clipboard` saves images; call it with
-//!   the clipboard reader lock held.
+//! - `clipboard_image()`: the clipboard image as RGBA, or `None` when there
+//!   is none, it cannot be decoded, or it has more pixels than the history
+//!   keeps. The size comes from the image header before the image is
+//!   decoded. On macOS the encoded bytes are copied in first. Only macOS
+//!   and Windows, where `read_clipboard` saves images; call it with the
+//!   clipboard reader lock held.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
 //!   is none or its source marked it secret. History need not be on. Call
@@ -74,7 +76,7 @@ pub use windows::*;
 
 use crate::error::{Error, Result};
 #[cfg(not(target_os = "linux"))]
-use crate::features::clipboard::{Content, MAX_IMAGE_BYTES, pixels_fit};
+use crate::features::clipboard::{Content, MAX_IMAGE_BYTES};
 #[cfg(not(target_os = "macos"))]
 use crate::settings::LauncherPosition;
 
@@ -175,19 +177,8 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
     if !images {
         return None;
     }
-    // arboard decodes the whole image, so a huge one is skipped before that.
-    if clipboard_image_size().is_some_and(|(width, height)| !pixels_fit(width, height)) {
-        return None;
-    }
-    let image = reader.get_image().ok()?;
-    let (width, height) = (
-        u32::try_from(image.width).ok()?,
-        u32::try_from(image.height).ok()?,
-    );
-    if !pixels_fit(width, height) {
-        return None;
-    }
-    let buffer = image::RgbaImage::from_raw(width, height, image.bytes.into_owned())?;
+    let buffer = clipboard_image()?;
+    let (width, height) = buffer.dimensions();
     let mut png = Vec::new();
     buffer
         .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
