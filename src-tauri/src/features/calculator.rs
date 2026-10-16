@@ -229,7 +229,10 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
 /// `round(9007199254740993)` gives 9007199254740992 and `floor(1e20)` gives
 /// 18446744073709551616. A run of 14 or more digits holds every such value
 /// in decimal, octal, binary, and hex (2^52 has 14 hex digits). This also
-/// drops some correct answers from 10^13 up.
+/// drops correct answers from 10^13 up in decimal, from 8^13 (about 5.5e11)
+/// up in octal, and from 8192 up in binary. A looser limit for runs of only
+/// 0 and 1 would keep small binary answers, but it would also keep wrong
+/// decimal ones: `round(10000000000000001)` gives 10000000000000000.
 ///
 /// `sinh` and `cosh` cap at 2^64 too: `sinh(50)` gives 18446744073709551616.
 fn is_f64_artifact(query: &str, value: &str) -> bool {
@@ -453,6 +456,10 @@ mod tests {
             "floor(1e20) * 2",
             "sinh(50)",
             "Cosh(50)",
+            // Wrong in decimal, but all 0s and 1s.
+            "round(10000000000000001)",
+            // Correct, but dropped by the 14-digit rule.
+            "round(10000) to binary",
         ] {
             assert_eq!(value(query), None, "{query}");
         }
