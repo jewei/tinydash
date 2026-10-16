@@ -356,8 +356,8 @@ pub fn expand_home(path: &str, home: &Path) -> PathBuf {
 
 /// Load settings. A damaged file is renamed aside, and defaults are used,
 /// so a bad edit never stops the launcher; the warning tells the user.
-/// A value this version cannot read only takes its default, and the
-/// warning names its field.
+/// A value this version cannot read only takes its default; the file is
+/// copied aside, and the warning names the field.
 pub fn load(dir: &Path) -> (Settings, Option<String>) {
     let path = dir.join(FILE_NAME);
     let text = match std::fs::read_to_string(&path) {
@@ -377,18 +377,25 @@ pub fn load(dir: &Path) -> (Settings, Option<String>) {
         dropped = drop_unreadable_values(&mut file);
         serde_json::from_value::<Settings>(file)
     });
+    let backup = dir.join("settings.invalid.json");
     match parsed {
         Ok(settings) => {
+            // The next save writes the defaults over the dropped values, so
+            // keep a copy for a newer version or for the user to restore.
             let warning = (!dropped.is_empty()).then(|| {
+                let note = if std::fs::copy(&path, &backup).is_ok() {
+                    format!(" The old file is at {}.", backup.display())
+                } else {
+                    String::new()
+                };
                 format!(
-                    "Some settings could not be read, so they use their defaults: {}.",
+                    "Some settings could not be read, so they use their defaults: {}.{note}",
                     dropped.join(", ")
                 )
             });
             (settings.normalized(), warning)
         }
         Err(error) => {
-            let backup = dir.join("settings.invalid.json");
             let moved = std::fs::rename(&path, &backup).is_ok();
             let note = if moved {
                 format!(" The old file is at {}.", backup.display())
@@ -455,11 +462,22 @@ mod tests {
         )
         .unwrap();
         let (settings, warning) = load(&dir);
-        std::fs::remove_dir_all(&dir).unwrap();
+        let backup = dir.join("settings.invalid.json");
         assert_eq!(
-            warning.as_deref(),
-            Some("Some settings could not be read, so they use their defaults: tabs.")
+            warning,
+            Some(format!(
+                "Some settings could not be read, so they use their defaults: tabs. \
+                 The old file is at {}.",
+                backup.display()
+            ))
         );
+        assert!(
+            std::fs::read_to_string(&backup)
+                .unwrap()
+                .contains("clipbord")
+        );
+        assert!(dir.join(FILE_NAME).exists());
+        std::fs::remove_dir_all(&dir).unwrap();
         assert!(!settings.hide_on_blur);
         assert_eq!(
             settings.tabs[0],

@@ -9,7 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
-- A setting saved by a newer version, such as a new search engine or emoji language, no longer resets all your settings in an older version. Only that setting goes back to its default, and the launcher says which one.
+- A setting saved by a newer version, such as a new search engine or emoji language, no longer resets all your settings in an older version. Only that setting goes back to its default, the launcher says which one, and a copy of the old file is kept.
 
 ## [0.6.0] - 2026-10-14
 
