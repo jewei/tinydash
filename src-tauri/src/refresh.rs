@@ -80,13 +80,18 @@ impl WeatherAttempt {
     /// the latest download keeps it, and only while its city is still the
     /// one in the settings: changing back to a city with fresh weather starts
     /// no new download, so the one still running may be for a city the user
-    /// left.
+    /// left. A dropped download does not count as a recent attempt, so
+    /// changing to its city again downloads at once.
     fn finish(&mut self, number: u64, wanted_city: &str) -> bool {
         if self.number != number {
             return false;
         }
         self.busy = false;
-        same_city(&self.city, wanted_city)
+        let keep = same_city(&self.city, wanted_city);
+        if !keep {
+            self.started = None;
+        }
+        keep
     }
 }
 
@@ -334,18 +339,20 @@ pub fn weather(app: &AppHandle, force: bool) {
         return;
     }
     let now = chrono::Utc::now().timestamp();
-    let fresh = state
-        .weather
-        .get()
-        .as_ref()
-        .as_ref()
-        .is_some_and(|weather| weather.is_for(&city) && !weather.is_stale(now));
     let number = {
         let mut attempt = state
             .freshness
             .weather_attempt
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        // Read the stored weather under the lock: a download that is storing
+        // its result holds it, so this sees that result.
+        let fresh = state
+            .weather
+            .get()
+            .as_ref()
+            .as_ref()
+            .is_some_and(|weather| weather.is_for(&city) && !weather.is_stale(now));
         let same = same_city(&attempt.city, &city);
         let waiting = attempt
             .started
@@ -426,12 +433,14 @@ mod tests {
         let oslo = attempt.start("Oslo");
         assert!(!attempt.finish(oslo, "Bergen"));
         assert!(!attempt.busy);
+        assert!(attempt.started.is_none());
 
         let oslo = attempt.start("Oslo");
         assert!(!attempt.finish(oslo - 1, " oslo "));
         assert!(attempt.busy);
         assert!(attempt.finish(oslo, " oslo "));
         assert!(!attempt.busy);
+        assert!(attempt.started.is_some());
     }
 
     #[test]
