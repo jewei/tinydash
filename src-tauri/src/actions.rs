@@ -40,6 +40,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             | Action::OpenUrl { .. }
             | Action::Copy { .. }
             | Action::CopyCalculation { .. }
+            | Action::CopySavedCalculation { .. }
             | Action::CopySnippet { .. }
             | Action::OpenQuicklink { .. }
             | Action::System { .. }
@@ -96,16 +97,17 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             let value = calculator::result(&query, Option::as_ref(&state.rates.get()))
                 .ok_or_else(|| Error::msg("This calculation no longer has an answer."))?;
             copy_and_close(app, || system_clipboard::write_text(&value, false))?;
-            // The copy worked; a failed save only costs the history entry.
-            if query.chars().count() <= calculator::MAX_EXPRESSION {
-                let saved = state
-                    .store
-                    .save_calculation(&query, &value, chrono::Utc::now().timestamp())
-                    .and_then(|()| state.reload_calculations());
-                if let Err(error) = saved {
-                    tracing::warn!(%error, "Could not save the calculation");
-                }
-            }
+            remember_calculation(&state, &query, &value);
+        }
+        Action::CopySavedCalculation { id } => {
+            let entry = state
+                .calculations
+                .get()
+                .get(id)
+                .cloned()
+                .ok_or_else(|| Error::msg("This calculation is no longer in the history."))?;
+            copy_and_close(app, || system_clipboard::write_text(&entry.result, false))?;
+            remember_calculation(&state, &entry.expression, &entry.result);
         }
         Action::DeleteCalculation { id } => {
             state.store.delete_calculation(id)?;
@@ -333,6 +335,21 @@ fn copy_and_close(app: &AppHandle, copy: impl FnOnce() -> Result<()>) -> Result<
     Ok(())
 }
 
+/// Keep a copied calculation in the history. The copy already worked, so a
+/// failed save only costs the history entry.
+fn remember_calculation(state: &State, expression: &str, value: &str) {
+    if expression.chars().count() > calculator::MAX_EXPRESSION {
+        return;
+    }
+    let saved = state
+        .store
+        .save_calculation(expression, value, chrono::Utc::now().timestamp())
+        .and_then(|()| state.reload_calculations());
+    if let Err(error) = saved {
+        tracing::warn!(%error, "Could not save the calculation");
+    }
+}
+
 fn open_path(path: &Path) -> Result<()> {
     if !path.exists() {
         return Err(Error::msg(format!("{} no longer exists.", path.display())));
@@ -384,6 +401,28 @@ mod tests {
         search::{Category, usage::Pins},
         settings::Settings,
     };
+
+    #[test]
+    fn copying_a_history_entry_moves_it_to_the_top() {
+        let state = State::for_tests(Settings::default());
+        remember_calculation(&state, "1+1", "2");
+        remember_calculation(&state, "2*3", "6");
+        let older = state.calculations.get().answer("= 1+1").unwrap()[0]
+            .id
+            .clone();
+        let id: i64 = older.trim_start_matches("calc-history:").parse().unwrap();
+        let entry = state.calculations.get().get(id).cloned().unwrap();
+        remember_calculation(&state, &entry.expression, &entry.result);
+        let titles: Vec<String> = state
+            .calculations
+            .get()
+            .answer("=")
+            .unwrap()
+            .into_iter()
+            .map(|result| result.title)
+            .collect();
+        assert_eq!(titles, ["2", "6"]);
+    }
 
     #[test]
     fn a_full_pin_list_gives_up_its_oldest_hidden_pin() {

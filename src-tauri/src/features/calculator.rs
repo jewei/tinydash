@@ -51,6 +51,21 @@ pub fn result(query: &str, rates: Option<&Rates>) -> Option<String> {
     evaluate(query, rates).map(|(value, _)| value)
 }
 
+/// The expression in `query`: a spreadsheet user types `=5+3` for `5+3`.
+/// A query that asks for the history stays as it is.
+pub fn expression(query: &str) -> &str {
+    match history_filter(query) {
+        Some(_) => query,
+        None => query.strip_prefix('=').unwrap_or(query),
+    }
+}
+
+/// `=` alone, or `=` and a space, asks for the history: the words after it.
+fn history_filter(query: &str) -> Option<&str> {
+    let rest = query.trim().strip_prefix('=')?;
+    (rest.is_empty() || rest.starts_with(char::is_whitespace)).then_some(rest)
+}
+
 /// A calculation the user copied.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Calculation {
@@ -70,15 +85,15 @@ impl CalculationHistory {
         Self { entries }
     }
 
+    pub fn get(&self, id: i64) -> Option<&Calculation> {
+        self.entries.iter().find(|entry| entry.id == id)
+    }
+
     /// `=` lists the history; `= words` lists the calculations whose
     /// expression or result holds every word. `None` for any other query,
     /// such as `=5+3`, which a spreadsheet user means as a calculation.
     pub fn answer(&self, query: &str) -> Option<Vec<SearchResult>> {
-        let rest = query.trim().strip_prefix('=')?;
-        if !rest.is_empty() && !rest.starts_with(char::is_whitespace) {
-            return None;
-        }
-        let filter = rest.to_lowercase();
+        let filter = history_filter(query)?.to_lowercase();
         let words: Vec<&str> = filter.split_whitespace().collect();
         Some(
             self.entries
@@ -105,12 +120,7 @@ fn history_result(entry: &Calculation) -> SearchResult {
         },
         // The saved result, as copied then; rates may have changed since.
         actions: vec![
-            ResultAction::new(
-                "Copy Result",
-                Action::Copy {
-                    text: entry.result.clone(),
-                },
-            ),
+            ResultAction::new("Copy Result", Action::CopySavedCalculation { id: entry.id }),
             ResultAction::new(
                 "Copy Expression",
                 Action::Copy {
@@ -312,6 +322,40 @@ mod tests {
         );
         assert_eq!(result("12 * 8", None).as_deref(), Some("96"));
         assert_eq!(result("hello", None), None);
+    }
+
+    #[test]
+    fn a_leading_equals_sign_is_a_calculation() {
+        assert_eq!(expression("=12*8"), "12*8");
+        assert_eq!(expression("12*8"), "12*8");
+        assert_eq!(expression("= 12*8"), "= 12*8");
+        assert_eq!(expression("="), "=");
+        let answer = answer(expression("=12*8"), None).unwrap();
+        assert_eq!(
+            answer.actions[0].action,
+            Action::CopyCalculation {
+                query: "12*8".into()
+            }
+        );
+    }
+
+    #[test]
+    fn a_history_row_copies_its_saved_result() {
+        let history = CalculationHistory::new(vec![Calculation {
+            id: 7,
+            expression: "12 * 8".into(),
+            result: "96".into(),
+        }]);
+        let row = &history.answer("=").unwrap()[0];
+        assert_eq!(
+            row.actions[0].action,
+            Action::CopySavedCalculation { id: 7 }
+        );
+        assert_eq!(
+            history.get(7).map(|entry| entry.result.as_str()),
+            Some("96")
+        );
+        assert_eq!(history.get(8), None);
     }
 
     fn value(query: &str) -> Option<String> {
