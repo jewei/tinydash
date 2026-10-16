@@ -1205,6 +1205,55 @@ describe("Launcher", () => {
     expect(backend.called("widgets")).toHaveLength(1);
   });
 
+  it("follows a change of the time zone in the clock and weather times", async () => {
+    const zone = process.env.TZ;
+    const updatedAt = Math.floor(Date.now() / 1000) - 3 * 3600;
+    const time = (ms: number, timeZone: string) =>
+      new Intl.DateTimeFormat(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+        timeZone,
+      }).format(ms);
+    try {
+      process.env.TZ = "Asia/Singapore";
+      setup(() => [], {
+        widgets: () => ({
+          clocks: [],
+          weather: {
+            type: "ready",
+            place: "Singapore",
+            temperature: 31,
+            high: 33,
+            low: 26,
+            unit: "celsius",
+            condition: "Sunny",
+            icon: "clearDay",
+            rainChance: 0,
+            updatedAt,
+            offline: false,
+          },
+        }),
+      });
+      const clocks = await screen.findByRole("region", { name: "Clocks" });
+      const weather = await screen.findByRole("region", { name: "Weather" });
+      const large = () => clocks.querySelector(".clock-time.large")?.textContent;
+      expect(large()).toBe(time(Date.now(), "Asia/Singapore"));
+      expect(weather.textContent).toContain(`Updated ${time(updatedAt * 1000, "Asia/Singapore")}`);
+
+      process.env.TZ = "Asia/Tokyo";
+      await waitFor(() => expect(large()).toBe(time(Date.now(), "Asia/Tokyo")), {
+        timeout: 2000,
+      });
+      await emit("widgets:changed", null);
+      await waitFor(() =>
+        expect(weather.textContent).toContain(`Updated ${time(updatedAt * 1000, "Asia/Tokyo")}`),
+      );
+    } finally {
+      process.env.TZ = zone;
+    }
+  });
+
   it("shows free disk space and warns when it is low", async () => {
     const disk = (freeBytes: number) => ({
       type: "ready",
