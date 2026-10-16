@@ -83,11 +83,17 @@ pub fn dismiss(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// Move the launcher with the pointer until the button is released.
+/// Move the launcher with the pointer until the button is released. The
+/// drag starts even when the position cannot be read; with no start
+/// recorded, nothing is saved on hide.
 pub fn drag(app: &AppHandle) -> Result<()> {
     let window = launcher(app)?;
-    let start = platform::launcher_position(&window)?;
-    drag_start().get_or_insert(start);
+    match platform::launcher_position(&window) {
+        Ok(start) => {
+            drag_start().get_or_insert(start);
+        }
+        Err(error) => tracing::debug!(%error, "Could not read where the drag starts"),
+    }
     window.start_dragging()?;
     Ok(())
 }
