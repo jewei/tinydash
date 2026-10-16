@@ -373,20 +373,20 @@ fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     let mut words = spaced.split_whitespace();
     let first = words.next()?;
     let (base, base_label) = match first {
-        "today" => (today, "today"),
-        "tomorrow" => (today + Days::new(1), "tomorrow"),
-        "yesterday" => (today - Days::new(1), "yesterday"),
-        "in" => (today, "today"),
+        "today" | "in" => (today, "today".to_owned()),
+        "tomorrow" => (today + Days::new(1), first.to_owned()),
+        "yesterday" => (today - Days::new(1), first.to_owned()),
         "next" | "last" => {
-            let weekday: Weekday = words.next()?.parse().ok()?;
+            let name = words.next()?;
+            let weekday: Weekday = name.parse().ok()?;
             let date = if first == "next" {
                 next_weekday(today, weekday)
             } else {
                 last_weekday(today, weekday)
             };
-            (date, first)
+            (date, format!("{first} {name}"))
         }
-        word => (iso_date(word)?, ""),
+        word => (iso_date(word)?, String::new()),
     };
     let mut date = base;
     if first == "in" {
@@ -403,7 +403,7 @@ fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     let from = if base_label.is_empty() {
         String::new()
     } else {
-        format!(" · {} is {}", base_label, today.format("%a %-d %b %Y"))
+        format!(" · {base_label} is {}", base.format("%a %-d %b %Y"))
     };
     let days = (date - today).num_days();
     let relative = match days {
@@ -513,6 +513,32 @@ mod tests {
         assert_eq!(math("2026-01-31 + 1 month").as_deref(), Some("2026-02-28"));
         assert_eq!(math("2026-10-03 - 1 year").as_deref(), Some("2025-10-03"));
         assert_eq!(math("tomorrow+1d").as_deref(), Some("2026-10-05"));
+    }
+
+    #[test]
+    fn date_math_subtitle_names_the_base_date() {
+        let subtitle = |query| date_math(query, date("2026-10-03")).unwrap().subtitle;
+        assert_eq!(
+            subtitle("tomorrow + 1 day"),
+            "in 2 days · tomorrow is Sun 4 Oct 2026"
+        );
+        assert_eq!(
+            subtitle("yesterday - 1 day"),
+            "2 days ago · yesterday is Fri 2 Oct 2026"
+        );
+        assert_eq!(
+            subtitle("next friday + 2 weeks"),
+            "in 20 days · next friday is Fri 9 Oct 2026"
+        );
+        assert_eq!(
+            subtitle("last monday"),
+            "5 days ago · last monday is Mon 28 Sep 2026"
+        );
+        assert_eq!(
+            subtitle("in 2 weeks"),
+            "in 14 days · today is Sat 3 Oct 2026"
+        );
+        assert_eq!(subtitle("2026-10-03 - 1 year"), "365 days ago");
     }
 
     #[test]
