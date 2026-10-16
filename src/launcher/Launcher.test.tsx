@@ -978,6 +978,24 @@ describe("Launcher", () => {
     expect(await screen.findByRole("option", { name: /Clear Clipboard History/ })).toBeTruthy();
   });
 
+  it("keeps focus in the confirm dialog after Clear History from an open menu", async () => {
+    const { backend, press } = setup((_query, category) =>
+      category === "clipboard" ? [clip] : [],
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Clipboard" }));
+    await waitFor(() =>
+      expect(backend.called("search").at(-1)?.args).toMatchObject({ category: "clipboard" }),
+    );
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByPlaceholderText("Search actions");
+    expect(document.activeElement).toBe(filter);
+    fireEvent.click(await screen.findByRole("button", { name: /Clear History/ }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByPlaceholderText("Search actions")).toBeNull();
+  });
+
   it("reloads the preview when results refresh", async () => {
     const snippet = { ...app, id: "snippet:1", kind: "snippet" as const, title: "Sig" };
     let text = "Regards";
