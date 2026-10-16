@@ -373,9 +373,12 @@ pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
 const CF_DIBV5: u32 = 17;
 
 /// arboard decodes the whole image, so a huge one is skipped, from its
-/// header, before that.
+/// header, before that. An image whose header cannot be read is skipped too:
+/// arboard reads only PNG and `CF_DIBV5`, and Windows makes `CF_DIBV5` from
+/// any bitmap, so it would find no image either.
 pub fn clipboard_image() -> Option<image::RgbaImage> {
-    if clipboard_image_size().is_some_and(|(width, height)| !pixels_fit(width, height)) {
+    let (width, height) = clipboard_image_size()?;
+    if !pixels_fit(width, height) {
         return None;
     }
     let image = arboard::Clipboard::new().ok()?.get_image().ok()?;
@@ -396,7 +399,7 @@ fn clipboard_image_size() -> Option<(u32, u32)> {
     // SAFETY: The clipboard stays open until CloseClipboard. Format IDs come
     // from RegisterClipboardFormatW or are standard; 0 is never available.
     unsafe {
-        if OpenClipboard(std::ptr::null_mut()) == 0 {
+        if !open_clipboard() {
             return None;
         }
         let size = if png != 0 && IsClipboardFormatAvailable(png) != 0 {
@@ -407,6 +410,23 @@ fn clipboard_image_size() -> Option<(u32, u32)> {
         CloseClipboard();
         size
     }
+}
+
+/// Opens the clipboard, and tries again for a short time while another app
+/// holds it, as arboard does. The caller must call `CloseClipboard` after a
+/// success.
+fn open_clipboard() -> bool {
+    const ATTEMPTS: usize = 6;
+    for attempt in 1..=ATTEMPTS {
+        // SAFETY: A null owner opens the clipboard for this thread.
+        if unsafe { OpenClipboard(std::ptr::null_mut()) } != 0 {
+            return true;
+        }
+        if attempt < ATTEMPTS {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+    false
 }
 
 /// Pass the bytes of one clipboard format to `read` in place, without a copy.
