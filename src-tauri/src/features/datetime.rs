@@ -370,7 +370,7 @@ fn iso_date(word: &str) -> Option<NaiveDate> {
 /// with its weekday.
 fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     let spaced = query.replace('+', " + ");
-    let mut words = spaced.split_whitespace();
+    let mut words = spaced.split_whitespace().flat_map(split_minus);
     let first = words.next()?;
     let (base, base_label) = match first {
         "today" => (today, "today"),
@@ -420,6 +420,26 @@ fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     );
     result.actions[0].label = "Copy Date".into();
     Some(result)
+}
+
+/// Split a minus sign from the words it touches, as in `-3`, `today-3d`,
+/// or `friday-1w`. The query cannot simply put spaces around every `-`, as
+/// it does for `+`, because ISO dates contain `-`; a word that starts with
+/// a digit keeps its `-`.
+fn split_minus(word: &str) -> Vec<&str> {
+    match word.split_once('-') {
+        Some((before, after))
+            if !after.is_empty() && before.chars().all(|c| c.is_ascii_alphabetic()) =>
+        {
+            let mut parts = Vec::with_capacity(3);
+            if !before.is_empty() {
+                parts.push(before);
+            }
+            parts.extend(["-", after]);
+            parts
+        }
+        _ => vec![word],
+    }
 }
 
 /// Apply one `<n> <unit>` step, also written together as in `3d` or `2weeks`.
@@ -513,6 +533,21 @@ mod tests {
         assert_eq!(math("2026-01-31 + 1 month").as_deref(), Some("2026-02-28"));
         assert_eq!(math("2026-10-03 - 1 year").as_deref(), Some("2025-10-03"));
         assert_eq!(math("tomorrow+1d").as_deref(), Some("2026-10-05"));
+        assert_eq!(math("2026-10-17").as_deref(), Some("2026-10-17"));
+    }
+
+    #[test]
+    fn minus_sign_may_touch_its_number() {
+        for (glued, spaced) in [
+            ("today -3 days", "today - 3 days"),
+            ("today-3d", "today - 3d"),
+            ("next friday -1 week", "next friday - 1 week"),
+            ("next friday-1w", "next friday - 1w"),
+            ("2026-10-17 -2d", "2026-10-17 - 2d"),
+        ] {
+            assert!(math(spaced).is_some(), "{spaced}");
+            assert_eq!(math(glued), math(spaced), "{glued}");
+        }
     }
 
     #[test]
