@@ -598,6 +598,11 @@ fn look(last: Look, change: u64, password_app_now_in_front: bool) -> (bool, Look
 /// Remember a change made in a password app, which marks nothing, so its
 /// copy stays secret after the user leaves the app. Reads no content.
 pub fn note_clipboard_change(change: u64) {
+    note_change(change);
+}
+
+/// Look at `change` and say whether a password app is in front now.
+fn note_change(change: u64) -> bool {
     let now_front = password_app_in_front();
     let mut last = LAST_LOOK.lock().unwrap_or_else(|e| e.into_inner());
     let (secret, next) = look(*last, change, now_front);
@@ -605,9 +610,12 @@ pub fn note_clipboard_change(change: u64) {
         PASSWORD_COPY.store(change, Ordering::Release);
     }
     *last = next;
+    now_front
 }
 
 /// Call with the reader lock held; it reads the change counter directly.
+/// It looks at the counter too: a read can come before the monitor's next
+/// tick, just after the user copied in a password app and switched away.
 fn clipboard_is_concealed() -> bool {
     autoreleasepool(|_| {
         let pasteboard = NSPasteboard::generalPasteboard();
@@ -616,9 +624,9 @@ fn clipboard_is_concealed() -> bool {
                 .iter()
                 .any(|kind| SECRET_FORMATS.contains(&kind.to_string().as_str()))
         });
-        marked
-            || PASSWORD_COPY.load(Ordering::Acquire) == pasteboard.changeCount() as u64
-            || password_app_in_front()
+        let change = pasteboard.changeCount() as u64;
+        let password_app_now_in_front = note_change(change);
+        marked || PASSWORD_COPY.load(Ordering::Acquire) == change || password_app_now_in_front
     })
 }
 
