@@ -48,6 +48,23 @@ jobs:
           if [ "$result" != success ]; then
             echo "CI has not passed on $GITHUB_SHA yet. Wait for it, then try again."; exit 1
           fi
+      # Without these, the macOS and Windows apps build and ship fine but can
+      # never check for updates, so their users stay on this version.
+      - name: Updates are set up
+        env:
+          TINYDASH_UPDATE_ENDPOINT: ${{ vars.TINYDASH_UPDATE_ENDPOINT }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_UPDATER_PUBLIC_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "Add the TAURI_UPDATER_PUBLIC_KEY and TAURI_SIGNING_PRIVATE_KEY repository secrets."; exit 1
+          fi
+          # The publish job puts latest.json on the release, so the app must
+          # read it from this repository's latest release.
+          feed="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/latest.json"
+          if [ "$TINYDASH_UPDATE_ENDPOINT" != "$feed" ]; then
+            echo "Set the TINYDASH_UPDATE_ENDPOINT repository variable (not a secret) to $feed."; exit 1
+          fi
 
   build:
     name: Build (${{ matrix.os }})
