@@ -52,18 +52,11 @@ jobs:
       # never check for updates, so their users stay on this version.
       - name: Updates are set up
         env:
-          TINYDASH_UPDATE_ENDPOINT: ${{ vars.TINYDASH_UPDATE_ENDPOINT }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ secrets.TAURI_UPDATER_PUBLIC_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           if [ -z "$TAURI_UPDATER_PUBLIC_KEY" ] || [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             echo "Add the TAURI_UPDATER_PUBLIC_KEY and TAURI_SIGNING_PRIVATE_KEY repository secrets."; exit 1
-          fi
-          # The publish job puts latest.json on the release, so the app must
-          # read it from this repository's latest release.
-          feed="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/latest.json"
-          if [ "$TINYDASH_UPDATE_ENDPOINT" != "$feed" ]; then
-            echo "Set the TINYDASH_UPDATE_ENDPOINT repository variable (not a secret) to $feed."; exit 1
           fi
 
   build:
@@ -122,11 +115,13 @@ jobs:
           APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
           # Updates (not on Linux, where installing a .deb needs root): the key
           # signs the update files, and the app is built with the feed
-          # address and the public key that checks them.
+          # address and the public key that checks them. The publish job puts
+          # latest.json on the release, so the feed is this repository's
+          # latest release.
           TAURI_SIGNING_PRIVATE_KEY: ${{ runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ runner.os != 'Linux' && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
           TAURI_UPDATER_PUBLIC_KEY: ${{ runner.os != 'Linux' && secrets.TAURI_UPDATER_PUBLIC_KEY || '' }}
-          TINYDASH_UPDATE_ENDPOINT: ${{ runner.os != 'Linux' && vars.TINYDASH_UPDATE_ENDPOINT || '' }}
+          TINYDASH_UPDATE_ENDPOINT: ${{ runner.os != 'Linux' && format('https://github.com/{0}/releases/latest/download/latest.json', github.repository) || '' }}
         with:
           tauriScript: bunx tauri
           # One macOS app for Apple silicon and Intel; update files on macOS
