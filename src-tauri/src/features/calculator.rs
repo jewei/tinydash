@@ -389,6 +389,9 @@ mod tests {
         assert_eq!(value("10:30 PM"), None);
         assert_eq!(value("2026 - 10").as_deref(), Some("2016"));
         assert_eq!(value("2026-10").as_deref(), Some("2016"));
+        assert_eq!(value("12-3-4").as_deref(), Some("5"));
+        assert_eq!(value("100-5-3").as_deref(), Some("92"));
+        assert_eq!(value("2026-1-5").as_deref(), Some("2020"));
     }
 
     #[test]

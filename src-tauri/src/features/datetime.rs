@@ -371,7 +371,17 @@ pub fn is_date_or_clock(query: &str) -> bool {
     iso_date(&query).is_some() || clock(&words).is_some_and(|(_, used)| used == words.len())
 }
 
+/// Only the strict `YYYY-MM-DD` shape: chrono's `%Y-%m-%d` also accepts
+/// `12-3-4`, which is a subtraction.
 fn iso_date(word: &str) -> Option<NaiveDate> {
+    let strict = word.len() == 10
+        && word.bytes().enumerate().all(|(index, byte)| match index {
+            4 | 7 => byte == b'-',
+            _ => byte.is_ascii_digit(),
+        });
+    if !strict {
+        return None;
+    }
     NaiveDate::parse_from_str(word, "%Y-%m-%d").ok()
 }
 
@@ -532,6 +542,8 @@ mod tests {
             "next",
             "next week",
             "2026-13-01",
+            "12-3-4",
+            "2026-1-5",
             "in bed",
         ] {
             assert_eq!(math(query), None, "{query}");
