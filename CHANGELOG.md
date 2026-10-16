@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- A click on an empty part of the tab bar or footer no longer pins the launcher to that screen. Only a drag that moves the launcher saves its spot.
 
 ## [0.6.0] - 2026-10-14
 
