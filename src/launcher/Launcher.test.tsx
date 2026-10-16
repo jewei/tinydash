@@ -1250,7 +1250,9 @@ describe("Launcher", () => {
         expect(weather.textContent).toContain(`Updated ${time(updatedAt * 1000, "Asia/Tokyo")}`),
       );
     } finally {
-      process.env.TZ = zone;
+      // Assigning undefined would store the string "undefined", which Node reads as UTC.
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
     }
   });
 
