@@ -115,12 +115,37 @@ impl LauncherTab {
     }
 }
 
-/// Drop the saved tabs this version cannot read, such as a typo or a tab
-/// from a newer version, so one bad entry never resets every setting.
-/// `normalized` then adds any tab that is missing.
-fn drop_unreadable_tabs(file: &mut Value) {
-    if let Some(Value::Array(tabs)) = file.get_mut("tabs") {
-        tabs.retain(|tab| serde_json::from_value::<LauncherTab>(tab.clone()).is_ok());
+/// Drop the saved values this version cannot read, such as a typo or a
+/// choice from a newer version, so one bad value never resets every
+/// setting. A list loses only its bad entries; any other field takes its
+/// default. `normalized` then adds any tab that is missing.
+fn drop_unreadable_values(file: &mut Value) {
+    let Value::Object(fields) = file else {
+        return;
+    };
+    keep_readable_entries::<LauncherTab>(fields, "tabs");
+    keep_readable_entries::<EmojiLanguage>(fields, "emojiLanguages");
+    let Ok(Value::Object(defaults)) = serde_json::to_value(Settings::default()) else {
+        return;
+    };
+    // Each field on top of the defaults alone, so a bad one cannot hide
+    // behind another.
+    fields.retain(|name, value| {
+        if !defaults.contains_key(name) {
+            return true;
+        }
+        let mut alone = defaults.clone();
+        alone.insert(name.clone(), value.clone());
+        serde_json::from_value::<Settings>(Value::Object(alone)).is_ok()
+    });
+}
+
+fn keep_readable_entries<T: serde::de::DeserializeOwned>(
+    fields: &mut Map<String, Value>,
+    name: &str,
+) {
+    if let Some(Value::Array(entries)) = fields.get_mut(name) {
+        entries.retain(|entry| serde_json::from_value::<T>(entry.clone()).is_ok());
     }
 }
 
@@ -330,7 +355,7 @@ pub fn load(dir: &Path) -> (Settings, Option<String>) {
         }
     };
     let parsed = serde_json::from_str::<Value>(&text).and_then(|mut file| {
-        drop_unreadable_tabs(&mut file);
+        drop_unreadable_values(&mut file);
         serde_json::from_value::<Settings>(file)
     });
     match parsed {
@@ -415,6 +440,37 @@ mod tests {
             }
         );
         assert_eq!(settings.tabs.len(), Category::ALL.len() - 1);
+    }
+
+    #[test]
+    fn a_value_from_a_newer_version_takes_its_default_without_resetting_the_rest() {
+        let dir = std::env::temp_dir().join(format!("tinydash-newer-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(FILE_NAME),
+            r#"{"shortcut": "Alt+Space", "searchEngine": "kagi",
+                "emojiLanguages": ["zh", "xx-unknown"], "focusMinutes": "soon"}"#,
+        )
+        .unwrap();
+        let (settings, warning) = load(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(warning, None);
+        assert_eq!(settings.shortcut, "Alt+Space");
+        assert_eq!(settings.search_engine, Settings::default().search_engine);
+        assert_eq!(settings.emoji_languages, [EmojiLanguage::Zh]);
+        assert_eq!(settings.focus_minutes, Settings::default().focus_minutes);
+    }
+
+    #[test]
+    fn a_file_that_is_not_an_object_is_moved_aside() {
+        let dir = std::env::temp_dir().join(format!("tinydash-array-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(FILE_NAME), "[1, 2]").unwrap();
+        let (settings, warning) = load(&dir);
+        assert_eq!(settings, Settings::default());
+        assert!(warning.is_some());
+        assert!(dir.join("settings.invalid.json").exists());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
