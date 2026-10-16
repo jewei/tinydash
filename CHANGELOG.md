@@ -9,7 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
-- The calculator no longer answers `floor`, `ceil`, or `round` of a number at or above 2^64 with the wrong value 18446744073709551616.
+- The calculator no longer shows wrong answers for `floor`, `ceil`, or `round` of numbers above 2^53 (about 9 quadrillion), or for `sinh` and `cosh` results above 2^64. It now shows no answer for these.
 
 ## [0.6.0] - 2026-10-14
 
