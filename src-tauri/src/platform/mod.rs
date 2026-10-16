@@ -16,6 +16,10 @@
 //!   that starts with a dot (the Windows hidden attribute, the macOS hidden
 //!   flag), or `None` when it has none, so the scan reads no metadata.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
+//! - `PHYSICAL_PLACEMENT`: whether windows are placed in physical pixels,
+//!   which Windows and X11 use the same way across monitors. When false
+//!   (macOS), they are placed in points: tao turns a logical position into
+//!   pixels with the window's own scale, which is right only there.
 //! - `SELF_UPDATE`: whether an installed copy can replace itself with a new
 //!   version (not on Linux, where installing a .deb needs root).
 //! - `RICH_CLIPBOARD`: whether clipboard history can save images and copied

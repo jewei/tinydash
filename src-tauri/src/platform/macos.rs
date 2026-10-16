@@ -57,6 +57,7 @@ pub const PACKAGE_EXTENSIONS: &[&str] = &[
 pub const SELF_UPDATE: bool = true;
 pub const RICH_CLIPBOARD: bool = true;
 pub const NATIVE_ICONS: bool = true;
+pub const PHYSICAL_PLACEMENT: bool = false;
 /// FSEvents watches a whole tree with one stream.
 pub const RECURSIVE_WATCH: bool = true;
 pub const TEMPLATE_TRAY_ICON: bool = true;
