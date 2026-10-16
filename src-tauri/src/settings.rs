@@ -118,15 +118,21 @@ impl LauncherTab {
 /// Drop the saved values this version cannot read, such as a typo or a
 /// choice from a newer version, so one bad value never resets every
 /// setting. A list loses only its bad entries; any other field takes its
-/// default. `normalized` then adds any tab that is missing.
-fn drop_unreadable_values(file: &mut Value) {
+/// default. `normalized` then adds any tab that is missing. Returns the
+/// names of the fields that lost a value, so `load` can tell the user.
+fn drop_unreadable_values(file: &mut Value) -> Vec<String> {
     let Value::Object(fields) = file else {
-        return;
+        return Vec::new();
     };
-    keep_readable_entries::<LauncherTab>(fields, "tabs");
-    keep_readable_entries::<EmojiLanguage>(fields, "emojiLanguages");
+    let mut dropped = Vec::new();
+    if keep_readable_entries::<LauncherTab>(fields, "tabs") {
+        dropped.push("tabs".to_owned());
+    }
+    if keep_readable_entries::<EmojiLanguage>(fields, "emojiLanguages") {
+        dropped.push("emojiLanguages".to_owned());
+    }
     let Ok(Value::Object(defaults)) = serde_json::to_value(Settings::default()) else {
-        return;
+        return dropped;
     };
     // Each field on top of the defaults alone, so a bad one cannot hide
     // behind another.
@@ -136,17 +142,27 @@ fn drop_unreadable_values(file: &mut Value) {
         }
         let mut alone = defaults.clone();
         alone.insert(name.clone(), value.clone());
-        serde_json::from_value::<Settings>(Value::Object(alone)).is_ok()
+        let readable = serde_json::from_value::<Settings>(Value::Object(alone)).is_ok();
+        if !readable {
+            dropped.push(name.clone());
+        }
+        readable
     });
+    dropped
 }
 
+/// Keep only the entries of the list `name` that read as `T`. Returns
+/// whether any entry was removed.
 fn keep_readable_entries<T: serde::de::DeserializeOwned>(
     fields: &mut Map<String, Value>,
     name: &str,
-) {
-    if let Some(Value::Array(entries)) = fields.get_mut(name) {
-        entries.retain(|entry| serde_json::from_value::<T>(entry.clone()).is_ok());
-    }
+) -> bool {
+    let Some(Value::Array(entries)) = fields.get_mut(name) else {
+        return false;
+    };
+    let before = entries.len();
+    entries.retain(|entry| serde_json::from_value::<T>(entry.clone()).is_ok());
+    entries.len() != before
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -340,6 +356,8 @@ pub fn expand_home(path: &str, home: &Path) -> PathBuf {
 
 /// Load settings. A damaged file is renamed aside, and defaults are used,
 /// so a bad edit never stops the launcher; the warning tells the user.
+/// A value this version cannot read only takes its default, and the
+/// warning names its field.
 pub fn load(dir: &Path) -> (Settings, Option<String>) {
     let path = dir.join(FILE_NAME);
     let text = match std::fs::read_to_string(&path) {
@@ -354,12 +372,21 @@ pub fn load(dir: &Path) -> (Settings, Option<String>) {
             );
         }
     };
+    let mut dropped = Vec::new();
     let parsed = serde_json::from_str::<Value>(&text).and_then(|mut file| {
-        drop_unreadable_values(&mut file);
+        dropped = drop_unreadable_values(&mut file);
         serde_json::from_value::<Settings>(file)
     });
     match parsed {
-        Ok(settings) => (settings.normalized(), None),
+        Ok(settings) => {
+            let warning = (!dropped.is_empty()).then(|| {
+                format!(
+                    "Some settings could not be read, so they use their defaults: {}.",
+                    dropped.join(", ")
+                )
+            });
+            (settings.normalized(), warning)
+        }
         Err(error) => {
             let backup = dir.join("settings.invalid.json");
             let moved = std::fs::rename(&path, &backup).is_ok();
@@ -429,7 +456,10 @@ mod tests {
         .unwrap();
         let (settings, warning) = load(&dir);
         std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(warning, None);
+        assert_eq!(
+            warning.as_deref(),
+            Some("Some settings could not be read, so they use their defaults: tabs.")
+        );
         assert!(!settings.hide_on_blur);
         assert_eq!(
             settings.tabs[0],
@@ -454,7 +484,11 @@ mod tests {
         .unwrap();
         let (settings, warning) = load(&dir);
         std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(warning, None);
+        let warning = warning.unwrap();
+        for field in ["emojiLanguages", "searchEngine", "focusMinutes"] {
+            assert!(warning.contains(field), "{warning}");
+        }
+        assert!(!warning.contains("shortcut"), "{warning}");
         assert_eq!(settings.shortcut, "Alt+Space");
         assert_eq!(settings.search_engine, Settings::default().search_engine);
         assert_eq!(settings.emoji_languages, [EmojiLanguage::Zh]);
