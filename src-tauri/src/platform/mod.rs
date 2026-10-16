@@ -98,8 +98,9 @@ pub const SECRET_FORMATS: &[&str] = &[
 
 /// Move the launcher to `saved` when the middle of its top edge would be on
 /// a screen, so it can still be dragged; else center it in the work area of
-/// the monitor under the pointer. Every value here is in physical pixels,
-/// which Windows and X11 use consistently across monitors.
+/// the monitor under the pointer. Positions are in physical pixels, which
+/// Windows and X11 use consistently across monitors; the window's size is
+/// counted at the target monitor's scale (see `centered`).
 ///
 /// It checks the monitors itself rather than with `monitor_from_point`: on
 /// Linux, that one takes logical pixels and returns the nearest monitor for
