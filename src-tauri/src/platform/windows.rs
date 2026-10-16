@@ -310,6 +310,9 @@ pub fn clipboard_change() -> u64 {
     u64::from(unsafe { GetClipboardSequenceNumber() })
 }
 
+/// How many times the secret check tries to open a busy clipboard.
+const OPEN_ATTEMPTS: u32 = 5;
+
 /// The source asked history tools to skip this copy, either with a marker
 /// format or with `CanIncludeInClipboardHistory` set to 0.
 fn clipboard_is_concealed() -> bool {
@@ -327,13 +330,22 @@ fn clipboard_is_concealed() -> bool {
     if !available(history) {
         return false;
     }
+    // Another reader, such as Windows clipboard history, often holds the
+    // clipboard for a moment after a copy; arboard waits for it the same way.
+    let opened = (0..OPEN_ATTEMPTS).any(|attempt| {
+        if attempt > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        // SAFETY: A null owner window is allowed; no pointer must stay valid.
+        (unsafe { OpenClipboard(std::ptr::null_mut()) }) != 0
+    });
+    if !opened {
+        // Still busy: treat as secret rather than risk saving a password.
+        return true;
+    }
     // SAFETY: The clipboard stays open until CloseClipboard, and the global
     // memory stays locked while the DWORD is read.
     unsafe {
-        if OpenClipboard(std::ptr::null_mut()) == 0 {
-            // Busy: treat as secret rather than risk saving a password.
-            return true;
-        }
         let handle = GetClipboardData(history);
         let mut excluded = false;
         if !handle.is_null() && GlobalSize(handle) >= 4 {
