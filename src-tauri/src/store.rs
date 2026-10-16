@@ -451,9 +451,14 @@ impl Store {
     pub fn save_calculation(&self, expression: &str, result: &str, now: i64) -> Result<()> {
         self.with(|db| {
             let transaction = db.transaction()?;
+            // A repeat gets a new, highest ID, so it is on top even when an
+            // earlier copy in the same second has the same `used_at`.
             transaction.execute(
-                "INSERT INTO calculations (expression, result, used_at) VALUES (?1, ?2, ?3)
-                 ON CONFLICT (expression) DO UPDATE SET result = ?2, used_at = ?3",
+                "DELETE FROM calculations WHERE expression = ?1",
+                [expression],
+            )?;
+            transaction.execute(
+                "INSERT INTO calculations (expression, result, used_at) VALUES (?1, ?2, ?3)",
                 params![expression, result, now],
             )?;
             transaction.execute(
@@ -795,6 +800,10 @@ mod tests {
                 .map(|entry| entry.expression)
                 .collect()
         };
+        assert_eq!(expressions(&store), ["1+1", "2*3"]);
+        // A repeat within the same second still moves to the top.
+        store.save_calculation("2*3", "6", 3).unwrap();
+        store.save_calculation("1+1", "2", 3).unwrap();
         assert_eq!(expressions(&store), ["1+1", "2*3"]);
         for n in 0..MAX_CALCULATIONS as i64 {
             store

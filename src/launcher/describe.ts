@@ -47,8 +47,13 @@ export function shortcutFor(result: SearchResult, action: Action): string[] | un
   const index = result.actions.findIndex((entry) => entry.action === action);
   if (index === 0) return ["↩"];
   if (index === 1) return [modKey(), "↩"];
-  if (action.type === "deleteClip") return [modKey(), "⌫"];
+  if (deletesHistoryEntry(action)) return [modKey(), "⌫"];
   return undefined;
+}
+
+/** Deletes a clipboard or calculation history entry, which Mod+Backspace runs. */
+export function deletesHistoryEntry(action: Action): boolean {
+  return action.type === "deleteClip" || action.type === "deleteCalculation";
 }
 
 /** Answers the user reads and copies, shown large and selectable. */

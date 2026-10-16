@@ -14,7 +14,7 @@ import { Glyph } from "../ui/Icon";
 import { Keys } from "../ui/Keys";
 import { ActionMenu, type MenuItem } from "./ActionMenu";
 import { AliasDialog } from "./AliasDialog";
-import { shortcutFor } from "./describe";
+import { deletesHistoryEntry, shortcutFor } from "./describe";
 import { commandFor } from "./keymap";
 import { PreviewPane } from "./PreviewPane";
 import { optionId, ResultList } from "./ResultList";
@@ -163,8 +163,7 @@ export function Launcher() {
 
   // Deleting cannot be undone, so it never waits for newer results: it acts
   // only on the highlighted entry the user can see.
-  const deleteAction = () =>
-    selected()?.actions.find((entry) => entry.action.type === "deleteClip");
+  const deleteAction = () => selected()?.actions.find((entry) => deletesHistoryEntry(entry.action));
   const canDelete = () => launcher.isCurrent() && deleteAction() !== undefined;
   const deleteSelected = () => {
     const action = deleteAction();
@@ -201,7 +200,7 @@ export function Launcher() {
       if (document.activeElement !== input && editsQuery(event)) focusInput();
       return;
     }
-    // Mod+Backspace deletes a clipboard entry; anywhere else it edits the
+    // Mod+Backspace deletes a history entry; anywhere else it edits the
     // text, in the search field even after a click moved focus.
     if (command.type === "delete" && !canDelete()) {
       if (document.activeElement !== input) focusInput();
