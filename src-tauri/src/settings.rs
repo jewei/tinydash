@@ -389,7 +389,8 @@ pub fn load(dir: &Path) -> (Settings, Option<String>) {
                     String::new()
                 };
                 format!(
-                    "Some settings could not be read, so they use their defaults: {}.{note}",
+                    "Some values under these names in settings.json could not be read: {}. \
+                     TinyDash skipped only those values and uses defaults for them.{note}",
                     dropped.join(", ")
                 )
             });
@@ -466,7 +467,8 @@ mod tests {
         assert_eq!(
             warning,
             Some(format!(
-                "Some settings could not be read, so they use their defaults: tabs. \
+                "Some values under these names in settings.json could not be read: tabs. \
+                 TinyDash skipped only those values and uses defaults for them. \
                  The old file is at {}.",
                 backup.display()
             ))
