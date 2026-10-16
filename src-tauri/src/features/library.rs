@@ -83,10 +83,20 @@ impl LibraryItem {
             return Err(Error::msg("Enter the text, up to 32 KB."));
         }
         if self.kind == LibraryKind::Quicklink {
-            // A sample name stands in for the values: some templates, such
-            // as `https://{query}`, work only once text is typed. Running
-            // the quicklink checks the real values again.
-            quicklink_target(&self.text, "x", Local::now(), || Some("x".into()))?;
+            // Some templates work only with certain values, such as
+            // `https://{query}` (needs text) or `http://localhost:{query}`
+            // (needs a number or nothing), so a template passes if any
+            // sample works. Unsafe schemes and roots fail for every value,
+            // and running the quicklink checks the real values again.
+            let now = Local::now();
+            let check =
+                |sample: &str| quicklink_target(&self.text, sample, now, || Some(sample.into()));
+            if let Err(error) = check("")
+                && check("x").is_err()
+                && check("1").is_err()
+            {
+                return Err(error);
+            }
         }
         Ok(self)
     }
@@ -474,7 +484,11 @@ mod tests {
         );
         // A template that works once text is typed after its keyword can
         // be saved, even if it fails with nothing typed.
-        for needs_query in ["https://{query}", "~/a/b/{query}/../c"] {
+        for needs_query in [
+            "https://{query}",
+            "~/a/b/{query}/../c",
+            "http://localhost:{query}",
+        ] {
             assert!(
                 item(LibraryKind::Quicklink, "a", "", needs_query)
                     .validated()
