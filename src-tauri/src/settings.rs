@@ -341,7 +341,7 @@ impl SettingsFile {
     pub fn save(&self, settings: &Settings) -> Result<()> {
         if !self.replaceable {
             return Err(Error::msg(format!(
-                "TinyDash could not read {} at startup, so it did not replace it. Quit and reopen TinyDash to change settings.",
+                "TinyDash could not use {} at startup, so it did not replace it. Quit and reopen TinyDash to change settings.",
                 self.dir.join(FILE_NAME).display()
             )));
         }
@@ -393,17 +393,19 @@ pub fn load(dir: &Path) -> Loaded {
         Err(error) => {
             let backup = dir.join("settings.invalid.json");
             let moved = std::fs::rename(&path, &backup).is_ok();
+            // Without a backup, a save would put defaults over the only copy.
             let note = if moved {
                 format!(" The old file is at {}.", backup.display())
             } else {
-                String::new()
+                " Changes will not be saved. Fix or remove the file, then reopen TinyDash."
+                    .to_owned()
             };
             loaded(
                 Settings::default(),
                 Some(format!(
                     "Settings were invalid ({error}), so defaults are in use.{note}"
                 )),
-                true,
+                moved,
             )
         }
     }
@@ -667,6 +669,27 @@ mod tests {
         assert_eq!(settings, Settings::default());
         assert!(warning.unwrap().contains("settings.invalid.json"));
         assert_eq!(backup.unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_damaged_file_that_could_not_be_moved_is_never_replaced() {
+        let dir = std::env::temp_dir().join(format!("tinydash-unmoved-{}", std::process::id()));
+        // A folder that is not empty in the backup's place blocks the rename on every OS.
+        std::fs::create_dir_all(dir.join("settings.invalid.json").join("taken")).unwrap();
+        let bytes = b"{\"clockCities\": [\"S\xe3o Paulo\"]}";
+        std::fs::write(dir.join(FILE_NAME), bytes).unwrap();
+        let Loaded {
+            settings,
+            warning,
+            file,
+        } = load(&dir);
+        let saved = file.save(&settings);
+        let kept = std::fs::read(dir.join(FILE_NAME));
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(settings, Settings::default());
+        assert!(warning.unwrap().contains("will not be saved"));
+        assert!(saved.is_err());
+        assert_eq!(kept.unwrap(), bytes);
     }
 
     #[test]
