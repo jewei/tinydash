@@ -576,12 +576,32 @@ fn password_app_in_front() -> bool {
     })
 }
 
+/// The change counter and whether a password app was in front, at the
+/// latest look by `note_clipboard_change`.
+static LAST_LOOK: Mutex<(u64, bool)> = Mutex::new((u64::MAX, false));
+
+/// Whether a change may come from a password app. The monitor looks only
+/// twice a second, so a copy made just before the user switched away shows
+/// up with another app in front; a password app in front at the look before
+/// counts too.
+fn copy_is_secret(
+    previous_front_was_password_app: bool,
+    now_front_is_password_app: bool,
+    change_moved: bool,
+) -> bool {
+    change_moved && (previous_front_was_password_app || now_front_is_password_app)
+}
+
 /// Remember a change made in a password app, which marks nothing, so its
 /// copy stays secret after the user leaves the app. Reads no content.
 pub fn note_clipboard_change(change: u64) {
-    if password_app_in_front() {
+    let now_front = password_app_in_front();
+    let mut last = LAST_LOOK.lock().unwrap_or_else(|e| e.into_inner());
+    let (previous_change, previous_front) = *last;
+    if copy_is_secret(previous_front, now_front, change != previous_change) {
         PASSWORD_COPY.store(change, Ordering::Release);
     }
+    *last = (change, now_front);
 }
 
 /// Call with the reader lock held; it reads the change counter directly.
@@ -791,6 +811,20 @@ mod tests {
         let png = app_icon(Path::new(&finder.path), 64).expect("icon");
         assert_eq!(&png[1..4], b"PNG");
         assert!(!apps.iter().any(|app| app.path.contains("/Contents/")));
+    }
+
+    #[test]
+    fn a_copy_seen_after_leaving_a_password_app_is_secret() {
+        // Passwords was in front at the look before; Safari is now.
+        assert!(copy_is_secret(true, false, true));
+        assert!(copy_is_secret(false, true, true));
+    }
+
+    #[test]
+    fn a_copy_made_away_from_password_apps_is_not_secret() {
+        assert!(!copy_is_secret(false, false, true));
+        // No new copy: the earlier one keeps its own verdict.
+        assert!(!copy_is_secret(true, true, false));
     }
 
     #[test]
