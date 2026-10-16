@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- A settings file that TinyDash cannot read, such as one saved in a non-UTF-8 encoding or locked by another app, no longer gets replaced with default settings. A file with a bad encoding moves to `settings.invalid.json`. A locked file stays as it is, and TinyDash does not save setting changes until you reopen it.
 
 ## [0.6.0] - 2026-10-14
 

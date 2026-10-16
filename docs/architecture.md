@@ -44,7 +44,7 @@ When data changes, Rust emits `results:stale` and the launcher searches again, k
 
 ## Storage
 
-- **Settings:** `settings.json` in the app config folder (`settings.rs`). Missing fields take defaults. A damaged file is renamed to `settings.invalid.json` and defaults are used.
+- **Settings:** `settings.json` in the app config folder (`settings.rs`). Missing fields take defaults. A damaged file (bad JSON or not UTF-8) is renamed to `settings.invalid.json` and defaults are used. A file that cannot be read for another reason, such as a lock, stays in place: defaults are used, and saves are refused until the next launch.
 - **Data:** `tinydash.db`, SQLite in the app's local data folder (`store.rs`; on Windows `%LOCALAPPDATA%`, so roaming profiles do not copy it). Tables: `usage` (the 1,000 most recently used IDs), `pins`, `clipboard`, `library`, `note` (the scratch note), `hidden` (results the user hid), `cache` (exchange rates and the weather). The file is owner-only on Unix and uses `secure_delete`. Migrations are append-only and refuse a database from a newer version.
 
 ## IPC contract
