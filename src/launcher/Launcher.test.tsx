@@ -1511,6 +1511,60 @@ describe("Launcher", () => {
     expect(on.called("spotlight_files").at(-1)?.args).toEqual({ query: "readme" });
   });
 
+  it("keeps a selected Spotlight row selected when results refresh", async () => {
+    const file = (name: string) => ({
+      ...app,
+      id: `file:/Users/me/${name}`,
+      kind: "file" as const,
+      title: name,
+      actions: [
+        {
+          label: "Open",
+          action: { type: "open" as const, path: `/Users/me/${name}` },
+          confirm: null,
+        },
+      ],
+    });
+    const [i1, i2, s1, s2] = ["i1.md", "i2.md", "s1.md", "s2.md"].map(file);
+    // The second Spotlight search waits, so the test can look at the list
+    // between the index's answer and Spotlight's.
+    let answer: (() => void) | undefined;
+    const backend = fakeBackend(
+      {
+        search: () => [i1, i2],
+        spotlight_files: () =>
+          backend.called("spotlight_files").length === 1
+            ? [s1, s2]
+            : new Promise((resolve) => (answer = () => resolve([s1, s2]))),
+      },
+      { spotlightFiles: true },
+    );
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await emit("launcher:shown", { category: "files" });
+    fireEvent.input(input, { target: { value: "readme" } });
+    const chosen = await screen.findByRole("option", { name: /s2\.md/ });
+    for (let step = 0; step < 3; step += 1) fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(chosen.getAttribute("aria-selected")).toBe("true");
+
+    await emit("results:stale", null);
+    await waitFor(() => expect(backend.called("spotlight_files")).toHaveLength(2));
+    const selectedName = () =>
+      screen.getAllByRole("option").find((row) => row.getAttribute("aria-selected") === "true")
+        ?.textContent;
+    expect(selectedName()).toMatch(/s2\.md/);
+    answer?.();
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(4));
+    expect(selectedName()).toMatch(/s2\.md/);
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: s2?.actions[0]?.action,
+      resultId: s2?.id,
+    });
+  });
+
   it("asks Spotlight nothing while it is off", async () => {
     const backend = fakeBackend({ search: () => [app] }, { spotlightFiles: false });
     render(() => <Launcher />);
