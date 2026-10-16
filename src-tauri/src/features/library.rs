@@ -83,7 +83,10 @@ impl LibraryItem {
             return Err(Error::msg("Enter the text, up to 32 KB."));
         }
         if self.kind == LibraryKind::Quicklink {
-            quicklink_target(&self.text, "", Local::now(), || None)?;
+            // A sample name stands in for the values: some templates, such
+            // as `https://{query}`, work only once text is typed. Running
+            // the quicklink checks the real values again.
+            quicklink_target(&self.text, "x", Local::now(), || Some("x".into()))?;
         }
         Ok(self)
     }
@@ -469,6 +472,24 @@ mod tests {
                 .validated()
                 .is_err()
         );
+        // A template that works once text is typed after its keyword can
+        // be saved, even if it fails with nothing typed.
+        for needs_query in ["https://{query}", "~/a/b/{query}/../c"] {
+            assert!(
+                item(LibraryKind::Quicklink, "a", "", needs_query)
+                    .validated()
+                    .is_ok(),
+                "{needs_query}"
+            );
+        }
+        for bad in ["javascript:{query}", "ms-settings:{query}"] {
+            assert!(
+                item(LibraryKind::Quicklink, "a", "", bad)
+                    .validated()
+                    .is_err(),
+                "{bad}"
+            );
+        }
     }
 
     #[test]
