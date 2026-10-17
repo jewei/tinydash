@@ -1426,7 +1426,7 @@ describe("Launcher", () => {
   it("keeps note text whose save failed when the pane closes, and saves it again", async () => {
     let failures = 1;
     const { backend, input } = setup(() => [app], {
-      widgets: () => ({ clocks: null, disk: null, note: "draft" }),
+      widgets: () => ({ clocks: null, disk: null, note: { type: "ready", text: "draft" } }),
       save_note: () => {
         if (failures-- > 0) throw "The database is locked.";
         return null;
