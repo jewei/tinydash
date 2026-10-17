@@ -202,6 +202,30 @@ describe("Settings", () => {
       id: "app:/Applications/Helper.app",
     });
     expect(await screen.findByText(/None\. To hide one/)).toBeTruthy();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("list", { name: "Hidden results" })),
+    );
+  });
+
+  it("moves focus to the next hidden result after Show Again", async () => {
+    let hidden = ["One", "Two", "Three"].map((title) => ({
+      id: `system:${title}`,
+      title,
+      subtitle: "Command",
+    }));
+    fakeBackend({
+      hidden_results: () => hidden,
+      unhide_result: (args) => {
+        hidden = hidden.filter((result) => result.id !== args.id);
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Show Two again" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Show Three again" })),
+    );
   });
 
   it("lists aliases and removes one, keeping keyboard focus in the list", async () => {
@@ -888,6 +912,33 @@ describe("Settings", () => {
     fireEvent.click(saveButton);
     await waitFor(() => expect(backend.called("save_library_item")).toHaveLength(2));
     expect(backend.called("save_library_item")[1]?.args).toMatchObject({ item: { id: null } });
+  });
+
+  it("keeps the open item when the list fails to reload after a save", async () => {
+    let reads = 0;
+    const item: LibraryItem = { id: 5, kind: "snippet", name: "Sig", keyword: "sig", text: "Hi" };
+    const backend = fakeBackend({
+      library_items: () => {
+        reads += 1;
+        if (reads > 1) throw "The database is busy.";
+        return [item];
+      },
+      save_library_item: (args) => args.item as LibraryItem,
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Sig/ }));
+    fireEvent.input(screen.getByRole("textbox", { name: "Text" }), {
+      target: { value: "Hello" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    await screen.findByText(/The database is busy/);
+    const saveButton = screen.getByRole("button", { name: "Save Snippet" }) as HTMLButtonElement;
+    await waitFor(() => expect(saveButton.disabled).toBe(false));
+    expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(backend.called("save_library_item")).toHaveLength(2));
+    expect(backend.called("save_library_item")[1]?.args).toMatchObject({ item: { id: 5 } });
   });
 
   it("records a new shortcut while the old one is paused", async () => {

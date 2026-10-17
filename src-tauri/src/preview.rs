@@ -4,6 +4,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::{
+    actions::offered_file,
     error::Result,
     features::{clipboard::Content, library::LibraryKind},
     search::id::Source,
@@ -38,8 +39,8 @@ pub enum Preview {
     },
 }
 
-/// The preview for a result ID. Files and apps must be indexed, so the
-/// webview cannot probe arbitrary paths.
+/// The preview for a result ID. Apps must be indexed and files offered, so
+/// the webview cannot probe arbitrary paths.
 pub fn load(state: &State, id: &str) -> Result<Option<Preview>> {
     let Some((source, key)) = Source::parse(id) else {
         return Ok(None);
@@ -56,7 +57,7 @@ pub fn load(state: &State, id: &str) -> Result<Option<Preview>> {
             })
         }
         Source::App if state.apps.get().contains(key) => file(key),
-        Source::File if state.files.get().contains(key) => file(key),
+        Source::File if offered_file(state, key) => file(key),
         Source::Snippet => key
             .parse()
             .ok()
@@ -79,4 +80,45 @@ fn file(path: &str) -> Option<Preview> {
             .and_then(|age| i64::try_from(age.as_secs()).ok()),
         is_dir: metadata.is_dir(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        features::library::{Library, LibraryItem},
+        settings::Settings,
+    };
+
+    #[test]
+    fn previews_only_offered_items() {
+        let state = State::for_tests(Settings::default());
+        let path = std::env::temp_dir().join(format!("tinydash-preview-{}", std::process::id()));
+        std::fs::write(&path, "hello").unwrap();
+        let path = path.display().to_string();
+        let id = Source::File.id(&path);
+
+        assert!(load(&state, &id).unwrap().is_none());
+        state.found.lock().unwrap().remember(&path);
+        assert!(matches!(
+            load(&state, &id).unwrap(),
+            Some(Preview::File {
+                size: 5,
+                is_dir: false,
+                ..
+            })
+        ));
+
+        state.library.set(Library::new(vec![LibraryItem {
+            id: Some(7),
+            kind: LibraryKind::Quicklink,
+            name: "Docs".into(),
+            keyword: String::new(),
+            text: "https://example.com".into(),
+        }]));
+        assert!(load(&state, "snippet:7").unwrap().is_none());
+        assert!(load(&state, "clip:abc").unwrap().is_none());
+        assert!(load(&state, "nothing:abc").unwrap().is_none());
+        std::fs::remove_file(path).unwrap();
+    }
 }
