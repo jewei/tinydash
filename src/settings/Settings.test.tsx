@@ -158,6 +158,19 @@ describe("Settings", () => {
     expect((field as HTMLInputElement).value).toBe("Atlantis");
   });
 
+  it("says when a clock city is already in the list in another case", async () => {
+    const backend = fakeBackend({
+      get_settings: () => ({ ...testSettings, clockCities: ["Tokyo"] }),
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    const field = await screen.findByRole("textbox", { name: "City to add" });
+    fireEvent.input(field, { target: { value: "tokyo" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(screen.getByText("“tokyo” is already in the list.")).toBeTruthy();
+    expect(backend.called("update_settings")).toHaveLength(0);
+  });
+
   it("saves the focus timer lengths within their limits", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
