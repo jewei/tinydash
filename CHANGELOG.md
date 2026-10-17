@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- On macOS, install TinyDash with Homebrew: `brew install jewei/tap/tinydash`.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
