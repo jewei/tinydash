@@ -22,8 +22,8 @@ use tauri::{
 
 use crate::{features::clipboard::Content, platform, state::State};
 
-/// Icons rendered so far, keyed by path, pixel size, and the file's
-/// modification time, so an app that updates in place shows its new icon.
+/// Icons rendered so far, keyed by path, pixel size, and
+/// `platform::icon_stamp`, so an app that updates in place shows its new icon.
 /// Small PNGs; capped.
 type IconCache = HashMap<(String, u32, Option<SystemTime>), Arc<Vec<u8>>>;
 static ICONS: LazyLock<Mutex<IconCache>> = LazyLock::new(Mutex::default);
@@ -61,10 +61,8 @@ fn cached_icon(
     size: u32,
     render: impl FnOnce(&Path, u32) -> Option<Vec<u8>>,
 ) -> Option<Arc<Vec<u8>>> {
-    let modified = std::fs::metadata(&path)
-        .and_then(|metadata| metadata.modified())
-        .ok();
-    let key = (path, size, modified);
+    let stamp = platform::icon_stamp(Path::new(&path));
+    let key = (path, size, stamp);
     let cached = lock(cache).get(&key).cloned();
     cached.or_else(|| {
         let png = Arc::new(render(Path::new(&key.0), size)?);
@@ -107,9 +105,10 @@ fn decoded_path(request: &Request<Vec<u8>>) -> Option<String> {
     (!decoded.is_empty()).then(|| Cow::into_owned(decoded))
 }
 
-/// An icon: the same for an hour, so the webview may keep it.
+/// An icon: the webview asks again each time, because the URL stays the
+/// same when an app update changes the icon. The icon cache makes that cheap.
 fn image_response(png: Vec<u8>) -> Response<Vec<u8>> {
-    png_response(png, "max-age=3600")
+    png_response(png, "no-cache")
 }
 
 /// A copied image, which may be private: the webview must not keep it on
@@ -138,7 +137,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn copied_images_are_never_cached_but_icons_are() {
+    fn copied_images_are_never_kept_and_icons_are_checked_again() {
         let cache = |response: Response<Vec<u8>>| {
             response.headers()[header::CACHE_CONTROL]
                 .to_str()
@@ -146,7 +145,7 @@ mod tests {
                 .to_owned()
         };
         assert_eq!(cache(clip_response(vec![1])), "no-store");
-        assert_eq!(cache(image_response(vec![1])), "max-age=3600");
+        assert_eq!(cache(image_response(vec![1])), "no-cache");
     }
 
     #[test]

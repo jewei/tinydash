@@ -320,6 +320,16 @@ pub fn launch_app(path: &Path) -> Result<()> {
         .map_err(|error| Error::msg(error.to_string()))
 }
 
+/// The newest modification time of `path` and, for an app bundle, its
+/// `Contents/Info.plist`. An update that writes inside the bundle, as a pkg
+/// installer does, leaves the bundle folder's own time unchanged, but every
+/// version bump rewrites Info.plist.
+pub fn icon_stamp(path: &Path) -> Option<std::time::SystemTime> {
+    let modified = |path: &Path| std::fs::metadata(path).and_then(|metadata| metadata.modified());
+    let plist = modified(&path.join("Contents/Info.plist")).ok();
+    modified(path).ok().max(plist)
+}
+
 /// Draw the Finder icon of `path` into a square bitmap of `pixels` and
 /// encode it as PNG. AppKit picks the best representation for that size.
 pub fn app_icon(path: &Path, pixels: u32) -> Option<Vec<u8>> {
@@ -865,6 +875,28 @@ pub fn restore_frontmost_app() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn icon_stamp_changes_when_an_update_writes_inside_the_bundle() {
+        use std::time::{Duration, SystemTime};
+        let bundle =
+            std::env::temp_dir().join(format!("tinydash-stamp-{}.app", std::process::id()));
+        std::fs::create_dir_all(bundle.join("Contents")).unwrap();
+        let plist = bundle.join("Contents/Info.plist");
+        std::fs::write(&plist, "1.0").unwrap();
+        let before = super::icon_stamp(&bundle).unwrap();
+
+        std::fs::File::options()
+            .write(true)
+            .open(&plist)
+            .unwrap()
+            .set_modified(SystemTime::now() + Duration::from_secs(60))
+            .unwrap();
+        let after = super::icon_stamp(&bundle).unwrap();
+
+        std::fs::remove_dir_all(&bundle).unwrap();
+        assert!(after > before);
+    }
+
     #[test]
     fn decodes_a_tiff_that_fits() {
         let mut tiff = Vec::new();

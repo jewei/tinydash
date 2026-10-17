@@ -143,6 +143,12 @@ pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
     None
 }
 
+pub fn icon_stamp(path: &Path) -> Option<std::time::SystemTime> {
+    std::fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .ok()
+}
+
 /// The drive of `path` (`C:`) and the space the user may still fill there,
 /// which honors disk quotas.
 pub fn disk_space(path: &Path) -> Result<super::Volume> {
