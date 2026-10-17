@@ -514,6 +514,14 @@ mod tests {
     }
 
     #[test]
+    fn an_iso_date_answers_with_its_weekday_first() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let first = search(&state.snapshot(), "2026-10-17", Category::All).remove(0);
+        assert_eq!(first.kind, ResultKind::DateTime);
+        assert_eq!(first.title, "Saturday, 17 October 2026");
+    }
+
+    #[test]
     fn a_source_kept_out_of_all_stays_in_its_tab() {
         use usage::Use;
 
