@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- A setting saved by a newer version, such as a new search engine or emoji language, no longer resets all your settings in an older version. TinyDash skips only the values it cannot read and uses defaults for them, the launcher names the settings that had such values, and a copy of the old file is kept.
 - Changing the weather city and then back again quickly no longer shows the weather of the other city, or leaves the widget loading.
 - A date such as `2026-10-17` answers with its weekday first, instead of a subtraction. `3pm` and `10am` no longer give a length answer.
 - A currency result below 1, such as `1 JPY to USD`, shows 3 significant digits instead of `0.01`. An exact result, such as `100 USD to MYR in exact`, shows its fraction correctly.
