@@ -7,6 +7,18 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Fixed
 
 - On macOS, after an update replaces an app and changes its icon, the launcher shows the new icon without a restart of TinyDash. Updates that change files inside the app, such as some installer packages, can still show the old icon, because macOS keeps it.
+- Exchange rates and the weather saved while the computer clock was set ahead now update once the clock is correct.
+- On Linux, TinyDash now notices newly installed apps when `XDG_DATA_DIRS` or `XDG_DATA_HOME` is set but empty.
+- A clip copied again within the same second as the clip before it moves to the top of the clipboard history.
+- In Settings > General, Center keeps keyboard focus after you use it, so Tab moves on from there instead of from the top of the page.
+- In Settings > Widgets, a clock city that is already in the list with other capital letters, such as `tokyo` after `Tokyo`, now shows "already in the list" instead of disappearing without a message.
+- A hidden result can no longer be pinned, and a pin left on a hidden result gives up its place when the pin list is full. Show the result again in Settings > Search to pin it.
+- Hide works only on a result that still exists, so a deleted snippet or quicklink no longer stays in the hidden list in Settings.
+- If the note cannot save when you start a search, its text is no longer lost. The note shows it again when the widgets come back, and tries to save it again.
+- On macOS, Also search with Spotlight now finds files for a search that starts with a dash, such as `-draft`.
+- If TinyDash cannot read the saved note, the Notepad says why, and the other widgets still show. Before, the whole widget pane showed only an error.
+- A Unix time now says "1 hour ago" or "In 1 year" instead of "60 minutes ago" or "In 12 months" when it is close to the next unit.
+- The full JSON view of a clipboard card closes when the launcher hides, so the widgets show again the next time it opens.
 
 ## [0.6.1] - 2026-10-17
 
