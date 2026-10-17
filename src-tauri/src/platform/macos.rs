@@ -457,8 +457,14 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
 /// Ask Spotlight for names that contain `name`, with fixed arguments and no
 /// shell. Stops after `limit` paths or a second, whichever comes first.
 pub fn find_files(name: &str, folder: &Path, limit: usize) -> Vec<PathBuf> {
+    // mdfind reads a name that starts with "-" as an unknown option, and it
+    // takes no "--", so it gets the name without its leading dashes.
+    let asked = name.trim_start_matches('-');
+    if asked.is_empty() {
+        return Vec::new();
+    }
     let mut command = Command::new("/usr/bin/mdfind");
-    command.arg("-onlyin").arg(folder).arg("-name").arg(name);
+    command.arg("-onlyin").arg(folder).arg("-name").arg(asked);
     let (mut child, output) = match spawn_on_terminal(command) {
         Ok(spawned) => spawned,
         Err(error) => {
@@ -466,11 +472,29 @@ pub fn find_files(name: &str, folder: &Path, limit: usize) -> Vec<PathBuf> {
             return Vec::new();
         }
     };
-    let paths = read_paths(output, limit, std::time::Duration::from_secs(1));
+    // Without its dashes, the name also matches paths that the full name does
+    // not. Drop them before the limit counts, or they can push out the paths
+    // that match.
+    let full_name = (asked.len() != name.len()).then(|| name.to_owned());
+    let keep = move |path: &Path| {
+        full_name
+            .as_deref()
+            .is_none_or(|full| name_contains(path, full))
+    };
+    let paths = read_paths(output, limit, std::time::Duration::from_secs(1), keep);
     // Spotlight may still be writing after `limit` paths; stop it either way.
     child.kill().ok();
     child.wait().ok();
     paths
+}
+
+/// Whether the last part of `path` contains `name`, ignoring case.
+fn name_contains(path: &Path, name: &str) -> bool {
+    path.file_name().is_some_and(|file| {
+        file.to_string_lossy()
+            .to_lowercase()
+            .contains(&name.to_lowercase())
+    })
 }
 
 /// Runs `command` with its output on a pseudo-terminal and returns the
@@ -518,23 +542,26 @@ fn spawn_on_terminal(
     Ok((child, std::fs::File::from(reader)))
 }
 
-/// Up to `limit` paths, one per line, that `output` gives before `timeout`.
-/// The reader sends each path as it reads it, so a slow search still keeps
-/// the paths it found before the timeout.
+/// Up to `limit` paths, one per line, that `output` gives before `timeout`
+/// and `keep` accepts. The reader sends each path as it reads it, so a slow
+/// search still keeps the paths it found before the timeout.
 fn read_paths(
     output: impl std::io::Read + Send + 'static,
     limit: usize,
     timeout: std::time::Duration,
+    keep: impl Fn(&Path) -> bool + Send + 'static,
 ) -> Vec<PathBuf> {
     use std::io::BufRead;
     let (send, receive) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        for line in std::io::BufReader::new(output)
+        for path in std::io::BufReader::new(output)
             .lines()
             .map_while(std::io::Result::ok)
+            .map(PathBuf::from)
+            .filter(|path| keep(path))
             .take(limit)
         {
-            if send.send(PathBuf::from(line)).is_err() {
+            if send.send(path).is_err() {
                 break;
             }
         }
@@ -949,7 +976,7 @@ mod tests {
             text: std::io::Cursor::new(b"/a\n/b\n".to_vec()),
             release: wait,
         };
-        let paths = read_paths(output, 10, std::time::Duration::from_millis(200));
+        let paths = read_paths(output, 10, std::time::Duration::from_millis(200), |_| true);
         drop(release);
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
     }
@@ -959,16 +986,56 @@ mod tests {
         let mut command = Command::new("/bin/sh");
         command.arg("-c").arg("test -t 1 && printf '/a\\n/b\\n'");
         let (mut child, output) = spawn_on_terminal(command).unwrap();
-        let paths = read_paths(output, 10, std::time::Duration::from_secs(5));
+        let paths = read_paths(output, 10, std::time::Duration::from_secs(5), |_| true);
         child.wait().ok();
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
     }
 
     #[test]
+    fn a_name_with_leading_dashes_keeps_them() {
+        assert!(name_contains(Path::new("/home/-Dash.txt"), "-dash"));
+        assert!(name_contains(Path::new("/home/x--dash.txt"), "--dash"));
+        assert!(!name_contains(Path::new("/home/dash.txt"), "-dash"));
+        assert!(!name_contains(Path::new("/-dash/notes.txt"), "-dash"));
+    }
+
+    /// Runs Spotlight for real: `TINYDASH_LIVE_SPOTLIGHT=1 cargo test live_spotlight`.
+    #[test]
+    fn live_spotlight_takes_a_name_that_starts_with_a_dash() {
+        if std::env::var_os("TINYDASH_LIVE_SPOTLIGHT").is_none() {
+            return;
+        }
+        let home = std::env::home_dir().expect("a home folder");
+        let folder = home.join(format!("Downloads/tinydash-dash-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let file = folder.join("-tinydash-dash.txt");
+        std::fs::write(&file, "").unwrap();
+        let mut found = Vec::new();
+        for _ in 0..30 {
+            found = find_files("-tinydash-dash", &folder, 10);
+            if !found.is_empty() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        std::fs::remove_dir_all(&folder).unwrap();
+        assert_eq!(found, [file]);
+        assert!(find_files("--", &home, 10).is_empty());
+    }
+
+    #[test]
     fn reads_at_most_the_limit() {
         let output = std::io::Cursor::new(b"/a\n/b\n/c\n".to_vec());
-        let paths = read_paths(output, 2, std::time::Duration::from_secs(1));
+        let paths = read_paths(output, 2, std::time::Duration::from_secs(1), |_| true);
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
+    }
+
+    #[test]
+    fn the_limit_counts_only_the_paths_kept() {
+        let output = std::io::Cursor::new(b"/draft.txt\n/Drafts\n/-draft.txt\n".to_vec());
+        let keep = |path: &Path| name_contains(path, "-draft");
+        let paths = read_paths(output, 2, std::time::Duration::from_secs(1), keep);
+        assert_eq!(paths, [PathBuf::from("/-draft.txt")]);
     }
 
     #[test]

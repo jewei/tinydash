@@ -115,7 +115,6 @@ pub async fn search(
     .await
 }
 
-/// `result_id` is sent with a result's primary action so usage can be ranked.
 /// More Files tab results from Spotlight, which the launcher adds after the
 /// index's own; empty while the setting is off.
 #[tauri::command]
@@ -123,6 +122,7 @@ pub async fn spotlight_files(app: AppHandle, query: String) -> Result<Vec<Search
     blocking(move || Ok(spotlight::search(&app.state::<State>(), &query))).await
 }
 
+/// `result_id` is sent with a result's primary action so usage can be ranked.
 #[tauri::command]
 pub async fn run_action(app: AppHandle, action: Action, result_id: Option<String>) -> Result<()> {
     blocking(move || actions::run(&app, action, result_id.as_deref())).await
@@ -397,7 +397,12 @@ pub async fn install_update(app: AppHandle) -> Result<()> {
 /// What the widget pane shows now.
 #[tauri::command]
 pub async fn widgets(app: AppHandle) -> Result<Widgets> {
-    blocking(move || widgets::load(&app.state::<State>(), || platform::clipboard_text(&app))).await
+    blocking(move || {
+        Ok(widgets::load(&app.state::<State>(), || {
+            platform::clipboard_text(&app)
+        }))
+    })
+    .await
 }
 
 /// Save the scratch note of the widget pane.

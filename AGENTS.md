@@ -37,6 +37,8 @@ src-tauri/src/
   state.rs             In-memory state; indexes are swapped whole (shared.rs).
   refresh.rs           When indexes, exchange rates, and the weather refresh.
   watcher.rs           File system events → "index is dirty".
+  spotlight.rs         More Files tab results from the OS's file index (Spotlight on macOS).
+  hud.rs               The "Copied" message window, which never takes focus.
   monitor.rs           Clipboard capture thread.
   updates.rs           Update checks and installs (macOS and Windows release builds).
   window.rs, tray.rs, shortcut.rs, images.rs, events.rs, system_clipboard.rs, error.rs
