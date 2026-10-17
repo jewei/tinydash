@@ -32,11 +32,14 @@
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
-//! - `note_clipboard_change(change)`: the monitor saw a new change; remember
-//!   what makes it secret but the content does not show (on macOS, a copy
-//!   made in Passwords or Keychain Access). Reads no content. On macOS,
-//!   `remember_frontmost_app` also calls it, for a copy made just before
-//!   the launcher opened.
+//! - `note_clipboard_change(change)`: the monitor looked at the counter, at
+//!   every tick; for a new change, remember what makes it secret but the
+//!   content does not show (on macOS, a copy made in Passwords or Keychain
+//!   Access, which was in front now or at the previous look). Reads no
+//!   content. On macOS, `remember_frontmost_app` also calls it, for a copy
+//!   made just before the launcher opened, and `read_clipboard` takes the
+//!   same look before it reads, for a copy newer than the monitor's last
+//!   tick.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
@@ -100,23 +103,37 @@ pub const SECRET_FORMATS: &[&str] = &[
 /// a screen, so it can still be dragged; else center it in the work area of
 /// the monitor under the pointer. Every value here is in physical pixels,
 /// which Windows and X11 use consistently across monitors.
+///
+/// It checks the monitors itself rather than with `monitor_from_point`: on
+/// Linux, that one takes logical pixels and returns the nearest monitor for
+/// a point on none, so a spot on an unplugged monitor would still pass.
 #[cfg(not(target_os = "macos"))]
 fn place_in_physical_pixels(
     app: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
     saved: Option<LauncherPosition>,
 ) -> tauri::Result<()> {
+    let monitors = app.available_monitors()?;
+    let bounds: Vec<_> = monitors
+        .iter()
+        .map(|monitor| (*monitor.position(), *monitor.size()))
+        .collect();
     let size = window.outer_size()?;
     if let Some(saved) = saved
-        && app
-            .monitor_from_point(saved.x + f64::from(size.width) / 2.0, saved.y + 1.0)?
-            .is_some()
+        && monitor_containing(
+            &bounds,
+            saved.x + f64::from(size.width) / 2.0,
+            saved.y + 1.0,
+        )
+        .is_some()
     {
         // `as` saturates, and the check above keeps the spot on a screen.
         return window.set_position(tauri::PhysicalPosition::new(saved.x as i32, saved.y as i32));
     }
     let cursor = app.cursor_position()?;
-    let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y)? else {
+    let Some(monitor) =
+        monitor_containing(&bounds, cursor.x, cursor.y).and_then(|index| monitors.get(index))
+    else {
         return Ok(());
     };
     let area = monitor.work_area();
@@ -130,6 +147,22 @@ fn place_in_physical_pixels(
         i32::try_from(x).unwrap_or(area.position.x),
         i32::try_from(y).unwrap_or(area.position.y),
     ))
+}
+
+/// The index of the monitor whose bounds hold a point, all in physical
+/// pixels. Each monitor holds its left and top edges but not its right and
+/// bottom ones, so a point on the line between two monitors has one owner.
+#[cfg(any(not(target_os = "macos"), test))]
+fn monitor_containing(
+    bounds: &[(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)],
+    x: f64,
+    y: f64,
+) -> Option<usize> {
+    bounds.iter().position(|(position, size)| {
+        let (left, top) = (f64::from(position.x), f64::from(position.y));
+        (left..left + f64::from(size.width)).contains(&x)
+            && (top..top + f64::from(size.height)).contains(&y)
+    })
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -226,6 +259,44 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    mod monitor_containing {
+        use super::super::monitor_containing;
+        use tauri::{PhysicalPosition, PhysicalSize};
+
+        /// A laptop panel and a monitor to its right.
+        fn two_monitors() -> [(PhysicalPosition<i32>, PhysicalSize<u32>); 2] {
+            [
+                (PhysicalPosition::new(0, 0), PhysicalSize::new(1920, 1080)),
+                (
+                    PhysicalPosition::new(1920, 0),
+                    PhysicalSize::new(2560, 1440),
+                ),
+            ]
+        }
+
+        #[test]
+        fn finds_the_second_monitor() {
+            assert_eq!(monitor_containing(&two_monitors(), 2500.0, 700.0), Some(1));
+        }
+
+        #[test]
+        fn a_point_on_no_monitor_has_none() {
+            // A spot saved on a monitor that is now unplugged.
+            assert_eq!(monitor_containing(&two_monitors()[..1], 2500.0, 1.0), None);
+            assert_eq!(monitor_containing(&two_monitors(), 4480.0, 1.0), None);
+            assert_eq!(monitor_containing(&two_monitors(), 100.0, 1200.0), None);
+            assert_eq!(monitor_containing(&two_monitors(), -1.0, 0.0), None);
+        }
+
+        #[test]
+        fn the_shared_edge_belongs_to_the_right_monitor() {
+            assert_eq!(monitor_containing(&two_monitors(), 1919.5, 0.0), Some(0));
+            assert_eq!(monitor_containing(&two_monitors(), 1920.0, 0.0), Some(1));
+            assert_eq!(monitor_containing(&two_monitors(), 0.0, 0.0), Some(0));
+            assert_eq!(monitor_containing(&two_monitors(), 0.0, 1080.0), None);
+        }
+    }
+
     #[test]
     fn many_threads_can_read_the_clipboard_at_once() {
         // The capture thread and the widget pane read together; AppKit
