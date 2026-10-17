@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    features::currency::Rates,
+    features::{currency::Rates, datetime},
     search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
 };
 
@@ -182,6 +182,9 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if !query.chars().any(|c| c.is_ascii_digit()) && !matches!(query, "pi" | "π") {
         return None;
     }
+    if datetime::is_date_or_clock(query) {
+        return None;
+    }
     let mut context = fend_core::Context::new();
     context.disable_rng();
     // fend matches units case-insensitively and reads `Bps` as bits. Define
@@ -213,18 +216,60 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if value == query.trim() {
         return None;
     }
+    if is_f64_artifact(query, &value) {
+        return None;
+    }
     if !used_rates.load(Ordering::Relaxed) {
         return Some((value, false));
     }
     Some((money(&value).unwrap_or(value), true))
 }
 
+/// Whether fend 1.5.8 computed the value through an f64 and got it wrong. A
+/// wrong answer is worse than none.
+///
+/// `floor`, `ceil`, and `round` lose digits above 2^53 and cap at 2^64, so
+/// `round(9007199254740993)` gives 9007199254740992 and `floor(1e20)` gives
+/// 18446744073709551616. A run of 14 or more digits holds every such value
+/// in decimal, octal, binary, and hex (2^52 has 14 hex digits). This also
+/// drops correct answers from 10^13 up in decimal, from 8^13 (about 5.5e11)
+/// up in octal, and from 8192 up in binary. A looser limit for runs of only
+/// 0 and 1 would keep small binary answers, but it would also keep wrong
+/// decimal ones: `round(10000000000000001)` gives 10000000000000000.
+///
+/// `sinh` and `cosh` cap at 2^64 too: `sinh(50)` gives 18446744073709551616.
+fn is_f64_artifact(query: &str, value: &str) -> bool {
+    let query = query.to_ascii_lowercase();
+    let names = |names: &[&str]| names.iter().any(|name| query.contains(name));
+    if names(&["floor", "ceil", "round"]) {
+        let longest_run = value
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .filter(|run| run.chars().any(|c| c.is_ascii_digit()))
+            .map(str::len)
+            .max();
+        return longest_run.is_some_and(|len| len >= 14);
+    }
+    names(&["sinh", "cosh"]) && value.contains("18446744073709551616")
+}
+
 /// `approx. 401.7094 MYR` as `401.71 MYR`. The subtitle already says the
 /// value comes from daily rates. (fend's own `to 2 dp` rounds incorrectly.)
+/// An amount below 1 keeps 3 significant digits, so `1 IDR to EUR` is not
+/// `0.00 EUR`. A fraction, such as `401 83/117 MYR` or `47000/117 MYR`,
+/// stays as fend wrote it. A unit with a `/`, such as `MYR / kg`, is rounded.
 fn money(value: &str) -> Option<String> {
     let (amount, currency) = value.trim_start_matches("approx. ").split_once(' ')?;
+    if currency.starts_with(|c: char| c.is_ascii_digit()) {
+        return None;
+    }
     let amount: f64 = amount.parse().ok()?;
-    Some(format!("{amount:.2} {currency}"))
+    let decimals = if amount == 0.0 || amount.abs() >= 1.0 {
+        2
+    } else {
+        // log10 of a finite amount below 1 is at least -324, so this fits.
+        (2.0 - amount.abs().log10().floor()) as usize
+    };
+    Some(format!("{amount:.decimals$} {currency}"))
 }
 
 /// `100 USD MYR` means `100 USD to MYR`.
@@ -379,6 +424,19 @@ mod tests {
     }
 
     #[test]
+    fn leaves_dates_and_clock_times_to_the_date_answers() {
+        assert_eq!(value("2026-10-17"), None);
+        assert_eq!(value("3pm"), None);
+        assert_eq!(value("10am"), None);
+        assert_eq!(value("10:30 PM"), None);
+        assert_eq!(value("2026 - 10").as_deref(), Some("2016"));
+        assert_eq!(value("2026-10").as_deref(), Some("2016"));
+        assert_eq!(value("12-3-4").as_deref(), Some("5"));
+        assert_eq!(value("100-5-3").as_deref(), Some("92"));
+        assert_eq!(value("2026-1-5").as_deref(), Some("2020"));
+    }
+
+    #[test]
     fn offers_to_turn_on_rates_only_for_currency_queries() {
         let answer = rates_off_answer("100 usd to eur").unwrap();
         assert_eq!(answer.actions[0].action, Action::TurnOnCurrencyRates);
@@ -407,5 +465,75 @@ mod tests {
         );
         assert_eq!(money("400 MYR").as_deref(), Some("400.00 MYR"));
         assert_eq!(money("MYR"), None);
+    }
+
+    #[test]
+    fn drops_answers_that_fend_computes_through_an_f64() {
+        for query in [
+            "floor(1e20)",
+            "ceil(1e25)",
+            "round(123456789012345678901.4)",
+            "floor(-1e20)",
+            "FLOOR(1e20 m)",
+            "floor(10000000000000000001)",
+            "round(9007199254740993)",
+            "floor(12345678901234567.5)",
+            "ceil(1e20) to hex",
+            "floor(9007199254740993) to hex",
+            "floor(1e20) + 1",
+            "floor(1e20) * 2",
+            "sinh(50)",
+            "Cosh(50)",
+            // Wrong in decimal, but all 0s and 1s.
+            "round(10000000000000001)",
+            // Correct, but dropped by the 14-digit rule.
+            "round(10000) to binary",
+        ] {
+            assert_eq!(value(query), None, "{query}");
+        }
+        assert_eq!(
+            value("round(1234567890123.4)").as_deref(),
+            Some("1234567890123")
+        );
+        assert_eq!(value("floor(3.5 km)").as_deref(), Some("3 km"));
+        assert_eq!(value("2^64").as_deref(), Some("18446744073709551616"));
+        assert_eq!(
+            value("sinh(40)").as_deref(),
+            Some("approx. 117692633418510000")
+        );
+    }
+
+    #[test]
+    fn keeps_exact_currency_fractions() {
+        let rates = Rates::fixture();
+        let (value, _) = evaluate("100 USD to MYR in exact", Some(&rates)).unwrap();
+        assert_eq!(value, "401 83/117 MYR");
+        assert_eq!(money("401 83/117 MYR"), None);
+        let (value, _) = evaluate("100 USD to MYR in fraction", Some(&rates)).unwrap();
+        assert_eq!(value, "47000/117 MYR");
+    }
+
+    #[test]
+    fn rounds_currency_per_unit() {
+        let rates = Rates::fixture();
+        let value = |query| evaluate(query, Some(&rates)).unwrap().0;
+        assert_eq!(value("10 USD/kg to MYR/kg"), "40.17 MYR / kg");
+        assert_eq!(value("10 USD per kg to MYR per kg"), "40.17 MYR / kg");
+    }
+
+    #[test]
+    fn keeps_significant_digits_of_small_amounts() {
+        let rates = Rates::parse(
+            br#"{"amount":1.0,"base":"EUR","date":"2026-10-02","rates":{"USD":1.17,"IDR":18850.0,"JPY":175.5}}"#,
+            0,
+        )
+        .unwrap();
+        let value = |query| evaluate(query, Some(&rates)).unwrap().0;
+        assert_eq!(value("1 IDR to EUR"), "0.0000531 EUR");
+        assert_eq!(value("1 JPY to USD"), "0.00667 USD");
+        assert_eq!(value("100 USD to EUR"), "85.47 EUR");
+        assert_eq!(money("0.5 EUR").as_deref(), Some("0.500 EUR"));
+        assert_eq!(money("0 EUR").as_deref(), Some("0.00 EUR"));
+        assert_eq!(money("-0.004 EUR").as_deref(), Some("-0.00400 EUR"));
     }
 }

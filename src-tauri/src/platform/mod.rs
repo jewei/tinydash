@@ -16,6 +16,10 @@
 //!   that starts with a dot (the Windows hidden attribute, the macOS hidden
 //!   flag), or `None` when it has none, so the scan reads no metadata.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
+//! - `PHYSICAL_PLACEMENT`: whether windows are placed in physical pixels,
+//!   which Windows and X11 use the same way across monitors. When false
+//!   (macOS), they are placed in points: tao turns a logical position into
+//!   pixels with the window's own scale, which is right only there.
 //! - `SELF_UPDATE`: whether an installed copy can replace itself with a new
 //!   version (not on Linux, where installing a .deb needs root).
 //! - `RICH_CLIPBOARD`: whether clipboard history can save images and copied
@@ -32,13 +36,22 @@
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
-//! - `note_clipboard_change(change)`: the monitor saw a new change; remember
-//!   what makes it secret but the content does not show (on macOS, a copy
-//!   made in Passwords or Keychain Access). Reads no content. On macOS,
-//!   `remember_frontmost_app` also calls it, for a copy made just before
-//!   the launcher opened.
+//! - `note_clipboard_change(change)`: the monitor looked at the counter, at
+//!   every tick; for a new change, remember what makes it secret but the
+//!   content does not show (on macOS, a copy made in Passwords or Keychain
+//!   Access, which was in front now or at the previous look). Reads no
+//!   content. On macOS, `remember_frontmost_app` also calls it, for a copy
+//!   made just before the launcher opened, and `read_clipboard` takes the
+//!   same look before it reads, for a copy newer than the monitor's last
+//!   tick.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
+//! - `clipboard_image()`: the clipboard image as RGBA, or `None` when there
+//!   is none, it cannot be decoded, or it has more pixels than the history
+//!   keeps. The size comes from the image header before the image is
+//!   decoded. On macOS the encoded bytes are copied in first. Only macOS
+//!   and Windows, where `read_clipboard` saves images; call it with the
+//!   clipboard reader lock held.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
 //!   is none or its source marked it secret. History need not be on. Call
@@ -70,7 +83,7 @@ pub use windows::*;
 
 use crate::error::{Error, Result};
 #[cfg(not(target_os = "linux"))]
-use crate::features::clipboard::{Content, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
+use crate::features::clipboard::{Content, MAX_IMAGE_BYTES};
 #[cfg(not(target_os = "macos"))]
 use crate::settings::LauncherPosition;
 
@@ -98,38 +111,88 @@ pub const SECRET_FORMATS: &[&str] = &[
 
 /// Move the launcher to `saved` when the middle of its top edge would be on
 /// a screen, so it can still be dragged; else center it in the work area of
-/// the monitor under the pointer. Every value here is in physical pixels,
-/// which Windows and X11 use consistently across monitors.
+/// the monitor under the pointer. Positions are in physical pixels, which
+/// Windows and X11 use consistently across monitors; the window's size is
+/// counted at the target monitor's scale (see `centered`).
+///
+/// It checks the monitors itself rather than with `monitor_from_point`: on
+/// Linux, that one takes logical pixels and returns the nearest monitor for
+/// a point on none, so a spot on an unplugged monitor would still pass.
 #[cfg(not(target_os = "macos"))]
 fn place_in_physical_pixels(
     app: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
     saved: Option<LauncherPosition>,
 ) -> tauri::Result<()> {
+    let monitors = app.available_monitors()?;
+    let bounds: Vec<_> = monitors
+        .iter()
+        .map(|monitor| (*monitor.position(), *monitor.size()))
+        .collect();
     let size = window.outer_size()?;
     if let Some(saved) = saved
-        && app
-            .monitor_from_point(saved.x + f64::from(size.width) / 2.0, saved.y + 1.0)?
-            .is_some()
+        && monitor_containing(
+            &bounds,
+            saved.x + f64::from(size.width) / 2.0,
+            saved.y + 1.0,
+        )
+        .is_some()
     {
         // `as` saturates, and the check above keeps the spot on a screen.
         return window.set_position(tauri::PhysicalPosition::new(saved.x as i32, saved.y as i32));
     }
     let cursor = app.cursor_position()?;
-    let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y)? else {
+    let Some(monitor) =
+        monitor_containing(&bounds, cursor.x, cursor.y).and_then(|index| monitors.get(index))
+    else {
         return Ok(());
     };
     let area = monitor.work_area();
-    let free_width = i64::from(area.size.width.saturating_sub(size.width));
-    let free_height = i64::from(area.size.height.saturating_sub(size.height));
+    window.set_position(centered(
+        area.position,
+        area.size,
+        size.to_logical(window.scale_factor()?),
+        monitor.scale_factor(),
+    ))
+}
+
+/// Where a window of `size` sits in the center of a work area. Windows keeps
+/// a window's logical size when it moves to a monitor with another scale, so
+/// the size counts in the target monitor's scale, not the one it is on now.
+#[cfg(any(not(target_os = "macos"), test))]
+fn centered(
+    area_position: tauri::PhysicalPosition<i32>,
+    area_size: tauri::PhysicalSize<u32>,
+    size: tauri::LogicalSize<f64>,
+    monitor_scale: f64,
+) -> tauri::PhysicalPosition<i32> {
+    let size = size.to_physical::<u32>(monitor_scale);
+    let free_width = i64::from(area_size.width.saturating_sub(size.width));
+    let free_height = i64::from(area_size.height.saturating_sub(size.height));
     // The window has a fixed height and never grows, so it sits in the
     // exact center rather than high up, as launchers that grow do.
-    let x = i64::from(area.position.x) + free_width / 2;
-    let y = i64::from(area.position.y) + free_height / 2;
-    window.set_position(tauri::PhysicalPosition::new(
-        i32::try_from(x).unwrap_or(area.position.x),
-        i32::try_from(y).unwrap_or(area.position.y),
-    ))
+    let x = i64::from(area_position.x) + free_width / 2;
+    let y = i64::from(area_position.y) + free_height / 2;
+    tauri::PhysicalPosition::new(
+        i32::try_from(x).unwrap_or(area_position.x),
+        i32::try_from(y).unwrap_or(area_position.y),
+    )
+}
+
+/// The index of the monitor whose bounds hold a point, all in physical
+/// pixels. Each monitor holds its left and top edges but not its right and
+/// bottom ones, so a point on the line between two monitors has one owner.
+#[cfg(any(not(target_os = "macos"), test))]
+fn monitor_containing(
+    bounds: &[(tauri::PhysicalPosition<i32>, tauri::PhysicalSize<u32>)],
+    x: f64,
+    y: f64,
+) -> Option<usize> {
+    bounds.iter().position(|(position, size)| {
+        let (left, top) = (f64::from(position.x), f64::from(position.y));
+        (left..left + f64::from(size.width)).contains(&x)
+            && (top..top + f64::from(size.height)).contains(&y)
+    })
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -171,15 +234,8 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
     if !images {
         return None;
     }
-    let image = reader.get_image().ok()?;
-    let (width, height) = (
-        u32::try_from(image.width).ok()?,
-        u32::try_from(image.height).ok()?,
-    );
-    if u64::from(width) * u64::from(height) > MAX_IMAGE_PIXELS {
-        return None;
-    }
-    let buffer = image::RgbaImage::from_raw(width, height, image.bytes.into_owned())?;
+    let buffer = clipboard_image()?;
+    let (width, height) = buffer.dimensions();
     let mut png = Vec::new();
     buffer
         .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
@@ -226,6 +282,94 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    mod monitor_containing {
+        use super::super::monitor_containing;
+        use tauri::{PhysicalPosition, PhysicalSize};
+
+        /// A laptop panel and a monitor to its right.
+        fn two_monitors() -> [(PhysicalPosition<i32>, PhysicalSize<u32>); 2] {
+            [
+                (PhysicalPosition::new(0, 0), PhysicalSize::new(1920, 1080)),
+                (
+                    PhysicalPosition::new(1920, 0),
+                    PhysicalSize::new(2560, 1440),
+                ),
+            ]
+        }
+
+        #[test]
+        fn finds_the_second_monitor() {
+            assert_eq!(monitor_containing(&two_monitors(), 2500.0, 700.0), Some(1));
+        }
+
+        #[test]
+        fn a_point_on_no_monitor_has_none() {
+            // A spot saved on a monitor that is now unplugged.
+            assert_eq!(monitor_containing(&two_monitors()[..1], 2500.0, 1.0), None);
+            assert_eq!(monitor_containing(&two_monitors(), 4480.0, 1.0), None);
+            assert_eq!(monitor_containing(&two_monitors(), 100.0, 1200.0), None);
+            assert_eq!(monitor_containing(&two_monitors(), -1.0, 0.0), None);
+        }
+
+        #[test]
+        fn the_shared_edge_belongs_to_the_right_monitor() {
+            assert_eq!(monitor_containing(&two_monitors(), 1919.5, 0.0), Some(0));
+            assert_eq!(monitor_containing(&two_monitors(), 1920.0, 0.0), Some(1));
+            assert_eq!(monitor_containing(&two_monitors(), 0.0, 0.0), Some(0));
+            assert_eq!(monitor_containing(&two_monitors(), 0.0, 1080.0), None);
+        }
+    }
+
+    mod centered {
+        use super::super::centered;
+        use tauri::{LogicalSize, PhysicalPosition, PhysicalSize};
+
+        /// The launcher's logical size.
+        const LAUNCHER: LogicalSize<f64> = LogicalSize::new(880.0, 560.0);
+
+        #[test]
+        fn centers_in_the_work_area() {
+            let position = centered(
+                PhysicalPosition::new(1920, 25),
+                PhysicalSize::new(2560, 1415),
+                LAUNCHER,
+                1.0,
+            );
+            assert_eq!(position, PhysicalPosition::new(1920 + 840, 25 + 427));
+        }
+
+        #[test]
+        fn counts_the_size_in_the_target_monitor_scale() {
+            // Last shown on a 200% monitor, now opened on a 100% laptop.
+            let on_laptop = centered(
+                PhysicalPosition::new(0, 0),
+                PhysicalSize::new(1920, 1080),
+                LAUNCHER,
+                1.0,
+            );
+            assert_eq!(on_laptop, PhysicalPosition::new(520, 260));
+            // And the other way, onto a 200% monitor to its right.
+            let on_4k = centered(
+                PhysicalPosition::new(1920, 0),
+                PhysicalSize::new(3840, 2160),
+                LAUNCHER,
+                2.0,
+            );
+            assert_eq!(on_4k, PhysicalPosition::new(1920 + 1040, 520));
+        }
+
+        #[test]
+        fn a_window_larger_than_the_area_sits_at_its_corner() {
+            let position = centered(
+                PhysicalPosition::new(-800, 0),
+                PhysicalSize::new(800, 600),
+                LAUNCHER,
+                1.0,
+            );
+            assert_eq!(position, PhysicalPosition::new(-800, 20));
+        }
+    }
+
     #[test]
     fn many_threads_can_read_the_clipboard_at_once() {
         // The capture thread and the widget pane read together; AppKit

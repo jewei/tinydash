@@ -283,9 +283,10 @@ export function Launcher() {
   const openMenu = () => {
     if (launcher.isCurrent()) setMenu(menuItems());
   };
+  // A dialog that opened over the menu keeps focus.
   const closeMenu = () => {
     setMenu(undefined);
-    focusInput();
+    if (!launcher.pending() && !launcher.naming()) focusInput();
   };
 
   // The widget pane takes the preview's place while All has no query.
@@ -505,7 +506,10 @@ export function Launcher() {
             type="button"
             class="footer-actions footer-clear"
             onMouseDown={(event) => event.preventDefault()}
-            onClick={() => launcher.run(clearHistory)}
+            onClick={() => {
+              setMenu(undefined);
+              launcher.run(clearHistory);
+            }}
           >
             Clear History…
           </button>
