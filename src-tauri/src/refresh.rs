@@ -75,6 +75,24 @@ impl WeatherAttempt {
         };
         self.number
     }
+
+    /// End download `number` and return whether to keep its result. Only
+    /// the latest download keeps it, and only while its city is still the
+    /// one in the settings: changing back to a city with fresh weather starts
+    /// no new download, so the one still running may be for a city the user
+    /// left. A dropped download does not count as a recent attempt, so
+    /// changing to its city again downloads at once.
+    fn finish(&mut self, number: u64, wanted_city: &str) -> bool {
+        if self.number != number {
+            return false;
+        }
+        self.busy = false;
+        let keep = same_city(&self.city, wanted_city);
+        if !keep {
+            self.started = None;
+        }
+        keep
+    }
 }
 
 fn same_city(a: &str, b: &str) -> bool {
@@ -311,7 +329,8 @@ pub fn rates(app: &AppHandle, force: bool) {
 
 /// Download the weather when the widget shows a city whose weather is
 /// missing or old. `force` skips the retry delay and the age check, for an
-/// explicit refresh. Only the latest download stores its result.
+/// explicit refresh. Only the latest download stores its result, and only
+/// while its city is still the one in the settings.
 pub fn weather(app: &AppHandle, force: bool) {
     let state = app.state::<State>();
     let settings = state.settings.get();
@@ -320,18 +339,20 @@ pub fn weather(app: &AppHandle, force: bool) {
         return;
     }
     let now = chrono::Utc::now().timestamp();
-    let fresh = state
-        .weather
-        .get()
-        .as_ref()
-        .as_ref()
-        .is_some_and(|weather| weather.is_for(&city) && !weather.is_stale(now));
     let number = {
         let mut attempt = state
             .freshness
             .weather_attempt
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        // Read the stored weather under the lock: a download that is storing
+        // its result holds it, so this sees that result.
+        let fresh = state
+            .weather
+            .get()
+            .as_ref()
+            .as_ref()
+            .is_some_and(|weather| weather.is_for(&city) && !weather.is_stale(now));
         let same = same_city(&attempt.city, &city);
         let waiting = attempt
             .started
@@ -351,10 +372,9 @@ pub fn weather(app: &AppHandle, force: bool) {
                 .weather_attempt
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
-            if attempt.number != number {
+            if !attempt.finish(number, &state.settings.get().weather_city) {
                 return;
             }
-            attempt.busy = false;
             attempt.failure = match result {
                 Ok(Some(found)) => {
                     if let Err(error) = state.store.save_weather(&found) {
@@ -405,6 +425,22 @@ mod tests {
         assert!(first_a != second_a && b != second_a);
         assert_eq!(attempt.number, second_a);
         assert!(attempt.busy);
+    }
+
+    #[test]
+    fn a_download_for_a_city_the_user_left_is_dropped() {
+        let mut attempt = WeatherAttempt::default();
+        let oslo = attempt.start("Oslo");
+        assert!(!attempt.finish(oslo, "Bergen"));
+        assert!(!attempt.busy);
+        assert!(attempt.started.is_none());
+
+        let oslo = attempt.start("Oslo");
+        assert!(!attempt.finish(oslo - 1, " oslo "));
+        assert!(attempt.busy);
+        assert!(attempt.finish(oslo, " oslo "));
+        assert!(!attempt.busy);
+        assert!(attempt.started.is_some());
     }
 
     #[test]
