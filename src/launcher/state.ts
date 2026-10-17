@@ -217,6 +217,9 @@ export function createLauncher(spotlight: () => boolean = () => false) {
    * alias, the alias itself.
    */
   function run(action: ResultAction, result?: SearchResult) {
+    // The user chose this action, by a click or a key; a waiting Enter
+    // would run a second one, or replace the dialog this one opens.
+    queued = undefined;
     // Usage ranking learns only from a result's main action.
     const resultId = result && result.actions[0] === action ? result.id : undefined;
     if (action.action.type === "setAlias") {
