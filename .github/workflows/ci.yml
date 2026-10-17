@@ -101,45 +101,6 @@ jobs:
   # change without a settings change. It runs even when a job fails, and
   # passes only when every job passed. A skipped job counts only for a
   # docs-only change; otherwise it fails, as a cancelled one does.
-  linux-bundles-trial:
-    name: Linux bundles (trial)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-      - name: Install Linux libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
-            libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev rpm
-      - run: rustup toolchain install
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
-      - run: bun install --frozen-lockfile
-      - run: bun scripts/set-version.ts 0.6.99
-      - run: bunx tauri build
-      - name: Collect like the release, then inspect
-        run: |
-          mkdir installers
-          find src-tauri/target -path '*/release/bundle/*' -type f \
-            \( -name '*.dmg' -o -name '*-setup.exe' -o -name '*-setup.exe.sig' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \
-            -o -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \) -exec cp {} installers/ \;
-          ls -la installers
-          test -f installers/TinyDash_0.6.99_amd64.deb
-          ls installers/*.rpm installers/*.AppImage
-          rpm -qpi installers/*.rpm | head -20
-          rpm -qpR installers/*.rpm
-          chmod +x installers/*.AppImage
-          cd installers && ./*.AppImage --appimage-extract >/dev/null
-          ls squashfs-root/usr/bin
-          ls squashfs-root/usr/lib | head -50
-
   required:
     name: Required checks
     if: always()
