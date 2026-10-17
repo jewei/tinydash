@@ -173,9 +173,22 @@ export function WidgetPane(props: {
     );
   };
 
+  const noteText = () => {
+    const note = loaded()?.note;
+    return note?.type === "ready" ? note.text : undefined;
+  };
+  const noteFailure = () => {
+    const note = loaded()?.note;
+    return note?.type === "unavailable" ? note.message : undefined;
+  };
+
   onMount(() => {
     const listeners = [
-      ipc.onLauncherShown(() => void refetch()),
+      ipc.onLauncherShown(() => {
+        // Each open starts on the pane, not on a view left open last time.
+        setJsonOpen(false);
+        void refetch();
+      }),
       ipc.onSettingsChanged(() => void refetch()),
       ipc.onWidgetsChanged(() => void refetch()),
     ];
@@ -218,13 +231,20 @@ export function WidgetPane(props: {
       <Show when={empty()}>
         <p class="widgets-empty">Copy a color, a Unix time, or JSON to see it here.</p>
       </Show>
-      {/* An empty note is still a note, so test its type, not its truth. */}
-      <Show when={typeof loaded()?.note === "string"}>
+      {/* An empty note is still a note, so test for text, not its truth. */}
+      <Show when={noteText() !== undefined}>
         <Notepad
-          initial={loaded()?.note ?? ""}
+          initial={noteText() ?? ""}
           field={(field) => (noteField = field)}
           onLeave={props.onLeave}
         />
+      </Show>
+      <Show when={noteFailure()}>
+        {(message) => (
+          <section class="widget notepad" aria-label="Notepad">
+            <p class="widget-note">Could not read the note. {message()}</p>
+          </section>
+        )}
       </Show>
       <Show when={jsonOpen() && json()}>
         {(content) => (
