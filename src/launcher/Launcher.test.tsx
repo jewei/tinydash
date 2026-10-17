@@ -1488,7 +1488,7 @@ describe("Launcher", () => {
     expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
   });
 
-  it("opens clipboard JSON in full, and Escape closes it before hiding", async () => {
+  it("opens clipboard JSON in full, and Escape or Mod+J closes it", async () => {
     const json = {
       id: "b2",
       content: {
@@ -1530,7 +1530,7 @@ describe("Launcher", () => {
       ],
     };
     const { backend, press } = setup(() => [], {
-      widgets: () => ({ ...noCards, clipCard: json }),
+      widgets: () => ({ ...noCards, note: "", clipCard: json }),
     });
     const card = await screen.findByRole("region", { name: "JSON on the clipboard" });
     expect(card.textContent).toContain("Object · 2 keys · depth 1 · 312 bytes");
@@ -1542,6 +1542,14 @@ describe("Launcher", () => {
     press("Escape");
     expect(screen.queryByRole("dialog", { name: "Clipboard JSON" })).toBeNull();
     expect(backend.called("hide_launcher")).toHaveLength(0);
+    // The view covers the note, so the note shows before it takes the keys.
+    press("Enter", { ctrlKey: true, shiftKey: true });
+    await screen.findByRole("dialog", { name: "Clipboard JSON" });
+    press("j", { ctrlKey: true, code: "KeyJ" });
+    expect(screen.queryByRole("dialog", { name: "Clipboard JSON" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Notepad" }));
+    fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
+
     press("Escape");
     await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
 

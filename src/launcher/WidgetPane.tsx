@@ -114,6 +114,8 @@ export function WidgetPane(props: {
   };
   props.controls({
     focusNote: () => {
+      // The JSON view covers the note, so typing would go to a hidden field.
+      if (noteField) setJsonOpen(false);
       noteField?.focus();
       return noteField !== undefined;
     },
