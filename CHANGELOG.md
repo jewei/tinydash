@@ -10,6 +10,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - On Linux, Flatpak and Snap apps no longer all match a search for "flatpak" or "env".
 - A calculation copied again within the same second moves to the top of the history.
+- After the computer changes its time zone, the clock widget and the weather's update time show the new local time without a restart of TinyDash.
 - In the Snippets tab, a keyword followed by text, such as `jira ABC-12` or `hi Sam`, now gives its result, as it does in All.
 - On Windows, a copy from an app that marks it for clipboard history is less likely to go missing from the history when another app reads the clipboard at the same moment.
 - Mod+J closes the full JSON view before it moves to the note, so you see what you type.

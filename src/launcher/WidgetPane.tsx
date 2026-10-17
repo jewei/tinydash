@@ -233,21 +233,20 @@ export function WidgetPane(props: {
   );
 }
 
-const localTime = hourMinute();
+// A formatter keeps the time zone it was made in, and the launcher page lives
+// until TinyDash quits, so local times get a new formatter each time they
+// render. That way they follow the OS time zone, as the cities' differences do.
+const localTime = (ms: number) => hourMinute().format(ms);
+const shortDate = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(
+    ms,
+  );
+const weekday = (ms: number) => new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(ms);
+const longDate = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year: "numeric" }).format(ms);
 // A city's time is UTC shifted by its offset, so a fixed offset such as
 // UTC+8 works too, which Intl cannot name.
 const shiftedTime = hourMinute("UTC");
-const shortDate = new Intl.DateTimeFormat(undefined, {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-});
-const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
-const longDate = new Intl.DateTimeFormat(undefined, {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
 
 function Clocks(props: { cities: CityClock[]; now: number }) {
   return (
@@ -256,17 +255,17 @@ function Clocks(props: { cities: CityClock[]; now: number }) {
         when={props.cities.length > 0}
         fallback={
           <div class="clock-alone">
-            <span class="clock-time large">{localTime.format(props.now)}</span>
+            <span class="clock-time large">{localTime(props.now)}</span>
             <span class="clock-day">
-              <strong>{weekday.format(props.now)}</strong>
-              <span>{longDate.format(props.now)}</span>
+              <strong>{weekday(props.now)}</strong>
+              <span>{longDate(props.now)}</span>
             </span>
           </div>
         }
       >
         <div class="clock-local">
-          <span class="clock-time">{localTime.format(props.now)}</span>
-          <span class="widget-note">{shortDate.format(props.now)}</span>
+          <span class="clock-time">{localTime(props.now)}</span>
+          <span class="widget-note">{shortDate(props.now)}</span>
         </div>
         <ul class="clock-cities">
           <For each={props.cities}>
