@@ -12,6 +12,7 @@ use std::{
     collections::HashMap,
     path::Path,
     sync::{Arc, LazyLock, Mutex},
+    time::SystemTime,
 };
 
 use tauri::{
@@ -21,8 +22,12 @@ use tauri::{
 
 use crate::{features::clipboard::Content, platform, state::State};
 
-/// Icons rendered so far, keyed by path and pixel size. Small PNGs; capped.
-type IconCache = HashMap<(String, u32), Arc<Vec<u8>>>;
+/// Icons rendered so far, keyed by path, pixel size, and the path's
+/// modification time. An update that replaces the whole app bundle changes
+/// that time, so the new icon renders. An update that writes inside the
+/// bundle does not, but AppKit keeps the old icon for it anyway, even
+/// after a restart or a LaunchServices registration. Small PNGs; capped.
+type IconCache = HashMap<(String, u32, Option<SystemTime>), Arc<Vec<u8>>>;
 static ICONS: LazyLock<Mutex<IconCache>> = LazyLock::new(Mutex::default);
 const ICON_CACHE_LIMIT: usize = 512;
 
@@ -42,22 +47,36 @@ pub fn serve_icon(
         .unwrap_or(64)
         .clamp(16, 256);
     tauri::async_runtime::spawn_blocking(move || {
-        let key = (path, size);
-        let cached = icons().get(&key).cloned();
-        let png = cached.or_else(|| {
-            let png = Arc::new(platform::app_icon(Path::new(&key.0), size)?);
-            let mut icons = icons();
-            if icons.len() >= ICON_CACHE_LIMIT {
-                icons.clear();
-            }
-            icons.insert(key, png.clone());
-            Some(png)
-        });
+        let png = cached_icon(&ICONS, path, size, platform::app_icon);
         responder.respond(match png {
             Some(png) => image_response(Vec::clone(&png)),
             None => not_found(),
         });
     });
+}
+
+/// The icon of `path` from `cache`, rendered with `render` when the cache
+/// has none for the file as it is now.
+fn cached_icon(
+    cache: &Mutex<IconCache>,
+    path: String,
+    size: u32,
+    render: impl FnOnce(&Path, u32) -> Option<Vec<u8>>,
+) -> Option<Arc<Vec<u8>>> {
+    let modified = std::fs::metadata(&path)
+        .and_then(|metadata| metadata.modified())
+        .ok();
+    let key = (path, size, modified);
+    let cached = lock(cache).get(&key).cloned();
+    cached.or_else(|| {
+        let png = Arc::new(render(Path::new(&key.0), size)?);
+        let mut icons = lock(cache);
+        if icons.len() >= ICON_CACHE_LIMIT {
+            icons.clear();
+        }
+        icons.insert(key, png.clone());
+        Some(png)
+    })
 }
 
 pub fn serve_clipboard_image(
@@ -78,8 +97,8 @@ pub fn serve_clipboard_image(
     });
 }
 
-fn icons() -> std::sync::MutexGuard<'static, IconCache> {
-    ICONS.lock().unwrap_or_else(|e| e.into_inner())
+fn lock(cache: &Mutex<IconCache>) -> std::sync::MutexGuard<'_, IconCache> {
+    cache.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn decoded_path(request: &Request<Vec<u8>>) -> Option<String> {
@@ -90,9 +109,10 @@ fn decoded_path(request: &Request<Vec<u8>>) -> Option<String> {
     (!decoded.is_empty()).then(|| Cow::into_owned(decoded))
 }
 
-/// An icon: the same for an hour, so the webview may keep it.
+/// An icon: the webview asks again each time, because the URL stays the
+/// same when an app update changes the icon. The icon cache makes that cheap.
 fn image_response(png: Vec<u8>) -> Response<Vec<u8>> {
-    png_response(png, "max-age=3600")
+    png_response(png, "no-cache")
 }
 
 /// A copied image, which may be private: the webview must not keep it on
@@ -121,7 +141,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn copied_images_are_never_cached_but_icons_are() {
+    fn copied_images_are_never_kept_and_icons_are_checked_again() {
         let cache = |response: Response<Vec<u8>>| {
             response.headers()[header::CACHE_CONTROL]
                 .to_str()
@@ -129,6 +149,31 @@ mod tests {
                 .to_owned()
         };
         assert_eq!(cache(clip_response(vec![1])), "no-store");
-        assert_eq!(cache(image_response(vec![1])), "max-age=3600");
+        assert_eq!(cache(image_response(vec![1])), "no-cache");
+    }
+
+    #[test]
+    fn an_icon_renders_again_after_its_file_changes() {
+        let path = std::env::temp_dir().join(format!("tinydash-icon-{}", std::process::id()));
+        std::fs::write(&path, "old").unwrap();
+        let cache = Mutex::default();
+        let renders = std::cell::Cell::new(0u8);
+        let icon = || {
+            cached_icon(&cache, path.to_string_lossy().into_owned(), 64, |_, _| {
+                renders.set(renders.get() + 1);
+                Some(vec![renders.get()])
+            })
+            .unwrap()
+        };
+
+        assert_eq!(*icon(), vec![1]);
+        assert_eq!(*icon(), vec![1], "the second request comes from the cache");
+
+        let file = std::fs::File::options().write(true).open(&path).unwrap();
+        file.set_modified(SystemTime::now() + std::time::Duration::from_secs(60))
+            .unwrap();
+        assert_eq!(*icon(), vec![2], "the changed file renders again");
+
+        std::fs::remove_file(&path).unwrap();
     }
 }

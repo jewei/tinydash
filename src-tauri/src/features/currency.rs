@@ -33,8 +33,10 @@ impl Rates {
         self.rates.get(code).copied()
     }
 
+    /// Rates saved in the future came from a clock that was ahead; refetch
+    /// them, or they would stay fresh until the clock catches up.
     pub fn is_stale(&self, now: i64) -> bool {
-        now - self.fetched_at >= MAX_AGE_SECONDS
+        now < self.fetched_at || now - self.fetched_at >= MAX_AGE_SECONDS
     }
 
     /// Parse and check a Frankfurter `latest` response.
@@ -95,6 +97,7 @@ mod tests {
         assert_eq!(rates.per_euro("XYZ"), None);
         assert!(!rates.is_stale(MAX_AGE_SECONDS - 1));
         assert!(rates.is_stale(MAX_AGE_SECONDS));
+        assert!(rates.is_stale(-1), "rates from a clock that was ahead");
         for bad in [
             r#"{"base":"USD","date":"2026-10-02","rates":{"EUR":1.0}}"#,
             r#"{"base":"EUR","date":"yesterday","rates":{"USD":1.0}}"#,
