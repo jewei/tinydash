@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- A hidden result no longer makes a search list shorter. The next result takes its place.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
