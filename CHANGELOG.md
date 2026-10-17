@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- On macOS, Apps finds Keychain Access, Archive Utility, and the other Apple utilities in `/System/Library/CoreServices/Applications`.
 - The calculator no longer shows wrong answers for `floor`, `ceil`, or `round` of numbers above 2^53 (about 9 quadrillion), or for `sinh` and `cosh` results above 2^64. It now shows no answer for these. It also shows no answer for some correct rounding results with 14 or more digits, such as `round(10000) to binary`.
 - A snippet or quicklink cannot take a keyword that another one already uses, so a keyword no longer stops working without a warning.
 - A quicklink keyword that is also a web keyword, such as `w`, now comes before the web search. So does the keyword of a snippet with `{query}`.

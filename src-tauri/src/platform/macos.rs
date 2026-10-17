@@ -77,6 +77,8 @@ pub fn app_folders() -> Vec<PathBuf> {
     let mut folders = vec![
         PathBuf::from("/Applications"),
         PathBuf::from("/System/Applications"),
+        // Keychain Access, Archive Utility, and other Apple utilities.
+        PathBuf::from("/System/Library/CoreServices/Applications"),
     ];
     if let Some(home) = std::env::home_dir() {
         folders.push(home.join("Applications"));
@@ -865,6 +867,12 @@ mod tests {
         let png = app_icon(Path::new(&finder.path), 64).expect("icon");
         assert_eq!(&png[1..4], b"PNG");
         assert!(!apps.iter().any(|app| app.path.contains("/Contents/")));
+    }
+
+    #[test]
+    fn finds_apps_in_core_services() {
+        let apps = discover_apps();
+        assert!(apps.iter().any(|app| app.name == "Archive Utility"));
     }
 
     #[test]
