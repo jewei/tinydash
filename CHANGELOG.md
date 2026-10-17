@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- Date math accepts a minus sign next to its number, as in `today -3 days` or `today-3d`, as it already did for a plus sign.
 - Clicking Clear History while the actions menu is open now puts focus on Cancel in the confirm dialog, so Enter and screen readers work there.
 - In Settings > Search, Show Again on a hidden result keeps keyboard focus in the list, on the next result.
 - Clipboard history skips an image over 16 megapixels before it decodes it, so copying a very large image uses much less memory.
