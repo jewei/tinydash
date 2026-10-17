@@ -51,8 +51,10 @@ impl Weather {
         self.city.to_lowercase() == city.trim().to_lowercase()
     }
 
+    /// Weather saved in the future came from a clock that was ahead; refetch
+    /// it, or it would stay fresh until the clock catches up.
     pub fn is_stale(&self, now: i64) -> bool {
-        now - self.fetched_at >= MAX_AGE_SECONDS
+        now < self.fetched_at || now - self.fetched_at >= MAX_AGE_SECONDS
     }
 }
 
@@ -305,6 +307,7 @@ mod tests {
         assert_eq!(weather.rain_chance, Some(40));
         assert!(!weather.is_stale(100 + MAX_AGE_SECONDS - 1));
         assert!(weather.is_stale(100 + MAX_AGE_SECONDS));
+        assert!(weather.is_stale(99), "weather from a clock that was ahead");
 
         let missing_day = FORECAST_JSON.replace("[33.2]", "[]");
         assert!(parse_forecast(missing_day.as_bytes(), "x", "X".into(), 0).is_err());
