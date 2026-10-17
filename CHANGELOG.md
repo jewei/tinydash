@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- A Unix time now says "1 hour ago" or "In 1 year" instead of "60 minutes ago" or "In 12 months" when it is close to the next unit.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
