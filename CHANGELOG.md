@@ -6,7 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
-- A hidden result can no longer be pinned, so no invisible pin takes one of the pin places. Show the result again in Settings > Search to pin it.
+- A hidden result can no longer be pinned, and a pin left on a hidden result gives up its place when the pin list is full. Show the result again in Settings > Search to pin it.
 - Hide works only on a result that still exists, so a deleted snippet or quicklink no longer stays in the hidden list in Settings.
 
 ## [0.6.1] - 2026-10-17

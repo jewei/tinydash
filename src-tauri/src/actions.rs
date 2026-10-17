@@ -388,7 +388,8 @@ fn open_path(path: &Path) -> Result<()> {
 /// while history is off) waits for its item to return, but it cannot be
 /// unpinned, so it gives up its place when the list is full. That way no
 /// more than `MAX_PINS` pins ever show. Until a source is `ready`, its pins
-/// only look hidden, so they stay.
+/// only look hidden, so they stay. A pin of an item the user hid shows in
+/// no list either; one can remain from before Pin refused hidden items.
 fn pin_to_drop(
     snapshot: &Snapshot,
     id: &str,
@@ -401,7 +402,10 @@ fn pin_to_drop(
     let ctx = Context::none();
     let known = |pin: &str| Source::parse(pin).is_none_or(|(source, _)| ready(source));
     pins.iter()
-        .find(|pin| known(pin) && search::resolve(snapshot, &ctx, pin).is_none())
+        .find(|pin| {
+            snapshot.hidden.contains(pin)
+                || (known(pin) && search::resolve(snapshot, &ctx, pin).is_none())
+        })
         .map(|pin| Some(pin.clone()))
         .ok_or_else(|| Error::msg(format!("You can pin up to {MAX_PINS} items.")))
 }
@@ -423,7 +427,10 @@ fn record_use(state: &State, id: &str) {
 mod tests {
     use super::*;
     use crate::{
-        search::{Category, usage::Pins},
+        search::{
+            Category,
+            usage::{Hidden, Pins},
+        },
         settings::Settings,
     };
 
@@ -474,6 +481,13 @@ mod tests {
         // Before the first scan, the file pin may only look hidden.
         assert_eq!(drop_with(pins, false).unwrap().as_deref(), Some("clip:7"));
         assert!(drop_with(emoji.clone(), true).is_err());
+        // A pin made before its item was hidden shows in no list.
+        state.hidden.set(Hidden::new([emoji[3].clone()]));
+        assert_eq!(
+            drop_with(emoji.clone(), true).unwrap().as_deref(),
+            Some(emoji[3].as_str())
+        );
+        state.hidden.set(Hidden::default());
         // A second Pin of a pinned item changes nothing.
         state.pins.set(Pins::new(emoji.clone()));
         assert_eq!(
