@@ -38,6 +38,7 @@ pub const PACKAGE_EXTENSIONS: &[&str] = &[];
 pub const SELF_UPDATE: bool = true;
 pub const RICH_CLIPBOARD: bool = true;
 pub const NATIVE_ICONS: bool = false;
+pub const PHYSICAL_PLACEMENT: bool = true;
 /// ReadDirectoryChangesW watches a whole tree with one handle.
 pub const RECURSIVE_WATCH: bool = true;
 pub const TEMPLATE_TRAY_ICON: bool = false;
