@@ -199,48 +199,8 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
                 return Err(error);
             }
         }
-        Action::Pin { id } => {
-            let _limit = state
-                .limited_change
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            // Only items that exist can be pinned, and the pin stores the
-            // item's own ID, so a pin never widens what Open and Reveal accept.
-            // Read readiness first: a scan that finishes after the snapshot
-            // must not make its old, empty index count as ready.
-            let ready = state.freshness.ready();
-            let snapshot = state.snapshot();
-            let id = search::resolve(&snapshot, &Context::none(), &id)
-                .ok_or_else(|| Error::msg("This item no longer exists."))?
-                .id;
-            if let Some(oldest) = pin_to_drop(&snapshot, &id, ready)? {
-                state.store.set_pinned(&oldest, false)?;
-                state.pins.update(|pins| pins.remove(&oldest));
-            }
-            state.store.set_pinned(&id, true)?;
-            state.pins.update(|pins| pins.add(&id));
-        }
-        Action::Hide { id } => {
-            let _limit = state
-                .limited_change
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            if !Source::parse(&id).is_some_and(|(source, _)| source.hideable()) {
-                return Err(Error::msg("This result cannot be hidden."));
-            }
-            if state.hidden.get().len() >= MAX_HIDDEN {
-                return Err(Error::msg(format!(
-                    "You can hide up to {MAX_HIDDEN} results. Show some again in Settings > Search."
-                )));
-            }
-            state
-                .store
-                .set_hidden(&id, true, chrono::Utc::now().timestamp())?;
-            state.hidden.update(|hidden| hidden.add(&id));
-            // A hidden pin would hold a place in the list no one can see.
-            state.store.set_pinned(&id, false)?;
-            state.pins.update(|pins| pins.remove(&id));
-        }
+        Action::Pin { id } => pin(&state, &id)?,
+        Action::Hide { id } => hide(&state, &id)?,
         Action::SetAlias { id, alias } => set_alias(&state, &id, &alias)?,
         Action::Unpin { id } => {
             state.store.set_pinned(&id, false)?;
@@ -268,6 +228,64 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
     } else {
         events::results_stale(app);
     }
+    Ok(())
+}
+
+/// Pin an item that exists and is not hidden. The pin stores the item's
+/// own ID, so a pin never widens what Open and Reveal accept.
+fn pin(state: &State, id: &str) -> Result<()> {
+    let _limit = state
+        .limited_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    // Read readiness first: a scan that finishes after the snapshot
+    // must not make its old, empty index count as ready.
+    let ready = state.freshness.ready();
+    let snapshot = state.snapshot();
+    let id = search::resolve(&snapshot, &Context::none(), id)
+        .ok_or_else(|| Error::msg("This item no longer exists."))?
+        .id;
+    // A hidden pin would hold a place in the list no one can see.
+    if snapshot.hidden.contains(&id) {
+        return Err(Error::msg(
+            "This item is hidden. Show it again in Settings > Search, then pin it.",
+        ));
+    }
+    if let Some(oldest) = pin_to_drop(&snapshot, &id, ready)? {
+        state.store.set_pinned(&oldest, false)?;
+        state.pins.update(|pins| pins.remove(&oldest));
+    }
+    state.store.set_pinned(&id, true)?;
+    state.pins.update(|pins| pins.add(&id));
+    Ok(())
+}
+
+/// Hide an item that exists, under its own ID, as a pin does. A row for a
+/// deleted item would stay in Settings and count toward the limit.
+fn hide(state: &State, id: &str) -> Result<()> {
+    let _limit = state
+        .limited_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if !Source::parse(id).is_some_and(|(source, _)| source.hideable()) {
+        return Err(Error::msg("This result cannot be hidden."));
+    }
+    let snapshot = state.snapshot();
+    let id = search::resolve(&snapshot, &Context::none(), id)
+        .ok_or_else(|| Error::msg("This item no longer exists."))?
+        .id;
+    if snapshot.hidden.len() >= MAX_HIDDEN {
+        return Err(Error::msg(format!(
+            "You can hide up to {MAX_HIDDEN} results. Show some again in Settings > Search."
+        )));
+    }
+    state
+        .store
+        .set_hidden(&id, true, chrono::Utc::now().timestamp())?;
+    state.hidden.update(|hidden| hidden.add(&id));
+    // A hidden pin would hold a place in the list no one can see.
+    state.store.set_pinned(&id, false)?;
+    state.pins.update(|pins| pins.remove(&id));
     Ok(())
 }
 
@@ -462,6 +480,25 @@ mod tests {
             pin_to_drop(&state.snapshot(), &emoji[5], |_| true).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn only_existing_items_are_hidden_and_hidden_ones_are_not_pinned() {
+        let state = State::for_tests(Settings::default());
+        let lock = "system:lock";
+        pin(&state, lock).unwrap();
+        hide(&state, lock).unwrap();
+        assert!(state.hidden.get().contains(lock));
+        assert!(!state.pins.get().contains(lock));
+        let hidden = pin(&state, lock).unwrap_err();
+        assert!(hidden.to_string().contains("hidden"), "{hidden}");
+        assert!(!state.pins.get().contains(lock));
+        assert!(state.store.pins().unwrap().ids().is_empty());
+
+        assert!(hide(&state, "system:gone").is_err());
+        assert!(hide(&state, "snippet:99").is_err());
+        assert_eq!(state.store.hidden().unwrap(), [lock]);
+        assert_eq!(state.hidden.get().len(), 1);
     }
 
     #[test]
