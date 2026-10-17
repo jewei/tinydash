@@ -14,7 +14,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. On
 | Mod+Enter       | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
 | Mod+1 … Mod+9   | Run the main action of that row                                                                                                |
 | Mod+K           | All actions for the result, plus Refresh, Center Launcher, Settings, and Quit                                                  |
-| Mod+Backspace   | Delete the selected clipboard entry                                                                                            |
+| Mod+Backspace   | Delete the selected clipboard entry or calculator history entry                                                                |
 | Tab / Shift+Tab | Next / previous category                                                                                                       |
 | Mod+,           | Open Settings                                                                                                                  |
 | Mod+J           | Edit the widget pane's note, and back                                                                                          |

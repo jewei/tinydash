@@ -45,13 +45,13 @@ When data changes, Rust emits `results:stale` and the launcher searches again, k
 ## Storage
 
 - **Settings:** `settings.json` in the app config folder (`settings.rs`). Missing fields take defaults. A value this version cannot read, such as one from a newer version, takes its default; a list loses only the entries it cannot read. The file is copied to `settings.invalid.json`, because the next save writes the defaults over those values, and the launcher warning names those fields. A damaged file (bad JSON, not a JSON object, or not UTF-8) is renamed to `settings.invalid.json` and defaults are used; if the rename fails, saves are refused until the next launch. A file that cannot be read for another reason, such as a lock, stays in place: defaults are used, and saves are refused until the next launch.
-- **Data:** `tinydash.db`, SQLite in the app's local data folder (`store.rs`; on Windows `%LOCALAPPDATA%`, so roaming profiles do not copy it). Tables: `usage` (the 1,000 most recently used IDs), `pins`, `clipboard`, `library`, `note` (the scratch note), `hidden` (results the user hid), `cache` (exchange rates and the weather). The file is owner-only on Unix and uses `secure_delete`. Migrations are append-only and refuse a database from a newer version.
+- **Data:** `tinydash.db`, SQLite in the app's local data folder (`store.rs`; on Windows `%LOCALAPPDATA%`, so roaming profiles do not copy it). Tables: `usage` (the 1,000 most recently used IDs), `pins`, `clipboard`, `library`, `note` (the scratch note), `hidden` (results the user hid), `aliases` (an alias for each result), `calculations` (the calculator history), `cache` (exchange rates and the weather). The file is owner-only on Unix and uses `secure_delete`. Migrations are append-only and refuse a database from a newer version.
 
 ## IPC contract
 
 Every command is listed in `lib.rs` and defined in `commands.rs`. Types that cross IPC derive `ts_rs::TS`; `cargo test` writes them to `src/generated`, and CI fails if they are stale. `src/lib/ipc.ts` is the only frontend module that calls `invoke` or `listen`.
 
-Events: `launcher:shown` (reset the query, optional category), `results:stale` (search again), `settings:changed` (apply theme and settings in every window), `update:changed` (the newer version an update check found, or none), `widgets:changed` (a widget changed on its own, such as the focus timer; the widget pane loads again). An event sent before a page listens is lost, so `launcher_init` also returns the category of the latest show, for example `--mode clipboard` at startup, and the update found so far; `about` also returns that update, for the Settings window.
+Events: `launcher:shown` (reset the query, optional category), `results:stale` (search again), `settings:changed` (apply theme and settings in every window), `update:changed` (the newer version an update check found, or none), `widgets:changed` (a widget changed on its own, such as the focus timer; the widget pane loads again), `hud:show` (the HUD window shows a short message, such as "Copied"). An event sent before a page listens is lost, so `launcher_init` also returns the category of the latest show, for example `--mode clipboard` at startup, and the update found so far; `about` also returns that update, for the Settings window.
 
 Images use custom protocols rather than IPC: `icon://` serves system icons (macOS; it returns only an icon image, never file contents) and `clip://` serves saved clipboard images by ID.
 
@@ -68,7 +68,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 ## Security
 
-- Both windows load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
+- All three windows (launcher, Settings, and the HUD) load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
 - External programs run only with fixed arguments; user text never reaches a shell.
 - Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Clipboard cards read the text when the widget pane loads, skip marked secrets the same way, and keep nothing. Network requests: the ECB rate table (when currency rates are on, which they are not by default), the weather (when the widget is on: the city name to Open-Meteo's geocoding service, then its coordinates to the forecast service), and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
