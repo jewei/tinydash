@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- In Settings > Search, Show Again on a hidden result keeps keyboard focus in the list, on the next result.
 - Clipboard history skips an image over 16 megapixels before it decodes it, so copying a very large image uses much less memory.
 - A setting saved by a newer version, such as a new search engine or emoji language, no longer resets all your settings in an older version. TinyDash skips only the values it cannot read and uses defaults for them, the launcher names the settings that had such values, and a copy of the old file is kept.
 - Changing the weather city and then back again quickly no longer shows the weather of the other city, or leaves the widget loading.
