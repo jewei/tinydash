@@ -168,7 +168,11 @@ export function WidgetPane(props: {
 
   onMount(() => {
     const listeners = [
-      ipc.onLauncherShown(() => void refetch()),
+      ipc.onLauncherShown(() => {
+        // Each open starts on the pane, not on a view left open last time.
+        setJsonOpen(false);
+        void refetch();
+      }),
       ipc.onSettingsChanged(() => void refetch()),
       ipc.onWidgetsChanged(() => void refetch()),
     ];
