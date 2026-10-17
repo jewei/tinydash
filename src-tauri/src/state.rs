@@ -22,7 +22,7 @@ use crate::{
         Category, Snapshot,
         usage::{Aliases, Hidden, Pins, Usage},
     },
-    settings::Settings,
+    settings::{Settings, SettingsFile},
     shared::Shared,
     store::Store,
     timer::FocusClock,
@@ -39,6 +39,7 @@ pub struct Dirs {
 /// [`Shared`] snapshots: background work builds a new value and swaps it in.
 pub struct State {
     pub settings: Shared<Settings>,
+    pub settings_file: SettingsFile,
     pub store: Store,
     pub apps: Shared<AppIndex>,
     pub files: Shared<FileIndex>,
@@ -76,7 +77,13 @@ pub struct State {
 
 impl State {
     /// Load saved data. A broken database part is reported, not fatal.
-    pub fn new(settings: Settings, store: Store, dirs: Dirs, mut warnings: Vec<String>) -> Self {
+    pub fn new(
+        settings: Settings,
+        settings_file: SettingsFile,
+        store: Store,
+        dirs: Dirs,
+        mut warnings: Vec<String>,
+    ) -> Self {
         let mut load = |what: &str, error: crate::error::Error| {
             warnings.push(format!("Could not load {what}: {error}"));
         };
@@ -143,6 +150,7 @@ impl State {
             weather: Shared::new(weather),
             freshness: Freshness::default(),
             dirs,
+            settings_file,
             settings_change: Mutex::new(()),
             reloading: Mutex::new(()),
             limited_change: Mutex::new(()),
@@ -214,7 +222,13 @@ impl State {
             data: PathBuf::new(),
             home: PathBuf::new(),
         };
-        Self::new(settings, Store::in_memory(), dirs, Vec::new())
+        Self::new(
+            settings,
+            SettingsFile::new(PathBuf::new()),
+            Store::in_memory(),
+            dirs,
+            Vec::new(),
+        )
     }
 
     pub fn warn(&self, message: impl Into<String>) {
