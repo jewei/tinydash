@@ -209,16 +209,20 @@ fn find(snapshot: &Snapshot, query: &str, category: Category) -> Vec<SearchResul
     let matcher = &mut Matcher::new(query);
     let ctx = &context;
     let s = snapshot;
+    // Each source cuts its own list, so it keeps room for the hidden
+    // results that are left out after it.
+    let limit = CATEGORY_LIMIT + s.hidden.len();
     let mut scored = match category {
         Category::All => return all(snapshot, ctx, query, matcher),
-        Category::Apps => s.apps.search(matcher, ctx, CATEGORY_LIMIT),
-        Category::Files => s.files.search(matcher, ctx, CATEGORY_LIMIT),
-        Category::Clipboard => s.clipboard.search(matcher, ctx, CATEGORY_LIMIT),
-        Category::Snippets => s.library.search(matcher, ctx, CATEGORY_LIMIT),
-        Category::Emoji => s.emoji.search(matcher, ctx, CATEGORY_LIMIT),
+        Category::Apps => s.apps.search(matcher, ctx, limit),
+        Category::Files => s.files.search(matcher, ctx, limit),
+        Category::Clipboard => s.clipboard.search(matcher, ctx, limit),
+        Category::Snippets => s.library.search(matcher, ctx, limit),
+        Category::Emoji => s.emoji.search(matcher, ctx, limit),
         Category::System => system::search(matcher, ctx),
     };
     scored.extend(alias_hits(s, ctx, matcher, category));
+    scored.retain(|hit| !s.hidden.contains(&hit.result.id));
     // A keyword with text, such as `jira ABC-12`, answers here as in All.
     // It has its item's own ID, so it takes the place of the name match.
     let answer = match category {
@@ -284,6 +288,7 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
             .into_iter()
             .filter(|id| {
                 !ctx.pinned(id)
+                    && !s.hidden.contains(id)
                     && Source::parse(id).is_some_and(|(source, _)| {
                         source.suggestible() && s.settings.in_all(source.category())
                     })
@@ -296,16 +301,22 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
             .usage
             .ranked(ctx.now)
             .into_iter()
-            .filter(|id| Source::parse(id).is_some_and(|(source, _)| source == Source::File))
+            .filter(|id| {
+                !s.hidden.contains(id)
+                    && Source::parse(id).is_some_and(|(source, _)| source == Source::File)
+            })
             .filter_map(|id| resolve(s, ctx, id))
             .take(CATEGORY_LIMIT)
             .collect(),
         Category::Clipboard => s.clipboard.browse(ctx),
         Category::Snippets => s.library.browse(ctx),
-        Category::Emoji => s.emoji.browse(ctx),
+        // The catalog is too long to list whole, so it keeps room for the
+        // hidden emoji that the filter below removes.
+        Category::Emoji => s.emoji.browse(ctx, CATEGORY_LIMIT + s.hidden.len()),
         Category::System => system::browse(ctx),
     };
     results.extend(rest.into_iter().filter(|result| !result.pinned));
+    results.retain(|result| !s.hidden.contains(&result.id));
     results.truncate(CATEGORY_LIMIT);
     results
 }
@@ -349,6 +360,7 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         alias_hits(s, ctx, matcher, Category::All)
             .into_iter()
             .partition(|hit| hit.score >= EXACT_ALIAS);
+    let limit = ALL_LIMIT + s.hidden.len();
     // A source the user keeps out of All is not searched at all.
     let mut source = |category, search: &mut dyn FnMut() -> Vec<Scored>| {
         s.settings.in_all(category).then(|| {
@@ -361,22 +373,16 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     };
     let sources = [
         Some(exact),
-        source(Category::Apps, &mut || {
-            s.apps.search(matcher, ctx, ALL_LIMIT)
-        }),
+        source(Category::Apps, &mut || s.apps.search(matcher, ctx, limit)),
         source(Category::System, &mut || system::search(matcher, ctx)),
         source(Category::Snippets, &mut || {
-            s.library.search(matcher, ctx, ALL_LIMIT)
+            s.library.search(matcher, ctx, limit)
         }),
-        source(Category::Files, &mut || {
-            s.files.search(matcher, ctx, ALL_LIMIT)
-        }),
+        source(Category::Files, &mut || s.files.search(matcher, ctx, limit)),
         source(Category::Clipboard, &mut || {
-            s.clipboard.search(matcher, ctx, ALL_LIMIT)
+            s.clipboard.search(matcher, ctx, limit)
         }),
-        source(Category::Emoji, &mut || {
-            s.emoji.search(matcher, ctx, ALL_LIMIT)
-        }),
+        source(Category::Emoji, &mut || s.emoji.search(matcher, ctx, limit)),
     ];
     let mut ranked: Vec<(usize, Scored)> = sources
         .into_iter()
@@ -393,7 +399,7 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     let ranked: Vec<SearchResult> = ranked
         .into_iter()
         .map(|(_, hit)| hit.result)
-        .filter(|result| seen.insert(result.id.clone()))
+        .filter(|result| !s.hidden.contains(&result.id) && seen.insert(result.id.clone()))
         .collect();
     // Quicklinks that can open the query, unless the user already chose a
     // keyword, such as `g` or a quicklink's own, or keeps snippets out of
@@ -826,6 +832,46 @@ mod tests {
         let titles: Vec<&str> = results.iter().map(|r| r.title.as_str()).collect();
         assert!(titles.contains(&"A Wiki"), "{titles:?}");
         assert!(!titles.contains(&"A Wiki: a"));
+    }
+
+    #[test]
+    fn a_hidden_result_leaves_its_slot_to_the_next_one() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let ids = |query, category| -> Vec<String> {
+            search(&state.snapshot(), query, category)
+                .into_iter()
+                .map(|result| result.id)
+                .collect()
+        };
+        let before = ids("a", Category::All);
+        assert_eq!(before.len(), ALL_LIMIT);
+        state.hidden.set(Hidden::new([before[0].clone()]));
+        let after = ids("a", Category::All);
+        assert_eq!(after.len(), ALL_LIMIT, "{after:?}");
+        assert!(!after.contains(&before[0]));
+        assert!(after.contains(&before[ALL_LIMIT - 2]));
+
+        // Hiding every row the user can hide makes each source reach past
+        // its first `ALL_LIMIT` matches to fill the list again.
+        let hideable: Vec<String> = before
+            .iter()
+            .filter(|id| Source::parse(id).is_some_and(|(source, _)| source.hideable()))
+            .cloned()
+            .collect();
+        state.hidden.set(Hidden::new(hideable.iter().cloned()));
+        let after = ids("a", Category::All);
+        assert_eq!(after.len(), ALL_LIMIT, "{after:?}");
+        assert!(after.iter().all(|id| !hideable.contains(id)));
+
+        // The emoji search and the empty Emoji tab each cut a long list.
+        for query in ["a", ""] {
+            let shown = ids(query, Category::Emoji);
+            assert_eq!(shown.len(), CATEGORY_LIMIT);
+            state.hidden.set(Hidden::new([shown[0].clone()]));
+            let after = ids(query, Category::Emoji);
+            assert_eq!(after.len(), CATEGORY_LIMIT, "{query:?}");
+            assert!(!after.contains(&shown[0]));
+        }
     }
 
     #[test]

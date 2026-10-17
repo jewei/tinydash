@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::search::{
-    CATEGORY_LIMIT, Context,
+    Context,
     id::Source,
     matcher::{KEYWORD_PENALTY, Matcher},
     result::{Action, Icon, ResultAction, ResultKind, Scored, SearchResult},
@@ -127,7 +127,7 @@ impl EmojiIndex {
     }
 
     /// Most used first, then catalog order.
-    pub fn browse(&self, ctx: &Context) -> Vec<SearchResult> {
+    pub fn browse(&self, ctx: &Context, limit: usize) -> Vec<SearchResult> {
         let mut used: Vec<_> = self
             .entries
             .iter()
@@ -140,7 +140,7 @@ impl EmojiIndex {
             .filter(|entry| ctx.boost(&id(entry.emoji)) == 0);
         used.into_iter()
             .chain(rest)
-            .take(CATEGORY_LIMIT)
+            .take(limit)
             .map(|entry| result(entry.emoji, ctx))
             .collect()
     }

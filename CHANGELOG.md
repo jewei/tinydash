@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
+- A hidden result no longer makes a list of results shorter, in a search or on an empty tab. The next result takes its place.
 - On macOS, after an update replaces an app and changes its icon, the launcher shows the new icon without a restart of TinyDash. Updates that change files inside the app, such as some installer packages, can still show the old icon, because macOS keeps it.
 - Exchange rates and the weather saved while the computer clock was set ahead now update once the clock is correct.
 - On Linux, TinyDash now notices newly installed apps when `XDG_DATA_DIRS` or `XDG_DATA_HOME` is set but empty.
