@@ -473,18 +473,25 @@ fn relative(seconds: i64) -> String {
     if distance < 45 {
         return "Just now".into();
     }
+    // Each unit with how many of it make the next one, so that rounding
+    // up to `60 minutes` shows `1 hour` instead.
     let units = [
-        (365 * 86_400, "year"),
-        (30 * 86_400, "month"),
-        (86_400, "day"),
-        (3_600, "hour"),
-        (60, "minute"),
+        (60, "minute", 60),
+        (3_600, "hour", 24),
+        (86_400, "day", 30),
+        (30 * 86_400, "month", 12),
+        (365 * 86_400, "year", u64::MAX),
     ];
-    let (size, name) = units
-        .into_iter()
-        .find(|(size, _)| distance >= *size)
-        .unwrap_or((60, "minute"));
-    let count = (distance + size / 2) / size;
+    let mut index = units
+        .iter()
+        .rposition(|(size, _, _)| distance >= *size)
+        .unwrap_or(0);
+    let round = |size: u64| (distance + size / 2) / size;
+    while round(units[index].0) >= units[index].2 {
+        index += 1;
+    }
+    let (size, name, _) = units[index];
+    let count = round(size);
     let amount = format!("{count} {name}{}", if count == 1 { "" } else { "s" });
     if seconds < 0 {
         format!("{amount} ago")
@@ -831,6 +838,11 @@ mod tests {
         assert_eq!(relative(30), "Just now");
         assert_eq!(relative(2 * 3600), "In 2 hours");
         assert_eq!(relative(-86_400), "1 day ago");
+        assert_eq!(relative(3_590), "In 1 hour");
+        assert_eq!(relative(-(23 * 3_600 + 40 * 60)), "1 day ago");
+        assert_eq!(relative(29 * 86_400 + 13 * 3_600), "In 1 month");
+        assert_eq!(relative(-355 * 86_400), "1 year ago");
+        assert_eq!(relative(59 * 60), "In 59 minutes");
     }
 
     #[test]

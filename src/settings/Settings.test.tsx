@@ -158,6 +158,19 @@ describe("Settings", () => {
     expect((field as HTMLInputElement).value).toBe("Atlantis");
   });
 
+  it("says when a clock city is already in the list in another case", async () => {
+    const backend = fakeBackend({
+      get_settings: () => ({ ...testSettings, clockCities: ["Tokyo"] }),
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    const field = await screen.findByRole("textbox", { name: "City to add" });
+    fireEvent.input(field, { target: { value: "tokyo" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(screen.getByText("“tokyo” is already in the list.")).toBeTruthy();
+    expect(backend.called("update_settings")).toHaveLength(0);
+  });
+
   it("saves the focus timer lengths within their limits", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);
@@ -387,12 +400,17 @@ describe("Settings", () => {
     render(() => <Settings />);
     const center = (await screen.findByRole("button", { name: "Center" })) as HTMLButtonElement;
     expect(screen.getByText("Opens where you last dragged it.")).toBeTruthy();
+    center.focus();
     fireEvent.click(center);
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
     expect(backend.called("update_settings")[0]?.args).toEqual({
       changes: { launcherPosition: null },
     });
-    await waitFor(() => expect(center.disabled).toBe(true));
+    await waitFor(() => expect(center.getAttribute("aria-disabled")).toBe("true"));
+    expect(document.activeElement).toBe(center);
+    fireEvent.click(center);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("update_settings")).toHaveLength(1);
   });
 
   it("keeps a tab's results out of All, but never hides it too", async () => {

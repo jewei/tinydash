@@ -207,3 +207,18 @@ fn open(app: &AppHandle, launch: Launch, already_running: bool) {
         tracing::warn!(%error, "Could not open a window");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_webview_may_only_listen_to_events() {
+        // Only Rust emits events; a webview that could emit them could fake
+        // `settings:changed` or `launcher:shown` for the other windows.
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
+        assert_eq!(
+            capability["permissions"],
+            serde_json::json!(["core:event:allow-listen", "core:event:allow-unlisten"])
+        );
+    }
+}
