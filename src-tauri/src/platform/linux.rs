@@ -43,12 +43,21 @@ const OWN_DESKTOP_IDS: &[&str] = &[
 /// XDG application folders, including Flatpak and Snap exports listed in
 /// `XDG_DATA_DIRS`.
 pub fn app_folders() -> Vec<PathBuf> {
-    let home = std::env::home_dir().unwrap_or_default();
-    let data_home = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".local/share"));
-    let data_dirs =
-        std::env::var("XDG_DATA_DIRS").unwrap_or_else(|_| "/usr/local/share:/usr/share".into());
+    xdg_app_folders(
+        &std::env::home_dir().unwrap_or_default(),
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from),
+        std::env::var("XDG_DATA_DIRS").ok(),
+    )
+}
+
+/// The user's data folder comes first, as XDG ranks it above system folders.
+fn xdg_app_folders(
+    home: &Path,
+    data_home: Option<PathBuf>,
+    data_dirs: Option<String>,
+) -> Vec<PathBuf> {
+    let data_home = data_home.unwrap_or_else(|| home.join(".local/share"));
+    let data_dirs = data_dirs.unwrap_or_else(|| "/usr/local/share:/usr/share".into());
     std::iter::once(data_home)
         .chain(
             data_dirs
@@ -428,5 +437,33 @@ mod tests {
             Some("firefox")
         );
         assert_eq!(executable_alias(Path::new("")), None);
+    }
+
+    #[test]
+    fn app_folders_follow_xdg_defaults() {
+        assert_eq!(
+            xdg_app_folders(Path::new("/home/ann"), None, None),
+            [
+                PathBuf::from("/home/ann/.local/share/applications"),
+                PathBuf::from("/usr/local/share/applications"),
+                PathBuf::from("/usr/share/applications"),
+            ]
+        );
+    }
+
+    #[test]
+    fn app_folders_include_flatpak_and_snap_exports() {
+        assert_eq!(
+            xdg_app_folders(
+                Path::new("/home/ann"),
+                Some(PathBuf::from("/data")),
+                Some("/var/lib/flatpak/exports/share::/var/lib/snapd/desktop:".into()),
+            ),
+            [
+                PathBuf::from("/data/applications"),
+                PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+                PathBuf::from("/var/lib/snapd/desktop/applications"),
+            ]
+        );
     }
 }
