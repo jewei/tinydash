@@ -851,6 +851,18 @@ mod tests {
         assert!(!after.contains(&before[0]));
         assert!(after.contains(&before[ALL_LIMIT - 2]));
 
+        // Hiding every row the user can hide makes each source reach past
+        // its first `ALL_LIMIT` matches to fill the list again.
+        let hideable: Vec<String> = before
+            .iter()
+            .filter(|id| Source::parse(id).is_some_and(|(source, _)| source.hideable()))
+            .cloned()
+            .collect();
+        state.hidden.set(Hidden::new(hideable.iter().cloned()));
+        let after = ids("a", Category::All);
+        assert_eq!(after.len(), ALL_LIMIT, "{after:?}");
+        assert!(after.iter().all(|id| !hideable.contains(id)));
+
         // The emoji search and the empty Emoji tab each cut a long list.
         for query in ["a", ""] {
             let shown = ids(query, Category::Emoji);
