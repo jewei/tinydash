@@ -4,6 +4,8 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-17
+
 ### Fixed
 
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
@@ -166,7 +168,8 @@ A rewrite: the same keyboard-first launcher, with much less code.
 
 The first public release: search apps, files, folders, and clipboard history; calculate, convert units, currencies, dates, and times; find emoji; generate passwords; clean URLs; and search the web.
 
-[Unreleased]: https://github.com/jewei/tinydash/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/jewei/tinydash/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/jewei/tinydash/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/jewei/tinydash/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jewei/tinydash/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/jewei/tinydash/compare/v0.4.0...v0.4.1
