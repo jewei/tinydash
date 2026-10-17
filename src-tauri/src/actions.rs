@@ -322,8 +322,9 @@ fn web_address(url: &str) -> bool {
     matches!(scheme.as_deref(), Some("http" | "https"))
 }
 
-/// An indexed file, or one a Spotlight search returned: TinyDash offered it.
-fn offered_file(state: &State, path: &str) -> bool {
+/// Whether the launcher offered this file: it is indexed, or Spotlight
+/// returned it. Opening and previewing both check this.
+pub(crate) fn offered_file(state: &State, path: &str) -> bool {
     state.files.get().contains(path)
         || state
             .found
