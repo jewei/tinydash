@@ -72,13 +72,14 @@ export function Library(props: { kind: LibraryKind }) {
   };
   // An open item that a delete removed stays open as a new one, with its
   // text, so Save adds it again instead of failing. Checked only when the
-  // list changes, so a save's new ID never looks deleted before the refetch.
+  // list changes, so a save's new ID never looks deleted before the refetch,
+  // and not after a failed read, whose empty list does not mean deleted.
   createEffect(
     on(
       items,
       (list) => {
         const id = draft().id;
-        if (list && id !== null && !list.some((item) => item.id === id)) {
+        if (list && !loadError() && id !== null && !list.some((item) => item.id === id)) {
           setDraft((item) => ({ ...item, id: null }));
         }
       },

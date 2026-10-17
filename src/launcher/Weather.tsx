@@ -87,11 +87,14 @@ function Icon(props: { icon: WeatherIcon; size: number }) {
   );
 }
 
-const hourMinute = new Intl.DateTimeFormat(undefined, {
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
+// A new formatter each time, so that the time follows a change of the OS
+// time zone: a formatter keeps the zone it was made in.
+const hourMinute = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(ms);
 
 /** How long ago a Unix time was, in words: "5 min ago", "3 h ago". */
 function ago(seconds: number, now: number) {
@@ -147,7 +150,7 @@ export function Weather(props: {
               <span class="widget-note weather-stamp">
                 {weather().offline
                   ? `Offline · updated ${ago(weather().updatedAt, props.now)}`
-                  : `Updated ${hourMinute.format(weather().updatedAt * 1000)}`}
+                  : `Updated ${hourMinute(weather().updatedAt * 1000)}`}
               </span>
             </>
           )}

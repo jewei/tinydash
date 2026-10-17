@@ -219,7 +219,19 @@ fn find(snapshot: &Snapshot, query: &str, category: Category) -> Vec<SearchResul
         Category::System => system::search(matcher, ctx),
     };
     scored.extend(alias_hits(s, ctx, matcher, category));
-    by_score(scored, CATEGORY_LIMIT)
+    // A keyword with text, such as `jira ABC-12`, answers here as in All.
+    // It has its item's own ID, so it takes the place of the name match.
+    let answer = match category {
+        Category::Snippets => s.library.keyword_answer(query),
+        _ => None,
+    };
+    let mut results = by_score(scored, CATEGORY_LIMIT);
+    if let Some(answer) = answer {
+        results.retain(|result| result.id != answer.id);
+        results.insert(0, answer);
+        results.truncate(CATEGORY_LIMIT);
+    }
+    results
 }
 
 /// Results whose alias starts with the query, in a category or in All.
@@ -441,8 +453,9 @@ fn answers(s: &Snapshot, query: &str) -> Vec<SearchResult> {
     results.extend(url_cleaner::answer(query));
     results.extend(clip_card::answer(query, s.now));
     results.extend(permissions::answer(query));
-    results.extend(web::answer(query));
+    // The user's own keyword goes before a web keyword it shares, such as `w`.
     results.extend(s.library.keyword_answer(query));
+    results.extend(web::answer(query));
     results
 }
 
@@ -513,6 +526,14 @@ mod tests {
     }
 
     #[test]
+    fn an_iso_date_answers_with_its_weekday_first() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let first = search(&state.snapshot(), "2026-10-17", Category::All).remove(0);
+        assert_eq!(first.kind, ResultKind::DateTime);
+        assert_eq!(first.title, "Saturday, 17 October 2026");
+    }
+
+    #[test]
     fn a_source_kept_out_of_all_stays_in_its_tab() {
         use usage::Use;
 
@@ -571,6 +592,31 @@ mod tests {
         state.reload_library().unwrap();
         let results = search(&state.snapshot(), "rust", Category::All);
         assert!(!results.iter().any(|result| result.title == "Jira: rust"));
+    }
+
+    #[test]
+    fn a_keyword_with_text_answers_in_the_snippets_tab() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings::default());
+        let item = LibraryItem {
+            id: None,
+            kind: LibraryKind::Quicklink,
+            name: "Jira".into(),
+            keyword: "jira".into(),
+            text: "https://jira.test/browse/{query}".into(),
+        };
+        state.store.save_library_item(&item).unwrap();
+        state.reload_library().unwrap();
+        let results = search(&state.snapshot(), "jira rust", Category::Snippets);
+        assert_eq!(results.len(), 1, "{results:?}");
+        assert_eq!(results[0].title, "Jira: rust");
+        // Its name still matches, but that row would be the same item.
+        let results = search(&state.snapshot(), "jira ji", Category::Snippets);
+        assert_eq!(results.len(), 1, "{results:?}");
+        assert_eq!(results[0].title, "Jira: ji");
+        let id = results[0].id.clone();
+        state.hidden.set(Hidden::new([id]));
+        assert!(search(&state.snapshot(), "jira rust", Category::Snippets).is_empty());
     }
 
     #[test]
@@ -644,6 +690,24 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), results.len());
+    }
+
+    #[test]
+    fn a_quicklink_keyword_goes_before_a_web_keyword() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings::default());
+        let item = LibraryItem {
+            id: None,
+            kind: LibraryKind::Quicklink,
+            name: "Work wiki".into(),
+            keyword: "w".into(),
+            text: "https://wiki.test/search?q={query}".into(),
+        };
+        state.store.save_library_item(&item).unwrap();
+        state.reload_library().unwrap();
+        let results = search(&state.snapshot(), "w vacation policy", Category::All);
+        assert_eq!(results[0].title, "Work wiki: vacation policy");
+        assert_eq!(results[1].kind, ResultKind::WebSearch);
     }
 
     #[test]

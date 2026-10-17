@@ -183,11 +183,12 @@ impl FileIndex {
     pub fn search(&self, matcher: &mut Matcher, ctx: &Context, limit: usize) -> Vec<Scored> {
         let query = matcher.query();
         let match_paths = query.contains(' ') || query.contains(['/', '\\']);
+        let mut paths = match_paths.then(|| path_matcher(query, std::path::MAIN_SEPARATOR));
         let mut hits = Vec::new();
         for (index, entry) in self.entries.iter().enumerate() {
             let score = matcher
                 .name(entry.name())
-                .or_else(|| match_paths.then(|| matcher.words(&entry.path)).flatten());
+                .or_else(|| paths.as_mut().and_then(|paths| paths.words(&entry.path)));
             if let Some(score) = score {
                 hits.push((score, index));
             }
@@ -208,6 +209,12 @@ impl FileIndex {
             })
             .collect()
     }
+}
+
+/// A matcher for whole paths. Users type `/` between folders on every OS,
+/// so it becomes the path `separator` (`\` on Windows).
+fn path_matcher(query: &str, separator: char) -> Matcher {
+    Matcher::new(&query.replace('/', separator.encode_utf8(&mut [0; 4])))
 }
 
 /// Whether a scan of `roots` lists `path`: nothing on the way is hidden
@@ -436,6 +443,7 @@ mod tests {
         };
         assert_eq!(titles("readme"), ["README.md"]);
         assert_eq!(titles("project readme")[0], "README.md");
+        assert_eq!(titles("project/readme"), ["README.md"]);
         assert!(index.contains(&root.join("notes/todo.txt").display().to_string()));
         for entry in &index.entries {
             assert!(index.contains(&entry.os_path().display().to_string()));
@@ -443,6 +451,23 @@ mod tests {
         assert!(!index.contains(&root.join("notes/missing.txt").display().to_string()));
         set_readonly(&root.join("notes/hidden.txt"), false);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn path_queries_typed_with_slashes_match_backslash_paths() {
+        let path = r"C:\Users\me\Documents\docs\readme.md";
+        assert!(Matcher::new("docs/readme").words(path).is_none());
+        assert!(path_matcher("docs/readme", '\\').words(path).is_some());
+        assert!(path_matcher(r"docs\readme", '\\').words(path).is_some());
+        assert!(path_matcher("docs/ readme", '\\').words(path).is_some());
+        let path = r"C:\Users\café\文档\readme.md";
+        assert!(path_matcher("café/文档", '\\').words(path).is_some());
+        assert!(path_matcher("文档/readme", '\\').words(path).is_some());
+        assert!(
+            path_matcher("docs/readme", '/')
+                .words("/Users/me/docs/readme.md")
+                .is_some()
+        );
     }
 
     #[test]

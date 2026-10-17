@@ -13,11 +13,18 @@ export function HiddenResults() {
   const stop = ipc.onResultsStale(() => void refetch());
   onCleanup(() => void stop.then((unlisten) => unlisten()));
 
-  const showAgain = (id: string) => {
+  let list!: HTMLUListElement;
+  // The shown row's button had focus; the row now in its place, or the list
+  // when it is empty, takes it, so keyboard users keep their place.
+  const showAgain = (id: string, index: number) => {
     setFailure(undefined);
     ipc
       .unhideResult(id)
       .then(() => refetch())
+      .then(() => {
+        const buttons = list.querySelectorAll<HTMLButtonElement>("button");
+        (buttons[Math.min(index, buttons.length - 1)] ?? list).focus();
+      })
       .catch((error) => setFailure(ipc.message(error)));
   };
 
@@ -31,7 +38,7 @@ export function HiddenResults() {
         )}
       </Show>
       <Show when={!hidden.error}>
-        <ul>
+        <ul ref={list} tabIndex={-1} aria-label="Hidden results">
           <For
             each={hidden.latest ?? []}
             fallback={
@@ -40,7 +47,7 @@ export function HiddenResults() {
               </li>
             }
           >
-            {(result) => (
+            {(result, index) => (
               <li>
                 <span class="hidden-result">
                   <span>{result.title}</span>
@@ -50,7 +57,7 @@ export function HiddenResults() {
                   type="button"
                   class="link"
                   aria-label={`Show ${result.title} again`}
-                  onClick={() => showAgain(result.id)}
+                  onClick={() => showAgain(result.id, index())}
                 >
                   Show Again
                 </button>

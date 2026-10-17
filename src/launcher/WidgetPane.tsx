@@ -94,15 +94,17 @@ export function WidgetPane(props: {
   const now = createNow();
   let noteField: HTMLTextAreaElement | undefined;
   const [jsonOpen, setJsonOpen] = createSignal(false);
+  // A failed load makes `latest` throw, which would break the launcher's keys.
+  const loaded = () => (widgets.error ? undefined : widgets.latest);
   const card = () => {
-    const found = widgets.latest?.clipCard;
+    const found = loaded()?.clipCard;
     return found && found.id !== props.dismissed ? found : undefined;
   };
   const json = () => {
     const content = card()?.content;
     return content?.type === "json" ? content : undefined;
   };
-  const timerActions = () => widgets.latest?.focus?.actions ?? [];
+  const timerActions = () => loaded()?.focus?.actions ?? [];
   const runCard = () => {
     const current = card();
     if (!current) return false;
@@ -112,6 +114,8 @@ export function WidgetPane(props: {
   };
   props.controls({
     focusNote: () => {
+      // The JSON view covers the note, so typing would go to a hidden field.
+      if (noteField) setJsonOpen(false);
       noteField?.focus();
       return noteField !== undefined;
     },
@@ -150,7 +154,7 @@ export function WidgetPane(props: {
   });
   // Nothing shows: only clipboard cards are on, and the clipboard has none.
   const empty = () => {
-    const shown = widgets.latest;
+    const shown = loaded();
     return (
       shown !== undefined &&
       !shown.clocks &&
@@ -195,24 +199,22 @@ export function WidgetPane(props: {
             </p>
           )}
         </Show>
-        <Show when={widgets.latest?.clocks}>
-          {(cities) => <Clocks cities={cities()} now={now()} />}
-        </Show>
-        <Show when={widgets.latest?.weather}>
+        <Show when={loaded()?.clocks}>{(cities) => <Clocks cities={cities()} now={now()} />}</Show>
+        <Show when={loaded()?.weather}>
           {(view) => <Weather view={view()} now={now()} onRun={props.onRun} />}
         </Show>
-        <Show when={widgets.latest?.focus}>
+        <Show when={loaded()?.focus}>
           {(timer) => <Focus timer={timer()} now={now()} onRun={props.onRun} />}
         </Show>
-        <Show when={widgets.latest?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
+        <Show when={loaded()?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
       </div>
       <Show when={empty()}>
         <p class="widgets-empty">Copy a color, a Unix time, or JSON to see it here.</p>
       </Show>
-      {/* An empty note is still a note, so test for null. */}
-      <Show when={widgets.latest && widgets.latest.note !== null}>
+      {/* An empty note is still a note, so test its type, not its truth. */}
+      <Show when={typeof loaded()?.note === "string"}>
         <Notepad
-          initial={widgets.latest?.note ?? ""}
+          initial={loaded()?.note ?? ""}
           field={(field) => (noteField = field)}
           onLeave={props.onLeave}
         />
@@ -231,21 +233,20 @@ export function WidgetPane(props: {
   );
 }
 
-const localTime = hourMinute();
+// A formatter keeps the time zone it was made in, and the launcher page lives
+// until TinyDash quits, so local times get a new formatter each time they
+// render. That way they follow the OS time zone, as the cities' differences do.
+const localTime = (ms: number) => hourMinute().format(ms);
+const shortDate = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(
+    ms,
+  );
+const weekday = (ms: number) => new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(ms);
+const longDate = (ms: number) =>
+  new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year: "numeric" }).format(ms);
 // A city's time is UTC shifted by its offset, so a fixed offset such as
 // UTC+8 works too, which Intl cannot name.
 const shiftedTime = hourMinute("UTC");
-const shortDate = new Intl.DateTimeFormat(undefined, {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-});
-const weekday = new Intl.DateTimeFormat(undefined, { weekday: "long" });
-const longDate = new Intl.DateTimeFormat(undefined, {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
 
 function Clocks(props: { cities: CityClock[]; now: number }) {
   return (
@@ -254,17 +255,17 @@ function Clocks(props: { cities: CityClock[]; now: number }) {
         when={props.cities.length > 0}
         fallback={
           <div class="clock-alone">
-            <span class="clock-time large">{localTime.format(props.now)}</span>
+            <span class="clock-time large">{localTime(props.now)}</span>
             <span class="clock-day">
-              <strong>{weekday.format(props.now)}</strong>
-              <span>{longDate.format(props.now)}</span>
+              <strong>{weekday(props.now)}</strong>
+              <span>{longDate(props.now)}</span>
             </span>
           </div>
         }
       >
         <div class="clock-local">
-          <span class="clock-time">{localTime.format(props.now)}</span>
-          <span class="widget-note">{shortDate.format(props.now)}</span>
+          <span class="clock-time">{localTime(props.now)}</span>
+          <span class="widget-note">{shortDate(props.now)}</span>
         </div>
         <ul class="clock-cities">
           <For each={props.cities}>
