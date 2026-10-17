@@ -33,7 +33,7 @@ pub struct Widgets {
     /// The disk that holds the home folder.
     pub disk: Option<Disk>,
     /// The scratch note.
-    pub note: Option<String>,
+    pub note: Option<Note>,
     pub focus: Option<FocusTimer>,
     pub weather: Option<WeatherView>,
     /// A card for the clipboard text, when it is a format a card shows.
@@ -57,6 +57,34 @@ pub enum Disk {
     },
     /// The OS did not report the disk; the message says why.
     Unavailable { message: String },
+}
+
+#[derive(Serialize, TS)]
+#[serde(
+    tag = "type",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(export)]
+pub enum Note {
+    Ready {
+        text: String,
+    },
+    /// The saved note could not be read; the message says why.
+    Unavailable {
+        message: String,
+    },
+}
+
+impl Note {
+    fn read(state: &State) -> Self {
+        match state.store.note() {
+            Ok(text) => Self::Ready { text },
+            Err(error) => Self::Unavailable {
+                message: error.to_string(),
+            },
+        }
+    }
 }
 
 impl Disk {
@@ -89,10 +117,10 @@ pub fn save_note(state: &State, text: &str) -> Result<()> {
 /// Gather the widgets that are on. One that cannot load says so in its
 /// card, so the others still show. `clipboard` reads the clipboard text,
 /// only when clipboard cards are on.
-pub fn load(state: &State, clipboard: impl FnOnce() -> Option<String>) -> Result<Widgets> {
+pub fn load(state: &State, clipboard: impl FnOnce() -> Option<String>) -> Widgets {
     let settings = state.settings.get();
     let now = chrono::Local::now();
-    Ok(Widgets {
+    Widgets {
         clocks: settings.show_clocks.then(|| {
             settings
                 .clock_cities
@@ -103,10 +131,7 @@ pub fn load(state: &State, clipboard: impl FnOnce() -> Option<String>) -> Result
         disk: settings
             .show_disk_space
             .then(|| Disk::read(&state.dirs.home)),
-        note: settings
-            .show_notepad
-            .then(|| state.store.note())
-            .transpose()?,
+        note: settings.show_notepad.then(|| Note::read(state)),
         focus: settings.show_focus_timer.then(|| state.focus.get()),
         weather: settings.show_weather.then(|| weather(state, &settings)),
         clip_card: settings
@@ -114,7 +139,7 @@ pub fn load(state: &State, clipboard: impl FnOnce() -> Option<String>) -> Result
             .then(clipboard)
             .flatten()
             .and_then(|text| clip_card::detect(&text, now)),
-    })
+    }
 }
 
 /// The latest weather for the city, or how getting it is going.
@@ -155,7 +180,6 @@ mod tests {
             ..Settings::default()
         });
         let names: Vec<String> = load(&on, || None)
-            .unwrap()
             .clocks
             .unwrap()
             .into_iter()
@@ -167,7 +191,7 @@ mod tests {
             show_clocks: false,
             ..Settings::default()
         });
-        assert!(load(&off, || None).unwrap().clocks.is_none());
+        assert!(load(&off, || None).clocks.is_none());
     }
 
     #[test]
@@ -176,11 +200,28 @@ mod tests {
             show_notepad: true,
             ..Settings::default()
         });
-        assert_eq!(load(&state, || None).unwrap().note.as_deref(), Some(""));
+        let note = |state: &State| match load(state, || None).note {
+            Some(Note::Ready { text }) => text,
+            _ => panic!("the note loads"),
+        };
+        assert_eq!(note(&state), "");
         let longest = "é".repeat(MAX_NOTE_CHARS);
         save_note(&state, &longest).unwrap();
         assert!(save_note(&state, &format!("{longest}!")).is_err());
-        assert_eq!(load(&state, || None).unwrap().note, Some(longest));
+        assert_eq!(note(&state), longest);
+    }
+
+    #[test]
+    fn a_note_that_cannot_be_read_leaves_the_other_widgets() {
+        let state = State::for_tests(Settings {
+            show_notepad: true,
+            show_clocks: true,
+            ..Settings::default()
+        });
+        state.store.lose_note_for_tests();
+        let widgets = load(&state, || None);
+        assert!(matches!(widgets.note, Some(Note::Unavailable { .. })));
+        assert!(widgets.clocks.is_some());
     }
 
     #[test]
@@ -246,19 +287,14 @@ mod tests {
             show_clipboard_cards: true,
             ..Settings::default()
         });
-        let card = load(&on, || Some("#2F6F5E".into())).unwrap().clip_card;
+        let card = load(&on, || Some("#2F6F5E".into())).clip_card;
         assert_eq!(card.unwrap().actions[0].label, "Copy HEX");
-        assert!(
-            load(&on, || Some("hello".into()))
-                .unwrap()
-                .clip_card
-                .is_none()
-        );
+        assert!(load(&on, || Some("hello".into())).clip_card.is_none());
 
         let off = State::for_tests(Settings::default());
         let read = load(&off, || {
             panic!("cards are off, so nothing reads the clipboard")
         });
-        assert!(read.unwrap().clip_card.is_none());
+        assert!(read.clip_card.is_none());
     }
 }
