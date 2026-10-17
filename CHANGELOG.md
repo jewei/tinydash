@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- Exchange rates saved while the computer clock was set ahead now update once the clock is correct.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
