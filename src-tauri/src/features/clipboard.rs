@@ -14,11 +14,17 @@ use crate::search::{
 pub const MAX_TEXT_BYTES: usize = 16 * 1024;
 /// Larger images are not saved.
 pub const MAX_IMAGE_BYTES: usize = 8 * 1024 * 1024;
-pub const MAX_IMAGE_PIXELS: u64 = 16_000_000;
+const MAX_IMAGE_PIXELS: u64 = 16_000_000;
 /// Most file references in one entry.
 pub const MAX_FILES: usize = 64;
 /// Most unpinned images kept, whatever the history limit.
 pub const MAX_IMAGES: usize = 32;
+
+/// Whether an image this size may be saved. Capture checks it before it
+/// decodes an image, so a huge one never fills memory.
+pub fn pixels_fit(width: u32, height: u32) -> bool {
+    u64::from(width) * u64::from(height) <= MAX_IMAGE_PIXELS
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClipKind {
@@ -56,8 +62,7 @@ impl Content {
                 !text.trim().is_empty() && text.len() <= MAX_TEXT_BYTES && !text.contains('\0')
             }
             Self::Image { png, width, height } => {
-                png.len() <= MAX_IMAGE_BYTES
-                    && u64::from(*width) * u64::from(*height) <= MAX_IMAGE_PIXELS
+                png.len() <= MAX_IMAGE_BYTES && pixels_fit(*width, *height)
             }
             Self::Files(paths) => {
                 !paths.is_empty()
@@ -273,6 +278,13 @@ mod tests {
         };
         assert!(image(4000, 4000).fits());
         assert!(!image(5000, 5000).fits());
+    }
+
+    #[test]
+    fn limits_pixels_without_overflow() {
+        assert!(pixels_fit(4000, 4000));
+        assert!(!pixels_fit(12_000, 12_000));
+        assert!(!pixels_fit(u32::MAX, u32::MAX));
     }
 
     #[test]
