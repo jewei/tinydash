@@ -10,6 +10,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - On Linux, Flatpak and Snap apps no longer all match a search for "flatpak" or "env".
 - A calculation copied again within the same second moves to the top of the history.
+- If Settings cannot reload the snippet or quicklink list after a save, the open item stays as it is, so the next Save does not add a copy.
 - On macOS, the Files tab now shows Spotlight results when Spotlight takes more than a second to answer. Before, such a search showed no Spotlight results.
 - On Windows, a Files search with `/`, such as `docs/readme`, now finds files in that folder, also when folder names have accents or non-Latin letters.
 - On macOS, Apps finds Keychain Access, Archive Utility, and the other Apple utilities in `/System/Library/CoreServices/Applications`.
