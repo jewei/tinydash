@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
+- Exchange rates and the weather saved while the computer clock was set ahead now update once the clock is correct.
 - On Linux, TinyDash now notices newly installed apps when `XDG_DATA_DIRS` or `XDG_DATA_HOME` is set but empty.
 - A clip copied again within the same second as the clip before it moves to the top of the clipboard history.
 - In Settings > General, Center keeps keyboard focus after you use it, so Tab moves on from there instead of from the top of the page.
