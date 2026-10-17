@@ -27,6 +27,7 @@ pub const SELF_UPDATE: bool = false;
 /// Only text: GTK reads it in the same request chain that checks for secrets.
 pub const RICH_CLIPBOARD: bool = false;
 pub const NATIVE_ICONS: bool = false;
+pub const PHYSICAL_PLACEMENT: bool = true;
 /// inotify needs one watch per folder from a shared per-user limit, so only
 /// the top folders are watched; deeper changes show up at the next rescan,
 /// when the launcher opens and the index is more than 15 minutes old.

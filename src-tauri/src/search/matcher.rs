@@ -1,6 +1,6 @@
 use nucleo_matcher::{
     Config, Matcher as Nucleo, Utf32Str,
-    pattern::{AtomKind, CaseMatching, Normalization, Pattern},
+    pattern::{Atom, AtomKind, CaseMatching, Normalization, Pattern},
 };
 use unicode_normalization::UnicodeNormalization;
 
@@ -37,11 +37,10 @@ pub struct Matcher {
 impl Matcher {
     pub fn new(query: &str) -> Self {
         let query = normalize(query);
-        let pattern = |kind| Pattern::new(&query, CaseMatching::Ignore, Normalization::Smart, kind);
         Self {
             nucleo: Nucleo::new(Config::DEFAULT),
-            pattern: pattern(AtomKind::Fuzzy),
-            words: pattern(AtomKind::Substring),
+            pattern: pattern(&query, AtomKind::Fuzzy),
+            words: pattern(&query, AtomKind::Substring),
             query,
             buffer: Vec::new(),
         }
@@ -111,6 +110,27 @@ impl Matcher {
         }
         best
     }
+}
+
+/// One atom per query word, with `\` kept as typed. `Pattern::new` reads
+/// `\ ` as an escaped space, and nucleo-matcher 0.3.1 doubles every `\` in a
+/// word with a non-ASCII letter, so Windows paths would not match.
+fn pattern(query: &str, kind: AtomKind) -> Pattern {
+    let mut pattern = Pattern::default();
+    pattern.atoms = query
+        .split(' ')
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            Atom::new(
+                word,
+                CaseMatching::Ignore,
+                Normalization::Smart,
+                kind,
+                false,
+            )
+        })
+        .collect();
+    pattern
 }
 
 /// Map a fuzzy score below `MAX_FUZZY`. A higher score never maps lower,
