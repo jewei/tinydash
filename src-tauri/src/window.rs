@@ -37,7 +37,11 @@ fn drag_start() -> std::sync::MutexGuard<'static, Option<LauncherPosition>> {
 /// that category.
 pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
     let window = launcher(app)?;
-    platform::remember_frontmost_app();
+    // While the launcher is open and focused, TinyDash itself is in front:
+    // keep the app remembered when it opened, so Escape still returns there.
+    if !in_use(&window)? {
+        platform::remember_frontmost_app();
+    }
     *drag_start() = None;
     let saved = app.state::<State>().settings.get().launcher_position;
     if let Err(error) = platform::place_launcher(app, &window, saved) {
@@ -136,9 +140,14 @@ pub fn center(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// Whether the launcher is open and has focus.
+fn in_use(window: &WebviewWindow) -> Result<bool> {
+    Ok(window.is_visible()? && window.is_focused()?)
+}
+
 pub fn toggle(app: &AppHandle) -> Result<()> {
     let window = launcher(app)?;
-    if window.is_visible()? && window.is_focused()? {
+    if in_use(&window)? {
         dismiss(app)
     } else {
         show(app, None)

@@ -231,10 +231,21 @@ impl Store {
         };
         self.with(|db| {
             let transaction = db.transaction()?;
+            // Entries sort by `copied_at`, then by ID. A repeat keeps its
+            // older ID, so it must be newer than every other entry: a copy
+            // in the same second as the one before it would otherwise stay
+            // below it. A new entry, with the highest ID, needs only a tie.
+            let newest: Option<i64> = transaction.query_row(
+                "SELECT MAX(copied_at) FROM clipboard WHERE hash <> ?1",
+                [content.hash()],
+                |row| row.get(0),
+            )?;
+            let (new_at, repeat_at) =
+                newest.map_or((now, now), |newest| (now.max(newest), now.max(newest + 1)));
             transaction.execute(
                 "INSERT INTO clipboard (kind, hash, title, content, image, width, height, copied_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-                 ON CONFLICT (hash) DO UPDATE SET copied_at = ?8",
+                 ON CONFLICT (hash) DO UPDATE SET copied_at = ?9",
                 params![
                     kind_to_sql(content.kind()),
                     content.hash(),
@@ -243,7 +254,8 @@ impl Store {
                     image,
                     width,
                     height,
-                    now
+                    new_at,
+                    repeat_at
                 ],
             )?;
             trim(&transaction, limit)?;
@@ -501,6 +513,13 @@ impl Store {
         })
     }
 
+    /// Remove the note's table, so that reading the note fails.
+    #[cfg(test)]
+    pub fn lose_note_for_tests(&self) {
+        self.with(|db| db.execute_batch("DROP TABLE note"))
+            .expect("the note table exists");
+    }
+
     /// The latest weather download, for the widget while offline.
     pub fn weather(&self) -> Result<Option<Weather>> {
         self.cached("weather")
@@ -693,6 +712,19 @@ mod tests {
     }
 
     #[test]
+    fn a_repeat_in_the_same_second_moves_to_the_top() {
+        let store = Store::in_memory();
+        for value in ["one", "two", "one"] {
+            store.save_clip(&text(value), 1, 10).unwrap();
+        }
+        assert_eq!(titles(&store), ["one", "two"]);
+        store.save_clip(&text("three"), 1, 10).unwrap();
+        assert_eq!(titles(&store), ["three", "one", "two"]);
+        store.trim_clipboard(2).unwrap();
+        assert_eq!(titles(&store), ["three", "one"]);
+    }
+
+    #[test]
     fn stores_images_and_files_in_their_original_form() {
         let store = Store::in_memory();
         let image = Content::Image {
@@ -836,6 +868,27 @@ mod tests {
         store.save_note("call the bank").unwrap();
         store.save_note("call the bank\nbuy milk").unwrap();
         assert_eq!(store.note().unwrap(), "call the bank\nbuy milk");
+    }
+
+    #[test]
+    fn an_older_database_upgrades_and_keeps_its_data() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch(MIGRATIONS[0]).unwrap();
+        connection.pragma_update(None, "user_version", 1).unwrap();
+        connection
+            .execute("INSERT INTO pins (id, position) VALUES ('app:/a', 0)", [])
+            .unwrap();
+
+        let store = Store::new(connection).unwrap();
+        let version: i64 = store
+            .with(|db| db.query_row("PRAGMA user_version", [], |row| row.get(0)))
+            .unwrap();
+        assert_eq!(version, MIGRATIONS.len() as i64);
+        assert_eq!(store.pins().unwrap().ids(), ["app:/a"]);
+        store.save_note("kept").unwrap();
+        store.set_alias("app:/a", Some("aa")).unwrap();
+        store.save_calculation("1+1", "2", 1).unwrap();
+        assert_eq!(store.calculations().unwrap().len(), 1);
     }
 
     #[test]
