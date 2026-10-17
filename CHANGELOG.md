@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- On macOS, install TinyDash with Homebrew: `brew install jewei/tap/tinydash`.
+
 ### Fixed
 
 - On macOS, a click on the tray icon while the launcher is open no longer makes Escape forget the app you came from.

@@ -215,3 +215,22 @@ jobs:
           if [ "$DRAFT" = true ]; then draft=(--draft); fi
           gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "TinyDash v$VERSION" --generate-notes "${draft[@]}" -- *
+      # Homebrew installs come from the owner's homebrew-tap repository; point
+      # its cask at the new DMG. A draft reaches no one, so it is left alone.
+      - name: Update the Homebrew cask
+        if: ${{ !inputs.draft }}
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set, so the Homebrew cask still offers the previous version."
+            exit 0
+          fi
+          sha=$(sha256sum "installers/TinyDash_${VERSION}_universal.dmg" | cut -d ' ' -f 1)
+          git clone -q --depth 1 "https://x-access-token:$TAP_TOKEN@github.com/$GITHUB_REPOSITORY_OWNER/homebrew-tap.git" tap
+          cd tap
+          sed -i -E "s/^  version \".*\"/  version \"$VERSION\"/; s/^  sha256 \".*\"/  sha256 \"$sha\"/" Casks/tinydash.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -am "Update TinyDash to $VERSION"
+          git push -q
