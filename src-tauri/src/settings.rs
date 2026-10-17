@@ -115,13 +115,54 @@ impl LauncherTab {
     }
 }
 
-/// Drop the saved tabs this version cannot read, such as a typo or a tab
-/// from a newer version, so one bad entry never resets every setting.
-/// `normalized` then adds any tab that is missing.
-fn drop_unreadable_tabs(file: &mut Value) {
-    if let Some(Value::Array(tabs)) = file.get_mut("tabs") {
-        tabs.retain(|tab| serde_json::from_value::<LauncherTab>(tab.clone()).is_ok());
+/// Drop the saved values this version cannot read, such as a typo or a
+/// choice from a newer version, so one bad value never resets every
+/// setting. A list loses only its bad entries; any other field takes its
+/// default. `normalized` then adds any tab that is missing. Returns the
+/// names of the fields that lost a value, so `load` can tell the user.
+fn drop_unreadable_values(file: &mut Value) -> Vec<String> {
+    let Value::Object(fields) = file else {
+        return Vec::new();
+    };
+    let mut dropped = Vec::new();
+    if keep_readable_entries::<LauncherTab>(fields, "tabs") {
+        dropped.push("tabs".to_owned());
     }
+    if keep_readable_entries::<EmojiLanguage>(fields, "emojiLanguages") {
+        dropped.push("emojiLanguages".to_owned());
+    }
+    let Ok(Value::Object(defaults)) = serde_json::to_value(Settings::default()) else {
+        return dropped;
+    };
+    // Each field on top of the defaults alone, so a bad one cannot hide
+    // behind another.
+    fields.retain(|name, value| {
+        if !defaults.contains_key(name) {
+            return true;
+        }
+        let mut alone = defaults.clone();
+        alone.insert(name.clone(), value.clone());
+        let readable = serde_json::from_value::<Settings>(Value::Object(alone)).is_ok();
+        if !readable {
+            dropped.push(name.clone());
+        }
+        readable
+    });
+    dropped
+}
+
+/// Keep only the entries of the list `name` that read as `T`. Returns
+/// whether any entry was removed.
+fn keep_readable_entries<T: serde::de::DeserializeOwned>(
+    fields: &mut Map<String, Value>,
+    name: &str,
+) -> bool {
+    let Some(Value::Array(entries)) = fields.get_mut(name) else {
+        return false;
+    };
+    let before = entries.len();
+    entries.retain(|entry| serde_json::from_value::<T>(entry.clone()).is_ok());
+    entries.len() != before
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -313,53 +354,121 @@ pub fn expand_home(path: &str, home: &Path) -> PathBuf {
     }
 }
 
+/// Settings read at startup, with the file to save changes to.
+pub struct Loaded {
+    pub settings: Settings,
+    pub warning: Option<String>,
+    pub file: SettingsFile,
+}
+
+/// The settings file. It refuses to save after a read failed for a reason
+/// other than its content, such as a lock held by a sync or antivirus tool:
+/// that file may still hold the user's settings, and this session has only
+/// defaults to write over it.
+pub struct SettingsFile {
+    dir: PathBuf,
+    replaceable: bool,
+}
+
+impl SettingsFile {
+    #[cfg(test)]
+    pub fn new(dir: PathBuf) -> Self {
+        Self {
+            dir,
+            replaceable: true,
+        }
+    }
+
+    pub fn save(&self, settings: &Settings) -> Result<()> {
+        if !self.replaceable {
+            return Err(Error::msg(format!(
+                "TinyDash could not use {} at startup, so it did not replace it. Quit and reopen TinyDash to change settings.",
+                self.dir.join(FILE_NAME).display()
+            )));
+        }
+        std::fs::create_dir_all(&self.dir)?;
+        let path = self.dir.join(FILE_NAME);
+        let temporary = self.dir.join(format!("{FILE_NAME}.tmp"));
+        std::fs::write(&temporary, serde_json::to_vec_pretty(settings)?)?;
+        std::fs::rename(&temporary, &path)?;
+        Ok(())
+    }
+}
+
 /// Load settings. A damaged file is renamed aside, and defaults are used,
 /// so a bad edit never stops the launcher; the warning tells the user.
-pub fn load(dir: &Path) -> (Settings, Option<String>) {
+/// A value this version cannot read only takes its default; the file is
+/// copied aside, and the warning names the field.
+pub fn load(dir: &Path) -> Loaded {
     let path = dir.join(FILE_NAME);
-    let text = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
+    let loaded = |settings, warning, replaceable| Loaded {
+        settings,
+        warning,
+        file: SettingsFile {
+            dir: dir.to_owned(),
+            replaceable,
+        },
+    };
+    let mut dropped = Vec::new();
+    let parsed = match std::fs::read_to_string(&path) {
+        Ok(text) => serde_json::from_str::<Value>(&text)
+            .and_then(|mut file| {
+                dropped = drop_unreadable_values(&mut file);
+                serde_json::from_value::<Settings>(file)
+            })
+            .map_err(|error| error.to_string()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return (Settings::default(), None);
+            return loaded(Settings::default(), None, true);
         }
+        // Not UTF-8: damaged content, like a parse error.
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidData => Err(error.to_string()),
         Err(error) => {
-            return (
+            return loaded(
                 Settings::default(),
-                Some(format!("Could not read settings: {error}")),
+                Some(format!(
+                    "Could not read settings ({error}), so defaults are in use and changes will not be saved. Quit and reopen TinyDash to try again."
+                )),
+                false,
             );
         }
     };
-    let parsed = serde_json::from_str::<Value>(&text).and_then(|mut file| {
-        drop_unreadable_tabs(&mut file);
-        serde_json::from_value::<Settings>(file)
-    });
+    let backup = dir.join("settings.invalid.json");
     match parsed {
-        Ok(settings) => (settings.normalized(), None),
+        Ok(settings) => {
+            // The next save writes the defaults over the dropped values, so
+            // keep a copy for a newer version or for the user to restore.
+            let warning = (!dropped.is_empty()).then(|| {
+                let note = if std::fs::copy(&path, &backup).is_ok() {
+                    format!(" The old file is at {}.", backup.display())
+                } else {
+                    String::new()
+                };
+                format!(
+                    "Some values under these names in settings.json could not be read: {}. \
+                     TinyDash skipped only those values and uses defaults for them.{note}",
+                    dropped.join(", ")
+                )
+            });
+            loaded(settings.normalized(), warning, true)
+        }
         Err(error) => {
-            let backup = dir.join("settings.invalid.json");
             let moved = std::fs::rename(&path, &backup).is_ok();
+            // Without a backup, a save would put defaults over the only copy.
             let note = if moved {
                 format!(" The old file is at {}.", backup.display())
             } else {
-                String::new()
+                " Changes will not be saved. Fix or remove the file, then reopen TinyDash."
+                    .to_owned()
             };
-            (
+            loaded(
                 Settings::default(),
                 Some(format!(
                     "Settings were invalid ({error}), so defaults are in use.{note}"
                 )),
+                moved,
             )
         }
     }
-}
-
-pub fn save(dir: &Path, settings: &Settings) -> Result<()> {
-    std::fs::create_dir_all(dir)?;
-    let path = dir.join(FILE_NAME);
-    let temporary = dir.join(format!("{FILE_NAME}.tmp"));
-    std::fs::write(&temporary, serde_json::to_vec_pretty(settings)?)?;
-    std::fs::rename(&temporary, &path)?;
-    Ok(())
 }
 
 #[cfg(test)]
@@ -402,9 +511,26 @@ mod tests {
                 {"category": "emoji", "shown": false}, "clipbord"]}"#,
         )
         .unwrap();
-        let (settings, warning) = load(&dir);
+        let Loaded {
+            settings, warning, ..
+        } = load(&dir);
+        let backup = dir.join("settings.invalid.json");
+        assert_eq!(
+            warning,
+            Some(format!(
+                "Some values under these names in settings.json could not be read: tabs. \
+                 TinyDash skipped only those values and uses defaults for them. \
+                 The old file is at {}.",
+                backup.display()
+            ))
+        );
+        assert!(
+            std::fs::read_to_string(&backup)
+                .unwrap()
+                .contains("clipbord")
+        );
+        assert!(dir.join(FILE_NAME).exists());
         std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(warning, None);
         assert!(!settings.hide_on_blur);
         assert_eq!(
             settings.tabs[0],
@@ -415,6 +541,45 @@ mod tests {
             }
         );
         assert_eq!(settings.tabs.len(), Category::ALL.len() - 1);
+    }
+
+    #[test]
+    fn a_value_from_a_newer_version_takes_its_default_without_resetting_the_rest() {
+        let dir = std::env::temp_dir().join(format!("tinydash-newer-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(FILE_NAME),
+            r#"{"shortcut": "Alt+Space", "searchEngine": "kagi",
+                "emojiLanguages": ["zh", "xx-unknown"], "focusMinutes": "soon"}"#,
+        )
+        .unwrap();
+        let Loaded {
+            settings, warning, ..
+        } = load(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let warning = warning.unwrap();
+        for field in ["emojiLanguages", "searchEngine", "focusMinutes"] {
+            assert!(warning.contains(field), "{warning}");
+        }
+        assert!(!warning.contains("shortcut"), "{warning}");
+        assert_eq!(settings.shortcut, "Alt+Space");
+        assert_eq!(settings.search_engine, Settings::default().search_engine);
+        assert_eq!(settings.emoji_languages, [EmojiLanguage::Zh]);
+        assert_eq!(settings.focus_minutes, Settings::default().focus_minutes);
+    }
+
+    #[test]
+    fn a_file_that_is_not_an_object_is_moved_aside() {
+        let dir = std::env::temp_dir().join(format!("tinydash-array-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(FILE_NAME), "[1, 2]").unwrap();
+        let Loaded {
+            settings, warning, ..
+        } = load(&dir);
+        assert_eq!(settings, Settings::default());
+        assert!(warning.is_some());
+        assert!(dir.join("settings.invalid.json").exists());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
@@ -589,12 +754,82 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("tinydash-settings-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join(FILE_NAME), "{ not json").unwrap();
-        let (settings, warning) = load(&dir);
+        let Loaded {
+            settings,
+            warning,
+            file,
+        } = load(&dir);
         assert_eq!(settings, Settings::default());
         assert!(warning.is_some());
         assert!(dir.join("settings.invalid.json").exists());
-        save(&dir, &settings).unwrap();
-        assert_eq!(load(&dir), (Settings::default(), None));
+        file.save(&settings).unwrap();
+        let again = load(&dir);
+        assert_eq!((again.settings, again.warning), (Settings::default(), None));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_file_that_is_not_utf8_is_moved_aside() {
+        let dir = std::env::temp_dir().join(format!("tinydash-latin1-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // "São Paulo" saved as Latin-1.
+        let bytes = b"{\"clockCities\": [\"S\xe3o Paulo\"]}";
+        std::fs::write(dir.join(FILE_NAME), bytes).unwrap();
+        let Loaded {
+            settings, warning, ..
+        } = load(&dir);
+        let backup = std::fs::read(dir.join("settings.invalid.json"));
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(settings, Settings::default());
+        assert!(warning.unwrap().contains("settings.invalid.json"));
+        assert_eq!(backup.unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_damaged_file_that_could_not_be_moved_is_never_replaced() {
+        let dir = std::env::temp_dir().join(format!("tinydash-unmoved-{}", std::process::id()));
+        // A folder that is not empty in the backup's place blocks the rename on every OS.
+        std::fs::create_dir_all(dir.join("settings.invalid.json").join("taken")).unwrap();
+        let bytes = b"{\"clockCities\": [\"S\xe3o Paulo\"]}";
+        std::fs::write(dir.join(FILE_NAME), bytes).unwrap();
+        let Loaded {
+            settings,
+            warning,
+            file,
+        } = load(&dir);
+        let saved = file.save(&settings);
+        let kept = std::fs::read(dir.join(FILE_NAME));
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(settings, Settings::default());
+        assert!(warning.unwrap().contains("will not be saved"));
+        assert!(saved.is_err());
+        assert_eq!(kept.unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_file_that_could_not_be_read_is_never_replaced() {
+        let dir = std::env::temp_dir().join(format!("tinydash-unread-{}", std::process::id()));
+        // A folder in its place fails to read, as a locked file would.
+        std::fs::create_dir_all(dir.join(FILE_NAME)).unwrap();
+        let Loaded {
+            settings,
+            warning,
+            file,
+        } = load(&dir);
+        assert_eq!(settings, Settings::default());
+        assert!(warning.unwrap().contains("will not be saved"));
+        let error = file.save(&settings).unwrap_err().to_string();
+        assert!(error.contains("did not replace"), "{error}");
+
+        std::fs::remove_dir(dir.join(FILE_NAME)).unwrap();
+        std::fs::write(dir.join(FILE_NAME), r#"{"hideOnBlur": false}"#).unwrap();
+        let blocked = SettingsFile {
+            dir: dir.clone(),
+            replaceable: false,
+        };
+        assert!(blocked.save(&Settings::default()).is_err());
+        let kept = std::fs::read_to_string(dir.join(FILE_NAME));
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(kept.unwrap(), r#"{"hideOnBlur": false}"#);
     }
 }

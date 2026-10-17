@@ -220,7 +220,10 @@ mod tests {
             clock.changed.notify_all();
         };
         let wait = || finished.recv_timeout(Duration::from_secs(5)).unwrap();
+        // Hold the lock while the time moves, as control() does, or the
+        // thread can read the old time, miss the notify, and sleep past it.
         let pass_time = |at: i64| {
+            let _timer = clock.lock();
             now.store(at, Ordering::SeqCst);
             clock.changed.notify_all();
         };

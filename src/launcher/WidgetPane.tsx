@@ -94,15 +94,17 @@ export function WidgetPane(props: {
   const now = createNow();
   let noteField: HTMLTextAreaElement | undefined;
   const [jsonOpen, setJsonOpen] = createSignal(false);
+  // A failed load makes `latest` throw, which would break the launcher's keys.
+  const loaded = () => (widgets.error ? undefined : widgets.latest);
   const card = () => {
-    const found = widgets.latest?.clipCard;
+    const found = loaded()?.clipCard;
     return found && found.id !== props.dismissed ? found : undefined;
   };
   const json = () => {
     const content = card()?.content;
     return content?.type === "json" ? content : undefined;
   };
-  const timerActions = () => widgets.latest?.focus?.actions ?? [];
+  const timerActions = () => loaded()?.focus?.actions ?? [];
   const runCard = () => {
     const current = card();
     if (!current) return false;
@@ -152,7 +154,7 @@ export function WidgetPane(props: {
   });
   // Nothing shows: only clipboard cards are on, and the clipboard has none.
   const empty = () => {
-    const shown = widgets.latest;
+    const shown = loaded();
     return (
       shown !== undefined &&
       !shown.clocks &&
@@ -197,24 +199,22 @@ export function WidgetPane(props: {
             </p>
           )}
         </Show>
-        <Show when={widgets.latest?.clocks}>
-          {(cities) => <Clocks cities={cities()} now={now()} />}
-        </Show>
-        <Show when={widgets.latest?.weather}>
+        <Show when={loaded()?.clocks}>{(cities) => <Clocks cities={cities()} now={now()} />}</Show>
+        <Show when={loaded()?.weather}>
           {(view) => <Weather view={view()} now={now()} onRun={props.onRun} />}
         </Show>
-        <Show when={widgets.latest?.focus}>
+        <Show when={loaded()?.focus}>
           {(timer) => <Focus timer={timer()} now={now()} onRun={props.onRun} />}
         </Show>
-        <Show when={widgets.latest?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
+        <Show when={loaded()?.disk}>{(disk) => <DiskSpace disk={disk()} />}</Show>
       </div>
       <Show when={empty()}>
         <p class="widgets-empty">Copy a color, a Unix time, or JSON to see it here.</p>
       </Show>
-      {/* An empty note is still a note, so test for null. */}
-      <Show when={widgets.latest && widgets.latest.note !== null}>
+      {/* An empty note is still a note, so test its type, not its truth. */}
+      <Show when={typeof loaded()?.note === "string"}>
         <Notepad
-          initial={widgets.latest?.note ?? ""}
+          initial={loaded()?.note ?? ""}
           field={(field) => (noteField = field)}
           onLeave={props.onLeave}
         />
