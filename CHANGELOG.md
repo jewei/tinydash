@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
+- If TinyDash cannot read the saved note, the Notepad says why, and the other widgets still show. Before, the whole widget pane showed only an error.
 - A Unix time now says "1 hour ago" or "In 1 year" instead of "60 minutes ago" or "In 12 months" when it is close to the next unit.
 - The full JSON view of a clipboard card closes when the launcher hides, so the widgets show again the next time it opens.
 
