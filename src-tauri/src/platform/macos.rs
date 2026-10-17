@@ -457,41 +457,97 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
 /// Ask Spotlight for names that contain `name`, with fixed arguments and no
 /// shell. Stops after `limit` paths or a second, whichever comes first.
 pub fn find_files(name: &str, folder: &Path, limit: usize) -> Vec<PathBuf> {
-    use std::io::BufRead;
-    let spawned = Command::new("/usr/bin/mdfind")
-        .arg("-onlyin")
-        .arg(folder)
-        .arg("-name")
-        .arg(name)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn();
-    let mut child = match spawned {
-        Ok(child) => child,
+    let mut command = Command::new("/usr/bin/mdfind");
+    command.arg("-onlyin").arg(folder).arg("-name").arg(name);
+    let (mut child, output) = match spawn_on_terminal(command) {
+        Ok(spawned) => spawned,
         Err(error) => {
             tracing::warn!(%error, "Could not run Spotlight");
             return Vec::new();
         }
     };
-    let Some(output) = child.stdout.take() else {
-        return Vec::new();
-    };
-    let (send, receive) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let paths: Vec<PathBuf> = std::io::BufReader::new(output)
-            .lines()
-            .map_while(std::io::Result::ok)
-            .take(limit)
-            .map(PathBuf::from)
-            .collect();
-        send.send(paths).ok();
-    });
-    let paths = receive
-        .recv_timeout(std::time::Duration::from_secs(1))
-        .unwrap_or_default();
+    let paths = read_paths(output, limit, std::time::Duration::from_secs(1));
     // Spotlight may still be writing after `limit` paths; stop it either way.
     child.kill().ok();
     child.wait().ok();
+    paths
+}
+
+/// Runs `command` with its output on a pseudo-terminal and returns the
+/// terminal's reading end. Into a pipe, mdfind writes only in 16 KB blocks
+/// or at its end, so a search that takes more than a second gave no paths;
+/// onto a terminal, it writes each path as it finds it.
+fn spawn_on_terminal(
+    mut command: Command,
+) -> std::io::Result<(std::process::Child, std::fs::File)> {
+    use std::os::fd::{FromRawFd, OwnedFd};
+    let (mut reader, mut writer) = (-1, -1);
+    // SAFETY: An all-zero termios is a valid value for cfmakeraw to fill.
+    let mut raw: libc::termios = unsafe { std::mem::zeroed() };
+    // SAFETY: Every pointer is valid for the call or null, which openpty
+    // allows for the name and window size. Raw mode keeps "\n" as it is.
+    let opened = unsafe {
+        libc::cfmakeraw(&mut raw);
+        libc::openpty(
+            &mut reader,
+            &mut writer,
+            std::ptr::null_mut(),
+            &mut raw,
+            std::ptr::null_mut(),
+        )
+    };
+    if opened != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // SAFETY: openpty succeeded, so both are open descriptors that nothing
+    // else owns.
+    let (reader, writer) = unsafe { (OwnedFd::from_raw_fd(reader), OwnedFd::from_raw_fd(writer)) };
+    for fd in [&reader, &writer] {
+        use std::os::fd::AsRawFd;
+        // SAFETY: The descriptor is open. Close-on-exec keeps it out of other
+        // children, which would hold the terminal open after `command` ends.
+        unsafe { libc::fcntl(fd.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC) };
+    }
+    let child = command
+        .stdin(std::process::Stdio::null())
+        .stdout(writer)
+        .stderr(std::process::Stdio::null())
+        .spawn()?;
+    // `command` held the writing end; dropping it lets reads end with the child.
+    drop(command);
+    Ok((child, std::fs::File::from(reader)))
+}
+
+/// Up to `limit` paths, one per line, that `output` gives before `timeout`.
+/// The reader sends each path as it reads it, so a slow search still keeps
+/// the paths it found before the timeout.
+fn read_paths(
+    output: impl std::io::Read + Send + 'static,
+    limit: usize,
+    timeout: std::time::Duration,
+) -> Vec<PathBuf> {
+    use std::io::BufRead;
+    let (send, receive) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for line in std::io::BufReader::new(output)
+            .lines()
+            .map_while(std::io::Result::ok)
+            .take(limit)
+        {
+            if send.send(PathBuf::from(line)).is_err() {
+                break;
+            }
+        }
+    });
+    let deadline = std::time::Instant::now() + timeout;
+    let mut paths = Vec::new();
+    while paths.len() < limit {
+        let left = deadline.saturating_duration_since(std::time::Instant::now());
+        match receive.recv_timeout(left) {
+            Ok(path) => paths.push(path),
+            Err(_) => break,
+        }
+    }
     paths
 }
 
@@ -867,6 +923,52 @@ mod tests {
         let png = app_icon(Path::new(&finder.path), 64).expect("icon");
         assert_eq!(&png[1..4], b"PNG");
         assert!(!apps.iter().any(|app| app.path.contains("/Contents/")));
+    }
+
+    /// Gives `text`, then blocks like a search that is still running, until
+    /// the test drops the sender of `release`.
+    struct SlowOutput {
+        text: std::io::Cursor<Vec<u8>>,
+        release: std::sync::mpsc::Receiver<()>,
+    }
+
+    impl std::io::Read for SlowOutput {
+        fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+            let read = self.text.read(buffer)?;
+            if read == 0 {
+                self.release.recv().ok();
+            }
+            Ok(read)
+        }
+    }
+
+    #[test]
+    fn keeps_paths_read_before_the_timeout() {
+        let (release, wait) = std::sync::mpsc::channel::<()>();
+        let output = SlowOutput {
+            text: std::io::Cursor::new(b"/a\n/b\n".to_vec()),
+            release: wait,
+        };
+        let paths = read_paths(output, 10, std::time::Duration::from_millis(200));
+        drop(release);
+        assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
+    }
+
+    #[test]
+    fn spawned_output_is_a_terminal_with_plain_lines() {
+        let mut command = Command::new("/bin/sh");
+        command.arg("-c").arg("test -t 1 && printf '/a\\n/b\\n'");
+        let (mut child, output) = spawn_on_terminal(command).unwrap();
+        let paths = read_paths(output, 10, std::time::Duration::from_secs(5));
+        child.wait().ok();
+        assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
+    }
+
+    #[test]
+    fn reads_at_most_the_limit() {
+        let output = std::io::Cursor::new(b"/a\n/b\n/c\n".to_vec());
+        let paths = read_paths(output, 2, std::time::Duration::from_secs(1));
+        assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
     }
 
     #[test]
