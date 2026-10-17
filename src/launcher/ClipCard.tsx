@@ -13,7 +13,7 @@ import { Keys } from "../ui/Keys";
 type Json = Extract<CardContent, { type: "json" }>;
 
 /** "Object · 8 keys · depth 3 · 312 bytes" */
-export const jsonSummary = (json: Json) => {
+const jsonSummary = (json: Json) => {
   const noun = json.array
     ? json.count === 1
       ? "item"
