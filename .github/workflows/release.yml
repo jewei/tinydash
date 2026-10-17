@@ -43,6 +43,14 @@ jobs:
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
             echo "v$VERSION already exists. Choose a new version."; exit 1
           fi
+          # A new release becomes Latest, and the update feed follows Latest,
+          # so a lower version would move every installed copy back.
+          # With no published release, gh prints the 404 body to stdout, so
+          # keep the output only when the call succeeds and it is a version.
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q '.tag_name | ltrimstr("v")' 2>/dev/null) || latest=""
+          if [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$(printf '%s\n%s\n' "$latest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            echo "$VERSION is lower than the latest release, $latest. Choose a higher version."; exit 1
+          fi
           result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?check_name=Required%20checks" \
             -q '.check_runs | map(.conclusion) | if any(. == "success") then "success" else "not passed" end')
           if [ "$result" != success ]; then
