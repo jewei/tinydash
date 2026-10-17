@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- After an app updates and its icon changes, the launcher shows the new icon without a restart of TinyDash.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
