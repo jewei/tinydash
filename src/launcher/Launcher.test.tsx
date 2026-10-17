@@ -1423,6 +1423,31 @@ describe("Launcher", () => {
     expect(await screen.findByText(/· Saved$/)).toBeTruthy();
   });
 
+  it("keeps note text whose save failed when the pane closes, and saves it again", async () => {
+    let failures = 1;
+    const { backend, input } = setup(() => [app], {
+      widgets: () => ({ clocks: null, disk: null, note: { type: "ready", text: "draft" } }),
+      save_note: () => {
+        if (failures-- > 0) throw "The database is locked.";
+        return null;
+      },
+    });
+    const note = await screen.findByRole("textbox", { name: "Notepad" });
+    fireEvent.input(note, { target: { value: "draft 2" } });
+
+    // A query closes the pane before the pause in typing ends.
+    fireEvent.input(input, { target: { value: "s" } });
+    await waitFor(() => expect(screen.queryByRole("textbox", { name: "Notepad" })).toBeNull());
+    await waitFor(() => expect(backend.called("save_note")).toHaveLength(1));
+
+    fireEvent.input(input, { target: { value: "" } });
+    const reopened = await screen.findByRole("textbox", { name: "Notepad" });
+    expect((reopened as HTMLTextAreaElement).value).toBe("draft 2");
+    await waitFor(() => expect(backend.called("save_note")).toHaveLength(2));
+    expect(backend.called("save_note")[1]?.args).toEqual({ text: "draft 2" });
+    expect(await screen.findByText(/· Saved$/)).toBeTruthy();
+  });
+
   it("counts the focus timer down and runs its actions with Mod+P and the menu", async () => {
     const start = { type: "focus", control: "start" } as const;
     const reset = { type: "focus", control: "reset" } as const;

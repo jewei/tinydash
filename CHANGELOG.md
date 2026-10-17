@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
+- If the note cannot save when you start a search, its text is no longer lost. The note shows it again when the widgets come back, and tries to save it again.
 - On macOS, Also search with Spotlight now finds files for a search that starts with a dash, such as `-draft`.
 - If TinyDash cannot read the saved note, the Notepad says why, and the other widgets still show. Before, the whole widget pane showed only an error.
 - A Unix time now says "1 hour ago" or "In 1 year" instead of "60 minutes ago" or "In 12 months" when it is close to the next unit.
