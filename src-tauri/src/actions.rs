@@ -405,7 +405,10 @@ fn record_use(state: &State, id: &str) {
 mod tests {
     use super::*;
     use crate::{
-        search::{Category, usage::Pins},
+        search::{
+            Category,
+            usage::{Aliases, Pins},
+        },
         settings::Settings,
     };
 
@@ -496,6 +499,22 @@ mod tests {
         set_alias(&state, lock, "").unwrap();
         assert_eq!(state.store.aliases().unwrap().len(), 0);
         assert_eq!(state.aliases.get().len(), 0);
+    }
+
+    #[test]
+    fn a_full_alias_list_refuses_new_aliases_but_allows_renames() {
+        let state = State::for_tests(Settings::default());
+        let lock = "system:lock";
+        let mut pairs = vec![(lock.to_owned(), "lk".to_owned())];
+        pairs.extend((1..MAX_ALIASES).map(|n| (format!("app:/{n}.app"), format!("a{n}"))));
+        state.aliases.set(Aliases::new(pairs));
+        assert_eq!(state.aliases.get().len(), MAX_ALIASES);
+
+        let full = set_alias(&state, "system:sleep", "sl").unwrap_err();
+        assert!(full.to_string().contains("Remove some"), "{full}");
+        set_alias(&state, lock, "lock").unwrap();
+        assert_eq!(state.aliases.get().get(lock), Some("lock"));
+        assert_eq!(state.aliases.get().len(), MAX_ALIASES);
     }
 
     #[test]
