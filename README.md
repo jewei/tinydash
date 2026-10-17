@@ -12,7 +12,17 @@ A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut
 
 ## Install
 
-Download the latest build from [Releases](https://github.com/jewei/tinydash/releases). On macOS you can also install it with Homebrew: `brew install jewei/tap/tinydash`. On Linux, choose the `.deb` (Debian, Ubuntu), the `.rpm` (Fedora, openSUSE), or the AppImage (most other distributions; make it executable, then run it). The macOS app is signed with a Developer ID and notarized by Apple. The Windows and Linux builds are not signed: Windows SmartScreen may ask you to confirm.
+- **macOS (Homebrew):**
+
+  ```sh
+  brew install jewei/tap/tinydash
+  ```
+
+- **macOS (download):** the `.dmg` from [Releases](https://github.com/jewei/tinydash/releases). The app is signed with a Developer ID and notarized by Apple.
+- **Windows:** the `-setup.exe` from [Releases](https://github.com/jewei/tinydash/releases). It is not signed, so Windows SmartScreen may ask you to confirm (More info > Run anyway).
+- **Linux:** from [Releases](https://github.com/jewei/tinydash/releases), the `.deb` (Debian, Ubuntu), the `.rpm` (Fedora, openSUSE), or the AppImage (most other distributions; make it executable, then run it). These are not signed.
+
+On macOS and Windows, TinyDash updates itself. On Linux, download new versions from Releases.
 
 Press **Control+Shift+Space** to open TinyDash. See [all features and shortcuts](docs/features.md).
 
