@@ -472,17 +472,20 @@ pub fn find_files(name: &str, folder: &Path, limit: usize) -> Vec<PathBuf> {
             return Vec::new();
         }
     };
-    let paths = read_paths(output, limit, std::time::Duration::from_secs(1));
+    // Without its dashes, the name also matches paths that the full name does
+    // not. Drop them before the limit counts, or they can push out the paths
+    // that match.
+    let full_name = (asked.len() != name.len()).then(|| name.to_owned());
+    let keep = move |path: &Path| {
+        full_name
+            .as_deref()
+            .is_none_or(|full| name_contains(path, full))
+    };
+    let paths = read_paths(output, limit, std::time::Duration::from_secs(1), keep);
     // Spotlight may still be writing after `limit` paths; stop it either way.
     child.kill().ok();
     child.wait().ok();
-    if asked.len() == name.len() {
-        return paths;
-    }
     paths
-        .into_iter()
-        .filter(|path| name_contains(path, name))
-        .collect()
 }
 
 /// Whether the last part of `path` contains `name`, ignoring case.
@@ -539,23 +542,26 @@ fn spawn_on_terminal(
     Ok((child, std::fs::File::from(reader)))
 }
 
-/// Up to `limit` paths, one per line, that `output` gives before `timeout`.
-/// The reader sends each path as it reads it, so a slow search still keeps
-/// the paths it found before the timeout.
+/// Up to `limit` paths, one per line, that `output` gives before `timeout`
+/// and `keep` accepts. The reader sends each path as it reads it, so a slow
+/// search still keeps the paths it found before the timeout.
 fn read_paths(
     output: impl std::io::Read + Send + 'static,
     limit: usize,
     timeout: std::time::Duration,
+    keep: impl Fn(&Path) -> bool + Send + 'static,
 ) -> Vec<PathBuf> {
     use std::io::BufRead;
     let (send, receive) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        for line in std::io::BufReader::new(output)
+        for path in std::io::BufReader::new(output)
             .lines()
             .map_while(std::io::Result::ok)
+            .map(PathBuf::from)
+            .filter(|path| keep(path))
             .take(limit)
         {
-            if send.send(PathBuf::from(line)).is_err() {
+            if send.send(path).is_err() {
                 break;
             }
         }
@@ -970,7 +976,7 @@ mod tests {
             text: std::io::Cursor::new(b"/a\n/b\n".to_vec()),
             release: wait,
         };
-        let paths = read_paths(output, 10, std::time::Duration::from_millis(200));
+        let paths = read_paths(output, 10, std::time::Duration::from_millis(200), |_| true);
         drop(release);
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
     }
@@ -980,7 +986,7 @@ mod tests {
         let mut command = Command::new("/bin/sh");
         command.arg("-c").arg("test -t 1 && printf '/a\\n/b\\n'");
         let (mut child, output) = spawn_on_terminal(command).unwrap();
-        let paths = read_paths(output, 10, std::time::Duration::from_secs(5));
+        let paths = read_paths(output, 10, std::time::Duration::from_secs(5), |_| true);
         child.wait().ok();
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
     }
@@ -1020,8 +1026,16 @@ mod tests {
     #[test]
     fn reads_at_most_the_limit() {
         let output = std::io::Cursor::new(b"/a\n/b\n/c\n".to_vec());
-        let paths = read_paths(output, 2, std::time::Duration::from_secs(1));
+        let paths = read_paths(output, 2, std::time::Duration::from_secs(1), |_| true);
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
+    }
+
+    #[test]
+    fn the_limit_counts_only_the_paths_kept() {
+        let output = std::io::Cursor::new(b"/draft.txt\n/Drafts\n/-draft.txt\n".to_vec());
+        let keep = |path: &Path| name_contains(path, "-draft");
+        let paths = read_paths(output, 2, std::time::Duration::from_secs(1), keep);
+        assert_eq!(paths, [PathBuf::from("/-draft.txt")]);
     }
 
     #[test]
