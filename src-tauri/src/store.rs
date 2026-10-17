@@ -513,6 +513,13 @@ impl Store {
         })
     }
 
+    /// Remove the note's table, so that reading the note fails.
+    #[cfg(test)]
+    pub fn lose_note_for_tests(&self) {
+        self.with(|db| db.execute_batch("DROP TABLE note"))
+            .expect("the note table exists");
+    }
+
     /// The latest weather download, for the widget while offline.
     pub fn weather(&self) -> Result<Option<Weather>> {
         self.cached("weather")
