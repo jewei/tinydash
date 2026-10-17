@@ -871,6 +871,27 @@ mod tests {
     }
 
     #[test]
+    fn an_older_database_upgrades_and_keeps_its_data() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection.execute_batch(MIGRATIONS[0]).unwrap();
+        connection.pragma_update(None, "user_version", 1).unwrap();
+        connection
+            .execute("INSERT INTO pins (id, position) VALUES ('app:/a', 0)", [])
+            .unwrap();
+
+        let store = Store::new(connection).unwrap();
+        let version: i64 = store
+            .with(|db| db.query_row("PRAGMA user_version", [], |row| row.get(0)))
+            .unwrap();
+        assert_eq!(version, MIGRATIONS.len() as i64);
+        assert_eq!(store.pins().unwrap().ids(), ["app:/a"]);
+        store.save_note("kept").unwrap();
+        store.set_alias("app:/a", Some("aa")).unwrap();
+        store.save_calculation("1+1", "2", 1).unwrap();
+        assert_eq!(store.calculations().unwrap().len(), 1);
+    }
+
+    #[test]
     fn rates_round_trip_and_newer_schemas_are_refused() {
         let store = Store::in_memory();
         assert_eq!(store.rates().unwrap(), None);
