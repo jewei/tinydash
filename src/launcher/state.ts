@@ -66,42 +66,66 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   let queued: Queued | undefined;
   const isCurrent = () => shown?.query === query() && shown?.category === category();
 
+  // The index's rows of the results on screen; Spotlight's rows follow them.
+  let indexed: SearchResult[] = [];
+
+  /** Show `list`, keeping the selected result, or its position when it is gone. */
+  function keepSelection(list: SearchResult[]) {
+    const kept = list.findIndex((result) => result.id === selected()?.id);
+    const index = kept >= 0 ? kept : Math.min(selectedIndex(), list.length - 1);
+    setResults(list);
+    setSelectedIndex(Math.max(index, 0));
+  }
+
   // Spotlight is slower than the index, so its results come after, for
-  // the same input only. A failure leaves the index's results as they are.
+  // the same input only, and replace the rows it gave before. A failure
+  // leaves only the index's results.
   const extras = latestOnly(
     (input: Input) => ipc.spotlightFiles(input.query),
     (found, input) => {
       if (shown?.query !== input.query || shown?.category !== input.category) return;
-      const known = new Set(results().map((result) => result.id));
-      const more = found.filter((result) => !known.has(result.id));
-      if (more.length > 0) setResults([...results(), ...more]);
+      const known = new Set(indexed.map((result) => result.id));
+      keepSelection([...indexed, ...found.filter((result) => !known.has(result.id))]);
     },
-    () => {},
+    (_error, input) => {
+      if (shown?.query !== input.query || shown?.category !== input.category) return;
+      keepSelection(indexed);
+    },
   );
 
   const request = latestOnly(
     (input: Input) => ipc.search(input.query, input.category),
     (found, input) => {
       const same = shown?.query === input.query && shown?.category === input.category;
-      shown = input;
-      batch(() => {
-        // A refresh keeps the selected result, or its position when it is
-        // gone (after a delete); a new input selects the first result.
-        const kept = same ? found.findIndex((result) => result.id === selected()?.id) : 0;
-        const index = kept >= 0 ? kept : Math.min(selectedIndex(), found.length - 1);
-        setResults(found);
-        setSelectedIndex(Math.max(index, 0));
-        setRevision((value) => value + 1);
-        setSearchError(undefined);
-      });
-      if (
+      const asksSpotlight =
         input.category === "files" &&
         // Code points, as Rust's `chars().count()` counts them.
         Array.from(input.query.trim()).length >= SPOTLIGHT_MIN_CHARS &&
-        spotlight()
-      ) {
-        void extras(input);
-      }
+        spotlight();
+      // A refresh keeps Spotlight's rows until Spotlight answers again, so
+      // a selected one stays selected and Enter never runs another row.
+      const known = new Set(found.map((result) => result.id));
+      const spotlightRows =
+        same && asksSpotlight
+          ? results()
+              .slice(indexed.length)
+              .filter((result) => !known.has(result.id))
+          : [];
+      shown = input;
+      indexed = found;
+      batch(() => {
+        // A refresh keeps the selected result, or its position when it is
+        // gone (after a delete); a new input selects the first result.
+        if (same) {
+          keepSelection([...found, ...spotlightRows]);
+        } else {
+          setResults(found);
+          setSelectedIndex(0);
+        }
+        setRevision((value) => value + 1);
+        setSearchError(undefined);
+      });
+      if (asksSpotlight) void extras(input);
       if (queued && isCurrent()) {
         const { target, position } = queued;
         queued = undefined;
@@ -113,6 +137,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       // nothing now and never waits to run on a later query.
       shown = input;
       queued = undefined;
+      indexed = [];
       batch(() => {
         setResults([]);
         setSelectedIndex(0);
