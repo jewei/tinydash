@@ -159,7 +159,7 @@ jobs:
         run: |
           mkdir installers
           find src-tauri/target -path '*/release/bundle/*' -type f \
-            \( -name '*.dmg' -o -name '*-setup.exe' -o -name '*-setup.exe.sig' -o -name '*.deb' \
+            \( -name '*.dmg' -o -name '*-setup.exe' -o -name '*-setup.exe.sig' -o -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \
             -o -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \) -exec cp {} installers/ \;
           # The macOS update file has no version in its name; give it one.
           if [ -f installers/TinyDash.app.tar.gz ]; then

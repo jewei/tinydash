@@ -7,6 +7,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Added
 
 - On macOS, install TinyDash with Homebrew: `brew install jewei/tap/tinydash`.
+- Linux releases add an `.rpm` package for Fedora and openSUSE, and an AppImage that runs on most distributions.
 
 ### Fixed
 

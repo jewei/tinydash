@@ -40,7 +40,9 @@
       "app",
       "dmg",
       "nsis",
-      "deb"
+      "deb",
+      "rpm",
+      "appimage"
     ],
     "category": "Utility",
     "shortDescription": "A small, keyboard-first desktop launcher",
@@ -67,6 +69,11 @@
         "section": "utils",
         "depends": [
           "libxdo3"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "libxdo"
         ]
       }
     }
