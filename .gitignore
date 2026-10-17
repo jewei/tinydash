@@ -14,3 +14,6 @@ src-tauri/gen/
 /artifacts/
 /designs/
 /.hallmark/
+
+# Claude Code settings and worktrees (per machine)
+/.claude/
