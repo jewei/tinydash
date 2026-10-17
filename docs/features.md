@@ -60,23 +60,24 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 ## Instant answers (All only)
 
-| Type        | Examples                                                                                | Enter copies                                        |
-| ----------- | --------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Calculator  | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                   | Result                                              |
-| History     | `=`, `= cm` (calculations you copied)                                                   | Result                                              |
-| Currency    | `100 usd to eur`, `100 USD MYR`                                                         | Result, to 2 decimals; 3 significant digits below 1 |
-| Time zones  | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york` | Time                                                |
-| Dates       | `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`          | `YYYY-MM-DD`                                        |
-| Passwords   | `password`, `pw 32`, `passphrase 8`, `pin 4`                                            | Value, marked secret                                |
-| Clean URL   | Paste a link with `utm_*`, `fbclid`, … parameters                                       | Clean URL                                           |
-| Color       | `#2F6F5E`, `#fff`, `rgb(47, 111, 94)`, `hsl(164, 41%, 31%)`                             | HEX                                                 |
-| Unix time   | `1791354301`, `1791354301250` (seconds or milliseconds, 2001 to 2103)                   | Local time                                          |
-| Permissions | `chmod 755`, `chmod 4755`, `rwxr-xr-x`, `-rw-r--r--` (a bare `755` needs `chmod`)       | The other form                                      |
-| Web search  | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser                                       |
+| Type        | Examples                                                                                     | Enter copies                                        |
+| ----------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Calculator  | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                        | Result                                              |
+| History     | `=`, `= cm` (calculations you copied)                                                        | Result                                              |
+| Currency    | `100 usd to eur`, `100 USD MYR`                                                              | Result, to 2 decimals; 3 significant digits below 1 |
+| Time zones  | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york`      | Time                                                |
+| Dates       | `2026-10-17`, `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week` | `YYYY-MM-DD`                                        |
+| Passwords   | `password`, `pw 32`, `passphrase 8`, `pin 4`                                                 | Value, marked secret                                |
+| Clean URL   | Paste a link with `utm_*`, `fbclid`, … parameters                                            | Clean URL                                           |
+| Color       | `#2F6F5E`, `#fff`, `rgb(47, 111, 94)`, `hsl(164, 41%, 31%)`                                  | HEX                                                 |
+| Unix time   | `1791354301`, `1791354301250` (seconds or milliseconds, 2001 to 2103)                        | Local time                                          |
+| Permissions | `chmod 755`, `chmod 4755`, `rwxr-xr-x`, `-rw-r--r--` (a bare `755` needs `chmod`)            | The other form                                      |
+| Web search  | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                     | Opens browser                                       |
 
 Every All search with text ends with a web search on the chosen engine (Settings > Search), unless it is a web keyword followed by text, such as `yt lofi`. After it come up to three quicklinks whose URL or path has `{query}`, most used first, each filled with the whole text: `Jira: ABC-12`. They do not show after a keyword search (`g rust`, or a snippet or quicklink keyword), when snippets are out of All, for a hidden quicklink, or for a quicklink that already shows because the text matches its name. A path quicklink shows only for text that is a name.
 
 - Copying a calculator answer keeps it in the calculator history (expressions of up to 500 characters), newest first, up to 50, on this computer in `tinydash.db`. Copying the same expression again moves it to the top with its new result. Typing `=` in All lists the history, and `=` and a space followed by words lists the calculations whose expression or result holds them all (up to 20 rows). Enter copies the saved result and moves it to the top, Mod+Enter copies the expression, and Delete from History (Mod+Backspace) removes one. A calculation that starts with `=` and no space, such as `=5+3`, is answered like `5+3`. The System command Clear Calculator History deletes them all, after you confirm.
+- The calculator does not answer a full date such as `2026-10-17` or a clock time such as `3pm` or `10:30`. A full date answers with its weekday. Shorter shapes, such as `12-3-4` or `2026-10`, stay subtractions.
 - Currency rates are off until you turn them on (Settings > Search, or Turn On Currency Rates on the answer that a currency query shows while they are off). TinyDash then uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded. Turning rates off deletes the saved table.
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
 - Color and Unix time answers decode like clipboard cards: a color shows its RGB, HSL, and contrast on white, and Mod+K copies each form; a Unix time shows UTC and how long ago it was.

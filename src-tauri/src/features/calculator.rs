@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    features::currency::Rates,
+    features::{currency::Rates, datetime},
     search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
 };
 
@@ -180,6 +180,9 @@ fn needs_rates(query: &str) -> bool {
 /// The result text and whether it needed exchange rates.
 fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if !query.chars().any(|c| c.is_ascii_digit()) && !matches!(query, "pi" | "π") {
+        return None;
+    }
+    if datetime::is_date_or_clock(query) {
         return None;
     }
     let mut context = fend_core::Context::new();
@@ -388,6 +391,19 @@ mod tests {
         assert_eq!(value("42"), None);
         assert_eq!(value("1password"), None);
         assert_eq!(value("12 +"), None);
+    }
+
+    #[test]
+    fn leaves_dates_and_clock_times_to_the_date_answers() {
+        assert_eq!(value("2026-10-17"), None);
+        assert_eq!(value("3pm"), None);
+        assert_eq!(value("10am"), None);
+        assert_eq!(value("10:30 PM"), None);
+        assert_eq!(value("2026 - 10").as_deref(), Some("2016"));
+        assert_eq!(value("2026-10").as_deref(), Some("2016"));
+        assert_eq!(value("12-3-4").as_deref(), Some("5"));
+        assert_eq!(value("100-5-3").as_deref(), Some("92"));
+        assert_eq!(value("2026-1-5").as_deref(), Some("2020"));
     }
 
     #[test]

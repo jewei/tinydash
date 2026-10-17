@@ -362,7 +362,34 @@ fn clock(words: &[&str]) -> Option<(NaiveTime, usize)> {
     Some((NaiveTime::from_hms_opt(hour, minute, 0)?, used))
 }
 
+/// Whether the whole query is a full `YYYY-MM-DD` date or a clock time, such
+/// as `2026-10-17` or `3pm`. The calculator leaves these alone: fend reads them
+/// as a subtraction or a length. Shorter dates, such as `2026-1-5`, stay
+/// subtractions.
+pub fn is_date_or_clock(query: &str) -> bool {
+    let query = query.trim().to_lowercase();
+    let words: Vec<&str> = query.split_whitespace().collect();
+    let full_date = query.len() == 10 && iso_date(&query).is_some();
+    full_date || clock(&words).is_some_and(|(_, used)| used == words.len())
+}
+
+/// A 4-digit year and a 1- or 2-digit month and day, such as `2026-10-17` or
+/// `2026-1-5`. chrono's `%Y-%m-%d` alone also accepts `12-3-4`, which is a
+/// subtraction.
 fn iso_date(word: &str) -> Option<NaiveDate> {
+    let digits = |part: Option<&str>, lengths: std::ops::RangeInclusive<usize>| {
+        part.is_some_and(|part| {
+            lengths.contains(&part.len()) && part.bytes().all(|byte| byte.is_ascii_digit())
+        })
+    };
+    let mut parts = word.split('-');
+    let shaped = digits(parts.next(), 4..=4)
+        && digits(parts.next(), 1..=2)
+        && digits(parts.next(), 1..=2)
+        && parts.next().is_none();
+    if !shaped {
+        return None;
+    }
     NaiveDate::parse_from_str(word, "%Y-%m-%d").ok()
 }
 
@@ -513,6 +540,7 @@ mod tests {
         assert_eq!(math("2026-01-31 + 1 month").as_deref(), Some("2026-02-28"));
         assert_eq!(math("2026-10-03 - 1 year").as_deref(), Some("2025-10-03"));
         assert_eq!(math("tomorrow+1d").as_deref(), Some("2026-10-05"));
+        assert_eq!(math("2026-1-5 + 1 week").as_deref(), Some("2026-01-12"));
     }
 
     #[test]
@@ -549,6 +577,7 @@ mod tests {
             "next",
             "next week",
             "2026-13-01",
+            "12-3-4",
             "in bed",
         ] {
             assert_eq!(math(query), None, "{query}");
@@ -579,6 +608,8 @@ mod tests {
         );
         // PST is a fixed offset even in summer.
         let results = conversion("2026-07-01 10am pst to utc", now()).unwrap();
+        assert!(results[0].title.starts_with("18:00"));
+        let results = conversion("2026-7-1 10am pst to utc", now()).unwrap();
         assert!(results[0].title.starts_with("18:00"));
     }
 
