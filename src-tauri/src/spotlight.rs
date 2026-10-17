@@ -3,12 +3,12 @@
 //! under the home folder, with the index's own rules for hidden and skipped
 //! names. Paths it returns are remembered, so Open and Reveal accept them.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::{
     features::files,
     platform,
-    search::{matcher::Matcher, result::SearchResult},
+    search::{id::Source, matcher::Matcher, result::SearchResult},
     state::State,
 };
 
@@ -24,13 +24,24 @@ pub fn search(state: &State, query: &str) -> Vec<SearchResult> {
     if !settings.spotlight_files || query.chars().count() < MIN_QUERY_CHARS || !home.is_absolute() {
         return Vec::new();
     }
+    let found = platform::find_files(query, home, LIMIT);
+    results(state, query, &found)
+}
+
+/// The paths of `found` that the Files tab would list but has not: not in
+/// the index, not hidden by the user, and listed by the index's rules.
+/// They are ranked and remembered. The OS search skips the hidden-results
+/// filter in `search::search`, so it is applied here.
+fn results(state: &State, query: &str, found: &[PathBuf]) -> Vec<SearchResult> {
+    let settings = state.settings.get();
+    let home = &state.dirs.home;
     let index = state.files.get();
+    let hidden_results = state.hidden.get();
     let mut matcher = Matcher::new(query);
     let mut hits: Vec<(u32, &Path, bool)> = Vec::new();
-    let found = platform::find_files(query, home, LIMIT);
-    for path in &found {
+    for path in found {
         let Some(text) = path.to_str() else { continue };
-        if index.contains(text) {
+        if index.contains(text) || hidden_results.contains(&Source::File.id(path.display())) {
             continue;
         }
         let Ok(metadata) = std::fs::symlink_metadata(path) else {
@@ -72,7 +83,7 @@ pub fn search(state: &State, query: &str) -> Vec<SearchResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::Settings;
+    use crate::{features::files::FileIndex, search::usage::Hidden, settings::Settings};
 
     fn state(spotlight_files: bool) -> State {
         State::for_tests(Settings {
@@ -87,6 +98,39 @@ mod tests {
         // On, but one character, and the test state has no home folder.
         assert!(search(&state(true), "r").is_empty());
         assert!(search(&state(true), "readme").is_empty());
+    }
+
+    #[test]
+    fn hidden_and_indexed_paths_are_skipped() {
+        let home = std::env::temp_dir().join(format!("tinydash-spotlight-{}", std::process::id()));
+        std::fs::create_dir_all(home.join("indexed")).unwrap();
+        let hidden = home.join("hidden.txt");
+        let indexed = home.join("indexed/notes.txt");
+        let other = home.join("other.txt");
+        for path in [&hidden, &indexed, &other] {
+            std::fs::write(path, "").unwrap();
+        }
+        let mut state = state(true);
+        state.dirs.home = home.clone();
+        state
+            .files
+            .set(FileIndex::scan(&[home.join("indexed")], &[], &[], None));
+        state
+            .hidden
+            .set(Hidden::new([Source::File.id(hidden.display())]));
+
+        let found = [hidden.clone(), indexed.clone(), other.clone()];
+        let ids: Vec<String> = results(&state, "txt", &found)
+            .into_iter()
+            .map(|result| result.id)
+            .collect();
+        assert_eq!(ids, [Source::File.id(other.display())]);
+        let remembered = state.found.lock().unwrap();
+        assert!(remembered.contains(&other.display().to_string()));
+        assert!(!remembered.contains(&hidden.display().to_string()));
+        assert!(!remembered.contains(&indexed.display().to_string()));
+        drop(remembered);
+        std::fs::remove_dir_all(&home).unwrap();
     }
 
     /// Runs Spotlight for real: `TINYDASH_LIVE_SPOTLIGHT=1 cargo test live_spotlight`.
