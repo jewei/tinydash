@@ -60,23 +60,24 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 ## Instant answers (All only)
 
-| Type        | Examples                                                                                | Enter copies          |
-| ----------- | --------------------------------------------------------------------------------------- | --------------------- |
-| Calculator  | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                   | Result                |
-| History     | `=`, `= cm` (calculations you copied)                                                   | Result                |
-| Currency    | `100 usd to eur`, `100 USD MYR`                                                         | Result, to 2 decimals |
-| Time zones  | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york` | Time                  |
-| Dates       | `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`          | `YYYY-MM-DD`          |
-| Passwords   | `password`, `pw 32`, `passphrase 8`, `pin 4`                                            | Value, marked secret  |
-| Clean URL   | Paste a link with `utm_*`, `fbclid`, … parameters                                       | Clean URL             |
-| Color       | `#2F6F5E`, `#fff`, `rgb(47, 111, 94)`, `hsl(164, 41%, 31%)`                             | HEX                   |
-| Unix time   | `1791354301`, `1791354301250` (seconds or milliseconds, 2001 to 2103)                   | Local time            |
-| Permissions | `chmod 755`, `chmod 4755`, `rwxr-xr-x`, `-rw-r--r--` (a bare `755` needs `chmod`)       | The other form        |
-| Web search  | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                | Opens browser         |
+| Type        | Examples                                                                                     | Enter copies                                        |
+| ----------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Calculator  | `12 * 8`, `sqrt(144)`, `5 ft to cm`, `8 Mbps to MBps`                                        | Result                                              |
+| History     | `=`, `= cm` (calculations you copied)                                                        | Result                                              |
+| Currency    | `100 usd to eur`, `100 USD MYR`                                                              | Result, to 2 decimals; 3 significant digits below 1 |
+| Time zones  | `now`, `time in tokyo`, `london time`, `10am pacific to kl`, `2026-12-15 9:30 new york`      | Time                                                |
+| Dates       | `2026-10-17`, `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week` | `YYYY-MM-DD`                                        |
+| Passwords   | `password`, `pw 32`, `passphrase 8`, `pin 4`                                                 | Value, marked secret                                |
+| Clean URL   | Paste a link with `utm_*`, `fbclid`, … parameters                                            | Clean URL                                           |
+| Color       | `#2F6F5E`, `#fff`, `rgb(47, 111, 94)`, `hsl(164, 41%, 31%)`                                  | HEX                                                 |
+| Unix time   | `1791354301`, `1791354301250` (seconds or milliseconds, 2001 to 2103)                        | Local time                                          |
+| Permissions | `chmod 755`, `chmod 4755`, `rwxr-xr-x`, `-rw-r--r--` (a bare `755` needs `chmod`)            | The other form                                      |
+| Web search  | `g rust`, `ddg`, `bing`, `brave`, `yt`, `gh`, `w` + text                                     | Opens browser                                       |
 
 Every All search with text ends with a web search on the chosen engine (Settings > Search), unless it is a web keyword followed by text, such as `yt lofi`. After it come up to three quicklinks whose URL or path has `{query}`, most used first, each filled with the whole text: `Jira: ABC-12`. They do not show after a keyword search (`g rust`, or a snippet or quicklink keyword), when snippets are out of All, for a hidden quicklink, or for a quicklink that already shows because the text matches its name. A path quicklink shows only for text that is a name.
 
 - Copying a calculator answer keeps it in the calculator history (expressions of up to 500 characters), newest first, up to 50, on this computer in `tinydash.db`. Copying the same expression again moves it to the top with its new result. Typing `=` in All lists the history, and `=` and a space followed by words lists the calculations whose expression or result holds them all (up to 20 rows). Enter copies the saved result and moves it to the top, Mod+Enter copies the expression, and Delete from History (Mod+Backspace) removes one. A calculation that starts with `=` and no space, such as `=5+3`, is answered like `5+3`. The System command Clear Calculator History deletes them all, after you confirm.
+- The calculator does not answer a full date such as `2026-10-17` or a clock time such as `3pm` or `10:30`. A full date answers with its weekday. Shorter shapes, such as `12-3-4` or `2026-10`, stay subtractions.
 - Currency rates are off until you turn them on (Settings > Search, or Turn On Currency Rates on the answer that a currency query shows while they are off). TinyDash then uses the daily ECB table from Frankfurter, cached for offline use, refreshed when older than 12 hours. Only the table is downloaded. Turning rates off deletes the saved table.
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
 - Color and Unix time answers decode like clipboard cards: a color shows its RGB, HSL, and contrast on white, and Mod+K copies each form; a Unix time shows UTC and how long ago it was.
@@ -87,7 +88,7 @@ Every All search with text ends with a web search on the chosen engine (Settings
 Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash saves what you copy, newest first, up to the limit you choose (1–1000; pins do not count). Lowering the limit deletes the oldest entries at once. Turning history off hides saved entries, and their pins, but keeps them until you clear them; turning it on again shows them.
 
 - Text up to 16 KB. Images (up to 32, not counting pins, each at most 8 MB and 16 megapixels) and copied files (up to 64 paths, as references) are separate opt-ins.
-- Copies marked secret by password managers are never read. On macOS, Passwords and Keychain Access mark nothing, so a copy made there is skipped when TinyDash notices it while the app is still in front: within half a second, or when you open the launcher from that app. Switching apps faster than that can let the copy through.
+- Copies marked secret by password managers are never read. On macOS, Passwords and Keychain Access mark nothing, so TinyDash skips a copy that it notices while that app is in front or was in front at its previous look. It looks twice a second, and when you open the launcher from that app. A copy made in the first half second after you switch to the app, if you also leave it in that time, can get through. A copy made in another app in the first half second after you leave it is also skipped.
 - Enter copies the entry back in its original format and returns you to the previous app, ready to paste. Copying an entry again moves it to the top.
 - Text is saved as plain text. A list of copied files also has Copy as Plain Text, which copies its paths, one per line.
 - The System command Make Clipboard Plain Text puts the clipboard's text back without its formatting, such as fonts and links from a web page or a document, so it pastes as plain text. It works while history is off, and leaves a copy that its app marked secret as it is. With history on, the plain copy moves the entry to the top.
@@ -101,13 +102,13 @@ Create them in Settings > Snippets and Settings > Quicklinks.
 - **Placeholders** work in both: `{query}` (the text you type after the keyword), `{clipboard}` (the text on the clipboard), `{date}` (`2026-10-11`), `{time}` (`09:05`), and `{datetime}`. They are filled in one pass, so a value that looks like a placeholder, such as typed text `{clipboard}`, stays as it is. Other text in braces stays too.
 - **Snippet:** text. Enter fills the placeholders and copies the text. A snippet with a keyword and `{query}` takes the text typed after its keyword: with keyword `hi` and text `Hello {query},`, typing `hi Sam` copies `Hello Sam,`. Run from its own row, a placeholder with no value, such as `{query}`, is filled with nothing. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.
 - **Quicklink:** an http, https, or mailto URL, or an absolute or `~` path. Placeholder values are encoded for a URL: with keyword `jira` and URL `https://jira.example.com/browse/{query}`, typing `jira ABC-12` opens that issue. In a path, the root (`~`, `/`, a drive, or a network share) comes from the quicklink, and a value must be a name: not a path, `.`, or `..`. `{clipboard}` is empty when the copy is secret: marked so by its app, as password managers do, or, on macOS, made in Passwords or Keychain Access.
-- Limits: 500 snippets and quicklinks in all. A name has up to 100 characters, the text up to 32 KB, and the optional keyword is one word of up to 32 characters.
+- Limits: 500 snippets and quicklinks in all. A name has up to 100 characters, the text up to 32 KB, and the optional keyword is one word of up to 32 characters. Each keyword belongs to one snippet or quicklink. A keyword that is also a web keyword, such as `w`, shows your quicklink, or your snippet with `{query}`, first and the web search after it.
 
 ## Files
 
 TinyDash indexes the names of files and folders in Desktop, Documents, and Downloads (change in Settings > Files, as full paths such as `~/Projects`; up to 50 folders and 50 names to skip), up to 50,000 entries. It skips hidden entries (names that start with a dot, and items that macOS or Windows marks hidden, such as `~/Library` and `desktop.ini`), symbolic links, and folders named in the skip list (`node_modules`, `target` by default). It never reads file contents. On macOS, packages such as apps and photo libraries are listed as one item, without their contents. Changes are picked up the next time the launcher opens. On Linux, only changes directly inside the chosen folders are noticed at once (each watched folder uses one inotify watch from a per-user limit); deeper changes appear at the next full rescan, which starts when the launcher opens and the index is more than 15 minutes old. One word matches names; two or more words also match paths, so `project readme` finds `project/README.md`. A word with `/`, such as `project/readme`, also matches paths, on Windows too.
 
-On macOS, **Also search with Spotlight** (Settings > Files, off by default) makes the Files tab also find names anywhere in your home folder, from the Spotlight index, below the results from your folders. It starts at two characters, skips hidden files and the folder names to skip, and adds up to 100 results. Spotlight finds only what it has indexed, and follows its own privacy settings. These results open, show in Finder, and copy their path; they cannot be pinned.
+On macOS, **Also search with Spotlight** (Settings > Files, off by default) makes the Files tab also find names anywhere in your home folder, from the Spotlight index, below the results from your folders. It starts at two characters, skips hidden files, results you hid, and the folder names to skip, and adds up to 100 results. Spotlight finds only what it has indexed, and follows its own privacy settings. These results open, show in Finder, and copy their path; they cannot be pinned.
 
 ## Settings
 
