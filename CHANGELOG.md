@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
+- On Linux, the launcher opens in the center of the screen again when its saved spot was on a monitor that is gone, and it centers on the screen with the pointer when the display is scaled.
 - On the Files tab, a selected Spotlight result stays selected when the results refresh in the background, so Enter opens the file you chose.
 - Settings now saves a quicklink that needs typed text to work, such as `https://{query}`, instead of calling it invalid.
 - Enter pressed while results load no longer runs a second result after you click one, and no longer changes the confirmation that your click opened.
