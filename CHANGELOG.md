@@ -10,6 +10,9 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
 - When the widgets cannot load, the launcher says why, and Escape and Mod+K still work.
+- A settings file that TinyDash cannot read, such as one saved in a non-UTF-8 encoding or locked by another app, no longer gets replaced with default settings. A file with a bad encoding moves to `settings.invalid.json`. A file that cannot be moved or a locked file stays as it is, and TinyDash does not save setting changes until you reopen it.
+- On macOS, a password copied in Passwords or Keychain Access stays out of clipboard history when you switch to another app right after the copy.
+- A file you hid no longer comes back in the Files tab from Spotlight results.
 
 ## [0.6.0] - 2026-10-14
 

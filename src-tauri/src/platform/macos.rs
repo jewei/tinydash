@@ -576,15 +576,46 @@ fn password_app_in_front() -> bool {
     })
 }
 
+/// The change counter and whether a password app was in front, at one look
+/// by `note_clipboard_change`.
+type Look = (u64, bool);
+
+/// No look yet: any first change counts as new.
+const NO_LOOK: Look = (u64::MAX, false);
+
+static LAST_LOOK: Mutex<Look> = Mutex::new(NO_LOOK);
+
+/// Whether a change seen now may come from a password app, and the look to
+/// keep for next time. The monitor looks only twice a second, so a copy made
+/// just before the user switched away shows up with another app in front; a
+/// password app in front at the look before counts too.
+fn look(last: Look, change: u64, password_app_now_in_front: bool) -> (bool, Look) {
+    let (last_change, password_app_was_in_front) = last;
+    let secret = change != last_change && (password_app_was_in_front || password_app_now_in_front);
+    (secret, (change, password_app_now_in_front))
+}
+
 /// Remember a change made in a password app, which marks nothing, so its
 /// copy stays secret after the user leaves the app. Reads no content.
 pub fn note_clipboard_change(change: u64) {
-    if password_app_in_front() {
+    note_change(change);
+}
+
+/// Look at `change` and say whether a password app is in front now.
+fn note_change(change: u64) -> bool {
+    let now_front = password_app_in_front();
+    let mut last = LAST_LOOK.lock().unwrap_or_else(|e| e.into_inner());
+    let (secret, next) = look(*last, change, now_front);
+    if secret {
         PASSWORD_COPY.store(change, Ordering::Release);
     }
+    *last = next;
+    now_front
 }
 
 /// Call with the reader lock held; it reads the change counter directly.
+/// It looks at the counter too: a read can come before the monitor's next
+/// tick, just after the user copied in a password app and switched away.
 fn clipboard_is_concealed() -> bool {
     autoreleasepool(|_| {
         let pasteboard = NSPasteboard::generalPasteboard();
@@ -593,9 +624,9 @@ fn clipboard_is_concealed() -> bool {
                 .iter()
                 .any(|kind| SECRET_FORMATS.contains(&kind.to_string().as_str()))
         });
-        marked
-            || PASSWORD_COPY.load(Ordering::Acquire) == pasteboard.changeCount() as u64
-            || password_app_in_front()
+        let change = pasteboard.changeCount() as u64;
+        let password_app_now_in_front = note_change(change);
+        marked || PASSWORD_COPY.load(Ordering::Acquire) == change || password_app_now_in_front
     })
 }
 
@@ -791,6 +822,36 @@ mod tests {
         let png = app_icon(Path::new(&finder.path), 64).expect("icon");
         assert_eq!(&png[1..4], b"PNG");
         assert!(!apps.iter().any(|app| app.path.contains("/Contents/")));
+    }
+
+    #[test]
+    fn a_copy_seen_after_leaving_a_password_app_is_secret() {
+        // Passwords in front, no new copy yet.
+        let (secret, last) = look((7, false), 7, true);
+        assert!(!secret);
+        // The user copied, then switched to Safari before the next look.
+        let (secret, last) = look(last, 8, false);
+        assert!(secret);
+        // Safari stays in front; nothing new.
+        let (secret, last) = look(last, 8, false);
+        assert!(!secret);
+        // A copy made in Safari is not secret.
+        let (secret, _) = look(last, 9, false);
+        assert!(!secret);
+    }
+
+    #[test]
+    fn a_copy_made_in_a_password_app_is_secret() {
+        let (secret, last) = look((7, false), 8, true);
+        assert!(secret);
+        // The same copy seen again is not new.
+        assert!(!look(last, 8, true).0);
+    }
+
+    #[test]
+    fn the_first_look_judges_only_the_app_in_front_now() {
+        assert!(!look(NO_LOOK, 3, false).0);
+        assert!(look(NO_LOOK, 3, true).0);
     }
 
     #[test]
