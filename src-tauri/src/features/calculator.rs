@@ -216,10 +216,40 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if value == query.trim() {
         return None;
     }
+    if is_f64_artifact(query, &value) {
+        return None;
+    }
     if !used_rates.load(Ordering::Relaxed) {
         return Some((value, false));
     }
     Some((money(&value).unwrap_or(value), true))
+}
+
+/// Whether fend 1.5.8 computed the value through an f64 and got it wrong. A
+/// wrong answer is worse than none.
+///
+/// `floor`, `ceil`, and `round` lose digits above 2^53 and cap at 2^64, so
+/// `round(9007199254740993)` gives 9007199254740992 and `floor(1e20)` gives
+/// 18446744073709551616. A run of 14 or more digits holds every such value
+/// in decimal, octal, binary, and hex (2^52 has 14 hex digits). This also
+/// drops correct answers from 10^13 up in decimal, from 8^13 (about 5.5e11)
+/// up in octal, and from 8192 up in binary. A looser limit for runs of only
+/// 0 and 1 would keep small binary answers, but it would also keep wrong
+/// decimal ones: `round(10000000000000001)` gives 10000000000000000.
+///
+/// `sinh` and `cosh` cap at 2^64 too: `sinh(50)` gives 18446744073709551616.
+fn is_f64_artifact(query: &str, value: &str) -> bool {
+    let query = query.to_ascii_lowercase();
+    let names = |names: &[&str]| names.iter().any(|name| query.contains(name));
+    if names(&["floor", "ceil", "round"]) {
+        let longest_run = value
+            .split(|c: char| !c.is_ascii_alphanumeric())
+            .filter(|run| run.chars().any(|c| c.is_ascii_digit()))
+            .map(str::len)
+            .max();
+        return longest_run.is_some_and(|len| len >= 14);
+    }
+    names(&["sinh", "cosh"]) && value.contains("18446744073709551616")
 }
 
 /// `approx. 401.7094 MYR` as `401.71 MYR`. The subtitle already says the
@@ -435,6 +465,42 @@ mod tests {
         );
         assert_eq!(money("400 MYR").as_deref(), Some("400.00 MYR"));
         assert_eq!(money("MYR"), None);
+    }
+
+    #[test]
+    fn drops_answers_that_fend_computes_through_an_f64() {
+        for query in [
+            "floor(1e20)",
+            "ceil(1e25)",
+            "round(123456789012345678901.4)",
+            "floor(-1e20)",
+            "FLOOR(1e20 m)",
+            "floor(10000000000000000001)",
+            "round(9007199254740993)",
+            "floor(12345678901234567.5)",
+            "ceil(1e20) to hex",
+            "floor(9007199254740993) to hex",
+            "floor(1e20) + 1",
+            "floor(1e20) * 2",
+            "sinh(50)",
+            "Cosh(50)",
+            // Wrong in decimal, but all 0s and 1s.
+            "round(10000000000000001)",
+            // Correct, but dropped by the 14-digit rule.
+            "round(10000) to binary",
+        ] {
+            assert_eq!(value(query), None, "{query}");
+        }
+        assert_eq!(
+            value("round(1234567890123.4)").as_deref(),
+            Some("1234567890123")
+        );
+        assert_eq!(value("floor(3.5 km)").as_deref(), Some("3 km"));
+        assert_eq!(value("2^64").as_deref(), Some("18446744073709551616"));
+        assert_eq!(
+            value("sinh(40)").as_deref(),
+            Some("approx. 117692633418510000")
+        );
     }
 
     #[test]
