@@ -57,6 +57,13 @@ const MAX_NOTE_CHARS = 10_000;
 /** Typing pauses this long before the note saves. */
 const SAVE_DELAY_MS = 400;
 
+// These outlive one Notepad, since the pane closes while a query is typed.
+// Saves run one at a time, in order, so an older text never lands last.
+let noteSaving = Promise.resolve();
+// The newest text sent to save until a save of it succeeds, so a reopened
+// pane starts from it and not from older saved text.
+let unsavedNote: string | undefined;
+
 /** A signal of the current time that ticks every second while mounted. */
 function createNow() {
   const [now, setNow] = createSignal(Date.now());
@@ -166,9 +173,22 @@ export function WidgetPane(props: {
     );
   };
 
+  const noteText = () => {
+    const note = loaded()?.note;
+    return note?.type === "ready" ? note.text : undefined;
+  };
+  const noteFailure = () => {
+    const note = loaded()?.note;
+    return note?.type === "unavailable" ? note.message : undefined;
+  };
+
   onMount(() => {
     const listeners = [
-      ipc.onLauncherShown(() => void refetch()),
+      ipc.onLauncherShown(() => {
+        // Each open starts on the pane, not on a view left open last time.
+        setJsonOpen(false);
+        void refetch();
+      }),
       ipc.onSettingsChanged(() => void refetch()),
       ipc.onWidgetsChanged(() => void refetch()),
     ];
@@ -211,13 +231,20 @@ export function WidgetPane(props: {
       <Show when={empty()}>
         <p class="widgets-empty">Copy a color, a Unix time, or JSON to see it here.</p>
       </Show>
-      {/* An empty note is still a note, so test its type, not its truth. */}
-      <Show when={typeof loaded()?.note === "string"}>
+      {/* An empty note is still a note, so test for text, not its truth. */}
+      <Show when={noteText() !== undefined}>
         <Notepad
-          initial={loaded()?.note ?? ""}
+          initial={noteText() ?? ""}
           field={(field) => (noteField = field)}
           onLeave={props.onLeave}
         />
+      </Show>
+      <Show when={noteFailure()}>
+        {(message) => (
+          <section class="widget notepad" aria-label="Notepad">
+            <p class="widget-note">Could not read the note. {message()}</p>
+          </section>
+        )}
       </Show>
       <Show when={jsonOpen() && json()}>
         {(content) => (
@@ -416,30 +443,31 @@ function DiskSpace(props: { disk: Disk }) {
  * One scratch note. It starts from the saved text and then keeps its own,
  * since only this field edits it; a pause in typing, leaving the field,
  * and closing the card save it. A failed save stays unsaved, so the next
- * of those tries again.
+ * of those, or the next time the card opens, tries again.
  */
 function Notepad(props: {
   initial: string;
   field: (field: HTMLTextAreaElement | undefined) => void;
   onLeave: () => void;
 }) {
-  const [text, setText] = createSignal(props.initial);
+  const [text, setText] = createSignal(unsavedNote ?? props.initial);
   // Typed text that is not saved yet, and why the last save failed.
   const [pending, setPending] = createSignal(false);
   const [failure, setFailure] = createSignal<string>();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let unsaved = false;
-  // Saves run one at a time, in order, so an older text never lands last.
-  let saving = Promise.resolve();
+  let unsaved = unsavedNote !== undefined;
 
   const save = () => {
     clearTimeout(timer);
     if (!unsaved) return;
     unsaved = false;
     const value = text();
-    saving = saving.then(() =>
+    unsavedNote = value;
+    setPending(true);
+    noteSaving = noteSaving.then(() =>
       ipc.saveNote(value).then(
         () => {
+          if (unsavedNote === value) unsavedNote = undefined;
           setFailure(undefined);
           setPending(unsaved);
         },
@@ -452,6 +480,8 @@ function Notepad(props: {
       ),
     );
   };
+  // Text an earlier pane could not save: try again now.
+  save();
   onCleanup(() => {
     save();
     props.field(undefined);

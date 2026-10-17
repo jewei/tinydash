@@ -45,19 +45,25 @@ const OWN_DESKTOP_IDS: &[&str] = &[
 pub fn app_folders() -> Vec<PathBuf> {
     xdg_app_folders(
         &std::env::home_dir().unwrap_or_default(),
-        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from),
+        std::env::var_os("XDG_DATA_HOME"),
         std::env::var("XDG_DATA_DIRS").ok(),
     )
 }
 
 /// The user's data folder comes first, as XDG ranks it above system folders.
+/// The XDG spec treats an empty variable as unset, so its default applies.
 fn xdg_app_folders(
     home: &Path,
-    data_home: Option<PathBuf>,
+    data_home: Option<std::ffi::OsString>,
     data_dirs: Option<String>,
 ) -> Vec<PathBuf> {
-    let data_home = data_home.unwrap_or_else(|| home.join(".local/share"));
-    let data_dirs = data_dirs.unwrap_or_else(|| "/usr/local/share:/usr/share".into());
+    let data_home = data_home
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".local/share"));
+    let data_dirs = data_dirs
+        .filter(|dirs| !dirs.is_empty())
+        .unwrap_or_else(|| "/usr/local/share:/usr/share".into());
     std::iter::once(data_home)
         .chain(
             data_dirs
@@ -428,6 +434,28 @@ mod tests {
     }
 
     #[test]
+    fn empty_xdg_variables_use_the_defaults() {
+        let home = Path::new("/home/me");
+        let defaults = vec![
+            PathBuf::from("/home/me/.local/share/applications"),
+            PathBuf::from("/usr/local/share/applications"),
+            PathBuf::from("/usr/share/applications"),
+        ];
+        assert_eq!(xdg_app_folders(home, None, None), defaults);
+        assert_eq!(
+            xdg_app_folders(home, Some("".into()), Some(String::new())),
+            defaults
+        );
+        assert_eq!(
+            xdg_app_folders(home, Some("/data".into()), Some("/opt/share:".into())),
+            vec![
+                PathBuf::from("/data/applications"),
+                PathBuf::from("/opt/share/applications"),
+            ]
+        );
+    }
+
+    #[test]
     fn launcher_wrappers_are_not_aliases() {
         assert_eq!(executable_alias(Path::new("/usr/bin/flatpak")), None);
         assert_eq!(executable_alias(Path::new("env")), None);
@@ -440,23 +468,11 @@ mod tests {
     }
 
     #[test]
-    fn app_folders_follow_xdg_defaults() {
-        assert_eq!(
-            xdg_app_folders(Path::new("/home/ann"), None, None),
-            [
-                PathBuf::from("/home/ann/.local/share/applications"),
-                PathBuf::from("/usr/local/share/applications"),
-                PathBuf::from("/usr/share/applications"),
-            ]
-        );
-    }
-
-    #[test]
     fn app_folders_include_flatpak_and_snap_exports() {
         assert_eq!(
             xdg_app_folders(
                 Path::new("/home/ann"),
-                Some(PathBuf::from("/data")),
+                Some("/data".into()),
                 Some("/var/lib/flatpak/exports/share::/var/lib/snapd/desktop:".into()),
             ),
             [
