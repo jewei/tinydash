@@ -1377,7 +1377,8 @@ describe("Launcher", () => {
     fireEvent.keyDown(note, { key: "x" });
     expect(document.activeElement).toBe(note);
     expect(within(card).getByRole("status").textContent).toBe("2 words · Saving…");
-    await waitFor(() => expect(backend.called("save_note")).toHaveLength(1));
+    // The save waits SAVE_DELAY_MS (400 ms); leave a slow runner room past it.
+    await waitFor(() => expect(backend.called("save_note")).toHaveLength(1), { timeout: 3000 });
     expect(backend.called("save_note")[0]?.args).toEqual({ text: "buy milk" });
     expect(backend.called("run_action")).toHaveLength(0);
     expect(backend.called("hide_launcher")).toHaveLength(0);
@@ -1449,13 +1450,16 @@ describe("Launcher", () => {
   });
 
   it("counts the focus timer down and runs its actions with Mod+P and the menu", async () => {
+    // A stopped clock: a slow runner cannot tick the countdown past 01:31.
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
     const start = { type: "focus", control: "start" } as const;
     const reset = { type: "focus", control: "reset" } as const;
     const running = {
       phase: "focus",
       state: "running",
       remainingMs: 0,
-      endsAtMs: Date.now() + 90_500,
+      endsAtMs: now + 90_500,
       totalMs: 25 * 60_000,
       session: 2,
       sessions: 4,
