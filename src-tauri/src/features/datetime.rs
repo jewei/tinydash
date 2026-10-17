@@ -362,7 +362,34 @@ fn clock(words: &[&str]) -> Option<(NaiveTime, usize)> {
     Some((NaiveTime::from_hms_opt(hour, minute, 0)?, used))
 }
 
+/// Whether the whole query is a full `YYYY-MM-DD` date or a clock time, such
+/// as `2026-10-17` or `3pm`. The calculator leaves these alone: fend reads them
+/// as a subtraction or a length. Shorter dates, such as `2026-1-5`, stay
+/// subtractions.
+pub fn is_date_or_clock(query: &str) -> bool {
+    let query = query.trim().to_lowercase();
+    let words: Vec<&str> = query.split_whitespace().collect();
+    let full_date = query.len() == 10 && iso_date(&query).is_some();
+    full_date || clock(&words).is_some_and(|(_, used)| used == words.len())
+}
+
+/// A 4-digit year and a 1- or 2-digit month and day, such as `2026-10-17` or
+/// `2026-1-5`. chrono's `%Y-%m-%d` alone also accepts `12-3-4`, which is a
+/// subtraction.
 fn iso_date(word: &str) -> Option<NaiveDate> {
+    let digits = |part: Option<&str>, lengths: std::ops::RangeInclusive<usize>| {
+        part.is_some_and(|part| {
+            lengths.contains(&part.len()) && part.bytes().all(|byte| byte.is_ascii_digit())
+        })
+    };
+    let mut parts = word.split('-');
+    let shaped = digits(parts.next(), 4..=4)
+        && digits(parts.next(), 1..=2)
+        && digits(parts.next(), 1..=2)
+        && parts.next().is_none();
+    if !shaped {
+        return None;
+    }
     NaiveDate::parse_from_str(word, "%Y-%m-%d").ok()
 }
 
@@ -370,23 +397,23 @@ fn iso_date(word: &str) -> Option<NaiveDate> {
 /// with its weekday.
 fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     let spaced = query.replace('+', " + ");
-    let mut words = spaced.split_whitespace();
+    let mut words = spaced.split_whitespace().flat_map(split_minus);
     let first = words.next()?;
     let (base, base_label) = match first {
-        "today" => (today, "today"),
-        "tomorrow" => (today + Days::new(1), "tomorrow"),
-        "yesterday" => (today - Days::new(1), "yesterday"),
-        "in" => (today, "today"),
+        "today" | "in" => (today, "today".to_owned()),
+        "tomorrow" => (today + Days::new(1), first.to_owned()),
+        "yesterday" => (today - Days::new(1), first.to_owned()),
         "next" | "last" => {
-            let weekday: Weekday = words.next()?.parse().ok()?;
+            let name = words.next()?;
+            let weekday: Weekday = name.parse().ok()?;
             let date = if first == "next" {
                 next_weekday(today, weekday)
             } else {
                 last_weekday(today, weekday)
             };
-            (date, first)
+            (date, format!("{first} {name}"))
         }
-        word => (iso_date(word)?, ""),
+        word => (iso_date(word)?, String::new()),
     };
     let mut date = base;
     if first == "in" {
@@ -403,7 +430,7 @@ fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     let from = if base_label.is_empty() {
         String::new()
     } else {
-        format!(" · {} is {}", base_label, today.format("%a %-d %b %Y"))
+        format!(" · {base_label} is {}", base.format("%a %-d %b %Y"))
     };
     let days = (date - today).num_days();
     let relative = match days {
@@ -420,6 +447,26 @@ fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     );
     result.actions[0].label = "Copy Date".into();
     Some(result)
+}
+
+/// Split a minus sign from the words it touches, as in `-3`, `today-3d`,
+/// or `friday-1w`. The query cannot simply put spaces around every `-`, as
+/// it does for `+`, because ISO dates contain `-`; a word that starts with
+/// a digit keeps its `-`.
+fn split_minus(word: &str) -> Vec<&str> {
+    match word.split_once('-') {
+        Some((before, after))
+            if !after.is_empty() && before.chars().all(|c| c.is_ascii_alphabetic()) =>
+        {
+            let mut parts = Vec::with_capacity(3);
+            if !before.is_empty() {
+                parts.push(before);
+            }
+            parts.extend(["-", after]);
+            parts
+        }
+        _ => vec![word],
+    }
 }
 
 /// Apply one `<n> <unit>` step, also written together as in `3d` or `2weeks`.
@@ -513,6 +560,48 @@ mod tests {
         assert_eq!(math("2026-01-31 + 1 month").as_deref(), Some("2026-02-28"));
         assert_eq!(math("2026-10-03 - 1 year").as_deref(), Some("2025-10-03"));
         assert_eq!(math("tomorrow+1d").as_deref(), Some("2026-10-05"));
+        assert_eq!(math("2026-10-17").as_deref(), Some("2026-10-17"));
+        assert_eq!(math("2026-1-5 + 1 week").as_deref(), Some("2026-01-12"));
+    }
+
+    #[test]
+    fn minus_sign_may_touch_its_number() {
+        for (glued, spaced) in [
+            ("today -3 days", "today - 3 days"),
+            ("today-3d", "today - 3d"),
+            ("next friday -1 week", "next friday - 1 week"),
+            ("next friday-1w", "next friday - 1w"),
+            ("2026-10-17 -2d", "2026-10-17 - 2d"),
+        ] {
+            assert!(math(spaced).is_some(), "{spaced}");
+            assert_eq!(math(glued), math(spaced), "{glued}");
+        }
+    }
+
+    #[test]
+    fn date_math_subtitle_names_the_base_date() {
+        let subtitle = |query| date_math(query, date("2026-10-03")).unwrap().subtitle;
+        assert_eq!(
+            subtitle("tomorrow + 1 day"),
+            "in 2 days · tomorrow is Sun 4 Oct 2026"
+        );
+        assert_eq!(
+            subtitle("yesterday - 1 day"),
+            "2 days ago · yesterday is Fri 2 Oct 2026"
+        );
+        assert_eq!(
+            subtitle("next friday + 2 weeks"),
+            "in 20 days · next friday is Fri 9 Oct 2026"
+        );
+        assert_eq!(
+            subtitle("last monday"),
+            "5 days ago · last monday is Mon 28 Sep 2026"
+        );
+        assert_eq!(
+            subtitle("in 2 weeks"),
+            "in 14 days · today is Sat 3 Oct 2026"
+        );
+        assert_eq!(subtitle("2026-10-03 - 1 year"), "365 days ago");
     }
 
     #[test]
@@ -523,6 +612,7 @@ mod tests {
             "next",
             "next week",
             "2026-13-01",
+            "12-3-4",
             "in bed",
         ] {
             assert_eq!(math(query), None, "{query}");
@@ -553,6 +643,8 @@ mod tests {
         );
         // PST is a fixed offset even in summer.
         let results = conversion("2026-07-01 10am pst to utc", now()).unwrap();
+        assert!(results[0].title.starts_with("18:00"));
+        let results = conversion("2026-7-1 10am pst to utc", now()).unwrap();
         assert!(results[0].title.starts_with("18:00"));
     }
 

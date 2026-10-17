@@ -132,7 +132,11 @@ fn setup(app: &mut App) {
     let home_dir = std::env::home_dir().unwrap_or_default();
 
     let mut warnings = Vec::new();
-    let (settings, warning) = settings::load(&config_dir);
+    let settings::Loaded {
+        settings,
+        warning,
+        file: settings_file,
+    } = settings::load(&config_dir);
     warnings.extend(warning);
     if legacy_dir.join(LEGACY_DATABASE).exists() {
         warnings.push(format!(
@@ -156,6 +160,7 @@ fn setup(app: &mut App) {
     let tray_visible = settings.show_tray_icon;
     app.manage(State::new(
         settings,
+        settings_file,
         store,
         Dirs {
             config: config_dir,

@@ -453,8 +453,9 @@ fn answers(s: &Snapshot, query: &str) -> Vec<SearchResult> {
     results.extend(url_cleaner::answer(query));
     results.extend(clip_card::answer(query, s.now));
     results.extend(permissions::answer(query));
-    results.extend(web::answer(query));
+    // The user's own keyword goes before a web keyword it shares, such as `w`.
     results.extend(s.library.keyword_answer(query));
+    results.extend(web::answer(query));
     results
 }
 
@@ -522,6 +523,14 @@ mod tests {
                 .iter()
                 .all(|(kind, _)| *kind != ResultKind::Permissions)
         );
+    }
+
+    #[test]
+    fn an_iso_date_answers_with_its_weekday_first() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let first = search(&state.snapshot(), "2026-10-17", Category::All).remove(0);
+        assert_eq!(first.kind, ResultKind::DateTime);
+        assert_eq!(first.title, "Saturday, 17 October 2026");
     }
 
     #[test]
@@ -681,6 +690,24 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), results.len());
+    }
+
+    #[test]
+    fn a_quicklink_keyword_goes_before_a_web_keyword() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings::default());
+        let item = LibraryItem {
+            id: None,
+            kind: LibraryKind::Quicklink,
+            name: "Work wiki".into(),
+            keyword: "w".into(),
+            text: "https://wiki.test/search?q={query}".into(),
+        };
+        state.store.save_library_item(&item).unwrap();
+        state.reload_library().unwrap();
+        let results = search(&state.snapshot(), "w vacation policy", Category::All);
+        assert_eq!(results[0].title, "Work wiki: vacation policy");
+        assert_eq!(results[1].kind, ResultKind::WebSearch);
     }
 
     #[test]
