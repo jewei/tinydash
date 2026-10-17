@@ -28,8 +28,6 @@
 //! - `discover_apps()`: installed apps.
 //! - `launch_app(path)`: start an app found by `discover_apps`.
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
-//! - `icon_stamp(path)`: a time that changes when the icon of `path` may
-//!   have changed, such as after an app update, or `None` when unreadable.
 //! - `run_system_command(command)`. Sleep Displays calls
 //!   `wait_for_key_release` first, only where it is supported.
 //! - `notify(app, title, body)`: show a system notification.

@@ -147,12 +147,6 @@ pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
     None
 }
 
-pub fn icon_stamp(path: &Path) -> Option<std::time::SystemTime> {
-    std::fs::metadata(path)
-        .and_then(|metadata| metadata.modified())
-        .ok()
-}
-
 /// Calls KDE's session manager directly: its command-line client is
 /// `qdbus`, `qdbus6`, or `qdbus-qt6` depending on the distribution.
 fn kde_log_out() -> Result<()> {

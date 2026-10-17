@@ -22,9 +22,11 @@ use tauri::{
 
 use crate::{features::clipboard::Content, platform, state::State};
 
-/// Icons rendered so far, keyed by path, pixel size, and
-/// `platform::icon_stamp`, so an app that updates in place shows its new icon.
-/// Small PNGs; capped.
+/// Icons rendered so far, keyed by path, pixel size, and the path's
+/// modification time. An update that replaces the whole app bundle changes
+/// that time, so the new icon renders. An update that writes inside the
+/// bundle does not, but AppKit keeps the old icon for it anyway, even
+/// after a restart or a LaunchServices registration. Small PNGs; capped.
 type IconCache = HashMap<(String, u32, Option<SystemTime>), Arc<Vec<u8>>>;
 static ICONS: LazyLock<Mutex<IconCache>> = LazyLock::new(Mutex::default);
 const ICON_CACHE_LIMIT: usize = 512;
@@ -61,8 +63,10 @@ fn cached_icon(
     size: u32,
     render: impl FnOnce(&Path, u32) -> Option<Vec<u8>>,
 ) -> Option<Arc<Vec<u8>>> {
-    let stamp = platform::icon_stamp(Path::new(&path));
-    let key = (path, size, stamp);
+    let modified = std::fs::metadata(&path)
+        .and_then(|metadata| metadata.modified())
+        .ok();
+    let key = (path, size, modified);
     let cached = lock(cache).get(&key).cloned();
     cached.or_else(|| {
         let png = Arc::new(render(Path::new(&key.0), size)?);
