@@ -8,6 +8,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `=5+3` now gives the calculator answer, as `5+3` does, instead of a web search.
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
+- On Linux, Flatpak and Snap apps no longer all match a search for "flatpak" or "env".
 - A calculation copied again within the same second moves to the top of the history.
 - On macOS, the Files tab now shows Spotlight results when Spotlight takes more than a second to answer. Before, such a search showed no Spotlight results.
 - On Windows, a Files search with `/`, such as `docs/readme`, now finds files in that folder, also when folder names have accents or non-Latin letters.
