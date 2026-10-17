@@ -63,24 +63,12 @@ pub fn discover_apps() -> Vec<App> {
             .into_iter();
         for entry in walker.flatten() {
             let path = entry.path();
-            let is_app = path.extension().is_some_and(|ext| {
-                ["lnk", "url", "exe", "appref-ms"]
-                    .iter()
-                    .any(|allowed| ext.eq_ignore_ascii_case(allowed))
-            });
-            let Some(name) = path
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().into_owned())
-            else {
-                continue;
-            };
-            // Start menus also hold uninstallers; nobody launches those by name.
-            if !is_app
-                || !entry.file_type().is_file()
-                || name.to_lowercase().starts_with("uninstall")
-            {
+            if !entry.file_type().is_file() {
                 continue;
             }
+            let Some(name) = app_name(path) else {
+                continue;
+            };
             if let Some(path) = path.to_str() {
                 // Reading a shortcut's comment needs COM; the folder shows instead.
                 apps.push(App {
@@ -93,6 +81,18 @@ pub fn discover_apps() -> Vec<App> {
         }
     }
     apps
+}
+
+/// The name of a Start menu entry that launches an app, or `None` for other
+/// files. Start menus also hold uninstallers; nobody launches those by name.
+fn app_name(path: &Path) -> Option<String> {
+    let is_app = path.extension().is_some_and(|ext| {
+        ["lnk", "url", "exe", "appref-ms"]
+            .iter()
+            .any(|allowed| ext.eq_ignore_ascii_case(allowed))
+    });
+    let name = path.file_stem()?.to_string_lossy().into_owned();
+    (is_app && !name.to_lowercase().starts_with("uninstall")).then_some(name)
 }
 
 pub fn prepare_app(app: &mut tauri::App) {
@@ -162,17 +162,22 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
     if done == 0 {
         return Err(std::io::Error::last_os_error().into());
     }
-    let name = match path.components().next() {
+    Ok(super::Volume {
+        name: drive_name(path),
+        total_bytes,
+        free_bytes,
+    })
+}
+
+/// The drive part of `path`, such as `C:` or `\\server\share`, or "Disk"
+/// when the path has none.
+fn drive_name(path: &Path) -> String {
+    match path.components().next() {
         Some(std::path::Component::Prefix(prefix)) => {
             prefix.as_os_str().to_string_lossy().into_owned()
         }
         _ => "Disk".into(),
-    };
-    Ok(super::Volume {
-        name,
-        total_bytes,
-        free_bytes,
-    })
+    }
 }
 
 /// No system file index here: Windows Search is not used yet. Search uses TinyDash's own index.
@@ -198,8 +203,7 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
             SystemCommand::EmptyTrash => {
                 let flags = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND;
                 let result = SHEmptyRecycleBinW(std::ptr::null_mut(), std::ptr::null(), flags);
-                // An already empty bin reports E_UNEXPECTED; that is not a failure.
-                if result >= 0 || result == 0x8000_FFFF_u32 as i32 {
+                if recycle_bin_emptied(result) {
                     Ok(())
                 } else {
                     let error = std::io::Error::from_raw_os_error(result);
@@ -236,6 +240,12 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     }
 }
 
+/// Whether an `SHEmptyRecycleBinW` result means the bin is now empty. An
+/// already empty bin reports E_UNEXPECTED; that is not a failure.
+fn recycle_bin_emptied(result: i32) -> bool {
+    result >= 0 || result == 0x8000_FFFF_u32 as i32
+}
+
 /// Switch apps and the taskbar between light and dark, as Settings >
 /// Personalization > Colors does. A custom mix of the two becomes one mode,
 /// the opposite of the apps' mode.
@@ -265,8 +275,7 @@ fn toggle_dark_mode() -> Result<()> {
             &raw mut size,
         )
     };
-    // No value yet means the default, light.
-    let next = u32::from(status == 0 && light == 0);
+    let next = next_light_theme(status, light);
     for name in ["AppsUseLightTheme", "SystemUsesLightTheme"] {
         let name = wide(name);
         // SAFETY: The strings are NUL-terminated, and `next` holds the four
@@ -304,6 +313,13 @@ fn toggle_dark_mode() -> Result<()> {
         };
     });
     Ok(())
+}
+
+/// The `AppsUseLightTheme` value that switches the mode, from the status and
+/// value of reading it: 1 (light) after dark, else 0 (dark). No value yet
+/// means the default, light.
+fn next_light_theme(read_status: u32, light: u32) -> u32 {
+    u32::from(read_status == 0 && light == 0)
 }
 
 /// Copies that should stay out of histories are marked here, so there is
@@ -546,6 +562,49 @@ pub fn restore_frontmost_app() {}
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
+    #[test]
+    fn names_start_menu_apps_and_skips_other_files() {
+        let name = |path: &str| super::app_name(Path::new(path));
+        assert_eq!(name(r"C:\Start\Firefox.lnk").as_deref(), Some("Firefox"));
+        assert_eq!(name(r"C:\Start\Tool.EXE").as_deref(), Some("Tool"));
+        assert_eq!(name(r"C:\Start\Site.url").as_deref(), Some("Site"));
+        assert_eq!(name(r"C:\Start\App.appref-ms").as_deref(), Some("App"));
+        assert_eq!(name(r"C:\Start\Uninstall Firefox.lnk"), None);
+        assert_eq!(name(r"C:\Start\UNINSTALL.exe"), None);
+        assert_eq!(name(r"C:\Start\desktop.ini"), None);
+        assert_eq!(name(r"C:\Start\Readme"), None);
+    }
+
+    #[test]
+    fn names_the_drive_of_a_path() {
+        assert_eq!(super::drive_name(Path::new(r"C:\Users\me")), "C:");
+        assert_eq!(super::drive_name(Path::new(r"d:\")), "d:");
+        assert_eq!(
+            super::drive_name(Path::new(r"\\server\share\folder")),
+            r"\\server\share"
+        );
+        assert_eq!(super::drive_name(Path::new(r"Users\me")), "Disk");
+    }
+
+    #[test]
+    fn an_empty_recycle_bin_is_not_a_failure() {
+        assert!(super::recycle_bin_emptied(0));
+        assert!(super::recycle_bin_emptied(1));
+        assert!(super::recycle_bin_emptied(0x8000_FFFF_u32 as i32));
+        // E_ACCESSDENIED
+        assert!(!super::recycle_bin_emptied(0x8007_0005_u32 as i32));
+    }
+
+    #[test]
+    fn toggles_the_color_mode() {
+        assert_eq!(super::next_light_theme(0, 1), 0);
+        assert_eq!(super::next_light_theme(0, 0), 1);
+        // ERROR_FILE_NOT_FOUND: no value yet means light, so dark comes next.
+        assert_eq!(super::next_light_theme(2, 0), 0);
+    }
+
     #[test]
     fn reads_the_png_size_from_its_header() {
         let mut png = Vec::new();
