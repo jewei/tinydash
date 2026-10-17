@@ -1274,6 +1274,25 @@ describe("Launcher", () => {
     expect(await within(card).findByText(/Low space/)).toBeTruthy();
   });
 
+  it("says why the widgets did not load, and its keys still work", async () => {
+    const { backend, press } = setup(() => [app], {
+      widgets: () => {
+        throw "The database is locked.";
+      },
+    });
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Could not load the widgets: The database is locked.");
+
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByRole("combobox", { name: "Search actions" });
+    fireEvent.keyDown(filter, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("combobox", { name: "Search actions" })).toBeNull(),
+    );
+    press("Escape");
+    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
+  });
+
   it("edits the note with Mod+J, saves it, and leaves with Escape", async () => {
     const { backend, input, press } = setup(() => [app], {
       widgets: () => ({ clocks: null, disk: null, note: "" }),
