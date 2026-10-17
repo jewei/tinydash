@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- On macOS, a click on the tray icon while the launcher is open no longer makes Escape forget the app you came from.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
