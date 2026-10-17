@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- On macOS, Also search with Spotlight now finds files for a search that starts with a dash, such as `-draft`.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
