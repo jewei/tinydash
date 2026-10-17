@@ -25,7 +25,7 @@ use crate::{
         id::Source,
         result::{Action, SearchResult},
     },
-    settings::{self, LauncherPosition, Settings},
+    settings::{LauncherPosition, Settings},
     shortcut, spotlight,
     state::State,
     tray, updates, watcher,
@@ -163,7 +163,7 @@ pub fn set_launcher_position(app: &AppHandle, position: Option<LauncherPosition>
         launcher_position: position,
         ..Settings::clone(&old)
     };
-    settings::save(&state.dirs.config, &new)?;
+    state.settings_file.save(&new)?;
     state.settings.set(new.clone());
     events::settings_changed(app, &new);
     Ok(())
@@ -186,7 +186,7 @@ pub fn turn_on_currency_rates(app: &AppHandle) -> Result<()> {
         currency_rates_enabled: true,
         ..Settings::clone(&old)
     };
-    settings::save(&state.dirs.config, &new)?;
+    state.settings_file.save(&new)?;
     state.settings.set(new.clone());
     events::settings_changed(app, &new);
     refresh::rates(app, true);
@@ -231,7 +231,7 @@ pub async fn update_settings(
             )));
         }
         let applied = apply_to_system(&app, &old, &new)
-            .and_then(|()| settings::save(&state.dirs.config, &new));
+            .and_then(|()| state.settings_file.save(&new));
         if let Err(error) = applied {
             // Undo whatever part did apply; the original error is the one to show.
             apply_to_system(&app, &new, &old).ok();
