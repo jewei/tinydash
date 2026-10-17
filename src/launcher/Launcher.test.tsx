@@ -1086,6 +1086,55 @@ describe("Launcher", () => {
     expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
   });
 
+  it("drops a queued Enter when the user clicks a row", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const notes = { ...app, id: "app:/Applications/Notes.app", title: "Notes" };
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "n") await slow;
+        return [app, notes];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Notes/ });
+    fireEvent.input(input, { target: { value: "n" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: /Notes/ }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    release();
+    await waitFor(() => expect(backend.called("search").length).toBeGreaterThanOrEqual(2));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(1);
+    expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
+  });
+
+  it("keeps the confirmation of a clicked row when a queued Enter's results arrive", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "r") await slow;
+        return [app, restart];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Restart/ });
+    fireEvent.input(input, { target: { value: "r" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: /Restart/ }));
+    const dialog = await screen.findByRole("alertdialog");
+    release();
+    await waitFor(() => expect(backend.called("search").length).toBeGreaterThanOrEqual(2));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Run" }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args.resultId).toBe(restart.id);
+  });
+
   it("ignores Enter before and after a search fails", async () => {
     let fail!: () => void;
     const failing = new Promise<void>((_, reject) => (fail = () => reject("Search failed.")));
