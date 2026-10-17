@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- In Settings > General, Center keeps keyboard focus after you use it, so Tab moves on from there instead of from the top of the page.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
