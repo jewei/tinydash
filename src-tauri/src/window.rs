@@ -2,13 +2,14 @@
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 use crate::{
     commands,
     error::{Error, Result},
     events, platform, refresh,
     search::Category,
+    settings::LauncherPosition,
     shortcut,
     state::State,
 };
@@ -21,10 +22,15 @@ fn launcher(app: &AppHandle) -> Result<WebviewWindow> {
         .ok_or_else(|| Error::msg("The launcher window is missing."))
 }
 
-/// Whether the user dragged the launcher since it was last shown, so its
-/// spot is saved when it hides. Only a drag counts: the app's own moves
-/// never do.
-static DRAGGED: AtomicBool = AtomicBool::new(false);
+/// Where the launcher was when the user first started a drag since it was
+/// last shown, so its spot is saved when it hides, but only if it moved: a
+/// click on empty space starts a drag too. Only a drag counts: the app's
+/// own moves never do.
+static DRAG_START: Mutex<Option<LauncherPosition>> = Mutex::new(None);
+
+fn drag_start() -> std::sync::MutexGuard<'static, Option<LauncherPosition>> {
+    DRAG_START.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 /// Show the launcher where the user last dragged it, or in the center of
 /// the screen with the pointer. A category opens it with an empty query in
@@ -32,7 +38,7 @@ static DRAGGED: AtomicBool = AtomicBool::new(false);
 pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
     let window = launcher(app)?;
     platform::remember_frontmost_app();
-    DRAGGED.store(false, Ordering::Relaxed);
+    *drag_start() = None;
     let saved = app.state::<State>().settings.get().launcher_position;
     if let Err(error) = platform::place_launcher(app, &window, saved) {
         tracing::debug!(%error, "Could not place the launcher");
@@ -77,21 +83,33 @@ pub fn dismiss(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// Move the launcher with the pointer until the button is released.
+/// Move the launcher with the pointer until the button is released. The
+/// drag starts even when the position cannot be read; with no start
+/// recorded, nothing is saved on hide.
 pub fn drag(app: &AppHandle) -> Result<()> {
-    launcher(app)?.start_dragging()?;
-    DRAGGED.store(true, Ordering::Relaxed);
+    let window = launcher(app)?;
+    match platform::launcher_position(&window) {
+        Ok(start) => {
+            drag_start().get_or_insert(start);
+        }
+        Err(error) => tracing::debug!(%error, "Could not read where the drag starts"),
+    }
+    window.start_dragging()?;
     Ok(())
 }
 
-/// After a drag, save where the launcher is. The save runs on a worker:
-/// hiding may happen on the main thread, and saving takes the settings lock.
+/// After a drag that moved the launcher, save where it is. The save runs
+/// on a worker: hiding may happen on the main thread, and saving takes the
+/// settings lock.
 fn remember_drag(app: &AppHandle, window: &WebviewWindow) {
-    if !DRAGGED.swap(false, Ordering::Relaxed) {
+    let Some(start) = drag_start().take() else {
         return;
-    }
+    };
     match platform::launcher_position(window) {
         Ok(position) => {
+            let Some(position) = moved_to(start, position) else {
+                return;
+            };
             let app = app.clone();
             tauri::async_runtime::spawn_blocking(move || {
                 if let Err(error) = commands::set_launcher_position(&app, Some(position)) {
@@ -103,10 +121,16 @@ fn remember_drag(app: &AppHandle, window: &WebviewWindow) {
     }
 }
 
+/// The spot to save after a drag from `start` that ended at `now`, or
+/// `None` when the launcher did not move.
+fn moved_to(start: LauncherPosition, now: LauncherPosition) -> Option<LauncherPosition> {
+    (now != start).then_some(now)
+}
+
 /// Forget where the launcher was dragged, and center it now. Not on the
 /// main thread: it saves the settings.
 pub fn center(app: &AppHandle) -> Result<()> {
-    DRAGGED.store(false, Ordering::Relaxed);
+    *drag_start() = None;
     commands::set_launcher_position(app, None)?;
     platform::place_launcher(app, &launcher(app)?, None)?;
     Ok(())
@@ -173,5 +197,23 @@ pub fn on_event(window: &tauri::Window, event: &WindowEvent) {
     };
     if let Err(error) = result {
         tracing::warn!(%error, "Could not hide the launcher");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_click_without_movement_saves_nothing() {
+        let start = LauncherPosition { x: 100.0, y: 200.0 };
+        assert_eq!(moved_to(start, start), None);
+    }
+
+    #[test]
+    fn a_drag_that_moves_saves_the_new_spot() {
+        let start = LauncherPosition { x: 100.0, y: 200.0 };
+        let now = LauncherPosition { x: 140.0, y: 200.0 };
+        assert_eq!(moved_to(start, now), Some(now));
     }
 }

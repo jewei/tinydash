@@ -978,6 +978,24 @@ describe("Launcher", () => {
     expect(await screen.findByRole("option", { name: /Clear Clipboard History/ })).toBeTruthy();
   });
 
+  it("keeps focus in the confirm dialog after Clear History from an open menu", async () => {
+    const { backend, press } = setup((_query, category) =>
+      category === "clipboard" ? [clip] : [],
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Clipboard" }));
+    await waitFor(() =>
+      expect(backend.called("search").at(-1)?.args).toMatchObject({ category: "clipboard" }),
+    );
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByPlaceholderText("Search actions");
+    expect(document.activeElement).toBe(filter);
+    fireEvent.click(await screen.findByRole("button", { name: /Clear History/ }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByPlaceholderText("Search actions")).toBeNull();
+  });
+
   it("reloads the preview when results refresh", async () => {
     const snippet = { ...app, id: "snippet:1", kind: "snippet" as const, title: "Sig" };
     let text = "Regards";
@@ -1084,6 +1102,55 @@ describe("Launcher", () => {
     fireEvent.click(await screen.findByRole("option", { name: /Notes/ }));
     await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
     expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
+  });
+
+  it("drops a queued Enter when the user clicks a row", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const notes = { ...app, id: "app:/Applications/Notes.app", title: "Notes" };
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "n") await slow;
+        return [app, notes];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Notes/ });
+    fireEvent.input(input, { target: { value: "n" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: /Notes/ }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    release();
+    await waitFor(() => expect(backend.called("search").length).toBeGreaterThanOrEqual(2));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(1);
+    expect(backend.called("run_action")[0]?.args.resultId).toBe(notes.id);
+  });
+
+  it("keeps the confirmation of a clicked row when a queued Enter's results arrive", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const backend = fakeBackend({
+      search: async (args) => {
+        if (args.query === "r") await slow;
+        return [app, restart];
+      },
+    });
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await screen.findByRole("option", { name: /Restart/ });
+    fireEvent.input(input, { target: { value: "r" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: /Restart/ }));
+    const dialog = await screen.findByRole("alertdialog");
+    release();
+    await waitFor(() => expect(backend.called("search").length).toBeGreaterThanOrEqual(2));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("run_action")).toHaveLength(0);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Run" }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args.resultId).toBe(restart.id);
   });
 
   it("ignores Enter before and after a search fails", async () => {
@@ -1223,6 +1290,25 @@ describe("Launcher", () => {
     reply = disk(20e9);
     await emit("launcher:shown", { category: null });
     expect(await within(card).findByText(/Low space/)).toBeTruthy();
+  });
+
+  it("says why the widgets did not load, and its keys still work", async () => {
+    const { backend, press } = setup(() => [app], {
+      widgets: () => {
+        throw "The database is locked.";
+      },
+    });
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Could not load the widgets: The database is locked.");
+
+    press("k", { ctrlKey: true });
+    const filter = await screen.findByRole("combobox", { name: "Search actions" });
+    fireEvent.keyDown(filter, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("combobox", { name: "Search actions" })).toBeNull(),
+    );
+    press("Escape");
+    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
   });
 
   it("edits the note with Mod+J, saves it, and leaves with Escape", async () => {
@@ -1402,7 +1488,7 @@ describe("Launcher", () => {
     expect(screen.queryByRole("region", { name: "Color on the clipboard" })).toBeNull();
   });
 
-  it("opens clipboard JSON in full, and Escape closes it before hiding", async () => {
+  it("opens clipboard JSON in full, and Escape or Mod+J closes it", async () => {
     const json = {
       id: "b2",
       content: {
@@ -1444,7 +1530,7 @@ describe("Launcher", () => {
       ],
     };
     const { backend, press } = setup(() => [], {
-      widgets: () => ({ ...noCards, clipCard: json }),
+      widgets: () => ({ ...noCards, note: "", clipCard: json }),
     });
     const card = await screen.findByRole("region", { name: "JSON on the clipboard" });
     expect(card.textContent).toContain("Object · 2 keys · depth 1 · 312 bytes");
@@ -1456,6 +1542,14 @@ describe("Launcher", () => {
     press("Escape");
     expect(screen.queryByRole("dialog", { name: "Clipboard JSON" })).toBeNull();
     expect(backend.called("hide_launcher")).toHaveLength(0);
+    // The view covers the note, so the note shows before it takes the keys.
+    press("Enter", { ctrlKey: true, shiftKey: true });
+    await screen.findByRole("dialog", { name: "Clipboard JSON" });
+    press("j", { ctrlKey: true, code: "KeyJ" });
+    expect(screen.queryByRole("dialog", { name: "Clipboard JSON" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Notepad" }));
+    fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
+
     press("Escape");
     await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
 
@@ -1509,6 +1603,99 @@ describe("Launcher", () => {
     expect(await screen.findByRole("option", { name: /readme\.txt/ })).toBeTruthy();
     expect(screen.getAllByRole("option", { name: /readme\.md/ })).toHaveLength(1);
     expect(on.called("spotlight_files").at(-1)?.args).toEqual({ query: "readme" });
+  });
+
+  it("keeps a selected Spotlight row selected when results refresh", async () => {
+    const file = (name: string) => ({
+      ...app,
+      id: `file:/Users/me/${name}`,
+      kind: "file" as const,
+      title: name,
+      actions: [
+        {
+          label: "Open",
+          action: { type: "open" as const, path: `/Users/me/${name}` },
+          confirm: null,
+        },
+      ],
+    });
+    const [i1, i2, s1, s2, s3] = ["i1.md", "i2.md", "s1.md", "s2.md", "s3.md"].map(file);
+    // The second Spotlight search waits, so the test can look at the list
+    // between the index's answer and Spotlight's. Its answer moves s2 up a
+    // row, so only a selection kept by ID stays on it.
+    let answer: (() => void) | undefined;
+    const backend = fakeBackend(
+      {
+        search: () => [i1, i2],
+        spotlight_files: () =>
+          backend.called("spotlight_files").length === 1
+            ? [s1, s2]
+            : new Promise((resolve) => (answer = () => resolve([s2, s3]))),
+      },
+      { spotlightFiles: true },
+    );
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await emit("launcher:shown", { category: "files" });
+    fireEvent.input(input, { target: { value: "readme" } });
+    const chosen = await screen.findByRole("option", { name: /s2\.md/ });
+    for (let step = 0; step < 3; step += 1) fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(chosen.getAttribute("aria-selected")).toBe("true");
+
+    await emit("results:stale", null);
+    await waitFor(() => expect(backend.called("spotlight_files")).toHaveLength(2));
+    const selectedName = () =>
+      screen.getAllByRole("option").find((row) => row.getAttribute("aria-selected") === "true")
+        ?.textContent;
+    expect(selectedName()).toMatch(/s2\.md/);
+    answer?.();
+    await screen.findByRole("option", { name: /s3\.md/ });
+    expect(screen.queryByRole("option", { name: /s1\.md/ })).toBeNull();
+    expect(selectedName()).toMatch(/s2\.md/);
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: s2?.actions[0]?.action,
+      resultId: s2?.id,
+    });
+  });
+
+  it("keeps only the index's rows when Spotlight fails on a refresh", async () => {
+    const file = (name: string) => ({
+      ...app,
+      id: `file:/Users/me/${name}`,
+      kind: "file" as const,
+      title: name,
+    });
+    const [i1, i2, s1, s2] = ["i1.md", "i2.md", "s1.md", "s2.md"].map(file);
+    const backend = fakeBackend(
+      {
+        search: () => [i1, i2],
+        spotlight_files: () =>
+          backend.called("spotlight_files").length === 1
+            ? [s1, s2]
+            : Promise.reject(new Error("Spotlight failed")),
+      },
+      { spotlightFiles: true },
+    );
+    render(() => <Launcher />);
+    const input = screen.getByRole("combobox");
+    await emit("launcher:shown", { category: "files" });
+    fireEvent.input(input, { target: { value: "readme" } });
+    const chosen = await screen.findByRole("option", { name: /s2\.md/ });
+    for (let step = 0; step < 3; step += 1) fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(chosen.getAttribute("aria-selected")).toBe("true");
+
+    await emit("results:stale", null);
+    await waitFor(() => expect(backend.called("spotlight_files")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+    const rows = screen.getAllByRole("option");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      expect.stringMatching(/i1\.md/),
+      expect.stringMatching(/i2\.md/),
+    ]);
+    expect(rows[1]?.getAttribute("aria-selected")).toBe("true");
   });
 
   it("asks Spotlight nothing while it is off", async () => {

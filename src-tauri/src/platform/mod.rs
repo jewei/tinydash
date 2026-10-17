@@ -16,6 +16,10 @@
 //!   that starts with a dot (the Windows hidden attribute, the macOS hidden
 //!   flag), or `None` when it has none, so the scan reads no metadata.
 //! - `NATIVE_ICONS`: whether `app_icon` returns images.
+//! - `PHYSICAL_PLACEMENT`: whether windows are placed in physical pixels,
+//!   which Windows and X11 use the same way across monitors. When false
+//!   (macOS), they are placed in points: tao turns a logical position into
+//!   pixels with the window's own scale, which is right only there.
 //! - `SELF_UPDATE`: whether an installed copy can replace itself with a new
 //!   version (not on Linux, where installing a .deb needs root).
 //! - `RICH_CLIPBOARD`: whether clipboard history can save images and copied
@@ -32,13 +36,22 @@
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
-//! - `note_clipboard_change(change)`: the monitor saw a new change; remember
-//!   what makes it secret but the content does not show (on macOS, a copy
-//!   made in Passwords or Keychain Access). Reads no content. On macOS,
-//!   `remember_frontmost_app` also calls it, for a copy made just before
-//!   the launcher opened.
+//! - `note_clipboard_change(change)`: the monitor looked at the counter, at
+//!   every tick; for a new change, remember what makes it secret but the
+//!   content does not show (on macOS, a copy made in Passwords or Keychain
+//!   Access, which was in front now or at the previous look). Reads no
+//!   content. On macOS, `remember_frontmost_app` also calls it, for a copy
+//!   made just before the launcher opened, and `read_clipboard` takes the
+//!   same look before it reads, for a copy newer than the monitor's last
+//!   tick.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
+//! - `clipboard_image()`: the clipboard image as RGBA, or `None` when there
+//!   is none, it cannot be decoded, or it has more pixels than the history
+//!   keeps. The size comes from the image header before the image is
+//!   decoded. On macOS the encoded bytes are copied in first. Only macOS
+//!   and Windows, where `read_clipboard` saves images; call it with the
+//!   clipboard reader lock held.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
 //!   is none or its source marked it secret. History need not be on. Call
@@ -70,7 +83,7 @@ pub use windows::*;
 
 use crate::error::{Error, Result};
 #[cfg(not(target_os = "linux"))]
-use crate::features::clipboard::{Content, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS};
+use crate::features::clipboard::{Content, MAX_IMAGE_BYTES};
 #[cfg(not(target_os = "macos"))]
 use crate::settings::LauncherPosition;
 
@@ -221,15 +234,8 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
     if !images {
         return None;
     }
-    let image = reader.get_image().ok()?;
-    let (width, height) = (
-        u32::try_from(image.width).ok()?,
-        u32::try_from(image.height).ok()?,
-    );
-    if u64::from(width) * u64::from(height) > MAX_IMAGE_PIXELS {
-        return None;
-    }
-    let buffer = image::RgbaImage::from_raw(width, height, image.bytes.into_owned())?;
+    let buffer = clipboard_image()?;
+    let (width, height) = buffer.dimensions();
     let mut png = Vec::new();
     buffer
         .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
