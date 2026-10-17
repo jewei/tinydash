@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- A clip copied again within the same second as the clip before it moves to the top of the clipboard history.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
