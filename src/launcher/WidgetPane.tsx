@@ -57,6 +57,13 @@ const MAX_NOTE_CHARS = 10_000;
 /** Typing pauses this long before the note saves. */
 const SAVE_DELAY_MS = 400;
 
+// These outlive one Notepad, since the pane closes while a query is typed.
+// Saves run one at a time, in order, so an older text never lands last.
+let noteSaving = Promise.resolve();
+// The newest text sent to save until a save of it succeeds, so a reopened
+// pane starts from it and not from older saved text.
+let unsavedNote: string | undefined;
+
 /** A signal of the current time that ticks every second while mounted. */
 function createNow() {
   const [now, setNow] = createSignal(Date.now());
@@ -416,30 +423,31 @@ function DiskSpace(props: { disk: Disk }) {
  * One scratch note. It starts from the saved text and then keeps its own,
  * since only this field edits it; a pause in typing, leaving the field,
  * and closing the card save it. A failed save stays unsaved, so the next
- * of those tries again.
+ * of those, or the next time the card opens, tries again.
  */
 function Notepad(props: {
   initial: string;
   field: (field: HTMLTextAreaElement | undefined) => void;
   onLeave: () => void;
 }) {
-  const [text, setText] = createSignal(props.initial);
+  const [text, setText] = createSignal(unsavedNote ?? props.initial);
   // Typed text that is not saved yet, and why the last save failed.
   const [pending, setPending] = createSignal(false);
   const [failure, setFailure] = createSignal<string>();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let unsaved = false;
-  // Saves run one at a time, in order, so an older text never lands last.
-  let saving = Promise.resolve();
+  let unsaved = unsavedNote !== undefined;
 
   const save = () => {
     clearTimeout(timer);
     if (!unsaved) return;
     unsaved = false;
     const value = text();
-    saving = saving.then(() =>
+    unsavedNote = value;
+    setPending(true);
+    noteSaving = noteSaving.then(() =>
       ipc.saveNote(value).then(
         () => {
+          if (unsavedNote === value) unsavedNote = undefined;
           setFailure(undefined);
           setPending(unsaved);
         },
@@ -452,6 +460,8 @@ function Notepad(props: {
       ),
     );
   };
+  // Text an earlier pane could not save: try again now.
+  save();
   onCleanup(() => {
     save();
     props.field(undefined);

@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- If the note cannot save when you start a search, its text is no longer lost. The note shows it again when the widgets come back, and tries to save it again.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
