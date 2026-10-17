@@ -50,6 +50,7 @@ pub fn app_folders() -> Vec<PathBuf> {
     )
 }
 
+/// The user's data folder comes first, as XDG ranks it above system folders.
 /// The XDG spec treats an empty variable as unset, so its default applies.
 fn xdg_app_folders(
     home: &Path,
@@ -464,5 +465,21 @@ mod tests {
             Some("firefox")
         );
         assert_eq!(executable_alias(Path::new("")), None);
+    }
+
+    #[test]
+    fn app_folders_include_flatpak_and_snap_exports() {
+        assert_eq!(
+            xdg_app_folders(
+                Path::new("/home/ann"),
+                Some("/data".into()),
+                Some("/var/lib/flatpak/exports/share::/var/lib/snapd/desktop:".into()),
+            ),
+            [
+                PathBuf::from("/data/applications"),
+                PathBuf::from("/var/lib/flatpak/exports/share/applications"),
+                PathBuf::from("/var/lib/snapd/desktop/applications"),
+            ]
+        );
     }
 }
