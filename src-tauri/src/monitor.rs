@@ -35,13 +35,14 @@ fn capture_forever(app: &AppHandle) {
     loop {
         std::thread::sleep(INTERVAL);
         let change = platform::clipboard_change();
+        // At every tick, also while history is off: whether a copy is secret
+        // may depend on what the previous tick saw, and a later read, such
+        // as a quicklink's {clipboard}, must still know the copy is secret.
+        platform::note_clipboard_change(change);
         if change == seen {
             continue;
         }
         seen = change;
-        // Also while history is off: a later read, such as a quicklink's
-        // {clipboard}, must still know the copy is secret.
-        platform::note_clipboard_change(change);
         let settings = state.settings.get();
         if !settings.clipboard_history_enabled {
             continue;
