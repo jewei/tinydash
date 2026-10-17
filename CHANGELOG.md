@@ -10,6 +10,23 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Copying a result from the calculator history moves it to the top, and Mod+Backspace deletes a history row.
 - A calculation copied again within the same second moves to the top of the history.
 - Date math accepts a minus sign next to its number, as in `today -3 days` or `today-3d`, as it already did for a plus sign.
+- Clicking Clear History while the actions menu is open now puts focus on Cancel in the confirm dialog, so Enter and screen readers work there.
+- In Settings > Search, Show Again on a hidden result keeps keyboard focus in the list, on the next result.
+- Clipboard history skips an image over 16 megapixels before it decodes it, so copying a very large image uses much less memory.
+- A setting saved by a newer version, such as a new search engine or emoji language, no longer resets all your settings in an older version. TinyDash skips only the values it cannot read and uses defaults for them, the launcher names the settings that had such values, and a copy of the old file is kept.
+- Changing the weather city and then back again quickly no longer shows the weather of the other city, or leaves the widget loading.
+- A date such as `2026-10-17` answers with its weekday first, instead of a subtraction. `3pm` and `10am` no longer give a length answer.
+- A currency result below 1, such as `1 JPY to USD`, shows 3 significant digits instead of `0.01`. An exact result, such as `100 USD to MYR in exact`, shows its fraction correctly.
+- Date math such as `tomorrow + 1 day` or `next friday + 2 weeks` shows the date of `tomorrow` or `next friday` under the answer, not today's date.
+- On Linux, the launcher opens in the center of the screen again when its saved spot was on a monitor that is gone, and it centers on the screen with the pointer when the display is scaled.
+- On the Files tab, a selected Spotlight result stays selected when the results refresh in the background, so Enter opens the file you chose.
+- Settings now saves a quicklink that needs typed text to work, such as `https://{query}`, instead of calling it invalid.
+- Enter pressed while results load no longer runs a second result after you click one, and no longer changes the confirmation that your click opened.
+- Files that Spotlight finds in the Files tab now show their size and modified date in the preview pane.
+- When the widgets cannot load, the launcher says why, and Escape and Mod+K still work.
+- A settings file that TinyDash cannot read, such as one saved in a non-UTF-8 encoding or locked by another app, no longer gets replaced with default settings. A file with a bad encoding moves to `settings.invalid.json`. A file that cannot be moved or a locked file stays as it is, and TinyDash does not save setting changes until you reopen it.
+- On macOS, a password copied in Passwords or Keychain Access stays out of clipboard history when you switch to another app right after the copy.
+- A file you hid no longer comes back in the Files tab from Spotlight results.
 
 ## [0.6.0] - 2026-10-14
 
