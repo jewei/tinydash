@@ -30,6 +30,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - A currency result below 1, such as `1 JPY to USD`, shows 3 significant digits instead of `0.01`. An exact result, such as `100 USD to MYR in exact`, shows its fraction correctly.
 - Date math such as `tomorrow + 1 day` or `next friday + 2 weeks` shows the date of `tomorrow` or `next friday` under the answer, not today's date.
 - On Linux, the launcher opens in the center of the screen again when its saved spot was on a monitor that is gone, and it centers on the screen with the pointer when the display is scaled.
+- On Windows, the launcher opens in the center of the screen with the pointer when that screen has another display scale than the one it was last on.
 - On the Files tab, a selected Spotlight result stays selected when the results refresh in the background, so Enter opens the file you chose.
 - Settings now saves a quicklink that needs typed text to work, such as `https://{query}`, instead of calling it invalid.
 - Enter pressed while results load no longer runs a second result after you click one, and no longer changes the confirmation that your click opened.
