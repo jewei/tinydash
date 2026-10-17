@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- In Settings > Widgets, a clock city that is already in the list with other capital letters, such as `tokyo` after `Tokyo`, now shows "already in the list" instead of disappearing without a message.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed

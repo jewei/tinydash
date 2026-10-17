@@ -142,13 +142,16 @@ export function TextField(props: {
  * list and gives back its error, which shows next to the field: the page's
  * own error line may be scrolled out of view. The edit is a function, so
  * the save applies it to the saved list, never to one that holds another
- * change still saving or one that failed.
+ * change still saving or one that failed. `ignoreCase` matches what the
+ * backend treats as the same entry, so a near duplicate is refused here
+ * with a reason instead of dropped by the save.
  */
 export function ListEditor(props: {
   label: string;
   items: string[];
   max: number;
   placeholder: string;
+  ignoreCase?: boolean;
   onChange: (edit: (items: string[]) => string[]) => Promise<string | undefined>;
 }) {
   const [draft, setDraft] = createSignal("");
@@ -165,14 +168,18 @@ export function ListEditor(props: {
       return failure;
     });
   };
+  const sameAs = (value: string) => (item: string) =>
+    props.ignoreCase ? item.toLowerCase() === value.toLowerCase() : item === value;
   const add = () => {
     const value = draft().trim();
     if (full() || !value) return;
-    if (props.items.includes(value)) return setNotice(`“${value}” is already in the list.`);
+    if (props.items.some(sameAs(value))) return setNotice(`“${value}” is already in the list.`);
     // The text stays until the save works, so a refused entry can be fixed.
-    void change((items) => (items.includes(value) ? items : [...items, value])).then((failure) => {
-      if (!failure && draft().trim() === value) setDraft("");
-    });
+    void change((items) => (items.some(sameAs(value)) ? items : [...items, value])).then(
+      (failure) => {
+        if (!failure && draft().trim() === value) setDraft("");
+      },
+    );
   };
   return (
     <div class="list-editor">

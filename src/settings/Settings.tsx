@@ -328,6 +328,7 @@ export function Settings() {
                   label="City to add"
                   max={3}
                   placeholder="Tokyo, London, or Europe/Paris"
+                  ignoreCase
                   items={settings().clockCities}
                   onChange={(edit) =>
                     save((current) => ({ clockCities: edit(current.clockCities) }))
