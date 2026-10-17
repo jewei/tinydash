@@ -1364,7 +1364,7 @@ describe("Launcher", () => {
 
   it("edits the note with Mod+J, saves it, and leaves with Escape", async () => {
     const { backend, input, press } = setup(() => [app], {
-      widgets: () => ({ clocks: null, disk: null, note: "" }),
+      widgets: () => ({ clocks: null, disk: null, note: { type: "ready", text: "" } }),
     });
     const card = await screen.findByRole("region", { name: "Notepad" });
     press("j", { ctrlKey: true, code: "KeyJ" });
@@ -1387,10 +1387,24 @@ describe("Launcher", () => {
     expect(backend.called("hide_launcher")).toHaveLength(0);
   });
 
+  it("says why the note could not be read, and keeps the other widgets", async () => {
+    setup(() => [], {
+      widgets: () => ({
+        ...noCards,
+        disk: { type: "unavailable", message: "No disk." },
+        note: { type: "unavailable", message: "The database is locked." },
+      }),
+    });
+    const card = await screen.findByRole("region", { name: "Notepad" });
+    expect(card.textContent).toBe("Could not read the note. The database is locked.");
+    expect(screen.queryByRole("textbox", { name: "Notepad" })).toBeNull();
+    expect(screen.getByText("Could not read the disk. No disk.")).toBeTruthy();
+  });
+
   it("shows why the note was not saved, and saves it on the next try", async () => {
     let failures = 1;
     const { backend } = setup(() => [], {
-      widgets: () => ({ clocks: null, disk: null, note: "draft" }),
+      widgets: () => ({ clocks: null, disk: null, note: { type: "ready", text: "draft" } }),
       save_note: () => {
         if (failures-- > 0) throw "The database is locked.";
         return null;
@@ -1581,7 +1595,7 @@ describe("Launcher", () => {
       ],
     };
     const { backend, press } = setup(() => [], {
-      widgets: () => ({ ...noCards, note: "", clipCard: json }),
+      widgets: () => ({ ...noCards, note: { type: "ready", text: "" }, clipCard: json }),
     });
     const card = await screen.findByRole("region", { name: "JSON on the clipboard" });
     expect(card.textContent).toContain("Object · 2 keys · depth 1 · 312 bytes");

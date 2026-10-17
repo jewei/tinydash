@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- If TinyDash cannot read the saved note, the Notepad says why, and the other widgets still show. Before, the whole widget pane showed only an error.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
