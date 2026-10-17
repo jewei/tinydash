@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    features::currency::Rates,
+    features::{currency::Rates, datetime},
     search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
 };
 
@@ -182,6 +182,9 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if !query.chars().any(|c| c.is_ascii_digit()) && !matches!(query, "pi" | "π") {
         return None;
     }
+    if datetime::is_date_or_clock(query) {
+        return None;
+    }
     let mut context = fend_core::Context::new();
     context.disable_rng();
     // fend matches units case-insensitively and reads `Bps` as bits. Define
@@ -221,10 +224,22 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
 
 /// `approx. 401.7094 MYR` as `401.71 MYR`. The subtitle already says the
 /// value comes from daily rates. (fend's own `to 2 dp` rounds incorrectly.)
+/// An amount below 1 keeps 3 significant digits, so `1 IDR to EUR` is not
+/// `0.00 EUR`. A fraction, such as `401 83/117 MYR` or `47000/117 MYR`,
+/// stays as fend wrote it. A unit with a `/`, such as `MYR / kg`, is rounded.
 fn money(value: &str) -> Option<String> {
     let (amount, currency) = value.trim_start_matches("approx. ").split_once(' ')?;
+    if currency.starts_with(|c: char| c.is_ascii_digit()) {
+        return None;
+    }
     let amount: f64 = amount.parse().ok()?;
-    Some(format!("{amount:.2} {currency}"))
+    let decimals = if amount == 0.0 || amount.abs() >= 1.0 {
+        2
+    } else {
+        // log10 of a finite amount below 1 is at least -324, so this fits.
+        (2.0 - amount.abs().log10().floor()) as usize
+    };
+    Some(format!("{amount:.decimals$} {currency}"))
 }
 
 /// `100 USD MYR` means `100 USD to MYR`.
@@ -379,6 +394,19 @@ mod tests {
     }
 
     #[test]
+    fn leaves_dates_and_clock_times_to_the_date_answers() {
+        assert_eq!(value("2026-10-17"), None);
+        assert_eq!(value("3pm"), None);
+        assert_eq!(value("10am"), None);
+        assert_eq!(value("10:30 PM"), None);
+        assert_eq!(value("2026 - 10").as_deref(), Some("2016"));
+        assert_eq!(value("2026-10").as_deref(), Some("2016"));
+        assert_eq!(value("12-3-4").as_deref(), Some("5"));
+        assert_eq!(value("100-5-3").as_deref(), Some("92"));
+        assert_eq!(value("2026-1-5").as_deref(), Some("2020"));
+    }
+
+    #[test]
     fn offers_to_turn_on_rates_only_for_currency_queries() {
         let answer = rates_off_answer("100 usd to eur").unwrap();
         assert_eq!(answer.actions[0].action, Action::TurnOnCurrencyRates);
@@ -407,5 +435,39 @@ mod tests {
         );
         assert_eq!(money("400 MYR").as_deref(), Some("400.00 MYR"));
         assert_eq!(money("MYR"), None);
+    }
+
+    #[test]
+    fn keeps_exact_currency_fractions() {
+        let rates = Rates::fixture();
+        let (value, _) = evaluate("100 USD to MYR in exact", Some(&rates)).unwrap();
+        assert_eq!(value, "401 83/117 MYR");
+        assert_eq!(money("401 83/117 MYR"), None);
+        let (value, _) = evaluate("100 USD to MYR in fraction", Some(&rates)).unwrap();
+        assert_eq!(value, "47000/117 MYR");
+    }
+
+    #[test]
+    fn rounds_currency_per_unit() {
+        let rates = Rates::fixture();
+        let value = |query| evaluate(query, Some(&rates)).unwrap().0;
+        assert_eq!(value("10 USD/kg to MYR/kg"), "40.17 MYR / kg");
+        assert_eq!(value("10 USD per kg to MYR per kg"), "40.17 MYR / kg");
+    }
+
+    #[test]
+    fn keeps_significant_digits_of_small_amounts() {
+        let rates = Rates::parse(
+            br#"{"amount":1.0,"base":"EUR","date":"2026-10-02","rates":{"USD":1.17,"IDR":18850.0,"JPY":175.5}}"#,
+            0,
+        )
+        .unwrap();
+        let value = |query| evaluate(query, Some(&rates)).unwrap().0;
+        assert_eq!(value("1 IDR to EUR"), "0.0000531 EUR");
+        assert_eq!(value("1 JPY to USD"), "0.00667 USD");
+        assert_eq!(value("100 USD to EUR"), "85.47 EUR");
+        assert_eq!(money("0.5 EUR").as_deref(), Some("0.500 EUR"));
+        assert_eq!(money("0 EUR").as_deref(), Some("0.00 EUR"));
+        assert_eq!(money("-0.004 EUR").as_deref(), Some("-0.00400 EUR"));
     }
 }
