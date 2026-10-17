@@ -6,7 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
-- A hidden result no longer makes a search list shorter. The next result takes its place.
+- A hidden result no longer makes a list of results shorter, in a search or on an empty tab. The next result takes its place.
 
 ## [0.6.1] - 2026-10-17
 

@@ -310,7 +310,9 @@ fn browse(s: &Snapshot, ctx: &Context, category: Category) -> Vec<SearchResult> 
             .collect(),
         Category::Clipboard => s.clipboard.browse(ctx),
         Category::Snippets => s.library.browse(ctx),
-        Category::Emoji => s.emoji.browse(ctx),
+        // The catalog is too long to list whole, so it keeps room for the
+        // hidden emoji that the filter below removes.
+        Category::Emoji => s.emoji.browse(ctx, CATEGORY_LIMIT + s.hidden.len()),
         Category::System => system::browse(ctx),
     };
     results.extend(rest.into_iter().filter(|result| !result.pinned));
@@ -835,24 +837,29 @@ mod tests {
     #[test]
     fn a_hidden_result_leaves_its_slot_to_the_next_one() {
         let state = crate::state::State::for_tests(Settings::default());
-        let ids = |category| -> Vec<String> {
-            search(&state.snapshot(), "a", category)
+        let ids = |query, category| -> Vec<String> {
+            search(&state.snapshot(), query, category)
                 .into_iter()
                 .map(|result| result.id)
                 .collect()
         };
-        let before = ids(Category::All);
+        let before = ids("a", Category::All);
         assert_eq!(before.len(), ALL_LIMIT);
         state.hidden.set(Hidden::new([before[0].clone()]));
-        let after = ids(Category::All);
+        let after = ids("a", Category::All);
         assert_eq!(after.len(), ALL_LIMIT, "{after:?}");
         assert!(!after.contains(&before[0]));
         assert!(after.contains(&before[ALL_LIMIT - 2]));
 
-        let emoji = ids(Category::Emoji);
-        assert_eq!(emoji.len(), CATEGORY_LIMIT);
-        state.hidden.set(Hidden::new([emoji[0].clone()]));
-        assert_eq!(ids(Category::Emoji).len(), CATEGORY_LIMIT);
+        // The emoji search and the empty Emoji tab each cut a long list.
+        for query in ["a", ""] {
+            let shown = ids(query, Category::Emoji);
+            assert_eq!(shown.len(), CATEGORY_LIMIT);
+            state.hidden.set(Hidden::new([shown[0].clone()]));
+            let after = ids(query, Category::Emoji);
+            assert_eq!(after.len(), CATEGORY_LIMIT, "{query:?}");
+            assert!(!after.contains(&shown[0]));
+        }
     }
 
     #[test]
