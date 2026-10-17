@@ -1601,6 +1601,14 @@ describe("Launcher", () => {
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Notepad" }));
     fireEvent.keyDown(document.activeElement as Element, { key: "Escape" });
 
+    // A view left open when the launcher hid must not cover the pane next time.
+    press("Enter", { ctrlKey: true, shiftKey: true });
+    await screen.findByRole("dialog", { name: "Clipboard JSON" });
+    await emit("launcher:shown", { category: null });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Clipboard JSON" })).toBeNull(),
+    );
+
     press("Escape");
     await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
 
