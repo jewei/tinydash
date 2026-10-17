@@ -400,12 +400,17 @@ describe("Settings", () => {
     render(() => <Settings />);
     const center = (await screen.findByRole("button", { name: "Center" })) as HTMLButtonElement;
     expect(screen.getByText("Opens where you last dragged it.")).toBeTruthy();
+    center.focus();
     fireEvent.click(center);
     await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
     expect(backend.called("update_settings")[0]?.args).toEqual({
       changes: { launcherPosition: null },
     });
-    await waitFor(() => expect(center.disabled).toBe(true));
+    await waitFor(() => expect(center.getAttribute("aria-disabled")).toBe("true"));
+    expect(document.activeElement).toBe(center);
+    fireEvent.click(center);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(backend.called("update_settings")).toHaveLength(1);
   });
 
   it("keeps a tab's results out of All, but never hides it too", async () => {

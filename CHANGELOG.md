@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
+- In Settings > General, Center keeps keyboard focus after you use it, so Tab moves on from there instead of from the top of the page.
 - In Settings > Widgets, a clock city that is already in the list with other capital letters, such as `tokyo` after `Tokyo`, now shows "already in the list" instead of disappearing without a message.
 - A hidden result can no longer be pinned, and a pin left on a hidden result gives up its place when the pin list is full. Show the result again in Settings > Search to pin it.
 - Hide works only on a result that still exists, so a deleted snippet or quicklink no longer stays in the hidden list in Settings.

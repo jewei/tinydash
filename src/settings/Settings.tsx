@@ -249,8 +249,11 @@ export function Settings() {
                   <button
                     type="button"
                     class="button"
-                    disabled={!settings().launcherPosition}
-                    onClick={() => void save({ launcherPosition: null })}
+                    // aria-disabled, not disabled: a disabled button drops keyboard focus to the page.
+                    aria-disabled={!settings().launcherPosition}
+                    onClick={() => {
+                      if (settings().launcherPosition) void save({ launcherPosition: null });
+                    }}
                   >
                     Center
                   </button>
