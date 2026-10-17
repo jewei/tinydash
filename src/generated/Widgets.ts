@@ -3,6 +3,7 @@ import type { CityClock } from "./CityClock";
 import type { ClipCard } from "./ClipCard";
 import type { Disk } from "./Disk";
 import type { FocusTimer } from "./FocusTimer";
+import type { Note } from "./Note";
 import type { WeatherView } from "./WeatherView";
 
 export type Widgets = { 
@@ -18,7 +19,7 @@ disk: Disk | null,
 /**
  * The scratch note.
  */
-note: string | null, focus: FocusTimer | null, weather: WeatherView | null, 
+note: Note | null, focus: FocusTimer | null, weather: WeatherView | null, 
 /**
  * A card for the clipboard text, when it is a format a card shows.
  */

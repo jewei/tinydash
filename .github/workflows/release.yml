@@ -27,7 +27,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       checks: read
-      contents: read
+      # Only a token that can write sees draft releases.
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
@@ -42,6 +43,13 @@ jobs:
           fi
           if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
             echo "v$VERSION already exists. Choose a new version."; exit 1
+          fi
+          # A draft has no tag yet, so the check above misses it. A second run
+          # would make another release with the same tag.
+          drafts=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            -q ".[] | select(.draft and .tag_name == \"v$VERSION\") | .id")
+          if [ -n "$drafts" ]; then
+            echo "A draft release for v$VERSION already exists. Publish or delete it on GitHub, or choose a new version."; exit 1
           fi
           # A new release becomes Latest, and the update feed follows Latest,
           # so a lower version would move every installed copy back.
