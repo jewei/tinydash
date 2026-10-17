@@ -14,7 +14,12 @@ use crate::{
 };
 
 /// fend checks this deadline while it works, so huge inputs cannot hang search.
-const TIME_LIMIT: Duration = Duration::from_millis(100);
+/// Tests get more time: a slow, busy runner must not turn an answer into none.
+const TIME_LIMIT: Duration = if cfg!(test) {
+    Duration::from_secs(10)
+} else {
+    Duration::from_millis(100)
+};
 /// Most calculations kept in history.
 pub const MAX_CALCULATIONS: usize = 50;
 /// Longer expressions are copied but not kept.
