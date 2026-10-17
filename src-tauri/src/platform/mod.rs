@@ -32,11 +32,14 @@
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
 //! - `clipboard_change()`: a counter that changes with the clipboard content.
-//! - `note_clipboard_change(change)`: the monitor saw a new change; remember
-//!   what makes it secret but the content does not show (on macOS, a copy
-//!   made in Passwords or Keychain Access). Reads no content. On macOS,
-//!   `remember_frontmost_app` also calls it, for a copy made just before
-//!   the launcher opened.
+//! - `note_clipboard_change(change)`: the monitor looked at the counter, at
+//!   every tick; for a new change, remember what makes it secret but the
+//!   content does not show (on macOS, a copy made in Passwords or Keychain
+//!   Access, which was in front now or at the previous look). Reads no
+//!   content. On macOS, `remember_frontmost_app` also calls it, for a copy
+//!   made just before the launcher opened, and `read_clipboard` takes the
+//!   same look before it reads, for a copy newer than the monitor's last
+//!   tick.
 //! - `read_clipboard(images, files)`: the content for the latest change, or
 //!   `None` when its source marked it secret or it cannot be read.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
