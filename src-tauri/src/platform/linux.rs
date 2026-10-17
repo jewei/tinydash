@@ -27,6 +27,7 @@ pub const SELF_UPDATE: bool = false;
 /// Only text: GTK reads it in the same request chain that checks for secrets.
 pub const RICH_CLIPBOARD: bool = false;
 pub const NATIVE_ICONS: bool = false;
+pub const PHYSICAL_PLACEMENT: bool = true;
 /// inotify needs one watch per folder from a shared per-user limit, so only
 /// the top folders are watched; deeper changes show up at the next rescan,
 /// when the launcher opens and the index is more than 15 minutes old.
@@ -74,9 +75,7 @@ pub fn discover_apps() -> Vec<App> {
             }
             let mut aliases: Vec<String> =
                 desktop.keywords().iter().map(ToString::to_string).collect();
-            if let Some(executable) = desktop.executable().file_name() {
-                aliases.push(executable.to_string_lossy().into_owned());
-            }
+            aliases.extend(executable_alias(&desktop.executable()));
             // A generic name ("Web Browser") is short; a comment says more.
             let description = desktop
                 .generic_name()
@@ -91,6 +90,17 @@ pub fn discover_apps() -> Vec<App> {
             })
         })
         .collect()
+}
+
+/// Programs that only start another one: Flatpak exports run
+/// `flatpak run ...` and many Snap files run `env VAR=... /snap/bin/x`, so
+/// their name would be the same alias for every such app.
+const LAUNCHER_WRAPPERS: &[&str] = &["flatpak", "snap", "env", "sh", "bash"];
+
+/// The file name of the first word of `Exec`, unless that is a wrapper.
+fn executable_alias(executable: &Path) -> Option<String> {
+    let name = executable.file_name()?.to_string_lossy();
+    (!LAUNCHER_WRAPPERS.contains(&name.as_ref())).then(|| name.into_owned())
 }
 
 pub fn prepare_app(app: &mut tauri::App) {
@@ -406,5 +416,17 @@ mod tests {
         *CAPTURED.lock().unwrap() = Some("note".into());
         assert!(read_clipboard(false, false).is_some());
         assert!(read_clipboard(false, false).is_some());
+    }
+
+    #[test]
+    fn launcher_wrappers_are_not_aliases() {
+        assert_eq!(executable_alias(Path::new("/usr/bin/flatpak")), None);
+        assert_eq!(executable_alias(Path::new("env")), None);
+        assert_eq!(executable_alias(Path::new("/usr/bin/snap")), None);
+        assert_eq!(
+            executable_alias(Path::new("/usr/bin/firefox")).as_deref(),
+            Some("firefox")
+        );
+        assert_eq!(executable_alias(Path::new("")), None);
     }
 }

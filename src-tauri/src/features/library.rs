@@ -83,7 +83,20 @@ impl LibraryItem {
             return Err(Error::msg("Enter the text, up to 32 KB."));
         }
         if self.kind == LibraryKind::Quicklink {
-            quicklink_target(&self.text, "", Local::now(), || None)?;
+            // Some templates work only with certain values, such as
+            // `https://{query}` (needs text) or `http://localhost:{query}`
+            // (needs a number or nothing), so a template passes if any
+            // sample works. Unsafe schemes and roots fail for every value,
+            // and running the quicklink checks the real values again.
+            let now = Local::now();
+            let check =
+                |sample: &str| quicklink_target(&self.text, sample, now, || Some(sample.into()));
+            if let Err(error) = check("")
+                && check("x").is_err()
+                && check("1").is_err()
+            {
+                return Err(error);
+            }
         }
         Ok(self)
     }
@@ -260,6 +273,25 @@ impl Library {
 
     pub fn find(&self, id: i64) -> Option<&LibraryItem> {
         self.items.iter().find(|item| item.id == Some(id))
+    }
+
+    /// Refuse a keyword that another item already has: only one of them
+    /// could answer it.
+    pub fn check_keyword(&self, item: &LibraryItem) -> Result<()> {
+        if item.keyword.is_empty() {
+            return Ok(());
+        }
+        match self
+            .items
+            .iter()
+            .find(|other| other.id != item.id && other.keyword == item.keyword)
+        {
+            Some(other) => Err(Error::msg(format!(
+                "The keyword “{}” is used by {}. Choose another keyword.",
+                item.keyword, other.name
+            ))),
+            None => Ok(()),
+        }
     }
 
     pub fn search(&self, matcher: &mut Matcher, ctx: &Context, limit: usize) -> Vec<Scored> {
@@ -469,6 +501,28 @@ mod tests {
                 .validated()
                 .is_err()
         );
+        // A template that works once text is typed after its keyword can
+        // be saved, even if it fails with nothing typed.
+        for needs_query in [
+            "https://{query}",
+            "~/a/b/{query}/../c",
+            "http://localhost:{query}",
+        ] {
+            assert!(
+                item(LibraryKind::Quicklink, "a", "", needs_query)
+                    .validated()
+                    .is_ok(),
+                "{needs_query}"
+            );
+        }
+        for bad in ["javascript:{query}", "ms-settings:{query}"] {
+            assert!(
+                item(LibraryKind::Quicklink, "a", "", bad)
+                    .validated()
+                    .is_err(),
+                "{bad}"
+            );
+        }
     }
 
     #[test]
@@ -511,6 +565,39 @@ mod tests {
         assert_eq!(text, "{clipboard} {date}{date} {x} {");
         assert_eq!(reads, 1);
         assert_eq!(render_snippet("{{query}}", "a", now, || None), "{a}");
+    }
+
+    #[test]
+    fn a_keyword_belongs_to_one_item() {
+        let library = Library::new(vec![item(
+            LibraryKind::Quicklink,
+            "Jira",
+            "j",
+            "https://jira.test/browse/{query}",
+        )]);
+        let jest = LibraryItem {
+            id: None,
+            ..item(LibraryKind::Snippet, "Jest template", "j", "test({query})")
+        };
+        let error = library.check_keyword(&jest).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "The keyword “j” is used by Jira. Choose another keyword."
+        );
+        let saved = LibraryItem {
+            id: Some(2),
+            ..jest.clone()
+        };
+        assert!(library.check_keyword(&saved).is_err());
+        // Jira keeps its own keyword when it is saved again.
+        assert!(library.check_keyword(&library.items()[0]).is_ok());
+        for keyword in ["jt", ""] {
+            let free = LibraryItem {
+                keyword: keyword.into(),
+                ..jest.clone()
+            };
+            assert!(library.check_keyword(&free).is_ok(), "{keyword}");
+        }
     }
 
     #[test]

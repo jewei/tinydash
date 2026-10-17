@@ -78,10 +78,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             window::hide(app)?;
         }
         Action::OpenUrl { url } => {
-            let scheme = url
-                .split_once(':')
-                .map(|(scheme, _)| scheme.to_ascii_lowercase());
-            if !matches!(scheme.as_deref(), Some("http" | "https")) {
+            if !web_address(&url) {
                 return Err(Error::msg("Only web addresses can be opened."));
             }
             tauri_plugin_opener::open_url(&url, None::<&str>)
@@ -316,8 +313,18 @@ pub fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
     Ok(())
 }
 
-/// An indexed file, or one a Spotlight search returned: TinyDash offered it.
-fn offered_file(state: &State, path: &str) -> bool {
+/// An http or https address, the only kind the OS opener may get: another
+/// scheme can start a program.
+fn web_address(url: &str) -> bool {
+    let scheme = url
+        .split_once(':')
+        .map(|(scheme, _)| scheme.to_ascii_lowercase());
+    matches!(scheme.as_deref(), Some("http" | "https"))
+}
+
+/// Whether the launcher offered this file: it is indexed, or Spotlight
+/// returned it. Opening and previewing both check this.
+pub(crate) fn offered_file(state: &State, path: &str) -> bool {
     state.files.get().contains(path)
         || state
             .found
@@ -489,6 +496,35 @@ mod tests {
         set_alias(&state, lock, "").unwrap();
         assert_eq!(state.store.aliases().unwrap().len(), 0);
         assert_eq!(state.aliases.get().len(), 0);
+    }
+
+    #[test]
+    fn an_alias_of_a_gone_item_can_still_be_removed() {
+        let state = State::for_tests(Settings::default());
+        let gone = "app:/Gone.app";
+        state.store.set_alias(gone, Some("gn")).unwrap();
+        state.aliases.set(state.store.aliases().unwrap());
+        assert_eq!(state.aliases.get().owner("gn"), Some(gone));
+        set_alias(&state, gone, "").unwrap();
+        assert_eq!(state.aliases.get().owner("gn"), None);
+        assert_eq!(state.store.aliases().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn opens_only_web_addresses() {
+        for url in ["https://x.test", "HTTP://x.test"] {
+            assert!(web_address(url), "{url}");
+        }
+        for url in [
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "httpx://x",
+            " https://x",
+            "ms-settings:",
+            "no-scheme",
+        ] {
+            assert!(!web_address(url), "{url}");
+        }
     }
 
     #[test]
