@@ -325,7 +325,9 @@ pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<Libr
                 "The library holds up to {MAX_LIBRARY_ITEMS} snippets and quicklinks."
             )));
         }
-        let saved = state.store.save_library_item(&item.validated()?)?;
+        let item = item.validated()?;
+        state.library.get().check_keyword(&item)?;
+        let saved = state.store.save_library_item(&item)?;
         state.reload_library()?;
         events::results_stale(&app);
         Ok(saved)
