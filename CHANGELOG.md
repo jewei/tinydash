@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- On Linux, TinyDash now notices newly installed apps when `XDG_DATA_DIRS` or `XDG_DATA_HOME` is set but empty.
+
 ## [0.6.1] - 2026-10-17
 
 ### Fixed
