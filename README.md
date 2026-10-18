@@ -2,6 +2,8 @@
 
 A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut, type a few letters, and press Enter.
 
+![TinyDash in use: "saf" finds Safari, "next friday + 2 weeks" answers with a date that Enter copies, Command+K pins Safari, and Tab moves through the tabs](docs/demo.avif)
+
 - **Find** apps, files, clipboard history, snippets, quicklinks, emoji, and system commands.
 - **Answer** calculations, unit and currency conversions, dates, time zones, passwords, and clean URLs.
 - **Stay private:** everything runs on your computer. The only downloads are the daily currency rate table and the weather for one city, each only after you turn it on, and, on macOS and Windows, a check for new versions on GitHub (you can turn it off) and, when you choose to install one, the new version.
