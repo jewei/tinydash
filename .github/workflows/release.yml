@@ -179,6 +179,9 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      # Sign and store the build provenance of each installer.
+      id-token: write
+      attestations: write
     env:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ inputs.version }}
@@ -206,6 +209,17 @@ jobs:
               "darwin-x86_64": {signature: $mac_sig, url: $mac_url},
               "windows-x86_64": {signature: $win_sig, url: $win_url}}}' > latest.json
           cat latest.json
+      # Records that this workflow built each file from this commit, so
+      # `gh attestation verify FILE --repo OWNER/REPO` can prove where it came from.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            installers/*.dmg
+            installers/*.exe
+            installers/*.deb
+            installers/*.rpm
+            installers/*.AppImage
+            installers/*.app.tar.gz
       - name: Tag the commit and publish the release
         run: |
           cd installers

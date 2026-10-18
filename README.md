@@ -26,6 +26,8 @@ A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut
 
 On macOS and Windows, TinyDash updates itself. On Linux, download new versions from Releases.
 
+From the release after 0.6.2 on, you can check that a download was built from this repository by its release workflow. Run `gh attestation verify FILE --repo jewei/tinydash` with the [GitHub CLI](https://cli.github.com).
+
 Press **Control+Shift+Space** to open TinyDash. See [all features and shortcuts](docs/features.md).
 
 ## Build from source
