@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Added
 
+- Settings > Privacy lists each connection TinyDash makes to the internet: what it sends, how often, and whether it is on now.
 - Each release file comes with a signed record of the commit and workflow that built it. Check a download with `gh attestation verify FILE --repo jewei/tinydash`.
 
 ## [0.6.2] - 2026-10-18
