@@ -37,6 +37,9 @@ interface Queued {
 /** Spotlight answers only queries this long, as Rust does. */
 const SPOTLIGHT_MIN_CHARS = 2;
 
+/** Queries that Up brings back, newest first. */
+const HISTORY_LIMIT = 50;
+
 /**
  * Launcher state and behavior, without any rendering. `spotlight` says
  * whether the Files tab also asks Spotlight, after the index has answered.
@@ -68,6 +71,12 @@ export function createLauncher(spotlight: () => boolean = () => false) {
 
   // The index's rows of the results on screen; Spotlight's rows follow them.
   let indexed: SearchResult[] = [];
+
+  // Queries that ran a result, newest first, kept only while TinyDash runs:
+  // a query can hold private text, so it is never saved. `recalled` is the
+  // entry in the search field, until the user edits it.
+  let history: string[] = [];
+  let recalled: number | undefined;
 
   /** Show `list`, keeping the selected result, or its position when it is gone. */
   function keepSelection(list: SearchResult[]) {
@@ -152,6 +161,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   // tab change drops it, so it never runs on a query the user did not confirm.
   function setQuery(value: string) {
     queued = undefined;
+    recalled = undefined;
     batch(() => {
       setQueryValue(value);
       setActionError(undefined);
@@ -182,10 +192,31 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     setSelectedIndex(Math.min(Math.max(selectedIndex() + by, 0), Math.max(last, 0)));
   }
 
+  /**
+   * Up on the first row, with an empty search field or one that Up filled,
+   * brings back the query before it. Returns whether it did.
+   */
+  function recall(): boolean {
+    if (selectedIndex() !== 0) return false;
+    const fromHistory = recalled !== undefined && history[recalled] === query();
+    if (query() !== "" && !fromHistory) return false;
+    const next = fromHistory ? (recalled ?? 0) + 1 : 0;
+    const text = history[next];
+    if (text === undefined) return false;
+    setQuery(text);
+    recalled = next;
+    return true;
+  }
+
+  function remember(text: string) {
+    history = [text, ...history.filter((entry) => entry !== text)].slice(0, HISTORY_LIMIT);
+  }
+
   /** The launcher opened: start over with an empty query. */
   function reset(next: Category | null) {
     shown = undefined;
     queued = undefined;
+    recalled = undefined;
     batch(() => {
       setQueryValue("");
       setCategoryValue(next ?? "all");
@@ -222,6 +253,8 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     queued = undefined;
     // Usage ranking learns only from a result's main action.
     const resultId = result && result.actions[0] === action ? result.id : undefined;
+    // A keyword row only types; the query worth keeping is the one it starts.
+    if (result && query().trim() && action.action.type !== "typeQuery") remember(query().trim());
     if (action.action.type === "setAlias") {
       setAliasError(undefined);
       setNaming({ action, title: result?.title ?? "", alias: action.action.alias });
@@ -305,6 +338,7 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     setCategory,
     moveCategory,
     move,
+    recall,
     reset,
     refresh,
     isCurrent,

@@ -8,6 +8,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - Settings > Privacy lists each connection TinyDash makes to the internet: what it sends, how often, and whether it is on now.
 - Type `?` to list every keyword, such as `pw`, `time in`, `g`, and your own snippet and quicklink keywords, with an example of each. Enter types the keyword for you.
+- With the search field empty, ↑ brings back your recent searches. They are kept until TinyDash quits, and never saved.
 - Each release file comes with a signed record of the commit and workflow that built it. Check a download with `gh attestation verify FILE --repo jewei/tinydash`.
 
 ## [0.6.2] - 2026-10-18

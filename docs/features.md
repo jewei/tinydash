@@ -6,21 +6,24 @@ What TinyDash does, for users and for anyone changing it. Keep this page true: u
 
 Press **Control+Shift+Space** (change it in Settings > General) from any app. On macOS, a letter or sign in the shortcut is stored by its key position, so on a layout other than US, Settings may name a different key than the one pressed. The macOS recorder ignores the ISO key left of 1 and the Japanese keyboard keys (¥, ろ, 英数, かな, and numpad comma), which cannot be registered there, and Caps Lock, which changes typing. As on Windows and Linux, it also ignores the volume and media keys. On Windows and Linux, the recorder takes letters, digits, F1–F24, Space, Enter, Tab, Backspace, Delete, Insert, Home, End, Page Up, Page Down, the arrows, Print Screen, Scroll Lock, and the numpad digits and + − * / . keys. It ignores signs, which each layout puts on different keys; keys that Windows or Linux would register as another key, such as numpad Enter, Num Lock, and Play/Pause; Pause, which Windows turns into Break when Control is held; the volume and track keys; numpad digits and the decimal key while Num Lock is off; and on Windows, which reads Control+Alt as AltGr, a Control+Alt press without Shift that types something other than its own letter or digit, such as German Control+Alt+7 ("{") or French Control+Alt+1 ("&"). The modifier shows as Win on Windows and Super on Linux. On Linux with X11 and more than one keyboard layout, a letter or digit goes to the first key that types it in any of the layouts, which may be a different key. On Wayland, bind a desktop shortcut to `tinydash`; running it again toggles the launcher.
 
-| Keys            | Action                                                                                                                         |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Type            | Search                                                                                                                         |
-| ↑ / ↓           | Select a result                                                                                                                |
-| Enter           | Run the selected result's main action                                                                                          |
-| Mod+Enter       | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
-| Mod+1 … Mod+9   | Run the main action of that row                                                                                                |
-| Mod+K           | All actions for the result, plus Refresh, Center Launcher, Settings, and Quit                                                  |
-| Mod+Backspace   | Delete the selected clipboard entry or calculator history entry                                                                |
-| Tab / Shift+Tab | Next / previous category                                                                                                       |
-| Mod+,           | Open Settings                                                                                                                  |
-| Mod+J           | Edit the widget pane's note, and back                                                                                          |
-| Mod+P           | Start, pause, or resume the focus timer                                                                                        |
-| Mod+Shift+Enter | Run the clipboard card's main action, such as Copy HEX                                                                         |
-| Escape          | Close the full JSON view, dismiss a warning, or hide and return to the previous app                                            |
+| Keys               | Action                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Type               | Search                                                                                                                         |
+| ↑ / ↓              | Select a result                                                                                                                |
+| ↑ on the first row | With the search field empty, or filled by ↑: bring back the search before it                                                   |
+| Enter              | Run the selected result's main action                                                                                          |
+| Mod+Enter          | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
+| Mod+1 … Mod+9      | Run the main action of that row                                                                                                |
+| Mod+K              | All actions for the result, plus Refresh, Center Launcher, Settings, and Quit                                                  |
+| Mod+Backspace      | Delete the selected clipboard entry or calculator history entry                                                                |
+| Tab / Shift+Tab    | Next / previous category                                                                                                       |
+| Mod+,              | Open Settings                                                                                                                  |
+| Mod+J              | Edit the widget pane's note, and back                                                                                          |
+| Mod+P              | Start, pause, or resume the focus timer                                                                                        |
+| Mod+Shift+Enter    | Run the clipboard card's main action, such as Copy HEX                                                                         |
+| Escape             | Close the full JSON view, dismiss a warning, or hide and return to the previous app                                            |
+
+↑ brings back up to 50 searches that ran a result, newest first, each once. They are kept only until TinyDash quits, never saved. Editing a search brought back makes it a new one, and ↑ selects results again.
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it; right-clicking it shows its actions, as Mod+K does. After a copy, the launcher hides and a short "Copied" message shows near the bottom of the screen; it never takes focus from the app you return to. The launcher opens with an empty query, in the center of the screen with the pointer, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it: it then opens there, until that spot is no longer on a screen. Center Launcher in the actions menu, or Center in Settings > General, puts it back.
 

@@ -84,6 +84,57 @@ describe("Launcher", () => {
     await waitFor(() => expect((input as HTMLInputElement).value).toBe("g "));
     expect(backend.called("search").at(-1)?.args).toEqual({ query: "g ", category: "all" });
     expect(document.activeElement).toBe(input);
+    // Typing a keyword is not a search to bring back.
+    await emit("launcher:shown", { category: null });
+    press("ArrowUp");
+    expect((input as HTMLInputElement).value).toBe("");
+  });
+
+  it("brings back past searches with Up from an empty search field", async () => {
+    const { backend, input, press } = setup(() => [app]);
+    const type = async (text: string) => {
+      fireEvent.input(input, { target: { value: text } });
+      await waitFor(() => expect(backend.called("search").at(-1)?.args.query).toBe(text));
+    };
+    for (const [index, text] of ["saf", "calc", "saf"].entries()) {
+      await type(text);
+      press("Enter");
+      await waitFor(() => expect(backend.called("run_action")).toHaveLength(index + 1));
+    }
+    await emit("launcher:shown", { category: null });
+    const value = () => (input as HTMLInputElement).value;
+    await waitFor(() => expect(value()).toBe(""));
+    // Newest first, each query once, stopping at the oldest.
+    press("ArrowUp");
+    expect(value()).toBe("saf");
+    press("ArrowUp");
+    expect(value()).toBe("calc");
+    press("ArrowUp");
+    expect(value()).toBe("calc");
+    await waitFor(() =>
+      expect(backend.called("search").at(-1)?.args).toEqual({ query: "calc", category: "all" }),
+    );
+    // An edited query is the user's own: Up moves in the results again.
+    await type("calcu");
+    press("ArrowUp");
+    expect(value()).toBe("calcu");
+  });
+
+  it("moves up the results, not through past searches, below the first row", async () => {
+    const second: SearchResult = { ...app, id: "app:/Notes.app", title: "Notes" };
+    const { backend, input, press } = setup(() => [app, second]);
+    fireEvent.input(input, { target: { value: "saf" } });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    await emit("launcher:shown", { category: null });
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe(""));
+    press("ArrowDown");
+    press("ArrowUp");
+    expect((input as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("option", { name: /Safari/ }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
   });
 
   it("asks before a destructive action, with Cancel focused", async () => {
