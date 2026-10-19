@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Each release file comes with a signed record of the commit and workflow that built it. Check a download with `gh attestation verify FILE --repo jewei/tinydash`.
+
 ## [0.6.2] - 2026-10-18
 
 ### Added
