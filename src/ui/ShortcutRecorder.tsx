@@ -1,16 +1,20 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, Show } from "solid-js";
 
 import * as ipc from "../lib/ipc";
 import { acceleratorFromEvent, displayKeys } from "../lib/keys";
-import { Keys } from "../ui/Keys";
+import { Keys } from "./Keys";
 
 /**
- * Click, then press a key combination. The global shortcut is paused while
- * recording, so pressing the current shortcut records it instead of
- * opening the launcher.
+ * Click, then press a key combination. The global shortcuts are paused while
+ * recording, so pressing a shortcut that is set records it instead of
+ * acting. `label` names it for screen readers; `startNow` records at once.
+ * An empty `value` shows `empty`.
  */
 export function ShortcutRecorder(props: {
+  label: string;
   value: string;
+  empty?: string;
+  startNow?: boolean;
   onChange: (value: string) => Promise<unknown>;
   onError: (message: string) => void;
 }) {
@@ -50,6 +54,12 @@ export function ShortcutRecorder(props: {
     });
   };
 
+  onMount(() => {
+    if (props.startNow) start();
+  });
+  // Closed while recording, as a dialog can be: turn the shortcuts back on.
+  onCleanup(() => stop());
+
   const onKeyDown = (event: KeyboardEvent) => {
     if (!recording()) return;
     event.preventDefault();
@@ -67,8 +77,8 @@ export function ShortcutRecorder(props: {
       classList={{ recording: recording() }}
       aria-label={
         recording()
-          ? "Launcher shortcut: press the new keys, or Escape to cancel"
-          : `Launcher shortcut: ${displayKeys(props.value).join(" ")}`
+          ? `${props.label}: press the new keys, or Escape to cancel`
+          : `${props.label}: ${props.value ? displayKeys(props.value).join(" ") : (props.empty ?? "")}`
       }
       // A mouse press must not blur the recorder first: WebKit on macOS would
       // stop recording on the blur, and the click would then start again.
@@ -78,7 +88,9 @@ export function ShortcutRecorder(props: {
       onBlur={() => stop()}
     >
       <Show when={!recording()} fallback="Press keys…">
-        <Keys keys={displayKeys(props.value)} />
+        <Show when={props.value} fallback={props.empty}>
+          <Keys keys={displayKeys(props.value)} />
+        </Show>
       </Show>
     </button>
   );

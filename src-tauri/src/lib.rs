@@ -103,6 +103,8 @@ pub fn run() {
             commands::aliases,
             commands::unhide_result,
             commands::remove_alias,
+            commands::hotkeys,
+            commands::remove_hotkey,
         ])
         .build(tauri::generate_context!())
         .expect("TinyDash failed to start")
@@ -174,6 +176,9 @@ fn setup(app: &mut App) {
     let state = handle.state::<State>();
     if let Err(error) = shortcut::register(handle, &shortcut) {
         state.warn(error.to_string());
+    }
+    for failure in shortcut::sync(handle, &state.hotkeys.get()) {
+        state.warn(format!("A hotkey is off. {}", failure.error));
     }
     if let Err(error) = tray::set_visible(handle, tray_visible) {
         state.warn(format!("The tray icon is unavailable: {error}"));

@@ -188,6 +188,116 @@ describe("Launcher", () => {
     expect(document.activeElement).toBe(screen.getByRole("combobox"));
   });
 
+  it("records a hotkey with the shortcuts paused, and saves it at once", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Set Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [withHotkey]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Set Hotkey/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+    const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+    expect(document.activeElement).toBe(recorder);
+    await waitFor(() =>
+      expect(backend.called("pause_shortcut")[0]?.args).toEqual({ paused: true }),
+    );
+    // Keys without a modifier are not a hotkey, and never reach the launcher.
+    fireEvent.keyDown(recorder, { key: "Enter", code: "Enter" });
+    expect(backend.called("run_action")).toHaveLength(0);
+    fireEvent.keyDown(recorder, { key: "k", code: "KeyK", ctrlKey: true, altKey: true });
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "setHotkey", id: app.id, shortcut: "Control+Alt+K" },
+      resultId: null,
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull(),
+    );
+    await waitFor(() =>
+      expect(backend.called("pause_shortcut").at(-1)?.args).toEqual({ paused: false }),
+    );
+    expect(document.activeElement).toBe(screen.getByRole("combobox"));
+  });
+
+  it("keeps the hotkey dialog open with the reason, and removes a hotkey", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Change Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "Control+Alt+K" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [withHotkey], {
+      run_action: (args: { action: { shortcut?: string } }) => {
+        if (args.action.shortcut) throw "These keys already run Notes. Choose other keys.";
+        return null;
+      },
+    });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Change Hotkey/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+    const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+    fireEvent.keyDown(recorder, { key: "n", code: "KeyN", ctrlKey: true, altKey: true });
+    expect((await within(dialog).findByRole("alert")).textContent).toBe(
+      "These keys already run Notes. Choose other keys.",
+    );
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove Hotkey" }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    expect(backend.called("run_action")[1]?.args).toEqual({
+      action: { type: "setHotkey", id: app.id, shortcut: "" },
+      resultId: null,
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull(),
+    );
+  });
+
+  it("closes the hotkey dialog with Escape once it stops recording", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Set Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [withHotkey]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Set Hotkey/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+    const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+    fireEvent.keyDown(recorder, { key: "Escape" });
+    expect(within(dialog).getByRole("button", { name: "Hotkey for Safari: None" })).toBeTruthy();
+    fireEvent.keyDown(recorder, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull(),
+    );
+    // Escape closed the dialog only; the launcher stays open.
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+    await waitFor(() =>
+      expect(backend.called("pause_shortcut").at(-1)?.args).toEqual({ paused: false }),
+    );
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
   it("keeps the alias dialog open with the reason when saving fails", async () => {
     const named: SearchResult = {
       ...app,

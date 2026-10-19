@@ -24,6 +24,7 @@ use crate::{
         self, Category,
         id::Source,
         result::{Action, SearchResult},
+        usage::Hotkeys,
     },
     settings::{LauncherPosition, Settings},
     shortcut, spotlight,
@@ -223,6 +224,14 @@ pub async fn update_settings(
                 "“{folder}” is not a full folder path. Enter the whole path, or start it with ~ for your home folder, such as ~/Projects."
             )));
         }
+        if new.shortcut != old.shortcut
+            && let Ok(keys) = shortcut::parse(&new.shortcut)
+            && let Some(name) = actions::hotkey_owner(&state.snapshot(), &keys, None)
+        {
+            return Err(Error::msg(format!(
+                "These keys already run {name}. Choose other keys, or remove that hotkey in Settings > Search."
+            )));
+        }
         if new.clock_cities != old.clock_cities
             && let Some(city) = new.unknown_clock_city()
         {
@@ -339,6 +348,12 @@ pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<Libr
 pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
     blocking(move || {
         let state = app.state::<State>();
+        // The item's hotkey is released under the settings lock, which is
+        // always taken before the other.
+        let _one_change_at_a_time = state
+            .settings_change
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // A pin or alias that checked the item before the delete must not
         // write after it, or its row would outlive the item.
         let _limit = state
@@ -362,6 +377,13 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
         state
             .aliases
             .update(|aliases| ids.iter().for_each(|id| aliases.remove(id)));
+        let mut hotkeys = Hotkeys::clone(&state.hotkeys.get());
+        ids.iter().for_each(|id| hotkeys.remove(id));
+        // Its row is gone; a key the OS kept only says the item is gone.
+        for failure in shortcut::sync(&app, &hotkeys) {
+            tracing::warn!(error = %failure.error, "Could not release a hotkey");
+        }
+        state.hotkeys.set(hotkeys);
         state.reload_library()?;
         events::results_stale(&app);
         Ok(())
@@ -487,6 +509,50 @@ fn aliased(snapshot: &search::Snapshot) -> Vec<AliasedResult> {
         .collect();
     results.sort_by(|a, b| a.alias.cmp(&b.alias));
     results
+}
+
+/// A hotkey the user set, as Settings lists it.
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct HotkeyResult {
+    pub id: String,
+    /// Accelerator text, such as `Control+Alt+S`.
+    pub shortcut: String,
+    pub title: String,
+    pub subtitle: String,
+}
+
+/// The hotkeys the user set, by result name.
+#[tauri::command]
+pub fn hotkeys(state: tauri::State<State>) -> Vec<HotkeyResult> {
+    let snapshot = state.snapshot();
+    let mut results: Vec<HotkeyResult> = snapshot
+        .hotkeys
+        .iter()
+        .map(|(id, shortcut)| {
+            let (title, subtitle) = describe(&snapshot, id);
+            HotkeyResult {
+                id: id.to_owned(),
+                shortcut: shortcut.to_owned(),
+                title,
+                subtitle,
+            }
+        })
+        .collect();
+    results.sort_by_cached_key(|result| result.title.to_lowercase());
+    results
+}
+
+/// Remove a result's hotkey, also when its item is gone.
+#[tauri::command]
+pub async fn remove_hotkey(app: AppHandle, id: String) -> Result<()> {
+    blocking(move || {
+        actions::set_hotkey(&app, &id, "")?;
+        events::results_stale(&app);
+        Ok(())
+    })
+    .await
 }
 
 /// Show a hidden result in search again.

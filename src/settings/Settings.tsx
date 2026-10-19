@@ -21,11 +21,12 @@ import * as ipc from "../lib/ipc";
 import { IS_MAC } from "../lib/keys";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { ShortcutRecorder } from "../ui/ShortcutRecorder";
 import { ListEditor, NumberField, Row, Select, TextField, Toggle } from "./controls";
 import { AliasList } from "./AliasList";
 import { HiddenResults } from "./HiddenResults";
+import { HotkeyList } from "./HotkeyList";
 import { Library } from "./Library";
-import { ShortcutRecorder } from "./ShortcutRecorder";
 import { TabsEditor } from "./TabsEditor";
 
 const SECTIONS = [
@@ -193,6 +194,7 @@ export function Settings() {
               <Match when={section() === "general"}>
                 <Row label="Launcher shortcut" description="Shows or hides TinyDash from any app.">
                   <ShortcutRecorder
+                    label="Launcher shortcut"
                     value={settings().shortcut}
                     onChange={(shortcut) => save({ shortcut })}
                     onError={setError}
@@ -551,6 +553,12 @@ export function Settings() {
                 <h2>Aliases</h2>
                 <p class="section-intro">Type an alias to put its result first. Up to 500.</p>
                 <AliasList />
+                {/* 50 matches MAX_HOTKEYS in the Rust code. */}
+                <h2>Hotkeys</h2>
+                <p class="section-intro">
+                  Keys that run a result from any app, as Enter does. Up to 50.
+                </p>
+                <HotkeyList />
                 {/* 500 matches MAX_HIDDEN in the Rust code. */}
                 <h2>Hidden results</h2>
                 <p class="section-intro">Search leaves these out. Up to 500.</p>

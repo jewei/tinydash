@@ -142,6 +142,8 @@ export function fakeBackend(
     unhide_result: () => null,
     aliases: () => [],
     remove_alias: () => null,
+    hotkeys: () => [],
+    remove_hotkey: () => null,
     about: () => ({
       version: "0.2.0",
       settingsFolder: "/data",

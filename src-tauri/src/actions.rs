@@ -21,8 +21,9 @@ use crate::{
         self, Context, Snapshot,
         id::Source,
         result::Action,
-        usage::{self, MAX_ALIASES, MAX_HIDDEN},
+        usage::{self, Hotkeys, MAX_ALIASES, MAX_HIDDEN, MAX_HOTKEYS},
     },
+    shortcut,
     state::State,
     system_clipboard, timer, window,
 };
@@ -202,6 +203,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         Action::Pin { id } => pin(&state, &id)?,
         Action::Hide { id } => hide(&state, &id)?,
         Action::SetAlias { id, alias } => set_alias(&state, &id, &alias)?,
+        Action::SetHotkey { id, shortcut } => set_hotkey(app, &id, &shortcut)?,
         Action::Unpin { id } => {
             state.store.set_pinned(&id, false)?;
             state.pins.update(|pins| pins.remove(&id));
@@ -339,6 +341,124 @@ pub fn set_alias(state: &State, id: &str, alias: &str) -> Result<()> {
     Ok(())
 }
 
+/// Give a result a hotkey, or remove it with an empty `shortcut`. The keys
+/// must register, and neither the launcher nor another result may have them.
+/// Either everything changes, or nothing does and the error says why.
+pub fn set_hotkey(app: &AppHandle, id: &str, shortcut: &str) -> Result<()> {
+    let state = app.state::<State>();
+    // A hotkey changes the OS, as the launcher shortcut does, so the two
+    // change one at a time, and never while a recorder paused them.
+    let _one_change_at_a_time = state
+        .settings_change
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let snapshot = state.snapshot();
+    let (id, shortcut) = checked_hotkey(&snapshot, id, shortcut)?;
+    let current = &snapshot.hotkeys;
+    let mut next = Hotkeys::clone(current);
+    match &shortcut {
+        Some(shortcut) => next.set(&id, shortcut),
+        None => next.remove(&id),
+    }
+    // Register first: keys another app holds must not be saved.
+    if let Some(failure) = shortcut::sync(app, &next)
+        .into_iter()
+        .find(|failure| failure.id == id)
+    {
+        shortcut::sync(app, current);
+        return Err(failure.error);
+    }
+    if let Err(error) = state.store.set_hotkey(&id, shortcut.as_deref()) {
+        shortcut::sync(app, current);
+        return Err(error);
+    }
+    state.hotkeys.set(next);
+    Ok(())
+}
+
+/// The result ID that `set_hotkey` changes, and its keys, or `None` to
+/// remove them. Refuses keys that cannot be a hotkey for it.
+fn checked_hotkey(
+    snapshot: &Snapshot,
+    id: &str,
+    shortcut: &str,
+) -> Result<(String, Option<String>)> {
+    if !Source::parse(id).is_some_and(|(source, _)| source.aliasable()) {
+        return Err(Error::msg("This result cannot have a hotkey."));
+    }
+    let found = search::resolve(snapshot, &Context::none(), id);
+    let shortcut = shortcut.trim();
+    if shortcut.is_empty() {
+        // The item may be gone; its hotkey can still be removed.
+        return Ok((found.map_or_else(|| id.to_owned(), |found| found.id), None));
+    }
+    let found = found.ok_or_else(|| Error::msg("This item no longer exists."))?;
+    if found.actions.first().is_none_or(|a| a.confirm.is_some()) {
+        return Err(Error::msg(format!(
+            "{} asks before it runs, so it cannot have a hotkey.",
+            found.title
+        )));
+    }
+    let keys = shortcut::parse(shortcut)?;
+    if !shortcut::can_be_hotkey(&keys) {
+        return Err(Error::msg(
+            "A hotkey needs a modifier such as Control or Alt, or a function key, so it never blocks typing.",
+        ));
+    }
+    if shortcut::parse(&snapshot.settings.shortcut).is_ok_and(|launcher| launcher == keys) {
+        return Err(Error::msg("These keys show TinyDash. Choose other keys."));
+    }
+    if let Some(name) = hotkey_owner(snapshot, &keys, Some(&found.id)) {
+        return Err(Error::msg(format!(
+            "These keys already run {name}. Choose other keys."
+        )));
+    }
+    let hotkeys = &snapshot.hotkeys;
+    if hotkeys.get(&found.id).is_none() && hotkeys.len() >= MAX_HOTKEYS {
+        return Err(Error::msg(format!(
+            "You can set up to {MAX_HOTKEYS} hotkeys. Remove some in Settings > Search."
+        )));
+    }
+    Ok((found.id, Some(shortcut.to_owned())))
+}
+
+/// The name of the result whose hotkey is `keys`, other than `except`.
+pub fn hotkey_owner(
+    snapshot: &Snapshot,
+    keys: &tauri_plugin_global_shortcut::Shortcut,
+    except: Option<&str>,
+) -> Option<String> {
+    let (owner, _) = snapshot.hotkeys.iter().find(|(owner, accelerator)| {
+        Some(*owner) != except && shortcut::parse(accelerator).is_ok_and(|other| other == *keys)
+    })?;
+    Some(
+        search::resolve(snapshot, &Context::none(), owner)
+            .map_or_else(|| owner.to_owned(), |found| found.title),
+    )
+}
+
+/// Run the main action of the result that a hotkey belongs to, as Enter
+/// would in the launcher.
+pub fn run_hotkey(app: &AppHandle, id: &str) -> Result<()> {
+    let snapshot = app.state::<State>().snapshot();
+    let ctx = Context {
+        usage: &snapshot.usage,
+        pins: &snapshot.pins,
+        now: snapshot.now.timestamp(),
+        skin_tone: snapshot.settings.emoji_skin_tone,
+    };
+    let found = search::resolve(&snapshot, &ctx, id).ok_or_else(|| {
+        Error::msg("This hotkey's item no longer exists. Remove the hotkey in Settings > Search.")
+    })?;
+    let main = found
+        .actions
+        .into_iter()
+        .next()
+        .filter(|action| action.confirm.is_none())
+        .ok_or_else(|| Error::msg("This item asks before it runs. Run it from TinyDash."))?;
+    run(app, main.action, Some(id))
+}
+
 /// An http or https address, the only kind the OS opener may get: another
 /// scheme can start a program.
 fn web_address(url: &str) -> bool {
@@ -441,6 +561,65 @@ mod tests {
         },
         settings::Settings,
     };
+
+    #[test]
+    fn a_hotkey_needs_free_keys_and_an_item_that_never_asks() {
+        let state = State::for_tests(Settings::default());
+        let check = |id: &str, keys: &str| {
+            checked_hotkey(&state.snapshot(), id, keys).map_err(|error| error.to_string())
+        };
+        assert_eq!(
+            check("system:lock", " Alt+L "),
+            Ok(("system:lock".into(), Some("Alt+L".into())))
+        );
+        assert_eq!(
+            check("system:lock", "Control+Shift+Space").unwrap_err(),
+            "These keys show TinyDash. Choose other keys."
+        );
+        assert!(check("system:lock", "Alt+Nothing").is_err());
+        // Plain keys would stop that key from typing in every app.
+        for keys in ["KeyA", "Shift+KeyA", "Shift+Space"] {
+            assert!(check("system:lock", keys).is_err(), "{keys}");
+        }
+        assert!(check("system:lock", "F5").is_ok());
+        assert!(check("system:lock", "Super+KeyL").is_ok());
+        assert_eq!(
+            check("system:sleep", "Alt+S").unwrap_err(),
+            "Sleep asks before it runs, so it cannot have a hotkey."
+        );
+        assert_eq!(
+            check("clip:1", "Alt+C").unwrap_err(),
+            "This result cannot have a hotkey."
+        );
+        assert_eq!(
+            check("app:/Gone.app", "Alt+G").unwrap_err(),
+            "This item no longer exists."
+        );
+        // A gone item's hotkey can still be removed.
+        assert_eq!(
+            check("app:/Gone.app", ""),
+            Ok(("app:/Gone.app".into(), None))
+        );
+
+        // The same keys, written another way, belong to Lock Screen.
+        state
+            .hotkeys
+            .set(Hotkeys::new([("system:lock".into(), "Alt+KeyL".into())]));
+        assert_eq!(
+            check("system:open-trash", "alt+l").unwrap_err(),
+            "These keys already run Lock Screen. Choose other keys."
+        );
+        assert!(check("system:lock", "Alt+L").is_ok());
+
+        state.hotkeys.set(Hotkeys::new(
+            (0..MAX_HOTKEYS).map(|n| (format!("app:/{n}.app"), format!("Alt+F{}", n % 24 + 1))),
+        ));
+        assert!(
+            check("system:lock", "Alt+Shift+L")
+                .unwrap_err()
+                .starts_with("You can set up to 50 hotkeys.")
+        );
+    }
 
     #[test]
     fn copying_a_history_entry_moves_it_to_the_top() {

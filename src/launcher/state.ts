@@ -25,6 +25,14 @@ interface Naming {
   alias: string;
 }
 
+/** A hotkey action, waiting for the user to press the keys. */
+interface Recording {
+  action: ResultAction;
+  title: string;
+  /** The hotkey the result has now, or "". */
+  shortcut: string;
+}
+
 /** Which row to run: a numbered row, or whichever row is selected then. */
 type Target = number | "selected";
 
@@ -60,6 +68,9 @@ export function createLauncher(spotlight: () => boolean = () => false) {
   const [savingFor, setSavingFor] = createSignal<Naming>();
   const saving = () => naming() !== undefined && savingFor() === naming();
   const [running, setRunning] = createSignal(false);
+  const [recording, setRecording] = createSignal<Recording>();
+  const [hotkeyError, setHotkeyError] = createSignal<string>();
+  const [savingHotkey, setSavingHotkey] = createSignal(false);
 
   const selected = () => results()[selectedIndex()];
 
@@ -224,6 +235,8 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       setPending(undefined);
       setNaming(undefined);
       setAliasError(undefined);
+      setRecording(undefined);
+      setHotkeyError(undefined);
     });
     void refresh();
   }
@@ -258,6 +271,9 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     if (action.action.type === "setAlias") {
       setAliasError(undefined);
       setNaming({ action, title: result?.title ?? "", alias: action.action.alias });
+    } else if (action.action.type === "setHotkey") {
+      setHotkeyError(undefined);
+      setRecording({ action, title: result?.title ?? "", shortcut: action.action.shortcut });
     } else if (action.confirm) {
       setPending({ action, resultId });
     } else {
@@ -293,6 +309,30 @@ export function createLauncher(spotlight: () => boolean = () => false) {
       setRunning(false);
       setSavingFor(undefined);
     }
+  }
+
+  /**
+   * Save the keys the user pressed; empty removes the hotkey. The dialog
+   * closes once they are saved, and shows the reason when they are not.
+   */
+  async function saveHotkey(shortcut: string) {
+    const waiting = recording();
+    if (waiting?.action.action.type !== "setHotkey" || savingHotkey()) return;
+    setSavingHotkey(true);
+    setHotkeyError(undefined);
+    try {
+      await ipc.runAction({ ...waiting.action.action, shortcut });
+      if (recording() === waiting) setRecording(undefined);
+    } catch (error) {
+      if (recording() === waiting) setHotkeyError(ipc.message(error));
+    } finally {
+      setSavingHotkey(false);
+    }
+  }
+
+  function cancelHotkey() {
+    setRecording(undefined);
+    setHotkeyError(undefined);
   }
 
   function cancelAlias() {
@@ -351,5 +391,11 @@ export function createLauncher(spotlight: () => boolean = () => false) {
     cancel: () => setPending(undefined),
     saveAlias,
     cancelAlias,
+    recording,
+    hotkeyError,
+    savingHotkey,
+    saveHotkey,
+    cancelHotkey,
+    setHotkeyError,
   };
 }

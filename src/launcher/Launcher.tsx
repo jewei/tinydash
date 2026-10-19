@@ -14,6 +14,7 @@ import { Glyph } from "../ui/Icon";
 import { Keys } from "../ui/Keys";
 import { ActionMenu, type MenuItem } from "./ActionMenu";
 import { AliasDialog } from "./AliasDialog";
+import { HotkeyDialog } from "./HotkeyDialog";
 import { deletesHistoryEntry, shortcutFor } from "./describe";
 import { commandFor } from "./keymap";
 import { PreviewPane } from "./PreviewPane";
@@ -181,7 +182,8 @@ export function Launcher() {
       isComposing(event) ||
       menu() ||
       launcher.pending() ||
-      launcher.naming()
+      launcher.naming() ||
+      launcher.recording()
     ) {
       return;
     }
@@ -292,7 +294,7 @@ export function Launcher() {
   // A dialog that opened over the menu keeps focus.
   const closeMenu = () => {
     setMenu(undefined);
-    if (!launcher.pending() && !launcher.naming()) focusInput();
+    if (!launcher.pending() && !launcher.naming() && !launcher.recording()) focusInput();
   };
 
   // The widget pane takes the preview's place while All has no query.
@@ -548,6 +550,26 @@ export function Launcher() {
             }}
             onCancel={() => {
               launcher.cancelAlias();
+              focusInput();
+            }}
+          />
+        )}
+      </Show>
+
+      <Show when={launcher.recording()}>
+        {(recording) => (
+          <HotkeyDialog
+            title={recording().title}
+            shortcut={recording().shortcut}
+            error={launcher.hotkeyError()}
+            busy={launcher.savingHotkey()}
+            onSave={async (shortcut) => {
+              await launcher.saveHotkey(shortcut);
+              if (!launcher.recording()) focusInput();
+            }}
+            onRecordError={launcher.setHotkeyError}
+            onCancel={() => {
+              launcher.cancelHotkey();
               focusInput();
             }}
           />

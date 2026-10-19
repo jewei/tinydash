@@ -10,6 +10,7 @@ import type { Action } from "../generated/Action";
 import type { AliasedResult } from "../generated/AliasedResult";
 import type { Category } from "../generated/Category";
 import type { HiddenResult } from "../generated/HiddenResult";
+import type { HotkeyResult } from "../generated/HotkeyResult";
 import type { LauncherInit } from "../generated/LauncherInit";
 import type { LauncherShown } from "../generated/LauncherShown";
 import type { LibraryItem } from "../generated/LibraryItem";
@@ -67,6 +68,10 @@ export const unhideResult = (id: string) => invoke<void>("unhide_result", { id }
 export const aliases = () => invoke<AliasedResult[]>("aliases");
 
 export const removeAlias = (id: string) => invoke<void>("remove_alias", { id });
+
+export const hotkeys = () => invoke<HotkeyResult[]>("hotkeys");
+
+export const removeHotkey = (id: string) => invoke<void>("remove_hotkey", { id });
 
 /** Resolves to the newer version, or `null` when this one is the latest. */
 export const checkForUpdate = () => invoke<string | null>("check_for_update");

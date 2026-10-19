@@ -220,6 +220,13 @@ pub enum Action {
         id: String,
         alias: String,
     },
+    /// Give a result a hotkey that runs its main action from any app, or
+    /// remove it with an empty one. The launcher records the keys first; the
+    /// result offers the ones it has now.
+    SetHotkey {
+        id: String,
+        shortcut: String,
+    },
     /// Turn on currency rates, which a currency query asked for while they
     /// were off, and download them.
     TurnOnCurrencyRates,

@@ -46,6 +46,8 @@ Pin any app, file, clipboard entry, snippet, quicklink, emoji, or command from i
 
 Give any app, indexed file, snippet, quicklink, emoji, or command an alias from its actions (Add Alias): one word of up to 32 characters, such as `vsc` for Visual Studio Code. Typing the whole alias puts its result first, after any instant answer and above any name match; typing its start ranks the result like a name that starts with the query. This works in All (while its tab is in All) and in its tab. Each alias names one result. Change Alias shows the current one; saving it empty removes it. A row that carries typed text, such as `Jira: ABC-12`, has no Add Alias or Hide from Results: use the item's own row. Settings > Search lists aliases, with Remove (up to 500). An alias stays when its item is gone for now, such as an app being reinstalled, and goes with a deleted snippet or quicklink.
 
+Give any app, indexed file, snippet, quicklink, emoji, or command a hotkey from its actions (Set Hotkey): keys that run its main action from any app, as Enter would, such as Control+Alt+S to open Safari or copy a snippet. The dialog records at once: press keys with Control, Alt, Command or Win, or a function key. They save when pressed; Escape stops recording, and Remove Hotkey removes it. The launcher shortcut and the hotkeys pause while you record, so pressing one records it. A hotkey must be free: not the launcher shortcut, not another result's hotkey (the launcher shortcut cannot take a hotkey's keys either), and not keys another app registered. A command that asks before it runs, such as Restart, has no hotkey. Settings > Search lists hotkeys, with Remove (up to 50). A hotkey goes with a deleted snippet or quicklink; for an item that is gone, such as an uninstalled app, pressing it says so. A hotkey that cannot register when TinyDash starts shows as a warning in the launcher. On Wayland, hotkeys do not work, as for the launcher shortcut.
+
 Hide any app, file, snippet, quicklink, emoji, or command from its actions (Hide from Results): search leaves it out for good, and hiding a pinned item unpins it. Settings > Search lists hidden results, with Show Again (up to 500 hidden). A hidden result cannot be pinned; show it again first. Clipboard entries are deleted instead.
 
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items.
@@ -119,16 +121,16 @@ On macOS, **Also search with Spotlight** (Settings > Files, off by default) make
 
 Changes save at once. If a change cannot apply (for example, the shortcut is taken), Settings shows why and keeps the previous value.
 
-| Section              | Settings                                                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs |
-| Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths              |
-| Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                      |
-| Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                        |
-| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, aliases, hidden results      |
-| Snippets, Quicklinks | Create, edit, delete                                                                                             |
-| Privacy              | Each connection to the internet, what it sends, how often, and whether it is on                                  |
-| About                | Version, Check for Updates, settings and data folders, credits                                                   |
+| Section              | Settings                                                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs     |
+| Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths                  |
+| Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                          |
+| Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                            |
+| Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, aliases, hotkeys, hidden results |
+| Snippets, Quicklinks | Create, edit, delete                                                                                                 |
+| Privacy              | Each connection to the internet, what it sends, how often, and whether it is on                                      |
+| About                | Version, Check for Updates, settings and data folders, credits                                                       |
 
 ## Updates
 
