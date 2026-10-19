@@ -103,7 +103,7 @@ impl LibraryItem {
 
     /// Text typed after its keyword fills it: a quicklink, or a snippet
     /// with `{query}`.
-    fn takes_query(&self) -> bool {
+    pub fn takes_query(&self) -> bool {
         !self.keyword.is_empty()
             && (self.kind == LibraryKind::Quicklink || self.text.contains("{query}"))
     }

@@ -16,6 +16,7 @@ pub mod download;
 pub mod emoji;
 pub mod files;
 pub mod focus;
+pub mod keywords;
 pub mod library;
 pub mod password;
 pub mod permissions;

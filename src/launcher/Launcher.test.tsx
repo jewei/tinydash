@@ -62,6 +62,30 @@ describe("Launcher", () => {
     });
   });
 
+  it("types a keyword from the ? list into the search field", async () => {
+    const keyword: SearchResult = {
+      ...app,
+      id: "keyword:Google",
+      kind: "keyword",
+      title: "g, google",
+      actions: [{ label: "Use Keyword", action: { type: "typeQuery", text: "g " }, confirm: null }],
+    };
+    const { backend, input, press } = setup((query) => (query === "?" ? [keyword] : []));
+    fireEvent.input(input, { target: { value: "?" } });
+    await screen.findByRole("option", { name: /g, google/ });
+    press("Enter");
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "typeQuery", text: "g " },
+      resultId: keyword.id,
+    });
+    // The backend checks the text and sends it back to type.
+    await emit("launcher:query", "g ");
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe("g "));
+    expect(backend.called("search").at(-1)?.args).toEqual({ query: "g ", category: "all" });
+    expect(document.activeElement).toBe(input);
+  });
+
   it("asks before a destructive action, with Cancel focused", async () => {
     const { backend, press } = setup(() => [restart]);
     await screen.findByRole("option", { name: /Restart/ });

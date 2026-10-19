@@ -110,6 +110,11 @@ export function Launcher() {
         launcher.reset(category);
         focusInput();
       }),
+      ipc.onLauncherQuery((text) => {
+        setMenu(undefined);
+        launcher.setQuery(text);
+        focusInput();
+      }),
       ipc.onResultsStale(() => void launcher.refresh()),
       ipc.onSettingsChanged(applySettings),
       ipc.onUpdateChanged((version) => {
@@ -623,6 +628,9 @@ function EmptyResults(props: {
             </li>
             <li>
               Generate <code>password</code>, or search the web with <code>g rust</code>
+            </li>
+            <li>
+              <code>?</code> lists every keyword
             </li>
           </ul>
         </Empty>

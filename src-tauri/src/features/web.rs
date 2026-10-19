@@ -79,6 +79,11 @@ impl SearchEngine {
     }
 }
 
+/// Each engine's name and its keywords, shortest first, for the `?` list.
+pub fn engines() -> impl Iterator<Item = (&'static str, &'static [&'static str])> {
+    ENGINES.iter().map(|engine| (engine.name, engine.keywords))
+}
+
 /// An engine keyword followed by search text. A bare keyword is not a search,
 /// so `gh` can still find an app.
 pub fn answer(query: &str) -> Option<SearchResult> {

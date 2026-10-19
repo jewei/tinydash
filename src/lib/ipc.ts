@@ -87,6 +87,10 @@ export const onUpdateChanged = (handler: (version: string | null) => void) =>
 export const onLauncherShown = (handler: (event: LauncherShown) => void) =>
   listen<LauncherShown>("launcher:shown", (event) => handler(event.payload));
 
+/** Text for the search field, from a row of the `?` list. */
+export const onLauncherQuery = (handler: (text: string) => void) =>
+  listen<string>("launcher:query", (event) => handler(event.payload));
+
 export const onResultsStale = (handler: () => void) => listen("results:stale", () => handler());
 
 /** A widget changed on its own, such as the focus timer at the end of a phase. */
