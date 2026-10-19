@@ -518,6 +518,44 @@ describe("Settings", () => {
     expect(screen.queryByRole("button", { name: "Check for Updates" })).toBeNull();
   });
 
+  it("lists each connection to the internet and whether it is on", async () => {
+    fakeBackend(
+      {},
+      { currencyRatesEnabled: true, showWeather: true, weatherCity: " ", checkForUpdates: false },
+    );
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Privacy" }));
+    const status = async (name: string) =>
+      (await screen.findByRole("group", { name })).querySelector(".status")?.textContent;
+    expect(await status("Currency rates")).toBe("On");
+    // The widget without a city downloads nothing.
+    expect(await status("Weather")).toBe("Off");
+    expect(await status("Update checks")).toBe("Off");
+  });
+
+  it("says when a build never checks for updates", async () => {
+    fakeBackend(
+      {
+        about: () => ({
+          version: "0.2.0",
+          settingsFolder: "/data",
+          dataFolder: "/data",
+          richClipboard: true,
+          selfUpdate: false,
+        }),
+      },
+      { checkForUpdates: true, showWeather: true, weatherCity: "Oslo" },
+    );
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Privacy" }));
+    const updates = await screen.findByRole("group", { name: "Update checks" });
+    expect(updates.textContent).toContain("never checks");
+    expect(updates.querySelector(".status")?.textContent).toBe("Off");
+    expect(
+      screen.getByRole("group", { name: "Weather" }).querySelector(".status")?.textContent,
+    ).toBe("On");
+  });
+
   it("describes each setting to screen readers", async () => {
     fakeBackend();
     render(() => <Settings />);

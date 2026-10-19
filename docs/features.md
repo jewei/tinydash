@@ -122,6 +122,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                        |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, aliases, hidden results      |
 | Snippets, Quicklinks | Create, edit, delete                                                                                             |
+| Privacy              | Each connection to the internet, what it sends, how often, and whether it is on                                  |
 | About                | Version, Check for Updates, settings and data folders, credits                                                   |
 
 ## Updates

@@ -36,6 +36,7 @@ const SECTIONS = [
   { id: "search", label: "Search" },
   { id: "snippets", label: "Snippets" },
   { id: "quicklinks", label: "Quicklinks" },
+  { id: "privacy", label: "Privacy" },
   { id: "about", label: "About" },
 ] as const;
 
@@ -564,6 +565,10 @@ export function Settings() {
                 <Library kind="quicklink" />
               </Match>
 
+              <Match when={section() === "privacy"}>
+                <Privacy settings={settings()} selfUpdate={about()?.selfUpdate === true} />
+              </Match>
+
               <Match when={section() === "about"}>
                 <About about={about()} error={aboutError()} updates={updates} />
               </Match>
@@ -671,6 +676,61 @@ function UpdateCheck(props: { version: string; updates: ReturnType<typeof create
         {updates().result() ?? ""}
       </p>
     </div>
+  );
+}
+
+/**
+ * Every connection TinyDash makes, and whether it is on. The hosts match
+ * `ENDPOINT` in currency.rs, `GEOCODING` and `FORECAST` in weather.rs, and
+ * the update feed that release.yml builds in; the intervals match their
+ * `MAX_AGE_SECONDS` and the six hours in updates.rs.
+ */
+function Privacy(props: { settings: Values; selfUpdate: boolean }) {
+  const status = (on: boolean) => <span class="status">{on ? "On" : "Off"}</span>;
+  return (
+    <>
+      <p class="section-intro">
+        TinyDash has no account, no analytics, and no crash reports. It connects to the internet
+        only for the features below, and each service sees your IP address.
+      </p>
+      <Row
+        label="Currency rates"
+        description="api.frankfurter.dev sends the daily ECB rate table, at most every 12 hours. Your amounts stay on this computer. Change it in Search."
+      >
+        {status(props.settings.currencyRatesEnabled)}
+      </Row>
+      <Row
+        label="Weather"
+        description="geocoding-api.open-meteo.com receives the city name, and api.open-meteo.com receives its location, at most every 30 minutes while the widget shows. Change it in Widgets."
+      >
+        {status(props.settings.showWeather && props.settings.weatherCity.trim() !== "")}
+      </Row>
+      <Show
+        when={props.selfUpdate}
+        fallback={
+          <Row label="Update checks" description="This build never checks for updates.">
+            {status(false)}
+          </Row>
+        }
+      >
+        <Row
+          label="Update checks"
+          description="github.com sends the details of the latest version when the launcher opens, at most every six hours, and when you choose Check for Updates. A new version downloads only when you install it. Change it in General."
+        >
+          {status(props.settings.checkForUpdates)}
+        </Row>
+      </Show>
+      <h2>Only when you choose</h2>
+      <p class="section-intro">
+        Web searches, quicklinks, and links open in your browser, which then connects to those
+        sites. TinyDash does not connect to them.
+      </p>
+      <h2>Kept on this computer</h2>
+      <p class="section-intro">
+        Clipboard history, the file index, snippets, quicklinks, the notepad, and what you use most
+        stay in the saved data folder that About shows.
+      </p>
+    </>
   );
 }
 
