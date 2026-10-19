@@ -35,7 +35,7 @@ use crate::{
 use id::Source;
 use matcher::{EXACT_ALIAS, Matcher, STRONG};
 use result::{Action, ResultAction, ResultKind, Scored, SearchResult};
-use usage::{Aliases, Hidden, Pins, Usage};
+use usage::{Aliases, Hidden, Hotkeys, Pins, Usage};
 
 /// Results in an All search with text. Instant answers and the web
 /// fallback, when there is one, count toward it. The empty All view stops
@@ -101,6 +101,7 @@ pub struct Snapshot {
     pub pins: Arc<Pins>,
     pub hidden: Arc<Hidden>,
     pub aliases: Arc<Aliases>,
+    pub hotkeys: Arc<Hotkeys>,
     pub rates: Arc<Option<Rates>>,
     pub now: DateTime<Local>,
 }
@@ -168,6 +169,23 @@ pub fn search(snapshot: &Snapshot, query: &str, category: Category) -> Vec<Searc
                 Action::SetAlias {
                     id: result.id.clone(),
                     alias: alias.to_owned(),
+                },
+            ));
+        }
+        // A hotkey runs the main action away from the launcher, where no
+        // one could confirm it, so a result that asks first has none.
+        if source.aliasable() && result.actions.first().is_some_and(|a| a.confirm.is_none()) {
+            let shortcut = snapshot.hotkeys.get(&result.id).unwrap_or_default();
+            let label = if shortcut.is_empty() {
+                "Set Hotkey…"
+            } else {
+                "Change Hotkey…"
+            };
+            result.actions.push(ResultAction::new(
+                label,
+                Action::SetHotkey {
+                    id: result.id.clone(),
+                    shortcut: shortcut.to_owned(),
                 },
             ));
         }
@@ -746,6 +764,34 @@ mod tests {
         assert!(labels.contains(&"Change Alias “lo”…"), "{labels:?}");
         state.hidden.set(Hidden::new(["system:sleep".to_owned()]));
         assert!(!ids("lo", Category::All).contains(&"system:sleep".to_owned()));
+    }
+
+    #[test]
+    fn a_hotkey_is_offered_only_where_nothing_asks_first() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let actions = |query: &str| -> Vec<Action> {
+            search(&state.snapshot(), query, Category::System)
+                .swap_remove(0)
+                .actions
+                .into_iter()
+                .map(|entry| entry.action)
+                .collect()
+        };
+        let set = |shortcut: &str| Action::SetHotkey {
+            id: "system:lock".into(),
+            shortcut: shortcut.into(),
+        };
+        assert!(actions("lock screen").contains(&set("")));
+        state
+            .hotkeys
+            .set(Hotkeys::new([("system:lock".into(), "Alt+KeyL".into())]));
+        assert!(actions("lock screen").contains(&set("Alt+KeyL")));
+        // Restart asks first, which a hotkey pressed in another app cannot.
+        assert!(
+            !actions("restart")
+                .iter()
+                .any(|action| matches!(action, Action::SetHotkey { .. }))
+        );
     }
 
     #[test]

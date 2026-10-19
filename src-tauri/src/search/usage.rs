@@ -175,6 +175,45 @@ impl Aliases {
     }
 }
 
+/// The most hotkeys the user may set. Each one holds a system-wide key
+/// combination, so the list stays short.
+pub const MAX_HOTKEYS: usize = 50;
+
+/// Key combinations that run a result from any app, by result ID, as
+/// accelerator text such as `Control+Alt+KeyS`. Each result has at most
+/// one, and each combination runs one result.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Hotkeys(std::collections::BTreeMap<String, String>);
+
+impl Hotkeys {
+    pub fn new(pairs: impl IntoIterator<Item = (String, String)>) -> Self {
+        Self(pairs.into_iter().collect())
+    }
+
+    pub fn get(&self, id: &str) -> Option<&str> {
+        self.0.get(id).map(String::as_str)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Pairs of result ID and accelerator.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0
+            .iter()
+            .map(|(id, shortcut)| (id.as_str(), shortcut.as_str()))
+    }
+
+    pub fn set(&mut self, id: &str, shortcut: &str) {
+        self.0.insert(id.to_owned(), shortcut.to_owned());
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        self.0.remove(id);
+    }
+}
+
 /// An alias in the form search compares: one lowercase word of up to
 /// [`MAX_ALIAS`] characters. Empty means "no alias".
 pub fn clean_alias(text: &str) -> crate::error::Result<String> {

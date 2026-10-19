@@ -306,7 +306,50 @@ describe("Settings", () => {
     expect(
       await screen.findByText("Could not read the aliases: The database is locked."),
     ).toBeTruthy();
-    expect(screen.queryByText(/None\. To add one/)).toBeNull();
+    expect(screen.queryByText(/None\. To add one, choose Add Alias/)).toBeNull();
+  });
+
+  it("lists hotkeys with their keys and removes one", async () => {
+    let hotkeys = [
+      {
+        id: "app:/Applications/Code.app",
+        shortcut: "Alt+Shift+C",
+        title: "Code",
+        subtitle: "Editor",
+      },
+    ];
+    const backend = fakeBackend({
+      hotkeys: () => hotkeys,
+      remove_hotkey: () => {
+        hotkeys = [];
+        return null;
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const list = await screen.findByRole("list", { name: "Hotkeys" });
+    await waitFor(() => expect(list.textContent).toContain("Code"));
+    expect(list.textContent).toContain("Alt");
+    fireEvent.click(screen.getByRole("button", { name: "Remove the hotkey of Code" }));
+    await waitFor(() => expect(backend.called("remove_hotkey")).toHaveLength(1));
+    expect(backend.called("remove_hotkey")[0]?.args).toEqual({
+      id: "app:/Applications/Code.app",
+    });
+    expect(await screen.findByText(/None\. To add one, choose Set Hotkey/)).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(list));
+  });
+
+  it("says when the hotkeys cannot be read", async () => {
+    fakeBackend({
+      hotkeys: () => {
+        throw "The database is locked.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    expect(
+      await screen.findByText("Could not read the hotkeys: The database is locked."),
+    ).toBeTruthy();
   });
 
   it("says when the hidden results cannot be read", async () => {
