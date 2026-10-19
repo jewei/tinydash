@@ -144,7 +144,14 @@ pub fn answer(query: &str, library: &Library) -> Option<Vec<SearchResult>> {
             .chain(own)
             .filter(|result| {
                 let text = format!("{} {}", result.title, result.subtitle).to_lowercase();
-                words.iter().all(|word| text.contains(word.as_str()))
+                // Each word starts a word of the row, so `git` finds GitHub
+                // but not "digits".
+                let row: Vec<&str> = text
+                    .split(|c: char| c.is_whitespace() || matches!(c, ',' | '·'))
+                    .collect();
+                words
+                    .iter()
+                    .all(|word| row.iter().any(|part| part.starts_with(word.as_str())))
             })
             .take(ROWS)
             .collect(),
@@ -234,6 +241,15 @@ mod tests {
         assert_eq!(rows.len(), 1);
         let rows = answer("? search git", &library).unwrap();
         assert_eq!(rows[0].title, "gh, github");
+        // A word matches the start of a word: "digits" in the PIN row has
+        // "git" inside it, not at its start.
+        let titles: Vec<String> = answer("? git", &library)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.title)
+            .collect();
+        assert_eq!(titles, ["gh, github"]);
+        assert_eq!(answer("? =", &library).unwrap()[0].title, "=");
         assert_eq!(typed(&rows[0]), "gh ");
         assert!(answer("? nothing-like-this", &library).unwrap().is_empty());
     }
