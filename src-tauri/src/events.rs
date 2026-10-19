@@ -12,6 +12,7 @@ pub const SETTINGS_CHANGED: &str = "settings:changed";
 pub const UPDATE_CHANGED: &str = "update:changed";
 pub const WIDGETS_CHANGED: &str = "widgets:changed";
 pub const HUD_SHOW: &str = "hud:show";
+pub const LAUNCHER_QUERY: &str = "launcher:query";
 
 #[derive(Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +29,13 @@ pub fn launcher_shown(app: &AppHandle, category: Option<Category>) {
         LauncherShown { category },
     ) {
         tracing::debug!(%error, "The launcher did not receive the show event");
+    }
+}
+
+/// Text for the launcher's search field, such as a keyword from the `?` list.
+pub fn launcher_query(app: &AppHandle, text: &str) {
+    if let Err(error) = app.emit_to(crate::window::LAUNCHER, LAUNCHER_QUERY, text) {
+        tracing::debug!(%error, "The launcher did not receive the text to type");
     }
 }
 

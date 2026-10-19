@@ -17,7 +17,7 @@ type Command =
 
 /**
  * Shortcuts, with Mod as Command on macOS and Control elsewhere:
- * ↑/↓ move, Enter runs, Mod+Enter runs the second action, Mod+K opens
+ * ↑/↓ move (↑ on the first row may bring back a past search), Enter runs, Mod+Enter runs the second action, Mod+K opens
  * actions, Mod+Backspace deletes, Mod+1–9 runs that row, Tab and Shift+Tab
  * change category, Mod+, opens Settings, Mod+J goes to the widget pane's
  * note and back, Mod+P runs the focus timer's main action, Mod+Shift+Enter

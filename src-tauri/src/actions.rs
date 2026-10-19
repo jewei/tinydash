@@ -13,7 +13,7 @@ use crate::{
     error::{Error, Result},
     events,
     features::{
-        calculator, clip_card,
+        calculator, clip_card, keywords,
         library::{self, LibraryKind, Target},
     },
     hud, platform, refresh,
@@ -215,6 +215,14 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         Action::TurnOnCurrencyRates => commands::turn_on_currency_rates(app)?,
         Action::OpenSettings => window::open_settings(app)?,
         Action::CenterLauncher => window::center(app)?,
+        Action::TypeQuery { text } => {
+            if text.trim().is_empty() || text.chars().count() > keywords::MAX_TYPED {
+                return Err(Error::msg(
+                    "This keyword cannot be typed. Type it yourself.",
+                ));
+            }
+            events::launcher_query(app, &text);
+        }
         Action::Focus { control } => timer::control(app, control)?,
         // Exits below, once the use is saved: exit ends the process from
         // the main thread while this worker may still be writing.

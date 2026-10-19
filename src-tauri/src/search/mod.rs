@@ -26,6 +26,7 @@ use crate::{
         datetime,
         emoji::EmojiIndex,
         files::FileIndex,
+        keywords,
         library::Library,
         password, permissions, system, url_cleaner, web,
     },
@@ -350,6 +351,10 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     // `=` asks for the calculation history and nothing else.
     if let Some(history) = s.calculations.answer(query) {
         return history;
+    }
+    // So does `?`, for the list of keywords.
+    if let Some(list) = keywords::answer(query, &s.library) {
+        return list;
     }
     let mut results = answers(s, query);
     let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
@@ -872,6 +877,29 @@ mod tests {
             assert_eq!(after.len(), CATEGORY_LIMIT, "{query:?}");
             assert!(!after.contains(&shown[0]));
         }
+    }
+
+    #[test]
+    fn each_built_in_keyword_example_gets_an_answer() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let s = state.snapshot();
+        for example in keywords::examples() {
+            let answered =
+                s.calculations.answer(example).is_some() || !answers(&s, example).is_empty();
+            assert!(answered, "{example}");
+        }
+    }
+
+    #[test]
+    fn a_question_mark_lists_keywords_in_all_only() {
+        let state = crate::state::State::for_tests(Settings::default());
+        let results = search(&state.snapshot(), "?", Category::All);
+        assert!(!results.is_empty());
+        assert!(results.iter().all(|r| r.kind == ResultKind::Keyword));
+        // No Add Alias or Hide: a keyword row is not an item.
+        assert!(results.iter().all(|r| r.actions.len() == 1));
+        let results = search(&state.snapshot(), "?", Category::Apps);
+        assert!(results.iter().all(|r| r.kind != ResultKind::Keyword));
     }
 
     #[test]

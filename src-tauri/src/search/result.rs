@@ -39,6 +39,8 @@ pub enum ResultKind {
     System,
     Color,
     Permissions,
+    /// A row of the `?` list, which types its keyword.
+    Keyword,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -227,6 +229,11 @@ pub enum Action {
     OpenSettings,
     /// Forget where the launcher was dragged, and center it.
     CenterLauncher,
+    /// Put text in the launcher's search field, such as a keyword from the
+    /// `?` list, ready for the text after it.
+    TypeQuery {
+        text: String,
+    },
     /// Start, pause, skip, or reset the focus timer of the widget pane.
     Focus {
         control: FocusControl,
