@@ -7,6 +7,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Added
 
 - The calculator reads percentages as people say them: `$30 + 20%`, `20% off $50`, `20 is what % of 200`, `50 to 75 is what %`, and `20 is 10% of what`.
+- The calculator reads `plus`, `minus`, `times`, `multiplied by`, and `divided by`, and amounts such as `€20`.
 
 ### Changed
 

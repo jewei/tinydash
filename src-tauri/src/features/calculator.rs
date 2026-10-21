@@ -1,8 +1,9 @@
 //! Arithmetic, unit conversion, and currency conversion through fend.
-//! Phrases that fend does not read, such as `$30 + 20%`, are rewritten into
-//! its syntax first.
+//! Phrases that fend does not read, such as `$30 + 20%` or `10 plus 5`, are
+//! rewritten into its syntax first.
 
 use std::{
+    borrow::Cow,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -293,7 +294,67 @@ fn fend_input(query: &str) -> String {
     if let Some(input) = currency_shorthand(query) {
         return input;
     }
-    percentage(query).unwrap_or_else(|| query.to_owned())
+    let input = euro_amounts(query);
+    let input = word_operators(&input);
+    percentage(&input).unwrap_or_else(|| input.into_owned())
+}
+
+/// `€20` as `20 EUR`: fend reads `$20` and `£20`, but not `€20`.
+fn euro_amounts(query: &str) -> Cow<'_, str> {
+    if !query.contains('€') {
+        return Cow::Borrowed(query);
+    }
+    let mut input = String::with_capacity(query.len() + 4);
+    let mut rest = query;
+    while let Some(at) = rest.find('€') {
+        input.push_str(&rest[..at]);
+        let after = &rest[at + '€'.len_utf8()..];
+        let amount = after
+            .find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '.' | ',')))
+            .unwrap_or(after.len());
+        if after.starts_with(|c: char| c.is_ascii_digit()) {
+            input.push_str(&after[..amount]);
+            input.push_str(" EUR");
+            rest = &after[amount..];
+        } else {
+            input.push('€');
+            rest = after;
+        }
+    }
+    input.push_str(rest);
+    Cow::Owned(input)
+}
+
+/// `plus`, `minus`, `times`, `multiplied by`, and `divided by` as signs.
+fn word_operators(query: &str) -> Cow<'_, str> {
+    let words: Vec<&str> = query.split_whitespace().collect();
+    let is = |i: usize, word: &str| words.get(i).is_some_and(|w| w.eq_ignore_ascii_case(word));
+    let mut input = Vec::with_capacity(words.len());
+    let mut changed = false;
+    let mut i = 0;
+    while i < words.len() {
+        let (sign, used) = if is(i, "plus") {
+            ("+", 1)
+        } else if is(i, "minus") {
+            ("-", 1)
+        } else if is(i, "times") {
+            ("*", 1)
+        } else if is(i, "multiplied") && is(i + 1, "by") {
+            ("*", 2)
+        } else if is(i, "divided") && is(i + 1, "by") {
+            ("/", 2)
+        } else {
+            (words[i], 0)
+        };
+        changed |= used > 0;
+        input.push(sign);
+        i += used.max(1);
+    }
+    if changed {
+        Cow::Owned(input.join(" "))
+    } else {
+        Cow::Borrowed(query)
+    }
 }
 
 /// fend's input for two parts of a phrase.
@@ -609,6 +670,28 @@ mod tests {
             assert_eq!(value, expected, "{query}");
         }
         assert!(rates_off_answer("$30 + 20%").is_some());
+    }
+
+    #[test]
+    fn reads_operator_words_and_euro_signs() {
+        for (query, expected) in [
+            ("10 plus 5", "15"),
+            ("10 minus 4", "6"),
+            ("10 Times 3", "30"),
+            ("3 multiplied by 4", "12"),
+            ("1,000 divided by 200", "5"),
+            ("30 plus 20%", "36"),
+        ] {
+            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
+        }
+        assert_eq!(value("10 divided 4"), None);
+        assert_eq!(euro_amounts("€20 + €5k"), "20 EUR + 5k EUR");
+        assert_eq!(euro_amounts("€ and €x"), "€ and €x");
+        let rates = Rates::fixture();
+        let (value, used) = evaluate("€20 + 10%", Some(&rates)).unwrap();
+        assert!(used);
+        assert_eq!(value, "22.00 EUR");
+        assert!(rates_off_answer("€20 to usd").is_some());
     }
 
     #[test]
