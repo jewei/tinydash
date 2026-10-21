@@ -1,4 +1,6 @@
 //! Arithmetic, unit conversion, and currency conversion through fend.
+//! Phrases that fend does not read, such as `$30 + 20%`, are rewritten into
+//! its syntax first.
 
 use std::{
     sync::{
@@ -176,7 +178,7 @@ fn needs_rates(query: &str) -> bool {
     context.set_exchange_rate_handler_v2(Probe {
         asked: asked.clone(),
     });
-    let input = currency_shorthand(query).unwrap_or_else(|| query.to_owned());
+    let input = fend_input(query);
     let deadline = Deadline(Instant::now() + TIME_LIMIT);
     let _ = fend_core::evaluate_preview_with_interrupt(&input, &context, &deadline);
     asked.load(Ordering::Relaxed)
@@ -208,7 +210,7 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
         });
     }
     let deadline = Deadline(Instant::now() + TIME_LIMIT);
-    let input = currency_shorthand(query).unwrap_or_else(|| query.to_owned());
+    let input = fend_input(query);
     let result = fend_core::evaluate_preview_with_interrupt(&input, &context, &deadline);
     let is_number = result
         .get_main_result_spans()
@@ -284,6 +286,110 @@ fn currency_shorthand(query: &str) -> Option<String> {
     let is_code = |code: &str| code.len() == 3 && code.bytes().all(|b| b.is_ascii_uppercase());
     (amount.parse::<f64>().is_ok() && is_code(from) && is_code(to))
         .then(|| format!("{amount} {from} to {to}"))
+}
+
+/// The query in fend's syntax.
+fn fend_input(query: &str) -> String {
+    if let Some(input) = currency_shorthand(query) {
+        return input;
+    }
+    percentage(query).unwrap_or_else(|| query.to_owned())
+}
+
+/// fend's input for two parts of a phrase.
+type Formula = fn(&str, &str) -> String;
+
+/// Percentage phrases as fend arithmetic. fend reads `30 + 20%` as 30.2,
+/// cannot add a percentage to money, and has no `off` or `is what %`.
+fn percentage(query: &str) -> Option<String> {
+    let query = query.trim();
+    // `50 to 75 is what %` is a change; `3/20 is what %` is a ratio.
+    for ending in [" is what %", " as %", " as a %"] {
+        if let Some(left) = strip_suffix(query, ending) {
+            return Some(match around(left, " to ") {
+                Some((from, to)) => format!("(({to}) - ({from})) / ({from}) to %"),
+                None => format!("({left}) to %"),
+            });
+        }
+    }
+    let ratios: [(&str, Formula); 5] = [
+        (" is what % of ", |a, b| format!("({a}) / ({b}) to %")),
+        (" as a % of ", |a, b| format!("({a}) / ({b}) to %")),
+        (" as % of ", |a, b| format!("({a}) / ({b}) to %")),
+        (" is what % off ", |a, b| {
+            format!("(1 - ({a}) / ({b})) to %")
+        }),
+        (" is what % on ", |a, b| format!("(({a}) / ({b}) - 1) to %")),
+    ];
+    for (separator, formula) in ratios {
+        if let Some((a, b)) = around(query, separator) {
+            return Some(formula(a, b));
+        }
+    }
+    let factors: [(&str, &str); 3] = [("% of", ""), ("% on", "1 + "), ("% off", "1 - ")];
+    // `20 is 10% of what`: the number that 20 is 10% of.
+    if let Some(left) = strip_suffix(query, " what") {
+        for (separator, factor) in factors {
+            if let Some((value, percent)) =
+                strip_suffix(left, separator).and_then(|left| around(left, " is "))
+                && is_number(percent)
+            {
+                return Some(format!("({value}) / ({factor}({percent}) / 100)"));
+            }
+        }
+    }
+    // `10% of 200`, `10% on 200`, `10% off 200`.
+    for (separator, factor) in factors {
+        if let Some((percent, value)) = around(query, &format!("{separator} "))
+            && is_number(percent)
+        {
+            return Some(format!("({value}) * ({factor}({percent}) / 100)"));
+        }
+    }
+    // `$30 + 20%` adds 20% of $30. `10% + 20%` stays a sum of percentages.
+    let left = query.strip_suffix('%')?;
+    let at = left.rfind(['+', '-'])?;
+    let (value, percent) = (left[..at].trim(), left[at + 1..].trim());
+    // `2e-3%` is an exponent, not a subtraction.
+    let exponent = value
+        .strip_suffix(['e', 'E'])
+        .is_some_and(|mantissa| mantissa.ends_with(|c: char| c.is_ascii_digit()));
+    // `5 * -10%` is a negative percentage, not a subtraction.
+    if exponent
+        || value.is_empty()
+        || value.ends_with(['%', '+', '-', '*', '/', '^', '('])
+        || !is_number(percent)
+    {
+        return None;
+    }
+    let sign = &left[at..=at];
+    Some(format!("({value}) * (1 {sign} ({percent}) / 100)"))
+}
+
+/// The text before `suffix`, matched in any case, when some is left.
+fn strip_suffix<'a>(text: &'a str, suffix: &str) -> Option<&'a str> {
+    let at = text.len().checked_sub(suffix.len())?;
+    if !text.is_char_boundary(at) || !text[at..].eq_ignore_ascii_case(suffix) {
+        return None;
+    }
+    Some(text[..at].trim()).filter(|left| !left.is_empty())
+}
+
+/// The text before and after the first `separator`, matched in any case,
+/// when both are there.
+fn around<'a>(text: &'a str, separator: &str) -> Option<(&'a str, &'a str)> {
+    // ASCII lowercase keeps every byte offset.
+    let at = text.to_ascii_lowercase().find(separator)?;
+    let (left, right) = (text[..at].trim(), text[at + separator.len()..].trim());
+    (!left.is_empty() && !right.is_empty()).then_some((left, right))
+}
+
+/// A plain number, such as `20`, `12.5`, or `1,000`.
+fn is_number(text: &str) -> bool {
+    text.chars().any(|c| c.is_ascii_digit())
+        && text
+            .chars()
+            .all(|c| c.is_ascii_digit() || matches!(c, '.' | ','))
 }
 
 struct Deadline(Instant);
@@ -460,6 +566,49 @@ mod tests {
         let answer = answer("100 USD to MYR", Some(&rates)).unwrap();
         assert!(answer.subtitle.contains("2026-10-02"));
         assert_eq!(evaluate("100 USD to MYR", None), None);
+    }
+
+    #[test]
+    fn reads_percentage_phrases() {
+        for (query, expected) in [
+            ("30 + 20%", "36"),
+            ("200 - 10%", "180"),
+            ("50 * 2 + 10%", "110"),
+            ("10% of 200", "20"),
+            ("10% on 200", "220"),
+            ("20 is what % of 200", "10%"),
+            ("20 as a % of 200", "10%"),
+            ("180 is what % off 200", "10%"),
+            ("180 is what % on 150", "20%"),
+            ("50 to 75 is what %", "50%"),
+            ("40 to 90 as %", "125%"),
+            ("3/20 is what %", "15%"),
+            ("0.35 as %", "35%"),
+            ("20 is 10% of what", "200"),
+            ("220 is 10% on what", "200"),
+            ("180 is 10% off what", "200"),
+            ("10% + 20%", "30%"),
+            ("5 * -10%", "-50%"),
+        ] {
+            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
+        }
+        assert_eq!(value("10% of what"), None);
+        assert_eq!(value("2e-3%").as_deref(), Some("0.002%"));
+        assert_eq!(value("5 - 1e-2%").as_deref(), Some("4.9999"));
+        // Not a char boundary where a suffix would start.
+        assert_eq!(value("2 Äpfel"), None);
+        assert_eq!(value("5 €€"), None);
+        // fend needs rates for any amount of money.
+        let rates = Rates::fixture();
+        for (query, expected) in [
+            ("$30 + 20%", "$36"),
+            ("30% of $200", "$60"),
+            ("15% OFF $200", "$170"),
+        ] {
+            let (value, _) = evaluate(query, Some(&rates)).unwrap();
+            assert_eq!(value, expected, "{query}");
+        }
+        assert!(rates_off_answer("$30 + 20%").is_some());
     }
 
     #[test]

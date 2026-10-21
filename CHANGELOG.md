@@ -4,6 +4,14 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- The calculator reads percentages as people say them: `$30 + 20%`, `20% off $50`, `20 is what % of 200`, `50 to 75 is what %`, and `20 is 10% of what`.
+
+### Changed
+
+- `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added
