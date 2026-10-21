@@ -53,6 +53,13 @@ const BUILT_IN: &[BuiltIn] = &[
         symbol: Symbol::Clock,
     },
     BuiltIn {
+        keywords: "days until, days since, days between",
+        what: "Count the days to or from a date",
+        example: "days until dec 25",
+        typed: "days until ",
+        symbol: Symbol::Clock,
+    },
+    BuiltIn {
         keywords: "password, pw",
         what: "A password, a passphrase, and a PIN",
         example: "pw 32",
