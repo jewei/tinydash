@@ -2,7 +2,9 @@
 //!
 //! - Current time: `now`, `time in tokyo`, `london time`
 //! - Conversion: `10am pacific`, `9:30 tokyo to london`, `tomorrow 3pm in kl`
-//! - Dates: `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`
+//! - Dates: `today + 3 days`, `next friday + 2 weeks`, `in 10 days`, `2028-02-28 + 1 week`,
+//!   `3 days from now`, `a week ago`, `2 weeks after dec 25`
+//! - Day counts: `days until dec 25`, `days since 2026-01-01`, `days between 1 mar and 30 may`
 //! - City clocks for the widget pane: `Tokyo`, `kl`, `Europe/London`
 
 use std::{collections::HashMap, sync::LazyLock};
@@ -69,7 +71,11 @@ pub fn answers(query: &str, now: DateTime<Local>) -> Vec<SearchResult> {
     if let Some(answers) = conversion(&query, now) {
         return answers;
     }
-    date_math(&query, now.date_naive()).into_iter().collect()
+    let today = now.date_naive();
+    day_count(&query, today)
+        .or_else(|| date_math(&query, today))
+        .into_iter()
+        .collect()
 }
 
 #[derive(Clone, Copy)]
@@ -393,44 +399,30 @@ fn iso_date(word: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(word, "%Y-%m-%d").ok()
 }
 
-/// `base (+|-) n unit ...` or `in n unit`. A bare ISO date also answers,
-/// with its weekday.
+/// `base (+|-) n unit ...`, or a phrase that `relative_phrase` reads. A bare
+/// date also answers, with its weekday.
 fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
+    let query = relative_phrase(query).unwrap_or_else(|| query.to_owned());
     let spaced = query.replace('+', " + ");
-    let mut words = spaced.split_whitespace().flat_map(split_minus);
-    let first = words.next()?;
-    let (base, base_label) = match first {
-        "today" | "in" => (today, "today".to_owned()),
-        "tomorrow" => (today + Days::new(1), first.to_owned()),
-        "yesterday" => (today - Days::new(1), first.to_owned()),
-        "next" | "last" => {
-            let name = words.next()?;
-            let weekday: Weekday = name.parse().ok()?;
-            let date = if first == "next" {
-                next_weekday(today, weekday)
-            } else {
-                last_weekday(today, weekday)
-            };
-            (date, format!("{first} {name}"))
-        }
-        word => (iso_date(word)?, String::new()),
-    };
-    let mut date = base;
-    if first == "in" {
-        date = shift(date, 1, &mut words)?;
-    }
-    while let Some(operator) = words.next() {
+    let words: Vec<&str> = spaced.split_whitespace().flat_map(split_minus).collect();
+    let end = words
+        .iter()
+        .position(|word| matches!(*word, "+" | "-"))
+        .unwrap_or(words.len());
+    let base = named_day(&words[..end], today)?;
+    let mut date = base.date;
+    let mut steps = words[end..].iter().copied();
+    while let Some(operator) = steps.next() {
         let sign = match operator {
             "+" => 1,
             "-" => -1,
             _ => return None,
         };
-        date = shift(date, sign, &mut words)?;
+        date = shift(date, sign, &mut steps)?;
     }
-    let from = if base_label.is_empty() {
-        String::new()
-    } else {
-        format!(" · {base_label} is {}", base.format("%a %-d %b %Y"))
+    let from = match &base.label {
+        Some(label) => format!(" · {label} is {}", base.date.format("%a %-d %b %Y")),
+        None => String::new(),
     };
     let days = (date - today).num_days();
     let relative = match days {
@@ -447,6 +439,233 @@ fn date_math(query: &str, today: NaiveDate) -> Option<SearchResult> {
     );
     result.actions[0].label = "Copy Date".into();
     Some(result)
+}
+
+/// `in 10 days`, `3 days from now`, `a week ago`, `2 weeks from tomorrow`,
+/// `2 months 3 days after dec 25`, or `3 days before next friday` in the
+/// `base (+|-) n unit ...` form.
+fn relative_phrase(query: &str) -> Option<String> {
+    if let Some(amount) = query.strip_prefix("in ") {
+        // `in 2 weeks + 1 day` already has its signs.
+        let steps = steps(amount).map_or_else(|| amount.to_owned(), |steps| steps.join(" + "));
+        return Some(format!("today + {steps}"));
+    }
+    let (amount, sign, base) = match query.strip_suffix(" ago") {
+        Some(amount) => (amount, '-', "today"),
+        None => [(" after ", '+'), (" from ", '+'), (" before ", '-')]
+            .iter()
+            .find_map(|(word, sign)| {
+                let (amount, base) = query.split_once(word)?;
+                Some((amount, *sign, if base == "now" { "today" } else { base }))
+            })?,
+    };
+    let steps: Vec<String> = steps(amount)?
+        .iter()
+        .map(|step| format!("{sign} {step}"))
+        .collect();
+    Some(format!("{base} {}", steps.join(" ")))
+}
+
+/// `2 months 3 days`, `2 months and 3 days`, `a week`, or `3d` as steps
+/// such as `2 months`, for `shift` to check.
+fn steps(amount: &str) -> Option<Vec<String>> {
+    let mut words = amount
+        .split_whitespace()
+        .map(|word| word.trim_end_matches(','))
+        .filter(|word| *word != "and");
+    let mut steps = Vec::new();
+    while let Some(word) = words.next() {
+        let number = if matches!(word, "a" | "an") {
+            "1"
+        } else {
+            word
+        };
+        if number.bytes().all(|byte| byte.is_ascii_digit()) {
+            steps.push(format!("{number} {}", words.next()?));
+        } else if number.starts_with(|c: char| c.is_ascii_digit()) {
+            steps.push(number.to_owned());
+        } else {
+            return None;
+        }
+    }
+    (!steps.is_empty()).then_some(steps)
+}
+
+/// `days until dec 25`, `days till next friday`, `days since 2026-01-01`,
+/// or `days between 1 mar and 30 may`.
+fn day_count(query: &str, today: NaiveDate) -> Option<SearchResult> {
+    let rest = query.strip_prefix("days ")?;
+    let day = |text: &str| named_day(&text.split_whitespace().collect::<Vec<_>>(), today);
+    let (from, to, subtitle) = if let Some(rest) = rest.strip_prefix("between ") {
+        let (first, second) = rest.split_once(" and ")?;
+        let first = day(first)?.date;
+        let second = day(second)?.date;
+        let subtitle = format!(
+            "from {} to {}",
+            first.format("%a %-d %b %Y"),
+            second.format("%a %-d %b %Y")
+        );
+        (first, second, subtitle)
+    } else {
+        let (target, ahead) = match rest.split_once(' ')? {
+            ("until" | "till", target) => (target, true),
+            ("since", target) => (target, false),
+            _ => return None,
+        };
+        let day = day(target)?;
+        // Without a year, `days until jan 1` in October means the coming
+        // one, and `days since dec 25` in October the last one.
+        let (month, day_of_month) = (day.date.month(), day.date.day());
+        let date = match (day.has_year, ahead) {
+            (false, true) if day.date < today => {
+                in_year(month, day_of_month, day.date.year() + 1, 1)?
+            }
+            (false, false) if day.date > today => {
+                in_year(month, day_of_month, day.date.year() - 1, -1)?
+            }
+            _ => day.date,
+        };
+        let word = if date >= today { "until" } else { "since" };
+        (
+            today,
+            date,
+            format!("{word} {}", date.format("%A, %-d %B %Y")),
+        )
+    };
+    let days = (to - from).num_days().abs();
+    let weeks = match (days / 7, days % 7) {
+        (0, _) => String::new(),
+        (weeks, 0) => format!("{} · ", plural(weeks, "week")),
+        (weeks, rest) => format!("{} {} · ", plural(weeks, "week"), plural(rest, "day")),
+    };
+    let mut result = answer(
+        plural(days, "day"),
+        format!("{weeks}{subtitle}"),
+        days.to_string(),
+    );
+    result.actions[0].label = "Copy Days".into();
+    Some(result)
+}
+
+fn plural(count: i64, unit: &str) -> String {
+    if count == 1 {
+        format!("1 {unit}")
+    } else {
+        format!("{count} {unit}s")
+    }
+}
+
+/// A day the user named.
+struct NamedDay {
+    date: NaiveDate,
+    /// The words of a day relative to today, such as `next friday`.
+    label: Option<String>,
+    /// Whether the user typed the year.
+    has_year: bool,
+}
+
+/// `today`, `tomorrow`, `yesterday`, `next friday`, `last monday`, an ISO
+/// date, or a date with a month name, such as `25 dec` or `December 25, 2026`.
+fn named_day(words: &[&str], today: NaiveDate) -> Option<NamedDay> {
+    let relative = |date| {
+        Some(NamedDay {
+            date,
+            label: Some(words.join(" ")),
+            has_year: true,
+        })
+    };
+    match *words {
+        ["today"] => relative(today),
+        ["tomorrow"] => relative(today + Days::new(1)),
+        ["yesterday"] => relative(today - Days::new(1)),
+        [which @ ("next" | "last"), name] => {
+            let weekday: Weekday = name.parse().ok()?;
+            relative(if which == "next" {
+                next_weekday(today, weekday)
+            } else {
+                last_weekday(today, weekday)
+            })
+        }
+        [word] => Some(NamedDay {
+            date: iso_date(word)?,
+            label: None,
+            has_year: true,
+        }),
+        _ => month_date(words, today),
+    }
+}
+
+const MONTHS: [&str; 12] = [
+    "january",
+    "february",
+    "march",
+    "april",
+    "may",
+    "june",
+    "july",
+    "august",
+    "september",
+    "october",
+    "november",
+    "december",
+];
+
+/// `25 dec`, `dec 25`, `25th december 2026`, or `December 25, 2026`.
+/// Without a year, the date is in this year, or for `feb 29`, the next leap
+/// year.
+fn month_date(words: &[&str], today: NaiveDate) -> Option<NamedDay> {
+    let (first, second, year) = match *words {
+        [first, second] => (first, second, None),
+        [first, second, year] => (first, second, Some(year)),
+        _ => return None,
+    };
+    let (day, month) = match (day_of_month(first), month(second)) {
+        (Some(day), Some(month)) => (day, month),
+        _ => (day_of_month(second)?, month(first)?),
+    };
+    let year = match year {
+        Some(year) if year.len() == 4 => Some(year.parse().ok()?),
+        Some(_) => return None,
+        None => None,
+    };
+    let date = match year {
+        Some(year) => NaiveDate::from_ymd_opt(year, month, day)?,
+        None => in_year(month, day, today.year(), 1)?,
+    };
+    Some(NamedDay {
+        date,
+        label: None,
+        has_year: year.is_some(),
+    })
+}
+
+/// The day in `year`, or in the first year after it (`step` 1) or before it
+/// (`step` -1) that has the day: only leap years have 29 February.
+fn in_year(month: u32, day: u32, year: i32, step: i32) -> Option<NaiveDate> {
+    (0..8).find_map(|n| NaiveDate::from_ymd_opt(year.checked_add(n * step)?, month, day))
+}
+
+/// `25`, `25th`, or `25,`.
+fn day_of_month(word: &str) -> Option<u32> {
+    let word = word.trim_end_matches(',');
+    let digits = ["st", "nd", "rd", "th"]
+        .iter()
+        .find_map(|suffix| word.strip_suffix(suffix))
+        .unwrap_or(word);
+    if digits.is_empty() || digits.len() > 2 || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+/// A month by its name or a start of 3 letters or more: `dec`, `sept`.
+fn month(word: &str) -> Option<u32> {
+    let word = word.trim_end_matches(['.', ',']);
+    if word.len() < 3 {
+        return None;
+    }
+    let index = MONTHS.iter().position(|month| month.starts_with(word))?;
+    u32::try_from(index + 1).ok()
 }
 
 /// Split a minus sign from the words it touches, as in `-3`, `today-3d`,
@@ -602,6 +821,123 @@ mod tests {
             "in 14 days · today is Sat 3 Oct 2026"
         );
         assert_eq!(subtitle("2026-10-03 - 1 year"), "365 days ago");
+    }
+
+    #[test]
+    fn reads_relative_phrases() {
+        for (query, expected) in [
+            ("3 days from now", "2026-10-06"),
+            ("3d from today", "2026-10-06"),
+            ("3 days ago", "2026-09-30"),
+            ("a week ago", "2026-09-26"),
+            ("2 weeks from tomorrow", "2026-10-18"),
+            ("3 days after next friday", "2026-10-12"),
+            ("2 months 3 days after 2026-06-05", "2026-08-08"),
+            ("2 months and 3 days before 2026-06-05", "2026-04-02"),
+            ("28 days before mar 12", "2026-02-12"),
+            ("in 2 weeks + 1 day", "2026-10-18"),
+            ("in a week", "2026-10-10"),
+            ("in 2 months 3 days", "2026-12-06"),
+            ("in 2 weeks and 1 day", "2026-10-18"),
+        ] {
+            assert_eq!(math(query).as_deref(), Some(expected), "{query}");
+        }
+        for query in [
+            "3 days",
+            "days ago",
+            "3 apples ago",
+            "a week from monday",
+            "3 days after",
+        ] {
+            assert_eq!(math(query), None, "{query}");
+        }
+    }
+
+    #[test]
+    fn reads_dates_with_month_names() {
+        for (query, expected) in [
+            ("dec 25", "2026-12-25"),
+            ("25 dec", "2026-12-25"),
+            ("25th december 2027", "2027-12-25"),
+            ("december 25, 2026 + 1 week", "2027-01-01"),
+            ("Sept 1", "2026-09-01"),
+        ] {
+            assert_eq!(
+                math(&query.to_lowercase()).as_deref(),
+                Some(expected),
+                "{query}"
+            );
+        }
+        assert_eq!(math("feb 29").as_deref(), Some("2028-02-29"));
+        for query in [
+            "jan 2026",
+            "may",
+            "ma 5",
+            "dec 32",
+            "feb 30",
+            "feb 29 2026",
+            "dec 25 26",
+            "june 5 notes",
+        ] {
+            assert_eq!(math(query), None, "{query}");
+        }
+    }
+
+    #[test]
+    fn counts_days() {
+        let count = |query| {
+            let result = day_count(query, date("2026-10-03")).unwrap();
+            (result.title, result.subtitle)
+        };
+        let title = |query| count(query).0;
+        assert_eq!(
+            count("days until dec 25"),
+            (
+                "83 days".into(),
+                "11 weeks 6 days · until Friday, 25 December 2026".into()
+            )
+        );
+        assert_eq!(title("days until jan 1"), "90 days");
+        assert_eq!(title("days till next friday"), "6 days");
+        assert_eq!(title("days since jan 1"), "275 days");
+        assert_eq!(title("days since dec 25"), "282 days");
+        assert_eq!(
+            count("days until 2026-10-01"),
+            ("2 days".into(), "since Thursday, 1 October 2026".into())
+        );
+        assert_eq!(
+            count("days until tomorrow"),
+            ("1 day".into(), "until Sunday, 4 October 2026".into())
+        );
+        assert_eq!(
+            count("days between 3 march and 30 may"),
+            (
+                "88 days".into(),
+                "12 weeks 4 days · from Tue 3 Mar 2026 to Sat 30 May 2026".into()
+            )
+        );
+        assert_eq!(title("days between 2026-01-15 and 2026-01-01"), "14 days");
+        assert_eq!(title("days until feb 29"), "514 days");
+        assert_eq!(title("days since feb 29"), "947 days");
+        let in_march_2028 = date("2028-03-01");
+        let after_leap_day = |query| day_count(query, in_march_2028).unwrap().title;
+        assert_eq!(after_leap_day("days until feb 29"), "1460 days");
+        assert_eq!(after_leap_day("days since feb 29"), "1 day");
+        assert_eq!(
+            count("days until 2026-10-17").1,
+            "2 weeks · until Saturday, 17 October 2026"
+        );
+        for query in [
+            "days",
+            "days until",
+            "days until soon",
+            "days between today",
+            "days ago",
+        ] {
+            assert!(day_count(query, date("2026-10-03")).is_none(), "{query}");
+        }
+        let result = &answers("Days until dec 25", now())[0];
+        assert_eq!(result.actions[0].label, "Copy Days");
     }
 
     #[test]

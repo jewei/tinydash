@@ -8,6 +8,8 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - The calculator reads percentages as people say them: `$30 + 20%`, `20% off $50`, `20 is what % of 200`, `50 to 75 is what %`, and `20 is 10% of what`.
 - The calculator reads `plus`, `minus`, `times`, `multiplied by`, and `divided by`, and amounts such as `€20`.
+- Date answers read phrases such as `3 days from now`, `a week ago`, `2 weeks after dec 25`, and dates with month names, such as `25 dec` or `December 25, 2026`.
+- Count days with `days until dec 25`, `days since 2026-01-01`, and `days between 3 mar and 30 may`.
 
 ### Changed
 
