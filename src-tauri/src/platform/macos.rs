@@ -563,16 +563,18 @@ fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
     }
 }
 
-/// Whether this build carries the usage strings, without which macOS ends
-/// an app that asks. The app bundle has them, and `tauri dev` embeds them
-/// in the binary; a build made with `--no-bundle` does not.
+/// Whether TinyDash runs as an app bundle that carries the usage strings.
+/// Without them, macOS ends an app that asks. Outside a bundle, as with
+/// `bun run dev`, macOS gives the access to the app that started TinyDash,
+/// such as a terminal, and every program it runs could then read calendars.
 fn can_ask_for_calendars() -> bool {
     let bundle = objc2_foundation::NSBundle::mainBundle();
-    CALENDAR_USAGE_KEYS.iter().all(|key| {
-        bundle
-            .objectForInfoDictionaryKey(&NSString::from_str(key))
-            .is_some()
-    })
+    bundle.bundlePath().to_string().ends_with(".app")
+        && CALENDAR_USAGE_KEYS.iter().all(|key| {
+            bundle
+                .objectForInfoDictionaryKey(&NSString::from_str(key))
+                .is_some()
+        })
 }
 
 fn ns_date(unix_ms: i64) -> Retained<NSDate> {
@@ -1235,13 +1237,10 @@ mod tests {
     }
 
     #[test]
-    fn reads_today_without_asking() {
-        // Reads the real calendars when this process may, and never asks.
-        let (from, to) = up_next::window(&chrono::Local::now());
-        let agenda = read_up_next(from, to).expect("macOS has calendars");
-        for event in agenda.events.unwrap_or_default() {
-            assert!(event.end_ms >= from && event.start_ms <= to, "{event:?}");
-        }
+    fn a_binary_outside_an_app_never_asks_for_calendars() {
+        // Like `bun run dev`, the test binary embeds the usage strings and
+        // runs from a terminal, which would get the access instead.
+        assert!(!can_ask_for_calendars());
     }
 
     #[test]

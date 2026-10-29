@@ -66,8 +66,9 @@ pub enum Unreadable {
     Denied,
     /// A policy, such as Screen Time, blocks access.
     Restricted,
-    /// This build lacks the usage strings, and macOS ends an app that asks
-    /// without them.
+    /// This build cannot ask: it lacks the usage strings, without which
+    /// macOS ends an app that asks, or it runs outside an app bundle, where
+    /// the app that started it, such as a terminal, would get the access.
     CannotAsk,
     /// The OS did not answer; the message says why.
     Failed(String),
