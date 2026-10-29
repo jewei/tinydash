@@ -28,13 +28,19 @@ pub struct App {
     pub description: Option<String>,
 }
 
+/// Most apps the index holds. More are cut off, and a warning is logged.
+pub const MAX_APPS: usize = 5_000;
+
 #[derive(Default)]
 pub struct AppIndex {
     apps: Vec<App>,
+    /// The platform found more than [`MAX_APPS`].
+    pub truncated: bool,
 }
 
 impl AppIndex {
-    /// Sort by name and keep one entry per path.
+    /// Keep one entry per path, up to [`MAX_APPS`] in the order found, and
+    /// sort them by name.
     pub fn new(apps: Vec<App>) -> Self {
         let mut seen = std::collections::HashSet::new();
         let mut apps: Vec<App> = apps
@@ -50,8 +56,10 @@ impl AppIndex {
                 ..app
             })
             .collect();
+        let truncated = apps.len() > MAX_APPS;
+        apps.truncate(MAX_APPS);
         apps.sort_by_cached_key(|app| (app.name.to_lowercase(), app.path.clone()));
-        Self { apps }
+        Self { apps, truncated }
     }
 
     pub fn len(&self) -> usize {
@@ -167,6 +175,21 @@ mod tests {
         ]);
         let names: Vec<_> = index.apps.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(names, ["Arc", "zed"]);
+    }
+
+    #[test]
+    fn index_keeps_the_first_apps_found_up_to_the_limit() {
+        let apps = (0..=MAX_APPS).map(|n| app(&format!("App {n}"), &format!("/{n}")));
+        let index = AppIndex::new(apps.collect());
+        assert_eq!(index.len(), MAX_APPS);
+        assert!(index.truncated);
+        assert!(!index.contains(&format!("/{MAX_APPS}")));
+        // A duplicate path does not count.
+        let mut apps: Vec<App> = (0..MAX_APPS)
+            .map(|n| app(&format!("App {n}"), &format!("/{n}")))
+            .collect();
+        apps.push(app("Copy", "/0"));
+        assert!(!AppIndex::new(apps).truncated);
     }
 
     #[test]
