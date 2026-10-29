@@ -2,7 +2,8 @@
 //! layer reads the keys typed in other apps, `features/expansion.rs` finds a
 //! trigger such as `;sig` in them, and a worker deletes the trigger and types
 //! the snippet. Typed text stays in memory, at most
-//! [`expansion::MAX_TYPED`] characters, and is never logged or saved.
+//! [`MAX_TYPED`](crate::features::expansion::MAX_TYPED) characters, and is
+//! never logged or saved.
 
 use std::{
     sync::{
@@ -18,12 +19,11 @@ use tauri::{AppHandle, Manager};
 use crate::{
     error::{Error, Result},
     features::{
-        expansion::{self, Expansion, Key, Keywords, Typed},
-        library::{self, Library},
+        expansion::{Expansion, Key, Keywords, Typed},
+        library::Library,
     },
     platform,
     state::State,
-    system_clipboard,
 };
 
 /// How long keys still count as a reset after a snippet is typed: the OS
@@ -125,8 +125,7 @@ fn find_triggers(
     }
 }
 
-/// The worker: type each trigger's snippet, filled as when it is copied
-/// from the launcher, with no text after the keyword, so `{query}` is empty.
+/// The worker: type each trigger's snippet.
 fn type_snippets(app: &AppHandle, triggers: &mpsc::Receiver<Expansion>, typing: &AtomicBool) {
     for expansion in triggers {
         type_snippet(app, &expansion);
@@ -137,17 +136,13 @@ fn type_snippets(app: &AppHandle, triggers: &mpsc::Receiver<Expansion>, typing: 
 
 fn type_snippet(app: &AppHandle, expansion: &Expansion) {
     let library = app.state::<State>().library.get();
-    // The snippet was deleted or lost its keyword since.
-    let Some(snippet) = expansion::snippet(library.items(), &expansion.keyword) else {
+    // Read the way quicklinks read it: a copy that its app marked secret,
+    // such as a password, is never typed as keys that other apps can read.
+    let clipboard = || platform::clipboard_text(app);
+    let Some(text) = expansion.text(library.items(), chrono::Local::now(), clipboard) else {
         return;
     };
-    let text = library::render_snippet(
-        &snippet.text,
-        "",
-        chrono::Local::now(),
-        system_clipboard::read_text,
-    );
-    if let Err(error) = platform::type_text(expansion.erase, &expansion.replacement(text)) {
+    if let Err(error) = platform::type_text(expansion.erase, &text) {
         tracing::warn!(%error, "Could not type a snippet");
     }
 }
