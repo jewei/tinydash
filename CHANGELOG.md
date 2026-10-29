@@ -19,6 +19,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - On macOS, a snippet with `{clipboard}`, or a copy, can no longer crash TinyDash when it uses the clipboard at the same moment as clipboard history.
 - On Windows, clipboard history skips a copy when it cannot read whether the app that made the copy allows it in history. Before, it saved the copy.
+- On Linux with GNOME, KDE, or Xfce, Restart and Shut Down now ask apps to quit first, as their confirmation says, so apps can offer to save your work. Before, they closed apps without asking.
 
 ## [0.7.0] - 2026-10-19
 
