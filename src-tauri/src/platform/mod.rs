@@ -93,7 +93,10 @@
 //!   `text` into the app in front, with Return for each line break. It stops
 //!   with an error when another app (macOS) or window comes to the front. It
 //!   never uses the clipboard. Call it on a thread other than the watch
-//!   thread.
+//!   thread. Typed keys never take on a modifier that the user holds: macOS
+//!   clears the modifiers of each key, and Windows and Linux wait with
+//!   `modifiers_released` before each part until the user lets go, and stop
+//!   with an error when a modifier stays down.
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -288,6 +291,27 @@ fn wait_for_key_release() {
     std::thread::sleep(std::time::Duration::from_secs(1));
 }
 
+/// How long typing a snippet waits for the user to let go of a modifier,
+/// such as the Shift of a keyword that ends in `@`.
+#[cfg(any(not(target_os = "macos"), test))]
+const MODIFIER_WAIT: std::time::Duration = std::time::Duration::from_millis(300);
+
+/// Wait until `held()` is false, for at most [`MODIFIER_WAIT`]. On Windows
+/// and Linux, the keys TinyDash types take on the modifiers that the user
+/// holds, so a held Control would turn them into shortcuts. False when a
+/// modifier stays down.
+#[cfg(any(not(target_os = "macos"), test))]
+fn modifiers_released(held: impl Fn() -> bool) -> bool {
+    let deadline = std::time::Instant::now() + MODIFIER_WAIT;
+    while held() {
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    true
+}
+
 /// Run a helper program with fixed arguments. Never pass user text here.
 fn run(program: &str, args: &[&str]) -> Result<()> {
     let mut command = std::process::Command::new(program);
@@ -310,6 +334,22 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn typing_waits_briefly_for_modifiers_to_be_released() {
+        use super::{MODIFIER_WAIT, modifiers_released};
+        // The user lets go of Shift soon after the keyword's last key.
+        let checks = std::cell::Cell::new(0);
+        assert!(modifiers_released(|| {
+            checks.set(checks.get() + 1);
+            checks.get() < 3
+        }));
+        assert_eq!(checks.get(), 3);
+        // Control stays down: typing would press shortcuts, so it stops.
+        let started = std::time::Instant::now();
+        assert!(!modifiers_released(|| true));
+        assert!(started.elapsed() >= MODIFIER_WAIT);
+    }
+
     mod monitor_containing {
         use super::super::monitor_containing;
         use tauri::{PhysicalPosition, PhysicalSize};

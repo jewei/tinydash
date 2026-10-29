@@ -881,12 +881,17 @@ fn keyboard_input(stroke: Stroke, down: bool) -> KEYBDINPUT {
 /// Types with `SendInput`, which puts the keys into the input stream as if
 /// they were typed. Windows marks them injected, so the hook skips them.
 /// Typing stops soon after another window comes to the front, so little of
-/// the rest lands there.
+/// the rest lands there. Each batch waits while the user holds a modifier.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
     let strokes = strokes(erase, text);
     // SAFETY: Takes no arguments.
     let foreground = unsafe { GetForegroundWindow() };
     for strokes in batches(&strokes, STROKE_BATCH) {
+        if !super::modifiers_released(|| modifiers_held(strokes)) {
+            return Err(Error::msg(
+                "Stopped typing the snippet: a key such as Control or Alt was held down.",
+            ));
+        }
         let batch: Vec<INPUT> = strokes
             .iter()
             .flat_map(|&stroke| {
@@ -922,6 +927,20 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
         std::thread::sleep(BATCH_GAP);
     }
     Ok(())
+}
+
+/// Whether the user holds a modifier that would change what `strokes` do.
+/// SendInput keys take on the modifiers that are down: with Control, Alt,
+/// or Windows, even text becomes a shortcut or a menu key. Shift changes
+/// only Backspace and Return, such as Shift+Return in a chat app.
+fn modifiers_held(strokes: &[Stroke]) -> bool {
+    let has_keys = strokes
+        .iter()
+        .any(|stroke| matches!(stroke, Stroke::Key(_)));
+    [VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN]
+        .into_iter()
+        .any(is_down)
+        || (has_keys && is_down(VK_SHIFT))
 }
 
 /// Groups of at most `size` strokes (at least 2). A group never ends between

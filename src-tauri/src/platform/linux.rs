@@ -461,6 +461,17 @@ const CURRENT_WINDOW: c_ulong = 0;
 /// Modifiers that make a key a shortcut: Control, Alt (Mod1), and Super
 /// (Mod4). AltGr (Mod5) types characters.
 const SHORTCUT_MODIFIERS: c_uint = xlib::ControlMask | xlib::Mod1Mask | xlib::Mod4Mask;
+/// Modifiers that change the keys libxdo sends, as XTEST keys take on the
+/// modifiers that are down: Shift and Caps Lock change the case, and
+/// Control, Alt, Mod3, Super, and AltGr (Mod5) change the key. Num Lock
+/// (Mod2) changes only the number pad, which libxdo does not use.
+const MODIFIERS_THAT_CHANGE_KEYS: c_uint = xlib::ShiftMask
+    | xlib::LockMask
+    | xlib::ControlMask
+    | xlib::Mod1Mask
+    | xlib::Mod3Mask
+    | xlib::Mod4Mask
+    | xlib::Mod5Mask;
 
 /// libxdo's context.
 #[repr(C)]
@@ -834,7 +845,8 @@ fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
 /// Types with libxdo, which sends keys with the XTEST extension and maps a
 /// character that no key types to a spare key for a moment. Typing stops
 /// soon after another window gets the focus, so little of the rest lands
-/// there.
+/// there. Each part waits while the user holds a modifier, which the keys
+/// would take on.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
     let xlib =
         Xlib::open().map_err(|_| Error::msg("Snippet expansion needs the libX11 library."))?;
@@ -850,8 +862,44 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
         unsafe { (xlib.XGetInputFocus)(display, &mut focus, &mut revert) };
         focus
     };
+    // SAFETY: The connection is open.
+    let root = unsafe { (xlib.XDefaultRootWindow)(display) };
+    let modifiers_held = || {
+        let (mut root_found, mut child) = (0, 0);
+        let (mut root_x, mut root_y, mut x, mut y) = (0, 0, 0, 0);
+        let mut state = 0;
+        // SAFETY: The connection is open, only this thread uses it, and the
+        // call writes only these values.
+        unsafe {
+            (xlib.XQueryPointer)(
+                display,
+                root,
+                &mut root_found,
+                &mut child,
+                &mut root_x,
+                &mut root_y,
+                &mut x,
+                &mut y,
+                &mut state,
+            )
+        };
+        state & MODIFIERS_THAT_CHANGE_KEYS != 0
+    };
     let first = focus();
-    let typed = type_with_xdo(display, erase, text, || focus() == first);
+    let ready = || {
+        if !super::modifiers_released(modifiers_held) {
+            return Err(Error::msg(
+                "Stopped typing the snippet: a key such as Shift or Control was held down, or Caps Lock is on.",
+            ));
+        }
+        if focus() != first {
+            return Err(Error::msg(
+                "Stopped typing the snippet: another window came to the front.",
+            ));
+        }
+        Ok(())
+    };
+    let typed = type_with_xdo(display, erase, text, ready);
     // SAFETY: The connection is open. XSync returns once the server handled
     // every key, so the recording has them before the quiet time ends.
     unsafe { (xlib.XSync)(display, xlib::False) };
@@ -865,7 +913,7 @@ fn type_with_xdo(
     display: *mut Display,
     erase: usize,
     text: &str,
-    still_in_front: impl Fn() -> bool,
+    ready: impl Fn() -> Result<()>,
 ) -> Result<()> {
     // SAFETY: The connection is open; 0 tells libxdo to leave it open.
     let xdo = unsafe { xdo_new_with_opened_display(display, ptr::null(), 0) };
@@ -874,17 +922,18 @@ fn type_with_xdo(
             "Could not type the snippet: libxdo did not start.",
         ));
     }
-    let typed = type_pieces(xdo, erase, text, still_in_front);
+    let typed = type_pieces(xdo, erase, text, ready);
     // SAFETY: Made above and freed once.
     unsafe { xdo_free(xdo) };
     typed
 }
 
+/// Type with `xdo`, after `ready` lets each step through.
 fn type_pieces(
     xdo: *mut Xdo,
     erase: usize,
     text: &str,
-    still_in_front: impl Fn() -> bool,
+    ready: impl Fn() -> Result<()>,
 ) -> Result<()> {
     let failed = || Error::msg("Could not type the snippet.");
     let press = |keys: &CStr| {
@@ -899,11 +948,7 @@ fn type_pieces(
         .take(erase)
         .chain(expansion::pieces(text, PIECE_UNITS).into_iter().map(Some));
     for step in steps {
-        if !still_in_front() {
-            return Err(Error::msg(
-                "Stopped typing the snippet: another window came to the front.",
-            ));
-        }
+        ready()?;
         match step {
             None => press(c"BackSpace")?,
             Some(Piece::Return) => press(c"Return")?,
