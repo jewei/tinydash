@@ -555,9 +555,13 @@ fn percentage_factors<'a>(query: &'a str, factors: &[(&str, &str)]) -> Cow<'a, s
             continue;
         };
         let percent = query[copied + before.len()..at].trim();
-        // After `/` or `^`, the factor would split from the number after it.
+        // After `/` or a power (`^`, `**`), the factor would split from the
+        // number after it.
         let operand = before.trim_end();
-        if is_number(percent) && (operand.is_empty() || operand.ends_with(['(', '+', '-', '*'])) {
+        if is_number(percent)
+            && (operand.is_empty() || operand.ends_with(['(', '+', '-', '*']))
+            && !ends_with_power(operand)
+        {
             input.push_str(before);
             input.push_str(&format!("({factor}{percent} / 100) * "));
             copied = end;
@@ -957,9 +961,13 @@ mod tests {
         ] {
             assert_eq!(value(query).as_deref(), Some(expected), "{query}");
         }
-        // `(1 - 10 / 100)` after `/` or `^` would bind to the wrong side.
+        // `(1 - 10 / 100)` after `/` or a power would bind to the wrong side.
         assert_eq!(value("400 / 10% off 200"), None);
         assert_eq!(value("2 ^ 10% on 200"), None);
+        assert_eq!(value("2 ** 10% on 200"), None);
+        // fend's own `of`: 1024% of 200.
+        assert_eq!(value("2 ^ 10% of 200").as_deref(), Some("2048"));
+        assert_eq!(value("2 ** 10% of 200").as_deref(), Some("2048"));
         let rates = Rates::fixture();
         for (query, expected) in [
             ("20% off $50 + $5", "$45"),
