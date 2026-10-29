@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     path::{Path, PathBuf},
     sync::mpsc,
     thread::JoinHandle,
@@ -20,25 +20,28 @@ use windows_sys::Win32::{
         Power::SetSuspendState,
         Registry::{HKEY_CURRENT_USER, REG_DWORD, RRF_RT_REG_DWORD, RegGetValueW, RegSetKeyValueW},
         Shutdown::LockWorkStation,
-        Threading::GetCurrentThreadId,
+        SystemInformation::GetTickCount,
+        Threading::{
+            GetCurrentThread, GetCurrentThreadId, SetThreadPriority, THREAD_PRIORITY_ABOVE_NORMAL,
+        },
     },
     UI::{
         Input::KeyboardAndMouse::{
-            GetAsyncKeyState, GetKeyState, GetKeyboardLayout, INPUT, INPUT_0, INPUT_KEYBOARD,
-            KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, SendInput, ToUnicodeEx, VIRTUAL_KEY,
-            VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME,
-            VK_INSERT, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_NEXT,
-            VK_NUMLOCK, VK_PRIOR, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN,
-            VK_SCROLL, VK_SHIFT, VK_TAB, VK_UP,
+            GetAsyncKeyState, GetKeyState, GetKeyboardLayout, GetLastInputInfo, INPUT, INPUT_0,
+            INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, LASTINPUTINFO,
+            SendInput, ToUnicodeEx, VIRTUAL_KEY, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DELETE,
+            VK_DOWN, VK_END, VK_ESCAPE, VK_HOME, VK_INSERT, VK_LCONTROL, VK_LEFT, VK_LMENU,
+            VK_LSHIFT, VK_LWIN, VK_MENU, VK_NEXT, VK_NUMLOCK, VK_PRIOR, VK_RCONTROL, VK_RETURN,
+            VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SCROLL, VK_SHIFT, VK_TAB, VK_UP,
         },
         Shell::{SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW},
         WindowsAndMessaging::{
             CallNextHookEx, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId, HC_ACTION,
-            HHOOK, HWND_BROADCAST, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, PostMessageW,
-            PostThreadMessageW, SC_MONITORPOWER, SMTO_ABORTIFHUNG, SendMessageTimeoutW,
+            HHOOK, HWND_BROADCAST, KBDLLHOOKSTRUCT, KillTimer, LLKHF_INJECTED, MSG, PostMessageW,
+            PostThreadMessageW, SC_MONITORPOWER, SMTO_ABORTIFHUNG, SendMessageTimeoutW, SetTimer,
             SetWindowsHookExW, UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN,
             WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_QUIT, WM_RBUTTONDOWN, WM_SETTINGCHANGE,
-            WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_XBUTTONDOWN,
+            WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_TIMER, WM_XBUTTONDOWN,
         },
     },
 };
@@ -594,6 +597,11 @@ const OWN_INPUT: usize = 0x5444_5348;
 /// the app in front keeps up.
 const STROKE_BATCH: usize = 32;
 const BATCH_GAP: Duration = Duration::from_millis(5);
+/// How often the hook thread checks that Windows still calls its hooks.
+const HOOK_CHECK_MILLISECONDS: u32 = 10_000;
+/// Input this much newer than the latest that a hook saw went past a hook
+/// that Windows removed. Under it, the hook may just be about to run.
+const MISSED_INPUT_MILLISECONDS: u32 = 1_000;
 
 pub fn typing_unavailable() -> Option<&'static str> {
     None
@@ -613,7 +621,7 @@ pub struct TypingWatch {
 
 impl TypingWatch {
     /// False once the thread has ended, also on its own when its message
-    /// loop failed.
+    /// loop failed or Windows did not let it set its hooks again.
     pub fn is_running(&self) -> bool {
         !self.thread.is_finished()
     }
@@ -637,6 +645,8 @@ struct Watcher {
 
 thread_local! {
     static WATCHER: RefCell<Option<Watcher>> = const { RefCell::new(None) };
+    /// When a hook last ran, or the hooks were set, as a tick count.
+    static HOOK_SEEN: Cell<u32> = const { Cell::new(0) };
 }
 
 pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWatch> {
@@ -662,6 +672,31 @@ fn run_hooks(on_key: Box<dyn FnMut(Key)>, ready: &mpsc::Sender<Result<u32>>) {
         on_key,
         foreground: std::ptr::null_mut(),
     }));
+    // Windows removes a hook that answers too slowly, as under heavy load,
+    // so this thread runs ahead of threads at normal priority.
+    // SAFETY: The pseudo handle stands for this thread.
+    unsafe { SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL) };
+    match set_hooks() {
+        Ok(hooks) => {
+            // SAFETY: Takes no arguments.
+            if ready.send(Ok(unsafe { GetCurrentThreadId() })).is_ok() {
+                watch_hooks(hooks);
+            } else {
+                hooks.into_iter().for_each(unhook);
+            }
+        }
+        Err(error) => {
+            let _ = ready.send(Err(Error::msg(format!(
+                "Windows did not let TinyDash read keys: {error}"
+            ))));
+        }
+    }
+    // Drops the typed text.
+    WATCHER.set(None);
+}
+
+/// Set the keyboard and mouse hooks, or neither.
+fn set_hooks() -> std::io::Result<[HHOOK; 2]> {
     // SAFETY: A null name asks for this program's own module.
     let module = unsafe { GetModuleHandleW(std::ptr::null()) };
     let hook = |kind, procedure| {
@@ -678,38 +713,73 @@ fn run_hooks(on_key: Box<dyn FnMut(Key)>, ready: &mpsc::Sender<Result<u32>>) {
         hook(WH_MOUSE_LL, Some(on_mouse))
             .map(|mouse| [keyboard, mouse])
             .inspect_err(|_| unhook(keyboard))
-    });
-    match hooks {
-        Ok(hooks) => {
-            // SAFETY: Takes no arguments.
-            if ready.send(Ok(unsafe { GetCurrentThreadId() })).is_ok() {
-                let mut message = MSG::default();
-                // The hooks run while this thread waits for messages.
-                // WM_QUIT ends the loop with 0, and an error with -1.
-                let ended = loop {
-                    // SAFETY: `message` is a valid MSG to fill.
-                    let got = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
-                    if got <= 0 {
-                        break got;
-                    }
-                };
-                if ended < 0 {
-                    tracing::warn!(
-                        error = %std::io::Error::last_os_error(),
-                        "Snippets stopped expanding as you type: the key watch failed"
-                    );
-                }
+    })?;
+    // Input before now needed no hook.
+    HOOK_SEEN.set(tick_count());
+    Ok(hooks)
+}
+
+/// Run the message loop, in which Windows calls the hooks, until WM_QUIT.
+/// Windows removes a hook that answers too slowly and tells no one, so a
+/// timer checks that the hooks saw the latest input, and sets them again
+/// when they did not.
+fn watch_hooks(hooks: [HHOOK; 2]) {
+    let mut hooks = Some(hooks);
+    // SAFETY: With no window, the timer posts WM_TIMER to this thread.
+    let timer = unsafe { SetTimer(std::ptr::null_mut(), 0, HOOK_CHECK_MILLISECONDS, None) };
+    let mut message = MSG::default();
+    let failure = loop {
+        // SAFETY: `message` is a valid MSG to fill.
+        let got = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
+        // WM_QUIT ends the loop with 0, and an error with -1.
+        if got <= 0 {
+            break (got < 0).then(std::io::Error::last_os_error);
+        }
+        if message.message == WM_TIMER && hooks_missed_input() {
+            hooks.take().into_iter().flatten().for_each(unhook);
+            match set_hooks() {
+                Ok(set) => hooks = Some(set),
+                Err(error) => break Some(error),
             }
-            hooks.into_iter().for_each(unhook);
+            // The keys that the hooks missed changed the text in the app.
+            send(&[Key::Reset]);
         }
-        Err(error) => {
-            let _ = ready.send(Err(Error::msg(format!(
-                "Windows did not let TinyDash read keys: {error}"
-            ))));
-        }
+    };
+    if let Some(error) = failure {
+        tracing::warn!(%error, "Snippets stopped expanding as you type: the key watch failed");
     }
-    // Drops the typed text.
-    WATCHER.set(None);
+    hooks.into_iter().flatten().for_each(unhook);
+    if timer != 0 {
+        // SAFETY: This thread set the timer, and kills it once.
+        unsafe { KillTimer(std::ptr::null_mut(), timer) };
+    }
+}
+
+/// Whether input came that neither hook saw. Windows says only when the
+/// latest input came, so a removed hook shows once the latest input is one
+/// that it missed.
+fn hooks_missed_input() -> bool {
+    let mut input = LASTINPUTINFO {
+        cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+        dwTime: 0,
+    };
+    // SAFETY: `input` is valid to write, and its size is set.
+    let read = unsafe { GetLastInputInfo(&mut input) } != 0;
+    read && missed_input(input.dwTime, HOOK_SEEN.get())
+}
+
+/// Whether the latest input, at tick `last_input`, came well after the
+/// latest that a hook saw, at tick `seen`. A hook usually runs a moment
+/// after the input, so `seen` is often the later one. Tick counts wrap
+/// after 49.7 days.
+fn missed_input(last_input: u32, seen: u32) -> bool {
+    let after = last_input.wrapping_sub(seen);
+    after > MISSED_INPUT_MILLISECONDS && after < u32::MAX / 2
+}
+
+fn tick_count() -> u32 {
+    // SAFETY: Takes no arguments.
+    unsafe { GetTickCount() }
 }
 
 fn unhook(hook: HHOOK) {
@@ -720,6 +790,7 @@ fn unhook(hook: HHOOK) {
 /// The keyboard hook. Windows waits for it before the key reaches the app,
 /// so it only reads the key.
 unsafe extern "system" fn on_keyboard(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    HOOK_SEEN.set(tick_count());
     let message = u32::try_from(wparam).unwrap_or_default();
     if code == HC_ACTION as i32 && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) {
         // SAFETY: For HC_ACTION, `lparam` points to the key's
@@ -737,6 +808,7 @@ unsafe extern "system" fn on_keyboard(code: i32, wparam: WPARAM, lparam: LPARAM)
 
 /// The mouse hook: a click may move the cursor.
 unsafe extern "system" fn on_mouse(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    HOOK_SEEN.set(tick_count());
     let message = u32::try_from(wparam).unwrap_or_default();
     let click = matches!(
         message,
@@ -1016,6 +1088,20 @@ mod tests {
         for vk in [u16::from(b'S'), VK_OEM_1, VK_SPACE, VK_NUMPAD1] {
             assert_eq!(key_role(vk), Some(KeyRole::Text(vk)), "{vk}");
         }
+    }
+
+    #[test]
+    fn tells_input_that_the_hooks_missed() {
+        use super::{MISSED_INPUT_MILLISECONDS, missed_input};
+        // The hooks saw the latest input, or will in a moment.
+        assert!(!missed_input(5_000, 5_000));
+        assert!(!missed_input(5_000, 5_010));
+        assert!(!missed_input(5_000 + MISSED_INPUT_MILLISECONDS, 5_000));
+        // Windows removed a hook, and a click or key went past it.
+        assert!(missed_input(9_000, 5_000));
+        // Across the wrap of the tick count.
+        assert!(missed_input(3_000, u32::MAX - 1_000));
+        assert!(!missed_input(u32::MAX - 1_000, 3_000));
     }
 
     #[test]
