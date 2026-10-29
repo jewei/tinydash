@@ -15,6 +15,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
 
+### Fixed
+
+- A snippet or quicklink name or keyword pasted with separate accent marks, as some macOS file names have them, now matches an accented search such as `résumé`. So do the other names an app is found by, and words typed after `?`.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added

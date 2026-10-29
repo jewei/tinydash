@@ -8,7 +8,10 @@ use crate::{
         library::{Library, LibraryKind},
         web,
     },
-    search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
+    search::{
+        matcher::normalize,
+        result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
+    },
 };
 
 /// Rows in the list. Up to 500 snippets and quicklinks can have keywords,
@@ -102,7 +105,10 @@ pub fn answer(query: &str, library: &Library) -> Option<Vec<SearchResult>> {
     if !(filter.is_empty() || filter.starts_with(char::is_whitespace)) {
         return None;
     }
-    let words: Vec<String> = filter.split_whitespace().map(str::to_lowercase).collect();
+    let words: Vec<String> = normalize(filter)
+        .split_whitespace()
+        .map(String::from)
+        .collect();
     let built_in = BUILT_IN.iter().map(|entry| {
         row(
             format!("keyword:{}", entry.keywords),
@@ -259,6 +265,21 @@ mod tests {
         assert_eq!(answer("? =", &library).unwrap()[0].title, "=");
         assert_eq!(typed(&rows[0]), "gh ");
         assert!(answer("? nothing-like-this", &library).unwrap().is_empty());
+    }
+
+    #[test]
+    fn words_match_in_either_unicode_form() {
+        let library = Library::new(vec![item(
+            1,
+            LibraryKind::Snippet,
+            "Caf\u{e9} menu",
+            "menu",
+            "Soup",
+        )]);
+        // Pasted text can hold decomposed accents.
+        let rows = answer("? cafe\u{301}", &library).unwrap();
+        let titles: Vec<&str> = rows.iter().map(|row| row.title.as_str()).collect();
+        assert_eq!(titles, ["menu"]);
     }
 
     #[test]

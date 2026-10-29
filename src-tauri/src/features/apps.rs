@@ -42,6 +42,11 @@ impl AppIndex {
             .filter(|app| seen.insert(app.path.clone()))
             .map(|app| App {
                 name: app.name.nfc().collect(),
+                aliases: app
+                    .aliases
+                    .iter()
+                    .map(|alias| alias.nfc().collect())
+                    .collect(),
                 ..app
             })
             .collect();
@@ -162,6 +167,17 @@ mod tests {
         ]);
         let names: Vec<_> = index.apps.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(names, ["Arc", "zed"]);
+    }
+
+    #[test]
+    fn aliases_match_in_either_unicode_form() {
+        let writer = App {
+            aliases: vec!["Re\u{301}sume\u{301}".into()],
+            ..app("Writer", "/w")
+        };
+        let index = AppIndex::new(vec![writer]);
+        let hits = index.search(&mut Matcher::new("r\u{e9}sum\u{e9}"), &Context::none(), 10);
+        assert_eq!(hits.len(), 1);
     }
 
     #[test]

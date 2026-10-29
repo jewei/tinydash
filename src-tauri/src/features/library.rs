@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::{
     error::{Error, Result},
@@ -61,10 +62,11 @@ impl LibraryItem {
         source.id(self.id.unwrap_or_default())
     }
 
-    /// Trim fields and reject items that could not work.
+    /// Trim fields and reject items that could not work. The name and
+    /// keyword are kept in NFC, the form the matcher gives the query.
     pub fn validated(mut self) -> Result<Self> {
-        self.name = self.name.trim().to_owned();
-        self.keyword = self.keyword.trim().to_lowercase();
+        self.name = self.name.trim().nfc().collect();
+        self.keyword = self.keyword.trim().nfc().collect::<String>().to_lowercase();
         if self.kind == LibraryKind::Quicklink {
             self.text = self.text.trim().to_owned();
         }
@@ -257,7 +259,17 @@ pub struct Library {
 }
 
 impl Library {
-    pub fn new(mut items: Vec<LibraryItem>) -> Self {
+    /// Names and keywords go into NFC, also for items saved before
+    /// [`LibraryItem::validated`] did that.
+    pub fn new(items: Vec<LibraryItem>) -> Self {
+        let mut items: Vec<LibraryItem> = items
+            .into_iter()
+            .map(|item| LibraryItem {
+                name: item.name.nfc().collect(),
+                keyword: item.keyword.nfc().collect(),
+                ..item
+            })
+            .collect();
         items.sort_by_cached_key(|item| {
             (
                 item.kind == LibraryKind::Quicklink,
@@ -345,7 +357,7 @@ impl Library {
     /// keyword is the first word.
     pub fn keyword_answer(&self, query: &str) -> Option<SearchResult> {
         let (keyword, text) = query.split_once(char::is_whitespace)?;
-        let keyword = keyword.to_lowercase();
+        let keyword = keyword.nfc().collect::<String>().to_lowercase();
         let item = self
             .items
             .iter()
@@ -598,6 +610,33 @@ mod tests {
             };
             assert!(library.check_keyword(&free).is_ok(), "{keyword}");
         }
+    }
+
+    #[test]
+    fn names_and_keywords_match_in_either_unicode_form() {
+        // A name pasted from a macOS file name can hold decomposed accents.
+        let decomposed = item(
+            LibraryKind::Quicklink,
+            "Re\u{301}sume\u{301}",
+            "cafe\u{301}",
+            "https://x.test/{query}",
+        );
+        let library = Library::new(vec![decomposed.clone()]);
+        let found = library.search(&mut Matcher::new("r\u{e9}sum\u{e9}"), &Context::none(), 10);
+        assert_eq!(found.len(), 1);
+        assert!(library.keyword_answer("caf\u{e9} x").is_some());
+        assert!(library.keyword_answer("cafe\u{301} x").is_some());
+        let saved = decomposed.validated().unwrap();
+        assert_eq!(
+            (saved.name.as_str(), saved.keyword.as_str()),
+            ("R\u{e9}sum\u{e9}", "caf\u{e9}")
+        );
+        // The other form of a keyword is the same keyword.
+        let other = LibraryItem {
+            id: Some(2),
+            ..item(LibraryKind::Snippet, "Other", "caf\u{e9}", "x")
+        };
+        assert!(library.check_keyword(&other.validated().unwrap()).is_err());
     }
 
     #[test]
