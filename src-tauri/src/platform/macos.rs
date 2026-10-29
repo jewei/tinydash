@@ -20,7 +20,8 @@ use objc2_app_kit::{
     NSWorkspace,
 };
 use objc2_event_kit::{
-    EKAuthorizationStatus, EKCalendarItem, EKEntityType, EKEvent, EKEventStore, EKReminder,
+    EKAuthorizationStatus, EKCalendarItem, EKEntityType, EKEvent, EKEventStatus, EKEventStore,
+    EKParticipantStatus, EKReminder,
 };
 use objc2_foundation::{
     NSArray, NSCalendar, NSDate, NSDateComponentUndefined, NSDictionary, NSNumber, NSPoint, NSRect,
@@ -618,7 +619,23 @@ fn read_event(event: &EKEvent) -> Option<up_next::Event> {
         start_ms: unix_ms(&start),
         end_ms: unix_ms(&end),
         all_day,
+        declined: canceled_or_declined(event),
     })
+}
+
+/// Whether the organizer canceled the event, or the user declined it.
+/// EventKit returns both, and Calendar hides them.
+fn canceled_or_declined(event: &EKEvent) -> bool {
+    // SAFETY: Getters of an event from the store and of its attendees.
+    unsafe {
+        event.status() == EKEventStatus::Canceled
+            || event.attendees().is_some_and(|attendees| {
+                attendees.iter().any(|attendee| {
+                    attendee.isCurrentUser()
+                        && attendee.participantStatus() == EKParticipantStatus::Declined
+                })
+            })
+    }
 }
 
 /// Read incomplete reminders due before `to`, overdue ones included.

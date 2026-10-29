@@ -38,6 +38,9 @@ pub struct Event {
     pub start_ms: i64,
     pub end_ms: i64,
     pub all_day: bool,
+    /// The organizer canceled it, or the user declined it, so it is not on
+    /// the user's day.
+    pub declined: bool,
 }
 
 /// An incomplete reminder with a due date, as the platform reads it.
@@ -138,7 +141,7 @@ where
     let mut items = Vec::new();
 
     let (mut events, events_problem) = split(agenda.events);
-    events.retain(|event| event.end_ms > now_ms && event.start_ms < end_ms);
+    events.retain(|event| !event.declined && event.end_ms > now_ms && event.start_ms < end_ms);
     events.sort_by(|a, b| {
         b.all_day
             .cmp(&a.all_day)
@@ -383,6 +386,7 @@ mod tests {
             start_ms,
             end_ms,
             all_day: false,
+            declined: false,
         }
     }
 
@@ -480,6 +484,22 @@ mod tests {
         assert_eq!(count(UpNextKind::Reminder), MAX_REMINDERS);
         assert_eq!(view.items[5].title, "Event 5");
         assert_eq!(view.items[11].title, "Task 5");
+    }
+
+    #[test]
+    fn leaves_out_canceled_and_declined_events() {
+        let declined = |title: &str| Event {
+            declined: true,
+            ..event(title, at(14, 30), at(15, 0))
+        };
+        // Enough of them to fill the list, were they kept.
+        let mut events: Vec<Event> = (0..MAX_EVENTS)
+            .map(|n| declined(&format!("Skipped {n}")))
+            .collect();
+        events.push(event("Review", at(16, 0), at(17, 0)));
+        let view = view(agenda(events, Vec::new()), &now());
+        assert_eq!(rows(&view), [row("16:00–17:00", "Review")]);
+        assert_eq!(view.changes_at_ms, at(16, 0));
     }
 
     #[test]
