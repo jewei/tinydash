@@ -154,7 +154,7 @@ fn setup(app: &mut App) {
         }
         Err(error) => {
             warnings.push(format!(
-                "Could not open saved data, so changes this session will not be saved. {error} Then quit and reopen TinyDash."
+                "Could not open saved data, so changes this session will not be saved. {error} To try again, quit and reopen TinyDash."
             ));
             store::Store::in_memory()
         }

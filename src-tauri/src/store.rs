@@ -921,6 +921,19 @@ mod tests {
     }
 
     #[test]
+    fn a_damaged_database_says_to_move_it_aside_not_to_free_space() {
+        let dir = std::env::temp_dir().join(format!("tinydash-damaged-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(FILE_NAME), [b'x'; 4096]).unwrap();
+        let error = Store::open(&dir).err().unwrap().to_string();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(
+            error.contains("move tinydash.db out of its data folder") && !error.contains("disk"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn the_note_saves_over_itself() {
         let store = Store::in_memory();
         assert_eq!(store.note().unwrap(), "");

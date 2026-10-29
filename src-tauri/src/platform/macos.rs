@@ -614,7 +614,12 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
 fn apple_script(script: &str) -> Result<()> {
     let output = Command::new("/usr/bin/osascript")
         .args(["-e", script])
-        .output()?;
+        .output()
+        .map_err(|error| {
+            Error::msg(format!(
+                "macOS could not run the command: {error}. Try again."
+            ))
+        })?;
     if output.status.success() {
         return Ok(());
     }
