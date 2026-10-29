@@ -1,4 +1,4 @@
-//! Reading and writing the OS clipboard through arboard.
+//! Writing the OS clipboard through arboard.
 
 use std::{borrow::Cow, sync::Mutex};
 
@@ -16,10 +16,12 @@ static WRITER: Mutex<Option<Clipboard>> = Mutex::new(None);
 
 fn with_writer<T>(write: impl FnOnce(&mut Clipboard) -> Result<T>) -> Result<T> {
     let mut writer = WRITER.lock().unwrap_or_else(|e| e.into_inner());
-    if writer.is_none() {
-        *writer = Some(Clipboard::new()?);
-    }
-    write(writer.as_mut().expect("created above"))
+    platform::write_clipboard(|| {
+        if writer.is_none() {
+            *writer = Some(Clipboard::new()?);
+        }
+        write(writer.as_mut().expect("created above"))
+    })
 }
 
 /// Write text. `secret` adds the markers that tell clipboard managers,
@@ -61,8 +63,4 @@ pub fn write(content: &Content) -> Result<()> {
             with_writer(|clipboard| Ok(clipboard.set_image(image)?))
         }
     }
-}
-
-pub fn read_text() -> Option<String> {
-    Clipboard::new().ok()?.get_text().ok()
 }

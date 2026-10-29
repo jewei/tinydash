@@ -204,15 +204,32 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
     })
 }
 
-/// Held while reading the clipboard. AppKit's pasteboard is not safe to
-/// read from two threads at once, and Windows lets one thread open the
-/// clipboard at a time; the capture thread and the widget pane both read.
+/// Held while reading or writing the clipboard. AppKit's pasteboard is not
+/// safe to use from two threads at once, and Windows lets one thread open
+/// the clipboard at a time; the capture thread, the widget pane, and
+/// actions all use it.
 #[cfg(not(target_os = "linux"))]
 static CLIPBOARD_READ: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(not(target_os = "linux"))]
 fn one_clipboard_reader() -> std::sync::MutexGuard<'static, ()> {
     CLIPBOARD_READ.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The clipboard's text now, also when its source marked it secret, so
+/// keep what is made from it secret too. Reads like every other read, one
+/// at a time.
+pub fn clipboard_text_unchecked() -> Option<String> {
+    #[cfg(not(target_os = "linux"))]
+    let _one_reader = one_clipboard_reader();
+    arboard::Clipboard::new().ok()?.get_text().ok()
+}
+
+/// Run `write`, which writes the clipboard, while no read runs.
+pub fn write_clipboard<T>(write: impl FnOnce() -> T) -> T {
+    #[cfg(not(target_os = "linux"))]
+    let _one_reader = one_clipboard_reader();
+    write()
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -380,6 +397,24 @@ mod tests {
                     for _ in 0..20 {
                         super::clipboard_change();
                         super::read_clipboard(false, false);
+                    }
+                });
+            }
+        });
+    }
+
+    #[test]
+    fn unchecked_reads_wait_for_other_reads() {
+        // A snippet's {clipboard} reads while the capture thread checks a copy.
+        std::thread::scope(|scope| {
+            for reader in 0..8 {
+                scope.spawn(move || {
+                    for _ in 0..20 {
+                        if reader % 2 == 0 {
+                            super::read_clipboard(false, false);
+                        } else {
+                            super::clipboard_text_unchecked();
+                        }
                     }
                 });
             }

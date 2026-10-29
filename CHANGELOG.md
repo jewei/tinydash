@@ -15,6 +15,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
 
+### Fixed
+
+- On macOS, a snippet with `{clipboard}`, or a copy, can no longer crash TinyDash when it uses the clipboard at the same moment as clipboard history.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added
