@@ -8,7 +8,10 @@
 
 use chrono::{DateTime, Local};
 
-use super::library::{self, LibraryItem, LibraryKind};
+use super::{
+    clipboard::MAX_TEXT_BYTES,
+    library::{self, LibraryItem, LibraryKind},
+};
 
 /// Characters kept from what the user types: enough for `;`, the longest
 /// keyword (32 characters), the character before them, and a space.
@@ -153,7 +156,9 @@ pub struct Expansion {
 impl Expansion {
     /// What to type in place of the trigger: its snippet, filled as when it
     /// is copied from the launcher, with no text after the keyword, so
-    /// `{query}` is empty. `None` when the snippet was deleted or lost its
+    /// `{query}` is empty. A copy over [`MAX_TEXT_BYTES`], which clipboard
+    /// history does not save either, fills nothing: typed key by key, it
+    /// would take minutes. `None` when the snippet was deleted or lost its
     /// keyword since.
     pub fn text(
         &self,
@@ -163,7 +168,9 @@ impl Expansion {
     ) -> Option<String> {
         let snippet = snippet(items, &self.keyword)?;
         let text = library::render_snippet(&snippet.text, "", now, || {
-            clipboard().map(|copied| one_line(&copied))
+            clipboard()
+                .filter(|copied| copied.len() <= MAX_TEXT_BYTES)
+                .map(|copied| one_line(&copied))
         });
         Some(self.replacement(text))
     }
@@ -503,6 +510,22 @@ mod tests {
         );
         // The snippet was deleted since.
         assert_eq!(at_once("gone", 5).text(&items, now, copied), None);
+    }
+
+    #[test]
+    fn fills_nothing_from_a_copy_too_long_to_type() {
+        let mut items = vec![item(LibraryKind::Snippet, "cb")];
+        items[0].text = "Log: {clipboard}".into();
+        let now = chrono::Local::now();
+        let longest = "x".repeat(MAX_TEXT_BYTES);
+        let filled = at_once("cb", 3).text(&items, now, || Some(longest.clone()));
+        assert_eq!(filled.map(|text| text.len()), Some(5 + MAX_TEXT_BYTES));
+        // A large build log would type for minutes, or hours on Linux.
+        let log = "x".repeat(MAX_TEXT_BYTES + 1);
+        assert_eq!(
+            at_once("cb", 3).text(&items, now, || Some(log)).as_deref(),
+            Some("Log: ")
+        );
     }
 
     #[test]
