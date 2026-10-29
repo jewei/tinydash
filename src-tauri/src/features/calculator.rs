@@ -16,16 +16,28 @@ use crate::{
     search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
 };
 
-/// fend checks this deadline while it works, so huge inputs cannot hang search.
-/// Tests get more time: a slow, busy runner must not turn an answer into none.
+/// fend checks this deadline while it evaluates, but not while it parses:
+/// `parses_fast` keeps the parse short. Tests get more time: a slow, busy
+/// runner must not turn an answer into none.
 const TIME_LIMIT: Duration = if cfg!(test) {
     Duration::from_secs(10)
 } else {
     Duration::from_millis(100)
 };
+/// Longest input, in bytes, that fend parses. Its parser recurses for each
+/// sign or operand, and a release build overflows a 2 MiB stack near 2,000
+/// (a debug build, with its larger stack frames, near 100).
+const MAX_INPUT: usize = 500;
+/// Most parentheses in an input. Each one nests fend's parser about 20 calls
+/// deeper, and fend adds a `(` at the start for each `)`. In a release
+/// build, 200 nested calls such as `sin(` overflow a 2 MiB stack.
+const MAX_PARENTHESES: usize = 32;
+/// Most parse work, as `parses_fast` counts it: about 20 ms in a release
+/// build for the slowest kind of input.
+const MAX_PARSE_WORK: u64 = 50_000;
 /// Most calculations kept in history.
 pub const MAX_CALCULATIONS: usize = 50;
-/// Longer expressions are copied but not kept.
+/// Longest expression, in characters, kept in history.
 pub const MAX_EXPRESSION: usize = 500;
 /// Most history rows one search shows.
 const HISTORY_ROWS: usize = 20;
@@ -292,15 +304,59 @@ fn currency_shorthand(query: &str) -> Option<String> {
 }
 
 /// The query in fend's syntax, or `None` when fend would read a percentage
-/// in it wrongly.
+/// in it wrongly or could not parse it fast.
 fn fend_input(query: &str) -> Option<String> {
-    if let Some(input) = currency_shorthand(query) {
-        return Some(input);
+    // Also bounds the rewrites, which recurse once for each percentage.
+    if query.len() > MAX_INPUT {
+        return None;
     }
-    let input = euro_amounts(query);
-    let input = word_operators(&input);
-    let input = percentage(&input).unwrap_or_else(|| input.into_owned());
-    (!adds_bare_percentage(&input)).then_some(input)
+    let input = match currency_shorthand(query) {
+        Some(input) => input,
+        None => {
+            let input = euro_amounts(query);
+            let input = word_operators(&input);
+            percentage(&input).unwrap_or_else(|| input.into_owned())
+        }
+    };
+    (parses_fast(&input) && !adds_bare_percentage(&input)).then_some(input)
+}
+
+/// Whether fend parses `input` fast and within the stack. fend cannot stop
+/// its parser, which tries one reading after another: it parses a group in
+/// parentheses once for each `+` or `-` term before it, up to three times
+/// after a value, as in `2(` or `1 2/(`, and all of that again for each
+/// parse of the group around it.
+fn parses_fast(input: &str) -> bool {
+    if input.len() > MAX_INPUT || input.matches(['(', ')']).count() > MAX_PARENTHESES {
+        return false;
+    }
+    // How often fend parses the current group, and its terms so far.
+    let (mut parses, mut terms) = (1_u64, 0_u64);
+    let mut outer = Vec::new();
+    let mut work = 0_u64;
+    let mut previous = '(';
+    for c in input.chars() {
+        let reads = parses.saturating_mul(terms + 1);
+        work = work.saturating_add(reads);
+        match c {
+            '(' => {
+                outer.push((parses, terms));
+                parses = reads.saturating_mul(if previous == '(' { 1 } else { 3 });
+                terms = 0;
+            }
+            ')' => {
+                if let Some(group) = outer.pop() {
+                    (parses, terms) = group;
+                }
+            }
+            '+' | '-' => terms += 1,
+            _ => {}
+        }
+        if !c.is_whitespace() {
+            previous = c;
+        }
+    }
+    work <= MAX_PARSE_WORK
 }
 
 /// `€20` as `20 EUR`: fend reads `$20` and `£20`, but not `€20`.
@@ -849,6 +905,36 @@ mod tests {
         ] {
             let (value, _) = evaluate(query, Some(&rates)).unwrap();
             assert_eq!(value, expected, "{query}");
+        }
+    }
+
+    #[test]
+    fn refuses_input_that_fend_cannot_parse_fast() {
+        let start = Instant::now();
+        for query in [
+            // Too deep for the stack.
+            format!("1{}", ")".repeat(5000)),
+            format!("{}1", "-".repeat(5000)),
+            format!("{}1", "1+".repeat(300)),
+            format!("100{}", " - 1%".repeat(100_000)),
+            // Parsed again and again.
+            "1(".repeat(30),
+            "1+1+1+1+1+1+1+(".repeat(8),
+            "1 2/(".repeat(16),
+            "1 2^-(".repeat(16),
+        ] {
+            assert_eq!(value(&query), None);
+            assert!(rates_off_answer(&query).is_none());
+        }
+        assert!(start.elapsed() < Duration::from_secs(1));
+        // What people type still has an answer.
+        for (query, expected) in [
+            (format!("{}1", "1.5+".repeat(40)), "61"),
+            ("(((2+3)*(4-1)+1)/(5-(2+1)))".into(), "8"),
+            ("((1+2)*(3+4))*((5+6)-(7+8))".into(), "-84"),
+            ("200 - 10% - 5% - 2% - 1%".into(), "165.9042"),
+        ] {
+            assert_eq!(value(&query).as_deref(), Some(expected), "{query}");
         }
     }
 
