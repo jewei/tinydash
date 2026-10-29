@@ -27,6 +27,9 @@
 //! - `app_folders()`: folders to watch for installed or removed apps.
 //! - `discover_apps()`: installed apps.
 //! - `launch_app(path)`: start an app found by `discover_apps`.
+//! - `open_path(path)` / `open_url(url)`: open with the default app.
+//!   Programs that TinyDash starts on Linux leave out the GTK setup that the
+//!   AppImage made for TinyDash itself.
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`. Sleep Displays calls
 //!   `wait_for_key_release` first, only where it is supported.
@@ -263,7 +266,9 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
 /// Start a GUI program and return at once; it keeps running on its own.
 #[cfg(target_os = "linux")]
 fn launch(program: &str) -> Result<()> {
-    let mut child = std::process::Command::new(program)
+    let mut command = std::process::Command::new(program);
+    linux::clean_environment(&mut command);
+    let mut child = command
         .spawn()
         .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))?;
     // Reap it when it exits, so no zombie process stays behind.
@@ -281,6 +286,8 @@ fn wait_for_key_release() {
 fn run(program: &str, args: &[&str]) -> Result<()> {
     let mut command = std::process::Command::new(program);
     command.args(args);
+    #[cfg(target_os = "linux")]
+    linux::clean_environment(&mut command);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

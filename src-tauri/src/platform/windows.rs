@@ -139,6 +139,15 @@ pub fn launch_app(path: &Path) -> Result<()> {
         .map_err(|error| Error::msg(error.to_string()))
 }
 
+pub fn open_path(path: &Path) -> Result<()> {
+    tauri_plugin_opener::open_path(path, None::<&str>)
+        .map_err(|error| Error::msg(error.to_string()))
+}
+
+pub fn open_url(url: &str) -> Result<()> {
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|error| Error::msg(error.to_string()))
+}
+
 pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
     None
 }

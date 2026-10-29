@@ -320,6 +320,15 @@ pub fn launch_app(path: &Path) -> Result<()> {
         .map_err(|error| Error::msg(error.to_string()))
 }
 
+pub fn open_path(path: &Path) -> Result<()> {
+    tauri_plugin_opener::open_path(path, None::<&str>)
+        .map_err(|error| Error::msg(error.to_string()))
+}
+
+pub fn open_url(url: &str) -> Result<()> {
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|error| Error::msg(error.to_string()))
+}
+
 /// Draw the Finder icon of `path` into a square bitmap of `pixels` and
 /// encode it as PNG. AppKit picks the best representation for that size.
 pub fn app_icon(path: &Path, pixels: u32) -> Option<Vec<u8>> {

@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     path::{Path, PathBuf},
     sync::{
         Mutex,
@@ -154,8 +155,101 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
 pub fn launch_app(path: &Path) -> Result<()> {
     let app = gio::DesktopAppInfo::from_filename(path)
         .ok_or_else(|| Error::msg("The application is no longer installed."))?;
-    app.launch(&[], None::<&gio::AppLaunchContext>)
+    app.launch(&[], Some(&launch_context()))
         .map_err(|error| Error::msg(error.to_string()))
+}
+
+/// Open with the default app through GIO, as `gio open` does, so that the
+/// app starts without the AppImage's setup.
+pub fn open_url(url: &str) -> Result<()> {
+    gio::AppInfo::launch_default_for_uri(url, Some(&launch_context()))
+        .map_err(|error| Error::msg(error.to_string()))
+}
+
+pub fn open_path(path: &Path) -> Result<()> {
+    open_url(&gio::File::for_path(path).uri())
+}
+
+/// Variables that the AppImage's GTK hook sets, so that TinyDash loads the
+/// GTK, GIO, and image modules inside the AppImage, with the theme it
+/// forces. Tauri's bundler adds the hook (linuxdeploy-plugin-gtk).
+const APPIMAGE_VARIABLES: &[&str] = &[
+    "GDK_PIXBUF_MODULE_FILE",
+    "GI_TYPELIB_PATH",
+    "GIO_MODULE_DIR",
+    "GSETTINGS_SCHEMA_DIR",
+    "GTK_DATA_PREFIX",
+    "GTK_EXE_PREFIX",
+    "GTK_IM_MODULE_FILE",
+    "GTK_PATH",
+    "GTK_THEME",
+];
+
+/// Folder lists where the AppImage can put its own folders.
+const FOLDER_LISTS: &[&str] = &["PATH", "XDG_DATA_DIRS"];
+
+/// The changes to the environment of a program that TinyDash starts from
+/// an AppImage mounted at `appdir`, where `var` reads TinyDash's own
+/// environment; `None` removes a variable. Without them, the program loads
+/// TinyDash's GTK and GIO modules: its input method and settings can
+/// break, and its images stop loading when TinyDash quits and the AppImage
+/// is unmounted.
+fn appimage_cleanup(
+    appdir: &Path,
+    var: impl Fn(&'static str) -> Option<OsString>,
+) -> Vec<(&'static str, Option<OsString>)> {
+    let mut changes: Vec<_> = APPIMAGE_VARIABLES
+        .iter()
+        .map(|name| (*name, None))
+        .collect();
+    for &name in FOLDER_LISTS {
+        let Some(list) = var(name) else {
+            continue;
+        };
+        let folders: Vec<PathBuf> = std::env::split_paths(&list).collect();
+        let kept: Vec<&PathBuf> = folders
+            .iter()
+            .filter(|folder| !folder.starts_with(appdir))
+            .collect();
+        if kept.len() < folders.len() {
+            let list = std::env::join_paths(kept)
+                .ok()
+                .filter(|list| !list.is_empty());
+            changes.push((name, list));
+        }
+    }
+    changes
+}
+
+/// The changes for every program that TinyDash starts: none unless it runs
+/// from an AppImage, whose runtime sets `APPDIR` to where it is mounted.
+fn child_environment() -> Vec<(&'static str, Option<OsString>)> {
+    match std::env::var_os("APPDIR").filter(|dir| !dir.is_empty()) {
+        Some(appdir) => appimage_cleanup(Path::new(&appdir), std::env::var_os),
+        None => Vec::new(),
+    }
+}
+
+/// Start `command` without the AppImage's setup.
+pub(super) fn clean_environment(command: &mut std::process::Command) {
+    for (name, value) in child_environment() {
+        match value {
+            Some(value) => command.env(name, value),
+            None => command.env_remove(name),
+        };
+    }
+}
+
+/// A GIO launch context that starts apps without the AppImage's setup.
+fn launch_context() -> gio::AppLaunchContext {
+    let context = gio::AppLaunchContext::new();
+    for (name, value) in child_environment() {
+        match value {
+            Some(value) => context.setenv(name, value),
+            None => context.unsetenv(name),
+        }
+    }
+    context
 }
 
 pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
@@ -298,7 +392,9 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
 /// exits once the launch is done.
 fn open_trash() -> Result<()> {
     use std::process::Stdio;
-    let status = std::process::Command::new("gio")
+    let mut command = std::process::Command::new("gio");
+    clean_environment(&mut command);
+    let status = command
         .args(["open", "trash:///"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -318,7 +414,9 @@ fn open_trash() -> Result<()> {
 /// settings do.
 fn toggle_gnome_dark_mode() -> Result<()> {
     const SCHEMA: &str = "org.gnome.desktop.interface";
-    let output = std::process::Command::new("gsettings")
+    let mut command = std::process::Command::new("gsettings");
+    clean_environment(&mut command);
+    let output = command
         .args(["get", SCHEMA, "color-scheme"])
         .output()
         .map_err(|error| Error::msg(format!("Could not run gsettings: {error}")))?;
@@ -563,6 +661,39 @@ mod tests {
             session_end("xfce", SystemCommand::LogOut),
             Some(Program("xfce4-session-logout", &["--logout"]))
         );
+    }
+
+    #[test]
+    fn programs_started_from_the_appimage_lose_its_setup() {
+        let appdir = Path::new("/tmp/.mount_TinyDaAb12");
+        let environment = |name: &str| {
+            let value = match name {
+                "XDG_DATA_DIRS" => "/tmp/.mount_TinyDaAb12/usr/share:/usr/share:/usr/local/share",
+                "PATH" => "/usr/bin:/tmp/.mount_TinyDaAb123/usr/bin",
+                "GTK_PATH" => "/tmp/.mount_TinyDaAb12/usr/lib/gtk-3.0",
+                _ => return None,
+            };
+            Some(OsString::from(value))
+        };
+        let changes = appimage_cleanup(appdir, environment);
+        for &name in APPIMAGE_VARIABLES {
+            assert!(changes.contains(&(name, None)), "{name} stays");
+        }
+        assert!(changes.contains(&(
+            "XDG_DATA_DIRS",
+            Some(OsString::from("/usr/share:/usr/local/share"))
+        )));
+        // Another AppImage's folder, whose name only starts the same.
+        assert!(!changes.iter().any(|(name, _)| *name == "PATH"));
+    }
+
+    #[test]
+    fn a_folder_list_of_only_appimage_folders_is_removed() {
+        let appdir = Path::new("/tmp/.mount_TinyDaAb12");
+        let changes = appimage_cleanup(appdir, |name| {
+            (name == "XDG_DATA_DIRS").then(|| OsString::from("/tmp/.mount_TinyDaAb12/usr/share"))
+        });
+        assert!(changes.contains(&("XDG_DATA_DIRS", None)));
     }
 
     #[test]
