@@ -34,11 +34,11 @@ use windows_sys::Win32::{
         Shell::{SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW},
         WindowsAndMessaging::{
             CallNextHookEx, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId, HC_ACTION,
-            HWND_BROADCAST, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, PostMessageW, PostThreadMessageW,
-            SC_MONITORPOWER, SMTO_ABORTIFHUNG, SendMessageTimeoutW, SetWindowsHookExW,
-            UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_LBUTTONDOWN,
-            WM_MBUTTONDOWN, WM_QUIT, WM_RBUTTONDOWN, WM_SETTINGCHANGE, WM_SYSCOMMAND,
-            WM_SYSKEYDOWN, WM_XBUTTONDOWN,
+            HHOOK, HWND_BROADCAST, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, PostMessageW,
+            PostThreadMessageW, SC_MONITORPOWER, SMTO_ABORTIFHUNG, SendMessageTimeoutW,
+            SetWindowsHookExW, UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN,
+            WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_QUIT, WM_RBUTTONDOWN, WM_SETTINGCHANGE,
+            WM_SYSCOMMAND, WM_SYSKEYDOWN, WM_XBUTTONDOWN,
         },
     },
 };
@@ -655,37 +655,46 @@ fn run_hooks(on_key: Box<dyn FnMut(Key)>, ready: &mpsc::Sender<Result<u32>>) {
     }));
     // SAFETY: A null name asks for this program's own module.
     let module = unsafe { GetModuleHandleW(std::ptr::null()) };
-    // SAFETY: Both procedures have the hook type, and this thread removes
-    // both hooks below, before it ends.
-    let hooks = unsafe {
-        [
-            SetWindowsHookExW(WH_KEYBOARD_LL, Some(on_keyboard), module, 0),
-            SetWindowsHookExW(WH_MOUSE_LL, Some(on_mouse), module, 0),
-        ]
+    let hook = |kind, procedure| {
+        // SAFETY: The procedure has the hook type, and this thread removes
+        // the hook before it ends.
+        let hook = unsafe { SetWindowsHookExW(kind, procedure, module, 0) };
+        if hook.is_null() {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(hook)
+        }
     };
-    let hooked = hooks.iter().all(|hook| !hook.is_null());
-    let sent = if hooked {
-        // SAFETY: Takes no arguments.
-        ready.send(Ok(unsafe { GetCurrentThreadId() }))
-    } else {
-        ready.send(Err(Error::msg(format!(
-            "Windows did not let TinyDash read keys: {}",
-            std::io::Error::last_os_error()
-        ))))
-    };
-    if hooked && sent.is_ok() {
-        let mut message = MSG::default();
-        // The hooks run while this thread waits for messages. WM_QUIT ends
-        // the loop with 0, and an error with -1.
-        // SAFETY: `message` is a valid MSG to fill.
-        while unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) } > 0 {}
-    }
-    for hook in hooks.into_iter().filter(|hook| !hook.is_null()) {
-        // SAFETY: This thread set the hook, and removes it once.
-        unsafe { UnhookWindowsHookEx(hook) };
+    let hooks = hook(WH_KEYBOARD_LL, Some(on_keyboard)).and_then(|keyboard| {
+        hook(WH_MOUSE_LL, Some(on_mouse))
+            .map(|mouse| [keyboard, mouse])
+            .inspect_err(|_| unhook(keyboard))
+    });
+    match hooks {
+        Ok(hooks) => {
+            // SAFETY: Takes no arguments.
+            if ready.send(Ok(unsafe { GetCurrentThreadId() })).is_ok() {
+                let mut message = MSG::default();
+                // The hooks run while this thread waits for messages.
+                // WM_QUIT ends the loop with 0, and an error with -1.
+                // SAFETY: `message` is a valid MSG to fill.
+                while unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) } > 0 {}
+            }
+            hooks.into_iter().for_each(unhook);
+        }
+        Err(error) => {
+            let _ = ready.send(Err(Error::msg(format!(
+                "Windows did not let TinyDash read keys: {error}"
+            ))));
+        }
     }
     // Drops the typed text.
     WATCHER.set(None);
+}
+
+fn unhook(hook: HHOOK) {
+    // SAFETY: This thread set the hook, and removes it once.
+    unsafe { UnhookWindowsHookEx(hook) };
 }
 
 /// The keyboard hook. Windows waits for it before the key reaches the app,
@@ -743,13 +752,10 @@ fn foreground_changed(foreground: HWND) -> bool {
 }
 
 fn read_key(vk: u32, scan: u32, system_key: bool) {
-    let Ok(vk) = VIRTUAL_KEY::try_from(vk) else {
+    // A modifier alone types nothing.
+    let Some(role) = VIRTUAL_KEY::try_from(vk).ok().and_then(key_role) else {
         return;
     };
-    let role = key_role(vk);
-    if role == KeyRole::Modifier {
-        return;
-    }
     // SAFETY: Takes no arguments.
     let foreground = unsafe { GetForegroundWindow() };
     if foreground_changed(foreground) {
@@ -764,7 +770,7 @@ fn read_key(vk: u32, scan: u32, system_key: bool) {
         _ if shortcut => vec![Key::Reset],
         KeyRole::Backspace => vec![Key::Backspace],
         KeyRole::Reset => vec![Key::Reset],
-        KeyRole::Text | KeyRole::Modifier => expansion::keys_for(&translate(vk, scan, foreground)),
+        KeyRole::Text(vk) => expansion::keys_for(&translate(vk, scan, foreground)),
     };
     send(&keys);
 }
@@ -813,26 +819,25 @@ fn is_down(vk: VIRTUAL_KEY) -> bool {
 /// What a key does to the typed text, before what it types is known.
 #[derive(Debug, PartialEq, Eq)]
 enum KeyRole {
-    /// Types nothing alone, such as Shift or Caps Lock.
-    Modifier,
     Backspace,
     /// Moves the cursor or ends the text, such as Return or an arrow.
     Reset,
     /// Types what the layout says, or nothing, such as a function key.
-    Text,
+    Text(VIRTUAL_KEY),
 }
 
-fn key_role(vk: VIRTUAL_KEY) -> KeyRole {
-    match vk {
+/// `None` for a key that types nothing alone, such as Shift or Caps Lock.
+fn key_role(vk: VIRTUAL_KEY) -> Option<KeyRole> {
+    Some(match vk {
         VK_SHIFT | VK_LSHIFT | VK_RSHIFT | VK_CONTROL | VK_LCONTROL | VK_RCONTROL | VK_MENU
         | VK_LMENU | VK_RMENU | VK_LWIN | VK_RWIN | VK_CAPITAL | VK_NUMLOCK | VK_SCROLL => {
-            KeyRole::Modifier
+            return None;
         }
         VK_BACK => KeyRole::Backspace,
         VK_RETURN | VK_ESCAPE | VK_TAB | VK_LEFT | VK_UP | VK_RIGHT | VK_DOWN | VK_HOME
         | VK_END | VK_PRIOR | VK_NEXT | VK_DELETE | VK_INSERT => KeyRole::Reset,
-        _ => KeyRole::Text,
-    }
+        _ => KeyRole::Text(vk),
+    })
 }
 
 /// One key to send: a virtual key, or a UTF-16 unit typed as it is.
@@ -918,17 +923,17 @@ mod tests {
             VK_NUMPAD1, VK_OEM_1, VK_RETURN, VK_RMENU, VK_SPACE, VK_TAB,
         };
         for vk in [VK_LSHIFT, VK_RMENU, VK_CAPITAL] {
-            assert_eq!(key_role(vk), KeyRole::Modifier, "{vk}");
+            assert_eq!(key_role(vk), None, "{vk}");
         }
-        assert_eq!(key_role(VK_BACK), KeyRole::Backspace);
+        assert_eq!(key_role(VK_BACK), Some(KeyRole::Backspace));
         for vk in [
             VK_RETURN, VK_ESCAPE, VK_TAB, VK_LEFT, VK_HOME, VK_NEXT, VK_DELETE,
         ] {
-            assert_eq!(key_role(vk), KeyRole::Reset, "{vk}");
+            assert_eq!(key_role(vk), Some(KeyRole::Reset), "{vk}");
         }
         // Letters, the ; key on US layouts, Space, and the number pad.
         for vk in [u16::from(b'S'), VK_OEM_1, VK_SPACE, VK_NUMPAD1] {
-            assert_eq!(key_role(vk), KeyRole::Text, "{vk}");
+            assert_eq!(key_role(vk), Some(KeyRole::Text(vk)), "{vk}");
         }
     }
 
