@@ -57,7 +57,7 @@ pub fn answer(query: &str) -> Option<Vec<SearchResult>> {
 }
 
 /// Refuse to run `command` while shell commands are off (`enabled`), or
-/// when [`check`] refuses it. `actions.rs` asks this before it runs one,
+/// when `check` refuses it. `actions.rs` asks this before it runs one,
 /// because the setting may have changed since the row showed.
 pub fn runnable(enabled: bool, command: &str) -> Result<()> {
     if !enabled {
@@ -69,8 +69,10 @@ pub fn runnable(enabled: bool, command: &str) -> Result<()> {
 }
 
 /// Refuse a command that is empty, longer than [`MAX_COMMAND_CHARS`], or
-/// holds a control character: a line break would start a second command.
-pub fn check(command: &str) -> Result<()> {
+/// holds a control character, a line or paragraph separator, or a direction
+/// mark: a line break would start a second command, and a direction mark
+/// can make the row show text that differs from what the shell reads.
+fn check(command: &str) -> Result<()> {
     if command.trim().is_empty() {
         return Err(Error::msg("Type a command after >."));
     }
@@ -81,28 +83,27 @@ pub fn check(command: &str) -> Result<()> {
     }
     if command
         .chars()
-        .any(|character| character.is_control() || reorders_or_breaks(character))
+        .any(|character| character.is_control() || matches!(character, '\u{2028}' | '\u{2029}'))
     {
         return Err(Error::msg(
             "A command must be one line, without tabs or other control characters.",
+        ));
+    }
+    if command.chars().any(is_direction_mark) {
+        return Err(Error::msg(
+            "The command has an invisible direction mark, which can hide what it does. Type the command instead of pasting it.",
         ));
     }
     Ok(())
 }
 
 /// The invisible marks that change the order in which the row shows text,
-/// but not the order in which the shell reads it, and the line and
-/// paragraph separators. The zero width joiner (U+200D) stays, for emoji.
-fn reorders_or_breaks(character: char) -> bool {
+/// but not the order in which the shell reads it. The zero width joiner
+/// (U+200D) is not one: emoji need it.
+fn is_direction_mark(character: char) -> bool {
     matches!(
         character,
-        '\u{061C}'
-            | '\u{200E}'
-            | '\u{200F}'
-            | '\u{202A}'..='\u{202E}'
-            | '\u{2066}'..='\u{2069}'
-            | '\u{2028}'
-            | '\u{2029}'
+        '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
     )
 }
 
@@ -210,6 +211,21 @@ mod tests {
         let row = &answer(&long).unwrap()[0];
         assert!(row.subtitle.starts_with("A command can have up to"));
         let row = &answer("> ls\tx").unwrap()[0];
+        assert!(row.subtitle.starts_with("A command must be one line"));
+        // A direction mark is invisible, so its message names it.
+        for command in [
+            "echo \u{200F}a",
+            "rm \u{202E}~ fr-",
+            "echo \u{2066}a\u{2069}",
+        ] {
+            let row = &answer(&format!("> {command}")).unwrap()[0];
+            assert!(
+                row.subtitle.contains("invisible direction mark"),
+                "{command:?}: {}",
+                row.subtitle
+            );
+        }
+        let row = &answer("> ls\u{2028}rm -rf ~").unwrap()[0];
         assert!(row.subtitle.starts_with("A command must be one line"));
     }
 }
