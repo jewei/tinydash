@@ -587,7 +587,8 @@ pub fn restore_frontmost_app() {}
 /// `ToUnicodeEx` flag: leave the keyboard state as it is, so reading a dead
 /// key does not use it up before the app gets it (Windows 10 1607 and later).
 const KEEP_KEYBOARD_STATE: u32 = 0x4;
-/// Marks the input TinyDash sends ("TDSH").
+/// Marks the input TinyDash sends ("TDSH"), so the hook tells it from what
+/// other programs send.
 const OWN_INPUT: usize = 0x5444_5348;
 /// Keys pressed in one `SendInput` call, with a pause after each call, so
 /// the app in front keeps up.
@@ -707,9 +708,10 @@ unsafe extern "system" fn on_keyboard(code: i32, wparam: WPARAM, lparam: LPARAM)
         // SAFETY: For HC_ACTION, `lparam` points to the key's
         // KBDLLHOOKSTRUCT, which is valid during the call.
         let key = unsafe { &*(lparam as *const KBDLLHOOKSTRUCT) };
-        // Keys that a program sends, TinyDash's own included, are not typing.
         if key.flags & LLKHF_INJECTED == 0 {
             read_key(key.vkCode, key.scanCode, message == WM_SYSKEYDOWN);
+        } else if let Some(reset) = injected_key(key.vkCode, key.dwExtraInfo) {
+            send(&[reset]);
         }
     }
     // SAFETY: Passes the hook's own arguments on, as every hook must.
@@ -751,6 +753,16 @@ fn foreground_changed(foreground: HWND) -> bool {
             })
         })
     })
+}
+
+/// What a key that a program sent does to the typed text. It is never
+/// typing: TinyDash's own keys and a modifier alone pass nothing. Any other
+/// key, such as from the touch keyboard, changed the app's text, so the
+/// text before the cursor is unknown and a later Backspace count would be
+/// wrong.
+fn injected_key(vk: u32, extra_info: usize) -> Option<Key> {
+    let changes_text = VIRTUAL_KEY::try_from(vk).ok().and_then(key_role).is_some();
+    (extra_info != OWN_INPUT && changes_text).then_some(Key::Reset)
 }
 
 fn read_key(vk: u32, scan: u32, system_key: bool) {
@@ -879,7 +891,8 @@ fn keyboard_input(stroke: Stroke, down: bool) -> KEYBDINPUT {
 }
 
 /// Types with `SendInput`, which puts the keys into the input stream as if
-/// they were typed. Windows marks them injected, so the hook skips them.
+/// they were typed. Windows marks them injected, and the hook skips them by
+/// [`OWN_INPUT`].
 /// Typing stops soon after another window comes to the front, so little of
 /// the rest lands there. Each batch waits while the user holds a modifier.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
@@ -986,6 +999,23 @@ mod tests {
         for vk in [u16::from(b'S'), VK_OEM_1, VK_SPACE, VK_NUMPAD1] {
             assert_eq!(key_role(vk), Some(KeyRole::Text(vk)), "{vk}");
         }
+    }
+
+    #[test]
+    fn keys_that_other_programs_send_reset_the_typed_text() {
+        use super::{OWN_INPUT, injected_key};
+        use crate::features::expansion::Key;
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{VK_BACK, VK_LSHIFT, VK_PACKET};
+        let s = u32::from(b'S');
+        // TinyDash's own keys pass nothing.
+        assert_eq!(injected_key(s, OWN_INPUT), None);
+        assert_eq!(injected_key(u32::from(VK_BACK), OWN_INPUT), None);
+        // The touch keyboard, a remap tool, or a remote-control tool.
+        for vk in [s, u32::from(VK_BACK), u32::from(VK_PACKET)] {
+            assert_eq!(injected_key(vk, 0), Some(Key::Reset), "{vk}");
+        }
+        // A modifier alone changes no text.
+        assert_eq!(injected_key(u32::from(VK_LSHIFT), 0), None);
     }
 
     #[test]
