@@ -193,10 +193,15 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             window::hide(app)?;
         }
         Action::System { command } => {
+            // A hotkey runs it while the launcher is hidden; then a failure
+            // must not bring the launcher up over the user's app.
+            let was_open = window::is_open(app)?;
             // Hide first: Lock and Sleep must not leave the launcher on screen.
             window::hide(app)?;
             if let Err(error) = platform::run_system_command(command) {
-                window::show_again(app)?;
+                if was_open {
+                    window::show_again(app)?;
+                }
                 return Err(error);
             }
         }
