@@ -5,7 +5,6 @@ import {
   createUniqueId,
   For,
   on,
-  onCleanup,
   Show,
 } from "solid-js";
 
@@ -29,10 +28,10 @@ const HELP: Record<LibraryKind, string> = {
 };
 
 /**
- * Create, edit, and delete snippets or quicklinks. `drafts` keeps the item
- * in the editor while another Settings section is open.
+ * Create, edit, and delete snippets or quicklinks. Settings keeps it open
+ * while another section shows; `shown` says whether its own section shows.
  */
-export function Library(props: { kind: LibraryKind; drafts: Map<LibraryKind, LibraryItem> }) {
+export function Library(props: { kind: LibraryKind; shown: boolean }) {
   // A failed read must say so, not look like an empty library.
   const [loadError, setLoadError] = createSignal<string>();
   const load = () =>
@@ -47,9 +46,7 @@ export function Library(props: { kind: LibraryKind; drafts: Map<LibraryKind, Lib
       },
     );
   const [items, { refetch }] = createResource(load);
-  const [draft, setDraft] = createSignal<LibraryItem>(
-    props.drafts.get(props.kind) ?? blank(props.kind),
-  );
+  const [draft, setDraft] = createSignal<LibraryItem>(blank(props.kind));
   const [error, setError] = createSignal<string>();
   const [confirmingDelete, setConfirmingDelete] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
@@ -94,12 +91,17 @@ export function Library(props: { kind: LibraryKind; drafts: Map<LibraryKind, Lib
   );
   const change = (field: "name" | "keyword" | "text", value: string) =>
     setDraft((item) => ({ ...item, [field]: value }));
-  // Not a draft that a save or delete still sends: its reply goes to this
-  // closed editor, so a kept new item would be added twice.
-  onCleanup(() => {
-    if (busy()) props.drafts.delete(props.kind);
-    else props.drafts.set(props.kind, draft());
-  });
+  // A failed read may have been brief: read again when the section opens.
+  // A write that still runs reads the list when it ends.
+  createEffect(
+    on(
+      () => props.shown,
+      (shown) => {
+        if (shown && loadError() && !busy()) void refetch();
+      },
+      { defer: true },
+    ),
+  );
 
   /**
    * Run one write at a time, so a double click cannot save twice. `open`

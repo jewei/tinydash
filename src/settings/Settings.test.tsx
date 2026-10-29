@@ -862,11 +862,11 @@ describe("Settings", () => {
     );
   });
 
-  it("does not keep a snippet that was saving when its section closed", async () => {
+  it("finishes a snippet save that runs while another section is open", async () => {
     let release!: () => void;
     const slow = new Promise<void>((resolve) => (release = resolve));
     const library = fakeLibrary();
-    fakeBackend({
+    const backend = fakeBackend({
       library_items: library.list,
       save_library_item: async (args) => {
         await slow;
@@ -875,18 +875,74 @@ describe("Settings", () => {
     });
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    const name = (await screen.findByRole("textbox", { name: "Name" })) as HTMLInputElement;
+    fireEvent.input(name, { target: { value: "Greeting" } });
+    fireEvent.input(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quicklinks" }));
+    fireEvent.click(screen.getByRole("button", { name: "Snippets" }));
+    // Back while it still runs: Save cannot send it a second time.
+    const save = screen.getByRole("button", { name: "Save Snippet" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(name.value).toBe("Greeting");
+    fireEvent.click(screen.getByRole("button", { name: "Quicklinks" }));
+    release();
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Snippets" }));
+    // The saved item stays open with its ID, so the next Save updates it.
+    expect(screen.getAllByRole("button", { name: /Greeting/ })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Delete" })).toBeTruthy();
+    expect(name.value).toBe("Greeting");
+    fireEvent.click(save);
+    await waitFor(() => expect(backend.called("save_library_item")).toHaveLength(2));
+    expect(backend.called("save_library_item")[1]?.args).toMatchObject({ item: { id: 9 } });
+  });
+
+  it("keeps a snippet and shows why its save failed while another section was open", async () => {
+    let refuse!: () => void;
+    const refused = new Promise<void>((resolve) => (refuse = resolve));
+    fakeBackend({
+      library_items: () => [],
+      save_library_item: async () => {
+        await refused;
+        throw "The keyword is in use.";
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
     fireEvent.input(await screen.findByRole("textbox", { name: "Name" }), {
       target: { value: "Greeting" },
     });
     fireEvent.input(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hi" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    const save = screen.getByRole("button", { name: "Save Snippet" }) as HTMLButtonElement;
+    fireEvent.click(save);
     fireEvent.click(screen.getByRole("button", { name: "Quicklinks" }));
-    release();
-    await waitFor(() => expect(library.list()).toHaveLength(1));
+    refuse();
+    await waitFor(() => expect(save.disabled).toBe(false));
     fireEvent.click(screen.getByRole("button", { name: "Snippets" }));
-    // The save added it; a kept copy, without its ID, would add it again.
-    expect(await screen.findByRole("button", { name: /Greeting/ })).toBeTruthy();
-    expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("alert").textContent).toBe("The keyword is in use.");
+    expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe(
+      "Greeting",
+    );
+    expect((screen.getByRole("textbox", { name: "Text" }) as HTMLTextAreaElement).value).toBe("Hi");
+  });
+
+  it("reads the snippets again on opening their section after a failed read", async () => {
+    let reads = 0;
+    fakeBackend({
+      library_items: () => {
+        reads += 1;
+        if (reads === 1) throw "The database is locked.";
+        return [{ id: 1, kind: "snippet", name: "Sig", keyword: "", text: "Hi" }];
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    await screen.findByText(/The database is locked/);
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    fireEvent.click(screen.getByRole("button", { name: "Snippets" }));
+    expect(await screen.findByRole("button", { name: /Sig/ })).toBeTruthy();
+    expect(screen.queryByText(/The database is locked/)).toBeNull();
   });
 
   it("keeps typing that happens while a snippet saves", async () => {
