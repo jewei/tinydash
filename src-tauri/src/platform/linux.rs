@@ -155,7 +155,11 @@ pub fn launch_app(path: &Path) -> Result<()> {
     let app = gio::DesktopAppInfo::from_filename(path)
         .ok_or_else(|| Error::msg("The application is no longer installed."))?;
     app.launch(&[], None::<&gio::AppLaunchContext>)
-        .map_err(|error| Error::msg(error.to_string()))
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not open the app: {error}. Check that it is still installed."
+            ))
+        })
 }
 
 pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {

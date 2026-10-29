@@ -248,7 +248,11 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
 fn launch(program: &str) -> Result<()> {
     let mut child = std::process::Command::new(program)
         .spawn()
-        .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))?;
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not open {program}: {error}. Check that it is installed."
+            ))
+        })?;
     // Reap it when it exits, so no zombie process stays behind.
     std::thread::spawn(move || child.wait());
     Ok(())
@@ -270,14 +274,22 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         command.creation_flags(CREATE_NO_WINDOW);
     }
-    let output = command
-        .output()
-        .map_err(|error| Error::msg(format!("Could not run {program}: {error}")))?;
+    let output = command.output().map_err(|error| {
+        Error::msg(format!(
+            "Could not run {program}: {error}. Check that it is installed."
+        ))
+    })?;
     if output.status.success() {
         return Ok(());
     }
     let detail = String::from_utf8_lossy(&output.stderr);
-    Err(Error::msg(format!("{program} failed: {}", detail.trim())))
+    let detail = detail.trim().trim_end_matches('.');
+    let reason = if detail.is_empty() {
+        String::new()
+    } else {
+        format!(": {detail}")
+    };
+    Err(Error::msg(format!("{program} failed{reason}. Try again.")))
 }
 
 #[cfg(test)]

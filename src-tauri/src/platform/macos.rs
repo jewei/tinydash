@@ -316,8 +316,11 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
 }
 
 pub fn launch_app(path: &Path) -> Result<()> {
-    tauri_plugin_opener::open_path(path, None::<&str>)
-        .map_err(|error| Error::msg(error.to_string()))
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open the app: {error}. Check that it is still installed."
+        ))
+    })
 }
 
 /// Draw the Finder icon of `path` into a square bitmap of `pixels` and

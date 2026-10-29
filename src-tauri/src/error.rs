@@ -8,13 +8,13 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("{0}")]
     Message(String),
-    #[error("File error: {0}")]
+    #[error("Could not read or write a file: {0}. Check that the disk is not full.")]
     Io(#[from] std::io::Error),
-    #[error("Storage error: {0}")]
+    #[error("Could not read or save data: {0}. Check that the disk is not full.")]
     Database(#[from] rusqlite::Error),
     #[error("Invalid data: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("Clipboard error: {0}")]
+    #[error("Could not use the clipboard: {0}. Try again.")]
     Clipboard(#[from] arboard::Error),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),

@@ -74,16 +74,19 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             if !state.apps.get().contains(&path) && !offered_file(&state, &path) {
                 return Err(Error::msg("This item is not in the index."));
             }
-            tauri_plugin_opener::reveal_item_in_dir(&path)
-                .map_err(|e| Error::msg(e.to_string()))?;
+            tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|error| {
+                Error::msg(format!(
+                    "Could not show it in {}: {error}. Check that it still exists.",
+                    platform::FILE_MANAGER
+                ))
+            })?;
             window::hide(app)?;
         }
         Action::OpenUrl { url } => {
             if !web_address(&url) {
                 return Err(Error::msg("Only web addresses can be opened."));
             }
-            tauri_plugin_opener::open_url(&url, None::<&str>)
-                .map_err(|e| Error::msg(e.to_string()))?;
+            open_url(&url)?;
             window::hide(app)?;
         }
         Action::Copy { text } => {
@@ -186,8 +189,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             // source or made in a password app, never goes into a link.
             let clipboard = || platform::clipboard_text(app);
             match library::quicklink_target(&item.text, &query, chrono::Local::now(), clipboard)? {
-                Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
-                    .map_err(|e| Error::msg(e.to_string()))?,
+                Target::Url(url) => open_url(&url)?,
                 Target::Path(path) => open_path(&path)?,
             }
             window::hide(app)?;
@@ -442,6 +444,20 @@ pub fn hotkey_owner(
     )
 }
 
+/// The warning for a hotkey that did not register at startup. It names
+/// the result, and apps and files, not scanned yet, by their path.
+pub fn hotkey_off(snapshot: &Snapshot, failure: &shortcut::HotkeyFailure) -> String {
+    let id = failure.id.as_str();
+    let name = search::resolve(snapshot, &Context::none(), id).map_or_else(
+        || Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
+        |found| found.title,
+    );
+    format!(
+        "The hotkey of {name} is off. {} Use Set Hotkey in its actions, or remove it in Settings > Search.",
+        failure.error
+    )
+}
+
 /// Run the main action of the result that a hotkey belongs to, as Enter
 /// would in the launcher.
 pub fn run_hotkey(app: &AppHandle, id: &str) -> Result<()> {
@@ -529,7 +545,21 @@ fn open_path(path: &Path) -> Result<()> {
     if !path.exists() {
         return Err(Error::msg(format!("{} no longer exists.", path.display())));
     }
-    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| Error::msg(e.to_string()))
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open {}: {error}. Check that an app on this computer opens this kind of file.",
+            path.display()
+        ))
+    })
+}
+
+/// Open a web or mail address with the app the OS assigns to it.
+fn open_url(url: &str) -> Result<()> {
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open {url}: {error}. Check that a default browser or mail app is set."
+        ))
+    })
 }
 
 /// The pin that must go before `id` fits, or `None` while there is room or
@@ -640,6 +670,27 @@ mod tests {
             check("system:lock", "Alt+Shift+L")
                 .unwrap_err()
                 .starts_with("You can set up to 50 hotkeys.")
+        );
+    }
+
+    #[test]
+    fn a_hotkey_that_is_off_at_startup_names_its_result() {
+        let state = State::for_tests(Settings::default());
+        let off = |id: &str| {
+            let failure = shortcut::HotkeyFailure {
+                id: id.into(),
+                error: Error::msg("Could not register Alt+L."),
+            };
+            hotkey_off(&state.snapshot(), &failure)
+        };
+        assert_eq!(
+            off("system:lock"),
+            "The hotkey of Lock Screen is off. Could not register Alt+L. Use Set Hotkey in its actions, or remove it in Settings > Search."
+        );
+        let safari = off("app:/Applications/Safari.app");
+        assert!(
+            safari.starts_with("The hotkey of /Applications/Safari.app is off."),
+            "{safari}"
         );
     }
 

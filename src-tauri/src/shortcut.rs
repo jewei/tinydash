@@ -123,9 +123,9 @@ pub fn can_be_hotkey(keys: &Shortcut) -> bool {
 
 fn register_error(accelerator: &str, error: impl std::fmt::Display) -> Error {
     let hint = if cfg!(target_os = "linux") {
-        " Another app may already use it. On Wayland, assign a desktop shortcut that runs `tinydash` instead."
+        " Another app may already use it, so choose other keys. On Wayland, assign a desktop shortcut that runs `tinydash` instead."
     } else {
-        " Another app may already use it."
+        " Another app may already use it, so choose other keys."
     };
     Error::msg(format!("Could not register {accelerator}: {error}.{hint}"))
 }

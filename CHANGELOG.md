@@ -24,6 +24,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - After you record a launcher shortcut, Settings no longer shows an error about a hotkey that another app holds as if the new shortcut had failed.
 - Keys that TinyDash could not release from a deleted snippet or quicklink now run the result you give them next. Before, they kept saying the deleted item was gone.
 - TinyDash no longer registers a launcher shortcut that would block typing, such as a plain letter in a hand-edited settings.json. At startup it uses Control+Shift+Space instead and says so.
+- More error messages say what to do, for example when a link, file, or app cannot open, an update check fails, or a file cannot be saved. The warning for a hotkey that cannot register at startup now names its result.
 
 ## [0.7.0] - 2026-10-19
 

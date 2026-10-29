@@ -154,7 +154,7 @@ fn setup(app: &mut App) {
         }
         Err(error) => {
             warnings.push(format!(
-                "Could not open saved data ({error}). Changes this session will not be saved."
+                "Could not open saved data, so changes this session will not be saved. {error} Then quit and reopen TinyDash."
             ));
             store::Store::in_memory()
         }
@@ -179,10 +179,12 @@ fn setup(app: &mut App) {
         state.warn(error.to_string());
     }
     for failure in shortcut::sync(handle, &state.hotkeys.get()) {
-        state.warn(format!("A hotkey is off. {}", failure.error));
+        state.warn(actions::hotkey_off(&state.snapshot(), &failure));
     }
     if let Err(error) = tray::set_visible(handle, tray_visible) {
-        state.warn(format!("The tray icon is unavailable: {error}"));
+        state.warn(format!(
+            "The tray icon is unavailable: {error}. Open TinyDash with its shortcut instead."
+        ));
     }
     if let Some(launcher) = handle.get_webview_window(window::LAUNCHER) {
         platform::prepare_launcher(&launcher);

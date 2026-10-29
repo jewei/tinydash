@@ -86,7 +86,10 @@ async fn blocking<T: Send + 'static>(
 ) -> Result<T> {
     tauri::async_runtime::spawn_blocking(work)
         .await
-        .map_err(|error| Error::msg(error.to_string()))?
+        .map_err(|error| {
+            tracing::error!(%error, "A command stopped before it finished");
+            Error::msg("Something went wrong. Try again.")
+        })?
 }
 
 #[tauri::command]
@@ -301,7 +304,11 @@ fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()
         } else {
             autostart.disable()
         };
-        toggled.map_err(|error| Error::msg(format!("Could not change open at login: {error}")))?;
+        toggled.map_err(|error| {
+            Error::msg(format!(
+                "Could not change open at login: {error}. Try again, or change it in your system settings."
+            ))
+        })?;
     }
     if to.show_tray_icon != from.show_tray_icon {
         tray::set_visible(app, to.show_tray_icon)?;
