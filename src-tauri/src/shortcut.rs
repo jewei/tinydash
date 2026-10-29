@@ -163,8 +163,9 @@ pub struct HotkeyFailure {
 
 /// Make the registered hotkeys match `wanted`: release the ones it no
 /// longer has or that changed, then register the new ones. Keys that are
-/// already registered are left alone, so calling it again changes nothing.
-/// Each failure is returned; the others still apply.
+/// already registered stay registered and run the result `wanted` gives
+/// them, so calling it again changes nothing. Each failure is returned;
+/// the others still apply.
 pub fn sync(app: &AppHandle, wanted: &Hotkeys) -> Vec<HotkeyFailure> {
     let mut failures = Vec::new();
     let wanted: Vec<(&str, &str, Result<Shortcut>)> = wanted
@@ -202,10 +203,13 @@ pub fn sync(app: &AppHandle, wanted: &Hotkeys) -> Vec<HotkeyFailure> {
                 continue;
             }
         };
-        if hotkeys()
-            .iter()
-            .any(|(registered, _)| *registered == shortcut)
+        // TinyDash may still hold these keys for another result, after its
+        // release failed; they run this result now.
+        if let Some((_, owner)) = hotkeys()
+            .iter_mut()
+            .find(|(registered, _)| *registered == shortcut)
         {
+            *owner = id.to_owned();
             continue;
         }
         match app.global_shortcut().register(shortcut) {
