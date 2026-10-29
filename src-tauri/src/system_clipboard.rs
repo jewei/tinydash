@@ -64,3 +64,14 @@ pub fn write(content: &Content) -> Result<()> {
         }
     }
 }
+
+#[cfg(all(test, not(target_os = "linux")))]
+mod tests {
+    #[test]
+    fn writes_hold_the_clipboard_lock() {
+        // AppKit crashes when the capture thread reads during a write. The
+        // check writes nothing, so the clipboard stays as it is.
+        let held = super::with_writer(|_| Ok(crate::platform::clipboard_in_use()));
+        assert!(held.unwrap());
+    }
+}

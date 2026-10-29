@@ -235,6 +235,12 @@ pub fn write_clipboard<T>(write: impl FnOnce() -> T) -> T {
     write()
 }
 
+/// Whether a thread holds the clipboard lock now.
+#[cfg(all(test, not(target_os = "linux")))]
+pub fn clipboard_in_use() -> bool {
+    CLIPBOARD_USE.try_lock().is_err()
+}
+
 #[cfg(not(target_os = "linux"))]
 /// Read what the clipboard holds, in the order apps expect: copied files
 /// first (Finder also offers their names as text), then text, then images.
