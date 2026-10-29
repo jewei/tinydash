@@ -410,15 +410,66 @@ fn percentage(query: &str) -> Option<String> {
             }
         }
     }
-    // `10% of 200`, `10% on 200`, `10% off 200`.
-    for (separator, factor) in factors {
-        if let Some((percent, value)) = around(query, &format!("{separator} "))
-            && is_number(percent)
-        {
-            return Some(format!("({value}) * ({factor}({percent}) / 100)"));
+    let query = percentage_factors(query, &factors);
+    added_percentage(&query).or(match query {
+        Cow::Owned(input) => Some(input),
+        Cow::Borrowed(_) => None,
+    })
+}
+
+/// `10% of 200`, `10% on 200`, and `10% off 200` as `(10 / 100) * 200`,
+/// `(1 + 10 / 100) * 200`, and `(1 - 10 / 100) * 200`, in place, so that the
+/// percentage takes only the number after it, as fend's own `of` does:
+/// `10% of 200 + 50` is 70.
+fn percentage_factors<'a>(query: &'a str, factors: &[(&str, &str)]) -> Cow<'a, str> {
+    let lower = query.to_ascii_lowercase();
+    let mut input = String::new();
+    // `input` holds `query` up to `copied`, rewritten.
+    let (mut copied, mut from) = (0, 0);
+    while let Some((at, end, factor)) = factors
+        .iter()
+        .filter_map(|(separator, factor)| {
+            let separator = format!("{separator} ");
+            let at = from + lower[from..].find(&separator)?;
+            Some((at, at + separator.len(), factor))
+        })
+        .min_by_key(|(at, ..)| *at)
+    {
+        from = end;
+        let Some(before) = before_percentage(&query[copied..=at]) else {
+            continue;
+        };
+        let percent = query[copied + before.len()..at].trim();
+        // After `/` or `^`, the factor would split from the number after it.
+        let operand = before.trim_end();
+        if is_number(percent) && (operand.is_empty() || operand.ends_with(['(', '+', '-', '*'])) {
+            input.push_str(before);
+            input.push_str(&format!("({factor}{percent} / 100) * "));
+            copied = end;
+            let rest = query[end..].trim_start();
+            if let Some(amount) = prefix_amount(rest) {
+                input.push_str(&format!("({amount})"));
+                copied = query.len() - rest.len() + amount.len();
+                from = copied;
+            }
         }
     }
-    added_percentage(query)
+    if copied == 0 {
+        return Cow::Borrowed(query);
+    }
+    input.push_str(&query[copied..]);
+    Cow::Owned(input)
+}
+
+/// An amount such as `$200` or `-£5` at the start of `text`. fend reads
+/// `* $200` as `* $`, so it needs parentheses after a sign.
+fn prefix_amount(text: &str) -> Option<&str> {
+    let unsigned = text.strip_prefix(['-', '+']).unwrap_or(text);
+    let amount = unsigned.strip_prefix(['$', '£', '¥'])?;
+    let digits = amount
+        .find(|c: char| !(c.is_ascii_digit() || matches!(c, '.' | ',')))
+        .unwrap_or(amount.len());
+    (digits > 0).then(|| &text[..text.len() - amount.len() + digits])
 }
 
 /// `$30 + 20%` adds 20% of $30, and `200 - 10% - 5%` takes 5% off 180.
@@ -771,6 +822,34 @@ mod tests {
             assert_eq!(value(query), None, "{query}");
         }
         assert!(rates_off_answer("$30 + 20% + 5").is_none());
+    }
+
+    #[test]
+    fn a_percentage_of_takes_only_the_next_number() {
+        for (query, expected) in [
+            ("10% of 200 + 50", "70"),
+            ("15% of 80 + 80", "92"),
+            ("10% off 200 + 5", "185"),
+            ("10% on 200 * 2", "440"),
+            ("10% of 200 - 5%", "19"),
+            ("5 + 10% of 200", "25"),
+            ("10% of 20% of 200", "4"),
+            ("10 percent of 200", "20"),
+        ] {
+            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
+        }
+        // `(1 - 10 / 100)` after `/` or `^` would bind to the wrong side.
+        assert_eq!(value("400 / 10% off 200"), None);
+        assert_eq!(value("2 ^ 10% on 200"), None);
+        let rates = Rates::fixture();
+        for (query, expected) in [
+            ("20% off $50 + $5", "$45"),
+            ("30% of -$200", "$-60"),
+            ("10% on  $50", "$55"),
+        ] {
+            let (value, _) = evaluate(query, Some(&rates)).unwrap();
+            assert_eq!(value, expected, "{query}");
+        }
     }
 
     #[test]
