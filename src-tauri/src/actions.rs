@@ -228,12 +228,7 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
         }
         Action::Focus { control } => timer::control(app, control)?,
         Action::RunInTerminal { command } => {
-            if !state.settings.get().shell_commands {
-                return Err(Error::msg(
-                    "Shell commands are off. Turn on Run shell commands in Settings > Search.",
-                ));
-            }
-            shell::check(&command)?;
+            shell::runnable(state.settings.get().shell_commands, &command)?;
             platform::run_in_terminal(&command, &state.dirs.data)?;
             window::hide(app)?;
         }

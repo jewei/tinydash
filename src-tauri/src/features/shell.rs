@@ -56,6 +56,18 @@ pub fn answer(query: &str) -> Option<Vec<SearchResult>> {
     }])
 }
 
+/// Refuse to run `command` while shell commands are off (`enabled`), or
+/// when [`check`] refuses it. `actions.rs` asks this before it runs one,
+/// because the setting may have changed since the row showed.
+pub fn runnable(enabled: bool, command: &str) -> Result<()> {
+    if !enabled {
+        return Err(Error::msg(
+            "Shell commands are off. Turn on Run shell commands in Settings > Search.",
+        ));
+    }
+    check(command)
+}
+
 /// Refuse a command that is empty, longer than [`MAX_COMMAND_CHARS`], or
 /// holds a control character: a line break would start a second command.
 pub fn check(command: &str) -> Result<()> {
@@ -67,12 +79,31 @@ pub fn check(command: &str) -> Result<()> {
             "A command can have up to {MAX_COMMAND_CHARS} characters. Run a longer one in {TERMINAL} yourself."
         )));
     }
-    if command.chars().any(char::is_control) {
+    if command
+        .chars()
+        .any(|character| character.is_control() || reorders_or_breaks(character))
+    {
         return Err(Error::msg(
             "A command must be one line, without tabs or other control characters.",
         ));
     }
     Ok(())
+}
+
+/// The invisible marks that change the order in which the row shows text,
+/// but not the order in which the shell reads it, and the line and
+/// paragraph separators. The zero width joiner (U+200D) stays, for emoji.
+fn reorders_or_breaks(character: char) -> bool {
+    matches!(
+        character,
+        '\u{061C}'
+            | '\u{200E}'
+            | '\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2066}'..='\u{2069}'
+            | '\u{2028}'
+            | '\u{2029}'
+    )
 }
 
 #[cfg(test)]
@@ -145,8 +176,31 @@ mod tests {
             "ls\0",
             "ls\tx",
             "ls\u{85}",
+            // U+202E shows the rest of the line in reverse order.
+            "rm \u{202E}~ fr-",
+            "echo \u{2066}a\u{2069}",
+            "echo \u{200F}a",
+            "echo \u{061C}a",
+            "ls\u{2028}rm -rf ~",
+            "ls\u{2029}",
         ] {
             assert!(check(command).is_err(), "{command:?}");
+        }
+        // An emoji sequence joins its parts with U+200D.
+        assert!(check("echo 👩\u{200D}💻").is_ok());
+    }
+
+    #[test]
+    fn runs_only_while_the_setting_is_on() {
+        let off = runnable(false, "ls").unwrap_err();
+        assert!(
+            off.to_string().starts_with("Shell commands are off"),
+            "{off}"
+        );
+        assert!(runnable(true, "ls -la").is_ok());
+        for enabled in [true, false] {
+            assert!(runnable(enabled, "ls\nrm -rf ~").is_err(), "{enabled}");
+            assert!(runnable(enabled, "").is_err(), "{enabled}");
         }
     }
 
