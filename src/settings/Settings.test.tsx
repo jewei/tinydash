@@ -182,7 +182,7 @@ describe("Settings", () => {
     expect(backend.called("update_settings")[0]?.args).toEqual({ changes: { focusMinutes: 120 } });
   });
 
-  it("offers Up Next only on macOS, which has the calendars it reads", async () => {
+  it("hides Up Next outside macOS, which has the calendars it reads", async () => {
     fakeBackend();
     render(() => <Settings />);
     fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
