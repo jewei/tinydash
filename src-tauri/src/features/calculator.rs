@@ -327,8 +327,10 @@ fn fend_input(query: &str) -> Option<String> {
 /// Whether fend parses `input` fast and within the stack. fend cannot stop
 /// its parser, which tries one reading after another: it parses a group in
 /// parentheses once for each `+` or `-` term before it, up to three times
-/// after a value, as in `2(` or `1 2/(`, and all of that again for each
-/// parse of the group around it.
+/// more where other readings start (see `group_reads`), and all of that
+/// again for each parse of the group around it. The count is an upper
+/// bound, also for input that fails to parse, as it does while the user
+/// types.
 fn parses_fast(input: &str) -> bool {
     if input.len() > MAX_INPUT || input.matches(['(', ')']).count() > MAX_PARENTHESES {
         return false;
@@ -337,14 +339,13 @@ fn parses_fast(input: &str) -> bool {
     let (mut parses, mut terms) = (1_u64, 0_u64);
     let mut outer = Vec::new();
     let mut work = 0_u64;
-    let mut previous = '(';
-    for c in input.chars() {
+    for (at, c) in input.char_indices() {
         let reads = parses.saturating_mul(terms + 1);
         work = work.saturating_add(reads);
         match c {
             '(' => {
                 outer.push((parses, terms));
-                parses = reads.saturating_mul(if previous == '(' { 1 } else { 3 });
+                parses = reads.saturating_mul(group_reads(&input[..at]));
                 terms = 0;
             }
             ')' => {
@@ -352,14 +353,69 @@ fn parses_fast(input: &str) -> bool {
                     (parses, terms) = group;
                 }
             }
+            // A lambda, `\x.x + 1`, runs to the end of its group. Where its
+            // body stops early, the reading around it parses the rest again.
+            '\\' => {
+                parses = reads.saturating_mul(2 * group_reads(&input[..at]));
+                terms = 0;
+            }
             '+' | '-' => terms += 1,
             _ => {}
         }
-        if !c.is_whitespace() {
-            previous = c;
-        }
     }
     work <= MAX_PARSE_WORK
+}
+
+/// How often fend parses a group that follows `text`, for each parse of the
+/// term around it. Once after `(`, a sign, or `*`. Twice after `/`: when the
+/// group fails, fend reads it again as `1/x`. Up to three times where it
+/// also tries a mixed fraction or an implied product: after a value (`2(`),
+/// in a power (`1 2^-(`), and in a mixed fraction (`1 2/(`).
+fn group_reads(text: &str) -> u64 {
+    let unsigned = text.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '+' | '-'));
+    let signed = unsigned.len() < text.trim_end().len();
+    let mut operand = unsigned.chars();
+    match operand.next_back() {
+        None | Some('(' | '×' | '✕') => 1,
+        Some('*') if !ends_with_power(unsigned) => 1,
+        Some('/' | '÷' | '∕') if !ends_mixed_fraction_top(operand.as_str()) => 2,
+        Some('^' | '*' | '/' | '÷' | '∕') => 3,
+        // A sign after a value adds or subtracts: the terms count it.
+        Some(_) if signed => 1,
+        Some(_) => 3,
+    }
+}
+
+/// Whether `text` ends with fend's power sign: `^`, `**`, or `×*`.
+fn ends_with_power(text: &str) -> bool {
+    text.ends_with('^')
+        || text
+            .strip_suffix('*')
+            .is_some_and(|left| left.ends_with(['*', '×', '✕']))
+}
+
+/// Whether `text` may end the top of a mixed fraction, as `1 2` does in
+/// `1 2/(`: a number right after a value.
+fn ends_mixed_fraction_top(text: &str) -> bool {
+    let text = text.trim_end();
+    let token = |c: char| c.is_alphanumeric() || matches!(c, '.' | ',');
+    let mut before = text.trim_end_matches(token);
+    // In `2e-3`, the sign belongs to the exponent.
+    if let Some(mantissa) = before.strip_suffix(['+', '-'])
+        && mantissa.ends_with(['e', 'E'])
+    {
+        before = mantissa.trim_end_matches(token);
+    }
+    let number = &text[before.len()..];
+    if number.is_empty() {
+        // `(1 + 2)/(` divides. After an operator, `/` is `1/x`, which can
+        // belong to a power, as in `1 2^/(`.
+        return !text.ends_with(')');
+    }
+    number.starts_with(|c: char| c.is_ascii_digit() || c == '.')
+        && before
+            .trim_end()
+            .ends_with(|c: char| !"(+-*×✕/÷∕^".contains(c))
 }
 
 /// `€20` as `20 EUR`: fend reads `$20` and `£20`, but not `€20`.
@@ -930,6 +986,10 @@ mod tests {
             format!("{}(", "1\u{2212}".repeat(15)).repeat(7),
             "1 2/(".repeat(16),
             "1 2^-(".repeat(16),
+            // When the group fails, fend reads each `/` again as `1/x`.
+            "(2/".repeat(30),
+            // A lambda's body stops early, and the rest is read again.
+            "1 \\x.1+(".repeat(11),
         ] {
             assert_eq!(value(&query), None);
             assert!(rates_off_answer(&query).is_none());
@@ -940,6 +1000,12 @@ mod tests {
             (format!("{}1", "1.5+".repeat(40)), "61"),
             ("(((2+3)*(4-1)+1)/(5-(2+1)))".into(), "8"),
             ("((1+2)*(3+4))*((5+6)-(7+8))".into(), "-84"),
+            ("1 - (2 - (3 - (4 - (5 - (6 - 7)))))".into(), "4"),
+            ("1-(1-(1-(1-(1-(1-1)))))".into(), "1"),
+            (
+                "1 + 1/(1 + 1/(1 + 1/(1 + 1/(1 + 1/(1 + 1)))))".into(),
+                "approx. 1.6153846154",
+            ),
             ("200 - 10% - 5% - 2% - 1%".into(), "165.9042"),
         ] {
             assert_eq!(value(&query).as_deref(), Some(expected), "{query}");
