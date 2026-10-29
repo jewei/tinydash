@@ -220,7 +220,8 @@ pub fn sync(app: &AppHandle, wanted: &Hotkeys) -> Vec<HotkeyFailure> {
 }
 
 /// Pause while a recorder takes new keys, in Settings or for a hotkey, so
-/// pressing a shortcut that is set is recorded instead of acting.
+/// pressing a shortcut that is set is recorded instead of acting. A pause
+/// that fails leaves every shortcut on, as it was.
 /// Takes the settings lock; never call it on the main thread.
 pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
     let state = app.state::<State>();
@@ -228,16 +229,21 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
         .settings_change
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    let wanted = if paused {
-        Hotkeys::default()
-    } else {
-        Hotkeys::clone(&state.hotkeys.get())
-    };
-    let failure = sync(app, &wanted).into_iter().next();
-    if paused {
-        unregister(app)?;
-    } else {
+    if !paused {
+        let failure = sync(app, &state.hotkeys.get()).into_iter().next();
         register(app, &state.settings.get().shortcut)?;
+        return failure.map_or(Ok(()), |failure| Err(failure.error));
     }
-    failure.map_or(Ok(()), |failure| Err(failure.error))
+    let released = match sync(app, &Hotkeys::default()).into_iter().next() {
+        Some(failure) => Err(failure.error),
+        None => unregister(app),
+    };
+    if released.is_err() {
+        // The recorder stops on this error and never resumes, so turn the
+        // released hotkeys back on. The launcher shortcut is still on.
+        for failure in sync(app, &state.hotkeys.get()) {
+            tracing::warn!(id = %failure.id, error = %failure.error, "A hotkey is off");
+        }
+    }
+    released
 }
