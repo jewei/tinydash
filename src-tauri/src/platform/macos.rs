@@ -474,6 +474,22 @@ const CALENDAR_USAGE_KEYS: [&str; 4] = [
 const REMINDERS_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
 /// Set while a request for access waits for the user.
 static ASKING_FOR_CALENDARS: AtomicBool = AtomicBool::new(false);
+/// The store that reads Up Next. Apple advises keeping one, since a store
+/// is slow to make and to release.
+static EVENT_STORE: Mutex<Option<KeptStore>> = Mutex::new(None);
+
+struct KeptStore {
+    store: Retained<EKEventStore>,
+    /// Whether events and reminders could be read when the store was made.
+    /// A store made before the user allowed access keeps seeing nothing,
+    /// so a new answer needs a new store.
+    readable: [bool; 2],
+}
+
+// SAFETY: A thread may use a store that another thread made, as Apple's
+// guide does to fetch events off the main thread, and the mutex lets one
+// read at a time use this one.
+unsafe impl Send for KeptStore {}
 
 pub fn read_up_next(from_ms: i64, to_ms: i64) -> Option<Agenda> {
     let events = calendar_access(EKEntityType::Event);
@@ -484,11 +500,22 @@ pub fn read_up_next(from_ms: i64, to_ms: i64) -> Option<Agenda> {
             reminders: Err(reminders.clone()),
         });
     }
+    let readable = [events.is_ok(), reminders.is_ok()];
     autoreleasepool(|_| {
-        // A new store each time: a store made before the user allowed
-        // access keeps seeing nothing.
-        // SAFETY: `new` takes no arguments and makes an empty store.
-        let store = unsafe { EKEventStore::new() };
+        // Held until the read ends, so one read at a time uses the store.
+        let mut kept = EVENT_STORE.lock().unwrap_or_else(|e| e.into_inner());
+        let store = match &mut *kept {
+            Some(current) if current.readable == readable => current.store.clone(),
+            slot => {
+                // SAFETY: `new` takes no arguments and makes an empty store.
+                let store = unsafe { EKEventStore::new() };
+                *slot = Some(KeptStore {
+                    store: store.clone(),
+                    readable,
+                });
+                store
+            }
+        };
         let to = ns_date(to_ms);
         Some(Agenda {
             events: events.map(|()| read_events(&store, &ns_date(from_ms), &to)),
