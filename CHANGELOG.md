@@ -23,6 +23,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - If TinyDash cannot pause the shortcuts when you record keys, the launcher shortcut and the hotkeys stay on. Before, some could stay off until TinyDash restarted.
 - After you record a launcher shortcut, Settings no longer shows an error about a hotkey that another app holds as if the new shortcut had failed.
 - Keys that TinyDash could not release from a deleted snippet or quicklink now run the result you give them next. Before, they kept saying the deleted item was gone.
+- TinyDash no longer registers a launcher shortcut that would block typing, such as a plain letter in a hand-edited settings.json. At startup it uses Control+Shift+Space instead and says so.
 
 ## [0.7.0] - 2026-10-19
 

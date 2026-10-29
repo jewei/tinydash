@@ -135,11 +135,12 @@ fn setup(app: &mut App) {
 
     let mut warnings = Vec::new();
     let settings::Loaded {
-        settings,
+        mut settings,
         warning,
         file: settings_file,
     } = settings::load(&config_dir);
     warnings.extend(warning);
+    warnings.extend(shortcut::checked_at_startup(&mut settings));
     if legacy_dir.join(LEGACY_DATABASE).exists() {
         warnings.push(format!(
             "This version starts with new history and pins. Data from TinyDash 0.1 is still in {}: delete {LEGACY_DATABASE} and recovery.tar there if you no longer need it.",

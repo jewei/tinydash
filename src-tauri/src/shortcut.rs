@@ -10,7 +10,7 @@ use std::sync::{Mutex, MutexGuard};
 
 use tauri::{AppHandle, Manager, Wry, plugin::TauriPlugin};
 use tauri_plugin_global_shortcut::{
-    Builder, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
+    Builder, Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState,
 };
 
 use crate::{
@@ -18,6 +18,7 @@ use crate::{
     error::{Error, Result},
     platform,
     search::usage::Hotkeys,
+    settings::Settings,
     state::State,
     window,
 };
@@ -82,7 +83,30 @@ fn toggle_launcher(app: &AppHandle) {
 pub fn parse(accelerator: &str) -> Result<Shortcut> {
     accelerator
         .parse()
-        .map_err(|error| Error::msg(format!("“{accelerator}” is not a valid shortcut: {error}")))
+        .map_err(|error| Error::msg(format!("“{accelerator}” is not a valid shortcut: {error}.")))
+}
+
+/// Read the launcher shortcut. It takes the keys a hotkey can, and also
+/// Shift+Space, as the recorder does (`acceleratorFromEvent`).
+pub fn launcher_keys(accelerator: &str) -> Result<Shortcut> {
+    let keys = parse(accelerator)?;
+    if can_be_hotkey(&keys) || keys == Shortcut::new(Some(Modifiers::SHIFT), Code::Space) {
+        return Ok(keys);
+    }
+    Err(Error::msg(format!(
+        "“{accelerator}” would block typing in every app. The launcher shortcut needs a modifier such as Control or Alt, or a function key."
+    )))
+}
+
+/// Replace a saved launcher shortcut that cannot be one, such as a plain
+/// key in a hand-edited settings.json, with the default, and say why.
+pub fn checked_at_startup(settings: &mut Settings) -> Option<String> {
+    let error = launcher_keys(&settings.shortcut).err()?;
+    settings.shortcut = Settings::default().shortcut;
+    Some(format!(
+        "{error} TinyDash uses {} until you choose other keys in Settings > General.",
+        settings.shortcut
+    ))
 }
 
 /// Whether keys can be a hotkey without blocking typing everywhere: they
@@ -255,5 +279,51 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
 fn turn_on_hotkeys(app: &AppHandle, hotkeys: &Hotkeys) {
     for failure in sync(app, hotkeys) {
         tracing::warn!(id = %failure.id, error = %failure.error, "A hotkey is off");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_launcher_shortcut_takes_only_keys_that_never_block_typing() {
+        for keys in [
+            "Control+Shift+Space",
+            "Alt+Space",
+            "Super+KeyK",
+            "F5",
+            "Shift+F12",
+            "Shift+Space",
+        ] {
+            assert!(launcher_keys(keys).is_ok(), "{keys}");
+        }
+        for keys in ["KeyA", "Shift+KeyA", "Space", "Enter", "Shift+Enter"] {
+            let error = launcher_keys(keys).unwrap_err().to_string();
+            assert!(error.contains("would block typing"), "{keys}: {error}");
+        }
+        assert!(launcher_keys("Alt+Nothing").is_err());
+    }
+
+    #[test]
+    fn a_saved_shortcut_that_blocks_typing_gives_way_to_the_default() {
+        let mut plain = Settings {
+            shortcut: "KeyA".into(),
+            ..Settings::default()
+        };
+        let warning = checked_at_startup(&mut plain).unwrap();
+        assert_eq!(plain.shortcut, Settings::default().shortcut);
+        assert!(
+            warning.starts_with("“KeyA” would block typing")
+                && warning.contains("Control+Shift+Space"),
+            "{warning}"
+        );
+
+        let mut kept = Settings {
+            shortcut: "Shift+Space".into(),
+            ..Settings::default()
+        };
+        assert_eq!(checked_at_startup(&mut kept), None);
+        assert_eq!(kept.shortcut, "Shift+Space");
     }
 }

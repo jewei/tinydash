@@ -224,13 +224,13 @@ pub async fn update_settings(
                 "“{folder}” is not a full folder path. Enter the whole path, or start it with ~ for your home folder, such as ~/Projects."
             )));
         }
-        if new.shortcut != old.shortcut
-            && let Ok(keys) = shortcut::parse(&new.shortcut)
-            && let Some(name) = actions::hotkey_owner(&state.snapshot(), &keys, None)
-        {
-            return Err(Error::msg(format!(
-                "These keys already run {name}. Choose other keys, or remove that hotkey in Settings > Search."
-            )));
+        if new.shortcut != old.shortcut {
+            let keys = shortcut::launcher_keys(&new.shortcut)?;
+            if let Some(name) = actions::hotkey_owner(&state.snapshot(), &keys, None) {
+                return Err(Error::msg(format!(
+                    "These keys already run {name}. Choose other keys, or remove that hotkey in Settings > Search."
+                )));
+            }
         }
         if new.clock_cities != old.clock_cities
             && let Some(city) = new.unknown_clock_city()
