@@ -35,9 +35,9 @@
 //!   shell open after it. The command never goes into a string that another
 //!   parser reads with other quoting rules (see `terminal.rs`). macOS writes
 //!   a script under `data` (zsh, in the app for `.command` files); Windows
-//!   runs PowerShell in a new console; Linux runs `sh` in `$TERMINAL`, or in
-//!   the first terminal it finds, and says to set `$TERMINAL` when it finds
-//!   none.
+//!   runs PowerShell in a new console; Linux writes the command to a file
+//!   under `data` and runs `sh` in `$TERMINAL`, or in the first terminal it
+//!   finds, and says to set `$TERMINAL` when it finds none.
 //! - `notify(app, title, body)`: show a system notification.
 //! - `disk_space(path)`: the [`Volume`] that holds `path`.
 //! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`

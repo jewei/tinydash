@@ -257,32 +257,66 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
 
 /// Run the command in `sh` in the user's terminal, in the home folder, and
 /// keep the user's login shell open after it: `$TERMINAL` when it is set,
-/// else the first known terminal found.
-pub fn run_in_terminal(command: &str, _data: &Path) -> Result<()> {
+/// else the first known terminal found. `sh` reads the command from a
+/// private file under `data`, because a terminal keeps its arguments while
+/// its window is open, and other users can read them.
+pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
+    use super::terminal;
     use std::process::Stdio;
+    let file = terminal::command_file(data, &format!("{command}\n")).map_err(|error| {
+        Error::msg(format!(
+            "TinyDash could not prepare the command for the terminal: {error}"
+        ))
+    })?;
     let preferred = std::env::var("TERMINAL").ok();
-    let (program, arguments) =
-        super::terminal::linux_terminal(preferred.as_deref(), find_program, command).ok_or_else(
-            || {
-                Error::msg(
-                    "TinyDash found no terminal app. Set the TERMINAL environment variable to yours, such as kitty, then restart TinyDash.",
-                )
-            },
-        )?;
-    let mut terminal = std::process::Command::new(&program);
-    terminal
+    let Some((program, arguments)) =
+        terminal::linux_terminal(preferred.as_deref(), find_program, &file)
+    else {
+        std::fs::remove_file(&file).ok();
+        return Err(Error::msg(
+            "TinyDash found no terminal app. Set the TERMINAL environment variable to yours, such as kitty, then restart TinyDash.",
+        ));
+    };
+    let mut launch = std::process::Command::new(&program);
+    launch
         .args(arguments)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     if let Some(home) = std::env::home_dir() {
-        terminal.current_dir(home);
+        launch.current_dir(home);
     }
-    let mut child = terminal
-        .spawn()
-        .map_err(|error| Error::msg(format!("Could not open {}: {error}", program.display())))?;
-    // Reap it when it exits, so no zombie process stays behind.
-    std::thread::spawn(move || child.wait());
+    let environment = std::env::vars_os()
+        .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)));
+    for (name, value) in terminal::outside_appimage(environment) {
+        match value {
+            Some(value) => launch.env(name, value),
+            None => launch.env_remove(name),
+        };
+    }
+    let mut child = match launch.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            std::fs::remove_file(&file).ok();
+            return Err(Error::msg(format!(
+                "Could not open {}: {error}",
+                program.display()
+            )));
+        }
+    };
+    // Reap it when it exits, so no zombie process stays behind. Its output
+    // is discarded (see `open_trash`), so a terminal that fails at once,
+    // such as one that cannot open a window, leaves only this log entry.
+    // `sh` deletes the command file when it starts; after a failure, this
+    // does.
+    std::thread::spawn(move || match child.wait() {
+        Ok(status) if status.success() => {}
+        Ok(status) => {
+            std::fs::remove_file(&file).ok();
+            tracing::warn!(%status, terminal = %program.display(), "The terminal ended with an error");
+        }
+        Err(error) => tracing::warn!(%error, "Could not wait for the terminal"),
+    });
     Ok(())
 }
 
