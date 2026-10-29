@@ -117,6 +117,8 @@ fn app_name(path: &Path) -> Option<String> {
     (is_app && !name.to_lowercase().starts_with("uninstall")).then_some(name)
 }
 
+pub fn prepare_process() {}
+
 pub fn prepare_app(app: &mut tauri::App) {
     if let Err(error) = app.handle().plugin(tauri_plugin_notification::init()) {
         tracing::warn!(%error, "Notifications are unavailable");

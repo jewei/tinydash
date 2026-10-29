@@ -129,6 +129,18 @@ fn executable_alias(executable: &Path) -> Option<String> {
     (!LAUNCHER_WRAPPERS.contains(&name.as_ref())).then(|| name.into_owned())
 }
 
+/// Turn on Xlib's locks before GTK opens its display, as Firefox and
+/// Chromium do. Xlib keeps some state for the whole process, and GTK, tao's
+/// device thread, and snippet expansion call it on threads of their own.
+/// libX11 1.8 and later turn the locks on by themselves.
+pub fn prepare_process() {
+    if let Ok(xlib) = Xlib::open() {
+        // SAFETY: Takes no arguments, and runs on the main thread before
+        // any other Xlib call.
+        unsafe { (xlib.XInitThreads)() };
+    }
+}
+
 pub fn prepare_app(app: &mut tauri::App) {
     if let Err(error) = app.handle().plugin(tauri_plugin_notification::init()) {
         tracing::warn!(%error, "Notifications are unavailable");
@@ -898,7 +910,13 @@ fn type_pieces(
             Some(Piece::Text(units)) => {
                 // `pieces` leaves NUL out, so this does not fail.
                 let text = CString::new(String::from_utf16_lossy(&units)).map_err(|_| failed())?;
-                // SAFETY: As above; `text` is a C string.
+                // SAFETY: As above; `text` is a C string. libxdo also calls
+                // setlocale(LC_CTYPE, "") here, which XInitThreads does not
+                // make safe: a thread that reads the locale name at that
+                // moment, as Xlib does when a connection first turns a key
+                // into text, may read the freed old name. Xlib reads it once
+                // per connection, and the window is a few instructions wide,
+                // so this is accepted.
                 let status =
                     unsafe { xdo_enter_text_window(xdo, CURRENT_WINDOW, text.as_ptr(), KEY_DELAY) };
                 if status != 0 {

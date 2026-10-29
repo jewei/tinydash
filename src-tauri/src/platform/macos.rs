@@ -301,6 +301,8 @@ fn describe(bundle_id: Option<&str>, category: Option<&str>) -> Option<&'static 
     })
 }
 
+pub fn prepare_process() {}
+
 pub fn prepare_app(app: &mut tauri::App) {
     // A launcher lives in the menu bar, not the Dock.
     app.set_activation_policy(tauri::ActivationPolicy::Accessory);

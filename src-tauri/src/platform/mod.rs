@@ -7,6 +7,10 @@
 //!   file index lists such a folder but not its contents.
 //! - `RECURSIVE_WATCH`: whether watching a folder also watches its subfolders.
 //! - `TEMPLATE_TRAY_ICON`: the OS tints a black tray icon (macOS menu bar).
+//! - `prepare_process()`: setup that must come before Tauri starts. On
+//!   Linux, it makes Xlib safe to call from several threads, which libX11
+//!   before 1.8 is not on its own: GTK, tao, and snippet expansion each use
+//!   Xlib on a thread of their own.
 //! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy
 //!   or the notification plugin.
 //! - `is_reopen(event)`: the user opened the running app again, and the OS

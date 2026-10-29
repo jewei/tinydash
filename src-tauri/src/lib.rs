@@ -57,6 +57,8 @@ pub fn run() {
         )
         .init();
 
+    // Before Tauri starts GTK, which opens the X display on Linux.
+    platform::prepare_process();
     tauri::Builder::default()
         // Must be first: a second process hands over its arguments and exits.
         .plugin(tauri_plugin_single_instance::init(
