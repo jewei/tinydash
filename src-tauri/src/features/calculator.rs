@@ -173,13 +173,15 @@ fn needs_rates(query: &str) -> bool {
     if !query.chars().any(|c| c.is_ascii_digit()) {
         return false;
     }
+    let Some(input) = fend_input(query) else {
+        return false;
+    };
     let asked = Arc::new(AtomicBool::new(false));
     let mut context = fend_core::Context::new();
     context.disable_rng();
     context.set_exchange_rate_handler_v2(Probe {
         asked: asked.clone(),
     });
-    let input = fend_input(query);
     let deadline = Deadline(Instant::now() + TIME_LIMIT);
     let _ = fend_core::evaluate_preview_with_interrupt(&input, &context, &deadline);
     asked.load(Ordering::Relaxed)
@@ -193,6 +195,7 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if datetime::is_date_or_clock(query) {
         return None;
     }
+    let input = fend_input(query)?;
     let mut context = fend_core::Context::new();
     context.disable_rng();
     // fend matches units case-insensitively and reads `Bps` as bits. Define
@@ -211,7 +214,6 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
         });
     }
     let deadline = Deadline(Instant::now() + TIME_LIMIT);
-    let input = fend_input(query);
     let result = fend_core::evaluate_preview_with_interrupt(&input, &context, &deadline);
     let is_number = result
         .get_main_result_spans()
@@ -289,14 +291,16 @@ fn currency_shorthand(query: &str) -> Option<String> {
         .then(|| format!("{amount} {from} to {to}"))
 }
 
-/// The query in fend's syntax.
-fn fend_input(query: &str) -> String {
+/// The query in fend's syntax, or `None` when fend would read a percentage
+/// in it wrongly.
+fn fend_input(query: &str) -> Option<String> {
     if let Some(input) = currency_shorthand(query) {
-        return input;
+        return Some(input);
     }
     let input = euro_amounts(query);
     let input = word_operators(&input);
-    percentage(&input).unwrap_or_else(|| input.into_owned())
+    let input = percentage(&input).unwrap_or_else(|| input.into_owned());
+    (!adds_bare_percentage(&input)).then_some(input)
 }
 
 /// `€20` as `20 EUR`: fend reads `$20` and `£20`, but not `€20`.
@@ -325,7 +329,8 @@ fn euro_amounts(query: &str) -> Cow<'_, str> {
     Cow::Owned(input)
 }
 
-/// `plus`, `minus`, `times`, `multiplied by`, and `divided by` as signs.
+/// `plus`, `minus`, `times`, `multiplied by`, and `divided by` as signs, and
+/// `percent` as `%`.
 fn word_operators(query: &str) -> Cow<'_, str> {
     let words: Vec<&str> = query.split_whitespace().collect();
     let is = |i: usize, word: &str| words.get(i).is_some_and(|w| w.eq_ignore_ascii_case(word));
@@ -343,6 +348,12 @@ fn word_operators(query: &str) -> Cow<'_, str> {
             ("*", 2)
         } else if is(i, "divided") && is(i + 1, "by") {
             ("/", 2)
+        } else if is(i, "percent") {
+            ("%", 1)
+        } else if let Some(number) = strip_suffix(words[i], "percent").filter(|n| is_number(n)) {
+            // `20percent`
+            input.push(number);
+            ("%", 1)
         } else {
             (words[i], 0)
         };
@@ -407,7 +418,12 @@ fn percentage(query: &str) -> Option<String> {
             return Some(format!("({value}) * ({factor}({percent}) / 100)"));
         }
     }
-    // `$30 + 20%` adds 20% of $30. `10% + 20%` stays a sum of percentages.
+    added_percentage(query)
+}
+
+/// `$30 + 20%` adds 20% of $30, and `200 - 10% - 5%` takes 5% off 180.
+/// `10% + 20%` stays a sum of percentages.
+fn added_percentage(query: &str) -> Option<String> {
     let left = query.strip_suffix('%')?;
     let at = left.rfind(['+', '-'])?;
     let (value, percent) = (left[..at].trim(), left[at + 1..].trim());
@@ -418,13 +434,70 @@ fn percentage(query: &str) -> Option<String> {
     // `5 * -10%` is a negative percentage, not a subtraction.
     if exponent
         || value.is_empty()
-        || value.ends_with(['%', '+', '-', '*', '/', '^', '('])
+        || value.ends_with(['+', '-', '*', '/', '^', '('])
         || !is_number(percent)
     {
         return None;
     }
+    let value = if value.ends_with('%') {
+        added_percentage(value)?
+    } else {
+        value.to_owned()
+    };
     let sign = &left[at..=at];
     Some(format!("({value}) * (1 {sign} ({percent}) / 100)"))
+}
+
+/// Whether fend would add a percentage in `input` to a number as a
+/// hundredth, as in `100 + 10% + 5`: `percentage` rewrites only the ones that
+/// end the calculation. A sum of percentages, such as `10% + 20%`, is right.
+fn adds_bare_percentage(input: &str) -> bool {
+    input.match_indices('%').any(|(at, _)| {
+        // `10 % 3` is a remainder.
+        let next = input[at + 1..].trim_start();
+        if next.starts_with(|c: char| c.is_ascii_digit() || matches!(c, '.' | '(')) {
+            return false;
+        }
+        let Some(left) = before_percentage(&input[..=at]).and_then(added_to) else {
+            return false;
+        };
+        let sum_of_percentages = before_percentage(left).is_some_and(|before| {
+            let before = before.trim_end();
+            before.is_empty() || before.ends_with(['(', '+', '-'])
+        });
+        !sum_of_percentages
+    })
+}
+
+/// The text before the percentage, such as `10%` or `1e-2 %`, that ends
+/// `text`.
+fn before_percentage(text: &str) -> Option<&str> {
+    let number = text.strip_suffix('%')?.trim_end();
+    let digit = |c: char| c.is_ascii_digit() || matches!(c, '.' | ',');
+    let mut rest = number.trim_end_matches(digit);
+    // In `1e-2`, the sign belongs to the exponent.
+    if let Some(mantissa) = rest
+        .strip_suffix(['+', '-'])
+        .unwrap_or(rest)
+        .strip_suffix(['e', 'E'])
+        && mantissa.ends_with(|c: char| c.is_ascii_digit())
+    {
+        rest = mantissa.trim_end_matches(digit);
+    }
+    number[rest.len()..]
+        .contains(|c: char| c.is_ascii_digit())
+        .then_some(rest)
+}
+
+/// What the `+` or `-` that ends `text` adds to: `100` in `100 + `. In
+/// `5 * -`, the sign belongs to the number after it.
+fn added_to(text: &str) -> Option<&str> {
+    let left = text.trim_end().strip_suffix(['+', '-'])?;
+    // `10 - -5%` subtracts too.
+    let operand = left.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '+' | '-'));
+    operand
+        .ends_with(|c: char| c.is_alphanumeric() || matches!(c, ')' | '%' | '!'))
+        .then_some(operand)
 }
 
 /// The text before `suffix`, matched in any case, when some is left.
@@ -655,7 +728,6 @@ mod tests {
         }
         assert_eq!(value("10% of what"), None);
         assert_eq!(value("2e-3%").as_deref(), Some("0.002%"));
-        assert_eq!(value("5 - 1e-2%").as_deref(), Some("4.9999"));
         // Not a char boundary where a suffix would start.
         assert_eq!(value("2 Äpfel"), None);
         assert_eq!(value("5 €€"), None);
@@ -670,6 +742,35 @@ mod tests {
             assert_eq!(value, expected, "{query}");
         }
         assert!(rates_off_answer("$30 + 20%").is_some());
+    }
+
+    #[test]
+    fn takes_percentages_in_turn_or_gives_no_answer() {
+        for (query, expected) in [
+            ("200 - 10% - 5%", "171"),
+            ("100 + 10% + 20%", "132"),
+            ("10% + 20% + 30%", "60%"),
+            ("(10% + 20%) * 2", "60%"),
+            ("5 + 10 % 3", "6"),
+            ("30 plus 20 percent", "36"),
+            ("30 + 20Percent", "36"),
+            ("20 is what percent of 200", "10%"),
+        ] {
+            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
+        }
+        // fend would add each percentage as a hundredth: 100 + 0.1 + 5.
+        for query in [
+            "100 + 10% + 5",
+            "(100 + 10%) * 2",
+            "round(200 - 10%)",
+            "5 - 1e-2%",
+            "10 - -5%",
+            "100 * 10% + 20%",
+            "5 + 10% to fraction",
+        ] {
+            assert_eq!(value(query), None, "{query}");
+        }
+        assert!(rates_off_answer("$30 + 20% + 5").is_none());
     }
 
     #[test]

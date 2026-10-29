@@ -15,6 +15,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
 
+### Fixed
+
+- The calculator no longer adds a percentage as a hundredth: `100 + 10% + 5` and `(100 + 10%) * 2` now give no answer instead of 105.1 and 200.2. `200 - 10% - 5%` gives 171, and `20 percent` works like `20%`.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added
