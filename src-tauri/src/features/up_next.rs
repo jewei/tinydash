@@ -271,12 +271,15 @@ impl Subject {
         }
     }
 
-    /// Where System Settings lists TinyDash for them.
+    /// Where the privacy settings list TinyDash for them. macOS 12 calls
+    /// those settings System Preferences > Security & Privacy, and later
+    /// versions System Settings > Privacy & Security, so the text names
+    /// neither path.
     fn place(self) -> &'static str {
         match self {
-            Self::Calendars => " > Calendars",
-            Self::Reminders => " > Reminders",
-            Self::Both => ", under Calendars and under Reminders",
+            Self::Calendars => "under Calendars",
+            Self::Reminders => "under Reminders",
+            Self::Both => "under Calendars and under Reminders",
         }
     }
 }
@@ -302,7 +305,7 @@ fn message(problem: &Unreadable, subject: Subject) -> String {
     match problem {
         Unreadable::NotAsked => format!("TinyDash needs your permission to read your {what}."),
         Unreadable::Denied => format!(
-            "TinyDash cannot read your {what}. Allow TinyDash in System Settings > Privacy & Security{}.",
+            "TinyDash cannot read your {what}. In the privacy settings of macOS, allow TinyDash {}.",
             subject.place()
         ),
         Unreadable::Restricted => {
@@ -593,7 +596,7 @@ mod tests {
         assert_eq!(
             both_denied.problems,
             [
-                "TinyDash cannot read your calendars and reminders. Allow TinyDash in System Settings > Privacy & Security, under Calendars and under Reminders."
+                "TinyDash cannot read your calendars and reminders. In the privacy settings of macOS, allow TinyDash under Calendars and under Reminders."
             ]
         );
         assert!(both_denied.ask.is_none() && both_denied.items.is_empty());
@@ -609,7 +612,7 @@ mod tests {
         assert_eq!(
             mixed.problems,
             [
-                "TinyDash cannot read your reminders. Allow TinyDash in System Settings > Privacy & Security > Reminders."
+                "TinyDash cannot read your reminders. In the privacy settings of macOS, allow TinyDash under Reminders."
             ]
         );
 
