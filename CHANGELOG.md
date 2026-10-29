@@ -10,6 +10,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - The calculator reads `plus`, `minus`, `times`, `multiplied by`, and `divided by`, and amounts such as `€20`.
 - Date answers read phrases such as `3 days from now`, `a week ago`, `2 weeks after dec 25`, and dates with month names, such as `25 dec` or `December 25, 2026`.
 - Count days with `days until dec 25`, `days since 2026-01-01`, and `days between 3 mar and 30 may`.
+- Type `;` and a snippet's keyword in any app, such as `;sig`, to replace it with the snippet. Turn it on in Settings > Snippets. To see the keyword, TinyDash reads what you type in other apps; it keeps only the last 64 characters, in memory, and never saves or sends them. On macOS it needs Accessibility and Input Monitoring; on Linux it needs X11.
 
 ### Changed
 
