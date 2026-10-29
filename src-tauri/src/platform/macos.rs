@@ -1,10 +1,16 @@
 use std::{
+    cell::{OnceCell, RefCell},
+    ffi::{c_ulong, c_void},
     path::{Path, PathBuf},
     process::Command,
+    ptr::NonNull,
     sync::{
-        Mutex,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc,
     },
+    thread::JoinHandle,
+    time::Duration,
 };
 
 use objc2::{
@@ -16,6 +22,12 @@ use objc2_app_kit::{
     NSCompositingOperation, NSDeviceRGBColorSpace, NSGraphicsContext, NSImageInterpolation,
     NSPasteboard, NSPasteboardTypeTIFF, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
     NSWorkspace,
+};
+use objc2_core_foundation::{CFMachPort, CFRetained, CFRunLoop, kCFRunLoopCommonModes};
+use objc2_core_graphics::{
+    CGEvent, CGEventField, CGEventFlags, CGEventSource, CGEventSourceStateID, CGEventTapLocation,
+    CGEventTapOptions, CGEventTapPlacement, CGEventTapProxy, CGEventType,
+    CGPreflightListenEventAccess, CGRequestListenEventAccess,
 };
 use objc2_foundation::{
     NSArray, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
@@ -29,6 +41,7 @@ use crate::{
     features::{
         apps::App,
         clipboard::{Content, pixels_fit},
+        expansion::{self, Key, Piece},
         system::SystemCommand,
     },
     settings::LauncherPosition,
@@ -890,8 +903,360 @@ pub fn restore_frontmost_app() {
     }
 }
 
+/// Marks the key events TinyDash types ("TDSH"), so its own tap skips them.
+const OWN_EVENTS: i64 = 0x5444_5348;
+/// Virtual key codes from `<HIToolbox/Events.h>`: `kVK_Delete` is Backspace.
+const BACKSPACE_KEY: u16 = 0x33;
+const RETURN_KEY: u16 = 0x24;
+/// `CGEventKeyboardSetUnicodeString` types at most 20 UTF-16 units an event.
+const MAX_UNITS_PER_EVENT: usize = 20;
+/// A pause after each typed key, so a busy app does not drop keys.
+const KEY_GAP: Duration = Duration::from_millis(1);
+
+#[link(name = "ApplicationServices", kind = "framework")]
+unsafe extern "C" {
+    fn AXIsProcessTrustedWithOptions(options: *const c_void) -> bool;
+    static kAXTrustedCheckOptionPrompt: &'static NSString;
+}
+
+pub fn typing_unavailable() -> Option<&'static str> {
+    None
+}
+
+/// Reading keys needs Input Monitoring, and typing needs Accessibility.
+pub fn typing_access(ask: bool) -> Result<()> {
+    let accessibility = accessibility_trusted(ask);
+    let mut input_monitoring = CGPreflightListenEventAccess();
+    if !input_monitoring && ask {
+        input_monitoring = CGRequestListenEventAccess();
+    }
+    missing_access(accessibility, input_monitoring)
+        .map_or(Ok(()), |message| Err(Error::msg(message)))
+}
+
+fn missing_access(accessibility: bool, input_monitoring: bool) -> Option<String> {
+    let missing = match (accessibility, input_monitoring) {
+        (true, true) => return None,
+        (false, true) => "Accessibility",
+        (true, false) => "Input Monitoring",
+        (false, false) => "Accessibility and Input Monitoring",
+    };
+    Some(format!(
+        "Allow TinyDash under {missing} in System Settings > Privacy & Security."
+    ))
+}
+
+/// Whether TinyDash may send keys. `ask` shows the macOS prompt that leads
+/// to System Settings when it may not.
+fn accessibility_trusted(ask: bool) -> bool {
+    autoreleasepool(|_| {
+        // SAFETY: The framework defines the key as a constant string that
+        // lives for the whole process.
+        let prompt = unsafe { kAXTrustedCheckOptionPrompt };
+        let options = NSDictionary::from_slices(&[prompt], &[&*NSNumber::new_bool(ask)]);
+        // SAFETY: An NSDictionary is a CFDictionary, and it outlives the call.
+        unsafe { AXIsProcessTrustedWithOptions(Retained::as_ptr(&options).cast()) }
+    })
+}
+
+/// Reads keys with an event tap on a thread that runs its own run loop.
+pub struct TypingWatch {
+    run_loop: TapRunLoop,
+    stopped: Arc<AtomicBool>,
+    thread: JoinHandle<()>,
+}
+
+/// The tap thread's run loop, kept only to stop it.
+struct TapRunLoop(CFRetained<CFRunLoop>);
+
+// SAFETY: `CFRunLoopStop` may be called from any thread, and this handle
+// is used for nothing else.
+unsafe impl Send for TapRunLoop {}
+
+impl TypingWatch {
+    pub fn stop(self) {
+        self.stopped.store(true, Ordering::Release);
+        // A stop that comes before the loop runs is lost, so repeat it
+        // until the thread ends.
+        while !self.thread.is_finished() {
+            self.run_loop.0.stop();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if self.thread.join().is_err() {
+            tracing::warn!("The key watch ended with a panic");
+        }
+    }
+}
+
+/// What the tap callback works with, on the tap thread only.
+struct Tap {
+    /// The tap itself, to turn it on again after macOS turns it off.
+    port: OnceCell<CFRetained<CFMachPort>>,
+    on_key: RefCell<Box<dyn FnMut(Key)>>,
+    /// The app that got the latest key; a key in another app starts afresh.
+    front_app: RefCell<Option<Retained<NSRunningApplication>>>,
+}
+
+pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWatch> {
+    let (ready, started) = mpsc::channel();
+    let stopped = Arc::new(AtomicBool::new(false));
+    let thread = std::thread::Builder::new()
+        .name("key-watch".into())
+        .spawn({
+            let stopped = Arc::clone(&stopped);
+            move || run_tap(Box::new(on_key), &stopped, &ready)
+        })?;
+    match started.recv() {
+        Ok(Ok(run_loop)) => Ok(TypingWatch {
+            run_loop,
+            stopped,
+            thread,
+        }),
+        Ok(Err(error)) => {
+            let _ = thread.join();
+            Err(error)
+        }
+        Err(_) => {
+            let _ = thread.join();
+            Err(Error::msg("Could not start reading keys."))
+        }
+    }
+}
+
+fn run_tap(
+    on_key: Box<dyn FnMut(Key)>,
+    stopped: &AtomicBool,
+    ready: &mpsc::Sender<Result<TapRunLoop>>,
+) {
+    let tap = Box::new(Tap {
+        port: OnceCell::new(),
+        on_key: RefCell::new(on_key),
+        front_app: RefCell::new(None),
+    });
+    let mask = [
+        CGEventType::KeyDown,
+        CGEventType::LeftMouseDown,
+        CGEventType::RightMouseDown,
+        CGEventType::OtherMouseDown,
+    ]
+    .iter()
+    .fold(0, |mask, kind| mask | 1 << kind.0);
+    // SAFETY: `on_tap_event` has the callback's type, and `tap` outlives
+    // the port, which is invalidated before `tap` drops.
+    let port = unsafe {
+        CGEvent::tap_create(
+            CGEventTapLocation::SessionEventTap,
+            CGEventTapPlacement::HeadInsertEventTap,
+            CGEventTapOptions::ListenOnly,
+            mask,
+            Some(on_tap_event),
+            std::ptr::from_ref::<Tap>(&tap).cast_mut().cast(),
+        )
+    };
+    let Some(port) = port else {
+        let _ = ready.send(Err(Error::msg(
+            "macOS did not let TinyDash read keys. Allow TinyDash under Input Monitoring in System Settings > Privacy & Security.",
+        )));
+        return;
+    };
+    let source = CFMachPort::new_run_loop_source(None, Some(&port), 0);
+    let (Some(source), Some(run_loop)) = (source, CFRunLoop::current()) else {
+        port.invalidate();
+        let _ = ready.send(Err(Error::msg("Could not start reading keys.")));
+        return;
+    };
+    // SAFETY: CoreFoundation sets the mode constant up before any code runs.
+    run_loop.add_source(Some(&source), unsafe { kCFRunLoopCommonModes });
+    CGEvent::tap_enable(&port, true);
+    let port = tap.port.get_or_init(|| port);
+    if ready.send(Ok(TapRunLoop(run_loop.clone()))).is_ok() {
+        // macOS invalidates the tap when access is taken away; the loop
+        // would then return at once, so the thread ends instead.
+        while !stopped.load(Ordering::Acquire) && port.is_valid() && source.is_valid() {
+            CFRunLoop::run();
+        }
+    }
+    CGEvent::tap_enable(port, false);
+    port.invalidate();
+    source.invalidate();
+}
+
+/// The tap callback. A listen-only tap returns the event unchanged.
+unsafe extern "C-unwind" fn on_tap_event(
+    _proxy: CGEventTapProxy,
+    kind: CGEventType,
+    event: NonNull<CGEvent>,
+    tap: *mut c_void,
+) -> *mut CGEvent {
+    // SAFETY: `tap` is the `Tap` that `run_tap` passed; it lives until the
+    // port is invalidated, and only the tap thread uses it.
+    let tap = unsafe { &*tap.cast::<Tap>() };
+    // SAFETY: macOS passes an event that is valid during the call.
+    read_tap_event(tap, kind, unsafe { event.as_ref() });
+    event.as_ptr()
+}
+
+fn read_tap_event(tap: &Tap, kind: CGEventType, event: &CGEvent) {
+    let send = |key| {
+        if let Ok(mut on_key) = tap.on_key.try_borrow_mut() {
+            on_key(key);
+        }
+    };
+    match kind {
+        CGEventType::KeyDown => {
+            let field = |field| CGEvent::integer_value_field(Some(event), field);
+            if field(CGEventField::EventSourceUserData) == OWN_EVENTS {
+                return;
+            }
+            let front_app =
+                autoreleasepool(|_| NSWorkspace::sharedWorkspace().frontmostApplication());
+            if tap.front_app.replace(front_app.clone()) != front_app {
+                send(Key::Reset);
+            }
+            let mut units = [0; 8];
+            let mut length: c_ulong = 0;
+            // SAFETY: Both pointers are valid, and the buffer holds the
+            // length passed.
+            unsafe {
+                CGEvent::keyboard_get_unicode_string(
+                    Some(event),
+                    units.len() as c_ulong,
+                    &mut length,
+                    units.as_mut_ptr(),
+                );
+            }
+            let typed = &units[..units.len().min(length as usize)];
+            let keycode = field(CGEventField::KeyboardEventKeycode);
+            for key in keys_for(keycode, CGEvent::flags(Some(event)), typed) {
+                send(key);
+            }
+        }
+        // macOS turns off a tap that took too long; keys missed meanwhile
+        // are unknown.
+        CGEventType::TapDisabledByTimeout => {
+            if let Some(port) = tap.port.get() {
+                CGEvent::tap_enable(port, true);
+            }
+            send(Key::Reset);
+        }
+        // A click, or the tap turned off for another reason.
+        _ => send(Key::Reset),
+    }
+}
+
+/// The keys for a key press: a reset for a shortcut (Command, Control, or
+/// Option held), Backspace, or what the key typed.
+fn keys_for(keycode: i64, flags: CGEventFlags, typed: &[u16]) -> Vec<Key> {
+    let shortcut =
+        CGEventFlags::MaskCommand | CGEventFlags::MaskControl | CGEventFlags::MaskAlternate;
+    if flags.intersects(shortcut) {
+        vec![Key::Reset]
+    } else if keycode == i64::from(BACKSPACE_KEY) {
+        vec![Key::Backspace]
+    } else {
+        expansion::keys_for(typed)
+    }
+}
+
+/// Types with key events posted at the system level, which reach the app in
+/// front. Each carries [`OWN_EVENTS`], so the tap skips it.
+pub fn type_text(erase: usize, text: &str) -> Result<()> {
+    let source = CGEventSource::new(CGEventSourceStateID::Private)
+        .ok_or_else(|| Error::msg("Could not type the snippet."))?;
+    CGEventSource::set_user_data(Some(&source), OWN_EVENTS);
+    // Keys the user presses meanwhile still arrive.
+    CGEventSource::set_local_events_suppression_interval(Some(&source), 0.0);
+    for _ in 0..erase {
+        press(&source, BACKSPACE_KEY, &[])?;
+    }
+    for piece in expansion::pieces(text, MAX_UNITS_PER_EVENT) {
+        match piece {
+            Piece::Return => press(&source, RETURN_KEY, &[])?,
+            // The key code does not matter once the event carries text.
+            Piece::Text(units) => press(&source, 0, &units)?,
+        }
+    }
+    Ok(())
+}
+
+/// Press and release a key, typing `text` (at most 20 UTF-16 units) when
+/// there is any.
+fn press(source: &CGEventSource, keycode: u16, text: &[u16]) -> Result<()> {
+    for down in [true, false] {
+        let event = CGEvent::new_keyboard_event(Some(source), keycode, down)
+            .ok_or_else(|| Error::msg("Could not type the snippet."))?;
+        CGEvent::set_integer_value_field(
+            Some(&event),
+            CGEventField::EventSourceUserData,
+            OWN_EVENTS,
+        );
+        // Without the modifiers the user may still hold, such as Shift.
+        CGEvent::set_flags(Some(&event), CGEventFlags::empty());
+        if !text.is_empty() {
+            // SAFETY: The pointer and length describe `text`.
+            unsafe {
+                CGEvent::keyboard_set_unicode_string(
+                    Some(&event),
+                    text.len() as c_ulong,
+                    text.as_ptr(),
+                );
+            }
+        }
+        CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&event));
+    }
+    std::thread::sleep(KEY_GAP);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn says_which_access_is_missing() {
+        use super::missing_access;
+        assert_eq!(missing_access(true, true), None);
+        let message = |accessibility, input| missing_access(accessibility, input).unwrap();
+        assert_eq!(
+            message(false, false),
+            "Allow TinyDash under Accessibility and Input Monitoring in System Settings > Privacy & Security."
+        );
+        assert!(message(false, true).contains("under Accessibility in"));
+        assert!(message(true, false).contains("under Input Monitoring in"));
+    }
+
+    #[test]
+    fn reads_key_presses() {
+        use super::{BACKSPACE_KEY, keys_for};
+        use crate::features::expansion::Key;
+        use objc2_core_graphics::CGEventFlags;
+        let none = CGEventFlags::empty();
+        let utf16 = |text: &str| text.encode_utf16().collect::<Vec<u16>>();
+        let backspace = i64::from(BACKSPACE_KEY);
+        // kVK_ANSI_S, without and with Shift.
+        assert_eq!(keys_for(1, none, &utf16("s")), [Key::Char('s')]);
+        assert_eq!(
+            keys_for(1, CGEventFlags::MaskShift, &utf16("S")),
+            [Key::Char('S')]
+        );
+        assert_eq!(keys_for(backspace, none, &utf16("\u{8}")), [Key::Backspace]);
+        // Shortcuts, and Option+Backspace, which deletes a word.
+        for flags in [
+            CGEventFlags::MaskCommand,
+            CGEventFlags::MaskControl,
+            CGEventFlags::MaskAlternate,
+        ] {
+            assert_eq!(keys_for(1, flags, &utf16("s")), [Key::Reset]);
+            assert_eq!(keys_for(backspace, flags, &[]), [Key::Reset]);
+        }
+        // Arrows carry the Fn flag on Mac keyboards, and still reset.
+        assert_eq!(
+            keys_for(0x7B, CGEventFlags::MaskSecondaryFn, &utf16("\u{F702}")),
+            [Key::Reset]
+        );
+        // Return and Escape.
+        assert_eq!(keys_for(0x24, none, &utf16("\r")), [Key::Reset]);
+        assert_eq!(keys_for(0x35, none, &utf16("\u{1b}")), [Key::Reset]);
+    }
+
     #[test]
     fn decodes_a_tiff_that_fits() {
         let mut tiff = Vec::new();

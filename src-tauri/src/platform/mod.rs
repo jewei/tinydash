@@ -66,6 +66,26 @@
 //! - `launcher_position(window)`: where the launcher is now, in the units
 //!   `place_launcher` takes.
 //! - `remember_frontmost_app()` / `restore_frontmost_app()`: return focus after Escape.
+//!
+//! Snippet expansion as you type (`expander.rs`):
+//!
+//! - `typing_unavailable()`: why snippets cannot expand in this session (a
+//!   Wayland session on Linux), or `None`.
+//! - `typing_access(ask)`: `Ok` when TinyDash may read and send keys, else
+//!   an error that says what to allow. On macOS that is Accessibility and
+//!   Input Monitoring; `ask` shows the macOS prompts for what is missing.
+//! - `watch_typing(on_key)`: read the keys typed in every app on a thread of
+//!   its own, and pass each to `on_key` on that thread as
+//!   [`Key`](crate::features::expansion::Key)s: Backspace, the characters a
+//!   key typed, or a reset (a key pressed with Command, Control, Alt, or
+//!   Windows; Return, Tab, Escape, arrows, Home, End, Page Up or Down; a dead
+//!   key; a click; another app or window in front). A modifier key alone
+//!   passes nothing. Keys that TinyDash types never reach `on_key`. Keep
+//!   `on_key` quick: on Windows, typing waits for it. `TypingWatch::stop()`
+//!   ends the thread and drops `on_key`. Never log what it reads.
+//! - `type_text(erase, text)`: press Backspace `erase` times, then type
+//!   `text` into the app in front, with Return for each line break. It never
+//!   uses the clipboard. Call it on a thread other than the watch thread.
 
 #[cfg(target_os = "linux")]
 mod linux;

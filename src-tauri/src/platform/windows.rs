@@ -1,6 +1,13 @@
-use std::path::{Path, PathBuf};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+    sync::mpsc,
+    thread::JoinHandle,
+    time::Duration,
+};
 
 use windows_sys::Win32::{
+    Foundation::{HWND, LPARAM, LRESULT, WPARAM},
     Graphics::Dwm::{DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute},
     Storage::FileSystem::{FILE_ATTRIBUTE_HIDDEN, GetDiskFreeSpaceExW},
     System::{
@@ -8,16 +15,30 @@ use windows_sys::Win32::{
             CloseClipboard, GetClipboardData, GetClipboardSequenceNumber,
             IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW,
         },
+        LibraryLoader::GetModuleHandleW,
         Memory::{GlobalLock, GlobalSize, GlobalUnlock},
         Power::SetSuspendState,
         Registry::{HKEY_CURRENT_USER, REG_DWORD, RRF_RT_REG_DWORD, RegGetValueW, RegSetKeyValueW},
         Shutdown::LockWorkStation,
+        Threading::GetCurrentThreadId,
     },
     UI::{
+        Input::KeyboardAndMouse::{
+            GetAsyncKeyState, GetKeyState, GetKeyboardLayout, INPUT, INPUT_0, INPUT_KEYBOARD,
+            KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, SendInput, ToUnicodeEx, VIRTUAL_KEY,
+            VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_HOME,
+            VK_INSERT, VK_LCONTROL, VK_LEFT, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_NEXT,
+            VK_NUMLOCK, VK_PRIOR, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN,
+            VK_SCROLL, VK_SHIFT, VK_TAB, VK_UP,
+        },
         Shell::{SHERB_NOCONFIRMATION, SHERB_NOPROGRESSUI, SHERB_NOSOUND, SHEmptyRecycleBinW},
         WindowsAndMessaging::{
-            HWND_BROADCAST, PostMessageW, SC_MONITORPOWER, SMTO_ABORTIFHUNG, SendMessageTimeoutW,
-            WM_SETTINGCHANGE, WM_SYSCOMMAND,
+            CallNextHookEx, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId, HC_ACTION,
+            HWND_BROADCAST, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG, PostMessageW, PostThreadMessageW,
+            SC_MONITORPOWER, SMTO_ABORTIFHUNG, SendMessageTimeoutW, SetWindowsHookExW,
+            UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_LBUTTONDOWN,
+            WM_MBUTTONDOWN, WM_QUIT, WM_RBUTTONDOWN, WM_SETTINGCHANGE, WM_SYSCOMMAND,
+            WM_SYSKEYDOWN, WM_XBUTTONDOWN,
         },
     },
 };
@@ -28,6 +49,7 @@ use crate::{
     features::{
         apps::App,
         clipboard::{Content, pixels_fit},
+        expansion::{self, Key, Piece},
         system::SystemCommand,
     },
 };
@@ -560,9 +582,394 @@ pub fn remember_frontmost_app() {}
 
 pub fn restore_frontmost_app() {}
 
+/// `ToUnicodeEx` flag: leave the keyboard state as it is, so reading a dead
+/// key does not use it up before the app gets it (Windows 10 1607 and later).
+const KEEP_KEYBOARD_STATE: u32 = 0x4;
+/// Marks the input TinyDash sends ("TDSH").
+const OWN_INPUT: usize = 0x5444_5348;
+/// Keys sent in one `SendInput` call, with a pause after each call, so the
+/// app in front keeps up.
+const INPUT_BATCH: usize = 64;
+const BATCH_GAP: Duration = Duration::from_millis(5);
+
+pub fn typing_unavailable() -> Option<&'static str> {
+    None
+}
+
+/// Windows asks for no permission to read or send keys.
+pub fn typing_access(_ask: bool) -> Result<()> {
+    Ok(())
+}
+
+/// Reads keys with low-level keyboard and mouse hooks, on a thread that
+/// runs a message loop.
+pub struct TypingWatch {
+    thread_id: u32,
+    thread: JoinHandle<()>,
+}
+
+impl TypingWatch {
+    pub fn stop(self) {
+        // SAFETY: The message carries no pointers, and the thread has a
+        // message queue, as it set its hooks before it sent its ID.
+        unsafe { PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0) };
+        if self.thread.join().is_err() {
+            tracing::warn!("The key watch ended with a panic");
+        }
+    }
+}
+
+/// What the hooks work with, on the hook thread only.
+struct Watcher {
+    on_key: Box<dyn FnMut(Key)>,
+    /// The window that got the latest key; a key in another starts afresh.
+    foreground: HWND,
+}
+
+thread_local! {
+    static WATCHER: RefCell<Option<Watcher>> = const { RefCell::new(None) };
+}
+
+pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWatch> {
+    let (ready, started) = mpsc::channel();
+    let thread = std::thread::Builder::new()
+        .name("key-watch".into())
+        .spawn(move || run_hooks(Box::new(on_key), &ready))?;
+    match started.recv() {
+        Ok(Ok(thread_id)) => Ok(TypingWatch { thread_id, thread }),
+        Ok(Err(error)) => {
+            let _ = thread.join();
+            Err(error)
+        }
+        Err(_) => {
+            let _ = thread.join();
+            Err(Error::msg("Could not start reading keys."))
+        }
+    }
+}
+
+fn run_hooks(on_key: Box<dyn FnMut(Key)>, ready: &mpsc::Sender<Result<u32>>) {
+    WATCHER.set(Some(Watcher {
+        on_key,
+        foreground: std::ptr::null_mut(),
+    }));
+    // SAFETY: A null name asks for this program's own module.
+    let module = unsafe { GetModuleHandleW(std::ptr::null()) };
+    // SAFETY: Both procedures have the hook type, and this thread removes
+    // both hooks below, before it ends.
+    let hooks = unsafe {
+        [
+            SetWindowsHookExW(WH_KEYBOARD_LL, Some(on_keyboard), module, 0),
+            SetWindowsHookExW(WH_MOUSE_LL, Some(on_mouse), module, 0),
+        ]
+    };
+    let hooked = hooks.iter().all(|hook| !hook.is_null());
+    let sent = if hooked {
+        // SAFETY: Takes no arguments.
+        ready.send(Ok(unsafe { GetCurrentThreadId() }))
+    } else {
+        ready.send(Err(Error::msg(format!(
+            "Windows did not let TinyDash read keys: {}",
+            std::io::Error::last_os_error()
+        ))))
+    };
+    if hooked && sent.is_ok() {
+        let mut message = MSG::default();
+        // The hooks run while this thread waits for messages. WM_QUIT ends
+        // the loop with 0, and an error with -1.
+        // SAFETY: `message` is a valid MSG to fill.
+        while unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) } > 0 {}
+    }
+    for hook in hooks.into_iter().filter(|hook| !hook.is_null()) {
+        // SAFETY: This thread set the hook, and removes it once.
+        unsafe { UnhookWindowsHookEx(hook) };
+    }
+    // Drops the typed text.
+    WATCHER.set(None);
+}
+
+/// The keyboard hook. Windows waits for it before the key reaches the app,
+/// so it only reads the key.
+unsafe extern "system" fn on_keyboard(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let message = u32::try_from(wparam).unwrap_or_default();
+    if code == HC_ACTION as i32 && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) {
+        // SAFETY: For HC_ACTION, `lparam` points to the key's
+        // KBDLLHOOKSTRUCT, which is valid during the call.
+        let key = unsafe { &*(lparam as *const KBDLLHOOKSTRUCT) };
+        // Keys that a program sends, TinyDash's own included, are not typing.
+        if key.flags & LLKHF_INJECTED == 0 {
+            read_key(key.vkCode, key.scanCode, message == WM_SYSKEYDOWN);
+        }
+    }
+    // SAFETY: Passes the hook's own arguments on, as every hook must.
+    unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
+}
+
+/// The mouse hook: a click may move the cursor.
+unsafe extern "system" fn on_mouse(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    let message = u32::try_from(wparam).unwrap_or_default();
+    let click = matches!(
+        message,
+        WM_LBUTTONDOWN | WM_RBUTTONDOWN | WM_MBUTTONDOWN | WM_XBUTTONDOWN
+    );
+    if code == HC_ACTION as i32 && click {
+        send(&[Key::Reset]);
+    }
+    // SAFETY: Passes the hook's own arguments on, as every hook must.
+    unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
+}
+
+fn send(keys: &[Key]) {
+    WATCHER.with(|watcher| {
+        if let Ok(mut watcher) = watcher.try_borrow_mut()
+            && let Some(watcher) = watcher.as_mut()
+        {
+            for &key in keys {
+                (watcher.on_key)(key);
+            }
+        }
+    });
+}
+
+/// Whether the window in front changed since the latest key.
+fn foreground_changed(foreground: HWND) -> bool {
+    WATCHER.with(|watcher| {
+        watcher.try_borrow_mut().is_ok_and(|mut watcher| {
+            watcher.as_mut().is_some_and(|watcher| {
+                std::mem::replace(&mut watcher.foreground, foreground) != foreground
+            })
+        })
+    })
+}
+
+fn read_key(vk: u32, scan: u32, system_key: bool) {
+    let Ok(vk) = VIRTUAL_KEY::try_from(vk) else {
+        return;
+    };
+    let role = key_role(vk);
+    if role == KeyRole::Modifier {
+        return;
+    }
+    // SAFETY: Takes no arguments.
+    let foreground = unsafe { GetForegroundWindow() };
+    if foreground_changed(foreground) {
+        send(&[Key::Reset]);
+    }
+    // A system key comes with Alt alone; AltGr holds Control and Alt.
+    let shortcut = system_key
+        || [VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN]
+            .into_iter()
+            .any(is_down);
+    let keys = match role {
+        _ if shortcut => vec![Key::Reset],
+        KeyRole::Backspace => vec![Key::Backspace],
+        KeyRole::Reset => vec![Key::Reset],
+        KeyRole::Text | KeyRole::Modifier => expansion::keys_for(&translate(vk, scan, foreground)),
+    };
+    send(&keys);
+}
+
+/// What a key types in the keyboard layout of the window in front, with
+/// Shift and Caps Lock as they are now. A dead key types nothing yet.
+fn translate(vk: VIRTUAL_KEY, scan: u32, foreground: HWND) -> Vec<u16> {
+    let mut state = [0u8; 256];
+    if is_down(VK_SHIFT) {
+        state[usize::from(VK_SHIFT)] = 0x80;
+    }
+    // SAFETY: Takes no pointers.
+    if unsafe { GetKeyState(i32::from(VK_CAPITAL)) } & 1 != 0 {
+        state[usize::from(VK_CAPITAL)] = 0x01;
+    }
+    // SAFETY: A null process ID pointer is allowed. A window that is gone
+    // gives thread 0, which means this thread's layout.
+    let layout =
+        unsafe { GetKeyboardLayout(GetWindowThreadProcessId(foreground, std::ptr::null_mut())) };
+    let mut units = [0u16; 8];
+    // SAFETY: `state` has the 256 entries Windows reads, and `units` holds
+    // the length passed.
+    let count = unsafe {
+        ToUnicodeEx(
+            u32::from(vk),
+            scan,
+            state.as_ptr(),
+            units.as_mut_ptr(),
+            units.len() as i32,
+            KEEP_KEYBOARD_STATE,
+            layout,
+        )
+    };
+    usize::try_from(count).map_or_else(
+        |_| Vec::new(),
+        |count| units[..count.min(units.len())].to_vec(),
+    )
+}
+
+fn is_down(vk: VIRTUAL_KEY) -> bool {
+    // SAFETY: Takes no pointers.
+    let state = unsafe { GetAsyncKeyState(i32::from(vk)) };
+    state < 0
+}
+
+/// What a key does to the typed text, before what it types is known.
+#[derive(Debug, PartialEq, Eq)]
+enum KeyRole {
+    /// Types nothing alone, such as Shift or Caps Lock.
+    Modifier,
+    Backspace,
+    /// Moves the cursor or ends the text, such as Return or an arrow.
+    Reset,
+    /// Types what the layout says, or nothing, such as a function key.
+    Text,
+}
+
+fn key_role(vk: VIRTUAL_KEY) -> KeyRole {
+    match vk {
+        VK_SHIFT | VK_LSHIFT | VK_RSHIFT | VK_CONTROL | VK_LCONTROL | VK_RCONTROL | VK_MENU
+        | VK_LMENU | VK_RMENU | VK_LWIN | VK_RWIN | VK_CAPITAL | VK_NUMLOCK | VK_SCROLL => {
+            KeyRole::Modifier
+        }
+        VK_BACK => KeyRole::Backspace,
+        VK_RETURN | VK_ESCAPE | VK_TAB | VK_LEFT | VK_UP | VK_RIGHT | VK_DOWN | VK_HOME
+        | VK_END | VK_PRIOR | VK_NEXT | VK_DELETE | VK_INSERT => KeyRole::Reset,
+        _ => KeyRole::Text,
+    }
+}
+
+/// One key to send: a virtual key, or a UTF-16 unit typed as it is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stroke {
+    Key(VIRTUAL_KEY),
+    Unit(u16),
+}
+
+/// The keys that delete `erase` characters and type `text`. A character
+/// beyond U+FFFF is two units, a surrogate pair.
+fn strokes(erase: usize, text: &str) -> Vec<Stroke> {
+    let mut strokes = vec![Stroke::Key(VK_BACK); erase];
+    for piece in expansion::pieces(text, usize::MAX) {
+        match piece {
+            Piece::Return => strokes.push(Stroke::Key(VK_RETURN)),
+            Piece::Text(units) => strokes.extend(units.into_iter().map(Stroke::Unit)),
+        }
+    }
+    strokes
+}
+
+/// A key press or release for `SendInput`, marked as TinyDash's own.
+fn keyboard_input(stroke: Stroke, down: bool) -> KEYBDINPUT {
+    let release = if down { 0 } else { KEYEVENTF_KEYUP };
+    let (key, unit, unicode) = match stroke {
+        Stroke::Key(key) => (key, 0, 0),
+        Stroke::Unit(unit) => (0, unit, KEYEVENTF_UNICODE),
+    };
+    KEYBDINPUT {
+        wVk: key,
+        wScan: unit,
+        dwFlags: unicode | release,
+        time: 0,
+        dwExtraInfo: OWN_INPUT,
+    }
+}
+
+/// Types with `SendInput`, which puts the keys into the input stream as if
+/// they were typed. Windows marks them injected, so the hook skips them.
+pub fn type_text(erase: usize, text: &str) -> Result<()> {
+    let inputs: Vec<INPUT> = strokes(erase, text)
+        .into_iter()
+        .flat_map(|stroke| {
+            [true, false].map(|down| INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: keyboard_input(stroke, down),
+                },
+            })
+        })
+        .collect();
+    for batch in inputs.chunks(INPUT_BATCH) {
+        // SAFETY: The pointer and count describe `batch`, and the size is
+        // INPUT's.
+        let sent = unsafe {
+            SendInput(
+                batch.len() as u32,
+                batch.as_ptr(),
+                std::mem::size_of::<INPUT>() as i32,
+            )
+        };
+        if sent as usize != batch.len() {
+            return Err(Error::msg(format!(
+                "Windows did not let TinyDash type the snippet: {}",
+                std::io::Error::last_os_error()
+            )));
+        }
+        std::thread::sleep(BATCH_GAP);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+
+    #[test]
+    fn sorts_keys_by_what_they_do_to_typed_text() {
+        use super::{KeyRole, key_role};
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            VK_BACK, VK_CAPITAL, VK_DELETE, VK_ESCAPE, VK_HOME, VK_LEFT, VK_LSHIFT, VK_NEXT,
+            VK_NUMPAD1, VK_OEM_1, VK_RETURN, VK_RMENU, VK_SPACE, VK_TAB,
+        };
+        for vk in [VK_LSHIFT, VK_RMENU, VK_CAPITAL] {
+            assert_eq!(key_role(vk), KeyRole::Modifier, "{vk}");
+        }
+        assert_eq!(key_role(VK_BACK), KeyRole::Backspace);
+        for vk in [
+            VK_RETURN, VK_ESCAPE, VK_TAB, VK_LEFT, VK_HOME, VK_NEXT, VK_DELETE,
+        ] {
+            assert_eq!(key_role(vk), KeyRole::Reset, "{vk}");
+        }
+        // Letters, the ; key on US layouts, Space, and the number pad.
+        for vk in [u16::from(b'S'), VK_OEM_1, VK_SPACE, VK_NUMPAD1] {
+            assert_eq!(key_role(vk), KeyRole::Text, "{vk}");
+        }
+    }
+
+    #[test]
+    fn types_backspaces_then_text_with_return_for_line_breaks() {
+        use super::{Stroke, strokes};
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{VK_BACK, VK_RETURN};
+        assert_eq!(
+            strokes(2, "a😀\r\nb"),
+            [
+                Stroke::Key(VK_BACK),
+                Stroke::Key(VK_BACK),
+                Stroke::Unit(u16::from(b'a')),
+                Stroke::Unit(0xD83D),
+                Stroke::Unit(0xDE00),
+                Stroke::Key(VK_RETURN),
+                Stroke::Unit(u16::from(b'b')),
+            ]
+        );
+        assert!(strokes(0, "").is_empty());
+    }
+
+    #[test]
+    fn builds_marked_key_presses_and_releases() {
+        use super::{OWN_INPUT, Stroke, keyboard_input};
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, VK_BACK,
+        };
+        let down = keyboard_input(Stroke::Unit(0xD83D), true);
+        assert_eq!(
+            (down.wVk, down.wScan, down.dwFlags, down.dwExtraInfo),
+            (0, 0xD83D, KEYEVENTF_UNICODE, OWN_INPUT)
+        );
+        let up = keyboard_input(Stroke::Unit(0xD83D), false);
+        assert_eq!(up.dwFlags, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP);
+        let backspace = keyboard_input(Stroke::Key(VK_BACK), false);
+        assert_eq!(
+            (backspace.wVk, backspace.wScan, backspace.dwFlags),
+            (VK_BACK, 0, KEYEVENTF_KEYUP)
+        );
+    }
 
     #[test]
     fn names_start_menu_apps_and_skips_other_files() {
