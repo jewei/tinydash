@@ -432,7 +432,7 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
     content.setBody(&NSString::from_str(body));
     content.setSound(Some(&UNNotificationSound::defaultSound()));
     // A new identifier each time, so a notification never replaces the last.
-    let id = format!("focus-{}", chrono::Utc::now().timestamp_millis());
+    let id = format!("tinydash-{}", chrono::Utc::now().timestamp_millis());
     let request = UNNotificationRequest::requestWithIdentifier_content_trigger(
         &NSString::from_str(&id),
         &content,

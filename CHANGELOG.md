@@ -15,6 +15,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
 
+### Fixed
+
+- A hotkey that cannot run now says why in a system notification. Before, the reason showed in the small "Copied" message, cut short and next to a check mark.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added

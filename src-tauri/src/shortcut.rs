@@ -16,7 +16,7 @@ use tauri_plugin_global_shortcut::{
 use crate::{
     actions,
     error::{Error, Result},
-    hud,
+    platform,
     search::usage::Hotkeys,
     state::State,
     window,
@@ -45,12 +45,22 @@ pub fn plugin() -> TauriPlugin<Wry> {
                 let handle = app.clone();
                 tauri::async_runtime::spawn_blocking(move || {
                     if let Err(error) = actions::run_hotkey(&handle, &id) {
-                        hud::show(&handle, &error.to_string());
+                        report_hotkey_error(&handle, &error);
                     }
                 });
             }
         })
         .build()
+}
+
+/// A hotkey runs while the user is in another app, so its error goes to a
+/// system notification. The "Copied" message is too small for an error and
+/// shows a check mark.
+fn report_hotkey_error(app: &AppHandle, error: &Error) {
+    tracing::warn!(%error, "A hotkey did not run");
+    if let Err(error) = platform::notify(app, "The hotkey did not run", &error.to_string()) {
+        tracing::warn!(%error, "Could not show why the hotkey did not run");
+    }
 }
 
 fn toggle_launcher(app: &AppHandle) {
