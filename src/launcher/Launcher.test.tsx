@@ -1799,6 +1799,25 @@ describe("Launcher", () => {
     expect(backend.called("widgets")).toHaveLength(2);
   });
 
+  it("leaves Up Next alone while the launcher is hidden", async () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    let loads = 0;
+    const { backend } = setup(() => [], {
+      widgets: () => {
+        loads += 1;
+        const changesAtMs = loads === 1 ? Date.now() - 1 : Date.now() + 3_600_000;
+        return { ...noCards, upNext: { items: [], problems: [], ask: null, changesAtMs } };
+      },
+    });
+    await screen.findByRole("region", { name: "Up Next" });
+    // The list is out of date, but a hidden launcher reads no calendars.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    expect(backend.called("widgets")).toHaveLength(1);
+
+    visibility.mockReturnValue("visible");
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2), { timeout: 1500 });
+  });
+
   it("shows a clipboard color, copies its forms, and stays dismissed", async () => {
     const copy = (text: string) => ({ type: "copy", text }) as const;
     const color = {

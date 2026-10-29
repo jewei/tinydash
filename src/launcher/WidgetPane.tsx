@@ -176,10 +176,20 @@ export function WidgetPane(props: {
       )
       .map((action) => ({ label: action.label, keys: undefined, run: () => props.onRun(action) }));
   };
-  // Up Next changes as time passes, as an event starts or ends: load again.
+  // Up Next changes as time passes, as an event starts or ends: load again,
+  // but only while the launcher shows. The pane stays in the hidden window,
+  // and a load reads the calendars and the clipboard; each show loads anyway.
+  // `now()` comes first, so the effect runs again on each tick.
   createEffect(() => {
     const changesAt = loaded()?.upNext?.changesAtMs;
-    if (changesAt !== undefined && now() >= changesAt && !widgets.loading) void refetch();
+    if (
+      changesAt !== undefined &&
+      now() >= changesAt &&
+      document.visibilityState === "visible" &&
+      !widgets.loading
+    ) {
+      void refetch();
+    }
   });
   // Nothing shows: only clipboard cards are on, and the clipboard has none.
   const empty = () => {
