@@ -19,7 +19,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - On macOS, a snippet with `{clipboard}`, or a copy, can no longer crash TinyDash when it uses the clipboard at the same moment as clipboard history.
 - On Windows, clipboard history skips a copy when it cannot read whether the app that made the copy allows it in history. Before, it saved the copy.
-- On Linux with GNOME, KDE, or Xfce, Restart and Shut Down now ask apps to quit first, as their confirmation says, so apps can offer to save your work. Before, they closed apps without asking.
+- On Linux with GNOME, KDE, or Xfce, Restart and Shut Down now ask apps to quit first, so apps can offer to save your work. Before, they closed apps without asking. Other Linux desktops still close apps without asking, so on Linux the confirmation now tells you to save your work first instead of saying that apps will be asked to quit.
 - Apps, files, and links that you open from the Linux AppImage no longer get the setup that the AppImage makes for TinyDash: its libraries, its GTK, Python, and Qt folders, and its theme. It could stop apps from starting, force the Adwaita theme on them, break their input method or settings, and stop their images from loading after TinyDash quit.
 
 ## [0.7.0] - 2026-10-19
