@@ -24,9 +24,10 @@ use objc2_event_kit::{
     EKParticipantStatus, EKReminder,
 };
 use objc2_foundation::{
-    NSArray, NSCalendar, NSDate, NSDateComponentUndefined, NSDictionary, NSNumber, NSPoint, NSRect,
-    NSSize, NSString, NSURL, NSURLVolumeAvailableCapacityForImportantUsageKey,
-    NSURLVolumeLocalizedNameKey, NSURLVolumeTotalCapacityKey,
+    NSArray, NSCalendar, NSCalendarIdentifierGregorian, NSDate, NSDateComponentUndefined,
+    NSDateComponents, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
+    NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeLocalizedNameKey,
+    NSURLVolumeTotalCapacityKey,
 };
 
 use super::SECRET_FORMATS;
@@ -684,22 +685,29 @@ fn read_reminder(reminder: &EKReminder) -> Option<up_next::Reminder> {
         let title: Option<Retained<NSString>> = msg_send![reminder, title];
         (title, reminder.dueDateComponents()?)
     };
-    let due = if due.hour() == NSDateComponentUndefined {
-        Due::Day(chrono::NaiveDate::from_ymd_opt(
-            i32::try_from(due.year()).ok()?,
-            u32::try_from(due.month()).ok()?,
-            u32::try_from(due.day()).ok()?,
-        )?)
-    } else {
-        // The calendar uses the components' own time zone when they have one.
-        let date = NSCalendar::currentCalendar().dateFromComponents(&due)?;
-        Due::At(unix_ms(&date))
-    };
     Some(up_next::Reminder {
         title: title.map(|title| title.to_string()).unwrap_or_default(),
         list: calendar_name(reminder),
-        due,
+        due: due_date(&due)?,
     })
+}
+
+/// When a reminder is due. EventKit keeps due dates in the Gregorian
+/// calendar, whichever calendar the user chose in the region settings.
+fn due_date(due: &NSDateComponents) -> Option<Due> {
+    if due.hour() == NSDateComponentUndefined {
+        return Some(Due::Day(chrono::NaiveDate::from_ymd_opt(
+            i32::try_from(due.year()).ok()?,
+            u32::try_from(due.month()).ok()?,
+            u32::try_from(due.day()).ok()?,
+        )?));
+    }
+    // SAFETY: A constant that Foundation defines.
+    let gregorian = NSCalendar::calendarWithIdentifier(unsafe { NSCalendarIdentifierGregorian })?;
+    // The calendar uses the components' own time zone when they have one,
+    // and the system's otherwise.
+    let date = gregorian.dateFromComponents(due)?;
+    Some(Due::At(unix_ms(&date)))
 }
 
 /// The name of the calendar or reminder list that holds `item`.
@@ -1258,6 +1266,24 @@ mod tests {
         // Like `bun run dev`, the test binary embeds the usage strings and
         // runs from a terminal, which would get the access instead.
         assert!(!can_ask_for_calendars());
+    }
+
+    #[test]
+    fn reads_due_dates_in_the_gregorian_calendar() {
+        let due = NSDateComponents::new();
+        due.setYear(2026);
+        due.setMonth(10);
+        due.setDay(30);
+        let day = chrono::NaiveDate::from_ymd_opt(2026, 10, 30).unwrap();
+        assert_eq!(due_date(&due), Some(Due::Day(day)));
+
+        // Without a time zone of its own, a due time is local.
+        due.setHour(16);
+        due.setMinute(30);
+        let local = chrono::TimeZone::with_ymd_and_hms(&chrono::Local, 2026, 10, 30, 16, 30, 0)
+            .unwrap()
+            .timestamp_millis();
+        assert_eq!(due_date(&due), Some(Due::At(local)));
     }
 
     #[test]
