@@ -24,7 +24,7 @@ use objc2_event_kit::{
     EKParticipantStatus, EKReminder,
 };
 use objc2_foundation::{
-    NSArray, NSCalendar, NSCalendarIdentifierGregorian, NSDate, NSDateComponentUndefined,
+    NSArray, NSBundle, NSCalendar, NSCalendarIdentifierGregorian, NSDate, NSDateComponentUndefined,
     NSDateComponents, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
     NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeLocalizedNameKey,
     NSURLVolumeTotalCapacityKey,
@@ -421,7 +421,7 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
 /// nothing, so each one asks and is added only when allowed.
 pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
     use objc2::runtime::Bool;
-    use objc2_foundation::{NSBundle, NSError};
+    use objc2_foundation::NSError;
     use objc2_user_notifications::{
         UNAuthorizationOptions, UNMutableNotificationContent, UNNotificationRequest,
         UNNotificationSound, UNUserNotificationCenter,
@@ -579,10 +579,16 @@ pub fn open_calendar_app(kind: UpNextKind) -> Result<()> {
 
 /// Whether TinyDash may read one kind, from the answer macOS keeps. Never asks.
 fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
+    let bundle = NSBundle::mainBundle();
+    // SAFETY: getppid takes no arguments and cannot fail.
+    let parent = unsafe { libc::getppid() };
+    if !answers_for_tinydash(&bundle.bundlePath().to_string(), parent) {
+        return Err(Unreadable::StartedByAnotherApp);
+    }
     // SAFETY: A class method that reads the saved answer for a valid kind.
     match unsafe { EKEventStore::authorizationStatusForEntityType(kind) } {
         EKAuthorizationStatus::FullAccess => Ok(()),
-        EKAuthorizationStatus::NotDetermined if can_ask_for_calendars() => {
+        EKAuthorizationStatus::NotDetermined if has_calendar_usage_strings(&bundle) => {
             Err(Unreadable::NotAsked)
         }
         EKAuthorizationStatus::NotDetermined => Err(Unreadable::CannotAsk),
@@ -592,18 +598,26 @@ fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
     }
 }
 
-/// Whether TinyDash runs as an app bundle that carries the usage strings.
-/// Without them, macOS ends an app that asks. Outside a bundle, as with
-/// `bun run dev`, macOS gives the access to the app that started TinyDash,
-/// such as a terminal, and every program it runs could then read calendars.
-fn can_ask_for_calendars() -> bool {
-    let bundle = objc2_foundation::NSBundle::mainBundle();
-    bundle.bundlePath().to_string().ends_with(".app")
-        && CALENDAR_USAGE_KEYS.iter().all(|key| {
-            bundle
-                .objectForInfoDictionaryKey(&NSString::from_str(key))
-                .is_some()
-        })
+/// Whether macOS answers about calendars for TinyDash itself. It answers
+/// for the app responsible for a process. An app bundle that launchd
+/// starts, from Finder, the Dock, `open`, or the login item, is its own,
+/// and its parent is launchd. A program that a terminal or another app
+/// starts belongs to that app, even inside TinyDash's bundle, as does one
+/// outside a bundle, as with `bun run dev`. TinyDash would then read and
+/// ask with that app's access, and every program it runs could use it.
+fn answers_for_tinydash(bundle_path: &str, parent_pid: libc::pid_t) -> bool {
+    const LAUNCHD: libc::pid_t = 1;
+    bundle_path.ends_with(".app") && parent_pid == LAUNCHD
+}
+
+/// Whether the app carries the usage strings, without which macOS ends an
+/// app that asks.
+fn has_calendar_usage_strings(bundle: &NSBundle) -> bool {
+    CALENDAR_USAGE_KEYS.iter().all(|key| {
+        bundle
+            .objectForInfoDictionaryKey(&NSString::from_str(key))
+            .is_some()
+    })
 }
 
 fn ns_date(unix_ms: i64) -> Retained<NSDate> {
@@ -1289,10 +1303,24 @@ mod tests {
     }
 
     #[test]
-    fn a_binary_outside_an_app_never_asks_for_calendars() {
+    fn a_binary_outside_an_app_never_reads_or_asks_for_calendars() {
         // Like `bun run dev`, the test binary embeds the usage strings and
-        // runs from a terminal, which would get the access instead.
-        assert!(!can_ask_for_calendars());
+        // runs from a terminal, whose access macOS would use instead.
+        for kind in [EKEntityType::Event, EKEntityType::Reminder] {
+            assert_eq!(calendar_access(kind), Err(Unreadable::StartedByAnotherApp));
+        }
+    }
+
+    #[test]
+    fn only_an_app_that_launchd_starts_reads_calendars() {
+        let app = "/Applications/TinyDash.app";
+        assert!(answers_for_tinydash(app, 1));
+        // The installed app, started from a terminal or a hotkey tool.
+        assert!(!answers_for_tinydash(app, 4242));
+        assert!(!answers_for_tinydash(
+            "/Users/me/tinydash/src-tauri/target/debug",
+            1
+        ));
     }
 
     #[test]

@@ -38,7 +38,7 @@ bunx tauri build --debug --no-bundle --config src-tauri/tauri.dev.conf.json
 
 If another TinyDash holds the global shortcut, run the binary again to toggle the launcher.
 
-On macOS, the Up Next widget asks for access to calendars and reminders only from an app bundle. `bun run dev` and the binary above run outside one, so macOS would give the access to your terminal; there the widget says to use the installed app. To try Up Next, build a bundle with `bunx tauri build --debug --bundles app --config src-tauri/tauri.dev.conf.json` and open `src-tauri/target/debug/bundle/macos/TinyDash Dev.app` in Finder.
+On macOS, the Up Next widget reads and asks for access to calendars and reminders only from an app bundle that launchd starts: from Finder, the Dock, `open`, or the login item. `bun run dev`, the binary above, and a bundle's binary that you start from a terminal belong to the terminal, so macOS would use and give the terminal's access; there the widget says to open TinyDash from Finder. To try Up Next, build a bundle with `bunx tauri build --debug --bundles app --config src-tauri/tauri.dev.conf.json` and open `src-tauri/target/debug/bundle/macos/TinyDash Dev.app` in Finder.
 
 ## Tests
 

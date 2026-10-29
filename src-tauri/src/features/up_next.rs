@@ -69,9 +69,11 @@ pub enum Unreadable {
     Denied,
     /// A policy, such as Screen Time, blocks access.
     Restricted,
+    /// Another app, such as a terminal, started TinyDash, so the OS answers
+    /// for that app: TinyDash would read and ask with that app's access.
+    StartedByAnotherApp,
     /// This build cannot ask: it lacks the usage strings, without which
-    /// macOS ends an app that asks, or it runs outside an app bundle, where
-    /// the app that started it, such as a terminal, would get the access.
+    /// macOS ends an app that asks.
     CannotAsk,
     /// The OS did not answer; the message says why.
     Failed(String),
@@ -319,6 +321,9 @@ fn message(problem: &Unreadable, subject: Subject) -> String {
         Unreadable::Restricted => {
             format!("Access to your {what} is restricted on this Mac, for example by Screen Time.")
         }
+        Unreadable::StartedByAnotherApp => format!(
+            "TinyDash cannot read your {what} when another app, such as a terminal, starts it. Quit TinyDash, then open it from Finder or Launchpad."
+        ),
         Unreadable::CannotAsk => {
             format!("This build of TinyDash cannot ask to read your {what}. Use the installed app.")
         }
@@ -661,6 +666,22 @@ mod tests {
             waiting.ask,
             Some(ResultAction::new("Allow Access", Action::AskCalendarAccess))
         );
+
+        // A terminal would get the access, so there is nothing to allow.
+        let from_terminal = view(
+            Agenda {
+                events: Err(Unreadable::StartedByAnotherApp),
+                reminders: Err(Unreadable::StartedByAnotherApp),
+            },
+            &now(),
+        );
+        assert_eq!(
+            from_terminal.problems,
+            [
+                "TinyDash cannot read your calendars and reminders when another app, such as a terminal, starts it. Quit TinyDash, then open it from Finder or Launchpad."
+            ]
+        );
+        assert!(from_terminal.ask.is_none());
     }
 
     #[test]

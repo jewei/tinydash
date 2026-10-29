@@ -41,10 +41,11 @@
 //! - `ask_calendar_access(done)`: ask the user to let TinyDash read
 //!   calendars and reminders, for each kind not answered yet, and call
 //!   `done` once both are answered. Returns at once. Does nothing while an
-//!   earlier request waits, outside an app bundle that has the usage
-//!   strings (macOS ends an app that asks without them, and outside a
-//!   bundle gives the access to the app that started TinyDash, such as a
-//!   terminal), or where TinyDash reads no calendars.
+//!   earlier request waits, or where TinyDash reads no calendars. On macOS,
+//!   also nothing unless launchd started TinyDash as an app bundle that has
+//!   the usage strings: macOS ends an app that asks without them, and
+//!   gives the access to the app that started TinyDash otherwise, such as
+//!   a terminal. Such a TinyDash reads no calendars either.
 //! - `open_calendar_app(kind)`: open the app that holds an Up Next item:
 //!   Calendar for an event, Reminders for a reminder. An error where
 //!   TinyDash reads no calendars.
