@@ -405,7 +405,7 @@ fn kept_out_of_history(value: Option<u32>) -> bool {
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
-    let _one_reader = super::one_clipboard_reader();
+    let _one_user = super::one_clipboard_user();
     let before = clipboard_change();
     if clipboard_is_concealed() {
         return None;

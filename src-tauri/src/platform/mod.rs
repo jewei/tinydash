@@ -54,7 +54,7 @@
 //!   keeps. The size comes from the image header before the image is
 //!   decoded. On macOS the encoded bytes are copied in first. Only macOS
 //!   and Windows, where `read_clipboard` saves images; call it with the
-//!   clipboard reader lock held.
+//!   clipboard lock held.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
 //!   is none or its source marked it secret. History need not be on. Call
@@ -212,11 +212,11 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
 /// the clipboard at a time; the capture thread, the widget pane, and
 /// actions all use it.
 #[cfg(not(target_os = "linux"))]
-static CLIPBOARD_READ: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static CLIPBOARD_USE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(not(target_os = "linux"))]
-fn one_clipboard_reader() -> std::sync::MutexGuard<'static, ()> {
-    CLIPBOARD_READ.lock().unwrap_or_else(|e| e.into_inner())
+fn one_clipboard_user() -> std::sync::MutexGuard<'static, ()> {
+    CLIPBOARD_USE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 /// The clipboard's text now, also when its source marked it secret, so
@@ -224,14 +224,14 @@ fn one_clipboard_reader() -> std::sync::MutexGuard<'static, ()> {
 /// at a time.
 pub fn clipboard_text_unchecked() -> Option<String> {
     #[cfg(not(target_os = "linux"))]
-    let _one_reader = one_clipboard_reader();
+    let _one_user = one_clipboard_user();
     arboard::Clipboard::new().ok()?.get_text().ok()
 }
 
 /// Run `write`, which writes the clipboard, while no read runs.
 pub fn write_clipboard<T>(write: impl FnOnce() -> T) -> T {
     #[cfg(not(target_os = "linux"))]
-    let _one_reader = one_clipboard_reader();
+    let _one_user = one_clipboard_user();
     write()
 }
 
