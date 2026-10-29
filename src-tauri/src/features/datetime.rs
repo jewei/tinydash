@@ -498,8 +498,21 @@ fn day_count(query: &str, today: NaiveDate) -> Option<SearchResult> {
     let day = |text: &str| named_day(&text.split_whitespace().collect::<Vec<_>>(), today);
     let (from, to, subtitle) = if let Some(rest) = rest.strip_prefix("between ") {
         let (first, second) = rest.split_once(" and ")?;
-        let first = day(first)?.date;
-        let second = day(second)?.date;
+        let (first, second) = (day(first)?, day(second)?);
+        // Without years, `days between dec 20 and jan 5` counts to the
+        // January after.
+        let second = if !first.has_year && !second.has_year && second.date < first.date {
+            let (month, day_of_month) = (second.date.month(), second.date.day());
+            let date = in_year(month, day_of_month, first.date.year(), 1)?;
+            if date < first.date {
+                in_year(month, day_of_month, first.date.year() + 1, 1)?
+            } else {
+                date
+            }
+        } else {
+            second.date
+        };
+        let first = first.date;
         let subtitle = format!(
             "from {} to {}",
             first.format("%a %-d %b %Y"),
@@ -917,6 +930,17 @@ mod tests {
             )
         );
         assert_eq!(title("days between 2026-01-15 and 2026-01-01"), "14 days");
+        // Without years, the second date is the first one after the first.
+        assert_eq!(
+            count("days between dec 20 and jan 5"),
+            (
+                "16 days".into(),
+                "2 weeks 2 days · from Sun 20 Dec 2026 to Tue 5 Jan 2027".into()
+            )
+        );
+        assert_eq!(title("days between jan 5 and dec 20"), "349 days");
+        assert_eq!(title("days between dec 20 and 2026-01-05"), "349 days");
+        assert_eq!(title("days between feb 29 and mar 1"), "1 day");
         assert_eq!(title("days until feb 29"), "514 days");
         assert_eq!(title("days since feb 29"), "947 days");
         let in_march_2028 = date("2028-03-01");
