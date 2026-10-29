@@ -5,6 +5,7 @@ import {
   createUniqueId,
   For,
   on,
+  onCleanup,
   Show,
 } from "solid-js";
 
@@ -27,8 +28,11 @@ const HELP: Record<LibraryKind, string> = {
     "Opens an http, https, or mailto URL, or an absolute or ~ path. {query} is replaced by text typed after the keyword, as in “jira ABC-12”. Also: {clipboard}, {date}, {time}, and {datetime}.",
 };
 
-/** Create, edit, and delete snippets or quicklinks. */
-export function Library(props: { kind: LibraryKind }) {
+/**
+ * Create, edit, and delete snippets or quicklinks. `drafts` keeps the item
+ * in the editor while another Settings section is open.
+ */
+export function Library(props: { kind: LibraryKind; drafts: Map<LibraryKind, LibraryItem> }) {
   // A failed read must say so, not look like an empty library.
   const [loadError, setLoadError] = createSignal<string>();
   const load = () =>
@@ -43,7 +47,9 @@ export function Library(props: { kind: LibraryKind }) {
       },
     );
   const [items, { refetch }] = createResource(load);
-  const [draft, setDraft] = createSignal<LibraryItem>(blank(props.kind));
+  const [draft, setDraft] = createSignal<LibraryItem>(
+    props.drafts.get(props.kind) ?? blank(props.kind),
+  );
   const [error, setError] = createSignal<string>();
   const [confirmingDelete, setConfirmingDelete] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
@@ -88,6 +94,12 @@ export function Library(props: { kind: LibraryKind }) {
   );
   const change = (field: "name" | "keyword" | "text", value: string) =>
     setDraft((item) => ({ ...item, [field]: value }));
+  // Not a draft that a save or delete still sends: its reply goes to this
+  // closed editor, so a kept new item would be added twice.
+  onCleanup(() => {
+    if (busy()) props.drafts.delete(props.kind);
+    else props.drafts.set(props.kind, draft());
+  });
 
   /**
    * Run one write at a time, so a double click cannot save twice. `open`

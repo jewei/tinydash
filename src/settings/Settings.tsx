@@ -13,6 +13,8 @@ import {
 
 import type { About as AboutInfo } from "../generated/About";
 import type { EmojiLanguage } from "../generated/EmojiLanguage";
+import type { LibraryItem } from "../generated/LibraryItem";
+import type { LibraryKind } from "../generated/LibraryKind";
 import type { SearchEngine } from "../generated/SearchEngine";
 import type { TemperatureUnit } from "../generated/TemperatureUnit";
 import type { Settings as Values } from "../generated/Settings";
@@ -101,6 +103,9 @@ export function Settings() {
     return base && changes().reduce(apply, base);
   });
   const [section, setSection] = createSignal<Section>("general");
+  // The snippet and quicklink editors close when another section opens;
+  // their drafts wait here, so typed text is still there on return.
+  const libraryDrafts = new Map<LibraryKind, LibraryItem>();
   const [error, setError] = createSignal<string>();
   // Read when Settings opens, and again on opening About after a failure:
   // About shows it, and the Clipboard section hides what this OS cannot save.
@@ -566,11 +571,11 @@ export function Settings() {
               </Match>
 
               <Match when={section() === "snippets"}>
-                <Library kind="snippet" />
+                <Library kind="snippet" drafts={libraryDrafts} />
               </Match>
 
               <Match when={section() === "quicklinks"}>
-                <Library kind="quicklink" />
+                <Library kind="quicklink" drafts={libraryDrafts} />
               </Match>
 
               <Match when={section() === "privacy"}>

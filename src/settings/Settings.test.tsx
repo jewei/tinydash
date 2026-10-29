@@ -836,6 +836,59 @@ describe("Settings", () => {
     });
   });
 
+  it("keeps an unsaved snippet and quicklink while another section is open", async () => {
+    fakeBackend({ library_items: () => [] });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.input(await screen.findByRole("textbox", { name: "Name" }), {
+      target: { value: "Greeting" },
+    });
+    fireEvent.input(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hello" } });
+    fireEvent.click(screen.getByRole("button", { name: "Quicklinks" }));
+    // Each kind has its own draft.
+    const link = (await screen.findByRole("textbox", { name: "Name" })) as HTMLInputElement;
+    expect(link.value).toBe("");
+    fireEvent.input(link, { target: { value: "Docs" } });
+    fireEvent.click(screen.getByRole("button", { name: "General" }));
+    fireEvent.click(screen.getByRole("button", { name: "Snippets" }));
+    const name = (await screen.findByRole("textbox", { name: "Name" })) as HTMLInputElement;
+    expect(name.value).toBe("Greeting");
+    expect((screen.getByRole("textbox", { name: "Text" }) as HTMLTextAreaElement).value).toBe(
+      "Hello",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Quicklinks" }));
+    expect(((await screen.findByRole("textbox", { name: "Name" })) as HTMLInputElement).value).toBe(
+      "Docs",
+    );
+  });
+
+  it("does not keep a snippet that was saving when its section closed", async () => {
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    const library = fakeLibrary();
+    fakeBackend({
+      library_items: library.list,
+      save_library_item: async (args) => {
+        await slow;
+        return library.save(args.item as LibraryItem, 9);
+      },
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    fireEvent.input(await screen.findByRole("textbox", { name: "Name" }), {
+      target: { value: "Greeting" },
+    });
+    fireEvent.input(screen.getByRole("textbox", { name: "Text" }), { target: { value: "Hi" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save Snippet" }));
+    fireEvent.click(screen.getByRole("button", { name: "Quicklinks" }));
+    release();
+    await waitFor(() => expect(library.list()).toHaveLength(1));
+    fireEvent.click(screen.getByRole("button", { name: "Snippets" }));
+    // The save added it; a kept copy, without its ID, would add it again.
+    expect(await screen.findByRole("button", { name: /Greeting/ })).toBeTruthy();
+    expect((screen.getByRole("textbox", { name: "Name" }) as HTMLInputElement).value).toBe("");
+  });
+
   it("keeps typing that happens while a snippet saves", async () => {
     let release!: () => void;
     const slow = new Promise<void>((resolve) => (release = resolve));

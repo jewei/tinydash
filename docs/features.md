@@ -109,7 +109,7 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 
 ## Snippets and quicklinks
 
-Create them in Settings > Snippets and Settings > Quicklinks.
+Create them in Settings > Snippets and Settings > Quicklinks. An edit that you did not save stays while you visit another section, until Settings closes.
 
 - **Placeholders** work in both: `{query}` (the text you type after the keyword), `{clipboard}` (the text on the clipboard), `{date}` (`2026-10-11`), `{time}` (`09:05`), and `{datetime}`. They are filled in one pass, so a value that looks like a placeholder, such as typed text `{clipboard}`, stays as it is. Other text in braces stays too.
 - **Snippet:** text. Enter fills the placeholders and copies the text. A snippet with a keyword and `{query}` takes the text typed after its keyword: with keyword `hi` and text `Hello {query},`, typing `hi Sam` copies `Hello Sam,`. Run from its own row, a placeholder with no value, such as `{query}`, is filled with nothing. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.
