@@ -19,6 +19,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - A snippet or quicklink name or keyword pasted with separate accent marks, as some macOS file names have them, now matches an accented search such as `résumé`. So do the other names an app is found by, and words typed after `?`.
 - Settings are written to disk before they replace the old file, so a crash or power loss right after a change no longer resets every setting.
+- Deleting a snippet or quicklink also removes it from the hidden results in one step, so a failure partway can no longer leave the deleted item in search.
 
 ## [0.7.0] - 2026-10-19
 

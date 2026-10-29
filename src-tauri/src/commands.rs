@@ -368,9 +368,6 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
         state
             .usage
             .update(|usage| ids.iter().for_each(|id| usage.remove(id)));
-        for id in &ids {
-            state.store.set_hidden(id, false, 0)?;
-        }
         state
             .hidden
             .update(|hidden| ids.iter().for_each(|id| hidden.remove(id)));
