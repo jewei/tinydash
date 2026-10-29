@@ -238,8 +238,11 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
     if !is_number || value.is_empty() {
         return None;
     }
-    // A bare number echoes itself; that is not an answer.
-    if value == query.trim() {
+    // A bare number echoes itself, also as fend writes it after the
+    // rewrites (`30 percent` as `30%`); that is not an answer.
+    let bare = |text: &str| text.split_whitespace().collect::<String>();
+    let echo = bare(&value);
+    if echo == bare(query) || echo == bare(&input) {
         return None;
     }
     if is_f64_artifact(query, &value) {
@@ -840,6 +843,9 @@ mod tests {
     fn ignores_text_bare_numbers_and_errors() {
         assert_eq!(value("safari"), None);
         assert_eq!(value("42"), None);
+        for echo in ["30 percent", "20percent", "\u{2212}5", "2kg"] {
+            assert_eq!(value(echo), None, "{echo}");
+        }
         assert_eq!(value("1password"), None);
         assert_eq!(value("12 +"), None);
     }
