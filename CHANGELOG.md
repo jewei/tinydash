@@ -21,6 +21,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - A command that fails when you run it with its hotkey, such as Toggle Dark Mode on a desktop without it, no longer brings up the launcher over the app you are in.
 - An app or file hotkey pressed just after TinyDash starts, before it has found your apps and files, now asks you to try again in a moment. Before, it said the item was gone and to remove the hotkey. Settings > Search shows such items as still loading.
 - If TinyDash cannot pause the shortcuts when you record keys, the launcher shortcut and the hotkeys stay on. Before, some could stay off until TinyDash restarted.
+- After you record a launcher shortcut, Settings no longer shows an error about a hotkey that another app holds as if the new shortcut had failed.
 
 ## [0.7.0] - 2026-10-19
 

@@ -230,9 +230,8 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
         .lock()
         .unwrap_or_else(|e| e.into_inner());
     if !paused {
-        let failure = sync(app, &state.hotkeys.get()).into_iter().next();
-        register(app, &state.settings.get().shortcut)?;
-        return failure.map_or(Ok(()), |failure| Err(failure.error));
+        turn_on_hotkeys(app, &state.hotkeys.get());
+        return register(app, &state.settings.get().shortcut);
     }
     let released = match sync(app, &Hotkeys::default()).into_iter().next() {
         Some(failure) => Err(failure.error),
@@ -241,9 +240,16 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
     if released.is_err() {
         // The recorder stops on this error and never resumes, so turn the
         // released hotkeys back on. The launcher shortcut is still on.
-        for failure in sync(app, &state.hotkeys.get()) {
-            tracing::warn!(id = %failure.id, error = %failure.error, "A hotkey is off");
-        }
+        turn_on_hotkeys(app, &state.hotkeys.get());
     }
     released
+}
+
+/// Register the hotkeys again after a pause. The recorder shows a pause
+/// error as the launcher shortcut's, so a hotkey that stays off, such as
+/// one that failed at startup, is only logged.
+fn turn_on_hotkeys(app: &AppHandle, hotkeys: &Hotkeys) {
+    for failure in sync(app, hotkeys) {
+        tracing::warn!(id = %failure.id, error = %failure.error, "A hotkey is off");
+    }
 }
