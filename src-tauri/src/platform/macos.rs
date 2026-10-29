@@ -913,8 +913,11 @@ mod tests {
     fn a_script_runs_the_command_deletes_itself_and_opens_the_login_shell() {
         let data = std::env::temp_dir().join(format!("tinydash-script-{}", std::process::id()));
         std::fs::remove_dir_all(&data).ok();
+        let home = data.join("home");
+        std::fs::create_dir_all(&home).unwrap();
         // `echo` stands in for the login shell and prints `-l` where it
-        // would open.
+        // would open. The app for `.command` files can start the script in
+        // any folder, such as `/`.
         let run = |command: &str| {
             let script = super::super::terminal::command_file(
                 &data,
@@ -922,6 +925,10 @@ mod tests {
             )
             .unwrap();
             let output = std::process::Command::new(&script)
+                .current_dir("/")
+                // zsh reads `.zshenv` in `ZDOTDIR`, else in `HOME`: here, none.
+                .env("HOME", &home)
+                .env_remove("ZDOTDIR")
                 .env("SHELL", "/bin/echo")
                 .stdin(std::process::Stdio::null())
                 .output()
@@ -930,6 +937,8 @@ mod tests {
             String::from_utf8(output.stdout).unwrap()
         };
         assert_eq!(run("echo {clipboard} \"it's\""), "{clipboard} it's\n-l\n");
+        // The command starts in the home folder, and can leave it.
+        assert_eq!(run("pwd"), format!("{}\n-l\n", home.display()));
         assert_eq!(run("cd / && pwd"), "/\n-l\n");
         // Exit, a syntax error, or a line that runs on still leave a shell.
         assert_eq!(run("exit 3"), "-l\n");

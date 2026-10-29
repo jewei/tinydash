@@ -95,11 +95,12 @@ fn remove_old_command_files(folder: &Path, now: std::time::SystemTime) {
 /// the line that the user typed. The script deletes itself first, so the
 /// command does not stay on disk, and the trap then opens the user's login
 /// shell when the command ends, exits, has a syntax error, or is stopped
-/// with Control+C.
+/// with Control+C. `cd` starts the command in the home folder, because the
+/// app can start the script in another folder (iTerm uses its profile's).
 #[cfg(any(target_os = "macos", test))]
 pub(super) fn macos_script(command: &str) -> String {
     format!(
-        "#!/bin/zsh\nrm -f -- \"$0\"\ntrap 'exec \"${{SHELL:-/bin/zsh}}\" -l' EXIT INT\n{command}\n"
+        "#!/bin/zsh\nrm -f -- \"$0\"\ntrap 'exec \"${{SHELL:-/bin/zsh}}\" -l' EXIT INT\ncd\n{command}\n"
     )
 }
 
@@ -275,7 +276,7 @@ mod tests {
         assert_eq!(
             macos_script(command),
             format!(
-                "#!/bin/zsh\nrm -f -- \"$0\"\ntrap 'exec \"${{SHELL:-/bin/zsh}}\" -l' EXIT INT\n{command}\n"
+                "#!/bin/zsh\nrm -f -- \"$0\"\ntrap 'exec \"${{SHELL:-/bin/zsh}}\" -l' EXIT INT\ncd\n{command}\n"
             )
         );
         assert_eq!(macos_script(command).lines().last(), Some(command));
