@@ -24,14 +24,18 @@ const TIME_LIMIT: Duration = if cfg!(test) {
 } else {
     Duration::from_millis(100)
 };
-/// Longest input, in bytes, that fend parses. Its parser recurses for each
-/// sign or operand, and a release build overflows a 2 MiB stack near 2,000
-/// (a debug build, with its larger stack frames, near 100).
+/// Longest query, in characters, that the calculator reads. fend's parser
+/// recurses for each sign or operand, and a release build overflows a 2 MiB
+/// stack near 2,000 (a debug build, with its larger stack frames, near 100).
 const MAX_INPUT: usize = 500;
-/// Most parentheses in an input. Each one nests fend's parser about 20 calls
-/// deeper, and fend adds a `(` at the start for each `)`. In a release
-/// build, 200 nested calls such as `sin(` overflow a 2 MiB stack.
+/// Most parentheses in a query. Each one nests fend's parser about 20 calls
+/// deeper. In a release build, about 170 nested calls such as `sin(`
+/// overflow a 2 MiB stack.
 const MAX_PARENTHESES: usize = 32;
+/// Deepest nesting of fend's input, after the rewrites that add parentheses.
+/// fend adds a `(` at the start for each `)`, so this counts each `)` and
+/// the deepest group. A release build overflows a 2 MiB stack near 550.
+const MAX_DEPTH: usize = 64;
 /// Most parse work, as `parses_fast` counts it: about 20 ms in a release
 /// build for the slowest kind of input.
 const MAX_PARSE_WORK: u64 = 50_000;
@@ -306,8 +310,10 @@ fn currency_shorthand(query: &str) -> Option<String> {
 /// The query in fend's syntax, or `None` when fend would read a percentage
 /// in it wrongly or could not parse it fast.
 fn fend_input(query: &str) -> Option<String> {
-    // Also bounds the rewrites, which recurse once for each percentage.
-    if query.len() > MAX_INPUT {
+    // The limits that the user sees. They also bound the rewrites, which
+    // recurse once for each percentage.
+    if query.chars().nth(MAX_INPUT).is_some() || query.matches(['(', ')']).count() > MAX_PARENTHESES
+    {
         return None;
     }
     // fend reads the minus sign of typeset math, `−`, as `-`, but the checks
@@ -332,23 +338,22 @@ fn fend_input(query: &str) -> Option<String> {
 /// bound, also for input that fails to parse, as it does while the user
 /// types.
 fn parses_fast(input: &str) -> bool {
-    if input.len() > MAX_INPUT || input.matches(['(', ')']).count() > MAX_PARENTHESES {
-        return false;
-    }
     // How often fend parses the current group, and its terms so far.
     let (mut parses, mut terms) = (1_u64, 0_u64);
     let mut outer = Vec::new();
-    let mut work = 0_u64;
+    let (mut work, mut closed, mut deepest) = (0_u64, 0, 0);
     for (at, c) in input.char_indices() {
         let reads = parses.saturating_mul(terms + 1);
         work = work.saturating_add(reads);
         match c {
             '(' => {
                 outer.push((parses, terms));
+                deepest = deepest.max(outer.len());
                 parses = reads.saturating_mul(group_reads(&input[..at]));
                 terms = 0;
             }
             ')' => {
+                closed += 1;
                 if let Some(group) = outer.pop() {
                     (parses, terms) = group;
                 }
@@ -363,7 +368,7 @@ fn parses_fast(input: &str) -> bool {
             _ => {}
         }
     }
-    work <= MAX_PARSE_WORK
+    closed + deepest <= MAX_DEPTH && work <= MAX_PARSE_WORK
 }
 
 /// How often fend parses a group that follows `text`, for each parse of the
@@ -609,13 +614,14 @@ fn added_percentage(query: &str) -> Option<String> {
     {
         return None;
     }
+    // Each step multiplies the one before it, so a chain adds no nesting.
     let value = if value.ends_with('%') {
         added_percentage(value)?
     } else {
-        value.to_owned()
+        format!("({value})")
     };
     let sign = &left[at..=at];
-    Some(format!("({value}) * (1 {sign} ({percent}) / 100)"))
+    Some(format!("{value} * (1 {sign} {percent} / 100)"))
 }
 
 /// Whether fend would add a percentage in `input` to a number as a
@@ -988,6 +994,11 @@ mod tests {
             format!("{}1", "-".repeat(5000)),
             format!("{}1", "1+".repeat(300)),
             format!("100{}", " - 1%".repeat(100_000)),
+            // 33 parentheses, and 501 characters.
+            format!("{}1{} + 10%", "(".repeat(17), ")".repeat(16)),
+            format!("1 +{}1", "\u{3000}".repeat(497)),
+            // Short, but its rewrite nests too deep.
+            format!("100{}", " - 1%".repeat(70)),
             // Parsed again and again.
             "1(".repeat(30),
             "1+1+1+1+1+1+1+(".repeat(8),
@@ -1015,6 +1026,14 @@ mod tests {
                 "approx. 1.6153846154",
             ),
             ("200 - 10% - 5% - 2% - 1%".into(), "165.9042"),
+            // The limits count what the user typed, not the rewrite.
+            ("200 - 1% - 1% - 1% - 1% - 1% - 1%".into(), "188.2960298802"),
+            (
+                format!("{}1{} + 10%", "(".repeat(16), ")".repeat(16)),
+                "1.1",
+            ),
+            // 499 characters, but 1,489 bytes.
+            (format!("1 +{}1", "\u{3000}".repeat(495)), "2"),
         ] {
             assert_eq!(value(&query).as_deref(), Some(expected), "{query}");
         }
