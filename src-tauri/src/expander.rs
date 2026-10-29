@@ -78,11 +78,11 @@ pub fn start(app: &AppHandle, ask: bool) -> Result<()> {
     std::thread::Builder::new()
         .name("snippet-typing".into())
         .spawn(move || type_snippets(&typist, &triggers, &typist_typing))?;
+    let watcher = app.clone();
+    let library = move || watcher.state::<State>().library.get();
     // If the watch cannot start, `found` drops with it, and the worker ends.
     *watch = Some(platform::watch_typing(find_triggers(
-        app.clone(),
-        found,
-        typing,
+        library, found, typing,
     ))?);
     Ok(())
 }
@@ -98,15 +98,15 @@ pub fn stop() {
 }
 
 /// What the watch thread runs for each key: match it against the snippet
-/// keywords, and hand a trigger to the worker. The keywords are built again
-/// only when a save swaps in a new library.
+/// keywords from `library`, and hand a trigger to the worker. The keywords
+/// are built again only when a save swaps in a new library.
 fn find_triggers(
-    app: AppHandle,
+    library: impl Fn() -> Arc<Library> + Send + 'static,
     found: mpsc::SyncSender<Expansion>,
     typing: Arc<AtomicBool>,
 ) -> impl FnMut(Key) + Send + 'static {
     let mut typed = Typed::default();
-    let mut library: Option<Arc<Library>> = None;
+    let mut known: Option<Arc<Library>> = None;
     let mut keywords = Keywords::default();
     move |key| {
         let key = if typing.load(Ordering::Acquire) {
@@ -114,13 +114,13 @@ fn find_triggers(
         } else {
             key
         };
-        let current = app.state::<State>().library.get();
-        if !library
+        let current = library();
+        if !known
             .as_ref()
             .is_some_and(|known| Arc::ptr_eq(known, &current))
         {
             keywords = Keywords::new(current.items());
-            library = Some(current);
+            known = Some(current);
         }
         let Some(expansion) = typed.press(key, &keywords) else {
             return;
@@ -152,5 +152,60 @@ fn type_snippet(app: &AppHandle, expansion: &Expansion) {
     };
     if let Err(error) = platform::type_text(expansion.erase, &text) {
         tracing::warn!(%error, "Could not type a snippet");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::features::library::{LibraryItem, LibraryKind};
+
+    fn library(keyword: &str) -> Arc<Library> {
+        Arc::new(Library::new(vec![LibraryItem {
+            id: Some(1),
+            kind: LibraryKind::Snippet,
+            name: keyword.into(),
+            keyword: keyword.into(),
+            text: "text".into(),
+        }]))
+    }
+
+    #[test]
+    fn hands_each_trigger_to_the_worker_once() {
+        let saved = Arc::new(Mutex::new(library("sig")));
+        let current = Arc::clone(&saved);
+        let typing = Arc::new(AtomicBool::new(false));
+        let (found, triggers) = mpsc::sync_channel(1);
+        let mut on_key = find_triggers(
+            move || Arc::clone(&current.lock().unwrap()),
+            found,
+            Arc::clone(&typing),
+        );
+        let mut type_keys = |text: &str| text.chars().for_each(|c| on_key(Key::Char(c)));
+        let keyword = |expansion: Expansion| expansion.keyword;
+
+        // While a snippet types, the app shows text that the watch never
+        // saw, so no key there starts a trigger.
+        typing.store(true, Ordering::Release);
+        type_keys(";sig");
+        assert!(triggers.try_recv().is_err());
+
+        typing.store(false, Ordering::Release);
+        type_keys(";sig");
+        assert_eq!(triggers.try_recv().map(keyword), Ok("sig".into()));
+        assert!(typing.load(Ordering::Acquire));
+
+        // A save swaps in a new library, and its keywords count at once.
+        typing.store(false, Ordering::Release);
+        *saved.lock().unwrap() = library("bye");
+        type_keys(" ;sig ;bye");
+        assert_eq!(triggers.try_recv().map(keyword), Ok("bye".into()));
+        assert!(triggers.try_recv().is_err());
+
+        // A worker that has stopped takes nothing, so the keys count again.
+        drop(triggers);
+        typing.store(false, Ordering::Release);
+        type_keys(" ;bye");
+        assert!(!typing.load(Ordering::Acquire));
     }
 }
