@@ -28,8 +28,8 @@
 //! - `discover_apps()`: installed apps.
 //! - `launch_app(path)`: start an app found by `discover_apps`.
 //! - `open_path(path)` / `open_url(url)`: open with the default app.
-//!   Programs that TinyDash starts on Linux leave out the GTK setup that the
-//!   AppImage made for TinyDash itself.
+//!   Programs that TinyDash starts on Linux leave out the setup that the
+//!   AppImage made for TinyDash itself: its libraries, GTK, and modules.
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`. Sleep Displays calls
 //!   `wait_for_key_release` first, only where it is supported.
