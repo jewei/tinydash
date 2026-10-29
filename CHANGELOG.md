@@ -19,6 +19,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - The calculator no longer adds a percentage as a hundredth: `100 + 10% + 5` and `(100 + 10%) * 2` now give no answer instead of 105.1 and 200.2. `200 - 10% - 5%` gives 171, and `20 percent` works like `20%`.
 - A very long or deeply nested calculation, such as hundreds of parentheses, no longer freezes search or crashes TinyDash. The calculator gives no answer for it.
+- A percentage after the typeset minus sign `−` works as after `-`: `100 − 10%` gives 90, not 99.9.
 
 ## [0.7.0] - 2026-10-19
 

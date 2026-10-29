@@ -310,10 +310,13 @@ fn fend_input(query: &str) -> Option<String> {
     if query.len() > MAX_INPUT {
         return None;
     }
-    let input = match currency_shorthand(query) {
+    // fend reads the minus sign of typeset math, `−`, as `-`, but the checks
+    // here know only `-`. (In `1e−2`, fend would read `1 e − 2`.)
+    let query = query.replace('\u{2212}', "-");
+    let input = match currency_shorthand(&query) {
         Some(input) => input,
         None => {
-            let input = euro_amounts(query);
+            let input = euro_amounts(&query);
             let input = word_operators(&input);
             percentage(&input).unwrap_or_else(|| input.into_owned())
         }
@@ -862,6 +865,9 @@ mod tests {
             ("30 plus 20 percent", "36"),
             ("30 + 20Percent", "36"),
             ("20 is what percent of 200", "10%"),
+            // The minus sign of typeset math.
+            ("100 \u{2212} 10%", "90"),
+            ("1e\u{2212}2 * 100", "1"),
         ] {
             assert_eq!(value(query).as_deref(), Some(expected), "{query}");
         }
@@ -874,6 +880,7 @@ mod tests {
             "10 - -5%",
             "100 * 10% + 20%",
             "5 + 10% to fraction",
+            "100 \u{2212} 10% + 5",
         ] {
             assert_eq!(value(query), None, "{query}");
         }
@@ -920,6 +927,7 @@ mod tests {
             // Parsed again and again.
             "1(".repeat(30),
             "1+1+1+1+1+1+1+(".repeat(8),
+            format!("{}(", "1\u{2212}".repeat(15)).repeat(7),
             "1 2/(".repeat(16),
             "1 2^-(".repeat(16),
         ] {
