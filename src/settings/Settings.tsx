@@ -577,10 +577,11 @@ export function Settings() {
                     .filter(Boolean)
                     .join(" ")}
                 >
+                  {/* Where it cannot work, a value set by hand can still turn off. */}
                   <Toggle
                     label="Expand snippets as you type"
                     checked={settings().expandSnippets}
-                    disabled={!!about()?.expandSnippetsUnavailable}
+                    disabled={!!about()?.expandSnippetsUnavailable && !settings().expandSnippets}
                     onChange={(expandSnippets) => void save({ expandSnippets })}
                   />
                 </Row>

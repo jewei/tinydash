@@ -117,6 +117,28 @@ describe("Settings", () => {
     expect((within(row).getByRole("switch") as HTMLInputElement).disabled).toBe(true);
   });
 
+  it("lets a snippet expansion setting that cannot work be turned off", async () => {
+    fakeBackend(
+      {
+        about: () => ({
+          version: "0.2.0",
+          settingsFolder: "/data",
+          dataFolder: "/data",
+          richClipboard: false,
+          selfUpdate: false,
+          pendingUpdate: null,
+          expandSnippetsUnavailable: "Not available on Wayland.",
+        }),
+      },
+      { expandSnippets: true },
+    );
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    const row = await screen.findByRole("group", { name: "Expand snippets as you type" });
+    await waitFor(() => expect(row.textContent).toContain("Not available on Wayland."));
+    expect((within(row).getByRole("switch") as HTMLInputElement).disabled).toBe(false);
+  });
+
   it("says when the app details cannot be read, and tries again on opening About", async () => {
     let fail = true;
     const backend = fakeBackend({
