@@ -19,6 +19,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - A hotkey that cannot run now says why in a system notification. Before, the reason showed in the small "Copied" message, cut short and next to a check mark.
 - A command that fails when you run it with its hotkey, such as Toggle Dark Mode on a desktop without it, no longer brings up the launcher over the app you are in.
+- An app or file hotkey pressed just after TinyDash starts, before it has found your apps and files, now asks you to try again in a moment. Before, it said the item was gone and to remove the hotkey. Settings > Search shows such items as still loading.
 
 ## [0.7.0] - 2026-10-19
 

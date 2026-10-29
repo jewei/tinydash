@@ -445,23 +445,40 @@ pub fn hotkey_owner(
 /// Run the main action of the result that a hotkey belongs to, as Enter
 /// would in the launcher.
 pub fn run_hotkey(app: &AppHandle, id: &str) -> Result<()> {
-    let snapshot = app.state::<State>().snapshot();
+    let state = app.state::<State>();
+    // Read readiness first, as `pin` does.
+    let ready = state.freshness.ready();
+    let action = hotkey_action(&state.snapshot(), id, ready)?;
+    run(app, action, Some(id))
+}
+
+/// The main action of the result with `id`. Until a source is `ready`,
+/// its items only look gone: a hotkey pressed just after startup must not
+/// ask the user to remove it.
+fn hotkey_action(snapshot: &Snapshot, id: &str, ready: impl Fn(Source) -> bool) -> Result<Action> {
     let ctx = Context {
         usage: &snapshot.usage,
         pins: &snapshot.pins,
         now: snapshot.now.timestamp(),
         skin_tone: snapshot.settings.emoji_skin_tone,
     };
-    let found = search::resolve(&snapshot, &ctx, id).ok_or_else(|| {
-        Error::msg("This hotkey's item no longer exists. Remove the hotkey in Settings > Search.")
-    })?;
-    let main = found
+    let Some(found) = search::resolve(snapshot, &ctx, id) else {
+        if Source::parse(id).is_some_and(|(source, _)| !ready(source)) {
+            return Err(Error::msg(
+                "TinyDash is still loading your apps and files. Try again in a moment.",
+            ));
+        }
+        return Err(Error::msg(
+            "This hotkey's item no longer exists. Remove the hotkey in Settings > Search.",
+        ));
+    };
+    found
         .actions
         .into_iter()
         .next()
         .filter(|action| action.confirm.is_none())
-        .ok_or_else(|| Error::msg("This item asks before it runs. Run it from TinyDash."))?;
-    run(app, main.action, Some(id))
+        .map(|main| main.action)
+        .ok_or_else(|| Error::msg("This item asks before it runs. Run it from TinyDash."))
 }
 
 /// An http or https address, the only kind the OS opener may get: another
@@ -624,6 +641,31 @@ mod tests {
                 .unwrap_err()
                 .starts_with("You can set up to 50 hotkeys.")
         );
+    }
+
+    #[test]
+    fn a_hotkey_pressed_before_the_first_scan_asks_to_wait() {
+        let state = State::for_tests(Settings::default());
+        let snapshot = state.snapshot();
+        let error = |id: &str, scanned: bool| {
+            let ready = |source| scanned || !matches!(source, Source::App | Source::File);
+            hotkey_action(&snapshot, id, ready).unwrap_err().to_string()
+        };
+        let safari = "app:/Applications/Safari.app";
+        assert_eq!(
+            error(safari, false),
+            "TinyDash is still loading your apps and files. Try again in a moment."
+        );
+        assert!(error("file:/notes.txt", false).contains("still loading"));
+        let gone = "This hotkey's item no longer exists. Remove the hotkey in Settings > Search.";
+        assert_eq!(error(safari, true), gone);
+        // Commands need no scan, so a gone one is gone at once.
+        assert_eq!(error("system:gone", false), gone);
+        assert!(matches!(
+            hotkey_action(&snapshot, "system:lock", |_| true),
+            Ok(Action::System { .. })
+        ));
+        assert!(error("system:sleep", true).contains("asks before it runs"));
     }
 
     #[test]
