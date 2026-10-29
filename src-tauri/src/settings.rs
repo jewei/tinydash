@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -389,7 +392,12 @@ impl SettingsFile {
         std::fs::create_dir_all(&self.dir)?;
         let path = self.dir.join(FILE_NAME);
         let temporary = self.dir.join(format!("{FILE_NAME}.tmp"));
-        std::fs::write(&temporary, serde_json::to_vec_pretty(settings)?)?;
+        let mut file = std::fs::File::create(&temporary)?;
+        file.write_all(&serde_json::to_vec_pretty(settings)?)?;
+        // The data must be on disk before the rename is: after a crash, a
+        // renamed but empty file would load as defaults.
+        file.sync_all()?;
+        drop(file);
         std::fs::rename(&temporary, &path)?;
         Ok(())
     }
