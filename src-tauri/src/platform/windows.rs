@@ -373,17 +373,24 @@ fn clipboard_is_concealed() -> bool {
     // memory stays locked while the DWORD is read.
     unsafe {
         let handle = GetClipboardData(history);
-        let mut excluded = false;
+        let mut value = None;
         if !handle.is_null() && GlobalSize(handle) >= 4 {
             let pointer = GlobalLock(handle);
             if !pointer.is_null() {
-                excluded = pointer.cast::<u32>().read_unaligned() == 0;
+                value = Some(pointer.cast::<u32>().read_unaligned());
                 GlobalUnlock(handle);
             }
         }
         CloseClipboard();
-        excluded
+        kept_out_of_history(value)
     }
+}
+
+/// Whether a `CanIncludeInClipboardHistory` value keeps a copy out of
+/// history. 0 does. A value that cannot be read (`None`) does too, as a
+/// busy clipboard does, rather than risk saving a password.
+fn kept_out_of_history(value: Option<u32>) -> bool {
+    value.is_none_or(|value| value == 0)
 }
 
 /// The clipboard content for the latest change, or `None` when its source
@@ -575,6 +582,13 @@ mod tests {
         assert_eq!(name(r"C:\Start\UNINSTALL.exe"), None);
         assert_eq!(name(r"C:\Start\desktop.ini"), None);
         assert_eq!(name(r"C:\Start\Readme"), None);
+    }
+
+    #[test]
+    fn an_unreadable_history_marker_keeps_the_copy_out() {
+        assert!(super::kept_out_of_history(None));
+        assert!(super::kept_out_of_history(Some(0)));
+        assert!(!super::kept_out_of_history(Some(1)));
     }
 
     #[test]

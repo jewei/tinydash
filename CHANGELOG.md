@@ -18,6 +18,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Fixed
 
 - On macOS, a snippet with `{clipboard}`, or a copy, can no longer crash TinyDash when it uses the clipboard at the same moment as clipboard history.
+- On Windows, clipboard history skips a copy when it cannot read whether the app that made the copy allows it in history. Before, it saved the copy.
 
 ## [0.7.0] - 2026-10-19
 
