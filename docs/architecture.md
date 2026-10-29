@@ -24,7 +24,7 @@ TinyDash is one Rust process with three webview windows: the **launcher**, creat
 
 A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42`, `emoji:🚀`) and a list of `ResultAction`s. The first action runs on Enter, the second on Mod+Enter. The frontend sends the chosen `Action` back to `run_action`, plus the result ID when it was the main action, which counts as use.
 
-`actions.rs` checks every action against Rust's own state. It launches only indexed apps, opens and reveals only indexed apps and files (and the paths a Spotlight search returned most recently, up to 500), opens only http(s) URLs (a quicklink the user saved may also open a mailto URL or an absolute or `~` path), pins and gives aliases only to items that still exist (at most 100 pins and 500 aliases, each alias naming one item), and reads snippets and quicklinks from its own library; a quicklink's placeholder values cannot add a path separator or a `..`. Previews load for indexed apps, offered files (indexed, or among the paths a Spotlight search returned most recently), saved clipboard entries (hidden while history is off), and snippets. Copies from the password generator are marked secret so clipboard managers skip them.
+`actions.rs` checks every action against Rust's own state. It launches only indexed apps, opens and reveals only indexed apps and files (and the paths a Spotlight search returned most recently, up to 500), opens only http(s) URLs (a quicklink the user saved may also open a mailto URL or an absolute or `~` path), pins and gives aliases only to items that still exist (at most 100 pins and 500 aliases, each alias naming one item), and reads snippets and quicklinks from its own library; a quicklink's placeholder values cannot add a path separator or a `..`. It runs a shell command only while shell commands are on, and only one line of up to 1,000 characters. Previews load for indexed apps, offered files (indexed, or among the paths a Spotlight search returned most recently), saved clipboard entries (hidden while history is off), and snippets. Copies from the password generator are marked secret so clipboard managers skip them.
 
 ## State and background work
 
@@ -57,7 +57,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 ## Platform layer
 
-`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection and reads (one thread at a time), disk space, a search of the OS's file index (Spotlight on macOS), launcher window setup, and returning focus. Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (AGENTS.md rule 6).
+`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection and reads (one thread at a time), disk space, a search of the OS's file index (Spotlight on macOS), a terminal for shell commands, launcher window setup, and returning focus. Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (AGENTS.md rule 6).
 
 | Concern          | macOS                                 | Windows                      | Linux                                                                                                         |
 | ---------------- | ------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -69,7 +69,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 ## Security
 
 - All three windows (launcher, Settings, and the HUD) load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
-- External programs run only with fixed arguments; user text never reaches a shell.
+- External programs run only with fixed arguments. User text reaches a shell only as a shell command (`>`), which is off by default and runs only on Enter: as an argument of its own on Linux, a script line of its own on macOS, and encoded on Windows, never inside another quoted string.
 - Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Clipboard cards read the text when the widget pane loads, skip marked secrets the same way, and keep nothing. Network requests: the ECB rate table (when currency rates are on, which they are not by default), the weather (when the widget is on: the city name to Open-Meteo's geocoding service, then its coordinates to the forecast service), and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
 ## Decisions

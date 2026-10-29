@@ -10,6 +10,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - The calculator reads `plus`, `minus`, `times`, `multiplied by`, and `divided by`, and amounts such as `€20`.
 - Date answers read phrases such as `3 days from now`, `a week ago`, `2 weeks after dec 25`, and dates with month names, such as `25 dec` or `December 25, 2026`.
 - Count days with `days until dec 25`, `days since 2026-01-01`, and `days between 3 mar and 30 may`.
+- Run a shell command from the launcher. Turn on Run shell commands in Settings > Search, then type `>` and a command, such as `> git pull`, and press Enter. It runs in Terminal (PowerShell on Windows), and your shell stays open after it. It is off by default.
 
 ### Changed
 
