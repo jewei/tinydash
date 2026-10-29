@@ -335,7 +335,9 @@ pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<Libr
             )));
         }
         let item = item.validated()?;
-        state.library.get().check_keyword(&item)?;
+        let library = state.library.get();
+        library.check_kind(&item)?;
+        library.check_keyword(&item)?;
         let saved = state.store.save_library_item(&item)?;
         state.reload_library()?;
         events::results_stale(&app);

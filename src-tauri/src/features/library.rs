@@ -287,6 +287,18 @@ impl Library {
         self.items.iter().find(|item| item.id == Some(id))
     }
 
+    /// Refuse to change a saved item between snippet and quicklink: its
+    /// result ID would change, and its pins, aliases, hidden rows, and
+    /// hotkey would stay with the old one.
+    pub fn check_kind(&self, item: &LibraryItem) -> Result<()> {
+        match item.id.and_then(|id| self.find(id)) {
+            Some(saved) if saved.kind != item.kind => Err(Error::msg(
+                "A snippet cannot become a quicklink, or a quicklink a snippet. Add a new item instead.",
+            )),
+            _ => Ok(()),
+        }
+    }
+
     /// Refuse a keyword that another item already has: only one of them
     /// could answer it.
     pub fn check_keyword(&self, item: &LibraryItem) -> Result<()> {
@@ -609,6 +621,27 @@ mod tests {
                 ..jest.clone()
             };
             assert!(library.check_keyword(&free).is_ok(), "{keyword}");
+        }
+    }
+
+    #[test]
+    fn a_saved_item_keeps_its_kind() {
+        let library = Library::new(vec![item(LibraryKind::Snippet, "Sig", "", "Regards")]);
+        let saved = &library.items()[0];
+        assert!(library.check_kind(saved).is_ok());
+        let changed = LibraryItem {
+            kind: LibraryKind::Quicklink,
+            text: "https://x.test".into(),
+            ..saved.clone()
+        };
+        assert!(library.check_kind(&changed).is_err());
+        // A new item, or one that was deleted meanwhile, has no kind to keep.
+        for id in [None, Some(9)] {
+            let other = LibraryItem {
+                id,
+                ..changed.clone()
+            };
+            assert!(library.check_kind(&other).is_ok(), "{id:?}");
         }
     }
 
