@@ -183,15 +183,23 @@ where
         };
         (!overdue(reminder.due), due, reminder.title.clone())
     });
+    // A reminder that falls due moves up among the overdue ones, so one
+    // that the limit leaves out can come in then.
+    changes.extend(
+        reminders
+            .iter()
+            .filter_map(|reminder| match reminder.due {
+                Due::At(ms) if ms > now_ms => Some(ms),
+                _ => None,
+            })
+            .min(),
+    );
     reminders.truncate(MAX_REMINDERS);
     for reminder in reminders {
         let time = match reminder.due {
             due if overdue(due) => "Overdue".to_owned(),
             Due::Day(_) => "Today".to_owned(),
-            Due::At(ms) => {
-                changes.push(ms);
-                clock(&zone, ms)
-            }
+            Due::At(ms) => clock(&zone, ms),
         };
         items.push(item(
             UpNextKind::Reminder,
@@ -563,6 +571,25 @@ mod tests {
         );
         assert_eq!(rows(&next), [row("Now", "Review")]);
         assert_eq!(next.changes_at_ms, at(16, 0));
+    }
+
+    #[test]
+    fn loads_again_when_a_reminder_left_out_falls_due() {
+        // At 16:00 the last one becomes overdue and moves to the top.
+        let mut reminders: Vec<Reminder> = (0..MAX_REMINDERS)
+            .map(|n| reminder(&format!("Task {n}"), Due::Day(now().date_naive())))
+            .collect();
+        reminders.push(reminder("Call back", Due::At(at(16, 0))));
+        let before = view(agenda(Vec::new(), reminders.clone()), &now());
+        assert!(!before.items.iter().any(|item| item.title == "Call back"));
+        assert_eq!(before.changes_at_ms, at(16, 0));
+
+        let after = view(
+            agenda(Vec::new(), reminders),
+            &(now() + TimeDelta::hours(2)),
+        );
+        assert_eq!(after.items[0].title, "Call back");
+        assert_eq!(after.items[0].time, "Overdue");
     }
 
     #[test]
