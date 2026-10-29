@@ -14,6 +14,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Changed
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
+- Search finds up to 5,000 installed apps. On a computer with more, TinyDash leaves out the rest.
 
 ### Fixed
 
