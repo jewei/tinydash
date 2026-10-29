@@ -182,6 +182,15 @@ describe("Settings", () => {
     expect(backend.called("update_settings")[0]?.args).toEqual({ changes: { focusMinutes: 120 } });
   });
 
+  it("offers Up Next only on macOS, which has the calendars it reads", async () => {
+    fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Widgets" }));
+    expect(await screen.findByRole("switch", { name: "Clocks" })).toBeTruthy();
+    // jsdom's user agent names no Mac, so the window counts as another OS.
+    expect(screen.queryByRole("switch", { name: "Up Next" })).toBeNull();
+  });
+
   it("saves the weather city when the field is left", async () => {
     const backend = fakeBackend();
     render(() => <Settings />);

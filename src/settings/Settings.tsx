@@ -284,6 +284,18 @@ export function Settings() {
                     onChange={(showClocks) => void save({ showClocks })}
                   />
                 </Row>
+                <Show when={IS_MAC}>
+                  <Row
+                    label="Up Next"
+                    description="Shows the rest of today's events and the reminders due today. macOS asks for access to Calendars and Reminders when you turn this on."
+                  >
+                    <Toggle
+                      label="Up Next"
+                      checked={settings().showUpNext}
+                      onChange={(showUpNext) => void save({ showUpNext })}
+                    />
+                  </Row>
+                </Show>
                 <Row label="Disk space" description="Free space on the disk of your home folder.">
                   <Toggle
                     label="Disk space"

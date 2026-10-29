@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createResource,
   createSignal,
   For,
@@ -16,16 +17,18 @@ import type { ResultAction } from "../generated/ResultAction";
 import type { Settings } from "../generated/Settings";
 import { formatBytes } from "../lib/format";
 import * as ipc from "../lib/ipc";
-import { isComposing, modKey } from "../lib/keys";
+import { IS_MAC, isComposing, modKey } from "../lib/keys";
 import { Glyph } from "../ui/Icon";
 import { Keys } from "../ui/Keys";
 import type { MenuItem } from "./ActionMenu";
 import { ClipCard, JsonView, mainLabel } from "./ClipCard";
+import { UpNextCard } from "./UpNext";
 import { Weather } from "./Weather";
 
 /** Whether any widget is on, so the pane has something to show. */
 export const hasWidgets = (settings: Settings) =>
   settings.showClocks ||
+  (IS_MAC && settings.showUpNext) ||
   settings.showDiskSpace ||
   settings.showNotepad ||
   settings.showFocusTimer ||
@@ -156,8 +159,27 @@ export function WidgetPane(props: {
         keys: index === 0 ? timerKeys() : undefined,
         run: () => props.onRun(action),
       }));
-      return [...cardItems, ...timerItems];
+      return [...cardItems, ...timerItems, ...upNextItems()];
     },
+  });
+  // Each Up Next action once: every event opens Calendar.
+  const upNextItems = (): MenuItem[] => {
+    const upNext = loaded()?.upNext;
+    if (!upNext) return [];
+    const actions = [
+      ...upNext.items.map((item) => item.action),
+      ...(upNext.ask ? [upNext.ask] : []),
+    ];
+    return actions
+      .filter(
+        (action, index) => actions.findIndex((other) => other.label === action.label) === index,
+      )
+      .map((action) => ({ label: action.label, keys: undefined, run: () => props.onRun(action) }));
+  };
+  // Up Next changes as time passes, as an event starts or ends: load again.
+  createEffect(() => {
+    const changesAt = loaded()?.upNext?.changesAtMs;
+    if (changesAt !== undefined && now() >= changesAt && !widgets.loading) void refetch();
   });
   // Nothing shows: only clipboard cards are on, and the clipboard has none.
   const empty = () => {
@@ -165,6 +187,7 @@ export function WidgetPane(props: {
     return (
       shown !== undefined &&
       !shown.clocks &&
+      !shown.upNext &&
       !shown.disk &&
       shown.note === null &&
       !shown.focus &&
@@ -220,6 +243,9 @@ export function WidgetPane(props: {
           )}
         </Show>
         <Show when={loaded()?.clocks}>{(cities) => <Clocks cities={cities()} now={now()} />}</Show>
+        <Show when={loaded()?.upNext}>
+          {(upNext) => <UpNextCard upNext={upNext()} onRun={props.onRun} />}
+        </Show>
         <Show when={loaded()?.weather}>
           {(view) => <Weather view={view()} now={now()} onRun={props.onRun} />}
         </Show>

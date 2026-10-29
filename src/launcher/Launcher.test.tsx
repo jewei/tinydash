@@ -1715,6 +1715,90 @@ describe("Launcher", () => {
     });
   });
 
+  it("lists what is up next and opens Calendar or Reminders", async () => {
+    const open = (kind: "event" | "reminder") => ({
+      label: kind === "event" ? "Open Calendar" : "Open Reminders",
+      action: { type: "openUpNext", kind },
+      confirm: null,
+    });
+    const item = (kind: "event" | "reminder", title: string, time: string, source: string) => ({
+      kind,
+      title,
+      time,
+      source,
+      action: open(kind),
+    });
+    const upNext = {
+      items: [
+        item("event", "Standup", "Now", "Work"),
+        item("event", "Review", "16:30–17:00", "Work"),
+        item("reminder", "Pay rent", "Overdue", "Home"),
+      ],
+      problems: [],
+      ask: null,
+      changesAtMs: Date.now() + 3_600_000,
+    };
+    const { backend, press } = setup(() => [], {
+      widgets: () => ({ ...noCards, upNext }),
+    });
+    const card = await screen.findByRole("region", { name: "Up Next" });
+    expect(within(card).getByRole("button", { name: "16:30–17:00 Review Work" })).toBeTruthy();
+
+    fireEvent.click(within(card).getByRole("button", { name: /Pay rent/ }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "openUpNext", kind: "reminder" },
+      resultId: null,
+    });
+
+    // The actions menu lists each app once, for the keyboard. One action
+    // runs at a time, so the menu waits for the click's.
+    await new Promise((resolve) => setTimeout(resolve));
+    press("k", { ctrlKey: true, code: "KeyK" });
+    expect(await screen.findAllByRole("option", { name: "Open Calendar" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("option", { name: "Open Reminders" }));
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    expect(backend.called("widgets")).toHaveLength(1);
+  });
+
+  it("says when nothing else is up today, and asks for access", async () => {
+    let upNext: object = { items: [], problems: [], ask: null, changesAtMs: Date.now() + 60_000 };
+    const { backend } = setup(() => [], { widgets: () => ({ ...noCards, upNext }) });
+    const card = await screen.findByRole("region", { name: "Up Next" });
+    expect(within(card).getByText("Nothing else today")).toBeTruthy();
+
+    upNext = {
+      items: [],
+      problems: ["TinyDash needs your permission to read your calendars and reminders."],
+      ask: { label: "Allow Access", action: { type: "askCalendarAccess" }, confirm: null },
+      changesAtMs: Date.now() + 60_000,
+    };
+    await emit("widgets:changed", null);
+    fireEvent.click(await within(card).findByRole("button", { name: "Allow Access" }));
+    expect(within(card).queryByText("Nothing else today")).toBeNull();
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect(backend.called("run_action")[0]?.args).toEqual({
+      action: { type: "askCalendarAccess" },
+      resultId: null,
+    });
+  });
+
+  it("loads Up Next again once its list changes with the time", async () => {
+    let loads = 0;
+    const { backend } = setup(() => [], {
+      widgets: () => {
+        loads += 1;
+        // The first list is already out of date; the next lasts an hour.
+        const changesAtMs = loads === 1 ? Date.now() - 1 : Date.now() + 3_600_000;
+        return { ...noCards, upNext: { items: [], problems: [], ask: null, changesAtMs } };
+      },
+    });
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2));
+    // The new time is an hour away, so it waits.
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    expect(backend.called("widgets")).toHaveLength(2);
+  });
+
   it("shows a clipboard color, copies its forms, and stays dismissed", async () => {
     const copy = (text: string) => ({ type: "copy", text }) as const;
     const color = {
