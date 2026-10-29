@@ -255,23 +255,35 @@ pub(super) fn outside_appimage(
     };
     // The root, or a relative folder, would match every path.
     let Some(appdir) = value("APPDIR")
-        .map(Path::new)
-        .filter(|appdir| appdir.has_root() && appdir.parent().is_some())
+        .filter(|appdir| {
+            let appdir = Path::new(appdir);
+            appdir.has_root() && appdir.parent().is_some()
+        })
         .filter(|_| value("APPIMAGE").is_some())
     else {
         return Vec::new();
     };
+    // The GTK hook sets `XDG_DATA_DIRS="$APPDIR/usr/share:/usr/share:$XDG_DATA_DIRS"`,
+    // so the user's own value, empty when it was not set, follows its two
+    // folders. Its `/usr/share` is outside the AppImage, but the user's
+    // value may not have it there, or at all.
+    let data_dirs_prefix = format!("{appdir}/usr/share:/usr/share:");
+    let inside = |entry: &str| Path::new(entry).starts_with(appdir);
     environment
         .iter()
         .filter_map(|(name, value)| {
             if APPIMAGE_ONLY.contains(&name.as_str()) {
                 return Some((name.clone(), None));
             }
-            let inside = |entry: &str| Path::new(entry).starts_with(appdir);
             if !value.split(':').any(inside) {
                 return None;
             }
-            let kept: Vec<&str> = value
+            let own = if name == "XDG_DATA_DIRS" {
+                value.strip_prefix(&data_dirs_prefix).unwrap_or(value)
+            } else {
+                value
+            };
+            let kept: Vec<&str> = own
                 .split(':')
                 .filter(|entry| !entry.is_empty() && !inside(entry))
                 .collect();
@@ -475,9 +487,39 @@ mod tests {
                 removed("OWD"),
                 (
                     "XDG_DATA_DIRS".to_owned(),
-                    Some("/usr/share:/usr/local/share:/usr/share".to_owned())
+                    Some("/usr/local/share:/usr/share".to_owned())
                 ),
             ]
+        );
+        // `XDG_DATA_DIRS` gets back the user's own value, as it was: none
+        // when the session did not set it, so the default applies again,
+        // and its own order otherwise. A value that the GTK hook did not
+        // make loses only its folders inside the AppImage.
+        let data_dirs = |value: &str| {
+            outside_appimage(environment(&[
+                ("APPIMAGE", "/home/me/TinyDash.AppImage"),
+                ("APPDIR", appdir),
+                ("XDG_DATA_DIRS", value),
+            ]))
+            .into_iter()
+            .find(|(name, _)| name == "XDG_DATA_DIRS")
+            .unwrap()
+            .1
+        };
+        assert_eq!(
+            data_dirs("/tmp/.mount_TinyDaAbC/usr/share:/usr/share:"),
+            None
+        );
+        assert_eq!(
+            data_dirs(
+                "/tmp/.mount_TinyDaAbC/usr/share:/usr/share:/home/me/.local/share/flatpak/exports/share:/usr/local/share:/usr/share"
+            )
+            .as_deref(),
+            Some("/home/me/.local/share/flatpak/exports/share:/usr/local/share:/usr/share")
+        );
+        assert_eq!(
+            data_dirs("/tmp/.mount_TinyDaAbC/usr/share:/opt/share").as_deref(),
+            Some("/opt/share")
         );
         // Outside an AppImage, or with an APPDIR that would match every
         // path, nothing changes.
