@@ -375,10 +375,11 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         return list;
     }
     // And `>`, for a shell command, while the user allows them, unless the
-    // user chose a keyword or an alias that starts with `>`.
+    // user chose a keyword or an alias that starts with `>`. The cheap test
+    // for `>` goes first, as this runs at each key press.
     if s.settings.shell_commands
-        && !is_users_word(s, query)
         && let Some(command) = shell::answer(query)
+        && !is_users_word(s, query)
     {
         return command;
     }
