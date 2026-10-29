@@ -854,6 +854,12 @@ fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
 /// there. Each part waits while the user holds a modifier, which the keys
 /// would take on.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
+    // Checked before the first Backspace, so the trigger stays.
+    if !xdo_can_type(text, session_locale_is_utf8) {
+        return Err(Error::msg(
+            "Could not type the snippet: it has characters outside ASCII, and the session's locale is not UTF-8. Set LANG to a UTF-8 locale, such as en_US.UTF-8.",
+        ));
+    }
     let xlib =
         Xlib::open().map_err(|_| Error::msg("Snippet expansion needs the libX11 library."))?;
     // SAFETY: A null name opens the display that DISPLAY names.
@@ -913,6 +919,44 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
     // SAFETY: Opened above and closed once; libxdo leaves it open.
     unsafe { (xlib.XCloseDisplay)(display) };
     typed
+}
+
+/// Whether libxdo can type `text`. It reads the text in the encoding of
+/// the session's locale, which it sets with `setlocale(LC_CTYPE, "")`, so
+/// characters outside ASCII type only when that locale is UTF-8. In another
+/// locale, they fail partway or type as other characters.
+fn xdo_can_type(text: &str, locale_is_utf8: impl FnOnce() -> bool) -> bool {
+    text.is_ascii() || locale_is_utf8()
+}
+
+/// Whether the locale that `setlocale(LC_CTYPE, "")` picks from the
+/// environment is UTF-8. False when it names a locale that is not
+/// installed: setlocale then keeps the C locale, which is ASCII.
+fn session_locale_is_utf8() -> bool {
+    // SAFETY: An empty name reads the locale from the environment, and a
+    // null base starts from the C locale. Nothing else uses this locale; it
+    // is freed once, after its codeset name is read.
+    unsafe {
+        let locale = libc::newlocale(libc::LC_CTYPE_MASK, c"".as_ptr(), ptr::null_mut());
+        if locale.is_null() {
+            return false;
+        }
+        let codeset = libc::nl_langinfo_l(libc::CODESET, locale);
+        let utf8 = !codeset.is_null() && is_utf8(CStr::from_ptr(codeset));
+        libc::freelocale(locale);
+        utf8
+    }
+}
+
+/// Whether a codeset name, such as `UTF-8` or `ANSI_X3.4-1968`, is UTF-8.
+fn is_utf8(codeset: &CStr) -> bool {
+    let name: Vec<u8> = codeset
+        .to_bytes()
+        .iter()
+        .filter(|&&byte| byte != b'-')
+        .map(u8::to_ascii_lowercase)
+        .collect();
+    name == b"utf8"
 }
 
 fn type_with_xdo(
@@ -982,6 +1026,24 @@ fn type_pieces(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn types_text_outside_ascii_only_in_a_utf8_locale() {
+        // ASCII needs no look at the locale.
+        assert!(xdo_can_type(";) Best regards,\n\tSam", || unreachable!()));
+        assert!(xdo_can_type("Café 😀", || true));
+        // In the C or an ISO-8859 locale, libxdo would fail after the
+        // trigger is erased, or type `CafÃ©`.
+        assert!(!xdo_can_type("Café", || false));
+        for codeset in [c"UTF-8", c"utf8", c"UTF8"] {
+            assert!(is_utf8(codeset), "{codeset:?}");
+        }
+        for codeset in [c"ANSI_X3.4-1968", c"ISO-8859-1", c"ASCII", c""] {
+            assert!(!is_utf8(codeset), "{codeset:?}");
+        }
+        // Reading the session's locale works, whatever it is.
+        let _ = session_locale_is_utf8();
+    }
 
     #[test]
     fn tells_a_wayland_session() {
