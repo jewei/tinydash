@@ -14,6 +14,7 @@ pub mod currency;
 pub mod datetime;
 pub mod download;
 pub mod emoji;
+pub mod expansion;
 pub mod files;
 pub mod focus;
 pub mod keywords;
