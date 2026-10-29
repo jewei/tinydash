@@ -14,7 +14,7 @@ use super::library::{self, LibraryItem, LibraryKind};
 /// keyword (32 characters), the character before them, and a space.
 pub const MAX_TYPED: usize = 64;
 /// Starts a trigger: `;sig` expands the snippet whose keyword is `sig`.
-pub const TRIGGER: char = ';';
+const TRIGGER: char = ';';
 /// macOS reports arrows, Home, End, and function keys as these characters.
 const FUNCTION_KEYS: std::ops::RangeInclusive<char> = '\u{F700}'..='\u{F8FF}';
 
@@ -147,7 +147,7 @@ pub struct Expansion {
     /// and one for the space that confirmed it.
     pub erase: usize,
     /// A space confirmed the trigger; the snippet keeps it after its text.
-    pub then_space: bool,
+    then_space: bool,
 }
 
 impl Expansion {
@@ -235,7 +235,7 @@ impl Typed {
 
     /// Forget the typed text, and overwrite all of it, including characters
     /// that Backspace removed.
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         let capacity = self.chars.capacity();
         self.chars.clear();
         self.chars.resize(capacity, '\0');
