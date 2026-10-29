@@ -20,9 +20,9 @@ use ts_rs::TS;
 use crate::search::result::{Action, ResultAction};
 
 /// The most events the widget shows.
-pub const MAX_EVENTS: usize = 6;
+const MAX_EVENTS: usize = 6;
 /// The most reminders the widget shows.
-pub const MAX_REMINDERS: usize = 6;
+const MAX_REMINDERS: usize = 6;
 /// The most items of each kind the platform hands over, so a long list of
 /// overdue reminders stays bounded before it is sorted.
 pub const MAX_READ: usize = 500;
@@ -213,7 +213,7 @@ where
 }
 
 /// The action that opens the app of an item.
-pub fn open_action(kind: UpNextKind) -> ResultAction {
+fn open_action(kind: UpNextKind) -> ResultAction {
     let label = match kind {
         UpNextKind::Event => "Open Calendar",
         UpNextKind::Reminder => "Open Reminders",
