@@ -1664,6 +1664,15 @@ describe("Launcher", () => {
     expect(await screen.findByText(/· Saved$/)).toBeTruthy();
   });
 
+  it("leaves the note's length to the save, which counts characters", async () => {
+    setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: { type: "ready", text: "" } }),
+    });
+    const note = await screen.findByRole("textbox", { name: "Notepad" });
+    // maxLength counts UTF-16 units, so it would cut a paste of emoji short.
+    expect(note.hasAttribute("maxlength")).toBe(false);
+  });
+
   it("keeps note text whose save failed when the pane closes, and saves it again", async () => {
     let failures = 1;
     const { backend, input } = setup(() => [app], {

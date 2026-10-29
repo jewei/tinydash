@@ -20,7 +20,8 @@ use crate::{
 
 /// Below this share of free space, the disk widget warns.
 const LOW_DISK_PERCENT: u64 = 10;
-/// The longest scratch note, in characters. The launcher's field stops here too.
+/// The longest scratch note, in characters. The launcher's field sets no
+/// `maxLength`, which counts UTF-16 units; `save_note` reports this limit.
 pub const MAX_NOTE_CHARS: usize = 10_000;
 
 #[derive(Serialize, TS)]
