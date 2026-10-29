@@ -53,8 +53,16 @@ pub fn apply(app: &AppHandle, on: bool) -> Result<()> {
 /// access prompts.
 pub fn start(app: &AppHandle, ask: bool) -> Result<()> {
     let mut watch = watch();
-    if watch.is_some() {
+    if watch
+        .as_ref()
+        .is_some_and(platform::TypingWatch::is_running)
+    {
         return Ok(());
+    }
+    // A watch that ended on its own, as on macOS when access was taken
+    // away, reads no keys: start a new one in its place.
+    if let Some(ended) = watch.take() {
+        ended.stop();
     }
     if let Some(reason) = platform::typing_unavailable() {
         return Err(Error::msg(reason));

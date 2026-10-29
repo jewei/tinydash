@@ -976,6 +976,12 @@ struct TapRunLoop(CFRetained<CFRunLoop>);
 unsafe impl Send for TapRunLoop {}
 
 impl TypingWatch {
+    /// False once the thread has ended, also on its own when macOS turned
+    /// the tap off for good, as it does when access is taken away.
+    pub fn is_running(&self) -> bool {
+        !self.thread.is_finished()
+    }
+
     pub fn stop(self) {
         self.stopped.store(true, Ordering::Release);
         // A stop that comes before the loop runs is lost, so repeat it
@@ -1076,6 +1082,11 @@ fn run_tap(
         // would then return at once, so the thread ends instead.
         while !stopped.load(Ordering::Acquire) && port.is_valid() && source.is_valid() {
             CFRunLoop::run();
+        }
+        if !stopped.load(Ordering::Acquire) {
+            tracing::warn!(
+                "Snippets stopped expanding as you type: macOS turned off the key watch, as it does when access is taken away"
+            );
         }
     }
     CGEvent::tap_enable(port, false);

@@ -612,6 +612,12 @@ pub struct TypingWatch {
 }
 
 impl TypingWatch {
+    /// False once the thread has ended, also on its own when its message
+    /// loop failed.
+    pub fn is_running(&self) -> bool {
+        !self.thread.is_finished()
+    }
+
     pub fn stop(self) {
         // SAFETY: The message carries no pointers, and the thread has a
         // message queue, as it set its hooks before it sent its ID.
@@ -680,8 +686,19 @@ fn run_hooks(on_key: Box<dyn FnMut(Key)>, ready: &mpsc::Sender<Result<u32>>) {
                 let mut message = MSG::default();
                 // The hooks run while this thread waits for messages.
                 // WM_QUIT ends the loop with 0, and an error with -1.
-                // SAFETY: `message` is a valid MSG to fill.
-                while unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) } > 0 {}
+                let ended = loop {
+                    // SAFETY: `message` is a valid MSG to fill.
+                    let got = unsafe { GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) };
+                    if got <= 0 {
+                        break got;
+                    }
+                };
+                if ended < 0 {
+                    tracing::warn!(
+                        error = %std::io::Error::last_os_error(),
+                        "Snippets stopped expanding as you type: the key watch failed"
+                    );
+                }
             }
             hooks.into_iter().for_each(unhook);
         }

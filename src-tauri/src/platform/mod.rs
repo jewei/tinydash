@@ -87,8 +87,10 @@
 //!   window). A modifier key alone passes nothing. Keys that TinyDash types
 //!   never reach `on_key` as characters (Linux passes resets while it types).
 //!   Keep `on_key` quick: on Windows, typing waits for it.
-//!   `TypingWatch::stop()` ends the thread and drops `on_key`. Never log what
-//!   it reads.
+//!   `TypingWatch::stop()` ends the thread and drops `on_key`.
+//!   `TypingWatch::is_running()` is false once the thread has ended, also
+//!   on its own, as on macOS when access is taken away; the thread then
+//!   logs why. Never log what it reads.
 //! - `type_text(erase, text)`: press Backspace `erase` times, then type
 //!   `text` into the app in front, with Return for each line break. It stops
 //!   with an error when another app (macOS) or window comes to the front. It

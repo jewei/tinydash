@@ -542,6 +542,12 @@ pub struct TypingWatch {
 }
 
 impl TypingWatch {
+    /// False once the thread has ended, which it does only when stopped or
+    /// after a panic.
+    pub fn is_running(&self) -> bool {
+        !self.thread.is_finished()
+    }
+
     /// The thread looks at `stopped` at least every `POLL_MILLISECONDS`.
     pub fn stop(self) {
         self.stopped.store(true, Ordering::Release);
