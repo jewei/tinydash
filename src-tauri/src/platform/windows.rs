@@ -587,9 +587,9 @@ pub fn restore_frontmost_app() {}
 const KEEP_KEYBOARD_STATE: u32 = 0x4;
 /// Marks the input TinyDash sends ("TDSH").
 const OWN_INPUT: usize = 0x5444_5348;
-/// Keys sent in one `SendInput` call, with a pause after each call, so the
-/// app in front keeps up.
-const INPUT_BATCH: usize = 64;
+/// Keys pressed in one `SendInput` call, with a pause after each call, so
+/// the app in front keeps up.
+const STROKE_BATCH: usize = 32;
 const BATCH_GAP: Duration = Duration::from_millis(5);
 
 pub fn typing_unavailable() -> Option<&'static str> {
@@ -878,23 +878,24 @@ fn keyboard_input(stroke: Stroke, down: bool) -> KEYBDINPUT {
 
 /// Types with `SendInput`, which puts the keys into the input stream as if
 /// they were typed. Windows marks them injected, so the hook skips them.
-/// Typing stops when another window comes to the front, so the rest never
-/// lands there.
+/// Typing stops soon after another window comes to the front, so little of
+/// the rest lands there.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
-    let inputs: Vec<INPUT> = strokes(erase, text)
-        .into_iter()
-        .flat_map(|stroke| {
-            [true, false].map(|down| INPUT {
-                r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: keyboard_input(stroke, down),
-                },
-            })
-        })
-        .collect();
+    let strokes = strokes(erase, text);
     // SAFETY: Takes no arguments.
     let foreground = unsafe { GetForegroundWindow() };
-    for batch in inputs.chunks(INPUT_BATCH) {
+    for strokes in batches(&strokes, STROKE_BATCH) {
+        let batch: Vec<INPUT> = strokes
+            .iter()
+            .flat_map(|&stroke| {
+                [true, false].map(|down| INPUT {
+                    r#type: INPUT_KEYBOARD,
+                    Anonymous: INPUT_0 {
+                        ki: keyboard_input(stroke, down),
+                    },
+                })
+            })
+            .collect();
         // SAFETY: Takes no arguments.
         if unsafe { GetForegroundWindow() } != foreground {
             return Err(Error::msg(
@@ -919,6 +920,25 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
         std::thread::sleep(BATCH_GAP);
     }
     Ok(())
+}
+
+/// Groups of at most `size` strokes (at least 2). A group never ends between
+/// the halves of a surrogate pair, so typing that stops between groups
+/// leaves no half character.
+fn batches(strokes: &[Stroke], size: usize) -> Vec<&[Stroke]> {
+    let mut batches = Vec::new();
+    let mut rest = strokes;
+    while !rest.is_empty() {
+        let mut end = size.max(2).min(rest.len());
+        let high_surrogate = |stroke: &Stroke| matches!(stroke, Stroke::Unit(unit) if (0xD800..0xDC00).contains(unit));
+        if end < rest.len() && high_surrogate(&rest[end - 1]) {
+            end -= 1;
+        }
+        let (batch, after) = rest.split_at(end);
+        batches.push(batch);
+        rest = after;
+    }
+    batches
 }
 
 #[cfg(test)]
@@ -984,6 +1004,22 @@ mod tests {
             (backspace.wVk, backspace.wScan, backspace.dwFlags),
             (VK_BACK, 0, KEYEVENTF_KEYUP)
         );
+    }
+
+    #[test]
+    fn never_splits_a_surrogate_pair_between_batches() {
+        use super::{batches, strokes};
+        let sizes = |text: &str, size| -> Vec<usize> {
+            batches(&strokes(0, text), size)
+                .iter()
+                .map(|batch| batch.len())
+                .collect()
+        };
+        assert_eq!(sizes(&"a".repeat(70), 32), [32, 32, 6]);
+        // The emoji's high half would end the first batch.
+        assert_eq!(sizes(&format!("{}😀b", "a".repeat(31)), 32), [31, 3]);
+        assert_eq!(sizes("😀😀", 3), [2, 2]);
+        assert!(sizes("", 32).is_empty());
     }
 
     #[test]
