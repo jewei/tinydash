@@ -137,6 +137,26 @@ describe("Launcher", () => {
     );
   });
 
+  it("stops a held Up at the first row, and a new press brings back a search", async () => {
+    const second: SearchResult = { ...app, id: "app:/Notes.app", title: "Notes" };
+    const { backend, input, press } = setup(() => [app, second]);
+    fireEvent.input(input, { target: { value: "saf" } });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    await emit("launcher:shown", { category: null });
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe(""));
+    press("ArrowDown");
+    press("ArrowUp", { repeat: true });
+    press("ArrowUp", { repeat: true });
+    expect((input as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("option", { name: /Safari/ }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    press("ArrowUp");
+    expect((input as HTMLInputElement).value).toBe("saf");
+  });
+
   it("asks before a destructive action, with Cancel focused", async () => {
     const { backend, press } = setup(() => [restart]);
     await screen.findByRole("option", { name: /Restart/ });

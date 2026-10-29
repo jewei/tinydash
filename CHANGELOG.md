@@ -15,6 +15,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
 
+### Fixed
+
+- Holding ↑ to go back to the top of a list no longer fills the search field with your past searches. Press ↑ again on the first row to bring one back.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added
