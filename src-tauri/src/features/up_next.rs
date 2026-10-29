@@ -170,19 +170,24 @@ where
         Due::Day(day) => day <= today,
         Due::At(ms) => ms < end_ms,
     });
+    let overdue = |due: Due| match due {
+        Due::Day(day) => day < today,
+        Due::At(ms) => ms <= now_ms,
+    };
+    // Overdue ones first, so a reminder due today without a time, which
+    // sorts at midnight, does not split them.
     reminders.sort_by_cached_key(|reminder| {
         let due = match reminder.due {
             Due::Day(day) => start_of_day(&zone, day),
             Due::At(ms) => ms,
         };
-        (due, reminder.title.clone())
+        (!overdue(reminder.due), due, reminder.title.clone())
     });
     reminders.truncate(MAX_REMINDERS);
     for reminder in reminders {
         let time = match reminder.due {
-            Due::Day(day) if day < today => "Overdue".to_owned(),
+            due if overdue(due) => "Overdue".to_owned(),
             Due::Day(_) => "Today".to_owned(),
-            Due::At(ms) if ms <= now_ms => "Overdue".to_owned(),
             Due::At(ms) => {
                 changes.push(ms);
                 clock(&zone, ms)
@@ -524,8 +529,8 @@ mod tests {
             rows(&view),
             [
                 row("Overdue", "Pay rent"),
-                row("Today", "Water plants"),
                 row("Overdue", "Send report"),
+                row("Today", "Water plants"),
                 row("16:00", "Call back"),
             ]
         );
