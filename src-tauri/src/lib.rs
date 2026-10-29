@@ -8,6 +8,7 @@ mod cli;
 mod commands;
 mod error;
 mod events;
+mod expander;
 mod features;
 mod hud;
 mod images;
@@ -112,6 +113,11 @@ pub fn run() {
             if platform::is_reopen(&event) {
                 open(app, Launch::Launcher, true);
             }
+            // Stop reading keys before the process ends; this forgets what
+            // was typed.
+            if matches!(event, tauri::RunEvent::Exit) {
+                expander::stop();
+            }
         });
 }
 
@@ -160,6 +166,7 @@ fn setup(app: &mut App) {
     };
     let shortcut = settings.shortcut.clone();
     let tray_visible = settings.show_tray_icon;
+    let expand_snippets = settings.expand_snippets;
     app.manage(State::new(
         settings,
         settings_file,
@@ -190,6 +197,17 @@ fn setup(app: &mut App) {
         tracing::warn!(%error, "Copy messages are unavailable");
     }
     monitor::start(handle);
+    if expand_snippets && let Err(error) = expander::start(handle, false) {
+        // Access granted later takes effect when TinyDash starts again.
+        let retry = if platform::typing_unavailable().is_none() {
+            " Then quit and reopen TinyDash."
+        } else {
+            ""
+        };
+        state.warn(format!(
+            "Snippets do not expand as you type. {error}{retry}"
+        ));
+    }
     timer::start(handle);
     watcher::watch(handle);
     refresh::apps(handle);

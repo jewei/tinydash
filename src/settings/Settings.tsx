@@ -566,6 +566,24 @@ export function Settings() {
               </Match>
 
               <Match when={section() === "snippets"}>
+                {/* 64 matches MAX_TYPED in features/expansion.rs. */}
+                <Row
+                  label="Expand snippets as you type"
+                  description={[
+                    "Type ; and a snippet's keyword in any app, such as ;sig, to replace it with the snippet. To see the keyword, TinyDash reads what you type in other apps. It keeps only the last 64 characters, in memory, and never saves or sends them.",
+                    IS_MAC ? "macOS asks for Accessibility and Input Monitoring." : "",
+                    about()?.expandSnippetsUnavailable ?? "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <Toggle
+                    label="Expand snippets as you type"
+                    checked={settings().expandSnippets}
+                    disabled={!!about()?.expandSnippetsUnavailable}
+                    onChange={(expandSnippets) => void save({ expandSnippets })}
+                  />
+                </Row>
                 <Library kind="snippet" />
               </Match>
 

@@ -47,6 +47,9 @@ pub struct Settings {
     /// The Files tab also asks the OS's file index (Spotlight on macOS) for
     /// names under the home folder. Off by default.
     pub spotlight_files: bool,
+    /// Typing `;` and a snippet's keyword in any app replaces it with the
+    /// snippet. Off by default: it reads the keys typed in other apps.
+    pub expand_snippets: bool,
     /// 0 is the default yellow; 1–5 are light to dark.
     pub emoji_skin_tone: u8,
     pub emoji_languages: Vec<EmojiLanguage>,
@@ -193,6 +196,7 @@ impl Default for Settings {
                 .into(),
             file_search_excluded_dirs: ["node_modules", "target"].map(String::from).into(),
             spotlight_files: false,
+            expand_snippets: false,
             emoji_skin_tone: 0,
             emoji_languages: Vec::new(),
             // Off until the user turns it on: it is the one search

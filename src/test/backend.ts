@@ -21,6 +21,7 @@ export const testSettings: Settings = {
   fileSearchFolders: ["~/Desktop", "~/Documents", "~/Downloads"],
   fileSearchExcludedDirs: ["node_modules", "target"],
   spotlightFiles: false,
+  expandSnippets: false,
   emojiSkinTone: 0,
   emojiLanguages: [],
   currencyRatesEnabled: false,
@@ -151,6 +152,7 @@ export function fakeBackend(
       richClipboard: true,
       selfUpdate: true,
       pendingUpdate: null,
+      expandSnippetsUnavailable: null,
     }),
   };
   clearMocks();
