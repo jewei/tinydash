@@ -374,8 +374,12 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     if let Some(list) = keywords::answer(query, &s.library, s.settings.shell_commands) {
         return list;
     }
-    // And `>`, for a shell command, while the user allows them.
-    if let Some(command) = shell::answer(query).filter(|_| s.settings.shell_commands) {
+    // And `>`, for a shell command, while the user allows them, unless the
+    // user chose a keyword or an alias that starts with `>`.
+    if s.settings.shell_commands
+        && !is_users_word(s, query)
+        && let Some(command) = shell::answer(query)
+    {
         return command;
     }
     let mut results = answers(s, query);
@@ -490,6 +494,19 @@ fn answers(s: &Snapshot, query: &str) -> Vec<SearchResult> {
     results.extend(s.library.keyword_answer(query));
     results.extend(web::answer(query));
     results
+}
+
+/// Whether `query` is the keyword of a snippet or quicklink, an alias, or a
+/// keyword followed by its text: `>j ABC-12` keeps opening the quicklink
+/// whose keyword is `>j`, as it did before `>` ran shell commands.
+fn is_users_word(s: &Snapshot, query: &str) -> bool {
+    let whole = matcher::normalize(query);
+    s.library.keyword_answer(query).is_some()
+        || s.library
+            .items()
+            .iter()
+            .any(|item| !item.keyword.is_empty() && item.keyword == whole)
+        || s.aliases.owner(&whole).is_some()
 }
 
 /// The best `limit` results, each ID once, at its best score.
@@ -994,6 +1011,56 @@ mod tests {
                 .all(|result| result.kind != ResultKind::Shell)
         );
         assert_eq!(results.last().map(|r| r.kind), Some(ResultKind::WebSearch));
+    }
+
+    #[test]
+    fn a_keyword_or_alias_that_starts_with_the_shell_sign_keeps_its_item() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        for (kind, name, keyword, text) in [
+            (
+                LibraryKind::Quicklink,
+                "Jira",
+                ">j",
+                "https://jira.test/{query}",
+            ),
+            (LibraryKind::Snippet, "Signature", ">sig", "Best, Sam"),
+        ] {
+            let item = LibraryItem {
+                id: None,
+                kind,
+                name: name.into(),
+                keyword: keyword.into(),
+                text: text.into(),
+            };
+            state.store.save_library_item(&item).unwrap();
+        }
+        state.reload_library().unwrap();
+        state
+            .aliases
+            .set(Aliases::new([("system:sleep".into(), ">zz".into())]));
+        let first = |query: &str| search(&state.snapshot(), query, Category::All)[0].clone();
+        let jira = first(">j ABC-12");
+        assert_eq!(jira.title, "Jira: ABC-12");
+        assert_eq!(jira.kind, ResultKind::Quicklink);
+        assert_eq!(first(">J").title, "Jira");
+        assert_eq!(first(">sig").title, "Signature");
+        assert_eq!(first(">zz").id, "system:sleep");
+        // The `?` list types `>j `, and the text after it opens the link.
+        let list = search(&state.snapshot(), "? >j", Category::All);
+        assert!(list.iter().any(|row| row.title == ">j"), "{list:?}");
+        // Other text after `>` is still a command, also with a space.
+        for (query, command) in [
+            (">jq .", "jq ."),
+            ("> j ABC-12", "j ABC-12"),
+            (">sig x", "sig x"),
+        ] {
+            let row = first(query);
+            assert_eq!((row.kind, row.title.as_str()), (ResultKind::Shell, command));
+        }
     }
 
     #[test]
