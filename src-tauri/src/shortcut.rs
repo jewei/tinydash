@@ -23,14 +23,42 @@ use crate::{
     window,
 };
 
-/// The launcher shortcut TinyDash registered, if any. Startup and the
-/// settings lock keep changes to it one at a time; it is never locked
-/// during a wait.
-static REGISTERED: Mutex<Option<Shortcut>> = Mutex::new(None);
+static REGISTRY: Registry = Registry::new();
 
-/// The hotkeys registered now, each with the result ID it runs. Changed
-/// only by [`sync`], under the settings lock, like the launcher shortcut.
-static HOTKEYS: Mutex<Vec<(Shortcut, String)>> = Mutex::new(Vec::new());
+/// The keys TinyDash holds now. Startup and the settings lock keep changes
+/// one at a time. A key press reads it, so it is never locked while the OS
+/// works.
+struct Registry {
+    /// The launcher shortcut, if any.
+    launcher: Mutex<Option<Shortcut>>,
+    /// The hotkeys, each with the result ID it runs.
+    hotkeys: Mutex<Vec<(Shortcut, String)>>,
+}
+
+/// The OS side of a change, apart from the records so that tests can
+/// refuse chosen keys. [`Plugin`] does it in the app.
+trait Os {
+    fn register(&self, shortcut: Shortcut) -> std::result::Result<(), String>;
+    fn unregister(&self, shortcut: Shortcut) -> std::result::Result<(), String>;
+}
+
+struct Plugin<'a>(&'a AppHandle);
+
+impl Os for Plugin<'_> {
+    fn register(&self, shortcut: Shortcut) -> std::result::Result<(), String> {
+        self.0
+            .global_shortcut()
+            .register(shortcut)
+            .map_err(|error| error.to_string())
+    }
+
+    fn unregister(&self, shortcut: Shortcut) -> std::result::Result<(), String> {
+        self.0
+            .global_shortcut()
+            .unregister(shortcut)
+            .map_err(|error| error.to_string())
+    }
+}
 
 pub fn plugin() -> TauriPlugin<Wry> {
     Builder::new()
@@ -38,9 +66,9 @@ pub fn plugin() -> TauriPlugin<Wry> {
             if event.state() != ShortcutState::Pressed {
                 return;
             }
-            if *registered() == Some(*shortcut) {
+            if REGISTRY.is_launcher(shortcut) {
                 toggle_launcher(app);
-            } else if let Some(id) = hotkey_target(shortcut) {
+            } else if let Some(id) = REGISTRY.hotkey_target(shortcut) {
                 // A result's action may wait for the OS, such as launching
                 // an app; the hotkey thread must stay free.
                 let handle = app.clone();
@@ -130,53 +158,12 @@ fn register_error(accelerator: &str, error: impl std::fmt::Display) -> Error {
     Error::msg(format!("Could not register {accelerator}: {error}.{hint}"))
 }
 
-/// Replace the registered shortcut. If the previous one cannot be removed,
-/// it stays registered and nothing changes. If the new one cannot be
-/// registered, nothing is registered, and the caller can register the
+/// Replace the registered launcher shortcut. If the previous one cannot be
+/// removed, it stays registered and nothing changes. If the new one cannot
+/// be registered, nothing is registered, and the caller can register the
 /// previous one again.
 pub fn register(app: &AppHandle, accelerator: &str) -> Result<()> {
-    let shortcut = parse(accelerator)?;
-    if *registered() == Some(shortcut) {
-        return Ok(());
-    }
-    unregister(app)?;
-    app.global_shortcut()
-        .register(shortcut)
-        .map_err(|error| register_error(accelerator, error))?;
-    *registered() = Some(shortcut);
-    Ok(())
-}
-
-/// The record changes only when the OS released the shortcut, so it always
-/// names the shortcut that is still active.
-fn unregister(app: &AppHandle) -> Result<()> {
-    let Some(shortcut) = *registered() else {
-        return Ok(());
-    };
-    app.global_shortcut()
-        .unregister(shortcut)
-        .map_err(|error| {
-            Error::msg(format!(
-                "Could not release the current shortcut: {error}. Restart TinyDash and try again."
-            ))
-        })?;
-    *registered() = None;
-    Ok(())
-}
-
-fn registered() -> MutexGuard<'static, Option<Shortcut>> {
-    REGISTERED.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-fn hotkeys() -> MutexGuard<'static, Vec<(Shortcut, String)>> {
-    HOTKEYS.lock().unwrap_or_else(|e| e.into_inner())
-}
-
-fn hotkey_target(shortcut: &Shortcut) -> Option<String> {
-    hotkeys()
-        .iter()
-        .find(|(registered, _)| registered == shortcut)
-        .map(|(_, id)| id.clone())
+    REGISTRY.register(&Plugin(app), accelerator)
 }
 
 /// A hotkey that could not be registered, and why.
@@ -191,60 +178,7 @@ pub struct HotkeyFailure {
 /// them, so calling it again changes nothing. Each failure is returned;
 /// the others still apply.
 pub fn sync(app: &AppHandle, wanted: &Hotkeys) -> Vec<HotkeyFailure> {
-    let mut failures = Vec::new();
-    let wanted: Vec<(&str, &str, Result<Shortcut>)> = wanted
-        .iter()
-        .map(|(id, accelerator)| (id, accelerator, parse(accelerator)))
-        .collect();
-    let stale: Vec<(Shortcut, String)> = hotkeys()
-        .iter()
-        .filter(|(shortcut, id)| {
-            !wanted
-                .iter()
-                .any(|(want, _, parsed)| want == id && parsed.as_ref().ok() == Some(shortcut))
-        })
-        .cloned()
-        .collect();
-    for (shortcut, id) in stale {
-        match app.global_shortcut().unregister(shortcut) {
-            Ok(()) => hotkeys().retain(|(registered, _)| *registered != shortcut),
-            Err(error) => failures.push(HotkeyFailure {
-                id,
-                error: Error::msg(format!(
-                    "Could not release a hotkey: {error}. Restart TinyDash and try again."
-                )),
-            }),
-        }
-    }
-    for (id, accelerator, parsed) in wanted {
-        let shortcut = match parsed {
-            Ok(shortcut) => shortcut,
-            Err(error) => {
-                failures.push(HotkeyFailure {
-                    id: id.to_owned(),
-                    error,
-                });
-                continue;
-            }
-        };
-        // TinyDash may still hold these keys for another result, after its
-        // release failed; they run this result now.
-        if let Some((_, owner)) = hotkeys()
-            .iter_mut()
-            .find(|(registered, _)| *registered == shortcut)
-        {
-            *owner = id.to_owned();
-            continue;
-        }
-        match app.global_shortcut().register(shortcut) {
-            Ok(()) => hotkeys().push((shortcut, id.to_owned())),
-            Err(error) => failures.push(HotkeyFailure {
-                id: id.to_owned(),
-                error: register_error(accelerator, error),
-            }),
-        }
-    }
-    failures
+    REGISTRY.sync(&Plugin(app), wanted)
 }
 
 /// Pause while a recorder takes new keys, in Settings or for a hotkey, so
@@ -257,28 +191,158 @@ pub fn pause(app: &AppHandle, paused: bool) -> Result<()> {
         .settings_change
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    if !paused {
-        turn_on_hotkeys(app, &state.hotkeys.get());
-        return register(app, &state.settings.get().shortcut);
-    }
-    let released = match sync(app, &Hotkeys::default()).into_iter().next() {
-        Some(failure) => Err(failure.error),
-        None => unregister(app),
-    };
-    if released.is_err() {
-        // The recorder stops on this error and never resumes, so turn the
-        // released hotkeys back on. The launcher shortcut is still on.
-        turn_on_hotkeys(app, &state.hotkeys.get());
-    }
-    released
+    REGISTRY.pause(
+        &Plugin(app),
+        paused,
+        &state.hotkeys.get(),
+        &state.settings.get().shortcut,
+    )
 }
 
-/// Register the hotkeys again after a pause. The recorder shows a pause
-/// error as the launcher shortcut's, so a hotkey that stays off, such as
-/// one that failed at startup, is only logged.
-fn turn_on_hotkeys(app: &AppHandle, hotkeys: &Hotkeys) {
-    for failure in sync(app, hotkeys) {
-        tracing::warn!(id = %failure.id, error = %failure.error, "A hotkey is off");
+impl Registry {
+    const fn new() -> Self {
+        Self {
+            launcher: Mutex::new(None),
+            hotkeys: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn launcher(&self) -> MutexGuard<'_, Option<Shortcut>> {
+        self.launcher.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn hotkeys(&self) -> MutexGuard<'_, Vec<(Shortcut, String)>> {
+        self.hotkeys.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn is_launcher(&self, shortcut: &Shortcut) -> bool {
+        *self.launcher() == Some(*shortcut)
+    }
+
+    fn hotkey_target(&self, shortcut: &Shortcut) -> Option<String> {
+        self.hotkeys()
+            .iter()
+            .find(|(registered, _)| registered == shortcut)
+            .map(|(_, id)| id.clone())
+    }
+
+    /// See [`register`].
+    fn register(&self, os: &impl Os, accelerator: &str) -> Result<()> {
+        let shortcut = parse(accelerator)?;
+        if self.is_launcher(&shortcut) {
+            return Ok(());
+        }
+        self.unregister(os)?;
+        os.register(shortcut)
+            .map_err(|error| register_error(accelerator, error))?;
+        *self.launcher() = Some(shortcut);
+        Ok(())
+    }
+
+    /// The record changes only when the OS released the shortcut, so it
+    /// always names the shortcut that is still active.
+    fn unregister(&self, os: &impl Os) -> Result<()> {
+        let Some(shortcut) = *self.launcher() else {
+            return Ok(());
+        };
+        os.unregister(shortcut).map_err(|error| {
+            Error::msg(format!(
+                "Could not release the current shortcut: {error}. Restart TinyDash and try again."
+            ))
+        })?;
+        *self.launcher() = None;
+        Ok(())
+    }
+
+    /// See [`sync`].
+    fn sync(&self, os: &impl Os, wanted: &Hotkeys) -> Vec<HotkeyFailure> {
+        let mut failures = Vec::new();
+        let wanted: Vec<(&str, &str, Result<Shortcut>)> = wanted
+            .iter()
+            .map(|(id, accelerator)| (id, accelerator, parse(accelerator)))
+            .collect();
+        let stale: Vec<(Shortcut, String)> = self
+            .hotkeys()
+            .iter()
+            .filter(|(shortcut, id)| {
+                !wanted
+                    .iter()
+                    .any(|(want, _, parsed)| want == id && parsed.as_ref().ok() == Some(shortcut))
+            })
+            .cloned()
+            .collect();
+        for (shortcut, id) in stale {
+            match os.unregister(shortcut) {
+                Ok(()) => self
+                    .hotkeys()
+                    .retain(|(registered, _)| *registered != shortcut),
+                Err(error) => failures.push(HotkeyFailure {
+                    id,
+                    error: Error::msg(format!(
+                        "Could not release a hotkey: {error}. Restart TinyDash and try again."
+                    )),
+                }),
+            }
+        }
+        for (id, accelerator, parsed) in wanted {
+            let shortcut = match parsed {
+                Ok(shortcut) => shortcut,
+                Err(error) => {
+                    failures.push(HotkeyFailure {
+                        id: id.to_owned(),
+                        error,
+                    });
+                    continue;
+                }
+            };
+            // TinyDash may still hold these keys for another result, after
+            // its release failed; they run this result now.
+            if let Some((_, owner)) = self
+                .hotkeys()
+                .iter_mut()
+                .find(|(registered, _)| *registered == shortcut)
+            {
+                *owner = id.to_owned();
+                continue;
+            }
+            match os.register(shortcut) {
+                Ok(()) => self.hotkeys().push((shortcut, id.to_owned())),
+                Err(error) => failures.push(HotkeyFailure {
+                    id: id.to_owned(),
+                    error: register_error(accelerator, error),
+                }),
+            }
+        }
+        failures
+    }
+
+    /// See [`pause`]. `hotkeys` and `launcher` are the saved ones, which a
+    /// resume turns on again.
+    fn pause(&self, os: &impl Os, paused: bool, hotkeys: &Hotkeys, launcher: &str) -> Result<()> {
+        if !paused {
+            self.turn_on_hotkeys(os, hotkeys);
+            return self.register(os, launcher);
+        }
+        let released = match self.sync(os, &Hotkeys::default()).into_iter().next() {
+            Some(failure) => Err(failure.error),
+            None => self.unregister(os),
+        };
+        if released.is_err() {
+            // The recorder stops on this error and never resumes, so turn
+            // the released hotkeys back on. The launcher shortcut is still
+            // on.
+            self.turn_on_hotkeys(os, hotkeys);
+        }
+        released
+    }
+
+    /// Register the hotkeys again after a pause. The recorder shows a pause
+    /// error as the launcher shortcut's, so a hotkey that stays off, such
+    /// as one that failed at startup, is only logged.
+    fn turn_on_hotkeys(&self, os: &impl Os, hotkeys: &Hotkeys) {
+        for failure in self.sync(os, hotkeys) {
+            tracing::warn!(id = %failure.id, error = %failure.error, "A hotkey is off");
+        }
     }
 }
 
@@ -325,5 +389,152 @@ mod tests {
         };
         assert_eq!(checked_at_startup(&mut kept), None);
         assert_eq!(kept.shortcut, "Shift+Space");
+    }
+
+    /// An OS that holds the keys registered with it, and refuses to
+    /// register or release the keys a test chooses.
+    #[derive(Default)]
+    struct FakeOs {
+        held: std::cell::RefCell<Vec<Shortcut>>,
+        refuse_register: Vec<Shortcut>,
+        refuse_release: Vec<Shortcut>,
+    }
+
+    impl Os for FakeOs {
+        fn register(&self, shortcut: Shortcut) -> std::result::Result<(), String> {
+            if self.refuse_register.contains(&shortcut) || self.held.borrow().contains(&shortcut) {
+                return Err("another app uses it".into());
+            }
+            self.held.borrow_mut().push(shortcut);
+            Ok(())
+        }
+
+        fn unregister(&self, shortcut: Shortcut) -> std::result::Result<(), String> {
+            if self.refuse_release.contains(&shortcut) {
+                return Err("the OS refused".into());
+            }
+            self.held.borrow_mut().retain(|held| *held != shortcut);
+            Ok(())
+        }
+    }
+
+    const LAUNCHER: &str = "Control+Shift+Space";
+
+    fn keys(accelerator: &str) -> Shortcut {
+        parse(accelerator).unwrap()
+    }
+
+    fn wanted(pairs: &[(&str, &str)]) -> Hotkeys {
+        Hotkeys::new(
+            pairs
+                .iter()
+                .map(|(id, accelerator)| ((*id).to_owned(), (*accelerator).to_owned())),
+        )
+    }
+
+    /// Whether the OS holds exactly these keys, in any order.
+    fn holds(os: &FakeOs, accelerators: &[&str]) -> bool {
+        let held = os.held.borrow();
+        held.len() == accelerators.len()
+            && accelerators
+                .iter()
+                .all(|accelerator| held.contains(&keys(accelerator)))
+    }
+
+    fn target(registry: &Registry, accelerator: &str) -> Option<String> {
+        registry.hotkey_target(&keys(accelerator))
+    }
+
+    /// Two hotkeys and the launcher shortcut, all on.
+    fn saved(os: &FakeOs) -> (Registry, Hotkeys) {
+        let registry = Registry::new();
+        let hotkeys = wanted(&[("app:a", "Alt+KeyA"), ("app:b", "Alt+KeyB")]);
+        registry.register(os, LAUNCHER).unwrap();
+        assert!(registry.sync(os, &hotkeys).is_empty());
+        (registry, hotkeys)
+    }
+
+    #[test]
+    fn keys_still_held_for_a_deleted_result_run_the_result_that_takes_them() {
+        let os = FakeOs {
+            refuse_release: vec![keys("Alt+KeyK")],
+            ..FakeOs::default()
+        };
+        let registry = Registry::new();
+        assert!(
+            registry
+                .sync(&os, &wanted(&[("snippet:5", "Alt+KeyK")]))
+                .is_empty()
+        );
+        let deleted = registry.sync(&os, &Hotkeys::default());
+        assert_eq!(deleted.len(), 1);
+        assert_eq!(target(&registry, "Alt+KeyK").as_deref(), Some("snippet:5"));
+
+        let failures = registry.sync(&os, &wanted(&[("app:safari", "Alt+KeyK")]));
+        assert!(failures.iter().all(|failure| failure.id == "snippet:5"));
+        assert_eq!(target(&registry, "Alt+KeyK").as_deref(), Some("app:safari"));
+        assert!(holds(&os, &["Alt+KeyK"]));
+    }
+
+    #[test]
+    fn a_pause_whose_hotkey_release_fails_keeps_every_shortcut_on() {
+        let os = FakeOs {
+            refuse_release: vec![keys("Alt+KeyB")],
+            ..FakeOs::default()
+        };
+        let (registry, hotkeys) = saved(&os);
+        assert!(registry.pause(&os, true, &hotkeys, LAUNCHER).is_err());
+        assert!(registry.is_launcher(&keys(LAUNCHER)));
+        assert_eq!(target(&registry, "Alt+KeyA").as_deref(), Some("app:a"));
+        assert_eq!(target(&registry, "Alt+KeyB").as_deref(), Some("app:b"));
+        assert!(holds(&os, &["Alt+KeyA", "Alt+KeyB", LAUNCHER]));
+    }
+
+    #[test]
+    fn a_pause_whose_launcher_release_fails_turns_the_hotkeys_back_on() {
+        let os = FakeOs {
+            refuse_release: vec![keys(LAUNCHER)],
+            ..FakeOs::default()
+        };
+        let (registry, hotkeys) = saved(&os);
+        assert!(registry.pause(&os, true, &hotkeys, LAUNCHER).is_err());
+        assert!(registry.is_launcher(&keys(LAUNCHER)));
+        assert_eq!(target(&registry, "Alt+KeyA").as_deref(), Some("app:a"));
+        assert_eq!(target(&registry, "Alt+KeyB").as_deref(), Some("app:b"));
+        assert!(holds(&os, &["Alt+KeyA", "Alt+KeyB", LAUNCHER]));
+    }
+
+    #[test]
+    fn a_resume_reports_only_the_launcher_shortcut() {
+        let os = FakeOs::default();
+        let (registry, hotkeys) = saved(&os);
+        assert!(registry.pause(&os, true, &hotkeys, LAUNCHER).is_ok());
+        assert!(holds(&os, &[]));
+
+        // Another app takes the keys of a hotkey during the pause.
+        let os = FakeOs {
+            refuse_register: vec![keys("Alt+KeyB")],
+            ..FakeOs::default()
+        };
+        assert!(registry.pause(&os, false, &hotkeys, LAUNCHER).is_ok());
+        assert!(registry.is_launcher(&keys(LAUNCHER)));
+        assert_eq!(target(&registry, "Alt+KeyA").as_deref(), Some("app:a"));
+        assert_eq!(target(&registry, "Alt+KeyB"), None);
+        assert!(holds(&os, &["Alt+KeyA", LAUNCHER]));
+
+        let os = FakeOs {
+            refuse_register: vec![keys("Alt+Space")],
+            ..FakeOs::default()
+        };
+        let registry = Registry::new();
+        let error = registry
+            .pause(&os, false, &hotkeys, "Alt+Space")
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .starts_with("Could not register Alt+Space"),
+            "{error}"
+        );
     }
 }
