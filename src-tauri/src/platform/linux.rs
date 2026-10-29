@@ -149,6 +149,10 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
 }
 
+pub fn sync_file(file: &std::fs::File) -> std::io::Result<()> {
+    file.sync_all()
+}
+
 /// Launch through GIO, which handles field codes, terminals, and D-Bus
 /// activation. Desktop files are never run through a shell.
 pub fn launch_app(path: &Path) -> Result<()> {

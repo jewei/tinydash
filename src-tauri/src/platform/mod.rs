@@ -12,6 +12,8 @@
 //! - `is_reopen(event)`: the user opened the running app again, and the OS
 //!   sent an event instead of starting a second process.
 //! - `restrict_to_owner(path)`: make a file readable only by the user.
+//! - `sync_file(file)`: write a file's data to the disk, like `sync_all`,
+//!   also on a volume that refuses the full sync of macOS.
 //! - `HIDDEN`: the OS's check for a hidden file or folder besides a name
 //!   that starts with a dot (the Windows hidden attribute, the macOS hidden
 //!   flag), or `None` when it has none, so the scan reads no metadata.

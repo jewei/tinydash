@@ -396,7 +396,7 @@ impl SettingsFile {
         file.write_all(&serde_json::to_vec_pretty(settings)?)?;
         // The data must be on disk before the rename is: after a crash, a
         // renamed but empty file would load as defaults.
-        file.sync_all()?;
+        crate::platform::sync_file(&file)?;
         drop(file);
         std::fs::rename(&temporary, &path)?;
         Ok(())
