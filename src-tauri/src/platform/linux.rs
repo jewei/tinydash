@@ -655,11 +655,15 @@ fn record_keys(
         }
     }
     // SAFETY: The context belongs to the control connection, which is open.
+    // While the context is on, the server reads nothing more from the data
+    // connection, and closing that connection waits for a reply. XSync sends
+    // the requests and waits until the server has handled them.
     unsafe {
         if enabled != 0 {
             (xrecord.XRecordDisableContext)(connections.control, context);
         }
         (xrecord.XRecordFreeContext)(connections.control, context);
+        (xlib.XSync)(connections.control, xlib::False);
     }
     drop(connections);
     // SAFETY: Made by Box::into_raw above. With the data connection closed,
