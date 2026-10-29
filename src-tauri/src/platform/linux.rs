@@ -307,13 +307,11 @@ pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
     // Reap it when it exits, so no zombie process stays behind. Its output
     // is discarded (see `open_trash`), so a terminal that fails at once,
     // such as one that cannot open a window, leaves only this log entry.
-    // `sh` deletes the command file when it starts; after a failure, this
-    // does.
     std::thread::spawn(move || match child.wait() {
-        Ok(status) if status.success() => {}
         Ok(status) => {
-            std::fs::remove_file(&file).ok();
-            tracing::warn!(%status, terminal = %program.display(), "The terminal ended with an error");
+            if terminal::failed_before_reading(status.success(), &file) {
+                tracing::warn!(%status, terminal = %program.display(), "The terminal ended with an error");
+            }
         }
         Err(error) => tracing::warn!(%error, "Could not wait for the terminal"),
     });

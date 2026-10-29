@@ -63,6 +63,20 @@ pub(super) fn command_file(data: &Path, contents: &str) -> std::io::Result<PathB
     Ok(path)
 }
 
+/// After a terminal ends: whether it failed before `sh` read the command
+/// in `file`, which `sh` deletes when it starts. This deletes the file of
+/// a command that never ran. A terminal that ends with an error after `sh`
+/// read the file did not fail to start it: some, such as foot, end with the
+/// status of the shell that the user closed.
+#[cfg(any(target_os = "linux", test))]
+pub(super) fn failed_before_reading(success: bool, file: &Path) -> bool {
+    if success || !file.exists() {
+        return false;
+    }
+    std::fs::remove_file(file).ok();
+    true
+}
+
 /// Delete the command files in `folder` older than [`COMMAND_MAX_AGE`] at
 /// `now`.
 #[cfg(unix)]
@@ -280,6 +294,25 @@ mod tests {
             )
         );
         assert_eq!(macos_script(command).lines().last(), Some(command));
+    }
+
+    #[test]
+    fn a_terminal_failed_only_when_the_command_never_ran() {
+        let file = std::env::temp_dir().join(format!(
+            "tinydash-terminal-exit-{}.command",
+            std::process::id()
+        ));
+        std::fs::write(&file, "ls\n").unwrap();
+        // A terminal that ended well may not have started `sh` yet.
+        assert!(!failed_before_reading(true, &file));
+        assert!(file.exists());
+        // One that ended with an error before `sh` read the file failed,
+        // and the command goes.
+        assert!(failed_before_reading(false, &file));
+        assert!(!file.exists());
+        // After `sh` read and deleted the file, an error is the status of
+        // the shell that the user closed.
+        assert!(!failed_before_reading(false, &file));
     }
 
     #[test]
