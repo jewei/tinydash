@@ -19,6 +19,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - Holding ↑ to go back to the top of a list no longer fills the search field with your past searches. Press ↑ again on the first row to bring one back.
 - In the hotkey dialog, Escape and Tab work again after a click on the dialog's text, and keys no longer reach the search field behind it.
+- On macOS 12.0 to 12.2, the actions menu opens again when exchange rates or the weather is on.
 
 ## [0.7.0] - 2026-10-19
 

@@ -31,7 +31,9 @@ function editsQuery(event: KeyboardEvent) {
 
 /** "A and B", or "A, B, and C". */
 const listed = (words: string[]) =>
-  words.length < 3 ? words.join(" and ") : `${words.slice(0, -1).join(", ")}, and ${words.at(-1)}`;
+  words.length < 3
+    ? words.join(" and ")
+    : `${words.slice(0, -1).join(", ")}, and ${words[words.length - 1]}`;
 
 /**
  * Actions that belong to no result, listed in the actions menu. Refresh also
