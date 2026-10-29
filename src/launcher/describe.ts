@@ -23,6 +23,7 @@ export const KIND_LABELS: Record<ResultKind, string> = {
   color: "Color",
   permissions: "Permissions",
   keyword: "Keyword",
+  shell: "Shell Command",
 };
 
 export const FALLBACK_GLYPHS: Record<ResultKind, GlyphName> = {
@@ -42,6 +43,7 @@ export const FALLBACK_GLYPHS: Record<ResultKind, GlyphName> = {
   color: "image",
   permissions: "lock",
   keyword: "search",
+  shell: "terminal",
 };
 
 /** Keys that run an action of the selected result directly. */

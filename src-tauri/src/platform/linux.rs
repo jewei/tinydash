@@ -255,6 +255,54 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     }
 }
 
+/// Run the command in `sh` in the user's terminal, in the home folder, and
+/// keep the user's login shell open after it: `$TERMINAL` when it is set,
+/// else the first known terminal found.
+pub fn run_in_terminal(command: &str, _data: &Path) -> Result<()> {
+    use std::process::Stdio;
+    let preferred = std::env::var("TERMINAL").ok();
+    let (program, arguments) =
+        super::terminal::linux_terminal(preferred.as_deref(), find_program, command).ok_or_else(
+            || {
+                Error::msg(
+                    "TinyDash found no terminal app. Set the TERMINAL environment variable to yours, such as kitty, then restart TinyDash.",
+                )
+            },
+        )?;
+    let mut terminal = std::process::Command::new(&program);
+    terminal
+        .args(arguments)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    if let Some(home) = std::env::home_dir() {
+        terminal.current_dir(home);
+    }
+    let mut child = terminal
+        .spawn()
+        .map_err(|error| Error::msg(format!("Could not open {}: {error}", program.display())))?;
+    // Reap it when it exits, so no zombie process stays behind.
+    std::thread::spawn(move || child.wait());
+    Ok(())
+}
+
+/// The full path of a program that can run: `name` itself when it is a
+/// path, else the first match on `PATH`.
+fn find_program(name: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let runs = |path: &Path| {
+        std::fs::metadata(path)
+            .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+    };
+    if name.contains('/') {
+        let path = PathBuf::from(name);
+        return runs(&path).then_some(path);
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|folder| folder.join(name))
+        .find(|path| runs(path))
+}
+
 /// Show the trash in the file manager. The output is discarded, not
 /// captured: a file manager that GLib starts directly inherits it, and a
 /// captured pipe would stay open until its window closes. `gio open` itself
@@ -453,6 +501,17 @@ mod tests {
                 PathBuf::from("/opt/share/applications"),
             ]
         );
+    }
+
+    #[test]
+    fn finds_programs_that_can_run() {
+        let sh = find_program("sh").unwrap();
+        assert!(sh.is_absolute(), "{}", sh.display());
+        assert_eq!(find_program(&sh.to_string_lossy()), Some(sh));
+        assert_eq!(find_program("no-such-terminal-here"), None);
+        assert_eq!(find_program("/no/such/terminal"), None);
+        // A file that cannot run is not a program.
+        assert_eq!(find_program("/etc/passwd"), None);
     }
 
     #[test]

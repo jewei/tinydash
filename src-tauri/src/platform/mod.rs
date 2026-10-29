@@ -30,6 +30,14 @@
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`. Sleep Displays calls
 //!   `wait_for_key_release` first, only where it is supported.
+//! - `run_in_terminal(command, data)`: open the user's terminal app in the
+//!   home folder, run `command` there as typed, and leave the user's login
+//!   shell open after it. The command never goes into a string that another
+//!   parser reads with other quoting rules (see `terminal.rs`). macOS writes
+//!   a script under `data` (zsh, in the app for `.command` files); Windows
+//!   runs PowerShell in a new console; Linux runs `sh` in `$TERMINAL`, or in
+//!   the first terminal it finds, and says to set `$TERMINAL` when it finds
+//!   none.
 //! - `notify(app, title, body)`: show a system notification.
 //! - `disk_space(path)`: the [`Volume`] that holds `path`.
 //! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`
@@ -71,6 +79,7 @@
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+mod terminal;
 #[cfg(target_os = "windows")]
 mod windows;
 

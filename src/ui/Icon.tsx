@@ -94,6 +94,12 @@ const GLYPHS: Record<
       <path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" />
     </>
   ),
+  terminal: () => (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M7 9l3 3-3 3M13 15h4" />
+    </>
+  ),
   restart: () => <path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 4v4.5h4.5" />,
   power: () => <path d="M12 3v9M6.3 6.3a8 8 0 1 0 11.4 0" />,
   logOut: () => <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l-4-4 4-4M6 12h10" />,

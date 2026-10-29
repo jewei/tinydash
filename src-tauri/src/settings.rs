@@ -55,6 +55,8 @@ pub struct Settings {
     /// hours. Only builds that can update themselves look.
     pub check_for_updates: bool,
     pub search_engine: SearchEngine,
+    /// `>` and a command run that command in the terminal. Off by default.
+    pub shell_commands: bool,
     /// Where the user dragged the launcher, in the units of
     /// `platform::launcher_position`. `None` centers it on the screen with
     /// the pointer. A spot no longer on any screen counts as `None`.
@@ -200,6 +202,7 @@ impl Default for Settings {
             currency_rates_enabled: false,
             check_for_updates: true,
             search_engine: SearchEngine::Google,
+            shell_commands: false,
             launcher_position: None,
             tabs: Category::ALL[1..]
                 .iter()

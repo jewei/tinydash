@@ -15,6 +15,7 @@ use crate::{
     features::{
         calculator, clip_card, keywords,
         library::{self, LibraryKind, Target},
+        shell,
     },
     hud, platform, refresh,
     search::{
@@ -226,6 +227,16 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             events::launcher_query(app, &text);
         }
         Action::Focus { control } => timer::control(app, control)?,
+        Action::RunInTerminal { command } => {
+            if !state.settings.get().shell_commands {
+                return Err(Error::msg(
+                    "Shell commands are off. Turn on Run shell commands in Settings > Search.",
+                ));
+            }
+            shell::check(&command)?;
+            platform::run_in_terminal(&command, &state.dirs.data)?;
+            window::hide(app)?;
+        }
         // Exits below, once the use is saved: exit ends the process from
         // the main thread while this worker may still be writing.
         Action::Quit => {}
@@ -797,5 +808,23 @@ mod tests {
         assert!(!learns_from_use("calc:1+1"));
         assert!(!learns_from_use("clip:3"));
         assert!(!learns_from_use("password:Pin:6"));
+        assert!(!learns_from_use("shell:git pull"));
+    }
+
+    #[test]
+    fn a_shell_command_is_never_pinned_hidden_aliased_or_given_a_hotkey() {
+        let state = State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        let id = "shell:git pull";
+        assert!(pin(&state, id).is_err());
+        assert!(hide(&state, id).is_err());
+        assert!(set_alias(&state, id, "gp").is_err());
+        assert!(checked_hotkey(&state.snapshot(), id, "Alt+G").is_err());
+        assert!(state.pins.get().ids().is_empty());
+        assert_eq!(state.hidden.get().len(), 0);
+        assert_eq!(state.aliases.get().len(), 0);
+        assert_eq!(state.hotkeys.get().len(), 0);
     }
 }

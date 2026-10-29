@@ -28,7 +28,7 @@ use crate::{
         files::FileIndex,
         keywords,
         library::Library,
-        password, permissions, system, url_cleaner, web,
+        password, permissions, shell, system, url_cleaner, web,
     },
     settings::Settings,
 };
@@ -371,8 +371,12 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         return history;
     }
     // So does `?`, for the list of keywords.
-    if let Some(list) = keywords::answer(query, &s.library) {
+    if let Some(list) = keywords::answer(query, &s.library, s.settings.shell_commands) {
         return list;
+    }
+    // And `>`, for a shell command, while the user allows them.
+    if let Some(command) = shell::answer(query).filter(|_| s.settings.shell_commands) {
+        return command;
     }
     let mut results = answers(s, query);
     let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
@@ -930,10 +934,66 @@ mod tests {
         let state = crate::state::State::for_tests(Settings::default());
         let s = state.snapshot();
         for example in keywords::examples() {
-            let answered =
-                s.calculations.answer(example).is_some() || !answers(&s, example).is_empty();
+            let answered = s.calculations.answer(example).is_some()
+                || shell::answer(example).is_some_and(|rows| !rows.is_empty())
+                || !answers(&s, example).is_empty();
             assert!(answered, "{example}");
         }
+    }
+
+    #[test]
+    fn a_shell_command_is_one_row_that_no_one_can_pin_alias_hide_or_bind() {
+        let state = crate::state::State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        let results = search(&state.snapshot(), "  > git pull ", Category::All);
+        assert_eq!(results.len(), 1, "{results:?}");
+        let row = &results[0];
+        assert_eq!(
+            (row.kind, row.title.as_str()),
+            (ResultKind::Shell, "git pull")
+        );
+        let actions: Vec<&Action> = row.actions.iter().map(|entry| &entry.action).collect();
+        assert_eq!(
+            actions,
+            [
+                &Action::RunInTerminal {
+                    command: "git pull".into()
+                },
+                &Action::Copy {
+                    text: "git pull".into()
+                },
+            ]
+        );
+        assert!(!row.actions.iter().any(|entry| matches!(
+            entry.action,
+            Action::Pin { .. }
+                | Action::Unpin { .. }
+                | Action::SetAlias { .. }
+                | Action::SetHotkey { .. }
+                | Action::Hide { .. }
+        )));
+        // Saved data never brings it back: its ID names no source.
+        assert!(resolve(&state.snapshot(), &Context::none(), &row.id).is_none());
+        // `>` alone offers nothing to run, not even a web search.
+        assert!(search(&state.snapshot(), ">", Category::All).is_empty());
+        // It is an answer in All only.
+        assert!(
+            search(&state.snapshot(), "> git pull", Category::Apps)
+                .iter()
+                .all(|result| result.kind != ResultKind::Shell)
+        );
+
+        // Turned off, `>` searches as before.
+        let off = crate::state::State::for_tests(Settings::default());
+        let results = search(&off.snapshot(), "> git pull", Category::All);
+        assert!(
+            results
+                .iter()
+                .all(|result| result.kind != ResultKind::Shell)
+        );
+        assert_eq!(results.last().map(|r| r.kind), Some(ResultKind::WebSearch));
     }
 
     #[test]
@@ -946,6 +1006,18 @@ mod tests {
         assert!(results.iter().all(|r| r.actions.len() == 1));
         let results = search(&state.snapshot(), "?", Category::Apps);
         assert!(results.iter().all(|r| r.kind != ResultKind::Keyword));
+        // `>` joins the list only while it runs commands.
+        let shell_row = |settings| {
+            let state = crate::state::State::for_tests(settings);
+            search(&state.snapshot(), "?", Category::All)
+                .iter()
+                .any(|result| result.title == ">")
+        };
+        assert!(!shell_row(Settings::default()));
+        assert!(shell_row(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        }));
     }
 
     #[test]

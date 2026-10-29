@@ -608,6 +608,85 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     }
 }
 
+/// The folder under the app's data folder that holds command scripts.
+const SCRIPT_FOLDER: &str = "shell-commands";
+
+/// A script still here after this long never ran, as each one deletes
+/// itself when it runs. A newer one stays, so the terminal has time to
+/// start and read it.
+const SCRIPT_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// Write the command to a script that only the user can read, and open it
+/// with the app for `.command` files: Terminal, or the one the user chose,
+/// such as iTerm. No Apple Events, so no permission prompt.
+pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let failed = |error: std::io::Error| {
+        Error::msg(format!(
+            "TinyDash could not prepare the command for Terminal: {error}"
+        ))
+    };
+    let folder = data.join(SCRIPT_FOLDER);
+    std::fs::create_dir_all(&folder).map_err(failed)?;
+    std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o700)).map_err(failed)?;
+    remove_old_scripts(&folder, std::time::SystemTime::now());
+    let script = write_script(&folder, command).map_err(failed)?;
+    let opened = super::run("/usr/bin/open", &[&script.to_string_lossy()]);
+    if opened.is_err() {
+        std::fs::remove_file(&script).ok();
+    }
+    opened
+}
+
+/// A new script in `folder` that runs `command`, readable, writable, and
+/// runnable by the user alone.
+fn write_script(folder: &Path, command: &str) -> std::io::Result<PathBuf> {
+    use std::{
+        io::Write,
+        os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    };
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let path = folder.join(format!("{stamp}.command"));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o700)
+        .open(&path)?;
+    // The umask may have taken a bit away, and Terminal runs only a script
+    // that can run.
+    file.set_permissions(std::fs::Permissions::from_mode(0o700))?;
+    file.write_all(super::terminal::macos_script(command).as_bytes())?;
+    Ok(path)
+}
+
+/// Delete the scripts in `folder` older than [`SCRIPT_MAX_AGE`] at `now`.
+fn remove_old_scripts(folder: &Path, now: std::time::SystemTime) {
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let old = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .is_ok_and(|modified| {
+                now.duration_since(modified)
+                    .is_ok_and(|age| age > SCRIPT_MAX_AGE)
+            });
+        if old
+            && path
+                .extension()
+                .is_some_and(|extension| extension == "command")
+            && let Err(error) = std::fs::remove_file(&path)
+        {
+            tracing::warn!(%error, "Could not delete an old command script");
+        }
+    }
+}
+
 fn apple_script(script: &str) -> Result<()> {
     let output = Command::new("/usr/bin/osascript")
         .args(["-e", script])
@@ -892,6 +971,61 @@ pub fn restore_frontmost_app() {
 
 #[cfg(test)]
 mod tests {
+    /// A new, empty folder for one test.
+    fn folder(name: &str) -> std::path::PathBuf {
+        let folder = std::env::temp_dir().join(format!("tinydash-{name}-{}", std::process::id()));
+        std::fs::remove_dir_all(&folder).ok();
+        std::fs::create_dir_all(&folder).unwrap();
+        folder
+    }
+
+    #[test]
+    fn a_script_is_private_and_deletes_itself_when_it_runs() {
+        use std::os::unix::fs::PermissionsExt;
+        let folder = folder("script");
+        // `echo` stands in for the login shell and prints `-l` where it
+        // would open.
+        let run = |command: &str| {
+            let script = super::write_script(&folder, command).unwrap();
+            let mode = std::fs::metadata(&script).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o700, "{command}");
+            let output = std::process::Command::new(&script)
+                .env("SHELL", "/bin/echo")
+                .stdin(std::process::Stdio::null())
+                .output()
+                .unwrap();
+            assert!(!script.exists(), "{command}");
+            String::from_utf8(output.stdout).unwrap()
+        };
+        assert_eq!(run("echo {clipboard} \"it's\""), "{clipboard} it's\n-l\n");
+        assert_eq!(run("cd / && pwd"), "/\n-l\n");
+        // Exit, a syntax error, or a line that runs on still leave a shell.
+        assert_eq!(run("exit 3"), "-l\n");
+        assert_eq!(run("echo it's"), "-l\n");
+        assert_eq!(run("echo a \\"), "a\n-l\n");
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
+    #[test]
+    fn only_old_scripts_are_deleted() {
+        let folder = folder("old-scripts");
+        let now = std::time::SystemTime::now();
+        let write = |name: &str, age_seconds: u64| {
+            let path = folder.join(name);
+            let file = std::fs::File::create(&path).unwrap();
+            let age = std::time::Duration::from_secs(age_seconds);
+            file.set_modified(now - age).unwrap();
+            path
+        };
+        let old = write("1.command", 11 * 60);
+        let new = write("2.command", 60);
+        let other = write("notes.txt", 11 * 60);
+        super::remove_old_scripts(&folder, now);
+        assert!(!old.exists());
+        assert!(new.exists() && other.exists());
+        std::fs::remove_dir_all(&folder).unwrap();
+    }
+
     #[test]
     fn decodes_a_tiff_that_fits() {
         let mut tiff = Vec::new();

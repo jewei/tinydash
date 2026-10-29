@@ -41,6 +41,8 @@ pub enum ResultKind {
     Permissions,
     /// A row of the `?` list, which types its keyword.
     Keyword,
+    /// A command after `>`, which runs in the terminal.
+    Shell,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -94,6 +96,7 @@ pub enum Symbol {
     Quit,
     Display,
     Contrast,
+    Terminal,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, TS)]
@@ -244,6 +247,11 @@ pub enum Action {
     /// Start, pause, skip, or reset the focus timer of the widget pane.
     Focus {
         control: FocusControl,
+    },
+    /// Run a command, as typed after `>`, in the user's terminal app, while
+    /// shell commands are on.
+    RunInTerminal {
+        command: String,
     },
     Quit,
 }
