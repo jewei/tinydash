@@ -1810,12 +1810,17 @@ describe("Launcher", () => {
       },
     });
     await screen.findByRole("region", { name: "Up Next" });
-    // The list is out of date, but a hidden launcher reads no calendars.
+    // The list is out of date, and settings and another widget change, but
+    // a hidden launcher reads no calendars. Each show loads anyway.
+    await emit("settings:changed", testSettings);
+    await emit("widgets:changed", null);
     await new Promise((resolve) => setTimeout(resolve, 1100));
     expect(backend.called("widgets")).toHaveLength(1);
 
     visibility.mockReturnValue("visible");
     await waitFor(() => expect(backend.called("widgets")).toHaveLength(2), { timeout: 1500 });
+    await emit("widgets:changed", null);
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(3));
   });
 
   it("shows a clipboard color, copies its forms, and stays dismissed", async () => {
