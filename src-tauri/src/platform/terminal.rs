@@ -51,8 +51,15 @@ pub(super) fn command_file(data: &Path, contents: &str) -> std::io::Result<PathB
         .open(&path)?;
     // The umask may have taken a bit away, and Terminal runs only a script
     // that can run.
-    file.set_permissions(std::fs::Permissions::from_mode(0o700))?;
-    file.write_all(contents.as_bytes())?;
+    let written = file
+        .set_permissions(std::fs::Permissions::from_mode(0o700))
+        .and_then(|()| file.write_all(contents.as_bytes()));
+    // A file that is not complete can hold part of the command, and the
+    // caller gets no path to delete it.
+    if let Err(error) = written {
+        std::fs::remove_file(&path).ok();
+        return Err(error);
+    }
     Ok(path)
 }
 
