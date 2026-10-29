@@ -318,6 +318,41 @@ describe("Launcher", () => {
     expect(backend.called("run_action")).toHaveLength(0);
   });
 
+  it("keeps the keyboard in the hotkey dialog after focus leaves it", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Set Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, input, press } = setup(() => [withHotkey]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Set Hotkey/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+    const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+    // A click on the dialog's text moves focus to <body> and stops recording.
+    recorder.blur();
+    expect(recorder.getAttribute("aria-label")).toBe("Hotkey for Safari: None");
+    // Tab goes back to the dialog's own controls.
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    expect(document.activeElement).toBe(recorder);
+    // A key pressed with focus outside goes back to the recorder.
+    input.focus();
+    fireEvent.keyDown(input, { key: "a" });
+    expect(document.activeElement).toBe(recorder);
+    recorder.blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull();
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
   it("keeps the alias dialog open with the reason when saving fails", async () => {
     const named: SearchResult = {
       ...app,
