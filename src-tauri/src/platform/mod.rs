@@ -79,13 +79,17 @@
 //!   [`Key`](crate::features::expansion::Key)s: Backspace, the characters a
 //!   key typed, or a reset (a key pressed with Command, Control, Alt, or
 //!   Windows; Return, Tab, Escape, arrows, Home, End, Page Up or Down; a dead
-//!   key; a click; another app or window in front). A modifier key alone
-//!   passes nothing. Keys that TinyDash types never reach `on_key`. Keep
-//!   `on_key` quick: on Windows, typing waits for it. `TypingWatch::stop()`
-//!   ends the thread and drops `on_key`. Never log what it reads.
+//!   key; a click; another app in front, or on Windows and Linux another
+//!   window). A modifier key alone passes nothing. Keys that TinyDash types
+//!   never reach `on_key` as characters (Linux passes resets while it types).
+//!   Keep `on_key` quick: on Windows, typing waits for it.
+//!   `TypingWatch::stop()` ends the thread and drops `on_key`. Never log what
+//!   it reads.
 //! - `type_text(erase, text)`: press Backspace `erase` times, then type
-//!   `text` into the app in front, with Return for each line break. It never
-//!   uses the clipboard. Call it on a thread other than the watch thread.
+//!   `text` into the app in front, with Return for each line break. It stops
+//!   with an error when another app (macOS) or window comes to the front. It
+//!   never uses the clipboard. Call it on a thread other than the watch
+//!   thread.
 
 #[cfg(target_os = "linux")]
 mod linux;

@@ -878,6 +878,8 @@ fn keyboard_input(stroke: Stroke, down: bool) -> KEYBDINPUT {
 
 /// Types with `SendInput`, which puts the keys into the input stream as if
 /// they were typed. Windows marks them injected, so the hook skips them.
+/// Typing stops when another window comes to the front, so the rest never
+/// lands there.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
     let inputs: Vec<INPUT> = strokes(erase, text)
         .into_iter()
@@ -890,7 +892,15 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
             })
         })
         .collect();
+    // SAFETY: Takes no arguments.
+    let foreground = unsafe { GetForegroundWindow() };
     for batch in inputs.chunks(INPUT_BATCH) {
+        // SAFETY: Takes no arguments.
+        if unsafe { GetForegroundWindow() } != foreground {
+            return Err(Error::msg(
+                "Stopped typing the snippet: another window came to the front.",
+            ));
+        }
         // SAFETY: The pointer and count describe `batch`, and the size is
         // INPUT's.
         let sent = unsafe {

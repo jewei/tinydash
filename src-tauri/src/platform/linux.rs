@@ -442,6 +442,8 @@ const OWN_KEYS_AFTER: Duration = Duration::from_millis(300);
 const POLL_MILLISECONDS: c_int = 200;
 /// libxdo's pause between keys, in microseconds, as `xdotool type` uses.
 const KEY_DELAY: c_uint = 12_000;
+/// UTF-16 units typed between focus checks: under half a second.
+const PIECE_UNITS: usize = 32;
 /// libxdo's `CURRENTWINDOW`: type into the window that has focus.
 const CURRENT_WINDOW: c_ulong = 0;
 /// Modifiers that make a key a shortcut: Control, Alt (Mod1), and Super
@@ -818,7 +820,8 @@ fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
 }
 
 /// Types with libxdo, which sends keys with the XTEST extension and maps a
-/// character that no key types to a spare key for a moment.
+/// character that no key types to a spare key for a moment. Typing stops
+/// when another window gets the focus, so the rest never lands there.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
     let xlib =
         Xlib::open().map_err(|_| Error::msg("Snippet expansion needs the libX11 library."))?;
@@ -828,7 +831,14 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
         return Err(Error::msg("Could not connect to the X server."));
     }
     own_typing_until(Instant::now() + Duration::from_secs(60 * 60));
-    let typed = type_with_xdo(display, erase, text);
+    let focus = || {
+        let (mut focus, mut revert) = (0, 0);
+        // SAFETY: The connection is open, and only this thread uses it.
+        unsafe { (xlib.XGetInputFocus)(display, &mut focus, &mut revert) };
+        focus
+    };
+    let first = focus();
+    let typed = type_with_xdo(display, erase, text, || focus() == first);
     // SAFETY: The connection is open. XSync returns once the server handled
     // every key, so the recording has them before the quiet time ends.
     unsafe { (xlib.XSync)(display, xlib::False) };
@@ -838,7 +848,12 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
     typed
 }
 
-fn type_with_xdo(display: *mut Display, erase: usize, text: &str) -> Result<()> {
+fn type_with_xdo(
+    display: *mut Display,
+    erase: usize,
+    text: &str,
+    still_in_front: impl Fn() -> bool,
+) -> Result<()> {
     // SAFETY: The connection is open; 0 tells libxdo to leave it open.
     let xdo = unsafe { xdo_new_with_opened_display(display, ptr::null(), 0) };
     if xdo.is_null() {
@@ -846,13 +861,18 @@ fn type_with_xdo(display: *mut Display, erase: usize, text: &str) -> Result<()> 
             "Could not type the snippet: libxdo did not start.",
         ));
     }
-    let typed = type_pieces(xdo, erase, text);
+    let typed = type_pieces(xdo, erase, text, still_in_front);
     // SAFETY: Made above and freed once.
     unsafe { xdo_free(xdo) };
     typed
 }
 
-fn type_pieces(xdo: *mut Xdo, erase: usize, text: &str) -> Result<()> {
+fn type_pieces(
+    xdo: *mut Xdo,
+    erase: usize,
+    text: &str,
+    still_in_front: impl Fn() -> bool,
+) -> Result<()> {
     let failed = || Error::msg("Could not type the snippet.");
     let press = |keys: &CStr| {
         // SAFETY: `xdo` is valid until its caller frees it, and `keys` is a
@@ -861,13 +881,20 @@ fn type_pieces(xdo: *mut Xdo, erase: usize, text: &str) -> Result<()> {
             unsafe { xdo_send_keysequence_window(xdo, CURRENT_WINDOW, keys.as_ptr(), KEY_DELAY) };
         if status == 0 { Ok(()) } else { Err(failed()) }
     };
-    for _ in 0..erase {
-        press(c"BackSpace")?;
-    }
-    for piece in expansion::pieces(text, usize::MAX) {
-        match piece {
-            Piece::Return => press(c"Return")?,
-            Piece::Text(units) => {
+    // `None` is a Backspace. Short pieces let typing stop soon.
+    let steps = std::iter::repeat_with(|| None)
+        .take(erase)
+        .chain(expansion::pieces(text, PIECE_UNITS).into_iter().map(Some));
+    for step in steps {
+        if !still_in_front() {
+            return Err(Error::msg(
+                "Stopped typing the snippet: another window came to the front.",
+            ));
+        }
+        match step {
+            None => press(c"BackSpace")?,
+            Some(Piece::Return) => press(c"Return")?,
+            Some(Piece::Text(units)) => {
                 // `pieces` leaves NUL out, so this does not fail.
                 let text = CString::new(String::from_utf16_lossy(&units)).map_err(|_| failed())?;
                 // SAFETY: As above; `text` is a C string.

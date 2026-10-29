@@ -1108,8 +1108,7 @@ fn read_tap_event(tap: &Tap, kind: CGEventType, event: &CGEvent) {
             if field(CGEventField::EventSourceUserData) == OWN_EVENTS {
                 return;
             }
-            let front_app =
-                autoreleasepool(|_| NSWorkspace::sharedWorkspace().frontmostApplication());
+            let front_app = frontmost_app();
             if tap.front_app.replace(front_app.clone()) != front_app {
                 send(Key::Reset);
             }
@@ -1131,17 +1130,22 @@ fn read_tap_event(tap: &Tap, kind: CGEventType, event: &CGEvent) {
                 send(key);
             }
         }
-        // macOS turns off a tap that took too long; keys missed meanwhile
-        // are unknown.
-        CGEventType::TapDisabledByTimeout => {
+        // macOS turns off a tap that took too long, and may turn it off
+        // after some user input; keys missed meanwhile are unknown. A tap
+        // that lost its access stays off, and its thread ends.
+        CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput => {
             if let Some(port) = tap.port.get() {
                 CGEvent::tap_enable(port, true);
             }
             send(Key::Reset);
         }
-        // A click, or the tap turned off for another reason.
+        // A click.
         _ => send(Key::Reset),
     }
+}
+
+fn frontmost_app() -> Option<Retained<NSRunningApplication>> {
+    autoreleasepool(|_| NSWorkspace::sharedWorkspace().frontmostApplication())
 }
 
 /// The keys for a key press: a reset for a shortcut (Command, Control, or
@@ -1159,22 +1163,31 @@ fn keys_for(keycode: i64, flags: CGEventFlags, typed: &[u16]) -> Vec<Key> {
 }
 
 /// Types with key events posted at the system level, which reach the app in
-/// front. Each carries [`OWN_EVENTS`], so the tap skips it.
+/// front. Each carries [`OWN_EVENTS`], so the tap skips it. Typing stops when
+/// another app comes to the front, so the rest never lands there.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
     let source = CGEventSource::new(CGEventSourceStateID::Private)
         .ok_or_else(|| Error::msg("Could not type the snippet."))?;
     CGEventSource::set_user_data(Some(&source), OWN_EVENTS);
     // Keys the user presses meanwhile still arrive.
     CGEventSource::set_local_events_suppression_interval(Some(&source), 0.0);
-    for _ in 0..erase {
-        press(&source, BACKSPACE_KEY, &[])?;
-    }
-    for piece in expansion::pieces(text, MAX_UNITS_PER_EVENT) {
-        match piece {
-            Piece::Return => press(&source, RETURN_KEY, &[])?,
-            // The key code does not matter once the event carries text.
-            Piece::Text(units) => press(&source, 0, &units)?,
+    let front_app = frontmost_app();
+    // The key code does not matter once the event carries text.
+    let presses = std::iter::repeat_n((BACKSPACE_KEY, Vec::new()), erase).chain(
+        expansion::pieces(text, MAX_UNITS_PER_EVENT)
+            .into_iter()
+            .map(|piece| match piece {
+                Piece::Return => (RETURN_KEY, Vec::new()),
+                Piece::Text(units) => (0, units),
+            }),
+    );
+    for (keycode, units) in presses {
+        if frontmost_app() != front_app {
+            return Err(Error::msg(
+                "Stopped typing the snippet: another app came to the front.",
+            ));
         }
+        press(&source, keycode, &units)?;
     }
     Ok(())
 }
