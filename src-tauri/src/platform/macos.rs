@@ -1163,8 +1163,8 @@ fn keys_for(keycode: i64, flags: CGEventFlags, typed: &[u16]) -> Vec<Key> {
 }
 
 /// Types with key events posted at the system level, which reach the app in
-/// front. Each carries [`OWN_EVENTS`], so the tap skips it. Typing stops when
-/// another app comes to the front, so the rest never lands there.
+/// front. Each carries [`OWN_EVENTS`], so the tap skips it. Typing stops soon
+/// after another app comes to the front, so little of the rest lands there.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
     let source = CGEventSource::new(CGEventSourceStateID::Private)
         .ok_or_else(|| Error::msg("Could not type the snippet."))?;

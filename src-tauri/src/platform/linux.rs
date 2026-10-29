@@ -821,7 +821,8 @@ fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
 
 /// Types with libxdo, which sends keys with the XTEST extension and maps a
 /// character that no key types to a spare key for a moment. Typing stops
-/// when another window gets the focus, so the rest never lands there.
+/// soon after another window gets the focus, so little of the rest lands
+/// there.
 pub fn type_text(erase: usize, text: &str) -> Result<()> {
     let xlib =
         Xlib::open().map_err(|_| Error::msg("Snippet expansion needs the libX11 library."))?;
