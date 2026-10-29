@@ -6,5 +6,13 @@
     <true/>
     <key>NSAppleEventsUsageDescription</key>
     <string>TinyDash asks Finder to empty the Trash, and System Events to restart, shut down, or log out, only when you run those commands.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>The Up Next widget shows the rest of today's events. TinyDash only reads your calendars, and only while the widget is on.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>The Up Next widget shows the rest of today's events. TinyDash only reads your calendars, and only while the widget is on.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>The Up Next widget shows the reminders due today. TinyDash only reads your reminders, and only while the widget is on.</string>
+    <key>NSRemindersUsageDescription</key>
+    <string>The Up Next widget shows the reminders due today. TinyDash only reads your reminders, and only while the widget is on.</string>
   </dict>
 </plist>
