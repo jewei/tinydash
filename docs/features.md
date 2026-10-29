@@ -95,8 +95,8 @@ Every All search with text ends with a web search on the chosen engine (Settings
 - Time zones accept IANA names (`America/New_York`), city names, countries, and common names (`pacific`, `pst`, `kl`). A wall time skipped by a clock change gives no answer; a repeated one gives two.
 - Color and Unix time answers decode like clipboard cards: a color shows its RGB, HSL, and contrast on white, and Mod+K copies each form; a Unix time shows UTC and how long ago it was.
 - Passwords: 8–64 characters from letters, digits, and symbols (at least one of each); 3–12 words from the EFF large wordlist, without its four hyphenated words, so the hyphens between words stay clear; 4–12 digits. Uses the OS random source.
-- Shell commands are off until you turn on Run shell commands in Settings > Search. Then `>` and a command, such as `> git pull`, shows one row and nothing else, and `>` alone shows nothing. Enter opens a new terminal window in your home folder and runs exactly the text after `>`: on macOS in zsh, in the app that opens `.command` files (Terminal, or iTerm if you chose it); on Windows in PowerShell, which Windows 11 shows in your default terminal app; on Linux in `sh`, in the terminal that `$TERMINAL` names, else the first one found of x-terminal-emulator, GNOME Terminal, Konsole, Xfce Terminal, kitty, Alacritty, WezTerm, foot, and xterm (with none, set `$TERMINAL`). Your own shell then stays open in that window, also after an error or Control+C. Mod+Enter copies the command instead.
-- Safety: nothing runs until you press Enter or click the row. The row cannot be pinned, given an alias or a hotkey, hidden, or suggested, so a command never runs from anywhere else. Placeholders such as `{clipboard}` stay as typed, so clipboard text never becomes a command. A command is one line of up to 1,000 characters; before it runs one, TinyDash checks that again, and that the setting is still on. On macOS, the command goes into a script in TinyDash's data folder that only you can read. The script deletes itself when it runs, and one that never ran is deleted at a later run, once it is 10 minutes old.
+- Shell commands are off until you turn on Run shell commands in Settings > Search. Then `>` and a command, such as `> git pull`, shows one row and nothing else, and `>` alone shows nothing. Enter opens a new terminal window in your home folder and runs exactly the text after `>`: on macOS in zsh, in the app that opens `.command` files (Terminal, or iTerm if you chose it); on Windows in PowerShell, which Windows 11 shows in your default terminal app; on Linux in `sh`, in the terminal that `$TERMINAL` names, else the first one found of x-terminal-emulator, GNOME Terminal, Ptyxis, GNOME Console, Konsole, Xfce Terminal, kitty, Alacritty, WezTerm, foot, and xterm (with none, set `$TERMINAL`). Your own shell then stays open in that window, also after an error or Control+C. Mod+Enter copies the command instead. A snippet or quicklink keyword or an alias of your own that starts with `>`, such as `>j`, keeps opening its item.
+- Safety: nothing runs until you press Enter or click the row. The row cannot be pinned, given an alias or a hotkey, hidden, or suggested, so a command never runs from anywhere else. Placeholders such as `{clipboard}` stay as typed, so clipboard text never becomes a command. A command is one line of up to 1,000 characters, without control characters or the invisible marks that change the order in which text shows; before it runs one, TinyDash checks that again, and that the setting is still on. Only the Settings window can turn the setting on or off. On macOS and Linux, the command goes into a file in TinyDash's data folder that only you can read, never into a program's arguments, which other users of the computer can see. The file is deleted when the command starts, and one that never ran is deleted at a later run, once it is 10 minutes old.
 
 ## Clipboard history
 
@@ -129,16 +129,16 @@ On macOS, **Also search with Spotlight** (Settings > Files, off by default) make
 
 Changes save at once. If a change cannot apply (for example, the shortcut is taken), Settings shows why and keeps the previous value.
 
-| Section              | Settings                                                                                                             |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs     |
-| Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths                  |
-| Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                          |
-| Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                            |
-| Search               | Search engine, currency rates and shell commands, emoji skin tone, emoji languages, aliases, hotkeys, hidden results |
-| Snippets, Quicklinks | Create, edit, delete                                                                                                 |
-| Privacy              | Each connection to the internet, what it sends, how often, and whether it is on                                      |
-| About                | Version, Check for Updates, settings and data folders, credits                                                       |
+| Section              | Settings                                                                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| General              | Shortcut, appearance (system, light, dark), hide on focus loss, open at login, tray/menu bar icon, updates, tabs                            |
+| Widgets              | Each widget and clipboard cards on or off, clock cities, weather city and unit, focus timer lengths                                         |
+| Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                                                 |
+| Files                | Folders to index, folder names to skip, Spotlight (macOS)                                                                                   |
+| Search               | Web search engine, currency rates on/off, shell commands on/off, emoji skin tone, emoji keyword languages, aliases, hotkeys, hidden results |
+| Snippets, Quicklinks | Create, edit, delete                                                                                                                        |
+| Privacy              | Each connection to the internet, what it sends, how often, and whether it is on                                                             |
+| About                | Version, Check for Updates, settings and data folders, credits                                                                              |
 
 ## Updates
 

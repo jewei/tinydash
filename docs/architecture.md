@@ -69,7 +69,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 ## Security
 
 - All three windows (launcher, Settings, and the HUD) load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
-- External programs run only with fixed arguments. User text reaches a shell only as a shell command (`>`), which is off by default and runs only on Enter: as an argument of its own on Linux, a script line of its own on macOS, and encoded on Windows, never inside another quoted string.
+- External programs run only with fixed arguments. User text reaches a shell only as a shell command (`>`), which is off by default, is turned on only from the Settings window, and runs only on Enter: a script line of its own on macOS, a line that `sh` reads from a file on Linux, and encoded on Windows, never inside another quoted string. On macOS and Linux the command stays out of every program's arguments, which other users can read.
 - Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Clipboard cards read the text when the widget pane loads, skip marked secrets the same way, and keep nothing. Network requests: the ECB rate table (when currency rates are on, which they are not by default), the weather (when the widget is on: the city name to Open-Meteo's geocoding service, then its coordinates to the forecast service), and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
 ## Decisions
