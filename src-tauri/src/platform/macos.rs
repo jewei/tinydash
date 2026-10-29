@@ -2,14 +2,16 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::{
-        Mutex,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
 };
 
+use block2::RcBlock;
 use objc2::{
-    AllocAnyThread,
+    AllocAnyThread, msg_send,
     rc::{Retained, autoreleasepool},
+    runtime::AnyObject,
 };
 use objc2_app_kit::{
     NSApplicationActivationOptions, NSBitmapImageFileType, NSBitmapImageRep,
@@ -17,10 +19,13 @@ use objc2_app_kit::{
     NSPasteboard, NSPasteboardTypeTIFF, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
     NSWorkspace,
 };
+use objc2_event_kit::{
+    EKAuthorizationStatus, EKCalendarItem, EKEntityType, EKEvent, EKEventStore, EKReminder,
+};
 use objc2_foundation::{
-    NSArray, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
-    NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeLocalizedNameKey,
-    NSURLVolumeTotalCapacityKey,
+    NSArray, NSCalendar, NSDate, NSDateComponentUndefined, NSDictionary, NSNumber, NSPoint, NSRect,
+    NSSize, NSString, NSURL, NSURLVolumeAvailableCapacityForImportantUsageKey,
+    NSURLVolumeLocalizedNameKey, NSURLVolumeTotalCapacityKey,
 };
 
 use super::SECRET_FORMATS;
@@ -30,6 +35,7 @@ use crate::{
         apps::App,
         clipboard::{Content, pixels_fit},
         system::SystemCommand,
+        up_next::{self, Agenda, Due, Unreadable, UpNextKind},
     },
     settings::LauncherPosition,
 };
@@ -452,6 +458,236 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
             &add,
         );
     Ok(())
+}
+
+/// The usage strings macOS needs before it asks for calendars and
+/// reminders: the full-access ones from macOS 14, the others before.
+const CALENDAR_USAGE_KEYS: [&str; 4] = [
+    "NSCalendarsFullAccessUsageDescription",
+    "NSCalendarsUsageDescription",
+    "NSRemindersFullAccessUsageDescription",
+    "NSRemindersUsageDescription",
+];
+/// Reminders come back on a queue of EventKit's; stop waiting after this.
+const REMINDERS_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+/// Set while a request for access waits for the user.
+static ASKING_FOR_CALENDARS: AtomicBool = AtomicBool::new(false);
+
+pub fn read_up_next(from_ms: i64, to_ms: i64) -> Option<Agenda> {
+    let events = calendar_access(EKEntityType::Event);
+    let reminders = calendar_access(EKEntityType::Reminder);
+    if let (Err(events), Err(reminders)) = (&events, &reminders) {
+        return Some(Agenda {
+            events: Err(events.clone()),
+            reminders: Err(reminders.clone()),
+        });
+    }
+    autoreleasepool(|_| {
+        // A new store each time: a store made before the user allowed
+        // access keeps seeing nothing.
+        // SAFETY: `new` takes no arguments and makes an empty store.
+        let store = unsafe { EKEventStore::new() };
+        let to = ns_date(to_ms);
+        Some(Agenda {
+            events: events.map(|()| read_events(&store, &ns_date(from_ms), &to)),
+            reminders: reminders.and_then(|()| read_reminders(&store, &to)),
+        })
+    })
+}
+
+pub fn ask_calendar_access(done: impl Fn() + Send + Sync + 'static) {
+    use objc2::runtime::Bool;
+    use objc2_foundation::NSError;
+    let kinds: Vec<EKEntityType> = [EKEntityType::Event, EKEntityType::Reminder]
+        .into_iter()
+        .filter(|&kind| calendar_access(kind) == Err(Unreadable::NotAsked))
+        .collect();
+    if kinds.is_empty() || ASKING_FOR_CALENDARS.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    // SAFETY: `new` takes no arguments and makes an empty store.
+    let store = unsafe { EKEventStore::new() };
+    let waiting = Arc::new(AtomicUsize::new(kinds.len()));
+    let done = Arc::new(done);
+    for kind in kinds {
+        let (waiting, done, kept) = (Arc::clone(&waiting), Arc::clone(&done), store.clone());
+        // EventKit calls this once, on a queue of its own. The store only
+        // has to live until then; the handler never uses it, and releasing
+        // an object is safe on any thread.
+        let answered = RcBlock::new(move |_granted: Bool, _error: *mut NSError| {
+            let _store = &kept;
+            if waiting.fetch_sub(1, Ordering::AcqRel) == 1 {
+                ASKING_FOR_CALENDARS.store(false, Ordering::Release);
+                done();
+            }
+        });
+        let handler = RcBlock::as_ptr(&answered);
+        // SAFETY: `handler` points to a live block of the expected type,
+        // which EventKit copies. Each request method exists on the macOS
+        // versions it is called on.
+        unsafe {
+            if objc2::available!(macos = 14.0) {
+                if kind == EKEntityType::Reminder {
+                    store.requestFullAccessToRemindersWithCompletion(handler);
+                } else {
+                    store.requestFullAccessToEventsWithCompletion(handler);
+                }
+            } else {
+                #[allow(deprecated)]
+                store.requestAccessToEntityType_completion(kind, handler);
+            }
+        }
+    }
+}
+
+pub fn open_calendar_app(kind: UpNextKind) -> Result<()> {
+    let app = match kind {
+        UpNextKind::Event => "com.apple.iCal",
+        UpNextKind::Reminder => "com.apple.reminders",
+    };
+    super::run("/usr/bin/open", &["-b", app])
+}
+
+/// Whether TinyDash may read one kind, from the answer macOS keeps. Never asks.
+fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
+    // SAFETY: A class method that reads the saved answer for a valid kind.
+    match unsafe { EKEventStore::authorizationStatusForEntityType(kind) } {
+        EKAuthorizationStatus::FullAccess => Ok(()),
+        EKAuthorizationStatus::NotDetermined if can_ask_for_calendars() => {
+            Err(Unreadable::NotAsked)
+        }
+        EKAuthorizationStatus::NotDetermined => Err(Unreadable::CannotAsk),
+        EKAuthorizationStatus::Restricted => Err(Unreadable::Restricted),
+        // Denied, or Add Events Only, which cannot read.
+        _ => Err(Unreadable::Denied),
+    }
+}
+
+/// Whether this build carries the usage strings, without which macOS ends
+/// an app that asks. The app bundle has them, and `tauri dev` embeds them
+/// in the binary; a build made with `--no-bundle` does not.
+fn can_ask_for_calendars() -> bool {
+    let bundle = objc2_foundation::NSBundle::mainBundle();
+    CALENDAR_USAGE_KEYS.iter().all(|key| {
+        bundle
+            .objectForInfoDictionaryKey(&NSString::from_str(key))
+            .is_some()
+    })
+}
+
+fn ns_date(unix_ms: i64) -> Retained<NSDate> {
+    NSDate::dateWithTimeIntervalSince1970(unix_ms as f64 / 1000.0)
+}
+
+fn unix_ms(date: &NSDate) -> i64 {
+    // Rounded, as seconds in a double miss some milliseconds by a hair.
+    // `as` saturates; real dates fit by far.
+    (date.timeIntervalSince1970() * 1000.0).round() as i64
+}
+
+fn read_events(store: &EKEventStore, from: &NSDate, to: &NSDate) -> Vec<up_next::Event> {
+    // SAFETY: The predicate comes from this store, as the search requires.
+    // The search may return nil, though its header says otherwise.
+    let found: Option<Retained<NSArray<EKEvent>>> = unsafe {
+        let predicate = store.predicateForEventsWithStartDate_endDate_calendars(from, to, None);
+        msg_send![store, eventsMatchingPredicate: &*predicate]
+    };
+    found
+        .iter()
+        .flat_map(|found| found.iter())
+        .take(up_next::MAX_READ)
+        .filter_map(|event| read_event(&event))
+        .collect()
+}
+
+fn read_event(event: &EKEvent) -> Option<up_next::Event> {
+    // SAFETY: Getters of an event from the store. The title and the dates
+    // may be nil, though the headers do not promise them, so they are read
+    // as optional.
+    let (title, start, end, all_day) = unsafe {
+        let title: Option<Retained<NSString>> = msg_send![event, title];
+        let start: Option<Retained<NSDate>> = msg_send![event, startDate];
+        let end: Option<Retained<NSDate>> = msg_send![event, endDate];
+        (title, start?, end?, event.isAllDay())
+    };
+    Some(up_next::Event {
+        title: title.map(|title| title.to_string()).unwrap_or_default(),
+        calendar: calendar_name(event),
+        start_ms: unix_ms(&start),
+        end_ms: unix_ms(&end),
+        all_day,
+    })
+}
+
+/// Read incomplete reminders due before `to`, overdue ones included.
+fn read_reminders(
+    store: &EKEventStore,
+    to: &NSDate,
+) -> std::result::Result<Vec<up_next::Reminder>, Unreadable> {
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    // EventKit calls this once, on a queue of its own.
+    let handler = RcBlock::new(move |found: *mut NSArray<EKReminder>| {
+        // SAFETY: EventKit passes null or an array that lives for this call.
+        let found = unsafe { found.as_ref() };
+        let reminders: Vec<up_next::Reminder> = found
+            .iter()
+            .flat_map(|found| found.iter())
+            .take(up_next::MAX_READ)
+            .filter_map(|reminder| read_reminder(&reminder))
+            .collect();
+        // The reader may have stopped waiting.
+        send.try_send(reminders).ok();
+    });
+    // SAFETY: The predicate comes from this store, as the fetch requires,
+    // and EventKit copies the handler. The fetch's identifier may be nil,
+    // though its header says otherwise.
+    let fetch: Option<Retained<AnyObject>> = unsafe {
+        let predicate = store.predicateForIncompleteRemindersWithDueDateStarting_ending_calendars(
+            None,
+            Some(to),
+            None,
+        );
+        msg_send![store, fetchRemindersMatchingPredicate: &*predicate, completion: &*handler]
+    };
+    receive.recv_timeout(REMINDERS_WAIT).map_err(|_| {
+        if let Some(fetch) = fetch {
+            // SAFETY: `fetch` is what this store returned for the fetch.
+            unsafe { store.cancelFetchRequest(&fetch) };
+        }
+        Unreadable::Failed("Reminders did not answer in time. Open the launcher again.".into())
+    })
+}
+
+fn read_reminder(reminder: &EKReminder) -> Option<up_next::Reminder> {
+    // SAFETY: Getters of a reminder from the store. The title may be nil,
+    // though the header does not promise it, so it is read as optional.
+    let (title, due) = unsafe {
+        let title: Option<Retained<NSString>> = msg_send![reminder, title];
+        (title, reminder.dueDateComponents()?)
+    };
+    let due = if due.hour() == NSDateComponentUndefined {
+        Due::Day(chrono::NaiveDate::from_ymd_opt(
+            i32::try_from(due.year()).ok()?,
+            u32::try_from(due.month()).ok()?,
+            u32::try_from(due.day()).ok()?,
+        )?)
+    } else {
+        // The calendar uses the components' own time zone when they have one.
+        let date = NSCalendar::currentCalendar().dateFromComponents(&due)?;
+        Due::At(unix_ms(&date))
+    };
+    Some(up_next::Reminder {
+        title: title.map(|title| title.to_string()).unwrap_or_default(),
+        list: calendar_name(reminder),
+        due,
+    })
+}
+
+/// The name of the calendar or reminder list that holds `item`.
+fn calendar_name(item: &EKCalendarItem) -> String {
+    // SAFETY: Getters of an item from the store and of its calendar, whose
+    // title is never nil.
+    unsafe { item.calendar().map(|calendar| calendar.title().to_string()) }.unwrap_or_default()
 }
 
 /// Ask Spotlight for names that contain `name`, with fixed arguments and no
@@ -989,6 +1225,23 @@ mod tests {
         let paths = read_paths(output, 10, std::time::Duration::from_secs(5), |_| true);
         child.wait().ok();
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
+    }
+
+    #[test]
+    fn dates_keep_their_milliseconds() {
+        for unix_ms in [0, 1_772_000_000_123, -86_400_000] {
+            assert_eq!(super::unix_ms(&ns_date(unix_ms)), unix_ms);
+        }
+    }
+
+    #[test]
+    fn reads_today_without_asking() {
+        // Reads the real calendars when this process may, and never asks.
+        let (from, to) = up_next::window(&chrono::Local::now());
+        let agenda = read_up_next(from, to).expect("macOS has calendars");
+        for event in agenda.events.unwrap_or_default() {
+            assert!(event.end_ms >= from && event.start_ms <= to, "{event:?}");
+        }
     }
 
     #[test]

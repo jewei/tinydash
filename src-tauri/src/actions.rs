@@ -25,7 +25,7 @@ use crate::{
     },
     shortcut,
     state::State,
-    system_clipboard, timer, window,
+    system_clipboard, timer, widgets, window,
 };
 
 /// Pins kept in all, including pins of items that are hidden for now.
@@ -226,6 +226,16 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             events::launcher_query(app, &text);
         }
         Action::Focus { control } => timer::control(app, control)?,
+        Action::OpenUpNext { kind } => {
+            platform::open_calendar_app(kind)?;
+            window::hide(app)?;
+        }
+        Action::AskCalendarAccess => {
+            if !state.settings.get().show_up_next {
+                return Err(Error::msg("Turn on Up Next in Settings > Widgets first."));
+            }
+            widgets::ask_calendar_access(app);
+        }
         // Exits below, once the use is saved: exit ends the process from
         // the main thread while this worker may still be writing.
         Action::Quit => {}

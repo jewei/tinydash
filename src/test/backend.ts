@@ -36,6 +36,7 @@ export const testSettings: Settings = {
   ),
   showClocks: true,
   clockCities: [],
+  showUpNext: false,
   showDiskSpace: true,
   showNotepad: false,
   showFocusTimer: false,
@@ -52,6 +53,7 @@ export const testSettings: Settings = {
 /** Every widget off, so an empty All search shows the preview. */
 export const noWidgets: Partial<Settings> = {
   showClocks: false,
+  showUpNext: false,
   showDiskSpace: false,
   showNotepad: false,
   showFocusTimer: false,
@@ -131,6 +133,7 @@ export function fakeBackend(
     install_update: () => null,
     widgets: () => ({
       clocks: [],
+      upNext: null,
       disk: null,
       note: null,
       focus: null,

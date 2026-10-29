@@ -21,6 +21,7 @@ pub mod library;
 pub mod password;
 pub mod permissions;
 pub mod system;
+pub mod up_next;
 pub mod url_cleaner;
 pub mod weather;
 pub mod web;

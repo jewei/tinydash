@@ -68,6 +68,9 @@ pub struct Settings {
     pub show_clocks: bool,
     /// Places the clocks widget shows next to local time, as typed.
     pub clock_cities: Vec<String>,
+    /// The rest of today's events and the reminders due today (macOS).
+    /// Off by default: turning it on asks the OS for access to them.
+    pub show_up_next: bool,
     pub show_disk_space: bool,
     pub show_notepad: bool,
     pub show_focus_timer: bool,
@@ -211,6 +214,7 @@ impl Default for Settings {
                 .collect(),
             show_clocks: true,
             clock_cities: Vec::new(),
+            show_up_next: false,
             show_disk_space: true,
             show_notepad: false,
             show_focus_timer: false,
