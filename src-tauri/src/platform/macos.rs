@@ -577,18 +577,16 @@ pub fn open_calendar_app(kind: UpNextKind) -> Result<()> {
     super::run("/usr/bin/open", &["-b", app])
 }
 
-/// Whether TinyDash may read one kind, from the answer macOS keeps. Never asks.
+/// Whether TinyDash may read one kind, from the answer macOS keeps. Never
+/// asks. macOS answers for the app responsible for TinyDash: the terminal
+/// or other app that started it, if one did.
 fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
-    let bundle = NSBundle::mainBundle();
-    // SAFETY: getppid takes no arguments and cannot fail.
-    let parent = unsafe { libc::getppid() };
-    if !answers_for_tinydash(&bundle.bundlePath().to_string(), parent) {
-        return Err(Unreadable::StartedByAnotherApp);
-    }
     // SAFETY: A class method that reads the saved answer for a valid kind.
     match unsafe { EKEventStore::authorizationStatusForEntityType(kind) } {
         EKAuthorizationStatus::FullAccess => Ok(()),
-        EKAuthorizationStatus::NotDetermined if has_calendar_usage_strings(&bundle) => {
+        EKAuthorizationStatus::NotDetermined
+            if has_calendar_usage_strings(&NSBundle::mainBundle()) =>
+        {
             Err(Unreadable::NotAsked)
         }
         EKAuthorizationStatus::NotDetermined => Err(Unreadable::CannotAsk),
@@ -598,20 +596,9 @@ fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
     }
 }
 
-/// Whether macOS answers about calendars for TinyDash itself. It answers
-/// for the app responsible for a process. An app bundle that launchd
-/// starts, from Finder, the Dock, `open`, or the login item, is its own,
-/// and its parent is launchd. A program that a terminal or another app
-/// starts belongs to that app, even inside TinyDash's bundle, as does one
-/// outside a bundle, as with `bun run dev`. TinyDash would then read and
-/// ask with that app's access, and every program it runs could use it.
-fn answers_for_tinydash(bundle_path: &str, parent_pid: libc::pid_t) -> bool {
-    const LAUNCHD: libc::pid_t = 1;
-    bundle_path.ends_with(".app") && parent_pid == LAUNCHD
-}
-
 /// Whether the app carries the usage strings, without which macOS ends an
-/// app that asks.
+/// app that asks. The app bundle has them, and `tauri dev` embeds them in
+/// the binary; a build made with `--no-bundle` does not.
 fn has_calendar_usage_strings(bundle: &NSBundle) -> bool {
     CALENDAR_USAGE_KEYS.iter().all(|key| {
         bundle
@@ -1303,24 +1290,30 @@ mod tests {
     }
 
     #[test]
-    fn a_binary_outside_an_app_never_reads_or_asks_for_calendars() {
-        // Like `bun run dev`, the test binary embeds the usage strings and
-        // runs from a terminal, whose access macOS would use instead.
-        for kind in [EKEntityType::Event, EKEntityType::Reminder] {
-            assert_eq!(calendar_access(kind), Err(Unreadable::StartedByAnotherApp));
+    fn asks_for_calendars_only_with_every_usage_string() {
+        let folder = std::env::temp_dir().join(format!("tinydash-usage-{}", std::process::id()));
+        // TinyDash's own Info.plist, then one that lacks a key. NSBundle
+        // keeps a bundle per path, so each case has its own.
+        let shipped =
+            std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Info.plist"))
+                .unwrap();
+        let cases = [
+            ("Shipped.app", shipped.clone(), true),
+            (
+                "Partial.app",
+                shipped.replace("NSRemindersFullAccessUsageDescription", "Unrelated"),
+                false,
+            ),
+        ];
+        for (name, info, can_ask) in cases {
+            let contents = folder.join(name).join("Contents");
+            std::fs::create_dir_all(&contents).unwrap();
+            std::fs::write(contents.join("Info.plist"), info).unwrap();
+            let path = NSString::from_str(&folder.join(name).to_string_lossy());
+            let bundle = NSBundle::bundleWithPath(&path).expect("a bundle");
+            assert_eq!(has_calendar_usage_strings(&bundle), can_ask, "{name}");
         }
-    }
-
-    #[test]
-    fn only_an_app_that_launchd_starts_reads_calendars() {
-        let app = "/Applications/TinyDash.app";
-        assert!(answers_for_tinydash(app, 1));
-        // The installed app, started from a terminal or a hotkey tool.
-        assert!(!answers_for_tinydash(app, 4242));
-        assert!(!answers_for_tinydash(
-            "/Users/me/tinydash/src-tauri/target/debug",
-            1
-        ));
+        std::fs::remove_dir_all(&folder).ok();
     }
 
     #[test]

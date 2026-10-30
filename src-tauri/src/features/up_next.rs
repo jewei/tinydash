@@ -69,9 +69,6 @@ pub enum Unreadable {
     Denied,
     /// A policy, such as Screen Time, blocks access.
     Restricted,
-    /// Another app, such as a terminal, started TinyDash, so the OS answers
-    /// for that app: TinyDash would read and ask with that app's access.
-    StartedByAnotherApp,
     /// This build cannot ask: it lacks the usage strings, without which
     /// macOS ends an app that asks.
     CannotAsk,
@@ -314,16 +311,15 @@ fn message(problem: &Unreadable, subject: Subject) -> String {
     let what = subject.words();
     match problem {
         Unreadable::NotAsked => format!("TinyDash needs your permission to read your {what}."),
+        // macOS answers for the app responsible for TinyDash, which is the
+        // terminal or other app that started it, so that app may need access.
         Unreadable::Denied => format!(
-            "TinyDash cannot read your {what}. In the privacy settings of macOS, allow TinyDash {}.",
+            "TinyDash cannot read your {what}. In the privacy settings of macOS, allow TinyDash {}. If a terminal or another app started TinyDash, macOS asks for and checks access on behalf of that app.",
             subject.place()
         ),
         Unreadable::Restricted => {
             format!("Access to your {what} is restricted on this Mac, for example by Screen Time.")
         }
-        Unreadable::StartedByAnotherApp => format!(
-            "TinyDash cannot read your {what} when another app, such as a terminal, starts it. Quit TinyDash, then open it from Finder or Launchpad."
-        ),
         Unreadable::CannotAsk => {
             format!("This build of TinyDash cannot ask to read your {what}. Use the installed app.")
         }
@@ -628,7 +624,7 @@ mod tests {
         assert_eq!(
             both_denied.problems,
             [
-                "TinyDash cannot read your calendars and reminders. In the privacy settings of macOS, allow TinyDash under Calendars and under Reminders."
+                "TinyDash cannot read your calendars and reminders. In the privacy settings of macOS, allow TinyDash under Calendars and under Reminders. If a terminal or another app started TinyDash, macOS asks for and checks access on behalf of that app."
             ]
         );
         assert!(both_denied.ask.is_none() && both_denied.items.is_empty());
@@ -644,7 +640,7 @@ mod tests {
         assert_eq!(
             mixed.problems,
             [
-                "TinyDash cannot read your reminders. In the privacy settings of macOS, allow TinyDash under Reminders."
+                "TinyDash cannot read your reminders. In the privacy settings of macOS, allow TinyDash under Reminders. If a terminal or another app started TinyDash, macOS asks for and checks access on behalf of that app."
             ]
         );
 
@@ -667,21 +663,21 @@ mod tests {
             Some(ResultAction::new("Allow Access", Action::AskCalendarAccess))
         );
 
-        // A terminal would get the access, so there is nothing to allow.
-        let from_terminal = view(
+        // Without the usage strings, macOS would end TinyDash if it asked.
+        let cannot_ask = view(
             Agenda {
-                events: Err(Unreadable::StartedByAnotherApp),
-                reminders: Err(Unreadable::StartedByAnotherApp),
+                events: Err(Unreadable::CannotAsk),
+                reminders: Err(Unreadable::CannotAsk),
             },
             &now(),
         );
         assert_eq!(
-            from_terminal.problems,
+            cannot_ask.problems,
             [
-                "TinyDash cannot read your calendars and reminders when another app, such as a terminal, starts it. Quit TinyDash, then open it from Finder or Launchpad."
+                "This build of TinyDash cannot ask to read your calendars and reminders. Use the installed app."
             ]
         );
-        assert!(from_terminal.ask.is_none());
+        assert!(cannot_ask.ask.is_none());
     }
 
     #[test]
