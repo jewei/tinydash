@@ -1,7 +1,7 @@
-//! `>` and a command run that command in the user's terminal app, while
-//! Settings > Search allows it. The command is the text after `>`, as
-//! typed: no placeholder is filled, so clipboard text never becomes part of
-//! a command. Nothing runs until the user picks the row.
+//! `>`, a space, and a command run that command in the user's terminal
+//! app, while Settings > Search allows it. The command is the text after
+//! `>`, as typed: no placeholder is filled, so clipboard text never becomes
+//! part of a command. Nothing runs until the user picks the row.
 
 use crate::{
     error::{Error, Result},
@@ -19,11 +19,17 @@ const TERMINAL: &str = if cfg!(windows) {
     "Terminal"
 };
 
-/// The row for `> command`, or no rows for `>` alone; `None` when the query
-/// does not start with `>`. Like `=` and `?`, `>` asks for this and nothing
+/// The row for `>`, a space, and a command, or no rows for `>` alone; `None`
+/// for any other query. Like `=` and `?`, `>` asks for this and nothing
 /// else, so Enter runs the command or nothing, never another result.
 pub fn answer(query: &str) -> Option<Vec<SearchResult>> {
-    let command = query.trim_start().strip_prefix('>')?.trim();
+    let after = query.trim_start().strip_prefix('>')?;
+    // `>git` searches as before. Keywords and aliases have no spaces, so
+    // one that starts with `>`, such as `>j`, keeps its item.
+    if !(after.is_empty() || after.starts_with(char::is_whitespace)) {
+        return None;
+    }
+    let command = after.trim();
     if command.is_empty() {
         return Some(Vec::new());
     }
@@ -120,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn a_command_after_the_sign_runs_or_copies_as_typed() {
+    fn a_command_after_the_sign_and_a_space_runs_or_copies_as_typed() {
         let rows = answer("  >  git pull --rebase ").unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].title, "git pull --rebase");
@@ -132,7 +138,7 @@ mod tests {
             [format!("Run in {TERMINAL}").as_str(), "Copy Command"]
         );
         assert_eq!(
-            actions(">git pull --rebase"),
+            actions("> git pull --rebase"),
             [
                 Action::RunInTerminal {
                     command: "git pull --rebase".into()
@@ -156,7 +162,21 @@ mod tests {
         for query in [">", " > ", ">   "] {
             assert_eq!(answer(query), Some(Vec::new()), "{query:?}");
         }
-        for query in ["", "git pull", "a > b", "=> x", "?"] {
+    }
+
+    #[test]
+    fn the_sign_without_a_space_is_text_to_search_for() {
+        // Such as the keyword `>j` or the alias `>zz`.
+        for query in [
+            "",
+            "git pull",
+            "a > b",
+            "=> x",
+            "?",
+            ">git",
+            ">j ABC-12",
+            ">>",
+        ] {
             assert_eq!(answer(query), None, "{query:?}");
         }
     }

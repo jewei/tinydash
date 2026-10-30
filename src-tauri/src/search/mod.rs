@@ -374,12 +374,9 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     if let Some(list) = keywords::answer(query, &s.library, s.settings.shell_commands) {
         return list;
     }
-    // And `>`, for a shell command, while the user allows them, unless the
-    // user chose a keyword or an alias that starts with `>`. The cheap test
-    // for `>` goes first, as this runs at each key press.
+    // And `>` with a space, for a shell command, while the user allows them.
     if s.settings.shell_commands
         && let Some(command) = shell::answer(query)
-        && !is_users_word(s, query)
     {
         return command;
     }
@@ -495,19 +492,6 @@ fn answers(s: &Snapshot, query: &str) -> Vec<SearchResult> {
     results.extend(s.library.keyword_answer(query));
     results.extend(web::answer(query));
     results
-}
-
-/// Whether `query` is the keyword of a snippet or quicklink, an alias, or a
-/// keyword followed by its text: `>j ABC-12` keeps opening the quicklink
-/// whose keyword is `>j`, as it did before `>` ran shell commands.
-fn is_users_word(s: &Snapshot, query: &str) -> bool {
-    let whole = matcher::normalize(query);
-    s.library.keyword_answer(query).is_some()
-        || s.library
-            .items()
-            .iter()
-            .any(|item| !item.keyword.is_empty() && item.keyword == whole)
-        || s.aliases.owner(&whole).is_some()
 }
 
 /// The best `limit` results, each ID once, at its best score.
@@ -1015,7 +999,7 @@ mod tests {
     }
 
     #[test]
-    fn a_keyword_or_alias_that_starts_with_the_shell_sign_keeps_its_item() {
+    fn only_the_sign_and_a_space_start_a_command_so_keywords_and_aliases_stay() {
         use crate::features::library::{LibraryItem, LibraryKind};
         let state = crate::state::State::for_tests(Settings {
             shell_commands: true,
@@ -1040,27 +1024,42 @@ mod tests {
             state.store.save_library_item(&item).unwrap();
         }
         state.reload_library().unwrap();
-        state
-            .aliases
-            .set(Aliases::new([("system:sleep".into(), ">zz".into())]));
-        let first = |query: &str| search(&state.snapshot(), query, Category::All)[0].clone();
-        let jira = first(">j ABC-12");
+        state.aliases.set(Aliases::new([
+            ("system:sleep".into(), ">zz".into()),
+            // An alias stays when its item is gone for now.
+            ("app:/Applications/Gone.app".into(), ">t".into()),
+        ]));
+        let results = |query: &str| search(&state.snapshot(), query, Category::All);
+        let jira = results(">j ABC-12")[0].clone();
         assert_eq!(jira.title, "Jira: ABC-12");
         assert_eq!(jira.kind, ResultKind::Quicklink);
-        assert_eq!(first(">J").title, "Jira");
-        assert_eq!(first(">sig").title, "Signature");
-        assert_eq!(first(">zz").id, "system:sleep");
+        assert_eq!(results(">J")[0].title, "Jira");
+        assert_eq!(results(">sig")[0].title, "Signature");
+        assert_eq!(results(">zz")[0].id, "system:sleep");
         // The `?` list types `>j `, and the text after it opens the link.
-        let list = search(&state.snapshot(), "? >j", Category::All);
+        let list = results("? >j");
         assert!(list.iter().any(|row| row.title == ">j"), "{list:?}");
-        // Other text after `>` is still a command, also with a space.
-        for (query, command) in [
-            (">jq .", "jq ."),
-            ("> j ABC-12", "j ABC-12"),
-            (">sig x", "sig x"),
-        ] {
-            let row = first(query);
-            assert_eq!((row.kind, row.title.as_str()), (ResultKind::Shell, command));
+        // Without a space after `>`, other text searches as before, also
+        // the alias of an app that is gone.
+        for query in [">jq .", ">t", ">sig x"] {
+            let found = results(query);
+            assert!(
+                found.iter().all(|row| row.kind != ResultKind::Shell),
+                "{query}: {found:?}"
+            );
+            assert!(
+                found.iter().any(|row| row.kind == ResultKind::WebSearch),
+                "{query}: {found:?}"
+            );
+        }
+        // With a space, the text is a command, also when it names a keyword.
+        for (query, command) in [("> j ABC-12", "j ABC-12"), ("> sig", "sig"), ("> zz", "zz")] {
+            let found = results(query);
+            assert_eq!(found.len(), 1, "{query}: {found:?}");
+            assert_eq!(
+                (found[0].kind, found[0].title.as_str()),
+                (ResultKind::Shell, command)
+            );
         }
     }
 

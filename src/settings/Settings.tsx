@@ -529,7 +529,7 @@ export function Settings() {
                 </Row>
                 <Row
                   label="Run shell commands"
-                  description={`Type > and a command, then press Enter, to run it in ${TERMINALS[PLATFORM]}. TinyDash runs exactly what you type, and only when you press Enter.`}
+                  description={`Type >, a space, and a command, then press Enter, to run it in ${TERMINALS[PLATFORM]}. TinyDash runs exactly what you type, and only when you press Enter.`}
                 >
                   <Toggle
                     label="Run shell commands"
