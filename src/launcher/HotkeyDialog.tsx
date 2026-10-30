@@ -30,7 +30,10 @@ export function HotkeyDialog(props: {
     if (recorder()?.classList.contains("recording")) return;
     const controls = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled)"));
     const index = controls.indexOf(document.activeElement as HTMLElement);
-    if (event.key === "Escape") {
+    if (event.repeat && event.key !== "Tab") {
+      // A held key acts once. Its repeats must not click a button again,
+      // close the dialog after Escape stopped recording, or start recording.
+    } else if (event.key === "Escape") {
       // A save already sent cannot be taken back, so it is not cancelled.
       if (!props.busy) props.onCancel();
     } else if (event.key === "Tab") {

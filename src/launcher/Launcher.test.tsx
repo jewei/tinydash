@@ -353,6 +353,57 @@ describe("Launcher", () => {
     expect(backend.called("run_action")).toHaveLength(0);
   });
 
+  it("acts once on a key held in the hotkey dialog", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Change Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "Control+Alt+K" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [withHotkey]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Change Hotkey/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+    const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+    // Sends a repeat of the key; true when the dialog stopped its default action.
+    const hold = (target: Element, key: string) => {
+      const repeat = new KeyboardEvent("keydown", {
+        key,
+        repeat: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      target.dispatchEvent(repeat);
+      return repeat.defaultPrevented;
+    };
+    // Escape stops recording; its repeats do not close the dialog too.
+    fireEvent.keyDown(recorder, { key: "Escape" });
+    expect(recorder.classList.contains("recording")).toBe(false);
+    expect(hold(recorder, "Escape")).toBe(true);
+    expect(screen.getByRole("dialog", { name: "Hotkey for Safari" })).toBeTruthy();
+    // A held Enter neither clicks the recorder, which records again, nor a
+    // button. A new press keeps its normal meaning.
+    expect(hold(recorder, "Enter")).toBe(true);
+    const remove = within(dialog).getByRole("button", { name: "Remove Hotkey" });
+    remove.focus();
+    expect(hold(remove, "Enter")).toBe(true);
+    expect(fireEvent.keyDown(remove, { key: "Enter" })).toBe(true);
+    // A held key with focus outside the dialog does nothing.
+    remove.blur();
+    expect(hold(document.body, "Enter")).toBe(true);
+    expect(document.activeElement).toBe(document.body);
+    expect(backend.called("run_action")).toHaveLength(0);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull();
+  });
+
   it("keeps the alias dialog open with the reason when saving fails", async () => {
     const named: SearchResult = {
       ...app,
