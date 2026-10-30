@@ -529,10 +529,11 @@ fn percentage(query: &str) -> Option<String> {
 
 /// A question about a percentage, as a whole: `20 is what % of 200`,
 /// `50 to 75 is what %`, `3/20 is what %`, or `20 is 10% of what`. Each part
-/// is a plain amount, or a ratio of two in `3/20 is what %`.
+/// is a plain amount, or a ratio of two in `3/20 is what %`. fend reads `to`
+/// and `in` as `as`, so `0.35 to %` is `0.35 as %`.
 fn percentage_question(query: &str) -> Option<String> {
     let query = query.trim();
-    for ending in [" is what %", " as %", " as a %"] {
+    for ending in [" is what %", " as %", " as a %", " to %", " in %"] {
         if let Some(left) = strip_suffix(query, ending) {
             return match around(left, " to ") {
                 Some((from, to)) => (is_amount(from) && is_amount(to))
@@ -984,6 +985,11 @@ mod tests {
             ("40 to 90 as %", "125%"),
             ("3/20 is what %", "15%"),
             ("0.35 as %", "35%"),
+            // fend reads `to` and `in` as `as`.
+            ("0.35 to %", "35%"),
+            ("1/8 in %", "12.5%"),
+            ("0.35 to percent", "35%"),
+            ("50 to 75 in %", "50%"),
             ("20 is 10% of what", "200"),
             ("220 is 10% on what", "200"),
             ("180 is 10% off what", "200"),
