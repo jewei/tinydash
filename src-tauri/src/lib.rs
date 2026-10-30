@@ -200,15 +200,7 @@ fn setup(app: &mut App) {
     }
     monitor::start(handle);
     if expand_snippets && let Err(error) = expander::start(handle, false) {
-        // Access granted later takes effect when TinyDash starts again.
-        let retry = if platform::typing_unavailable().is_none() {
-            " Then quit and reopen TinyDash."
-        } else {
-            ""
-        };
-        state.warn(format!(
-            "Snippets do not expand as you type. {error}{retry}"
-        ));
+        state.warn(format!("Snippets do not expand as you type. {error}"));
     }
     timer::start(handle);
     watcher::watch(handle);

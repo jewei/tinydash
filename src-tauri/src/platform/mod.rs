@@ -77,7 +77,9 @@
 //!   Wayland session on Linux), or `None`.
 //! - `typing_access(ask)`: `Ok` when TinyDash may read and send keys, else
 //!   an error that says what to allow. On macOS that is Accessibility and
-//!   Input Monitoring; `ask` shows the macOS prompts for what is missing.
+//!   Input Monitoring, which may count only once TinyDash starts again, so
+//!   the error also says to quit and reopen it; `ask` shows the macOS
+//!   prompts for what is missing.
 //! - `Focus`: the app (macOS) or window that gets typed keys. It can go to
 //!   another thread and is only compared.
 //! - `watch_typing(on_key)`: read the keys typed in every app on a thread of

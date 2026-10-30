@@ -936,6 +936,8 @@ pub fn typing_access(ask: bool) -> Result<()> {
         .map_or(Ok(()), |message| Err(Error::msg(message)))
 }
 
+/// What to allow. Access that the user allows may count only once TinyDash
+/// starts again, so the message also says to quit and reopen it.
 fn missing_access(accessibility: bool, input_monitoring: bool) -> Option<String> {
     let missing = match (accessibility, input_monitoring) {
         (true, true) => return None,
@@ -944,7 +946,7 @@ fn missing_access(accessibility: bool, input_monitoring: bool) -> Option<String>
         (false, false) => "Accessibility and Input Monitoring",
     };
     Some(format!(
-        "Allow TinyDash under {missing} in System Settings > Privacy & Security."
+        "Allow TinyDash under {missing} in System Settings > Privacy & Security. Then quit and reopen TinyDash."
     ))
 }
 
@@ -1067,7 +1069,7 @@ fn run_tap(
     };
     let Some(port) = port else {
         let _ = ready.send(Err(Error::msg(
-            "macOS did not let TinyDash read keys. Allow TinyDash under Input Monitoring in System Settings > Privacy & Security.",
+            "macOS did not let TinyDash read keys. Allow TinyDash under Input Monitoring in System Settings > Privacy & Security. Then quit and reopen TinyDash.",
         )));
         return;
     };
@@ -1251,10 +1253,12 @@ mod tests {
         let message = |accessibility, input| missing_access(accessibility, input).unwrap();
         assert_eq!(
             message(false, false),
-            "Allow TinyDash under Accessibility and Input Monitoring in System Settings > Privacy & Security."
+            "Allow TinyDash under Accessibility and Input Monitoring in System Settings > Privacy & Security. Then quit and reopen TinyDash."
         );
         assert!(message(false, true).contains("under Accessibility in"));
         assert!(message(true, false).contains("under Input Monitoring in"));
+        // Access allowed while TinyDash runs may count only after a restart.
+        assert!(message(true, false).ends_with(" Then quit and reopen TinyDash."));
     }
 
     #[test]
