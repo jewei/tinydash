@@ -82,7 +82,8 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             if !web_address(&url) {
                 return Err(Error::msg("Only web addresses can be opened."));
             }
-            platform::open_url(&url)?;
+            tauri_plugin_opener::open_url(&url, None::<&str>)
+                .map_err(|e| Error::msg(e.to_string()))?;
             window::hide(app)?;
         }
         Action::Copy { text } => {
@@ -185,7 +186,8 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             // source or made in a password app, never goes into a link.
             let clipboard = || platform::clipboard_text(app);
             match library::quicklink_target(&item.text, &query, chrono::Local::now(), clipboard)? {
-                Target::Url(url) => platform::open_url(&url)?,
+                Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
+                    .map_err(|e| Error::msg(e.to_string()))?,
                 Target::Path(path) => open_path(&path)?,
             }
             window::hide(app)?;
@@ -505,7 +507,7 @@ fn open_path(path: &Path) -> Result<()> {
     if !path.exists() {
         return Err(Error::msg(format!("{} no longer exists.", path.display())));
     }
-    platform::open_path(path)
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| Error::msg(e.to_string()))
 }
 
 /// The pin that must go before `id` fits, or `None` while there is room or
