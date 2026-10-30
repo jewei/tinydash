@@ -996,16 +996,20 @@ impl TypingWatch {
     }
 }
 
+/// The app in front, which gets typed keys.
+#[derive(Clone, PartialEq)]
+pub struct Focus(Option<Retained<NSRunningApplication>>);
+
 /// What the tap callback works with, on the tap thread only.
 struct Tap {
     /// The tap itself, to turn it on again after macOS turns it off.
     port: OnceCell<CFRetained<CFMachPort>>,
-    on_key: RefCell<Box<dyn FnMut(Key)>>,
+    on_key: RefCell<Box<dyn FnMut(Key, Focus)>>,
     /// The app that got the latest key; a key in another app starts afresh.
-    front_app: RefCell<Option<Retained<NSRunningApplication>>>,
+    front_app: RefCell<Focus>,
 }
 
-pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWatch> {
+pub fn watch_typing(on_key: impl FnMut(Key, Focus) + Send + 'static) -> Result<TypingWatch> {
     let (ready, started) = mpsc::channel();
     let stopped = Arc::new(AtomicBool::new(false));
     let thread = std::thread::Builder::new()
@@ -1032,14 +1036,14 @@ pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWa
 }
 
 fn run_tap(
-    on_key: Box<dyn FnMut(Key)>,
+    on_key: Box<dyn FnMut(Key, Focus)>,
     stopped: &AtomicBool,
     ready: &mpsc::Sender<Result<TapRunLoop>>,
 ) {
     let tap = Box::new(Tap {
         port: OnceCell::new(),
         on_key: RefCell::new(on_key),
-        front_app: RefCell::new(None),
+        front_app: RefCell::new(Focus(None)),
     });
     let mask = [
         CGEventType::KeyDown,
@@ -1110,9 +1114,11 @@ unsafe extern "C-unwind" fn on_tap_event(
 }
 
 fn read_tap_event(tap: &Tap, kind: CGEventType, event: &CGEvent) {
+    // Each key goes with the app that got the latest key.
     let send = |key| {
         if let Ok(mut on_key) = tap.on_key.try_borrow_mut() {
-            on_key(key);
+            let front_app = tap.front_app.borrow().clone();
+            on_key(key, front_app);
         }
     };
     match kind {
@@ -1121,7 +1127,7 @@ fn read_tap_event(tap: &Tap, kind: CGEventType, event: &CGEvent) {
             if field(CGEventField::EventSourceUserData) == OWN_EVENTS {
                 return;
             }
-            let front_app = frontmost_app();
+            let front_app = front_app();
             if tap.front_app.replace(front_app.clone()) != front_app {
                 send(Key::Reset);
             }
@@ -1157,8 +1163,10 @@ fn read_tap_event(tap: &Tap, kind: CGEventType, event: &CGEvent) {
     }
 }
 
-fn frontmost_app() -> Option<Retained<NSRunningApplication>> {
-    autoreleasepool(|_| NSWorkspace::sharedWorkspace().frontmostApplication())
+fn front_app() -> Focus {
+    Focus(autoreleasepool(|_| {
+        NSWorkspace::sharedWorkspace().frontmostApplication()
+    }))
 }
 
 /// The keys for a key press: a reset for a shortcut (Command, Control, or
@@ -1176,15 +1184,15 @@ fn keys_for(keycode: i64, flags: CGEventFlags, typed: &[u16]) -> Vec<Key> {
 }
 
 /// Types with key events posted at the system level, which reach the app in
-/// front. Each carries [`OWN_EVENTS`], so the tap skips it. Typing stops soon
-/// after another app comes to the front, so little of the rest lands there.
-pub fn type_text(erase: usize, text: &str) -> Result<()> {
+/// front. Each carries [`OWN_EVENTS`], so the tap skips it. Each key goes
+/// only while `focus` is in front, so typing stops soon after another app
+/// comes to the front, and types nothing when one came before it started.
+pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
     let source = CGEventSource::new(CGEventSourceStateID::Private)
         .ok_or_else(|| Error::msg("Could not type the snippet."))?;
     CGEventSource::set_user_data(Some(&source), OWN_EVENTS);
     // Keys the user presses meanwhile still arrive.
     CGEventSource::set_local_events_suppression_interval(Some(&source), 0.0);
-    let front_app = frontmost_app();
     // The key code does not matter once the event carries text.
     let presses = std::iter::repeat_n((BACKSPACE_KEY, Vec::new()), erase).chain(
         expansion::pieces(text, MAX_UNITS_PER_EVENT)
@@ -1195,7 +1203,7 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
             }),
     );
     for (keycode, units) in presses {
-        if frontmost_app() != front_app {
+        if front_app() != focus {
             return Err(Error::msg(
                 "Stopped typing the snippet: another app came to the front.",
             ));

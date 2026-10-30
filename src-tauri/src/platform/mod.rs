@@ -78,14 +78,18 @@
 //! - `typing_access(ask)`: `Ok` when TinyDash may read and send keys, else
 //!   an error that says what to allow. On macOS that is Accessibility and
 //!   Input Monitoring; `ask` shows the macOS prompts for what is missing.
+//! - `Focus`: the app (macOS) or window that gets typed keys. It can go to
+//!   another thread and is only compared.
 //! - `watch_typing(on_key)`: read the keys typed in every app on a thread of
-//!   its own, and pass each to `on_key` on that thread as
-//!   [`Key`](crate::features::expansion::Key)s: Backspace, the characters a
-//!   key typed, or a reset (a key pressed with Command, Control, Alt, or
-//!   Windows; Return, Tab, Escape, arrows, Home, End, Page Up or Down; a dead
-//!   key; a click; another app in front, or on Windows and Linux another
-//!   window). A modifier key alone passes nothing. Keys that TinyDash types
-//!   never reach `on_key` as characters (Linux passes resets while it types).
+//!   its own, and pass each to `on_key` on that thread as a
+//!   [`Key`](crate::features::expansion::Key), with the `Focus` that got the
+//!   latest key: Backspace, the characters a key typed, or a reset (a key
+//!   pressed with Command, Control, Alt, or Windows; Return, Tab, Escape,
+//!   arrows, Home, End, Page Up or Down; a dead key; a click; a key in
+//!   another app, or on Windows and Linux another window, which passes a
+//!   reset first). A modifier key alone passes nothing. Keys that TinyDash
+//!   types never reach `on_key` as characters (Linux passes resets while it
+//!   types).
 //!   Keep `on_key` quick: on Windows, typing waits for it. When the OS
 //!   stops passing keys but the thread runs on (the macOS tap turned off
 //!   after a timeout, or a Windows hook removed for answering too slowly),
@@ -94,14 +98,17 @@
 //!   `TypingWatch::is_running()` is false once the thread has ended, also
 //!   on its own, as on macOS when access is taken away; the thread then
 //!   logs why. Never log what it reads.
-//! - `type_text(erase, text)`: press Backspace `erase` times, then type
-//!   `text` into the app in front, with Return for each line break. It stops
-//!   with an error when another app (macOS) or window comes to the front. It
-//!   never uses the clipboard. Call it on a thread other than the watch
-//!   thread. Typed keys never take on a modifier that the user holds: macOS
-//!   clears the modifiers of each key, and Windows and Linux wait with
-//!   `modifiers_released` before each part until the user lets go, and stop
-//!   with an error when a modifier stays down.
+//! - `type_text(focus, erase, text)`: press Backspace `erase` times, then
+//!   type `text`, with Return for each line break, into `focus`: the app or
+//!   window that got the trigger, as `watch_typing` passed it. Before each
+//!   part, the first Backspace too, it checks that `focus` is still in front,
+//!   and stops with an error when it is not. So focus that moved before
+//!   typing started, even while the clipboard was read for the snippet,
+//!   leaves the trigger as typed. It never pastes with the clipboard. Call
+//!   it on a thread other than the watch thread. Typed keys never take on a modifier
+//!   that the user holds: macOS clears the modifiers of each key, and
+//!   Windows and Linux wait with `modifiers_released` before each part until
+//!   the user lets go, and stop with an error when a modifier stays down.
 
 #[cfg(target_os = "linux")]
 mod linux;

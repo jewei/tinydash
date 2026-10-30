@@ -1,7 +1,8 @@
 //! Snippet expansion as you type. While the setting is on, the platform
 //! layer reads the keys typed in other apps, `features/expansion.rs` finds a
 //! trigger such as `;sig` in them, and a worker deletes the trigger and types
-//! the snippet. Typed text stays in memory, at most
+//! the snippet into the app or window where the trigger was typed. Typed
+//! text stays in memory, at most
 //! [`MAX_TYPED`](crate::features::expansion::MAX_TYPED) characters, and is
 //! never logged or saved.
 
@@ -97,18 +98,21 @@ pub fn stop() {
     }
 }
 
-/// What the watch thread runs for each key: match it against the snippet
-/// keywords from `library`, and hand a trigger to the worker. The keywords
-/// are built again only when a save swaps in a new library.
-fn find_triggers(
+/// What the watch thread runs for each key, with the app or window that got
+/// it: match the key against the snippet keywords from `library`, and hand
+/// a trigger to the worker with where it was typed. The worker types there
+/// only, so focus that moves after the trigger, even while the clipboard is
+/// read, stops it before the first Backspace. The keywords are built again
+/// only when a save swaps in a new library.
+fn find_triggers<Focus: Send + 'static>(
     library: impl Fn() -> Arc<Library> + Send + 'static,
-    found: mpsc::SyncSender<Expansion>,
+    found: mpsc::SyncSender<(Expansion, Focus)>,
     typing: Arc<AtomicBool>,
-) -> impl FnMut(Key) + Send + 'static {
+) -> impl FnMut(Key, Focus) + Send + 'static {
     let mut typed = Typed::default();
     let mut known: Option<Arc<Library>> = None;
     let mut keywords = Keywords::default();
-    move |key| {
+    move |key, focus| {
         let key = if typing.load(Ordering::Acquire) {
             Key::Reset
         } else {
@@ -126,23 +130,27 @@ fn find_triggers(
             return;
         };
         typing.store(true, Ordering::Release);
-        if found.try_send(expansion).is_err() {
+        if found.try_send((expansion, focus)).is_err() {
             typing.store(false, Ordering::Release);
             tracing::warn!("A snippet did not expand: its typing worker has stopped");
         }
     }
 }
 
-/// The worker: type each trigger's snippet.
-fn type_snippets(app: &AppHandle, triggers: &mpsc::Receiver<Expansion>, typing: &AtomicBool) {
-    for expansion in triggers {
-        type_snippet(app, &expansion);
+/// The worker: type each trigger's snippet where the trigger was typed.
+fn type_snippets(
+    app: &AppHandle,
+    triggers: &mpsc::Receiver<(Expansion, platform::Focus)>,
+    typing: &AtomicBool,
+) {
+    for (expansion, focus) in triggers {
+        type_snippet(app, &expansion, focus);
         std::thread::sleep(SETTLE);
         typing.store(false, Ordering::Release);
     }
 }
 
-fn type_snippet(app: &AppHandle, expansion: &Expansion) {
+fn type_snippet(app: &AppHandle, expansion: &Expansion, focus: platform::Focus) {
     let library = app.state::<State>().library.get();
     // Read the way quicklinks read it: a copy that its app marked secret,
     // such as a password, is never typed as keys that other apps can read.
@@ -150,7 +158,7 @@ fn type_snippet(app: &AppHandle, expansion: &Expansion) {
     let Some(text) = expansion.text(library.items(), chrono::Local::now(), clipboard) else {
         return;
     };
-    if let Err(error) = platform::type_text(expansion.erase, &text) {
+    if let Err(error) = platform::type_text(focus, expansion.erase, &text) {
         tracing::warn!(%error, "Could not type a snippet");
     }
 }
@@ -166,8 +174,23 @@ mod tests {
             kind: LibraryKind::Snippet,
             name: keyword.into(),
             keyword: keyword.into(),
-            text: "text".into(),
+            text: format!("Text of {keyword}"),
         }]))
+    }
+
+    /// The window that got a key, as the watch passes it.
+    type Window = &'static str;
+
+    /// The snippet text of the next trigger that the worker gets, filled
+    /// from `library`, and the window to type it in.
+    fn next_trigger(
+        triggers: &mpsc::Receiver<(Expansion, Window)>,
+        library: &Mutex<Arc<Library>>,
+    ) -> Option<(String, Window)> {
+        let (expansion, window) = triggers.try_recv().ok()?;
+        let library = Arc::clone(&library.lock().unwrap());
+        let text = expansion.text(library.items(), chrono::Local::now(), || None)?;
+        Some((text, window))
     }
 
     #[test]
@@ -181,31 +204,47 @@ mod tests {
             found,
             Arc::clone(&typing),
         );
-        let mut type_keys = |text: &str| text.chars().for_each(|c| on_key(Key::Char(c)));
-        let keyword = |expansion: Expansion| expansion.keyword;
+        let mut type_keys = |text: &str, window: Window| {
+            text.chars().for_each(|c| on_key(Key::Char(c), window));
+        };
 
         // While a snippet types, the app shows text that the watch never
         // saw, so no key there starts a trigger.
         typing.store(true, Ordering::Release);
-        type_keys(";sig");
+        type_keys(";sig", "editor");
         assert!(triggers.try_recv().is_err());
 
         typing.store(false, Ordering::Release);
-        type_keys(";sig");
-        assert_eq!(triggers.try_recv().map(keyword), Ok("sig".into()));
+        type_keys(";sig", "editor");
+        assert_eq!(
+            next_trigger(&triggers, &saved),
+            Some(("Text of sig".into(), "editor"))
+        );
         assert!(typing.load(Ordering::Acquire));
+
+        // The worker gets the window where the trigger was typed, not the
+        // one in front when it starts to type.
+        typing.store(false, Ordering::Release);
+        type_keys(" ;sig", "chat");
+        assert_eq!(
+            next_trigger(&triggers, &saved),
+            Some(("Text of sig".into(), "chat"))
+        );
 
         // A save swaps in a new library, and its keywords count at once.
         typing.store(false, Ordering::Release);
         *saved.lock().unwrap() = library("bye");
-        type_keys(" ;sig ;bye");
-        assert_eq!(triggers.try_recv().map(keyword), Ok("bye".into()));
+        type_keys(" ;sig ;bye", "editor");
+        assert_eq!(
+            next_trigger(&triggers, &saved),
+            Some(("Text of bye".into(), "editor"))
+        );
         assert!(triggers.try_recv().is_err());
 
         // A worker that has stopped takes nothing, so the keys count again.
         drop(triggers);
         typing.store(false, Ordering::Release);
-        type_keys(" ;bye");
+        type_keys(" ;bye", "editor");
         assert!(!typing.load(Ordering::Acquire));
     }
 }

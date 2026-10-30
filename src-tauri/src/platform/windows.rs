@@ -636,11 +636,22 @@ impl TypingWatch {
     }
 }
 
+/// The window in front, which gets typed keys. Only its handle's address
+/// is kept: it is only compared, and it goes to the typing thread.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Focus(usize);
+
+impl Focus {
+    fn of(window: HWND) -> Self {
+        Self(window.addr())
+    }
+}
+
 /// What the hooks work with, on the hook thread only.
 struct Watcher {
-    on_key: Box<dyn FnMut(Key)>,
+    on_key: Box<dyn FnMut(Key, Focus)>,
     /// The window that got the latest key; a key in another starts afresh.
-    foreground: HWND,
+    foreground: Focus,
 }
 
 thread_local! {
@@ -649,7 +660,7 @@ thread_local! {
     static HOOK_SEEN: Cell<u32> = const { Cell::new(0) };
 }
 
-pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWatch> {
+pub fn watch_typing(on_key: impl FnMut(Key, Focus) + Send + 'static) -> Result<TypingWatch> {
     let (ready, started) = mpsc::channel();
     let thread = std::thread::Builder::new()
         .name("key-watch".into())
@@ -667,10 +678,10 @@ pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWa
     }
 }
 
-fn run_hooks(on_key: Box<dyn FnMut(Key)>, ready: &mpsc::Sender<Result<u32>>) {
+fn run_hooks(on_key: Box<dyn FnMut(Key, Focus)>, ready: &mpsc::Sender<Result<u32>>) {
     WATCHER.set(Some(Watcher {
         on_key,
-        foreground: std::ptr::null_mut(),
+        foreground: Focus(0),
     }));
     // Windows removes a hook that answers too slowly, as under heavy load,
     // so this thread runs ahead of threads at normal priority.
@@ -821,20 +832,21 @@ unsafe extern "system" fn on_mouse(code: i32, wparam: WPARAM, lparam: LPARAM) ->
     unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
 }
 
+/// Pass keys on, each with the window that got the latest key.
 fn send(keys: &[Key]) {
     WATCHER.with(|watcher| {
         if let Ok(mut watcher) = watcher.try_borrow_mut()
             && let Some(watcher) = watcher.as_mut()
         {
             for &key in keys {
-                (watcher.on_key)(key);
+                (watcher.on_key)(key, watcher.foreground);
             }
         }
     });
 }
 
 /// Whether the window in front changed since the latest key.
-fn foreground_changed(foreground: HWND) -> bool {
+fn foreground_changed(foreground: Focus) -> bool {
     WATCHER.with(|watcher| {
         watcher.try_borrow_mut().is_ok_and(|mut watcher| {
             watcher.as_mut().is_some_and(|watcher| {
@@ -861,7 +873,7 @@ fn read_key(vk: u32, scan: u32, system_key: bool) {
     };
     // SAFETY: Takes no arguments.
     let foreground = unsafe { GetForegroundWindow() };
-    if foreground_changed(foreground) {
+    if foreground_changed(Focus::of(foreground)) {
         send(&[Key::Reset]);
     }
     // A system key comes with Alt alone; AltGr holds Control and Alt.
@@ -982,12 +994,11 @@ fn keyboard_input(stroke: Stroke, down: bool) -> KEYBDINPUT {
 /// Types with `SendInput`, which puts the keys into the input stream as if
 /// they were typed. Windows marks them injected, and the hook skips them by
 /// [`OWN_INPUT`].
-/// Typing stops soon after another window comes to the front, so little of
-/// the rest lands there. Each batch waits while the user holds a modifier.
-pub fn type_text(erase: usize, text: &str) -> Result<()> {
+/// Each batch goes only while `focus` is in front, so typing stops soon
+/// after another window comes to the front, and types nothing when one came
+/// before it started. Each batch waits while the user holds a modifier.
+pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
     let strokes = strokes(erase, text);
-    // SAFETY: Takes no arguments.
-    let foreground = unsafe { GetForegroundWindow() };
     for strokes in batches(&strokes, STROKE_BATCH) {
         if !super::modifiers_released(|| modifiers_held(strokes)) {
             return Err(Error::msg(
@@ -1006,7 +1017,7 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
             })
             .collect();
         // SAFETY: Takes no arguments.
-        if unsafe { GetForegroundWindow() } != foreground {
+        if Focus::of(unsafe { GetForegroundWindow() }) != focus {
             return Err(Error::msg(
                 "Stopped typing the snippet: another window came to the front.",
             ));

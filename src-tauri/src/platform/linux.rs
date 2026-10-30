@@ -557,7 +557,11 @@ impl TypingWatch {
     }
 }
 
-pub fn watch_typing(on_key: impl FnMut(Key) + Send + 'static) -> Result<TypingWatch> {
+/// The window with the input focus, which gets typed keys.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Focus(xlib::Window);
+
+pub fn watch_typing(on_key: impl FnMut(Key, Focus) + Send + 'static) -> Result<TypingWatch> {
     if let Some(reason) = typing_unavailable() {
         return Err(Error::msg(reason));
     }
@@ -626,13 +630,13 @@ struct Recording<'a> {
     xrecord: &'a Xrecord,
     /// The connection that translates keys and asks for the focus.
     lookup: *mut Display,
-    on_key: Box<dyn FnMut(Key)>,
+    on_key: Box<dyn FnMut(Key, Focus)>,
     /// The window that had focus at the latest key.
-    focus: xlib::Window,
+    focus: Focus,
 }
 
 fn record_keys(
-    on_key: Box<dyn FnMut(Key)>,
+    on_key: Box<dyn FnMut(Key, Focus)>,
     stopped: &AtomicBool,
     ready: &mpsc::Sender<Result<()>>,
 ) {
@@ -653,7 +657,7 @@ fn record_keys(
         xrecord: &xrecord,
         lookup: connections.control,
         on_key,
-        focus: 0,
+        focus: Focus(0),
     }));
     // SAFETY: `recording` stays valid until the data connection closes, and
     // only this thread uses it: RECORD calls back inside the calls on the
@@ -761,8 +765,9 @@ impl Recording<'_> {
             xlib::ButtonPress if !(4..=7).contains(&detail) => vec![Key::Reset],
             _ => return,
         };
+        // Each key goes with the window that had focus at the latest key.
         for key in keys {
-            (self.on_key)(key);
+            (self.on_key)(key, self.focus);
         }
     }
 
@@ -772,20 +777,13 @@ impl Recording<'_> {
             return vec![Key::Reset];
         }
         let mut keys = Vec::new();
-        let focus = self.focus();
+        let focus = input_focus(self.xlib, self.lookup);
         if std::mem::replace(&mut self.focus, focus) != focus {
             keys.push(Key::Reset);
         }
         let state = c_uint::from(state);
         keys.extend(keys_for(self.keysym(keycode, state), state));
         keys
-    }
-
-    fn focus(&self) -> xlib::Window {
-        let (mut focus, mut revert) = (0, 0);
-        // SAFETY: The connection is open and used by this thread only.
-        unsafe { (self.xlib.XGetInputFocus)(self.lookup, &mut focus, &mut revert) };
-        focus
     }
 
     /// What a key types with these modifiers, with Shift, Caps Lock, AltGr,
@@ -811,6 +809,15 @@ impl Recording<'_> {
         }
         u32::try_from(keysym).unwrap_or_default()
     }
+}
+
+/// The window with the input focus. Window IDs are the same on every
+/// connection to the X server.
+fn input_focus(xlib: &Xlib, display: *mut Display) -> Focus {
+    let (mut focus, mut revert) = (0, 0);
+    // SAFETY: The connection is open and used by this thread only.
+    unsafe { (xlib.XGetInputFocus)(display, &mut focus, &mut revert) };
+    Focus(focus)
 }
 
 /// Read the events that X sends every client, such as a new key map, so
@@ -849,11 +856,12 @@ fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
 }
 
 /// Types with libxdo, which sends keys with the XTEST extension and maps a
-/// character that no key types to a spare key for a moment. Typing stops
-/// soon after another window gets the focus, so little of the rest lands
-/// there. Each part waits while the user holds a modifier, which the keys
+/// character that no key types to a spare key for a moment. Each part goes
+/// only while `focus` has the input focus, so typing stops soon after
+/// another window gets it, and types nothing when one got it before typing
+/// started. Each part waits while the user holds a modifier, which the keys
 /// would take on.
-pub fn type_text(erase: usize, text: &str) -> Result<()> {
+pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
     // Checked before the first Backspace, so the trigger stays.
     if !xdo_can_type(text, session_locale_is_utf8) {
         return Err(Error::msg(
@@ -868,12 +876,6 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
         return Err(Error::msg("Could not connect to the X server."));
     }
     own_typing_until(Instant::now() + Duration::from_secs(60 * 60));
-    let focus = || {
-        let (mut focus, mut revert) = (0, 0);
-        // SAFETY: The connection is open, and only this thread uses it.
-        unsafe { (xlib.XGetInputFocus)(display, &mut focus, &mut revert) };
-        focus
-    };
     // SAFETY: The connection is open.
     let root = unsafe { (xlib.XDefaultRootWindow)(display) };
     let modifiers_held = || {
@@ -897,14 +899,13 @@ pub fn type_text(erase: usize, text: &str) -> Result<()> {
         };
         state & MODIFIERS_THAT_CHANGE_KEYS != 0
     };
-    let first = focus();
     let ready = || {
         if !super::modifiers_released(modifiers_held) {
             return Err(Error::msg(
                 "Stopped typing the snippet: a key such as Shift or Control was held down, or Caps Lock is on.",
             ));
         }
-        if focus() != first {
+        if input_focus(&xlib, display) != focus {
             return Err(Error::msg(
                 "Stopped typing the snippet: another window came to the front.",
             ));
