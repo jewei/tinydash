@@ -183,9 +183,12 @@ const TERMINALS: &[(&str, &[&str])] = &[
 /// The `sh` script that runs the command, which it reads as one line from
 /// the file `$1` and then deletes. `command eval` keeps `sh` running after
 /// a syntax error, and the trap then opens the user's login shell, also
-/// after `exit` or Control+C.
+/// after `exit` or Control+C. `cd` starts the command in the home folder,
+/// because a terminal can start `sh` in a folder of its own (a Konsole
+/// profile or Alacritty's `working_directory`); when `cd` fails, `sh` goes
+/// on.
 #[cfg(any(target_os = "linux", test))]
-const LINUX_SCRIPT: &str = r#"IFS= read -r tinydash_command < "$1"; rm -f -- "$1"; trap 'exec "${SHELL:-sh}" -l' EXIT INT; command eval "$tinydash_command""#;
+const LINUX_SCRIPT: &str = r#"IFS= read -r tinydash_command < "$1"; rm -f -- "$1"; trap 'exec "${SHELL:-sh}" -l' EXIT INT; cd; command eval "$tinydash_command""#;
 
 /// The terminal that runs the command in `file`, and its arguments:
 /// `$TERMINAL` (`preferred`) when `find` finds it, else the first of
@@ -452,8 +455,11 @@ mod tests {
                 .iter()
                 .position(|argument| argument == "sh")
                 .unwrap();
+            // A terminal can start `sh` in any folder, such as `/`.
             let output = std::process::Command::new("sh")
                 .args(&arguments[script + 1..])
+                .current_dir("/")
+                .env("HOME", &data)
                 .env("SHELL", "echo")
                 .stdin(std::process::Stdio::null())
                 .output()
@@ -462,6 +468,8 @@ mod tests {
             String::from_utf8(output.stdout).unwrap()
         };
         assert_eq!(run("echo '{clipboard}' \"$0\""), "{clipboard} sh\n-l\n");
+        // The command starts in the home folder, and can leave it.
+        assert_eq!(run("pwd"), format!("{}\n-l\n", data.display()));
         assert_eq!(run("cd / && pwd"), "/\n-l\n");
         // Spaces and backslashes stay as typed.
         assert_eq!(run("  printf '%s\\n' a\\ b"), "a b\n-l\n");

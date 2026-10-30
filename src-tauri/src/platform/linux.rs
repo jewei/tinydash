@@ -283,6 +283,8 @@ pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    // The script goes home itself, because a terminal can start it in a
+    // folder of its own. This start folder is for the terminal.
     if let Some(home) = std::env::home_dir() {
         launch.current_dir(home);
     }
