@@ -311,11 +311,10 @@ fn currency_shorthand(query: &str) -> Option<String> {
 }
 
 /// The query in fend's syntax, or `None` when fend would read a percentage
-/// in it wrongly or could not parse it fast.
+/// in it differently from people or could not parse it fast.
 fn fend_input(query: &str) -> Option<String> {
     let ascii = ascii_signs(query);
-    // The limits that the user sees, on what they typed. They also bound the
-    // rewrites, which recurse once for each percentage. A launcher needs no
+    // The limits that the user sees, on what they typed. A launcher needs no
     // lambdas, such as `\x.x + 1`, and fend parses a lambda's body again for
     // each reading around it.
     if query.chars().nth(MAX_INPUT).is_some()
@@ -326,13 +325,9 @@ fn fend_input(query: &str) -> Option<String> {
     }
     let input = match currency_shorthand(&ascii) {
         Some(input) => input,
-        None => {
-            let input = euro_amounts(&ascii);
-            let input = word_operators(&input);
-            percentage(&input).unwrap_or_else(|| input.into_owned())
-        }
+        None => percentage(&word_operators(&euro_amounts(&ascii)))?,
     };
-    (parses_fast(&input) && !adds_bare_percentage(&input)).then_some(input)
+    parses_fast(&input).then_some(input)
 }
 
 /// The query with fend's other spellings of its signs (fend-core 1.5.8,
@@ -502,20 +497,40 @@ fn word_operators(query: &str) -> Cow<'_, str> {
     }
 }
 
-/// fend's input for two parts of a phrase.
+/// fend's input for two parts of a question.
 type Formula = fn(&str, &str) -> String;
 
-/// Percentage phrases as fend arithmetic. fend reads `30 + 20%` as 30.2,
-/// cannot add a percentage to money, and has no `off` or `is what %`.
+/// `10% of`, `10% on`, and `10% off` as a factor: `10 / 100`, `1 + 10 / 100`,
+/// and `1 - 10 / 100`.
+const FACTORS: [(&str, &str); 3] = [("of", ""), ("on", "1 + "), ("off", "1 - ")];
+
+/// Percentages as people say them, in fend's syntax, or `None` for a
+/// percentage in any other shape. fend reads `30 + 20%` as 30.2 and
+/// `200 / 10%` as 20%, cannot add a percentage to money, and has no `off` or
+/// `is what %`. A wrong answer is worse than none.
 fn percentage(query: &str) -> Option<String> {
+    if let Some(input) = percentage_question(query).or_else(|| percentage_steps(query)) {
+        return Some(input);
+    }
+    let input = percentage_phrases(query);
+    (!mixes_percentage(&input)).then(|| input.into_owned())
+}
+
+/// A question about a percentage, as a whole: `20 is what % of 200`,
+/// `50 to 75 is what %`, `3/20 is what %`, or `20 is 10% of what`. Each part
+/// is a plain amount, or a ratio of two in `3/20 is what %`.
+fn percentage_question(query: &str) -> Option<String> {
     let query = query.trim();
-    // `50 to 75 is what %` is a change; `3/20 is what %` is a ratio.
     for ending in [" is what %", " as %", " as a %"] {
         if let Some(left) = strip_suffix(query, ending) {
-            return Some(match around(left, " to ") {
-                Some((from, to)) => format!("(({to}) - ({from})) / ({from}) to %"),
-                None => format!("({left}) to %"),
-            });
+            return match around(left, " to ") {
+                Some((from, to)) => (is_amount(from) && is_amount(to))
+                    .then(|| format!("(({to}) - ({from})) / ({from}) to %")),
+                None => left
+                    .split_once('/')
+                    .map_or(is_amount(left), |(a, b)| is_amount(a) && is_amount(b))
+                    .then(|| format!("({left}) to %")),
+            };
         }
     }
     let ratios: [(&str, Formula); 5] = [
@@ -529,67 +544,83 @@ fn percentage(query: &str) -> Option<String> {
     ];
     for (separator, formula) in ratios {
         if let Some((a, b)) = around(query, separator) {
-            return Some(formula(a, b));
+            return (is_amount(a) && is_amount(b)).then(|| formula(a, b));
         }
     }
-    let factors: [(&str, &str); 3] = [("% of", ""), ("% on", "1 + "), ("% off", "1 - ")];
     // `20 is 10% of what`: the number that 20 is 10% of.
-    if let Some(left) = strip_suffix(query, " what") {
-        for (separator, factor) in factors {
-            if let Some((value, percent)) =
-                strip_suffix(left, separator).and_then(|left| around(left, " is "))
-                && is_number(percent)
-            {
-                return Some(format!("({value}) / ({factor}({percent}) / 100)"));
-            }
-        }
-    }
-    let query = percentage_factors(query, &factors);
-    added_percentage(&query).or(match query {
-        Cow::Owned(input) => Some(input),
-        Cow::Borrowed(_) => None,
+    let left = strip_suffix(query, " what")?;
+    FACTORS.iter().find_map(|(word, factor)| {
+        let (value, percent) = around(strip_suffix(left, word)?.strip_suffix('%')?, " is ")?;
+        (is_amount(value) && is_number(percent))
+            .then(|| format!("({value}) / ({factor}{percent} / 100)"))
     })
 }
 
-/// `10% of 200`, `10% on 200`, and `10% off 200` as `(10 / 100) * 200`,
-/// `(1 + 10 / 100) * 200`, and `(1 - 10 / 100) * 200`, in place, so that the
-/// percentage takes only the number after it, as fend's own `of` does:
-/// `10% of 200 + 50` is 70.
-fn percentage_factors<'a>(query: &'a str, factors: &[(&str, &str)]) -> Cow<'a, str> {
-    let lower = query.to_ascii_lowercase();
+/// `$30 + 20%` adds 20% of $30, and `200 - 10% - 5%` takes 5% off 180: each
+/// percentage is of the value before it. The whole query is a plain amount
+/// and such steps.
+fn percentage_steps(query: &str) -> Option<String> {
+    let query = query.trim();
+    let amount = &query[..amount_len(query)?];
+    let mut rest = query[amount.len()..].trim_start();
+    if rest.is_empty() {
+        return None;
+    }
+    // Each step multiplies the one before it, so a chain adds no nesting.
+    let mut input = format!("({amount})");
+    while !rest.is_empty() {
+        let step = rest.strip_prefix(['+', '-'])?.trim_start();
+        let sign = &rest[..1];
+        let percent = &step[..number_len(step)?];
+        rest = step[percent.len()..]
+            .trim_start()
+            .strip_prefix('%')?
+            .trim_start();
+        input.push_str(&format!(" * (1 {sign} {percent} / 100)"));
+    }
+    Some(input)
+}
+
+/// `10% of 200`, `10% on 200`, and `10% off 200` as `((10 / 100) * (200))`,
+/// `((1 + 10 / 100) * (200))`, and `((1 - 10 / 100) * (200))`: one value,
+/// where it stands, so `10% of 200 + 50` is 70. Only where that is the one
+/// reading (see `starts_value` and `ends_value`). After `/` or a power, fend
+/// takes a percentage of all that comes before it: `1/2% of 200` is 1. After
+/// a sign alone, `-10% off 200` could be -180 or 220.
+fn percentage_phrases(query: &str) -> Cow<'_, str> {
     let mut input = String::new();
     // `input` holds `query` up to `copied`, rewritten.
-    let (mut copied, mut from) = (0, 0);
-    while let Some((at, end, factor)) = factors
-        .iter()
-        .filter_map(|(separator, factor)| {
-            let separator = format!("{separator} ");
-            let at = from + lower[from..].find(&separator)?;
-            Some((at, at + separator.len(), factor))
-        })
-        .min_by_key(|(at, ..)| *at)
-    {
-        from = end;
-        let Some(before) = before_percentage(&query[copied..=at]) else {
+    let mut copied = 0;
+    for (at, _) in query.match_indices('%') {
+        // A `%` before `copied` is in a phrase already rewritten.
+        let Some(before) = query.get(copied..=at).and_then(before_percentage) else {
             continue;
         };
         let percent = query[copied + before.len()..at].trim();
-        // After `/` or a power (`^`, `**`), the factor would split from the
-        // number after it.
-        let operand = before.trim_end();
+        let after = query[at + 1..].trim_start();
+        let letters = after.find(|c: char| !c.is_alphabetic());
+        let (word, rest) = after.split_at(letters.unwrap_or(after.len()));
+        let Some((_, factor)) = FACTORS
+            .iter()
+            .find(|(name, _)| word.eq_ignore_ascii_case(name))
+        else {
+            continue;
+        };
+        let amount = rest.trim_start();
+        let Some(len) = amount_len(amount) else {
+            continue;
+        };
         if is_number(percent)
-            && (operand.is_empty() || operand.ends_with(['(', '+', '-', '*']))
-            && !ends_with_power(operand)
+            && amount.len() < rest.len()
+            && starts_value(before)
+            && ends_value(&amount[len..])
         {
             input.push_str(before);
-            input.push_str(&format!("({factor}{percent} / 100) * "));
-            copied = end;
-            let rest = query[end..].trim_start();
-            if let Some(amount) = prefix_amount(rest) {
-                input.push_str(&format!("({amount})"));
-                copied = query.len() - rest.len() + amount.len();
-                from = copied;
-            }
+            input.push_str(&format!(
+                "(({factor}{percent} / 100) * ({}))",
+                &amount[..len]
+            ));
+            copied = query.len() - amount.len() + len;
         }
     }
     if copied == 0 {
@@ -599,64 +630,45 @@ fn percentage_factors<'a>(query: &'a str, factors: &[(&str, &str)]) -> Cow<'a, s
     Cow::Owned(input)
 }
 
-/// An amount such as `$200` or `-£5` at the start of `text`. fend reads
-/// `* $200` as `* $`, so it needs parentheses after a sign.
-fn prefix_amount(text: &str) -> Option<&str> {
-    let unsigned = text.strip_prefix(['-', '+']).unwrap_or(text);
-    let amount = unsigned.strip_prefix(['$', '£', '¥'])?;
-    let digits = amount
-        .find(|c: char| !(c.is_ascii_digit() || matches!(c, '.' | ',')))
-        .unwrap_or(amount.len());
-    (digits > 0).then(|| &text[..text.len() - amount.len() + digits])
-}
-
-/// `$30 + 20%` adds 20% of $30, and `200 - 10% - 5%` takes 5% off 180.
-/// `10% + 20%` stays a sum of percentages.
-fn added_percentage(query: &str) -> Option<String> {
-    let left = query.strip_suffix('%')?;
-    let at = left.rfind(['+', '-'])?;
-    let (value, percent) = (left[..at].trim(), left[at + 1..].trim());
-    // `2e-3%` is an exponent, not a subtraction.
-    let exponent = value
-        .strip_suffix(['e', 'E'])
-        .is_some_and(|mantissa| mantissa.ends_with(|c: char| c.is_ascii_digit()));
-    // `5 * -10%` is a negative percentage, not a subtraction.
-    if exponent
-        || value.is_empty()
-        || value.ends_with(['+', '-', '*', '/', '^', '('])
-        || !is_number(percent)
-    {
-        return None;
+/// Whether a value after `text` stands on its own: at the start, or after
+/// `(` or a `+`, `-`, or `*` between two values.
+fn starts_value(text: &str) -> bool {
+    let text = text.trim_end();
+    match text.strip_suffix(['+', '-', '*']) {
+        Some(left) => left
+            .trim_end()
+            .ends_with(|c: char| c.is_alphanumeric() || matches!(c, ')' | '.' | '!')),
+        None => text.is_empty() || text.ends_with('('),
     }
-    // Each step multiplies the one before it, so a chain adds no nesting.
-    let value = if value.ends_with('%') {
-        added_percentage(value)?
-    } else {
-        format!("({value})")
-    };
-    let sign = &left[at..=at];
-    Some(format!("{value} * (1 {sign} {percent} / 100)"))
 }
 
-/// Whether fend would add a percentage in `input` to a number as a
-/// hundredth, as in `100 + 10% + 5`: `percentage` rewrites only the ones that
-/// end the calculation. A sum of percentages, such as `10% + 20%`, is right.
-fn adds_bare_percentage(input: &str) -> bool {
-    input.match_indices('%').any(|(at, _)| {
-        // `10 % 3` is a remainder.
-        let next = input[at + 1..].trim_start();
-        if next.starts_with(|c: char| c.is_ascii_digit() || matches!(c, '.' | '(')) {
-            return false;
-        }
-        let Some(left) = before_percentage(&input[..=at]).and_then(added_to) else {
-            return false;
-        };
-        let sum_of_percentages = before_percentage(left).is_some_and(|before| {
-            let before = before.trim_end();
-            before.is_empty() || before.ends_with(['(', '+', '-'])
-        });
-        !sum_of_percentages
-    })
+/// Whether a value before `text` stands on its own: at the end, or before
+/// `)`, `+`, `-`, `/`, or a `*` that is not a power.
+fn ends_value(text: &str) -> bool {
+    let text = text.trim_start();
+    text.is_empty()
+        || text.starts_with([')', '+', '-', '/'])
+        || (text.starts_with('*') && !text.starts_with("**"))
+}
+
+/// Whether `input` has a percentage with something else, which fend reads
+/// differently from people: `100 + 10% + 5` as 105.1, `200 / 10%` as 20%. A
+/// percentage alone, such as `2e-3%`, and a remainder, such as `10 % 3`, are
+/// fine.
+fn mixes_percentage(input: &str) -> bool {
+    // `20 percent` is `20 %` by now, but `(20 percent)` is not.
+    if input.to_ascii_lowercase().contains("percent") {
+        return true;
+    }
+    let alone = before_percentage(input.trim())
+        .is_some_and(|before| matches!(before.trim(), "" | "+" | "-"));
+    // fend reads a `%` before a number or `(` as a remainder.
+    !alone
+        && input.match_indices('%').any(|(at, _)| {
+            !input[at + 1..]
+                .trim_start()
+                .starts_with(|c: char| c.is_ascii_digit() || matches!(c, '.' | '('))
+        })
 }
 
 /// The text before the percentage, such as `10%` or `1e-2 %`, that ends
@@ -679,15 +691,45 @@ fn before_percentage(text: &str) -> Option<&str> {
         .then_some(rest)
 }
 
-/// What the `+` or `-` that ends `text` adds to: `100` in `100 + `. In
-/// `5 * -`, the sign belongs to the number after it.
-fn added_to(text: &str) -> Option<&str> {
-    let left = text.trim_end().strip_suffix(['+', '-'])?;
-    // `10 - -5%` subtracts too.
-    let operand = left.trim_end_matches(|c: char| c.is_whitespace() || matches!(c, '+' | '-'));
-    operand
-        .ends_with(|c: char| c.is_alphanumeric() || matches!(c, ')' | '%' | '!'))
-        .then_some(operand)
+/// Whether `text` is a plain amount: a number with an optional sign,
+/// currency sign, and unit, such as `200`, `-$5`, or `5 kg`.
+fn is_amount(text: &str) -> bool {
+    let text = text.trim();
+    amount_len(text) == Some(text.len())
+}
+
+/// The length of the plain amount at the start of `text`.
+fn amount_len(text: &str) -> Option<usize> {
+    let unsigned = text.strip_prefix(['+', '-']).unwrap_or(text);
+    let number = unsigned.strip_prefix(['$', '£', '¥']).unwrap_or(unsigned);
+    let mut rest = &number[number_len(number)?..];
+    // A unit is a word after a space, such as `kg` or `EUR`: in `2e-3`, `e`
+    // is part of the number.
+    let unit = rest.trim_start();
+    let letters = unit
+        .find(|c: char| !c.is_alphabetic())
+        .unwrap_or(unit.len());
+    if letters > 0 && unit.len() < rest.len() && ends_token(&unit[letters..]) {
+        rest = &unit[letters..];
+    }
+    Some(text.len() - rest.len())
+}
+
+/// The length of the plain number at the start of `text`, such as `20`,
+/// `12.5`, or `1,000`, when fend's number ends there too: not in `2e3`,
+/// `2(`, or `2^3`.
+fn number_len(text: &str) -> Option<usize> {
+    let len = text
+        .find(|c: char| !(c.is_ascii_digit() || matches!(c, '.' | ',')))
+        .unwrap_or(text.len());
+    (is_number(&text[..len]) && !text.starts_with(',') && ends_token(&text[len..])).then_some(len)
+}
+
+/// Whether a number or a word ends before `rest`.
+fn ends_token(rest: &str) -> bool {
+    rest.chars()
+        .next()
+        .is_none_or(|c| c.is_whitespace() || "+-*/)%".contains(c))
 }
 
 /// The text before `suffix`, matched in any case, when some is left.
@@ -900,7 +942,7 @@ mod tests {
         for (query, expected) in [
             ("30 + 20%", "36"),
             ("200 - 10%", "180"),
-            ("50 * 2 + 10%", "110"),
+            ("5 kg + 10%", "5.5 kg"),
             ("10% of 200", "20"),
             ("10% on 200", "220"),
             ("20 is what % of 200", "10%"),
@@ -914,8 +956,6 @@ mod tests {
             ("20 is 10% of what", "200"),
             ("220 is 10% on what", "200"),
             ("180 is 10% off what", "200"),
-            ("10% + 20%", "30%"),
-            ("5 * -10%", "-50%"),
         ] {
             assert_eq!(value(query).as_deref(), Some(expected), "{query}");
         }
@@ -938,32 +978,103 @@ mod tests {
     }
 
     #[test]
-    fn takes_percentages_in_turn_or_gives_no_answer() {
+    fn takes_percentages_in_turn() {
         for (query, expected) in [
             ("200 - 10% - 5%", "171"),
             ("100 + 10% + 20%", "132"),
-            ("10% + 20% + 30%", "60%"),
-            ("(10% + 20%) * 2", "60%"),
-            ("5 + 10 % 3", "6"),
             ("30 plus 20 percent", "36"),
             ("30 + 20Percent", "36"),
             ("20 is what percent of 200", "10%"),
+            // A remainder, not a percentage.
+            ("5 + 10 % 3", "6"),
         ] {
             assert_eq!(value(query).as_deref(), Some(expected), "{query}");
         }
-        // fend would add each percentage as a hundredth: 100 + 0.1 + 5.
+    }
+
+    #[test]
+    fn gives_no_answer_for_a_percentage_in_another_shape() {
         for query in [
+            // fend adds a hundredth: 100 + 0.1 + 5.
             "100 + 10% + 5",
             "(100 + 10%) * 2",
             "round(200 - 10%)",
-            "5 - 1e-2%",
-            "10 - -5%",
+            "100 - (10%)",
+            "100 - 2 * 5%",
+            "5% + 100 + 10%",
+            "50 * 2 + 10%",
             "100 * 10% + 20%",
             "5 + 10% to fraction",
+            "2 dozen 10%",
+            // The percentage is not a plain number.
+            "5 - 1e-2%",
+            "10 - -5%",
+            // fend reads `200 / 10%` as (200 / 10)%, which is 20%.
+            "200 / 10%",
+            "200 * 10%",
+            "10% + 20%",
+            "(10% + 20%) * 2",
+            "5 * -10%",
+            // A part of the question is not a plain amount.
+            "50 * 2 is what % of 400",
+            "1 + 2 is what %",
+            // `percent` that is not a word of its own.
+            "100 - (20 percent)",
+            "5+20percent",
         ] {
             assert_eq!(value(query), None, "{query}");
         }
         assert!(rates_off_answer("$30 + 20% + 5").is_none());
+    }
+
+    #[test]
+    fn a_percentage_of_is_one_value() {
+        for (query, expected) in [
+            ("10% of 200 + 50", "70"),
+            ("15% of 80 + 80", "92"),
+            ("10% off 200 + 5", "185"),
+            ("10% on 200 * 2", "440"),
+            ("10% of 200 / 4", "5"),
+            ("5 + 10% of 200", "25"),
+            ("100 - 10% off 200", "-80"),
+            ("3 * 10% of 200", "60"),
+            ("(10% of 200) / 4", "5"),
+            ("10 percent of 200", "20"),
+        ] {
+            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
+        }
+        for query in [
+            // After `/` or a power, fend takes the percentage of all that
+            // comes before it: 1/2% of 200 is 1.
+            "1/2% of 200",
+            "400 / 10% of 200",
+            "400 / 10% off 200",
+            "400 / -10% off 200",
+            "2 ^ 10% on 200",
+            "2 ^ -10% of 200",
+            "2 ** 10% of 200",
+            // A sign or a value right before the percentage.
+            "-10% off 200",
+            "2 10% of 200",
+            "1e-2% of 200",
+            // More than a plain amount after it.
+            "10% of 2^3",
+            "10% of 5!",
+            "10% of 200 mod 3",
+            "10% of 20% of 200",
+            "10% of 200 - 5%",
+        ] {
+            assert_eq!(value(query), None, "{query}");
+        }
+        let rates = Rates::fixture();
+        for (query, expected) in [
+            ("20% off $50 + $5", "$45"),
+            ("30% of -$200", "$-60"),
+            ("10% on  $50", "$55"),
+        ] {
+            let (value, _) = evaluate(query, Some(&rates)).unwrap();
+            assert_eq!(value, expected, "{query}");
+        }
     }
 
     #[test]
@@ -994,38 +1105,6 @@ mod tests {
     }
 
     #[test]
-    fn a_percentage_of_takes_only_the_next_number() {
-        for (query, expected) in [
-            ("10% of 200 + 50", "70"),
-            ("15% of 80 + 80", "92"),
-            ("10% off 200 + 5", "185"),
-            ("10% on 200 * 2", "440"),
-            ("10% of 200 - 5%", "19"),
-            ("5 + 10% of 200", "25"),
-            ("10% of 20% of 200", "4"),
-            ("10 percent of 200", "20"),
-        ] {
-            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
-        }
-        // `(1 - 10 / 100)` after `/` or a power would bind to the wrong side.
-        assert_eq!(value("400 / 10% off 200"), None);
-        assert_eq!(value("2 ^ 10% on 200"), None);
-        assert_eq!(value("2 ** 10% on 200"), None);
-        // fend's own `of`: 1024% of 200.
-        assert_eq!(value("2 ^ 10% of 200").as_deref(), Some("2048"));
-        assert_eq!(value("2 ** 10% of 200").as_deref(), Some("2048"));
-        let rates = Rates::fixture();
-        for (query, expected) in [
-            ("20% off $50 + $5", "$45"),
-            ("30% of -$200", "$-60"),
-            ("10% on  $50", "$55"),
-        ] {
-            let (value, _) = evaluate(query, Some(&rates)).unwrap();
-            assert_eq!(value, expected, "{query}");
-        }
-    }
-
-    #[test]
     fn refuses_input_that_fend_cannot_parse_fast() {
         let start = Instant::now();
         for query in [
@@ -1035,7 +1114,7 @@ mod tests {
             format!("{}1", "1+".repeat(300)),
             format!("100{}", " - 1%".repeat(100_000)),
             // 33 parentheses, and 501 characters.
-            format!("{}1{} + 10%", "(".repeat(17), ")".repeat(16)),
+            format!("{}10% of 200{}", "(".repeat(17), ")".repeat(16)),
             format!("1 +{}1", "\u{3000}".repeat(497)),
             // Short, but its rewrite nests too deep.
             format!("100{}", " - 1%".repeat(70)),
@@ -1072,8 +1151,8 @@ mod tests {
             // The limits count what the user typed, not the rewrite.
             ("200 - 1% - 1% - 1% - 1% - 1% - 1%".into(), "188.2960298802"),
             (
-                format!("{}1{} + 10%", "(".repeat(16), ")".repeat(16)),
-                "1.1",
+                format!("{}10% of 200{}", "(".repeat(16), ")".repeat(16)),
+                "20",
             ),
             // 499 characters, but 1,489 bytes.
             (format!("1 +{}1", "\u{3000}".repeat(495)), "2"),
