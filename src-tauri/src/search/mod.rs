@@ -362,9 +362,9 @@ pub fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
 }
 
 /// All: instant answers, then name matches across sources, then fuzzy
-/// matches, then a web search unless a web keyword already answered. Inside
-/// each tier, sources keep a fixed order so that, for example, an app named
-/// like the query beats an emoji code.
+/// matches, then a web search unless a web keyword already answered or the
+/// text can be a shell command. Inside each tier, sources keep a fixed order
+/// so that, for example, an app named like the query beats an emoji code.
 fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
     // `=` asks for the calculation history and nothing else.
     if let Some(history) = s.calculations.answer(query) {
@@ -430,6 +430,11 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         .map(|(_, hit)| hit.result)
         .filter(|result| !s.hidden.contains(&result.id) && seen.insert(result.id.clone()))
         .collect();
+    // While `>` runs commands, text that starts with it can be a command
+    // typed without the space, which may hold a password or a token. No
+    // web search or quicklink gets it, as either one would be the first
+    // row, which Enter opens, when nothing else matches.
+    let maybe_command = s.settings.shell_commands && query.trim_start().starts_with('>');
     // Quicklinks that can open the query, unless the user already chose a
     // keyword, such as `g` or a quicklink's own, or keeps snippets out of
     // All. A quicklink that shows as a name match is not offered again.
@@ -439,16 +444,18 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
             ResultKind::WebSearch | ResultKind::Quicklink | ResultKind::Snippet
         )
     });
-    let candidates: Vec<SearchResult> = if chose || !s.settings.in_all(Category::Snippets) {
-        Vec::new()
-    } else {
-        s.library
-            .fallbacks(query, ctx, s.now)
-            .into_iter()
-            .filter(|link| !s.hidden.contains(&link.id) && !answered.contains(&link.id))
-            .collect()
-    };
-    let fallback = usize::from(!keyword_search);
+    let candidates: Vec<SearchResult> =
+        if chose || maybe_command || !s.settings.in_all(Category::Snippets) {
+            Vec::new()
+        } else {
+            s.library
+                .fallbacks(query, ctx, s.now)
+                .into_iter()
+                .filter(|link| !s.hidden.contains(&link.id) && !answered.contains(&link.id))
+                .collect()
+        };
+    let web_search = !keyword_search && !maybe_command;
+    let fallback = usize::from(web_search);
     let room = |links: usize| ALL_LIMIT.saturating_sub(results.len() + fallback + links);
     // The links take room from the name matches, and the name matches that
     // show decide which links are left; fewer links leave more room, so
@@ -468,7 +475,7 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         links = offered.len();
     };
     results.extend(ranked.into_iter().take(room));
-    if !keyword_search {
+    if web_search {
         results.push(web::fallback(query, s.settings.search_engine));
     }
     results.extend(links);
@@ -1040,15 +1047,15 @@ mod tests {
         let list = results("? >j");
         assert!(list.iter().any(|row| row.title == ">j"), "{list:?}");
         // Without a space after `>`, other text searches as before, also
-        // the alias of an app that is gone.
+        // the alias of an app that is gone, but it may be a command, so no
+        // website gets it.
         for query in [">jq .", ">t", ">sig x"] {
             let found = results(query);
             assert!(
-                found.iter().all(|row| row.kind != ResultKind::Shell),
-                "{query}: {found:?}"
-            );
-            assert!(
-                found.iter().any(|row| row.kind == ResultKind::WebSearch),
+                found.iter().all(|row| !matches!(
+                    row.kind,
+                    ResultKind::Shell | ResultKind::WebSearch
+                ) && !row.title.starts_with("Jira: ")),
                 "{query}: {found:?}"
             );
         }
@@ -1061,6 +1068,46 @@ mod tests {
                 (ResultKind::Shell, command)
             );
         }
+    }
+
+    #[test]
+    fn text_after_the_sign_goes_to_no_website_only_while_shell_commands_are_on() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let search_with = |shell_commands: bool, query: &str| {
+            let state = crate::state::State::for_tests(Settings {
+                shell_commands,
+                ..Settings::default()
+            });
+            let item = LibraryItem {
+                id: None,
+                kind: LibraryKind::Quicklink,
+                name: "Translate".into(),
+                keyword: String::new(),
+                text: "https://translate.test/?q={query}".into(),
+            };
+            state.store.save_library_item(&item).unwrap();
+            state.reload_library().unwrap();
+            search(&state.snapshot(), query, Category::All)
+                .into_iter()
+                .map(|result| result.kind)
+                .collect::<Vec<_>>()
+        };
+        let websites = [ResultKind::WebSearch, ResultKind::Quicklink];
+        // A command typed without the space, with a token in it.
+        let command = r#">curl -H "Authorization: Bearer sk_live_abc" https://api.test/x"#;
+        for query in [command, " >jq .", ">"] {
+            let on = search_with(true, query);
+            assert!(
+                !on.iter().any(|kind| websites.contains(kind)),
+                "{query}: {on:?}"
+            );
+            // Turned off, `>` is plain text, which a web search and a
+            // quicklink with `{query}` can open as before.
+            let off = search_with(false, query);
+            assert_eq!(off, websites, "{query}");
+        }
+        // Other text still ends with them.
+        assert_eq!(search_with(true, "jq ."), websites);
     }
 
     #[test]
