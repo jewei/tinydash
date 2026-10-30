@@ -10,7 +10,7 @@ use tauri_plugin_autostart::ManagerExt;
 use ts_rs::TS;
 
 use crate::{
-    actions,
+    actions::{self, Origin},
     error::{Error, Result},
     events,
     features::{
@@ -129,7 +129,7 @@ pub async fn spotlight_files(app: AppHandle, query: String) -> Result<Vec<Search
 /// `result_id` is sent with a result's primary action so usage can be ranked.
 #[tauri::command]
 pub async fn run_action(app: AppHandle, action: Action, result_id: Option<String>) -> Result<()> {
-    blocking(move || actions::run(&app, action, result_id.as_deref())).await
+    blocking(move || actions::run(&app, Origin::Launcher, action, result_id.as_deref())).await
 }
 
 #[tauri::command]

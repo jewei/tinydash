@@ -59,14 +59,9 @@ pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
     Ok(())
 }
 
-/// Whether the launcher is on screen.
-pub fn is_open(app: &AppHandle) -> Result<bool> {
-    Ok(launcher(app)?.is_visible()?)
-}
-
 /// Show the launcher again as it was, without a reset, so the error of an
-/// action that hid it shows where the user ran it. Only for a launcher that
-/// was open before the action.
+/// action that hid it shows where the user ran it. Only for an action that
+/// the user ran in the launcher.
 pub fn show_again(app: &AppHandle) -> Result<()> {
     let window = launcher(app)?;
     window.show()?;

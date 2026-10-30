@@ -31,8 +31,18 @@ use crate::{
 /// Pins kept in all, including pins of items that are hidden for now.
 const MAX_PINS: usize = 100;
 
+/// Where the user ran an action, which decides where its error shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Origin {
+    /// The launcher, which shows the error under the query. Settings sends
+    /// its actions this way too and shows their errors itself.
+    Launcher,
+    /// A hotkey, pressed in another app. Its error goes to a notification.
+    Hotkey,
+}
+
 /// Run an action. `result_id` identifies the result it came from, for usage ranking.
-pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<()> {
+pub fn run(app: &AppHandle, origin: Origin, action: Action, result_id: Option<&str>) -> Result<()> {
     let state = app.state::<State>();
     let counts_as_use = matches!(
         action,
@@ -194,19 +204,12 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             }
             window::hide(app)?;
         }
-        Action::System { command } => {
-            // A hotkey runs it while the launcher is hidden; then a failure
-            // must not bring the launcher up over the user's app.
-            let was_open = window::is_open(app)?;
-            // Hide first: Lock and Sleep must not leave the launcher on screen.
-            window::hide(app)?;
-            if let Err(error) = platform::run_system_command(command) {
-                if was_open {
-                    window::show_again(app)?;
-                }
-                return Err(error);
-            }
-        }
+        Action::System { command } => run_with_launcher_hidden(
+            origin,
+            || window::hide(app),
+            || platform::run_system_command(command),
+            || window::show_again(app),
+        )?,
         Action::Pin { id } => pin(&state, &id)?,
         Action::Hide { id } => hide(&state, &id)?,
         Action::SetAlias { id, alias } => set_alias(&state, &id, &alias)?,
@@ -465,7 +468,7 @@ pub fn run_hotkey(app: &AppHandle, id: &str) -> Result<()> {
     // Read readiness first, as `pin` does.
     let ready = state.freshness.ready();
     let action = hotkey_action(&state.snapshot(), id, ready)?;
-    run(app, action, Some(id))
+    run(app, Origin::Hotkey, action, Some(id))
 }
 
 /// The main action of the result with `id`. Until a source is `ready`,
@@ -515,6 +518,27 @@ pub(crate) fn offered_file(state: &State, path: &str) -> bool {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .contains(path)
+}
+
+/// Run a system command with the launcher hidden first: Lock and Sleep must
+/// not leave it on screen. When a command run in the launcher fails, the
+/// launcher shows again as it was, so the error shows where the user ran
+/// it. A hotkey's error goes to a notification, and the launcher must not
+/// come up over the app the user is in.
+fn run_with_launcher_hidden(
+    origin: Origin,
+    hide: impl FnOnce() -> Result<()>,
+    command: impl FnOnce() -> Result<()>,
+    show_again: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    hide()?;
+    let Err(error) = command() else {
+        return Ok(());
+    };
+    if origin == Origin::Launcher {
+        show_again()?;
+    }
+    Err(error)
 }
 
 /// Copy, then hide and hand focus back so the user can paste right away,
@@ -717,6 +741,39 @@ mod tests {
             Ok(Action::System { .. })
         ));
         assert!(error("system:sleep", true).contains("asks before it runs"));
+    }
+
+    #[test]
+    fn a_failed_command_shows_the_launcher_again_only_when_run_from_it() {
+        let steps = |origin, works: bool| {
+            let steps = std::cell::RefCell::new(Vec::new());
+            let step = |name| {
+                steps.borrow_mut().push(name);
+                Ok(())
+            };
+            let result = run_with_launcher_hidden(
+                origin,
+                || step("hide"),
+                || {
+                    step("run")?;
+                    works
+                        .then_some(())
+                        .ok_or_else(|| Error::msg("This desktop has no dark mode."))
+                },
+                || step("show again"),
+            );
+            (result.is_ok(), steps.into_inner())
+        };
+        assert_eq!(
+            steps(Origin::Launcher, false),
+            (false, vec!["hide", "run", "show again"])
+        );
+        // The launcher may be on screen behind the user's app, or hidden:
+        // either way, a hotkey's failure must not bring it up.
+        assert_eq!(steps(Origin::Hotkey, false), (false, vec!["hide", "run"]));
+        for origin in [Origin::Launcher, Origin::Hotkey] {
+            assert_eq!(steps(origin, true), (true, vec!["hide", "run"]));
+        }
     }
 
     #[test]
