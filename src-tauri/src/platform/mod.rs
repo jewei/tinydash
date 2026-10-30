@@ -35,16 +35,19 @@
 //! - `read_up_next(from_ms, to_ms)`: the events between two Unix times and
 //!   the incomplete reminders due before `to_ms`, from the OS calendars
 //!   (EventKit on macOS), each kind with why it cannot be read, such as
-//!   access the user has not given. It never asks for access. `None` where
-//!   TinyDash reads no calendars. Waits up to two seconds for reminders;
-//!   call it off the main thread.
+//!   access the user has not given. It never asks for access. It reads
+//!   nothing when TinyDash is not its own responsible process: macOS would
+//!   check the access of the terminal or other app that started it. `None`
+//!   where TinyDash reads no calendars. Waits up to two seconds for
+//!   reminders; call it off the main thread.
 //! - `ask_calendar_access(done)`: ask the user to let TinyDash read
 //!   calendars and reminders, for each kind not answered yet, and call
 //!   `done` once both are answered. Returns at once. Does nothing while an
-//!   earlier request waits, in a build without the usage strings (macOS
-//!   ends an app that asks without them), or where TinyDash reads no
-//!   calendars. When a terminal or another app starts TinyDash, macOS asks
-//!   for and checks access on behalf of that app.
+//!   earlier request waits, when TinyDash is not its own responsible
+//!   process (macOS would ask for the other app, and end TinyDash if that
+//!   app lacks the usage strings), in a build without the usage strings
+//!   (macOS ends an app that asks without them), or where TinyDash reads no
+//!   calendars.
 //! - `open_calendar_app(kind)`: open the app that holds an Up Next item:
 //!   Calendar for an event, Reminders for a reminder. An error where
 //!   TinyDash reads no calendars.

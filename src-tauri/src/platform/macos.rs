@@ -2,7 +2,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
 };
@@ -492,8 +492,9 @@ struct KeptStore {
 unsafe impl Send for KeptStore {}
 
 pub fn read_up_next(from_ms: i64, to_ms: i64) -> Option<Agenda> {
-    let events = calendar_access(EKEntityType::Event);
-    let reminders = calendar_access(EKEntityType::Reminder);
+    let own = is_own_responsible_process();
+    let events = calendar_access(EKEntityType::Event, own);
+    let reminders = calendar_access(EKEntityType::Reminder, own);
     if let (Err(events), Err(reminders)) = (&events, &reminders) {
         return Some(Agenda {
             events: Err(events.clone()),
@@ -527,9 +528,10 @@ pub fn read_up_next(from_ms: i64, to_ms: i64) -> Option<Agenda> {
 pub fn ask_calendar_access(done: impl Fn() + Send + Sync + 'static) {
     use objc2::runtime::Bool;
     use objc2_foundation::NSError;
+    let own = is_own_responsible_process();
     let kinds: Vec<EKEntityType> = [EKEntityType::Event, EKEntityType::Reminder]
         .into_iter()
-        .filter(|&kind| calendar_access(kind) == Err(Unreadable::NotAsked))
+        .filter(|&kind| calendar_access(kind, own) == Err(Unreadable::NotAsked))
         .collect();
     if kinds.is_empty() || ASKING_FOR_CALENDARS.swap(true, Ordering::AcqRel) {
         return;
@@ -578,9 +580,15 @@ pub fn open_calendar_app(kind: UpNextKind) -> Result<()> {
 }
 
 /// Whether TinyDash may read one kind, from the answer macOS keeps. Never
-/// asks. macOS answers for the app responsible for TinyDash: the terminal
-/// or other app that started it, if one did.
-fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
+/// asks. `own_responsible_process` comes from `is_own_responsible_process`.
+fn calendar_access(
+    kind: EKEntityType,
+    own_responsible_process: bool,
+) -> std::result::Result<(), Unreadable> {
+    if !own_responsible_process {
+        // The saved answer would be the other app's, so it is not read.
+        return Err(Unreadable::OpenedByAnotherApp);
+    }
     // SAFETY: A class method that reads the saved answer for a valid kind.
     match unsafe { EKEventStore::authorizationStatusForEntityType(kind) } {
         EKAuthorizationStatus::FullAccess => Ok(()),
@@ -596,9 +604,55 @@ fn calendar_access(kind: EKEntityType) -> std::result::Result<(), Unreadable> {
     }
 }
 
-/// Whether the app carries the usage strings, without which macOS ends an
-/// app that asks. The app bundle has them, and `tauri dev` embeds them in
-/// the binary; a build made with `--no-bundle` does not.
+/// `pid_t responsibility_get_pid_responsible_for_pid(pid_t)`, a private
+/// libSystem function: the process that macOS holds responsible for a
+/// process, or -1 when it cannot tell.
+type ResponsibleFor = unsafe extern "C" fn(libc::pid_t) -> libc::pid_t;
+
+/// Whether TinyDash is its own responsible process. macOS checks the access
+/// and the usage strings of the responsible process, not of the process
+/// that reads or asks, and a program that a terminal or another app starts
+/// belongs to that app. An app that launchd starts is its own: from Finder,
+/// Launchpad, the Dock, or `open`. So are the login item, a LaunchAgent
+/// that runs the binary, and the restart after an update, which Tauri runs
+/// through `/usr/bin/open -n`. The answer cannot change while TinyDash
+/// runs, so it is looked up once.
+fn is_own_responsible_process() -> bool {
+    static OWN: OnceLock<bool> = OnceLock::new();
+    *OWN.get_or_init(|| {
+        // SAFETY: getpid takes no arguments and cannot fail.
+        let pid = unsafe { libc::getpid() };
+        responsible_for_itself(find_responsible_for(), pid)
+    })
+}
+
+/// The private function, where this macOS has it.
+fn find_responsible_for() -> Option<ResponsibleFor> {
+    // SAFETY: dlsym receives a valid C string, and returns null when no
+    // loaded library defines the symbol.
+    let symbol = unsafe {
+        libc::dlsym(
+            libc::RTLD_DEFAULT,
+            c"responsibility_get_pid_responsible_for_pid".as_ptr(),
+        )
+    };
+    // SAFETY: libSystem defines the symbol with the C signature of
+    // `ResponsibleFor` on every supported macOS.
+    (!symbol.is_null())
+        .then(|| unsafe { std::mem::transmute::<*mut libc::c_void, ResponsibleFor>(symbol) })
+}
+
+/// Whether `responsible_for` names `pid` as its own responsible process.
+/// Without the function, TinyDash cannot tell, so it takes the safe answer.
+fn responsible_for_itself(responsible_for: Option<ResponsibleFor>, pid: libc::pid_t) -> bool {
+    // SAFETY: The function takes any process ID and only reads what the
+    // kernel keeps about it.
+    responsible_for.is_some_and(|responsible_for| unsafe { responsible_for(pid) } == pid)
+}
+
+/// Whether the app carries the usage strings. macOS ends its own responsible
+/// process when it asks without them. The app bundle has them, and `tauri
+/// dev` embeds them in the binary; a build made with `--no-bundle` does not.
 fn has_calendar_usage_strings(bundle: &NSBundle) -> bool {
     CALENDAR_USAGE_KEYS.iter().all(|key| {
         bundle
@@ -1314,6 +1368,42 @@ mod tests {
             assert_eq!(has_calendar_usage_strings(&bundle), can_ask, "{name}");
         }
         std::fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn reads_and_asks_for_calendars_only_as_its_own_responsible_process() {
+        extern "C" fn itself(pid: libc::pid_t) -> libc::pid_t {
+            pid
+        }
+        extern "C" fn terminal(_pid: libc::pid_t) -> libc::pid_t {
+            4242
+        }
+        extern "C" fn unknown(_pid: libc::pid_t) -> libc::pid_t {
+            -1
+        }
+        assert!(responsible_for_itself(Some(itself), 1234));
+        assert!(!responsible_for_itself(Some(terminal), 1234));
+        assert!(!responsible_for_itself(Some(unknown), 1234));
+        assert!(!responsible_for_itself(None, 1234));
+
+        // Started by another app, TinyDash does not even read the saved
+        // answer, and so never asks either.
+        for kind in [EKEntityType::Event, EKEntityType::Reminder] {
+            assert_eq!(
+                calendar_access(kind, false),
+                Err(Unreadable::OpenedByAnotherApp)
+            );
+        }
+    }
+
+    #[test]
+    fn finds_the_process_responsible_for_tinydash() {
+        let responsible_for = find_responsible_for().expect("the private function");
+        // SAFETY: getpid takes no arguments and cannot fail.
+        let pid = unsafe { libc::getpid() };
+        // This process, or the app that started the tests.
+        // SAFETY: The function takes any process ID.
+        assert!(unsafe { responsible_for(pid) } > 0);
     }
 
     #[test]
