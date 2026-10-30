@@ -621,9 +621,11 @@ fn percentage_phrases(query: &str) -> Cow<'_, str> {
         let Some(len) = amount_len(amount) else {
             continue;
         };
+        // What the user typed before the percentage, so that an amount in
+        // a phrase already rewritten is a value too.
         if is_number(percent)
             && amount.len() < rest.len()
-            && starts_value(before)
+            && starts_value(&query[..copied + before.len()])
             && ends_value(&amount[len..])
         {
             input.push_str(before);
@@ -1070,6 +1072,11 @@ mod tests {
             ("(10% of 200) / 4", "5"),
             ("10 percent of 200", "20"),
             ("10% of 200 per 4", "5"),
+            // A phrase right after another one.
+            ("10% of 200 + 20% of 300", "80"),
+            ("10% of 200 * 10% of 50", "100"),
+            ("10% off 200 - 5% off 100", "85"),
+            ("5 + 10% of 200 + 10% of 300", "55"),
         ] {
             assert_eq!(value(query).as_deref(), Some(expected), "{query}");
         }
@@ -1083,6 +1090,8 @@ mod tests {
             "2 ^ 10% on 200",
             "2 ^ -10% of 200",
             "2 ** 10% of 200",
+            "10% of 200 / 10% of 50",
+            "10% of 200 ^ 10% of 50",
             // `per` is fend's `/`. After it or another operator word, such
             // as `mod`, the sign belongs to the percentage.
             "400 per -10% off 200",
@@ -1090,6 +1099,7 @@ mod tests {
             "400 mod +10% off 200",
             "5 choose +10% of 20",
             // A sign or a value right before the percentage.
+            "10% of 200 - -10% of 50",
             "-10% off 200",
             "2 10% of 200",
             "1e-2% of 200",
