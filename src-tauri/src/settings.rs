@@ -405,11 +405,14 @@ fn save_failed(dir: &Path, error: &std::io::Error) -> Error {
         ErrorKind::StorageFull | ErrorKind::QuotaExceeded => {
             " Free some disk space, then try again.".to_owned()
         }
-        // Windows also refuses to replace a file that another app holds open.
-        ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem => format!(
+        // Only Windows refuses to replace a file that another app holds open.
+        ErrorKind::PermissionDenied if cfg!(windows) => format!(
             " Check that you can write to {} and that no other app has {FILE_NAME} open.",
             dir.display()
         ),
+        ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem => {
+            format!(" Check that you can write to {}.", dir.display())
+        }
         _ => String::new(),
     };
     Error::msg(format!(
@@ -840,12 +843,20 @@ mod tests {
                 std::io::Error::from(ErrorKind::StorageFull)
             )
         );
+        let open = if cfg!(windows) {
+            " and that no other app has settings.json open"
+        } else {
+            ""
+        };
         let denied = error(ErrorKind::PermissionDenied);
         assert!(
-            denied.ends_with(
-                ". Check that you can write to /settings and that no other app has settings.json open."
-            ),
+            denied.ends_with(&format!(". Check that you can write to /settings{open}.")),
             "{denied}"
+        );
+        let read_only = error(ErrorKind::ReadOnlyFilesystem);
+        assert!(
+            read_only.ends_with(". Check that you can write to /settings."),
+            "{read_only}"
         );
         assert_eq!(
             error(ErrorKind::TimedOut),
