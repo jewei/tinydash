@@ -15,13 +15,14 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` (also with the typeset minus sign `−`) gives 180.
 - The calculator answers a percentage only in the shapes that it reads as people say them: an amount with percentages added or subtracted, `10% of`, `on`, or `off` an amount, and questions such as `20 is what % of 200`. Any other calculation with a percentage, such as `10% + 20%` or `200 * 10%`, now gives no answer.
-- The calculator no longer answers lambda functions, such as `(\x.x + 1) 5`.
+- The calculator no longer answers lambda functions, such as `(x: x + 1) 5` or `(\x.x + 1) 5`.
 - The calculator no longer shows an answer that only repeats the query with other spacing, such as `2 kg` for `2kg`.
 
 ### Fixed
 
 - The calculator no longer reads a percentage in a way that people do not mean: `100 + 10% + 5` and `(100 + 10%) * 2` now give no answer instead of 105.1 and 200.2, and `200 / 10%` gives none instead of 20%. `200 - 10% - 5%` gives 171, and `20 percent` works like `20%`.
 - A very long or deeply nested calculation, such as hundreds of parentheses, no longer freezes search or crashes TinyDash. The calculator gives no answer for it.
+- A function that calls itself, such as `(x: x x)(x: x x) 1`, no longer crashes TinyDash.
 
 ## [0.7.0] - 2026-10-19
 

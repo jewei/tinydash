@@ -314,12 +314,10 @@ fn currency_shorthand(query: &str) -> Option<String> {
 /// in it differently from people or could not parse it fast.
 fn fend_input(query: &str) -> Option<String> {
     let ascii = ascii_signs(query);
-    // The limits that the user sees, on what they typed. A launcher needs no
-    // lambdas, such as `\x.x + 1`, and fend parses a lambda's body again for
-    // each reading around it.
+    // The limits that the user sees, on what they typed.
     if query.chars().nth(MAX_INPUT).is_some()
         || query.matches(['(', ')']).count() > MAX_PARENTHESES
-        || ascii.contains('\\')
+        || has_lambda(&ascii)
     {
         return None;
     }
@@ -348,6 +346,15 @@ fn ascii_signs(query: &str) -> String {
         }
     }
     input
+}
+
+/// Whether `input` has a lambda in any of fend's spellings: `\x.x + 1`,
+/// `x: x + 1`, or `x => x + 1` (`λ` is `\` by now). A launcher needs none.
+/// fend parses the body of a `\` lambda again for each reading around it,
+/// and a lambda that calls itself, such as `(x: x x)(x: x x) 1`, recurses
+/// until it overflows the stack, which crashes TinyDash.
+fn has_lambda(input: &str) -> bool {
+    input.contains(['\\', ':']) || input.contains("=>")
 }
 
 /// Whether fend parses `input` fast and within the stack. fend cannot stop
@@ -1096,11 +1103,26 @@ mod tests {
             "100 \u{2212} 10% + 5",
             "100 ÷ 10% off 200",
             "2 ×* 10% on 200",
-            // A lambda.
-            "(\\x.x) 5",
-            "(\u{3bb}x.x) 5",
         ] {
             assert_eq!(value(query), None, "{query}");
+        }
+    }
+
+    #[test]
+    fn refuses_lambdas() {
+        for query in [
+            "(\\x.x + 1) 5",
+            "(\u{3bb}x.x + 1) 5",
+            "(x: x + 1) 5",
+            "(x => x * 2) 5",
+            "f = x: x * 2; f 5",
+            // Each calls itself until the stack overflows.
+            "(x: x x)(x: x x) 1",
+            "(x => x x)(x => x x) 1",
+            "f = x: f x; f 1",
+        ] {
+            assert_eq!(value(query), None, "{query}");
+            assert!(rates_off_answer(query).is_none(), "{query}");
         }
     }
 
