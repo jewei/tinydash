@@ -1,4 +1,4 @@
-import { createUniqueId, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createUniqueId, on, onCleanup, onMount, Show } from "solid-js";
 
 import { ShortcutRecorder } from "../ui/ShortcutRecorder";
 
@@ -56,6 +56,17 @@ export function HotkeyDialog(props: {
     window.addEventListener("keydown", onKeyDown, true);
   });
   onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
+  // A button that a save disables drops its focus. When the save ends and
+  // the dialog stays open, the recorder takes it back.
+  createEffect(
+    on(
+      () => props.busy,
+      (busy) => {
+        if (!busy && !dialog.contains(document.activeElement)) recorder()?.focus();
+      },
+      { defer: true },
+    ),
+  );
 
   return (
     <div

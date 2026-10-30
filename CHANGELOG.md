@@ -18,7 +18,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Fixed
 
 - Holding ↑ to go back to the top of a list no longer fills the search field with your past searches. Press ↑ again on the first row to bring one back.
-- In the hotkey dialog, Escape and Tab work again after a click on the dialog's text, and keys no longer reach the search field behind it. A held Enter or Escape acts only once there.
+- In the hotkey dialog, Escape and Tab work again after a click on the dialog's text or a failed Remove Hotkey, and keys no longer reach the search field behind it. A held Enter or Escape acts only once there.
 - On macOS 12.0 to 12.2, the actions menu opens again when exchange rates or the weather is on.
 - A long paste into the Notepad, such as one with many emoji, is no longer cut short without a message. A note over 10,000 characters says so and is not saved until you shorten it.
 - In Settings, a snippet or quicklink that you did not save is still there when you come back from another section. So is one that was still saving, with its error if the save failed.

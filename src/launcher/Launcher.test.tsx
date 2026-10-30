@@ -404,6 +404,63 @@ describe("Launcher", () => {
     expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull();
   });
 
+  it("gives focus back to the hotkey dialog when a save ends", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Change Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "Control+Alt+K" },
+          confirm: null,
+        },
+      ],
+    };
+    let finish: (error?: string) => void = () => undefined;
+    const { backend, press } = setup(() => [withHotkey], {
+      run_action: () =>
+        new Promise((resolve, reject) => {
+          finish = (error) => (error ? reject(error) : resolve(null));
+        }),
+    });
+    const open = async () => {
+      press("k", { ctrlKey: true });
+      fireEvent.click(await screen.findByRole("option", { name: /Change Hotkey/ }));
+      const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+      const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+      return { dialog, recorder };
+    };
+    await screen.findByRole("option", { name: /Safari/ });
+    const { dialog, recorder } = await open();
+    fireEvent.keyDown(recorder, { key: "Escape" });
+    const remove = within(dialog).getByRole("button", { name: "Remove Hotkey" });
+    // WebKit leaves focus on <body> after a click on a button, which it does
+    // not focus, and after a key press on one that the save then disables.
+    recorder.blur();
+    fireEvent.click(remove);
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect((remove as HTMLButtonElement).disabled).toBe(true);
+    expect(document.activeElement).toBe(document.body);
+    finish("Could not remove the hotkey.");
+    expect((await within(dialog).findByRole("alert")).textContent).toBe(
+      "Could not remove the hotkey.",
+    );
+    expect(document.activeElement).toBe(recorder);
+    // A save that succeeds after the launcher opened again ends in the
+    // dialog opened since, which keeps it open and takes focus back.
+    fireEvent.click(remove);
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    await emit("launcher:shown", { category: null });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull(),
+    );
+    const next = await open();
+    next.recorder.blur();
+    finish();
+    await waitFor(() => expect(document.activeElement).toBe(next.recorder));
+    expect(screen.getByRole("dialog", { name: "Hotkey for Safari" })).toBe(next.dialog);
+  });
+
   it("keeps the alias dialog open with the reason when saving fails", async () => {
     const named: SearchResult = {
       ...app,
