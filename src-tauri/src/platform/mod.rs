@@ -89,9 +89,11 @@
 //!   pressed with Command, Control, Alt, or Windows; Return, Tab, Escape,
 //!   arrows, Home, End, Page Up or Down; a dead key; a click; a key in
 //!   another app, or on Windows and Linux another window, which passes a
-//!   reset first). A modifier key alone passes nothing. Keys that TinyDash
-//!   types never reach `on_key` as characters (Linux passes resets while it
-//!   types).
+//!   reset first). A click is a press of a mouse button other than the
+//!   scroll wheel. A modifier key alone passes nothing. On macOS and
+//!   Windows, the keys that TinyDash types never reach `on_key`, so every
+//!   call while it types is a key or click from someone else. X11 does not
+//!   mark them, so Linux passes every key as a reset while TinyDash types.
 //!   Keep `on_key` quick: on Windows, typing waits for it. When the OS
 //!   stops passing keys but the thread runs on (the macOS tap turned off
 //!   after a timeout, or a Windows hook removed for answering too slowly),
@@ -100,17 +102,26 @@
 //!   `TypingWatch::is_running()` is false once the thread has ended, also
 //!   on its own, as on macOS when access is taken away; the thread then
 //!   logs why. Never log what it reads.
-//! - `type_text(focus, erase, text)`: press Backspace `erase` times, then
-//!   type `text`, with Return for each line break, into `focus`: the app or
-//!   window that got the trigger, as `watch_typing` passed it. Before each
-//!   part, the first Backspace too, it checks that `focus` is still in front,
-//!   and stops with an error when it is not. So focus that moved before
-//!   typing started, even while the clipboard was read for the snippet,
-//!   leaves the trigger as typed. It never pastes with the clipboard. Call
-//!   it on a thread other than the watch thread. Typed keys never take on a modifier
-//!   that the user holds: macOS clears the modifiers of each key, and
-//!   Windows and Linux wait with `modifiers_released` before each part until
-//!   the user lets go, and stop with an error when a modifier stays down.
+//! - `type_text(focus, erase, text, interrupted)`: press Backspace `erase`
+//!   times, then type `text`, with Return for each line break, into
+//!   `focus`: the app or window that got the trigger, as `watch_typing`
+//!   passed it. It never pastes with the clipboard. Call it on a thread
+//!   other than the watch thread. It stops with an error before a part,
+//!   the first Backspace too, in these cases:
+//!   - `focus` is no longer in front. So focus that moved before typing
+//!     started, even while the clipboard was read for the snippet, leaves
+//!     the trigger as typed.
+//!   - `interrupted` is set: a key or click came after the trigger, so the
+//!     text before the cursor may no longer end with it. Every OS checks
+//!     it with `no_input_since_trigger` before the first Backspace, after
+//!     any wait for modifiers. macOS and Windows also check it before each
+//!     later part, so a key or click while TinyDash types stops it. Linux
+//!     checks it before the first Backspace only, as the keys that
+//!     TinyDash types set it too.
+//!   - A modifier stays down. Typed keys never take on a modifier that the
+//!     user holds: macOS clears the modifiers of each key, and Windows and
+//!     Linux wait with `modifiers_released` before each part until the user
+//!     lets go.
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -326,6 +337,20 @@ fn modifiers_released(held: impl Fn() -> bool) -> bool {
     true
 }
 
+/// An error when the key watch saw a key or click after the trigger, as
+/// `interrupted` says. The user typed on, clicked elsewhere, or switched
+/// tabs, so a Backspace could erase their text and not the trigger, and
+/// the snippet could land somewhere they did not mean.
+pub fn no_input_since_trigger(interrupted: &std::sync::atomic::AtomicBool) -> Result<()> {
+    if interrupted.load(std::sync::atomic::Ordering::Acquire) {
+        Err(Error::msg(
+            "Stopped typing the snippet: a key or click came after the trigger.",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// Run a helper program with fixed arguments. Never pass user text here.
 fn run(program: &str, args: &[&str]) -> Result<()> {
     let mut command = std::process::Command::new(program);
@@ -362,6 +387,18 @@ mod tests {
         let started = std::time::Instant::now();
         assert!(!modifiers_released(|| true));
         assert!(started.elapsed() >= MODIFIER_WAIT);
+    }
+
+    #[test]
+    fn typing_stops_after_a_key_or_click_that_follows_the_trigger() {
+        use super::no_input_since_trigger;
+        use std::sync::atomic::AtomicBool;
+        assert!(no_input_since_trigger(&AtomicBool::new(false)).is_ok());
+        let error = no_input_since_trigger(&AtomicBool::new(true)).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Stopped typing the snippet: a key or click came after the trigger."
+        );
     }
 
     mod monitor_containing {

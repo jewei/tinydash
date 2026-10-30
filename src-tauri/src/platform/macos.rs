@@ -1189,9 +1189,11 @@ fn keys_for(keycode: i64, flags: CGEventFlags, typed: &[u16]) -> Vec<Key> {
 
 /// Types with key events posted at the system level, which reach the app in
 /// front. Each carries [`OWN_EVENTS`], so the tap skips it. Each key goes
-/// only while `focus` is in front, so typing stops soon after another app
-/// comes to the front, and types nothing when one came before it started.
-pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
+/// only while `focus` is in front and no key or click came since the
+/// trigger. So typing stops at the user's next key or click, or soon after
+/// another app comes to the front, and types nothing when one came before
+/// it started.
+pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBool) -> Result<()> {
     let source = CGEventSource::new(CGEventSourceStateID::Private)
         .ok_or_else(|| Error::msg("Could not type the snippet."))?;
     CGEventSource::set_user_data(Some(&source), OWN_EVENTS);
@@ -1212,6 +1214,9 @@ pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
                 "Stopped typing the snippet: another app came to the front.",
             ));
         }
+        // The tap skips TinyDash's own keys, so each key or click that it
+        // passed since the trigger is the user's.
+        super::no_input_since_trigger(interrupted)?;
         press(&source, keycode, &units)?;
     }
     Ok(())

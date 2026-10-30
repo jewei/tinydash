@@ -1,4 +1,5 @@
 use std::{
+    cell::Cell,
     ffi::{CStr, CString, OsStr, c_char, c_int, c_uint, c_ulong},
     path::{Path, PathBuf},
     ptr,
@@ -860,8 +861,10 @@ fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
 /// only while `focus` has the input focus, so typing stops soon after
 /// another window gets it, and types nothing when one got it before typing
 /// started. Each part waits while the user holds a modifier, which the keys
-/// would take on.
-pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
+/// would take on. A key or click since the trigger stops it only before the
+/// first key: X11 does not mark the keys that TinyDash sends, so after that
+/// the watch passes them too, and they set `interrupted`.
+pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBool) -> Result<()> {
     // Checked before the first Backspace, so the trigger stays.
     if !xdo_can_type(text, session_locale_is_utf8) {
         return Err(Error::msg(
@@ -899,6 +902,7 @@ pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
         };
         state & MODIFIERS_THAT_CHANGE_KEYS != 0
     };
+    let started = Cell::new(false);
     let ready = || {
         if !super::modifiers_released(modifiers_held) {
             return Err(Error::msg(
@@ -909,6 +913,9 @@ pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
             return Err(Error::msg(
                 "Stopped typing the snippet: another window came to the front.",
             ));
+        }
+        if !started.replace(true) {
+            super::no_input_since_trigger(interrupted)?;
         }
         Ok(())
     };

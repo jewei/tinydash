@@ -1,7 +1,7 @@
 use std::{
     cell::{Cell, RefCell},
     path::{Path, PathBuf},
-    sync::mpsc,
+    sync::{atomic::AtomicBool, mpsc},
     thread::JoinHandle,
     time::Duration,
 };
@@ -994,10 +994,12 @@ fn keyboard_input(stroke: Stroke, down: bool) -> KEYBDINPUT {
 /// Types with `SendInput`, which puts the keys into the input stream as if
 /// they were typed. Windows marks them injected, and the hook skips them by
 /// [`OWN_INPUT`].
-/// Each batch goes only while `focus` is in front, so typing stops soon
-/// after another window comes to the front, and types nothing when one came
-/// before it started. Each batch waits while the user holds a modifier.
-pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
+/// Each batch waits while the user holds a modifier, and then goes only
+/// while `focus` is in front and no key or click came since the trigger.
+/// So typing stops at the user's next key or click, or soon after another
+/// window comes to the front, and types nothing when one came before it
+/// started.
+pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBool) -> Result<()> {
     let strokes = strokes(erase, text);
     for strokes in batches(&strokes, STROKE_BATCH) {
         if !super::modifiers_released(|| modifiers_held(strokes)) {
@@ -1022,6 +1024,9 @@ pub fn type_text(focus: Focus, erase: usize, text: &str) -> Result<()> {
                 "Stopped typing the snippet: another window came to the front.",
             ));
         }
+        // The hook skips TinyDash's own keys by their mark, so each key or
+        // click that it passed since the trigger came from someone else.
+        super::no_input_since_trigger(interrupted)?;
         // SAFETY: The pointer and count describe `batch`, and the size is
         // INPUT's.
         let sent = unsafe {
