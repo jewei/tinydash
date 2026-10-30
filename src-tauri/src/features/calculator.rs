@@ -466,7 +466,8 @@ fn euro_amounts(query: &str) -> Cow<'_, str> {
 }
 
 /// `plus`, `minus`, `times`, `multiplied by`, and `divided by` as signs, and
-/// `percent` as `%`.
+/// `percent` as `%`. Also `per` as `/`, which fend reads the same, so that
+/// the checks here see the division.
 fn word_operators(query: &str) -> Cow<'_, str> {
     let words: Vec<&str> = query.split_whitespace().collect();
     let is = |i: usize, word: &str| words.get(i).is_some_and(|w| w.eq_ignore_ascii_case(word));
@@ -484,6 +485,9 @@ fn word_operators(query: &str) -> Cow<'_, str> {
             ("*", 2)
         } else if is(i, "divided") && is(i + 1, "by") {
             ("/", 2)
+        } else if words[i] == "per" {
+            // Only this spelling: fend reads `Per` as a name.
+            ("/", 1)
         } else if is(i, "percent") {
             ("%", 1)
         } else if let Some(number) = strip_suffix(words[i], "percent").filter(|n| is_number(n)) {
@@ -638,15 +642,33 @@ fn percentage_phrases(query: &str) -> Cow<'_, str> {
 }
 
 /// Whether a value after `text` stands on its own: at the start, or after
-/// `(` or a `+`, `-`, or `*` between two values.
+/// `(` or a `+`, `-`, or `*` between two values. A word that fend reads as
+/// an operator, such as `mod` in `400 mod -10% off 200`, is not a value.
 fn starts_value(text: &str) -> bool {
     let text = text.trim_end();
     match text.strip_suffix(['+', '-', '*']) {
-        Some(left) => left
-            .trim_end()
-            .ends_with(|c: char| c.is_alphanumeric() || matches!(c, ')' | '.' | '!')),
+        Some(left) => {
+            let left = left.trim_end();
+            left.ends_with(|c: char| c.is_alphanumeric() || matches!(c, ')' | '.' | '!'))
+                && !ends_with_operator_word(left)
+        }
         None => text.is_empty() || text.ends_with('('),
     }
+}
+
+/// The words that fend-core 1.5.8 reads as operators (`lexer.rs`).
+const OPERATOR_WORDS: [&str; 13] = [
+    "to", "as", "in", "per", "of", "mod", "and", "or", "xor", "choose", "nCr", "permute", "nPr",
+];
+
+/// Whether `text` ends with one of fend's operator words, in any case. fend
+/// starts a word after the digits of a number, so `5mod` ends with `mod`.
+fn ends_with_operator_word(text: &str) -> bool {
+    let before = text.trim_end_matches(char::is_alphanumeric);
+    let word = text[before.len()..].trim_start_matches(|c: char| c.is_ascii_digit());
+    OPERATOR_WORDS
+        .iter()
+        .any(|operator| word.eq_ignore_ascii_case(operator))
 }
 
 /// Whether a value before `text` stands on its own: at the end, or before
@@ -1047,6 +1069,7 @@ mod tests {
             ("3 * 10% of 200", "60"),
             ("(10% of 200) / 4", "5"),
             ("10 percent of 200", "20"),
+            ("10% of 200 per 4", "5"),
         ] {
             assert_eq!(value(query).as_deref(), Some(expected), "{query}");
         }
@@ -1060,6 +1083,12 @@ mod tests {
             "2 ^ 10% on 200",
             "2 ^ -10% of 200",
             "2 ** 10% of 200",
+            // `per` is fend's `/`. After it or another operator word, such
+            // as `mod`, the sign belongs to the percentage.
+            "400 per -10% off 200",
+            "400 per +10% off 200",
+            "400 mod +10% off 200",
+            "5 choose +10% of 20",
             // A sign or a value right before the percentage.
             "-10% off 200",
             "2 10% of 200",
@@ -1081,6 +1110,21 @@ mod tests {
         ] {
             let (value, _) = evaluate(query, Some(&rates)).unwrap();
             assert_eq!(value, expected, "{query}");
+        }
+    }
+
+    #[test]
+    fn an_operator_word_is_not_a_value() {
+        for word in [
+            "to", "as", "in", "per", "of", "mod", "and", "AND", "or", "OR", "xor", "XOR", "choose",
+            "nCr", "permute", "nPr",
+        ] {
+            assert!(!starts_value(&format!("400 {word} -")), "{word}");
+            assert!(!starts_value(&format!("400{word}+")), "{word}");
+        }
+        // A word that only ends like one, such as `min`, is a value.
+        for text in ["400 -", "5 kg *", "(2) +", "5 min -", "x2mod -"] {
+            assert!(starts_value(text), "{text}");
         }
     }
 
