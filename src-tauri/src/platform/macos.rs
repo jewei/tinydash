@@ -607,7 +607,7 @@ fn calendar_access(
 /// `pid_t responsibility_get_pid_responsible_for_pid(pid_t)`, a private
 /// libSystem function: the process that macOS holds responsible for a
 /// process, or -1 when it cannot tell.
-type ResponsibleFor = unsafe extern "C" fn(libc::pid_t) -> libc::pid_t;
+type ResponsibleFor = extern "C" fn(libc::pid_t) -> libc::pid_t;
 
 /// Whether TinyDash is its own responsible process. macOS checks the access
 /// and the usage strings of the responsible process, not of the process
@@ -620,8 +620,7 @@ type ResponsibleFor = unsafe extern "C" fn(libc::pid_t) -> libc::pid_t;
 fn is_own_responsible_process() -> bool {
     static OWN: OnceLock<bool> = OnceLock::new();
     *OWN.get_or_init(|| {
-        // SAFETY: getpid takes no arguments and cannot fail.
-        let pid = unsafe { libc::getpid() };
+        let pid = std::process::id() as libc::pid_t;
         responsible_for_itself(find_responsible_for(), pid)
     })
 }
@@ -637,7 +636,8 @@ fn find_responsible_for() -> Option<ResponsibleFor> {
         )
     };
     // SAFETY: libSystem defines the symbol with the C signature of
-    // `ResponsibleFor` on every supported macOS.
+    // `ResponsibleFor` on every supported macOS. It is safe to call with any
+    // process ID, because it only reads what the kernel keeps about it.
     (!symbol.is_null())
         .then(|| unsafe { std::mem::transmute::<*mut libc::c_void, ResponsibleFor>(symbol) })
 }
@@ -645,9 +645,7 @@ fn find_responsible_for() -> Option<ResponsibleFor> {
 /// Whether `responsible_for` names `pid` as its own responsible process.
 /// Without the function, TinyDash cannot tell, so it takes the safe answer.
 fn responsible_for_itself(responsible_for: Option<ResponsibleFor>, pid: libc::pid_t) -> bool {
-    // SAFETY: The function takes any process ID and only reads what the
-    // kernel keeps about it.
-    responsible_for.is_some_and(|responsible_for| unsafe { responsible_for(pid) } == pid)
+    responsible_for.is_some_and(|responsible_for| responsible_for(pid) == pid)
 }
 
 /// Whether the app carries the usage strings. macOS ends its own responsible
@@ -1399,11 +1397,9 @@ mod tests {
     #[test]
     fn finds_the_process_responsible_for_tinydash() {
         let responsible_for = find_responsible_for().expect("the private function");
-        // SAFETY: getpid takes no arguments and cannot fail.
-        let pid = unsafe { libc::getpid() };
+        let pid = std::process::id() as libc::pid_t;
         // This process, or the app that started the tests.
-        // SAFETY: The function takes any process ID.
-        assert!(unsafe { responsible_for(pid) } > 0);
+        assert!(responsible_for(pid) > 0);
     }
 
     #[test]
