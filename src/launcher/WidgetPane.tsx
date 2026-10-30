@@ -85,9 +85,9 @@ const hourMinute = (timeZone?: string) =>
 
 /**
  * The cards to the right of an empty All search. They load when the pane
- * appears and each time the launcher opens. While the launcher shows, they
- * also load when settings change, when a widget changes on its own, and
- * when Up Next changes with the time.
+ * appears, each time the launcher opens, when settings change, and when a
+ * widget changes on its own. While the launcher shows, they also load when
+ * Up Next changes with the time.
  */
 export function WidgetPane(props: {
   controls: (controls: PaneControls) => void;
@@ -177,18 +177,18 @@ export function WidgetPane(props: {
       )
       .map((action) => ({ label: action.label, keys: undefined, run: () => props.onRun(action) }));
   };
-  // The pane stays in the hidden window, and a load reads the calendars and
-  // the clipboard, so it loads again only while the launcher shows. Each
-  // show loads anyway.
-  const shows = () => document.visibilityState === "visible";
-  const reloadWhileShown = () => {
-    if (shows()) void refetch();
-  };
-  // Up Next changes as time passes, as an event starts or ends.
+  // Up Next changes as time passes, as an event starts or ends: load again,
+  // but only while the launcher shows. The pane stays in the hidden window,
+  // and a load reads the calendars and the clipboard; each show loads anyway.
   // `now()` comes first, so the effect runs again on each tick.
   createEffect(() => {
     const changesAt = loaded()?.upNext?.changesAtMs;
-    if (changesAt !== undefined && now() >= changesAt && shows() && !widgets.loading) {
+    if (
+      changesAt !== undefined &&
+      now() >= changesAt &&
+      document.visibilityState === "visible" &&
+      !widgets.loading
+    ) {
       void refetch();
     }
   });
@@ -223,8 +223,8 @@ export function WidgetPane(props: {
         setJsonOpen(false);
         void refetch();
       }),
-      ipc.onSettingsChanged(reloadWhileShown),
-      ipc.onWidgetsChanged(reloadWhileShown),
+      ipc.onSettingsChanged(() => void refetch()),
+      ipc.onWidgetsChanged(() => void refetch()),
     ];
     onCleanup(() => listeners.forEach((listener) => void listener.then((stop) => stop())));
   });

@@ -1799,28 +1799,29 @@ describe("Launcher", () => {
     expect(backend.called("widgets")).toHaveLength(2);
   });
 
-  it("leaves Up Next alone while the launcher is hidden", async () => {
+  it("loads Up Next on time only while the launcher shows", async () => {
     const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
-    let loads = 0;
+    let outOfDate = true;
     const { backend } = setup(() => [], {
       widgets: () => {
-        loads += 1;
-        const changesAtMs = loads === 1 ? Date.now() - 1 : Date.now() + 3_600_000;
+        const changesAtMs = outOfDate ? Date.now() - 1 : Date.now() + 3_600_000;
         return { ...noCards, upNext: { items: [], problems: [], ask: null, changesAtMs } };
       },
     });
     await screen.findByRole("region", { name: "Up Next" });
-    // The list is out of date, and settings and another widget change, but
-    // a hidden launcher reads no calendars. Each show loads anyway.
-    await emit("settings:changed", testSettings);
-    await emit("widgets:changed", null);
+    // The list is out of date, but a hidden launcher waits until it shows.
     await new Promise((resolve) => setTimeout(resolve, 1100));
     expect(backend.called("widgets")).toHaveLength(1);
 
-    visibility.mockReturnValue("visible");
-    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2), { timeout: 1500 });
+    // A setting or another widget changes: the pane loads, hidden or not.
+    await emit("settings:changed", testSettings);
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(2));
     await emit("widgets:changed", null);
     await waitFor(() => expect(backend.called("widgets")).toHaveLength(3));
+
+    outOfDate = false;
+    visibility.mockReturnValue("visible");
+    await waitFor(() => expect(backend.called("widgets")).toHaveLength(4), { timeout: 1500 });
   });
 
   it("shows a clipboard color, copies its forms, and stays dismissed", async () => {
