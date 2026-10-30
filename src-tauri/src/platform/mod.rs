@@ -211,9 +211,38 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
 #[cfg(not(target_os = "linux"))]
 static CLIPBOARD_USE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+/// This thread's hold on the clipboard lock, until it is dropped.
 #[cfg(not(target_os = "linux"))]
-fn one_clipboard_user() -> std::sync::MutexGuard<'static, ()> {
-    CLIPBOARD_USE.lock().unwrap_or_else(|e| e.into_inner())
+struct ClipboardUser {
+    _lock: std::sync::MutexGuard<'static, ()>,
+}
+
+#[cfg(not(target_os = "linux"))]
+fn one_clipboard_user() -> ClipboardUser {
+    let lock = CLIPBOARD_USE.lock().unwrap_or_else(|e| e.into_inner());
+    #[cfg(test)]
+    HOLDS_CLIPBOARD.set(true);
+    ClipboardUser { _lock: lock }
+}
+
+// Tests that run at the same time also take the lock, so a test asks
+// whether its own thread holds it, not whether any thread does.
+#[cfg(all(test, not(target_os = "linux")))]
+thread_local! {
+    static HOLDS_CLIPBOARD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(all(test, not(target_os = "linux")))]
+impl Drop for ClipboardUser {
+    fn drop(&mut self) {
+        HOLDS_CLIPBOARD.set(false);
+    }
+}
+
+/// Whether this thread holds the clipboard lock now.
+#[cfg(all(test, not(target_os = "linux")))]
+pub fn clipboard_in_use() -> bool {
+    HOLDS_CLIPBOARD.get()
 }
 
 /// The clipboard's text now, also when its source marked it secret, so
@@ -230,12 +259,6 @@ pub fn write_clipboard<T>(write: impl FnOnce() -> T) -> T {
     #[cfg(not(target_os = "linux"))]
     let _one_user = one_clipboard_user();
     write()
-}
-
-/// Whether a thread holds the clipboard lock now.
-#[cfg(all(test, not(target_os = "linux")))]
-pub fn clipboard_in_use() -> bool {
-    CLIPBOARD_USE.try_lock().is_err()
 }
 
 #[cfg(not(target_os = "linux"))]

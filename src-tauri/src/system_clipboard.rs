@@ -71,7 +71,10 @@ mod tests {
     fn writes_hold_the_clipboard_lock() {
         // AppKit crashes when the capture thread reads during a write. The
         // check writes nothing, so the clipboard stays as it is.
-        let held = super::with_writer(|_| Ok(crate::platform::clipboard_in_use()));
+        use crate::platform::clipboard_in_use;
+        assert!(!clipboard_in_use());
+        let held = super::with_writer(|_| Ok(clipboard_in_use()));
         assert!(held.unwrap());
+        assert!(!clipboard_in_use());
     }
 }
