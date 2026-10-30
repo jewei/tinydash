@@ -23,7 +23,8 @@ const TERMINAL: &str = if cfg!(windows) {
 /// Like `=` and `?`, `>` with a command asks for this and nothing else, so
 /// Enter runs the command or nothing, never another result.
 ///
-/// `>` alone and `>git` search as before. Keywords and aliases have no
+/// `>` alone and `>git` are text to search for, without the web search or
+/// quicklink fallbacks (see `search::all`). Keywords and aliases have no
 /// spaces, so one that starts with `>`, such as `>j` or `>` itself, keeps
 /// opening its item. The one exception: `> text` is a command, so a
 /// quicklink, or a snippet with `{query}`, whose keyword is exactly `>`
