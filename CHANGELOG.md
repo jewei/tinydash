@@ -14,6 +14,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Changed
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
+- The calculator no longer answers lambda functions, such as `(\x.x + 1) 5`.
 - The calculator no longer shows an answer that only repeats the query with other spacing, such as `2 kg` for `2kg`.
 
 ### Fixed

@@ -313,24 +313,46 @@ fn currency_shorthand(query: &str) -> Option<String> {
 /// The query in fend's syntax, or `None` when fend would read a percentage
 /// in it wrongly or could not parse it fast.
 fn fend_input(query: &str) -> Option<String> {
-    // The limits that the user sees. They also bound the rewrites, which
-    // recurse once for each percentage.
-    if query.chars().nth(MAX_INPUT).is_some() || query.matches(['(', ')']).count() > MAX_PARENTHESES
+    let ascii = ascii_signs(query);
+    // The limits that the user sees, on what they typed. They also bound the
+    // rewrites, which recurse once for each percentage. A launcher needs no
+    // lambdas, such as `\x.x + 1`, and fend parses a lambda's body again for
+    // each reading around it.
+    if query.chars().nth(MAX_INPUT).is_some()
+        || query.matches(['(', ')']).count() > MAX_PARENTHESES
+        || ascii.contains('\\')
     {
         return None;
     }
-    // fend reads the minus sign of typeset math, `−`, as `-`, but the checks
-    // here know only `-`. (In `1e−2`, fend would read `1 e − 2`.)
-    let query = query.replace('\u{2212}', "-");
-    let input = match currency_shorthand(&query) {
+    let input = match currency_shorthand(&ascii) {
         Some(input) => input,
         None => {
-            let input = euro_amounts(&query);
+            let input = euro_amounts(&ascii);
             let input = word_operators(&input);
             percentage(&input).unwrap_or_else(|| input.into_owned())
         }
     };
     (parses_fast(&input) && !adds_bare_percentage(&input)).then_some(input)
+}
+
+/// The query with fend's other spellings of its signs (fend-core 1.5.8,
+/// `lexer.rs`) in ASCII, so that the checks here see every sign. One
+/// difference: fend reads `1e−2` as `1 e − 2`, and this as 0.01.
+fn ascii_signs(query: &str) -> String {
+    let mut input = String::with_capacity(query.len());
+    for c in query.chars() {
+        match c {
+            '\u{2212}' => input.push('-'),
+            // fend reads `×*` as a power, like `**`, but `*×` and `××` as
+            // two products. The space keeps them apart.
+            '×' | '✕' => input.push_str(" *"),
+            '÷' | '∕' => input.push('/'),
+            '≠' => input.push_str("!="),
+            'λ' => input.push('\\'),
+            c => input.push(c),
+        }
+    }
+    input
 }
 
 /// Whether fend parses `input` fast and within the stack. fend cannot stop
@@ -361,12 +383,6 @@ fn parses_fast(input: &str) -> bool {
                     (parses, terms) = group;
                 }
             }
-            // A lambda, `\x.x + 1`, runs to the end of its group. Where its
-            // body stops early, the reading around it parses the rest again.
-            '\\' => {
-                parses = reads.saturating_mul(2 * group_reads(&input[..at]));
-                terms = 0;
-            }
             '+' | '-' => terms += 1,
             _ => {}
         }
@@ -384,22 +400,19 @@ fn group_reads(text: &str) -> u64 {
     let signed = unsigned.len() < text.trim_end().len();
     let mut operand = unsigned.chars();
     match operand.next_back() {
-        None | Some('(' | '×' | '✕') => 1,
+        None | Some('(') => 1,
         Some('*') if !ends_with_power(unsigned) => 1,
-        Some('/' | '÷' | '∕') if !ends_mixed_fraction_top(operand.as_str()) => 2,
-        Some('^' | '*' | '/' | '÷' | '∕') => 3,
+        Some('/') if !ends_mixed_fraction_top(operand.as_str()) => 2,
+        Some('^' | '*' | '/') => 3,
         // A sign after a value adds or subtracts: the terms count it.
         Some(_) if signed => 1,
         Some(_) => 3,
     }
 }
 
-/// Whether `text` ends with fend's power sign: `^`, `**`, or `×*`.
+/// Whether `text` ends with fend's power sign, `^` or `**`.
 fn ends_with_power(text: &str) -> bool {
-    text.ends_with('^')
-        || text
-            .strip_suffix('*')
-            .is_some_and(|left| left.ends_with(['*', '×', '✕']))
+    text.ends_with('^') || text.ends_with("**")
 }
 
 /// Whether `text` may end the top of a mixed fraction, as `1 2` does in
@@ -421,9 +434,7 @@ fn ends_mixed_fraction_top(text: &str) -> bool {
         return !text.ends_with(')');
     }
     number.starts_with(|c: char| c.is_ascii_digit() || c == '.')
-        && before
-            .trim_end()
-            .ends_with(|c: char| !"(+-*×✕/÷∕^".contains(c))
+        && before.trim_end().ends_with(|c: char| !"(+-*/^".contains(c))
 }
 
 /// `€20` as `20 EUR`: fend reads `$20` and `£20`, but not `€20`.
@@ -937,9 +948,6 @@ mod tests {
             ("30 plus 20 percent", "36"),
             ("30 + 20Percent", "36"),
             ("20 is what percent of 200", "10%"),
-            // The minus sign of typeset math.
-            ("100 \u{2212} 10%", "90"),
-            ("1e\u{2212}2 * 100", "1"),
         ] {
             assert_eq!(value(query).as_deref(), Some(expected), "{query}");
         }
@@ -952,11 +960,37 @@ mod tests {
             "10 - -5%",
             "100 * 10% + 20%",
             "5 + 10% to fraction",
-            "100 \u{2212} 10% + 5",
         ] {
             assert_eq!(value(query), None, "{query}");
         }
         assert!(rates_off_answer("$30 + 20% + 5").is_none());
+    }
+
+    #[test]
+    fn reads_other_spellings_of_signs() {
+        assert_eq!(ascii_signs("1\u{2212}2×3✕4÷5∕6≠7λ"), "1-2 *3 *4/5/6!=7\\");
+        for (query, expected) in [
+            ("5 × 3", "15"),
+            ("5 ×* 3", "125"),
+            ("12 ÷ 4", "3"),
+            ("100 \u{2212} 10%", "90"),
+            ("1e\u{2212}2 * 100", "1"),
+        ] {
+            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
+        }
+        for query in [
+            // Two products, not a power.
+            "5 ×× 3",
+            "5 *× 3",
+            "100 \u{2212} 10% + 5",
+            "100 ÷ 10% off 200",
+            "2 ×* 10% on 200",
+            // A lambda.
+            "(\\x.x) 5",
+            "(\u{3bb}x.x) 5",
+        ] {
+            assert_eq!(value(query), None, "{query}");
+        }
     }
 
     #[test]
@@ -1013,8 +1047,11 @@ mod tests {
             "1 2^-(".repeat(16),
             // When the group fails, fend reads each `/` again as `1/x`.
             "(2/".repeat(30),
-            // A lambda's body stops early, and the rest is read again.
+            // A lambda: fend parses its body again for each reading around
+            // it. `λ` is fend's other spelling of `\`.
             "1 \\x.1+(".repeat(11),
+            format!("{}1", "1 \u{3bb}x.".repeat(30)),
+            "1 \u{3bb}x.1+(".repeat(12),
         ] {
             assert_eq!(value(&query), None);
             assert!(rates_off_answer(&query).is_none());
