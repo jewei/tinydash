@@ -1,7 +1,7 @@
 //! The parts of `run_in_terminal` that need no OS: the macOS script, the
-//! Windows PowerShell arguments, the Linux terminal list and environment,
-//! and the private file that carries a command on macOS and Linux. Each OS
-//! file uses its own; tests build them on every OS (the file on Unix).
+//! Windows PowerShell arguments, the Linux terminal list, and the private
+//! file that carries a command on macOS and Linux. Each OS file uses its
+//! own; tests build them on every OS (the file on Unix).
 //!
 //! The command never goes into a string that another parser reads with
 //! other quoting rules. On macOS it is a line of its own in a script, on
@@ -226,75 +226,6 @@ pub(super) fn linux_terminal(
     Some((program, arguments))
 }
 
-/// Variables that the AppImage runtime and its GTK hook set for TinyDash
-/// alone. The hook replaced any value of the user's own for `GDK_BACKEND`
-/// and `GTK_THEME`, so removing them gives the default back.
-#[cfg(any(target_os = "linux", test))]
-const APPIMAGE_ONLY: &[&str] = &[
-    "APPDIR",
-    "APPIMAGE",
-    "ARGV0",
-    "OWD",
-    "GDK_BACKEND",
-    "GTK_THEME",
-];
-
-/// The changes that give a program started from the AppImage build the
-/// environment of the user's own programs, as `(name, value)`, where `None`
-/// removes the variable. TinyDash's GTK needs the folders inside the
-/// AppImage, such as in `XDG_DATA_DIRS` and `GIO_EXTRA_MODULES`, but a
-/// terminal and the shell in it would keep them after TinyDash quits and
-/// the AppImage is gone. Outside an AppImage, nothing changes.
-#[cfg(any(target_os = "linux", test))]
-pub(super) fn outside_appimage(
-    environment: impl IntoIterator<Item = (String, String)>,
-) -> Vec<(String, Option<String>)> {
-    let environment: Vec<(String, String)> = environment.into_iter().collect();
-    let value = |name: &str| {
-        environment
-            .iter()
-            .find(|(own, _)| own == name)
-            .map(|(_, value)| value.as_str())
-    };
-    // The root, or a relative folder, would match every path.
-    let Some(appdir) = value("APPDIR")
-        .filter(|appdir| {
-            let appdir = Path::new(appdir);
-            appdir.has_root() && appdir.parent().is_some()
-        })
-        .filter(|_| value("APPIMAGE").is_some())
-    else {
-        return Vec::new();
-    };
-    // The GTK hook sets `XDG_DATA_DIRS="$APPDIR/usr/share:/usr/share:$XDG_DATA_DIRS"`,
-    // so the user's own value, empty when it was not set, follows its two
-    // folders. Its `/usr/share` is outside the AppImage, but the user's
-    // value may not have it there, or at all.
-    let data_dirs_prefix = format!("{appdir}/usr/share:/usr/share:");
-    let inside = |entry: &str| Path::new(entry).starts_with(appdir);
-    environment
-        .iter()
-        .filter_map(|(name, value)| {
-            if APPIMAGE_ONLY.contains(&name.as_str()) {
-                return Some((name.clone(), None));
-            }
-            if !value.split(':').any(inside) {
-                return None;
-            }
-            let own = if name == "XDG_DATA_DIRS" {
-                value.strip_prefix(&data_dirs_prefix).unwrap_or(value)
-            } else {
-                value
-            };
-            let kept: Vec<&str> = own
-                .split(':')
-                .filter(|entry| !entry.is_empty() && !inside(entry))
-                .collect();
-            Some((name.clone(), (!kept.is_empty()).then(|| kept.join(":"))))
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -451,99 +382,6 @@ mod tests {
                 arguments.last().map(OsString::as_os_str),
                 Some(file.as_os_str())
             );
-        }
-    }
-
-    #[test]
-    fn a_terminal_from_the_appimage_gets_the_users_environment() {
-        let appdir = "/tmp/.mount_TinyDaAbC";
-        let environment = |pairs: &[(&str, &str)]| -> Vec<(String, String)> {
-            pairs
-                .iter()
-                .map(|&(name, value)| (name.to_owned(), value.to_owned()))
-                .collect()
-        };
-        let mut changes = outside_appimage(environment(&[
-            ("APPIMAGE", "/home/me/TinyDash.AppImage"),
-            ("APPDIR", appdir),
-            ("ARGV0", "TinyDash.AppImage"),
-            ("OWD", "/home/me"),
-            ("GDK_BACKEND", "x11"),
-            ("GTK_THEME", "Adwaita:dark"),
-            ("GTK_DATA_PREFIX", appdir),
-            (
-                "GIO_EXTRA_MODULES",
-                "/tmp/.mount_TinyDaAbC//usr/lib/gio/modules",
-            ),
-            (
-                "XDG_DATA_DIRS",
-                "/tmp/.mount_TinyDaAbC/usr/share:/usr/share:/usr/local/share:/usr/share",
-            ),
-            ("HOME", "/home/me"),
-            ("PATH", "/usr/bin:/bin"),
-            // Another folder whose name only starts the same way stays.
-            ("NOTES", "/tmp/.mount_TinyDaAbCD/notes"),
-        ]));
-        changes.sort();
-        let removed = |name: &str| (name.to_owned(), None);
-        assert_eq!(
-            changes,
-            [
-                removed("APPDIR"),
-                removed("APPIMAGE"),
-                removed("ARGV0"),
-                removed("GDK_BACKEND"),
-                removed("GIO_EXTRA_MODULES"),
-                removed("GTK_DATA_PREFIX"),
-                removed("GTK_THEME"),
-                removed("OWD"),
-                (
-                    "XDG_DATA_DIRS".to_owned(),
-                    Some("/usr/local/share:/usr/share".to_owned())
-                ),
-            ]
-        );
-        // `XDG_DATA_DIRS` gets back the user's own value, as it was: none
-        // when the session did not set it, so the default applies again,
-        // and its own order otherwise. A value that the GTK hook did not
-        // make loses only its folders inside the AppImage.
-        let data_dirs = |value: &str| {
-            outside_appimage(environment(&[
-                ("APPIMAGE", "/home/me/TinyDash.AppImage"),
-                ("APPDIR", appdir),
-                ("XDG_DATA_DIRS", value),
-            ]))
-            .into_iter()
-            .find(|(name, _)| name == "XDG_DATA_DIRS")
-            .unwrap()
-            .1
-        };
-        assert_eq!(
-            data_dirs("/tmp/.mount_TinyDaAbC/usr/share:/usr/share:"),
-            None
-        );
-        assert_eq!(
-            data_dirs(
-                "/tmp/.mount_TinyDaAbC/usr/share:/usr/share:/home/me/.local/share/flatpak/exports/share:/usr/local/share:/usr/share"
-            )
-            .as_deref(),
-            Some("/home/me/.local/share/flatpak/exports/share:/usr/local/share:/usr/share")
-        );
-        assert_eq!(
-            data_dirs("/tmp/.mount_TinyDaAbC/usr/share:/opt/share").as_deref(),
-            Some("/opt/share")
-        );
-        // Outside an AppImage, or with an APPDIR that would match every
-        // path, nothing changes.
-        let plain = environment(&[("APPDIR", appdir), ("GDK_BACKEND", "x11")]);
-        assert!(outside_appimage(plain).is_empty());
-        for appdir in ["/", "relative", ""] {
-            let odd = environment(&[
-                ("APPIMAGE", "/a.AppImage"),
-                ("APPDIR", appdir),
-                ("PATH", "/bin"),
-            ]);
-            assert!(outside_appimage(odd).is_empty(), "{appdir}");
         }
     }
 

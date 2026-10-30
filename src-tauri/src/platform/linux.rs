@@ -286,14 +286,6 @@ pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
     if let Some(home) = std::env::home_dir() {
         launch.current_dir(home);
     }
-    let environment = std::env::vars_os()
-        .filter_map(|(name, value)| Some((name.into_string().ok()?, value.into_string().ok()?)));
-    for (name, value) in terminal::outside_appimage(environment) {
-        match value {
-            Some(value) => launch.env(name, value),
-            None => launch.env_remove(name),
-        };
-    }
     let mut child = match launch.spawn() {
         Ok(child) => child,
         Err(error) => {
