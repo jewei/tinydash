@@ -153,9 +153,7 @@ fn setup(app: &mut App) {
             store
         }
         Err(error) => {
-            warnings.push(format!(
-                "Could not open saved data, so changes this session will not be saved. {error} To try again, quit and reopen TinyDash."
-            ));
+            warnings.push(data_not_opened(&error));
             store::Store::in_memory()
         }
     };
@@ -201,6 +199,16 @@ fn setup(app: &mut App) {
     refresh::weather(handle, false);
 }
 
+/// The warning when saved data cannot open. Only a file error has no step of
+/// its own, so only it gets one here; a second step would repeat the first.
+fn data_not_opened(error: &error::Error) -> String {
+    let step = match error {
+        error::Error::Io(_) => " To try again, quit and reopen TinyDash.",
+        _ => "",
+    };
+    format!("Could not open saved data, so changes this session will not be saved. {error}{step}")
+}
+
 /// Act on launch arguments. With no arguments, a second launch toggles the
 /// launcher, so a desktop shortcut running `tinydash` works like the hotkey.
 fn open(app: &AppHandle, launch: Launch, already_running: bool) {
@@ -228,5 +236,26 @@ mod tests {
             capability["permissions"],
             serde_json::json!(["core:event:allow-listen", "core:event:allow-unlisten"])
         );
+    }
+
+    #[test]
+    fn the_data_warning_gives_one_next_step() {
+        use crate::error::Error;
+        use rusqlite::ffi;
+        let file =
+            super::data_not_opened(&std::io::Error::from(std::io::ErrorKind::NotFound).into());
+        assert!(
+            file.ends_with(". To try again, quit and reopen TinyDash."),
+            "{file}"
+        );
+        let data = super::data_not_opened(&Error::from(rusqlite::Error::SqliteFailure(
+            ffi::Error::new(ffi::SQLITE_IOERR),
+            None,
+        )));
+        assert!(
+            data.ends_with(". Try again, or restart TinyDash."),
+            "{data}"
+        );
+        assert!(!data.contains("quit and reopen"), "{data}");
     }
 }
