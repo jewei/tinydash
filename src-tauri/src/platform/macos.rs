@@ -315,31 +315,6 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
 }
 
-/// `sync_all` asks for a full sync (`F_FULLFSYNC`), which also empties the
-/// drive's own cache. Some volumes, such as SMB shares, refuse it with
-/// ENOTSUP; a plain fsync still sends the data to the server there.
-pub fn sync_file(file: &std::fs::File) -> std::io::Result<()> {
-    match file.sync_all() {
-        Err(error) if error.raw_os_error() == Some(libc::ENOTSUP) => fsync(file),
-        result => result,
-    }
-}
-
-fn fsync(file: &std::fs::File) -> std::io::Result<()> {
-    use std::os::fd::AsRawFd;
-    loop {
-        // SAFETY: The descriptor belongs to `file`, which stays open for the
-        // whole call.
-        if unsafe { libc::fsync(file.as_raw_fd()) } == 0 {
-            return Ok(());
-        }
-        let error = std::io::Error::last_os_error();
-        if error.kind() != std::io::ErrorKind::Interrupted {
-            return Err(error);
-        }
-    }
-}
-
 pub fn launch_app(path: &Path) -> Result<()> {
     tauri_plugin_opener::open_path(path, None::<&str>)
         .map_err(|error| Error::msg(error.to_string()))
@@ -917,20 +892,6 @@ pub fn restore_frontmost_app() {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn syncs_a_file_with_a_full_sync_and_with_the_fallback() {
-        use std::io::Write;
-        let path = std::env::temp_dir().join(format!("tinydash-sync-{}", std::process::id()));
-        let mut file = std::fs::File::create(&path).unwrap();
-        file.write_all(b"{}").unwrap();
-        super::sync_file(&file).unwrap();
-        // The local test volume accepts a full sync, so call the fallback
-        // that an SMB share needs directly.
-        super::fsync(&file).unwrap();
-        drop(file);
-        std::fs::remove_file(path).unwrap();
-    }
-
     #[test]
     fn decodes_a_tiff_that_fits() {
         let mut tiff = Vec::new();

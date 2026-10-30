@@ -134,10 +134,6 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn sync_file(file: &std::fs::File) -> std::io::Result<()> {
-    file.sync_all()
-}
-
 pub fn launch_app(path: &Path) -> Result<()> {
     tauri_plugin_opener::open_path(path, None::<&str>)
         .map_err(|error| Error::msg(error.to_string()))
