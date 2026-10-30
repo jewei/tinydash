@@ -38,7 +38,8 @@ emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnable
  */
 checkForUpdates: boolean, searchEngine: SearchEngine, 
 /**
- * `>` and a command run that command in the terminal. Off by default.
+ * `>`, a space, and a command run that command in the terminal. Off by
+ * default.
  */
 shellCommands: boolean, 
 /**
