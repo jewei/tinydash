@@ -145,7 +145,7 @@ fn snippet<'a>(items: &'a [LibraryItem], keyword: &str) -> Option<&'a LibraryIte
 /// A trigger the user typed, to replace with its snippet.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Expansion {
-    pub keyword: String,
+    keyword: String,
     /// Backspaces that delete the trigger: one for each of its characters,
     /// and one for the space that confirmed it.
     pub erase: usize,
