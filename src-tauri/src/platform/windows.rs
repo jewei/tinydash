@@ -250,6 +250,9 @@ pub fn run_in_terminal(command: &str, _data: &Path) -> Result<()> {
     powershell
         .args(super::terminal::powershell_arguments(command))
         .creation_flags(CREATE_NEW_CONSOLE);
+    // The script goes home itself, after the user's profile. This start
+    // folder is for the profile, and for the prompt when the script has a
+    // syntax error and does not run at all.
     if let Some(home) = std::env::home_dir() {
         powershell.current_dir(home);
     }

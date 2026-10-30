@@ -118,12 +118,15 @@ pub(super) fn macos_script(command: &str) -> String {
     )
 }
 
-/// PowerShell's arguments to run `command` and then stay open.
-/// `-EncodedCommand` takes Base64 of UTF-16LE, so neither the Windows
-/// command line nor PowerShell's own parameters can change the command.
+/// PowerShell's arguments to run `command` in the home folder and then stay
+/// open. The script goes to the home folder first, because the user's
+/// profile, which runs before it, can change the folder. `-EncodedCommand`
+/// takes Base64 of UTF-16LE, so neither the Windows command line nor
+/// PowerShell's own parameters can change the command.
 #[cfg(any(windows, test))]
 pub(super) fn powershell_arguments(command: &str) -> [String; 4] {
-    let utf16: Vec<u8> = command.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let script = format!("Set-Location -LiteralPath $env:USERPROFILE\n{command}");
+    let utf16: Vec<u8> = script.encode_utf16().flat_map(u16::to_le_bytes).collect();
     [
         "-NoLogo".into(),
         "-NoExit".into(),
@@ -344,17 +347,26 @@ mod tests {
     }
 
     #[test]
-    fn powershell_gets_the_command_as_utf16_in_base64() {
-        // `dir` in UTF-16LE is the bytes 64 00 69 00 72 00.
+    fn powershell_goes_home_then_gets_the_command_as_utf16_in_base64() {
+        // The script is "Set-Location -LiteralPath $env:USERPROFILE", a line
+        // break, and the command. The expected text comes from Python's
+        // `base64` and `utf-16-le` codecs.
         assert_eq!(
             powershell_arguments("dir"),
-            ["-NoLogo", "-NoExit", "-EncodedCommand", "ZABpAHIA"]
+            [
+                "-NoLogo",
+                "-NoExit",
+                "-EncodedCommand",
+                "UwBlAHQALQBMAG8AYwBhAHQAaQBvAG4AIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAZQBuAHYAOgBVAFMARQBSAFAAUgBPAEYASQBMAEUACgBkAGkAcgA="
+            ]
         );
         // Quotes and signs stay inside the encoding, and 🚀, outside the
-        // Basic Multilingual Plane, takes two UTF-16 units. The expected
-        // text comes from Python's `base64` and `utf-16-le` codecs.
+        // Basic Multilingual Plane, takes two UTF-16 units.
         let [.., encoded] = powershell_arguments("echo \"a b\" & 🚀");
-        assert_eq!(encoded, "ZQBjAGgAbwAgACIAYQAgAGIAIgAgACYAIAA92IDe");
+        assert_eq!(
+            encoded,
+            "UwBlAHQALQBMAG8AYwBhAHQAaQBvAG4AIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAZQBuAHYAOgBVAFMARQBSAFAAUgBPAEYASQBMAEUACgBlAGMAaABvACAAIgBhACAAYgAiACAAJgAgAD3YgN4="
+        );
     }
 
     #[test]
