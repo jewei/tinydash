@@ -917,7 +917,9 @@ const KEY_GAP: Duration = Duration::from_millis(1);
 
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
-    fn AXIsProcessTrustedWithOptions(options: *const c_void) -> bool;
+    /// Returns a CoreFoundation `Boolean`, an unsigned char. Read as a Rust
+    /// `bool`, any value other than 0 or 1 would be undefined behavior.
+    fn AXIsProcessTrustedWithOptions(options: *const c_void) -> u8;
     static kAXTrustedCheckOptionPrompt: &'static NSString;
 }
 
@@ -959,7 +961,7 @@ fn accessibility_trusted(ask: bool) -> bool {
         let prompt = unsafe { kAXTrustedCheckOptionPrompt };
         let options = NSDictionary::from_slices(&[prompt], &[&*NSNumber::new_bool(ask)]);
         // SAFETY: An NSDictionary is a CFDictionary, and it outlives the call.
-        unsafe { AXIsProcessTrustedWithOptions(Retained::as_ptr(&options).cast()) }
+        unsafe { AXIsProcessTrustedWithOptions(Retained::as_ptr(&options).cast()) != 0 }
     })
 }
 
