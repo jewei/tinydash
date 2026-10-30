@@ -19,24 +19,25 @@ const TERMINAL: &str = if cfg!(windows) {
     "Terminal"
 };
 
-/// The row for `>`, a space, and a command, or no rows for `>` alone; `None`
-/// for any other query. Like `=` and `?`, `>` asks for this and nothing
-/// else, so Enter runs the command or nothing, never another result.
-pub fn answer(query: &str) -> Option<Vec<SearchResult>> {
+/// The row for `>`, a space, and a command; `None` for any other query.
+/// Like `=` and `?`, `>` with a command asks for this and nothing else, so
+/// Enter runs the command or nothing, never another result.
+///
+/// `>` alone and `>git` search as before. Keywords and aliases have no
+/// spaces, so one that starts with `>`, such as `>j` or `>` itself, keeps
+/// opening its item. The one exception: `> text` is a command, so a
+/// quicklink, or a snippet with `{query}`, whose keyword is exactly `>`
+/// does not get the text after it, and its `?` row starts a command.
+pub fn answer(query: &str) -> Option<SearchResult> {
     let after = query.trim_start().strip_prefix('>')?;
-    // `>git` searches as before. Keywords and aliases have no spaces, so
-    // one that starts with `>`, such as `>j`, keeps its item.
-    if !(after.is_empty() || after.starts_with(char::is_whitespace)) {
-        return None;
-    }
     let command = after.trim();
-    if command.is_empty() {
-        return Some(Vec::new());
+    if command.is_empty() || !after.starts_with(char::is_whitespace) {
+        return None;
     }
     let run = format!("Run in {TERMINAL}");
     // A command that cannot run says why before Enter does.
     let subtitle = check(command).map_or_else(|refused| refused.to_string(), |()| run.clone());
-    Some(vec![SearchResult {
+    Some(SearchResult {
         id: format!("shell:{command}"),
         kind: ResultKind::Shell,
         title: command.to_owned(),
@@ -59,7 +60,7 @@ pub fn answer(query: &str) -> Option<Vec<SearchResult>> {
             ),
         ],
         pinned: false,
-    }])
+    })
 }
 
 /// Refuse to run `command` while shell commands are off (`enabled`), or
@@ -123,7 +124,8 @@ mod tests {
     const REFUSED: &str = "The command has a line break, tab, invisible character, or special space. Type the command instead of pasting it.";
 
     fn actions(query: &str) -> Vec<Action> {
-        answer(query).unwrap()[0]
+        answer(query)
+            .unwrap()
             .actions
             .iter()
             .map(|entry| entry.action.clone())
@@ -132,12 +134,11 @@ mod tests {
 
     #[test]
     fn a_command_after_the_sign_and_a_space_runs_or_copies_as_typed() {
-        let rows = answer("  >  git pull --rebase ").unwrap();
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].title, "git pull --rebase");
-        assert_eq!(rows[0].subtitle, format!("Run in {TERMINAL}"));
-        assert_eq!(rows[0].kind, ResultKind::Shell);
-        let labels: Vec<&str> = rows[0].actions.iter().map(|a| a.label.as_str()).collect();
+        let row = answer("  >  git pull --rebase ").unwrap();
+        assert_eq!(row.title, "git pull --rebase");
+        assert_eq!(row.subtitle, format!("Run in {TERMINAL}"));
+        assert_eq!(row.kind, ResultKind::Shell);
+        let labels: Vec<&str> = row.actions.iter().map(|a| a.label.as_str()).collect();
         assert_eq!(
             labels,
             [format!("Run in {TERMINAL}").as_str(), "Copy Command"]
@@ -163,15 +164,9 @@ mod tests {
     }
 
     #[test]
-    fn the_sign_alone_offers_nothing_to_run() {
-        for query in [">", " > ", ">   "] {
-            assert_eq!(answer(query), Some(Vec::new()), "{query:?}");
-        }
-    }
-
-    #[test]
-    fn the_sign_without_a_space_is_text_to_search_for() {
-        // Such as the keyword `>j` or the alias `>zz`.
+    fn the_sign_alone_or_without_a_space_is_text_to_search_for() {
+        // Such as the keyword `>j`, the alias `>zz`, or the keyword `>`,
+        // also with the space that its `?` row types.
         for query in [
             "",
             "git pull",
@@ -181,6 +176,10 @@ mod tests {
             ">git",
             ">j ABC-12",
             ">>",
+            ">",
+            " > ",
+            ">   ",
+            ">\u{3000}",
         ] {
             assert_eq!(answer(query), None, "{query:?}");
         }
@@ -272,7 +271,7 @@ mod tests {
     #[test]
     fn a_command_that_cannot_run_says_why_in_its_row() {
         let long = format!("> {}", "x".repeat(MAX_COMMAND_CHARS + 1));
-        let row = &answer(&long).unwrap()[0];
+        let row = answer(&long).unwrap();
         assert!(row.subtitle.starts_with("A command can have up to"));
         // A blank letter at the end stays, as it is not a space.
         for command in [
@@ -281,11 +280,11 @@ mod tests {
             "ls\u{2028}rm -rf ~",
             "ls\u{2800}",
         ] {
-            let row = &answer(&format!("> {command}")).unwrap()[0];
+            let row = answer(&format!("> {command}")).unwrap();
             assert_eq!(row.subtitle, REFUSED, "{command:?}");
         }
         // Spaces around the command are not part of it.
-        let row = &answer(">\u{3000}ls\u{00A0}").unwrap()[0];
+        let row = answer(">\u{3000}ls\u{00A0}").unwrap();
         assert_eq!(row.title, "ls");
         assert_eq!(row.subtitle, format!("Run in {TERMINAL}"));
     }

@@ -374,11 +374,11 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
     if let Some(list) = keywords::answer(query, &s.library, s.settings.shell_commands) {
         return list;
     }
-    // And `>` with a space, for a shell command, while the user allows them.
+    // And `>`, a space, and a command, while the user allows them.
     if s.settings.shell_commands
         && let Some(command) = shell::answer(query)
     {
-        return command;
+        return vec![command];
     }
     let mut results = answers(s, query);
     let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
@@ -944,7 +944,7 @@ mod tests {
         let s = state.snapshot();
         for example in keywords::examples() {
             let answered = s.calculations.answer(example).is_some()
-                || shell::answer(example).is_some_and(|rows| !rows.is_empty())
+                || shell::answer(example).is_some()
                 || !answers(&s, example).is_empty();
             assert!(answered, "{example}");
         }
@@ -985,8 +985,12 @@ mod tests {
         )));
         // Saved data never brings it back: its ID names no source.
         assert!(resolve(&state.snapshot(), &Context::none(), &row.id).is_none());
-        // `>` alone offers nothing to run, not even a web search.
-        assert!(search(&state.snapshot(), ">", Category::All).is_empty());
+        // `>` alone, also with the space that its `?` row types, is not a
+        // command. Nothing here is named `>`, and no website gets it.
+        for query in [">", "> "] {
+            let results = search(&state.snapshot(), query, Category::All);
+            assert!(results.is_empty(), "{query:?}: {results:?}");
+        }
         // It is an answer in All only.
         assert!(
             search(&state.snapshot(), "> git pull", Category::Apps)
@@ -1068,6 +1072,62 @@ mod tests {
                 (ResultKind::Shell, command)
             );
         }
+    }
+
+    #[test]
+    fn a_keyword_or_alias_that_is_the_sign_alone_keeps_its_item() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        for (kind, name, text) in [
+            (LibraryKind::Quicklink, "Jira", "https://jira.test/{query}"),
+            (LibraryKind::Snippet, "Signature", "Best, Sam"),
+        ] {
+            let item = LibraryItem {
+                id: None,
+                kind,
+                name: name.into(),
+                keyword: ">".into(),
+                text: text.into(),
+            };
+            state.store.save_library_item(&item).unwrap();
+        }
+        state.reload_library().unwrap();
+        state
+            .aliases
+            .set(Aliases::new([("system:sleep".into(), ">".into())]));
+        let results = |query: &str| search(&state.snapshot(), query, Category::All);
+        // Typed alone, `>` finds each of them, the whole alias first.
+        let found = results(">");
+        assert_eq!(found[0].id, "system:sleep", "{found:?}");
+        for (kind, name) in [
+            (ResultKind::Quicklink, "Jira"),
+            (ResultKind::Snippet, "Signature"),
+        ] {
+            assert!(
+                found
+                    .iter()
+                    .any(|row| row.kind == kind && row.title == name),
+                "{name}: {found:?}"
+            );
+        }
+        // The quicklink's `?` row types `> `, which shows the same rows.
+        let list = results("? >");
+        let own = list
+            .iter()
+            .find(|row| row.subtitle.starts_with("Jira"))
+            .unwrap();
+        assert_eq!(
+            own.actions[0].action,
+            Action::TypeQuery { text: "> ".into() }
+        );
+        assert_eq!(results("> "), found);
+        // The one exception: the text after it is a command, not the link's.
+        let found = results("> ABC-12");
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0].kind, ResultKind::Shell);
     }
 
     #[test]
