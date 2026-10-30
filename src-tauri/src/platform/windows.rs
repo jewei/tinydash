@@ -163,7 +163,7 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
         )
     };
     if done == 0 {
-        return Err(std::io::Error::last_os_error().into());
+        return Err(Error::msg(std::io::Error::last_os_error().to_string()));
     }
     Ok(super::Volume {
         name: drive_name(path),

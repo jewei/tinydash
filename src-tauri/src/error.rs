@@ -1,6 +1,5 @@
 use rusqlite::ErrorCode;
 use serde::{Serialize, Serializer};
-use std::io::ErrorKind;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -10,7 +9,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("{0}")]
     Message(String),
-    #[error("Could not read or write a file: {0}. {step}", step = file_next_step(.0))]
+    /// No next step: files fail for many causes in many places. A place
+    /// that knows the cause maps the error to its own message.
+    #[error("Could not read or write a file: {0}.")]
     Io(#[from] std::io::Error),
     #[error("Could not read or save data: {0}. {step}", step = data_next_step(.0))]
     Database(#[from] rusqlite::Error),
@@ -28,20 +29,8 @@ impl Error {
     }
 }
 
-/// The step that fits the cause. The files TinyDash reads and writes itself
-/// are its settings and its data.
-fn file_next_step(error: &std::io::Error) -> &'static str {
-    match error.kind() {
-        ErrorKind::StorageFull | ErrorKind::QuotaExceeded => {
-            "Free some disk space, then try again."
-        }
-        ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem => {
-            "Check that you can write to TinyDash's settings and data folders."
-        }
-        _ => "Try again, or restart TinyDash.",
-    }
-}
-
+/// The step that fits the cause. Only the store uses SQLite, so a step can
+/// name its file.
 fn data_next_step(error: &rusqlite::Error) -> &'static str {
     match error.sqlite_error_code() {
         Some(ErrorCode::DiskFull) => "Free some disk space, then try again.",
@@ -67,10 +56,7 @@ impl Serialize for Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn file_error(kind: ErrorKind) -> String {
-        Error::from(std::io::Error::from(kind)).to_string()
-    }
+    use std::io::ErrorKind;
 
     fn data_error(code: std::ffi::c_int) -> String {
         Error::from(rusqlite::Error::SqliteFailure(
@@ -81,21 +67,15 @@ mod tests {
     }
 
     #[test]
-    fn a_file_error_says_to_free_space_only_when_the_disk_is_full() {
-        assert!(
-            file_error(ErrorKind::StorageFull).ends_with("Free some disk space, then try again.")
-        );
-        let denied = file_error(ErrorKind::PermissionDenied);
-        assert!(
-            denied.ends_with("Check that you can write to TinyDash's settings and data folders."),
-            "{denied}"
-        );
-        for kind in [ErrorKind::WouldBlock, ErrorKind::NotFound, ErrorKind::Other] {
-            let error = file_error(kind);
-            assert!(
-                error.ends_with("Try again, or restart TinyDash."),
-                "{error}"
-            );
+    fn a_file_error_gives_no_step_that_could_be_wrong() {
+        for kind in [
+            ErrorKind::PermissionDenied,
+            ErrorKind::StorageFull,
+            ErrorKind::NotFound,
+        ] {
+            let cause = std::io::Error::from(kind);
+            let expected = format!("Could not read or write a file: {cause}.");
+            assert_eq!(Error::from(cause).to_string(), expected);
         }
     }
 

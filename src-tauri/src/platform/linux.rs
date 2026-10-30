@@ -195,7 +195,9 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
         .query_filesystem_info("filesystem::size,filesystem::free", gio::Cancellable::NONE)
         .map_err(|error| Error::msg(error.to_string()))?;
     // The mount point is the highest folder on the same device.
-    let device = std::fs::metadata(path)?.dev();
+    let device = std::fs::metadata(path)
+        .map_err(|error| Error::msg(error.to_string()))?
+        .dev();
     let mount = path
         .ancestors()
         .take_while(|folder| std::fs::metadata(folder).is_ok_and(|meta| meta.dev() == device))
