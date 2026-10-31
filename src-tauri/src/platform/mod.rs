@@ -31,7 +31,8 @@
 //! - `run_system_command(command)`. Sleep Displays calls
 //!   `wait_for_key_release` first, only where it is supported.
 //! - `notify(app, title, body)`: show a system notification.
-//! - `disk_space(path)`: the [`Volume`] that holds `path`.
+//! - `disk_space(path)`: the [`Volume`] that holds `path`. Its error is the
+//!   OS's own reason; the disk widget says what failed.
 //! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
@@ -248,7 +249,11 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
 fn launch(program: &str) -> Result<()> {
     let mut child = std::process::Command::new(program)
         .spawn()
-        .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))?;
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not open {program}: {error}. Check that it is installed."
+            ))
+        })?;
     // Reap it when it exits, so no zombie process stays behind.
     std::thread::spawn(move || child.wait());
     Ok(())
@@ -270,14 +275,22 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         command.creation_flags(CREATE_NO_WINDOW);
     }
-    let output = command
-        .output()
-        .map_err(|error| Error::msg(format!("Could not run {program}: {error}")))?;
+    let output = command.output().map_err(|error| {
+        Error::msg(format!(
+            "Could not run {program}: {error}. Check that it is installed."
+        ))
+    })?;
     if output.status.success() {
         return Ok(());
     }
     let detail = String::from_utf8_lossy(&output.stderr);
-    Err(Error::msg(format!("{program} failed: {}", detail.trim())))
+    let detail = detail.trim().trim_end_matches('.');
+    let reason = if detail.is_empty() {
+        String::new()
+    } else {
+        format!(": {detail}")
+    };
+    Err(Error::msg(format!("{program} failed{reason}. Try again.")))
 }
 
 #[cfg(test)]

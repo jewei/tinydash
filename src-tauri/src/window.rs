@@ -60,7 +60,8 @@ pub fn show(app: &AppHandle, category: Option<Category>) -> Result<()> {
 }
 
 /// Show the launcher again as it was, without a reset, so the error of an
-/// action that hid it shows where the user ran it.
+/// action that hid it shows where the user ran it. Only for an action that
+/// the user ran in the launcher.
 pub fn show_again(app: &AppHandle) -> Result<()> {
     let window = launcher(app)?;
     window.show()?;
