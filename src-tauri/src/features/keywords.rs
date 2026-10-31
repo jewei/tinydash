@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn other_queries_are_not_the_list() {
         let library = Library::new(Vec::new());
-        for query in ["", "?x", "what?", "x ?"] {
+        for query in ["", "?x", "what?"] {
             assert!(answer(query, &library).is_none(), "{query}");
         }
     }

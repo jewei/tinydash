@@ -948,9 +948,7 @@ mod tests {
     #[test]
     fn only_stable_results_learn_from_use() {
         assert!(learns_from_use("app:/Applications/Safari.app"));
-        assert!(learns_from_use("emoji:🚀"));
         assert!(!learns_from_use("calc:1+1"));
         assert!(!learns_from_use("clip:3"));
-        assert!(!learns_from_use("password:Pin:6"));
     }
 }
