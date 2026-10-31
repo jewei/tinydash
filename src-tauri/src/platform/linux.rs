@@ -820,14 +820,14 @@ impl Recording<'_> {
 /// Passes a press of mouse button `button` to `on_key`. Buttons 4 to 7
 /// scroll, which moves no cursor, so they pass nothing. Another button is a
 /// click: a reset, then a mark in [`CLICKED`], as TinyDash never clicks. The
-/// reset goes first, so a click before typing starts has set `interrupted`
-/// by the time typing clears the mark.
+/// reset goes first, so a click after the trigger has set `interrupted` by
+/// the time typing clears the mark.
 fn press_button(button: u8, mut on_key: impl FnMut(Key)) {
     if (4..=7).contains(&button) {
         return;
     }
     on_key(Key::Reset);
-    CLICKED.store(true, Ordering::SeqCst);
+    CLICKED.store(true, Ordering::Release);
 }
 
 /// The window with the input focus. Window IDs are the same on every
@@ -950,14 +950,16 @@ pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBoo
 /// no clicks, so each click since typing started came from someone else.
 fn no_input_from_others(interrupted: &AtomicBool) -> impl Fn() -> Result<()> + '_ {
     // Forget older clicks: one before the trigger does not count, and one
-    // after it set `interrupted`, which the first check reads.
-    CLICKED.store(false, Ordering::SeqCst);
+    // after it set `interrupted`, which the first check reads. A swap reads
+    // the latest mark, so when it takes one, the `interrupted` store before
+    // that mark is visible too.
+    CLICKED.swap(false, Ordering::Acquire);
     let started = Cell::new(false);
     move || {
         if !started.replace(true) {
             super::no_input_since_trigger(interrupted)?;
         }
-        if CLICKED.load(Ordering::SeqCst) {
+        if CLICKED.load(Ordering::Acquire) {
             return Err(Error::msg(
                 "Stopped typing the snippet: a click came while it typed.",
             ));
@@ -1111,10 +1113,13 @@ mod tests {
         assert!(no_input().is_ok());
         // A click while TinyDash types stops it before the next part. Its
         // reset reaches the watch before the click is marked.
+        let mut resets = 0;
         press_button(3, |key| {
             assert_eq!(key, Key::Reset);
-            assert!(!CLICKED.load(Ordering::SeqCst));
+            assert!(!CLICKED.load(Ordering::Acquire));
+            resets += 1;
         });
+        assert_eq!(resets, 1);
         let error = no_input().unwrap_err();
         assert_eq!(
             error.to_string(),
