@@ -5,7 +5,7 @@
 use std::{
     borrow::Cow,
     sync::{
-        Arc,
+        Arc, OnceLock,
         atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
@@ -50,7 +50,11 @@ const HISTORY_ROWS: usize = 20;
 const CURRENCY_NAMES: [(&str, &str); 3] = [("rmb", "CNY"), ("renminbi", "CNY"), ("yuan", "CNY")];
 
 pub fn answer(query: &str, rates: Option<&Rates>) -> Option<SearchResult> {
-    let (value, used_rates) = evaluate(query, rates)?;
+    let (value, used_rates) = match fend_answer(query, rates) {
+        (Some(value), _) => value,
+        (None, Some(code)) => return rates.map(|rates| no_rate_answer(query, &code, rates)),
+        (None, None) => return None,
+    };
     let subtitle = match rates {
         Some(rates) if used_rates => format!("{query} · ECB rates from {}", rates.date),
         _ => format!("= {query}"),
@@ -163,6 +167,26 @@ fn history_result(entry: &Calculation) -> SearchResult {
     }
 }
 
+/// A query that needs a currency that the rate table does not have, such as
+/// `100 twd to myr`, says so instead of giving no answer.
+fn no_rate_answer(query: &str, code: &str, rates: &Rates) -> SearchResult {
+    SearchResult {
+        id: format!("calc:{query}"),
+        kind: ResultKind::Calculation,
+        title: format!("No exchange rate for {code}"),
+        subtitle: format!(
+            "The ECB rates from {} have {} currencies, and {code} is not one of them.",
+            rates.date,
+            rates.currencies()
+        ),
+        icon: Icon::Symbol {
+            name: Symbol::Calculator,
+        },
+        actions: Vec::new(),
+        pinned: false,
+    }
+}
+
 /// While currency rates are off, a query that needs them, such as
 /// `100 usd to eur`, says so and offers to turn them on.
 pub fn rates_off_answer(query: &str) -> Option<SearchResult> {
@@ -207,6 +231,23 @@ fn needs_rates(query: &str) -> bool {
 
 /// The result text and whether it needed exchange rates.
 fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
+    fend_answer(query, rates).0
+}
+
+/// What `evaluate` gives, and, when it gives nothing, the first currency
+/// that fend asked for and the rate table does not have.
+fn fend_answer(query: &str, rates: Option<&Rates>) -> (Option<(String, bool)>, Option<String>) {
+    let missing = Arc::new(OnceLock::new());
+    let value = evaluate_noting(query, rates, &missing);
+    let code = value.is_none().then(|| missing.get().cloned()).flatten();
+    (value, code)
+}
+
+fn evaluate_noting(
+    query: &str,
+    rates: Option<&Rates>,
+    missing: &Arc<OnceLock<String>>,
+) -> Option<(String, bool)> {
     if !query.chars().any(|c| c.is_ascii_digit()) && !matches!(query, "pi" | "π") {
         return None;
     }
@@ -220,6 +261,7 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
         context.set_exchange_rate_handler_v2(RateLookup {
             rates: rates.clone(),
             used: used_rates.clone(),
+            missing: missing.clone(),
         });
     }
     let deadline = Deadline(Instant::now() + TIME_LIMIT);
@@ -847,6 +889,8 @@ impl fend_core::Interrupt for Deadline {
 struct RateLookup {
     rates: Rates,
     used: Arc<AtomicBool>,
+    /// The first currency asked for that `rates` does not have.
+    missing: Arc<OnceLock<String>>,
 }
 
 struct Probe {
@@ -871,9 +915,10 @@ impl fend_core::ExchangeRateFnV2 for RateLookup {
         _: &fend_core::ExchangeRateFnV2Options,
     ) -> Result<f64, Box<dyn std::error::Error + Send + Sync>> {
         self.used.store(true, Ordering::Relaxed);
-        self.rates
-            .per_euro(currency)
-            .ok_or_else(|| format!("No exchange rate for {currency}").into())
+        self.rates.per_euro(currency).ok_or_else(|| {
+            let _ = self.missing.set(currency.to_owned());
+            format!("No exchange rate for {currency}").into()
+        })
     }
 }
 
@@ -1039,6 +1084,30 @@ mod tests {
         assert_eq!(value("100 usd to rmb").as_deref(), Some("683.76 CNY"));
         // The ECB table has no Taiwan dollar.
         assert_eq!(value("100 twd to myr"), None);
+    }
+
+    #[test]
+    fn says_when_the_rates_lack_a_currency() {
+        let rates = Rates::fixture();
+        let row = answer("100 twd to myr", Some(&rates)).unwrap();
+        assert_eq!(row.title, "No exchange rate for TWD");
+        assert_eq!(
+            row.subtitle,
+            "The ECB rates from 2026-10-02 have 4 currencies, and TWD is not one of them."
+        );
+        assert!(row.actions.is_empty());
+        assert_eq!(
+            answer("100 usd to twd", Some(&rates)).unwrap().title,
+            "No exchange rate for TWD"
+        );
+        // A query that fend cannot read, or that needs no rate, is not this.
+        assert_eq!(answer("100 usd to qqq", Some(&rates)), None);
+        assert_eq!(
+            answer("100 usd to myr", Some(&rates)).unwrap().title,
+            "401.71 MYR"
+        );
+        // Without rates, the rates-off answer speaks instead.
+        assert_eq!(answer("100 twd to myr", None), None);
     }
 
     #[test]

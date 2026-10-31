@@ -33,6 +33,11 @@ impl Rates {
         self.rates.get(code).copied()
     }
 
+    /// How many currencies the table has, the euro included.
+    pub fn currencies(&self) -> usize {
+        self.rates.len() + 1
+    }
+
     /// Rates saved in the future came from a clock that was ahead; refetch
     /// them, or they would stay fresh until the clock catches up.
     pub fn is_stale(&self, now: i64) -> bool {
