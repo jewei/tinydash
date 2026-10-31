@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::features::{focus::FocusControl, system::SystemCommand};
+use crate::features::{focus::FocusControl, system::SystemCommand, up_next::UpNextKind};
 
 /// One row in the launcher. Results carry their own actions, so the frontend
 /// renders them without knowing how each kind works.
@@ -248,6 +248,13 @@ pub enum Action {
     Focus {
         control: FocusControl,
     },
+    /// Open Calendar for an event of the Up Next widget, or Reminders for
+    /// a reminder.
+    OpenUpNext {
+        kind: UpNextKind,
+    },
+    /// Ask the OS to let the Up Next widget read calendars and reminders.
+    AskCalendarAccess,
     /// Run a command, as typed after `>`, in the user's terminal app, while
     /// shell commands are on.
     RunInTerminal {

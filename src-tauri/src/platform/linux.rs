@@ -15,6 +15,7 @@ use crate::{
         apps::App,
         clipboard::{Content, MAX_TEXT_BYTES},
         system::SystemCommand,
+        up_next::{Agenda, UpNextKind},
     },
 };
 
@@ -253,6 +254,17 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
 /// No system file index here: desktops use different file indexes, none of them yet. Search uses TinyDash's own index.
 pub fn find_files(_name: &str, _folder: &Path, _limit: usize) -> Vec<PathBuf> {
     Vec::new()
+}
+
+/// No calendars here: the Up Next widget reads only the macOS calendars.
+pub fn read_up_next(_from_ms: i64, _to_ms: i64) -> Option<Agenda> {
+    None
+}
+
+pub fn ask_calendar_access(_done: impl Fn() + Send + Sync + 'static) {}
+
+pub fn open_calendar_app(_kind: UpNextKind) -> Result<()> {
+    Err(Error::msg("Up Next works only on macOS."))
 }
 
 pub fn run_system_command(command: SystemCommand) -> Result<()> {

@@ -62,7 +62,12 @@ showClocks: boolean,
 /**
  * Places the clocks widget shows next to local time, as typed.
  */
-clockCities: Array<string>, showDiskSpace: boolean, showNotepad: boolean, showFocusTimer: boolean, focusMinutes: number, shortBreakMinutes: number, longBreakMinutes: number, 
+clockCities: Array<string>, 
+/**
+ * The rest of today's events and the reminders due today (macOS).
+ * Off by default: turning it on asks the OS for access to them.
+ */
+showUpNext: boolean, showDiskSpace: boolean, showNotepad: boolean, showFocusTimer: boolean, focusMinutes: number, shortBreakMinutes: number, longBreakMinutes: number, 
 /**
  * Focus sessions in a cycle; the last one earns the long break.
  */

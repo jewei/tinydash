@@ -299,6 +299,9 @@ pub async fn update_settings(
         if new.show_weather != old.show_weather || new.weather_city != old.weather_city {
             refresh::weather(&app, false);
         }
+        if new.show_up_next && !old.show_up_next {
+            widgets::ask_calendar_access(&app);
+        }
         events::settings_changed(&app, &new);
         events::results_stale(&app);
         Ok(new)

@@ -43,6 +43,25 @@
 //! - `notify(app, title, body)`: show a system notification.
 //! - `disk_space(path)`: the [`Volume`] that holds `path`. Its error is the
 //!   OS's own reason; the disk widget says what failed.
+//! - `read_up_next(from_ms, to_ms)`: the events between two Unix times and
+//!   the incomplete reminders due before `to_ms`, from the OS calendars
+//!   (EventKit on macOS), each kind with why it cannot be read, such as
+//!   access the user has not given. It never asks for access. It reads
+//!   nothing when TinyDash is not its own responsible process: macOS would
+//!   check the access of the terminal or other app that started it. `None`
+//!   where TinyDash reads no calendars. Waits up to two seconds for
+//!   reminders; call it off the main thread.
+//! - `ask_calendar_access(done)`: ask the user to let TinyDash read
+//!   calendars and reminders, for each kind not answered yet, and call
+//!   `done` once both are answered. Returns at once. Does nothing while an
+//!   earlier request waits, when TinyDash is not its own responsible
+//!   process (macOS would ask for the other app, and end TinyDash if that
+//!   app lacks the usage strings), in a build without the usage strings
+//!   (macOS ends an app that asks without them), or where TinyDash reads no
+//!   calendars.
+//! - `open_calendar_app(kind)`: open the app that holds an Up Next item:
+//!   Calendar for an event, Reminders for a reminder. An error where
+//!   TinyDash reads no calendars.
 //! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.

@@ -7,6 +7,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Added
 
 - Run a shell command from the launcher. Turn on Run shell commands in Settings > Search, then type `>`, a space, and a command, such as `> git pull`, and press Enter. It runs in Terminal (PowerShell on Windows), and your shell stays open after it. It is off by default.
+- On macOS, the Up Next widget shows the rest of today's events and the reminders due today. Click one to open Calendar or Reminders. Turn it on in Settings > Widgets; macOS then asks for access to Calendars and Reminders.
 
 ## [0.8.0] - 2026-11-01
 
