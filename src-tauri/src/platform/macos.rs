@@ -658,7 +658,7 @@ fn lock_screen() -> Result<()> {
 }
 
 pub fn clipboard_change() -> u64 {
-    let _one_reader = super::one_clipboard_reader();
+    let _one_user = super::one_clipboard_user();
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
@@ -712,7 +712,7 @@ fn note_change(change: u64) -> bool {
     now_front
 }
 
-/// Call with the reader lock held; it reads the change counter directly.
+/// Call with the clipboard lock held; it reads the change counter directly.
 /// It looks at the counter too: a read can come before the monitor's next
 /// tick, just after the user copied in a password app and switched away.
 fn clipboard_is_concealed() -> bool {
@@ -732,7 +732,7 @@ fn clipboard_is_concealed() -> bool {
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
-    let _one_reader = super::one_clipboard_reader();
+    let _one_user = super::one_clipboard_user();
     let change = || NSPasteboard::generalPasteboard().changeCount();
     let before = change();
     if clipboard_is_concealed() {
@@ -867,7 +867,7 @@ static PREVIOUS_APP: Mutex<Option<Retained<NSRunningApplication>>> = Mutex::new(
 pub fn remember_frontmost_app() {
     // A copy made in a password app just before the shortcut may be newer
     // than the clipboard monitor's last look; it must stay secret too. The
-    // counter waits for the reader lock, so it is read only then.
+    // counter waits for the clipboard lock, so it is read only then.
     if password_app_in_front() {
         note_clipboard_change(clipboard_change());
     }

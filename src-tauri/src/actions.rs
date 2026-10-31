@@ -183,7 +183,7 @@ pub fn run(app: &AppHandle, origin: Origin, action: Action, result_id: Option<&s
             let read_clipboard = std::cell::Cell::new(false);
             let text = library::render_snippet(&item.text, &query, chrono::Local::now(), || {
                 read_clipboard.set(true);
-                system_clipboard::read_text()
+                platform::clipboard_text_unchecked()
             });
             copy_and_close(app, || {
                 system_clipboard::write_text(&text, read_clipboard.get())

@@ -34,6 +34,12 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - TinyDash no longer registers a launcher shortcut that would block typing, such as a plain letter in a hand-edited settings.json. At startup it uses Control+Shift+Space instead and says so.
 - More error messages say what to do, for example when a link, file, or app cannot open, an update check fails, or settings cannot be saved. The warning for a hotkey that cannot register at startup now names its result.
 
+### Fixed
+
+- On macOS, a snippet with `{clipboard}`, or a copy, can no longer crash TinyDash when it uses the clipboard at the same moment as clipboard history.
+- On Windows, clipboard history skips a copy when it cannot read whether the app that made the copy allows it in history. Before, it saved the copy.
+- On Linux with GNOME, KDE, or Xfce, Restart and Shut Down now ask apps to quit first, so apps can offer to save your work. Before, they closed apps without asking. Other Linux desktops still close apps without asking, so on Linux the confirmation now tells you to save your work first instead of saying that apps will be asked to quit.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added
