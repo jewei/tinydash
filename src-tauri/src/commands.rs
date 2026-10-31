@@ -342,7 +342,9 @@ pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<Libr
             )));
         }
         let item = item.validated()?;
-        state.library.get().check_keyword(&item)?;
+        let library = state.library.get();
+        library.check_kind(&item)?;
+        library.check_keyword(&item)?;
         let saved = state.store.save_library_item(&item)?;
         state.reload_library()?;
         events::results_stale(&app);
@@ -375,9 +377,6 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
         state
             .usage
             .update(|usage| ids.iter().for_each(|id| usage.remove(id)));
-        for id in &ids {
-            state.store.set_hidden(id, false, 0)?;
-        }
         state
             .hidden
             .update(|hidden| ids.iter().for_each(|id| hidden.remove(id)));

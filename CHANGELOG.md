@@ -14,6 +14,13 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Changed
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
+- Search finds up to 5,000 installed apps. On a computer with more, TinyDash leaves out the rest.
+
+### Fixed
+
+- A snippet or quicklink name or keyword pasted with separate accent marks, as some macOS file names have them, now matches an accented search such as `résumé`. So do the other names an app is found by, and words typed after `?`.
+- Settings are written to disk before they replace the old file, so a crash or power loss right after a change no longer resets every setting. A disk that refuses this step, such as some network shares, still saves the change.
+- Deleting a snippet or quicklink also removes it from the hidden results in one step, so a failure partway can no longer leave the deleted item in search.
 
 ### Fixed
 

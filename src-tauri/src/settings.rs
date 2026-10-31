@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -380,6 +383,16 @@ impl SettingsFile {
     }
 
     pub fn save(&self, settings: &Settings) -> Result<()> {
+        self.save_with(settings, std::fs::File::sync_all)
+    }
+
+    /// `save` passes `File::sync_all`. A test passes a sync that fails,
+    /// because the local disk of a test run accepts every sync.
+    fn save_with(
+        &self,
+        settings: &Settings,
+        sync: fn(&std::fs::File) -> std::io::Result<()>,
+    ) -> Result<()> {
         if !self.replaceable {
             return Err(Error::msg(format!(
                 "TinyDash could not use {} at startup, so it did not replace it. Quit and reopen TinyDash to change settings.",
@@ -390,7 +403,20 @@ impl SettingsFile {
         let temporary = self.dir.join(format!("{FILE_NAME}.tmp"));
         let text = serde_json::to_vec_pretty(settings)?;
         std::fs::create_dir_all(&self.dir)
-            .and_then(|()| std::fs::write(&temporary, text))
+            .and_then(|()| {
+                let mut file = std::fs::File::create(&temporary)?;
+                file.write_all(&text)?;
+                // The data should be on disk before the rename is: after a
+                // crash, a renamed but empty file would load as defaults. Some
+                // volumes refuse the sync, as SMB shares refuse the full sync
+                // of macOS. The save still goes ahead there, as it did before
+                // the sync was added, so that no settings change fails on
+                // such a volume.
+                if let Err(error) = sync(&file) {
+                    tracing::warn!(%error, "Could not write the settings to disk before replacing them");
+                }
+                Ok(())
+            })
             .and_then(|()| std::fs::rename(&temporary, &path))
             .map_err(|error| save_failed(&self.dir, &error))
     }
@@ -792,6 +818,24 @@ mod tests {
         let again = load(&dir);
         assert_eq!((again.settings, again.warning), (Settings::default(), None));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_save_goes_ahead_when_the_disk_refuses_to_sync() {
+        let dir = std::env::temp_dir().join(format!("tinydash-unsynced-{}", std::process::id()));
+        let changed = Settings {
+            hide_on_blur: false,
+            ..Settings::default()
+        };
+        let saved = SettingsFile::new(dir.clone()).save_with(&changed, |_| {
+            Err(std::io::Error::other("full sync refused"))
+        });
+        let again = load(&dir);
+        let leftover = dir.join(format!("{FILE_NAME}.tmp")).exists();
+        std::fs::remove_dir_all(&dir).unwrap();
+        saved.unwrap();
+        assert_eq!((again.settings, again.warning), (changed, None));
+        assert!(!leftover);
     }
 
     #[test]
