@@ -43,6 +43,14 @@ const SECTIONS = [
 
 type Section = (typeof SECTIONS)[number]["id"];
 
+// The Snippets and Quicklinks sections. Their editors stay open, hidden,
+// after the first visit, so an unsaved edit, and a save that still runs with
+// its reply or error, wait there.
+const LIBRARIES = [
+  { section: "snippets", kind: "snippet" },
+  { section: "quicklinks", kind: "quicklink" },
+] as const;
+
 const THEMES: ReadonlyArray<{ value: Theme; label: string }> = [
   { value: "system", label: "Match System" },
   { value: "light", label: "Light" },
@@ -101,6 +109,11 @@ export function Settings() {
     return base && changes().reduce(apply, base);
   });
   const [section, setSection] = createSignal<Section>("general");
+  // Every section opened so far.
+  const opened = createMemo<ReadonlySet<Section>>(
+    (before) => (before.has(section()) ? before : new Set([...before, section()])),
+    new Set<Section>(),
+  );
   const [error, setError] = createSignal<string>();
   // Read when Settings opens, and again on opening About after a failure:
   // About shows it, and the Clipboard section hides what this OS cannot save.
@@ -585,11 +598,6 @@ export function Settings() {
                     onChange={(expandSnippets) => void save({ expandSnippets })}
                   />
                 </Row>
-                <Library kind="snippet" />
-              </Match>
-
-              <Match when={section() === "quicklinks"}>
-                <Library kind="quicklink" />
               </Match>
 
               <Match when={section() === "privacy"}>
@@ -601,6 +609,17 @@ export function Settings() {
               </Match>
             </Switch>
           )}
+        </Show>
+        <Show when={values()}>
+          <For each={LIBRARIES}>
+            {(library) => (
+              <Show when={opened().has(library.section)}>
+                <div hidden={section() !== library.section}>
+                  <Library kind={library.kind} shown={section() === library.section} />
+                </div>
+              </Show>
+            )}
+          </For>
         </Show>
       </main>
 

@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -384,19 +387,68 @@ impl SettingsFile {
     }
 
     pub fn save(&self, settings: &Settings) -> Result<()> {
+        self.save_with(settings, std::fs::File::sync_all)
+    }
+
+    /// `save` passes `File::sync_all`. A test passes a sync that fails,
+    /// because the local disk of a test run accepts every sync.
+    fn save_with(
+        &self,
+        settings: &Settings,
+        sync: fn(&std::fs::File) -> std::io::Result<()>,
+    ) -> Result<()> {
         if !self.replaceable {
             return Err(Error::msg(format!(
                 "TinyDash could not use {} at startup, so it did not replace it. Quit and reopen TinyDash to change settings.",
                 self.dir.join(FILE_NAME).display()
             )));
         }
-        std::fs::create_dir_all(&self.dir)?;
         let path = self.dir.join(FILE_NAME);
         let temporary = self.dir.join(format!("{FILE_NAME}.tmp"));
-        std::fs::write(&temporary, serde_json::to_vec_pretty(settings)?)?;
-        std::fs::rename(&temporary, &path)?;
-        Ok(())
+        let text = serde_json::to_vec_pretty(settings)?;
+        std::fs::create_dir_all(&self.dir)
+            .and_then(|()| {
+                let mut file = std::fs::File::create(&temporary)?;
+                file.write_all(&text)?;
+                // The data should be on disk before the rename is: after a
+                // crash, a renamed but empty file would load as defaults. Some
+                // volumes refuse the sync, as SMB shares refuse the full sync
+                // of macOS. The save still goes ahead there, as it did before
+                // the sync was added, so that no settings change fails on
+                // such a volume.
+                if let Err(error) = sync(&file) {
+                    tracing::warn!(%error, "Could not write the settings to disk before replacing them");
+                }
+                Ok(())
+            })
+            .and_then(|()| std::fs::rename(&temporary, &path))
+            .map_err(|error| save_failed(&self.dir, &error))
     }
+}
+
+/// Why settings could not be saved. Here the folder is known, so a refused
+/// write or a full disk can say what to do; other causes have no step that
+/// fits them all.
+fn save_failed(dir: &Path, error: &std::io::Error) -> Error {
+    use std::io::ErrorKind;
+    let step = match error.kind() {
+        ErrorKind::StorageFull | ErrorKind::QuotaExceeded => {
+            " Free some disk space, then try again.".to_owned()
+        }
+        // Only Windows refuses to replace a file that another app holds open.
+        ErrorKind::PermissionDenied if cfg!(windows) => format!(
+            " Check that you can write to {} and that no other app has {FILE_NAME} open.",
+            dir.display()
+        ),
+        ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem => {
+            format!(" Check that you can write to {}.", dir.display())
+        }
+        _ => String::new(),
+    };
+    Error::msg(format!(
+        "Could not save settings in {}: {error}.{step}",
+        dir.display()
+    ))
 }
 
 /// Load settings. A damaged file is renamed aside, and defaults are used,
@@ -773,6 +825,24 @@ mod tests {
     }
 
     #[test]
+    fn a_save_goes_ahead_when_the_disk_refuses_to_sync() {
+        let dir = std::env::temp_dir().join(format!("tinydash-unsynced-{}", std::process::id()));
+        let changed = Settings {
+            hide_on_blur: false,
+            ..Settings::default()
+        };
+        let saved = SettingsFile::new(dir.clone()).save_with(&changed, |_| {
+            Err(std::io::Error::other("full sync refused"))
+        });
+        let again = load(&dir);
+        let leftover = dir.join(format!("{FILE_NAME}.tmp")).exists();
+        std::fs::remove_dir_all(&dir).unwrap();
+        saved.unwrap();
+        assert_eq!((again.settings, again.warning), (changed, None));
+        assert!(!leftover);
+    }
+
+    #[test]
     fn a_file_that_is_not_utf8_is_moved_aside() {
         let dir = std::env::temp_dir().join(format!("tinydash-latin1-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -808,6 +878,49 @@ mod tests {
         assert!(warning.unwrap().contains("will not be saved"));
         assert!(saved.is_err());
         assert_eq!(kept.unwrap(), bytes);
+    }
+
+    #[test]
+    fn a_failed_save_says_what_to_do_only_when_the_cause_is_known() {
+        use std::io::ErrorKind;
+        let error = |kind: ErrorKind| save_failed(Path::new("/settings"), &kind.into()).to_string();
+        assert_eq!(
+            error(ErrorKind::StorageFull),
+            format!(
+                "Could not save settings in /settings: {}. Free some disk space, then try again.",
+                std::io::Error::from(ErrorKind::StorageFull)
+            )
+        );
+        let open = if cfg!(windows) {
+            " and that no other app has settings.json open"
+        } else {
+            ""
+        };
+        let denied = error(ErrorKind::PermissionDenied);
+        assert!(
+            denied.ends_with(&format!(". Check that you can write to /settings{open}.")),
+            "{denied}"
+        );
+        let read_only = error(ErrorKind::ReadOnlyFilesystem);
+        assert!(
+            read_only.ends_with(". Check that you can write to /settings."),
+            "{read_only}"
+        );
+        assert_eq!(
+            error(ErrorKind::TimedOut),
+            format!(
+                "Could not save settings in /settings: {}.",
+                std::io::Error::from(ErrorKind::TimedOut)
+            )
+        );
+
+        // A file in the folder's place stops the save on every OS.
+        let blocked = std::env::temp_dir().join(format!("tinydash-blocked-{}", std::process::id()));
+        std::fs::write(&blocked, "").unwrap();
+        let saved = SettingsFile::new(blocked.join("settings")).save(&Settings::default());
+        std::fs::remove_file(&blocked).unwrap();
+        let saved = saved.unwrap_err().to_string();
+        assert!(saved.starts_with("Could not save settings in "), "{saved}");
     }
 
     #[test]

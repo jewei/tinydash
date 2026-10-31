@@ -1,4 +1,4 @@
-import { createUniqueId, onMount, Show } from "solid-js";
+import { createEffect, createUniqueId, on, onCleanup, onMount, Show } from "solid-js";
 
 import { ShortcutRecorder } from "../ui/ShortcutRecorder";
 
@@ -20,24 +20,53 @@ export function HotkeyDialog(props: {
   const errorId = createUniqueId();
   let dialog!: HTMLDivElement;
   let pressedBackdrop = false;
+  const recorder = () => dialog.querySelector<HTMLElement>(".recorder");
 
-  // The recorder takes the keys while it records and stops them there; any
-  // other key stays in the dialog, so the launcher never acts behind it.
+  // Handle keys on the window before anything else, so the dialog stays
+  // modal even when focus left it (a click on its text, or a button that a
+  // save disabled), and the launcher never acts behind it.
   const onKeyDown = (event: KeyboardEvent) => {
-    event.stopPropagation();
-    if (event.key === "Escape" && !props.busy) {
-      event.preventDefault();
-      props.onCancel();
+    // The recorder takes the keys while it records and stops them there.
+    if (recorder()?.classList.contains("recording")) return;
+    const controls = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled)"));
+    const index = controls.indexOf(document.activeElement as HTMLElement);
+    if (event.repeat && event.key !== "Tab") {
+      // A held key acts once. Its repeats must not click a button again,
+      // close the dialog after Escape stopped recording, or start recording.
+    } else if (event.key === "Escape") {
+      // A save already sent cannot be taken back, so it is not cancelled.
+      if (!props.busy) props.onCancel();
     } else if (event.key === "Tab") {
-      event.preventDefault();
-      const controls = Array.from(dialog.querySelectorAll<HTMLElement>("button:not(:disabled)"));
-      const index = controls.indexOf(document.activeElement as HTMLElement);
       const step = event.shiftKey ? -1 : 1;
       const next = index < 0 ? 0 : (index + step + controls.length) % controls.length;
       controls[next]?.focus();
+    } else if (index < 0) {
+      // Focus left the dialog; it goes back to the recorder.
+      recorder()?.focus();
+    } else {
+      // Enter and Space keep their normal meaning on the focused button.
+      event.stopPropagation();
+      return;
     }
+    event.preventDefault();
+    event.stopPropagation();
   };
-  onMount(() => dialog.querySelector<HTMLButtonElement>(".recorder")?.focus());
+  onMount(() => {
+    recorder()?.focus();
+    window.addEventListener("keydown", onKeyDown, true);
+  });
+  onCleanup(() => window.removeEventListener("keydown", onKeyDown, true));
+  // A button that a save disables drops its focus. When the save ends and
+  // the dialog stays open, the recorder takes it back.
+  createEffect(
+    on(
+      () => props.busy,
+      (busy) => {
+        if (!busy && !dialog.contains(document.activeElement)) recorder()?.focus();
+      },
+      { defer: true },
+    ),
+  );
 
   return (
     <div
@@ -56,7 +85,6 @@ export function HotkeyDialog(props: {
         aria-modal="true"
         aria-label={`Hotkey for ${props.title}`}
         aria-describedby={props.error ? `${errorId} ${helpId}` : helpId}
-        onKeyDown={onKeyDown}
       >
         <div class="dialog-field">
           Hotkey for {props.title}

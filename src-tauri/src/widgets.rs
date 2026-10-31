@@ -20,7 +20,8 @@ use crate::{
 
 /// Below this share of free space, the disk widget warns.
 const LOW_DISK_PERCENT: u64 = 10;
-/// The longest scratch note, in characters. The launcher's field stops here too.
+/// The longest scratch note, in characters. The launcher's field sets no
+/// `maxLength`, which counts UTF-16 units; `save_note` reports this limit.
 pub const MAX_NOTE_CHARS: usize = 10_000;
 
 #[derive(Serialize, TS)]
@@ -239,6 +240,10 @@ mod tests {
         assert!(total_bytes > 0 && free_bytes <= total_bytes, "{name}");
         for missing in [home.join("tinydash-missing-folder"), PathBuf::new()] {
             assert!(matches!(Disk::read(&missing), Disk::Unavailable { .. }));
+            // The OS's reason alone: a file error's own words would repeat
+            // what the widget says.
+            let error = platform::disk_space(&missing).err();
+            assert!(matches!(error, Some(Error::Message(_))), "{error:?}");
         }
     }
 

@@ -27,8 +27,11 @@ const HELP: Record<LibraryKind, string> = {
     "Opens an http, https, or mailto URL, or an absolute or ~ path. {query} is replaced by text typed after the keyword, as in “jira ABC-12”. Also: {clipboard}, {date}, {time}, and {datetime}.",
 };
 
-/** Create, edit, and delete snippets or quicklinks. */
-export function Library(props: { kind: LibraryKind }) {
+/**
+ * Create, edit, and delete snippets or quicklinks. Settings keeps it open
+ * while another section shows; `shown` says whether its own section shows.
+ */
+export function Library(props: { kind: LibraryKind; shown: boolean }) {
   // A failed read must say so, not look like an empty library.
   const [loadError, setLoadError] = createSignal<string>();
   const load = () =>
@@ -88,6 +91,17 @@ export function Library(props: { kind: LibraryKind }) {
   );
   const change = (field: "name" | "keyword" | "text", value: string) =>
     setDraft((item) => ({ ...item, [field]: value }));
+  // A failed read may have been brief: read again when the section opens.
+  // A write that still runs reads the list when it ends.
+  createEffect(
+    on(
+      () => props.shown,
+      (shown) => {
+        if (shown && loadError() && !busy()) void refetch();
+      },
+      { defer: true },
+    ),
+  );
 
   /**
    * Run one write at a time, so a double click cannot save twice. `open`
