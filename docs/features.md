@@ -23,7 +23,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. Th
 | Mod+Shift+Enter    | Run the clipboard card's main action, such as Copy HEX                                                                         |
 | Escape             | Close the full JSON view, dismiss a warning, or hide and return to the previous app                                            |
 
-↑ brings back up to 50 searches that ran a result, newest first, each once. They are kept only until TinyDash quits, never saved. Editing a search brought back makes it a new one, and ↑ selects results again.
+↑ brings back up to 50 searches that ran a result, newest first, each once. They are kept only until TinyDash quits, never saved. Editing a search brought back makes it a new one, and ↑ selects results again. A held ↑ stops at the first row; press it again to bring back a search.
 
 Mod is Command on macOS and Control elsewhere. Clicking a row runs it; right-clicking it shows its actions, as Mod+K does. After a copy, the launcher hides and a short "Copied" message shows near the bottom of the screen; it never takes focus from the app you return to. The launcher opens with an empty query, in the center of the screen with the pointer, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it: it then opens there, until that spot is no longer on a screen. Center Launcher in the actions menu, or Center in Settings > General, puts it back.
 
@@ -109,7 +109,7 @@ Off until you turn it on (in the Clipboard tab or Settings). While on, TinyDash 
 
 ## Snippets and quicklinks
 
-Create them in Settings > Snippets and Settings > Quicklinks.
+Create them in Settings > Snippets and Settings > Quicklinks. An edit that you did not save stays while you visit another section, until Settings closes.
 
 - **Placeholders** work in both: `{query}` (the text you type after the keyword), `{clipboard}` (the text on the clipboard), `{date}` (`2026-10-11`), `{time}` (`09:05`), and `{datetime}`. They are filled in one pass, so a value that looks like a placeholder, such as typed text `{clipboard}`, stays as it is. Other text in braces stays too.
 - **Snippet:** text. Enter fills the placeholders and copies the text. A snippet with a keyword and `{query}` takes the text typed after its keyword: with keyword `hi` and text `Hello {query},`, typing `hi Sam` copies `Hello Sam,`. Run from its own row, a placeholder with no value, such as `{query}`, is filled with nothing. Text that includes `{clipboard}` is copied as secret, so clipboard histories skip it, in case the clipboard held a password.

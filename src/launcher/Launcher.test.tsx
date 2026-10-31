@@ -137,6 +137,26 @@ describe("Launcher", () => {
     );
   });
 
+  it("stops a held Up at the first row, and a new press brings back a search", async () => {
+    const second: SearchResult = { ...app, id: "app:/Notes.app", title: "Notes" };
+    const { backend, input, press } = setup(() => [app, second]);
+    fireEvent.input(input, { target: { value: "saf" } });
+    await screen.findByRole("option", { name: /Safari/ });
+    press("Enter");
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    await emit("launcher:shown", { category: null });
+    await waitFor(() => expect((input as HTMLInputElement).value).toBe(""));
+    press("ArrowDown");
+    press("ArrowUp", { repeat: true });
+    press("ArrowUp", { repeat: true });
+    expect((input as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("option", { name: /Safari/ }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    press("ArrowUp");
+    expect((input as HTMLInputElement).value).toBe("saf");
+  });
+
   it("asks before a destructive action, with Cancel focused", async () => {
     const { backend, press } = setup(() => [restart]);
     await screen.findByRole("option", { name: /Restart/ });
@@ -296,6 +316,149 @@ describe("Launcher", () => {
       expect(backend.called("pause_shortcut").at(-1)?.args).toEqual({ paused: false }),
     );
     expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("keeps the keyboard in the hotkey dialog after focus leaves it", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Set Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, input, press } = setup(() => [withHotkey]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Set Hotkey/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+    const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+    // A click on the dialog's text moves focus to <body> and stops recording.
+    recorder.blur();
+    expect(recorder.getAttribute("aria-label")).toBe("Hotkey for Safari: None");
+    // Tab goes back to the dialog's own controls.
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    expect(document.activeElement).toBe(recorder);
+    // A key pressed with focus outside goes back to the recorder.
+    input.focus();
+    fireEvent.keyDown(input, { key: "a" });
+    expect(document.activeElement).toBe(recorder);
+    recorder.blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull();
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+    expect(backend.called("run_action")).toHaveLength(0);
+  });
+
+  it("acts once on a key held in the hotkey dialog", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Change Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "Control+Alt+K" },
+          confirm: null,
+        },
+      ],
+    };
+    const { backend, press } = setup(() => [withHotkey]);
+    await screen.findByRole("option", { name: /Safari/ });
+    press("k", { ctrlKey: true });
+    fireEvent.click(await screen.findByRole("option", { name: /Change Hotkey/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+    const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+    // Sends a repeat of the key; true when the dialog stopped its default action.
+    const hold = (target: Element, key: string) => {
+      const repeat = new KeyboardEvent("keydown", {
+        key,
+        repeat: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      target.dispatchEvent(repeat);
+      return repeat.defaultPrevented;
+    };
+    // Escape stops recording; its repeats do not close the dialog too.
+    fireEvent.keyDown(recorder, { key: "Escape" });
+    expect(recorder.classList.contains("recording")).toBe(false);
+    expect(hold(recorder, "Escape")).toBe(true);
+    expect(screen.getByRole("dialog", { name: "Hotkey for Safari" })).toBeTruthy();
+    // A held Enter neither clicks the recorder, which records again, nor a
+    // button. A new press keeps its normal meaning.
+    expect(hold(recorder, "Enter")).toBe(true);
+    const remove = within(dialog).getByRole("button", { name: "Remove Hotkey" });
+    remove.focus();
+    expect(hold(remove, "Enter")).toBe(true);
+    expect(fireEvent.keyDown(remove, { key: "Enter" })).toBe(true);
+    // A held key with focus outside the dialog does nothing.
+    remove.blur();
+    expect(hold(document.body, "Enter")).toBe(true);
+    expect(document.activeElement).toBe(document.body);
+    expect(backend.called("run_action")).toHaveLength(0);
+    expect(backend.called("hide_launcher")).toHaveLength(0);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull();
+  });
+
+  it("gives focus back to the hotkey dialog when a save ends", async () => {
+    const withHotkey: SearchResult = {
+      ...app,
+      actions: [
+        ...app.actions,
+        {
+          label: "Change Hotkey…",
+          action: { type: "setHotkey", id: app.id, shortcut: "Control+Alt+K" },
+          confirm: null,
+        },
+      ],
+    };
+    let finish: (error?: string) => void = () => undefined;
+    const { backend, press } = setup(() => [withHotkey], {
+      run_action: () =>
+        new Promise((resolve, reject) => {
+          finish = (error) => (error ? reject(error) : resolve(null));
+        }),
+    });
+    const open = async () => {
+      press("k", { ctrlKey: true });
+      fireEvent.click(await screen.findByRole("option", { name: /Change Hotkey/ }));
+      const dialog = await screen.findByRole("dialog", { name: "Hotkey for Safari" });
+      const recorder = within(dialog).getByRole("button", { name: /press the new keys/ });
+      return { dialog, recorder };
+    };
+    await screen.findByRole("option", { name: /Safari/ });
+    const { dialog, recorder } = await open();
+    fireEvent.keyDown(recorder, { key: "Escape" });
+    const remove = within(dialog).getByRole("button", { name: "Remove Hotkey" });
+    // WebKit leaves focus on <body> after a click on a button, which it does
+    // not focus, and after a key press on one that the save then disables.
+    recorder.blur();
+    fireEvent.click(remove);
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(1));
+    expect((remove as HTMLButtonElement).disabled).toBe(true);
+    expect(document.activeElement).toBe(document.body);
+    finish("Could not remove the hotkey.");
+    expect((await within(dialog).findByRole("alert")).textContent).toBe(
+      "Could not remove the hotkey.",
+    );
+    expect(document.activeElement).toBe(recorder);
+    // A save that succeeds after the launcher opened again ends in the
+    // dialog opened since, which keeps it open and takes focus back.
+    fireEvent.click(remove);
+    await waitFor(() => expect(backend.called("run_action")).toHaveLength(2));
+    await emit("launcher:shown", { category: null });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Hotkey for Safari" })).toBeNull(),
+    );
+    const next = await open();
+    next.recorder.blur();
+    finish();
+    await waitFor(() => expect(document.activeElement).toBe(next.recorder));
+    expect(screen.getByRole("dialog", { name: "Hotkey for Safari" })).toBe(next.dialog);
   });
 
   it("keeps the alias dialog open with the reason when saving fails", async () => {
@@ -1601,6 +1764,15 @@ describe("Launcher", () => {
     await waitFor(() => expect(backend.called("save_note")).toHaveLength(2));
     expect(backend.called("save_note")[1]?.args).toEqual({ text: "draft 2" });
     expect(await screen.findByText(/· Saved$/)).toBeTruthy();
+  });
+
+  it("leaves the note's length to the save, which counts characters", async () => {
+    setup(() => [], {
+      widgets: () => ({ clocks: null, disk: null, note: { type: "ready", text: "" } }),
+    });
+    const note = await screen.findByRole("textbox", { name: "Notepad" });
+    // maxLength counts UTF-16 units, so it would cut a paste of emoji short.
+    expect(note.hasAttribute("maxlength")).toBe(false);
   });
 
   it("keeps note text whose save failed when the pane closes, and saves it again", async () => {

@@ -40,6 +40,14 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - On Windows, clipboard history skips a copy when it cannot read whether the app that made the copy allows it in history. Before, it saved the copy.
 - On Linux with GNOME, KDE, or Xfce, Restart and Shut Down now ask apps to quit first, so apps can offer to save your work. Before, they closed apps without asking. Other Linux desktops still close apps without asking, so on Linux the confirmation now tells you to save your work first instead of saying that apps will be asked to quit.
 
+### Fixed
+
+- Holding ↑ to go back to the top of a list no longer fills the search field with your past searches. Press ↑ again on the first row to bring one back.
+- In the hotkey dialog, Escape and Tab work again after a click on the dialog's text or a failed Remove Hotkey, and keys no longer reach the search field behind it. A held Enter or Escape acts only once there.
+- On macOS 12.0 to 12.2, the actions menu opens again when exchange rates or the weather is on.
+- A long paste into the Notepad, such as one with many emoji, is no longer cut short without a message. A note over 10,000 characters says so and is not saved until you shorten it.
+- In Settings, a snippet or quicklink that you did not save is still there when you come back from another section. So is one that was still saving, with its error if the save failed.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added
