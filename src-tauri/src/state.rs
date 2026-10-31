@@ -86,7 +86,7 @@ impl State {
         mut warnings: Vec<String>,
     ) -> Self {
         let mut load = |what: &str, error: crate::error::Error| {
-            warnings.push(format!("Could not load {what}: {error}"));
+            warnings.push(format!("Could not load {what}. {error}"));
         };
         let usage = store.usage().unwrap_or_else(|e| {
             load("usage", e);

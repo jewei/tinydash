@@ -57,6 +57,20 @@ const SLEEP_DISPLAYS: &str = if cfg!(target_os = "macos") {
     "Turn Off Displays"
 };
 
+/// On Linux desktops without a known session manager, systemd restarts and
+/// shuts down without asking apps to quit, so the text promises nothing.
+const CONFIRM_RESTART: &str = if cfg!(target_os = "linux") {
+    "Restart the computer? Save your work first."
+} else {
+    "Restart the computer? Apps will be asked to quit."
+};
+
+const CONFIRM_SHUT_DOWN: &str = if cfg!(target_os = "linux") {
+    "Shut down the computer? Save your work first."
+} else {
+    "Shut down the computer? Apps will be asked to quit."
+};
+
 const fn system(command: SystemCommand) -> Action {
     Action::System { command }
 }
@@ -87,7 +101,7 @@ const COMMANDS: &[Command] = &[
         aliases: &["reboot"],
         symbol: Symbol::Restart,
         action: system(SystemCommand::Restart),
-        confirm: Some("Restart the computer? Apps will be asked to quit."),
+        confirm: Some(CONFIRM_RESTART),
     },
     Command {
         key: "shut-down",
@@ -96,7 +110,7 @@ const COMMANDS: &[Command] = &[
         aliases: &["shutdown", "power off", "turn off"],
         symbol: Symbol::Power,
         action: system(SystemCommand::ShutDown),
-        confirm: Some("Shut down the computer? Apps will be asked to quit."),
+        confirm: Some(CONFIRM_SHUT_DOWN),
     },
     Command {
         key: "log-out",
@@ -289,5 +303,25 @@ mod tests {
         assert!(confirmed("shut-down"));
         assert!(confirmed("empty-trash"));
         assert!(!confirmed("lock"));
+    }
+
+    #[test]
+    fn only_restarts_that_ask_apps_to_quit_say_so() {
+        let (usage, pins) = (Usage::default(), Pins::default());
+        let ctx = Context {
+            usage: &usage,
+            pins: &pins,
+            now: 0,
+            skin_tone: 0,
+        };
+        // Linux falls back to systemd, which does not ask apps.
+        for key in ["restart", "shut-down"] {
+            let confirm = get(key, &ctx).unwrap().actions[0].confirm.clone().unwrap();
+            assert_eq!(
+                confirm.contains("asked to quit"),
+                !cfg!(target_os = "linux"),
+                "{confirm}"
+            );
+        }
     }
 }

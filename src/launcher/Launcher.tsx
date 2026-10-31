@@ -31,7 +31,9 @@ function editsQuery(event: KeyboardEvent) {
 
 /** "A and B", or "A, B, and C". */
 const listed = (words: string[]) =>
-  words.length < 3 ? words.join(" and ") : `${words.slice(0, -1).join(", ")}, and ${words.at(-1)}`;
+  words.length < 3
+    ? words.join(" and ")
+    : `${words.slice(0, -1).join(", ")}, and ${words[words.length - 1]}`;
 
 /**
  * Actions that belong to no result, listed in the actions menu. Refresh also
@@ -214,11 +216,12 @@ export function Launcher() {
       return;
     }
     event.preventDefault();
-    // Holding a key moves the selection; it never repeats an action.
+    // Holding a key moves the selection; it never repeats an action. A
+    // held Up stops at the first row: only a new press brings back a search.
     if (event.repeat && command.type !== "move") return;
     switch (command.type) {
       case "move":
-        if (command.by === -1 && launcher.recall()) return;
+        if (command.by === -1 && !event.repeat && launcher.recall()) return;
         return launcher.move(command.by);
       case "run":
         return launcher.activate("selected");

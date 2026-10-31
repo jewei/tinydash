@@ -18,15 +18,15 @@ pub fn get(url: &str, max_bytes: u64, what: &str) -> Result<Vec<u8>> {
         )
         .build()
         .into();
-    let response = agent
-        .get(url)
-        .call()
-        .map_err(|error| Error::msg(format!("Could not download {what}: {error}")))?;
+    let failed =
+        |error: &dyn std::fmt::Display| Error::msg(format!("Could not download {what}: {error}"));
+    let response = agent.get(url).call().map_err(|error| failed(&error))?;
     let mut body = Vec::new();
     response
         .into_body()
         .into_reader()
         .take(max_bytes)
-        .read_to_end(&mut body)?;
+        .read_to_end(&mut body)
+        .map_err(|error| failed(&error))?;
     Ok(body)
 }

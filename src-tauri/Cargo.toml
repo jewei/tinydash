@@ -34,7 +34,7 @@ image = { version = "0.25.10", default-features = false, features = ["png"] }
 notify = "8.2.0"
 nucleo-matcher = "0.3.1"
 percent-encoding = "2.3.2"
-rusqlite = { version = "0.40.2", features = ["bundled"] }
+rusqlite = { version = "0.41.0", features = ["bundled"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.21"
