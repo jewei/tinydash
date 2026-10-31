@@ -1145,12 +1145,13 @@ mod tests {
             "400 per +10% off 200",
             "400 mod +10% off 200",
             "5 choose +10% of 20",
-            // After a number with letters or superscripts, fend still reads
-            // the word as an operator.
+            // After a number with letters, fend still reads the word as an
+            // operator.
             "1e1mod +10% off 200",
-            "5²mod +10% off 200",
             "0x10mod +10% off 200",
             "1e1per -10% off 200",
+            // fend cannot read `5²mod` at all.
+            "5²mod +10% off 200",
             // Anything else before the sign.
             "5! + 10% of 200",
             // A sign or a value right before the percentage.
