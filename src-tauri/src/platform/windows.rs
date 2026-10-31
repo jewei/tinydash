@@ -1025,7 +1025,8 @@ pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBoo
             ));
         }
         // The hook skips TinyDash's own keys by their mark, so each key or
-        // click that it passed since the trigger came from someone else.
+        // click that it passed since the trigger came from someone else, or
+        // is the reset after the hooks were set again.
         super::no_input_since_trigger(interrupted)?;
         // SAFETY: The pointer and count describe `batch`, and the size is
         // INPUT's.

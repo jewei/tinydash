@@ -92,10 +92,10 @@
 //!   reset first). A click is a press of a mouse button other than the
 //!   scroll wheel. A modifier key alone passes nothing. On macOS and
 //!   Windows, the keys that TinyDash types never reach `on_key`, so every
-//!   call while it types is a key or click from someone else. X11 does not
-//!   mark them, so Linux passes every key as a reset while TinyDash types.
-//!   TinyDash sends no clicks, so on every OS a click came from someone
-//!   else.
+//!   call while it types is a key or click from someone else, or the reset
+//!   after the watch turns on again. X11 does not mark them, so Linux
+//!   passes every key as a reset while TinyDash types. TinyDash sends no
+//!   clicks, so on every OS a click came from someone else.
 //!   Keep `on_key` quick: on Windows, typing waits for it. When the OS
 //!   stops passing keys but the thread runs on (the macOS tap turned off
 //!   after a timeout, or a Windows hook removed for answering too slowly),
@@ -113,13 +113,13 @@
 //!   - `focus` is no longer in front. So focus that moved before typing
 //!     started, even while the clipboard was read for the snippet, leaves
 //!     the trigger as typed.
-//!   - `interrupted` is set: a key or click came after the trigger, so the
-//!     text before the cursor may no longer end with it. Every OS checks
-//!     it with `no_input_since_trigger` before the first Backspace, after
-//!     any wait for modifiers. macOS and Windows also check it before each
-//!     later part, so a key or click while TinyDash types stops it. Linux
-//!     checks it before the first Backspace only, as the keys that
-//!     TinyDash types set it too.
+//!   - `interrupted` is set: a key or click came after the trigger, or the
+//!     watch turned on again, so the text before the cursor may no longer
+//!     end with it. Every OS checks it with `no_input_since_trigger` before
+//!     the first Backspace, after any wait for modifiers. macOS and Windows
+//!     also check it before each later part, so a key or click while
+//!     TinyDash types stops it. Linux checks it before the first Backspace
+//!     only, as the keys that TinyDash types set it too.
 //!   - On Linux, a click came since typing started. So on Linux, a click
 //!     while TinyDash types stops it, and a key does not.
 //!   - A modifier stays down. Typed keys never take on a modifier that the

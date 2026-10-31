@@ -1215,7 +1215,8 @@ pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBoo
             ));
         }
         // The tap skips TinyDash's own keys, so each key or click that it
-        // passed since the trigger is the user's.
+        // passed since the trigger came from someone else, or is the reset
+        // after the tap turned on again.
         super::no_input_since_trigger(interrupted)?;
         press(&source, keycode, &units)?;
     }

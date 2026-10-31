@@ -52,8 +52,9 @@ struct Handover {
     /// set, and cleared when the next trigger is handed over. The user typed
     /// on, clicked elsewhere, or switched tabs, so the text before the cursor
     /// may no longer end with the trigger: a Backspace would erase their
-    /// text, and the snippet could land in the wrong place. On Linux, the
-    /// keys that TinyDash types set it too, so `type_text` there checks it
+    /// text, and the snippet could land in the wrong place. The reset that
+    /// the watch passes when it turns on again sets it too. On Linux, the
+    /// keys that TinyDash types also set it, so `type_text` there checks it
     /// before the first key only, and then stops only at a click.
     interrupted: AtomicBool,
 }
