@@ -30,6 +30,8 @@ chrono-tz = "0.10.4"
 emojis = "0.9.0"
 fend-core = "1.5.8"
 getrandom = "0.4.3"
+# Unicode properties of the characters in shell commands. url already builds it.
+icu_properties = "2.3.0"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 notify = "8.2.0"
 nucleo-matcher = "0.3.1"

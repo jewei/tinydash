@@ -617,6 +617,22 @@ describe("Settings", () => {
     expect(description?.textContent).toContain("unencrypted");
   });
 
+  it("turns on shell commands in Search, which are off at first", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const toggle = await screen.findByRole("switch", { name: "Run shell commands" });
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+    const row = screen.getByRole("group", { name: "Run shell commands" });
+    const description = document.getElementById(row.getAttribute("aria-describedby") ?? "");
+    expect(description?.textContent).toContain("only when you press Enter");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({
+      changes: { shellCommands: true },
+    });
+  });
+
   it("says when the shortcut cannot be turned back on", async () => {
     fakeBackend({
       pause_shortcut: (args) => {

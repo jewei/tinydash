@@ -13,12 +13,13 @@ import {
 
 import type { About as AboutInfo } from "../generated/About";
 import type { EmojiLanguage } from "../generated/EmojiLanguage";
+import type { Platform } from "../generated/Platform";
 import type { SearchEngine } from "../generated/SearchEngine";
 import type { TemperatureUnit } from "../generated/TemperatureUnit";
 import type { Settings as Values } from "../generated/Settings";
 import type { Theme } from "../generated/Theme";
 import * as ipc from "../lib/ipc";
-import { IS_MAC } from "../lib/keys";
+import { IS_MAC, PLATFORM } from "../lib/keys";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ShortcutRecorder } from "../ui/ShortcutRecorder";
@@ -68,6 +69,13 @@ const UNITS: ReadonlyArray<{ value: TemperatureUnit; label: string }> = [
   { value: "celsius", label: "Celsius (°C)" },
   { value: "fahrenheit", label: "Fahrenheit (°F)" },
 ];
+
+/** Where `>` runs a command on each OS. */
+const TERMINALS: Record<Platform, string> = {
+  macos: "Terminal",
+  windows: "PowerShell",
+  linux: "your terminal",
+};
 
 const SKIN_TONES = [
   "👋 Default",
@@ -542,6 +550,16 @@ export function Settings() {
                     label="Currency rates"
                     checked={settings().currencyRatesEnabled}
                     onChange={(currencyRatesEnabled) => void save({ currencyRatesEnabled })}
+                  />
+                </Row>
+                <Row
+                  label="Run shell commands"
+                  description={`Type >, a space, and a command, then press Enter, to run it in ${TERMINALS[PLATFORM]}. TinyDash runs exactly what you type, and only when you press Enter.`}
+                >
+                  <Toggle
+                    label="Run shell commands"
+                    checked={settings().shellCommands}
+                    onChange={(shellCommands) => void save({ shellCommands })}
                   />
                 </Row>
                 <Row label="Emoji skin tone">

@@ -20,6 +20,7 @@ pub mod keywords;
 pub mod library;
 pub mod password;
 pub mod permissions;
+pub mod shell;
 pub mod system;
 pub mod up_next;
 pub mod url_cleaner;
