@@ -31,7 +31,8 @@
 //! - `run_system_command(command)`. Sleep Displays calls
 //!   `wait_for_key_release` first, only where it is supported.
 //! - `notify(app, title, body)`: show a system notification.
-//! - `disk_space(path)`: the [`Volume`] that holds `path`.
+//! - `disk_space(path)`: the [`Volume`] that holds `path`. Its error is the
+//!   OS's own reason; the disk widget says what failed.
 //! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
@@ -51,7 +52,7 @@
 //!   keeps. The size comes from the image header before the image is
 //!   decoded. On macOS the encoded bytes are copied in first. Only macOS
 //!   and Windows, where `read_clipboard` saves images; call it with the
-//!   clipboard reader lock held.
+//!   clipboard lock held.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
 //!   is none or its source marked it secret. History need not be on. Call
@@ -204,15 +205,61 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
     })
 }
 
-/// Held while reading the clipboard. AppKit's pasteboard is not safe to
-/// read from two threads at once, and Windows lets one thread open the
-/// clipboard at a time; the capture thread and the widget pane both read.
+/// Held while reading or writing the clipboard. AppKit's pasteboard is not
+/// safe to use from two threads at once, and Windows lets one thread open
+/// the clipboard at a time; the capture thread, the widget pane, and
+/// actions all use it.
 #[cfg(not(target_os = "linux"))]
-static CLIPBOARD_READ: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static CLIPBOARD_USE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// This thread's hold on the clipboard lock, until it is dropped.
+#[cfg(not(target_os = "linux"))]
+struct ClipboardUser {
+    _lock: std::sync::MutexGuard<'static, ()>,
+}
 
 #[cfg(not(target_os = "linux"))]
-fn one_clipboard_reader() -> std::sync::MutexGuard<'static, ()> {
-    CLIPBOARD_READ.lock().unwrap_or_else(|e| e.into_inner())
+fn one_clipboard_user() -> ClipboardUser {
+    let lock = CLIPBOARD_USE.lock().unwrap_or_else(|e| e.into_inner());
+    #[cfg(test)]
+    HOLDS_CLIPBOARD.set(true);
+    ClipboardUser { _lock: lock }
+}
+
+// Tests that run at the same time also take the lock, so a test asks
+// whether its own thread holds it, not whether any thread does.
+#[cfg(all(test, not(target_os = "linux")))]
+thread_local! {
+    static HOLDS_CLIPBOARD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(all(test, not(target_os = "linux")))]
+impl Drop for ClipboardUser {
+    fn drop(&mut self) {
+        HOLDS_CLIPBOARD.set(false);
+    }
+}
+
+/// Whether this thread holds the clipboard lock now.
+#[cfg(all(test, not(target_os = "linux")))]
+pub fn clipboard_in_use() -> bool {
+    HOLDS_CLIPBOARD.get()
+}
+
+/// The clipboard's text now, also when its source marked it secret, so
+/// keep what is made from it secret too. Reads like every other read, one
+/// at a time.
+pub fn clipboard_text_unchecked() -> Option<String> {
+    #[cfg(not(target_os = "linux"))]
+    let _one_user = one_clipboard_user();
+    arboard::Clipboard::new().ok()?.get_text().ok()
+}
+
+/// Run `write`, which writes the clipboard, while no read runs.
+pub fn write_clipboard<T>(write: impl FnOnce() -> T) -> T {
+    #[cfg(not(target_os = "linux"))]
+    let _one_user = one_clipboard_user();
+    write()
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -248,7 +295,11 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
 fn launch(program: &str) -> Result<()> {
     let mut child = std::process::Command::new(program)
         .spawn()
-        .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))?;
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not open {program}: {error}. Check that it is installed."
+            ))
+        })?;
     // Reap it when it exits, so no zombie process stays behind.
     std::thread::spawn(move || child.wait());
     Ok(())
@@ -270,14 +321,22 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         command.creation_flags(CREATE_NO_WINDOW);
     }
-    let output = command
-        .output()
-        .map_err(|error| Error::msg(format!("Could not run {program}: {error}")))?;
+    let output = command.output().map_err(|error| {
+        Error::msg(format!(
+            "Could not run {program}: {error}. Check that it is installed."
+        ))
+    })?;
     if output.status.success() {
         return Ok(());
     }
     let detail = String::from_utf8_lossy(&output.stderr);
-    Err(Error::msg(format!("{program} failed: {}", detail.trim())))
+    let detail = detail.trim().trim_end_matches('.');
+    let reason = if detail.is_empty() {
+        String::new()
+    } else {
+        format!(": {detail}")
+    };
+    Err(Error::msg(format!("{program} failed{reason}. Try again.")))
 }
 
 #[cfg(test)]
@@ -380,6 +439,24 @@ mod tests {
                     for _ in 0..20 {
                         super::clipboard_change();
                         super::read_clipboard(false, false);
+                    }
+                });
+            }
+        });
+    }
+
+    #[test]
+    fn unchecked_reads_wait_for_other_reads() {
+        // A snippet's {clipboard} reads while the capture thread checks a copy.
+        std::thread::scope(|scope| {
+            for reader in 0..8 {
+                scope.spawn(move || {
+                    for _ in 0..20 {
+                        if reader % 2 == 0 {
+                            super::read_clipboard(false, false);
+                        } else {
+                            super::clipboard_text_unchecked();
+                        }
                     }
                 });
             }

@@ -17,7 +17,12 @@ use tauri::{AppHandle, Manager};
 
 use crate::{
     events,
-    features::{apps::AppIndex, currency, files, files::FileIndex, weather},
+    features::{
+        apps::{AppIndex, MAX_APPS},
+        currency, files,
+        files::FileIndex,
+        weather,
+    },
     platform,
     search::id::Source,
     state::State,
@@ -220,6 +225,9 @@ pub fn apps(app: &AppHandle) {
         |state| &state.freshness.apps,
         |state| {
             let index = AppIndex::new(platform::discover_apps());
+            if index.truncated {
+                tracing::warn!(limit = MAX_APPS, "The app index is full");
+            }
             tracing::info!(apps = index.len(), "Indexed applications");
             state.apps.set(index);
         },

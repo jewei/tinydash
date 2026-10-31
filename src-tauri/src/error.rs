@@ -1,3 +1,4 @@
+use rusqlite::ErrorCode;
 use serde::{Serialize, Serializer};
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -8,13 +9,15 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("{0}")]
     Message(String),
-    #[error("File error: {0}")]
+    /// No next step: files fail for many causes in many places. A place
+    /// that knows the cause maps the error to its own message.
+    #[error("Could not read or write a file: {0}.")]
     Io(#[from] std::io::Error),
-    #[error("Storage error: {0}")]
+    #[error("Could not read or save data: {0}. {step}", step = data_next_step(.0))]
     Database(#[from] rusqlite::Error),
     #[error("Invalid data: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("Clipboard error: {0}")]
+    #[error("Could not use the clipboard: {0}. Try again.")]
     Clipboard(#[from] arboard::Error),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),
@@ -26,8 +29,87 @@ impl Error {
     }
 }
 
+/// The step that fits the cause. Only the store uses SQLite, so a step can
+/// name its file.
+fn data_next_step(error: &rusqlite::Error) -> &'static str {
+    match error.sqlite_error_code() {
+        Some(ErrorCode::DiskFull) => "Free some disk space, then try again.",
+        Some(ErrorCode::DatabaseCorrupt | ErrorCode::NotADatabase) => {
+            "The saved data is damaged. Quit TinyDash, then move tinydash.db out of its data folder to start with new data."
+        }
+        Some(ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked) => {
+            "Close other programs that use tinydash.db, then try again."
+        }
+        Some(ErrorCode::ReadOnly | ErrorCode::PermissionDenied | ErrorCode::CannotOpen) => {
+            "Check that you can write to TinyDash's data folder."
+        }
+        _ => "Try again, or restart TinyDash.",
+    }
+}
+
 impl Serialize for Error {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::ErrorKind;
+
+    fn data_error(code: std::ffi::c_int) -> String {
+        Error::from(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(code),
+            None,
+        ))
+        .to_string()
+    }
+
+    #[test]
+    fn a_file_error_gives_no_step_that_could_be_wrong() {
+        for kind in [
+            ErrorKind::PermissionDenied,
+            ErrorKind::StorageFull,
+            ErrorKind::NotFound,
+        ] {
+            let cause = std::io::Error::from(kind);
+            let expected = format!("Could not read or write a file: {cause}.");
+            assert_eq!(Error::from(cause).to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn a_data_error_gives_the_step_for_its_cause() {
+        use rusqlite::ffi;
+        let cases = [
+            (ffi::SQLITE_FULL, "Free some disk space, then try again."),
+            (
+                ffi::SQLITE_NOTADB,
+                "move tinydash.db out of its data folder",
+            ),
+            (
+                ffi::SQLITE_CORRUPT,
+                "move tinydash.db out of its data folder",
+            ),
+            (
+                ffi::SQLITE_BUSY,
+                "Close other programs that use tinydash.db",
+            ),
+            (
+                ffi::SQLITE_READONLY,
+                "Check that you can write to TinyDash's data folder.",
+            ),
+            (ffi::SQLITE_IOERR, "Try again, or restart TinyDash."),
+        ];
+        for (code, step) in cases {
+            let error = data_error(code);
+            assert!(error.contains(step), "{code}: {error}");
+            assert_eq!(
+                error.contains("disk space"),
+                code == ffi::SQLITE_FULL,
+                "{error}"
+            );
+        }
     }
 }

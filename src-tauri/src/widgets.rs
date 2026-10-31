@@ -240,6 +240,10 @@ mod tests {
         assert!(total_bytes > 0 && free_bytes <= total_bytes, "{name}");
         for missing in [home.join("tinydash-missing-folder"), PathBuf::new()] {
             assert!(matches!(Disk::read(&missing), Disk::Unavailable { .. }));
+            // The OS's reason alone: a file error's own words would repeat
+            // what the widget says.
+            let error = platform::disk_space(&missing).err();
+            assert!(matches!(error, Some(Error::Message(_))), "{error:?}");
         }
     }
 

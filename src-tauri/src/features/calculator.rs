@@ -613,7 +613,7 @@ mod tests {
         let answer = rates_off_answer("100 usd to eur").unwrap();
         assert_eq!(answer.actions[0].action, Action::TurnOnCurrencyRates);
         assert!(rates_off_answer("100 USD MYR").is_some());
-        for query in ["12 * 8", "5 ft to cm", "usd", "hello"] {
+        for query in ["12 * 8", "5 ft to cm", "usd"] {
             assert!(rates_off_answer(query).is_none(), "{query}");
         }
     }

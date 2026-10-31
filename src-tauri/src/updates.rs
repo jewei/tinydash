@@ -83,10 +83,11 @@ pub fn on_launcher_shown(app: &AppHandle) {
 /// the latest, and tells the windows either way.
 pub async fn check(app: &AppHandle) -> Result<Option<String>> {
     let _busy = Busy::start(app)?;
-    let found = updater(app)?
-        .check()
-        .await
-        .map_err(|error| Error::msg(format!("Could not check for updates: {error}")))?;
+    let found = updater(app)?.check().await.map_err(|error| {
+        Error::msg(format!(
+            "Could not check for updates: {error}. Check your internet connection and try again."
+        ))
+    })?;
     let version = found.as_ref().map(|update| update.version.clone());
     *app.state::<Updates>()
         .pending
@@ -127,11 +128,19 @@ fn updater(app: &AppHandle) -> Result<tauri_plugin_updater::Updater> {
     };
     let feed = feed
         .parse()
-        .map_err(|error| Error::msg(format!("The update address is not valid: {error}")))?;
+        .map_err(|error| {
+            Error::msg(format!(
+                "The update address is not valid: {error}. Download new versions from the Releases page."
+            ))
+        })?;
     app.updater_builder()
         .endpoints(vec![feed])
         .and_then(|builder| builder.pubkey(key).timeout(TIMEOUT).build())
-        .map_err(|error| Error::msg(format!("Could not start the updater: {error}")))
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not start the updater: {error}. Download new versions from the Releases page."
+            ))
+        })
 }
 
 /// Marks a check or install as running until dropped.

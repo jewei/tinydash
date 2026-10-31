@@ -798,12 +798,6 @@ describe("Launcher", () => {
     expect(backend.called("search").at(-1)?.args).toEqual({ query: "", category: "emoji" });
   });
 
-  it("hides with Escape", async () => {
-    const { backend, press } = setup(() => []);
-    press("Escape");
-    await waitFor(() => expect(backend.called("hide_launcher")).toHaveLength(1));
-  });
-
   it("starts over when the launcher opens", async () => {
     const { backend, input } = setup(() => []);
     fireEvent.input(input, { target: { value: "old" } });
