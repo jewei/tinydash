@@ -323,6 +323,11 @@ mod tests {
         on_key(Key::Char('x'), "editor");
         on_key(Key::Reset, "editor");
         ";sig".chars().for_each(|c| on_key(Key::Char(c), "editor"));
+        // Without a trigger, the worker would wait for one forever.
+        assert!(
+            handover.typing.load(Ordering::Acquire),
+            "No trigger was handed over"
+        );
         // The watch stops while the snippet fills, so the worker ends after
         // this trigger.
         let watch = std::cell::RefCell::new(Some(on_key));
@@ -338,7 +343,10 @@ mod tests {
                 }
                 expansion.text(items.items(), chrono::Local::now(), || None)
             },
-            |window, erase, text, _| {
+            |window, erase, text, interrupted: &AtomicBool| {
+                // Typing stops at a key or click only if it reads the flag
+                // that the watch sets.
+                assert!(std::ptr::eq(interrupted, &handover.interrupted));
                 typed.borrow_mut().push((window, erase, text.to_owned()));
                 Ok(())
             },
