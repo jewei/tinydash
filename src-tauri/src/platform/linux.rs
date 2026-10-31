@@ -517,6 +517,10 @@ fn own_typing() -> bool {
         .is_some_and(|until| Instant::now() < until)
 }
 
+/// Set by each click that the recording gets. libxdo sends no clicks, so a
+/// click while TinyDash types came from the user or another program.
+static CLICKED: AtomicBool = AtomicBool::new(false);
+
 pub fn typing_unavailable() -> Option<&'static str> {
     wayland_session(
         std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
@@ -762,8 +766,7 @@ impl Recording<'_> {
     fn event(&mut self, kind: u8, detail: u8, state: u16) {
         let keys = match c_int::from(kind) {
             xlib::KeyPress => self.key(detail, state),
-            // Buttons 4 to 7 scroll, which moves no cursor.
-            xlib::ButtonPress if !(4..=7).contains(&detail) => vec![Key::Reset],
+            xlib::ButtonPress => button_keys(detail),
             _ => return,
         };
         // Each key goes with the window that had focus at the latest key.
@@ -810,6 +813,17 @@ impl Recording<'_> {
         }
         u32::try_from(keysym).unwrap_or_default()
     }
+}
+
+/// The keys for a press of mouse button `button`. Buttons 4 to 7 scroll,
+/// which moves no cursor, so they pass nothing. Another button is a click:
+/// a reset, also kept in [`CLICKED`], as TinyDash never clicks.
+fn button_keys(button: u8) -> Vec<Key> {
+    if (4..=7).contains(&button) {
+        return Vec::new();
+    }
+    CLICKED.store(true, Ordering::Release);
+    vec![Key::Reset]
 }
 
 /// The window with the input focus. Window IDs are the same on every
@@ -861,9 +875,7 @@ fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
 /// only while `focus` has the input focus, so typing stops soon after
 /// another window gets it, and types nothing when one got it before typing
 /// started. Each part waits while the user holds a modifier, which the keys
-/// would take on. A key or click since the trigger stops it only before the
-/// first key: X11 does not mark the keys that TinyDash sends, so after that
-/// the watch passes them too, and they set `interrupted`.
+/// would take on, and goes only while `no_input_from_others` lets it.
 pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBool) -> Result<()> {
     // Checked before the first Backspace, so the trigger stays.
     if !xdo_can_type(text, session_locale_is_utf8) {
@@ -902,7 +914,7 @@ pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBoo
         };
         state & MODIFIERS_THAT_CHANGE_KEYS != 0
     };
-    let started = Cell::new(false);
+    let no_input = no_input_from_others(interrupted);
     let ready = || {
         if !super::modifiers_released(modifiers_held) {
             return Err(Error::msg(
@@ -914,10 +926,7 @@ pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBoo
                 "Stopped typing the snippet: another window came to the front.",
             ));
         }
-        if !started.replace(true) {
-            super::no_input_since_trigger(interrupted)?;
-        }
-        Ok(())
+        no_input()
     };
     let typed = type_with_xdo(display, erase, text, ready);
     // SAFETY: The connection is open. XSync returns once the server handled
@@ -927,6 +936,30 @@ pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBoo
     // SAFETY: Opened above and closed once; libxdo leaves it open.
     unsafe { (xlib.XCloseDisplay)(display) };
     typed
+}
+
+/// The check, before each part of typing, that no one else typed or
+/// clicked. Make it when typing starts. Before the first key, a key or
+/// click since the trigger stops typing, as `interrupted` says. After that,
+/// only a click stops it: X11 does not mark the keys that TinyDash sends,
+/// so the watch passes them too, and they set `interrupted`. libxdo sends
+/// no clicks, so each click since typing started came from someone else.
+fn no_input_from_others(interrupted: &AtomicBool) -> impl Fn() -> Result<()> + '_ {
+    // Forget older clicks: one before the trigger does not count, and one
+    // after it set `interrupted`, which the first check reads.
+    CLICKED.store(false, Ordering::Release);
+    let started = Cell::new(false);
+    move || {
+        if !started.replace(true) {
+            super::no_input_since_trigger(interrupted)?;
+        }
+        if CLICKED.load(Ordering::Acquire) {
+            return Err(Error::msg(
+                "Stopped typing the snippet: a click came while it typed.",
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// Whether libxdo can type `text`. It reads the text in the encoding of
@@ -1051,6 +1084,35 @@ mod tests {
         }
         // Reading the session's locale works, whatever it is.
         let _ = session_locale_is_utf8();
+    }
+
+    #[test]
+    fn a_click_while_typing_stops_it_and_a_key_does_not() {
+        let interrupted = AtomicBool::new(false);
+        // A click before the trigger does not count.
+        assert_eq!(button_keys(1), [Key::Reset]);
+        let no_input = no_input_from_others(&interrupted);
+        assert!(no_input().is_ok());
+        // TinyDash's own keys set `interrupted`, and the scroll wheel does
+        // not click.
+        interrupted.store(true, Ordering::Release);
+        for button in 4..=7 {
+            assert!(button_keys(button).is_empty(), "{button}");
+        }
+        assert!(no_input().is_ok());
+        // A click while TinyDash types stops it before the next part.
+        assert_eq!(button_keys(3), [Key::Reset]);
+        let error = no_input().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Stopped typing the snippet: a click came while it typed."
+        );
+        // A key or click after the trigger stops it before the first key.
+        let error = no_input_from_others(&interrupted)().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Stopped typing the snippet: a key or click came after the trigger."
+        );
     }
 
     #[test]

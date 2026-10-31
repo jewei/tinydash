@@ -94,6 +94,8 @@
 //!   Windows, the keys that TinyDash types never reach `on_key`, so every
 //!   call while it types is a key or click from someone else. X11 does not
 //!   mark them, so Linux passes every key as a reset while TinyDash types.
+//!   TinyDash sends no clicks, so on every OS a click came from someone
+//!   else.
 //!   Keep `on_key` quick: on Windows, typing waits for it. When the OS
 //!   stops passing keys but the thread runs on (the macOS tap turned off
 //!   after a timeout, or a Windows hook removed for answering too slowly),
@@ -118,6 +120,8 @@
 //!     later part, so a key or click while TinyDash types stops it. Linux
 //!     checks it before the first Backspace only, as the keys that
 //!     TinyDash types set it too.
+//!   - On Linux, a click came since typing started. So on Linux, a click
+//!     while TinyDash types stops it, and a key does not.
 //!   - A modifier stays down. Typed keys never take on a modifier that the
 //!     user holds: macOS clears the modifiers of each key, and Windows and
 //!     Linux wait with `modifiers_released` before each part until the user

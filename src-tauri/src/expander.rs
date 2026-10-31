@@ -54,7 +54,7 @@ struct Handover {
     /// may no longer end with the trigger: a Backspace would erase their
     /// text, and the snippet could land in the wrong place. On Linux, the
     /// keys that TinyDash types set it too, so `type_text` there checks it
-    /// before the first key only.
+    /// before the first key only, and then stops only at a click.
     interrupted: AtomicBool,
 }
 
