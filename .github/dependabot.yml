@@ -31,3 +31,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    # CodeQL stops when its init, analyze, and upload-sarif steps run different
+    # versions, so they update in one PR.
+    groups:
+      codeql: { patterns: ["github/codeql-action*"] }

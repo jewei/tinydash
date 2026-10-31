@@ -135,8 +135,11 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
 }
 
 pub fn launch_app(path: &Path) -> Result<()> {
-    tauri_plugin_opener::open_path(path, None::<&str>)
-        .map_err(|error| Error::msg(error.to_string()))
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open the app: {error}. Check that it is still installed."
+        ))
+    })
 }
 
 pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
@@ -160,7 +163,7 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
         )
     };
     if done == 0 {
-        return Err(std::io::Error::last_os_error().into());
+        return Err(Error::msg(std::io::Error::last_os_error().to_string()));
     }
     Ok(super::Volume {
         name: drive_name(path),

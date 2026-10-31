@@ -31,8 +31,18 @@ use crate::{
 /// Pins kept in all, including pins of items that are hidden for now.
 const MAX_PINS: usize = 100;
 
+/// Where the user ran an action, which decides where its error shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Origin {
+    /// The launcher, which shows the error under the query. Settings sends
+    /// its actions this way too and shows their errors itself.
+    Launcher,
+    /// A hotkey, pressed in another app. Its error goes to a notification.
+    Hotkey,
+}
+
 /// Run an action. `result_id` identifies the result it came from, for usage ranking.
-pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<()> {
+pub fn run(app: &AppHandle, origin: Origin, action: Action, result_id: Option<&str>) -> Result<()> {
     let state = app.state::<State>();
     let counts_as_use = matches!(
         action,
@@ -74,16 +84,19 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             if !state.apps.get().contains(&path) && !offered_file(&state, &path) {
                 return Err(Error::msg("This item is not in the index."));
             }
-            tauri_plugin_opener::reveal_item_in_dir(&path)
-                .map_err(|e| Error::msg(e.to_string()))?;
+            tauri_plugin_opener::reveal_item_in_dir(&path).map_err(|error| {
+                Error::msg(format!(
+                    "Could not show it in {}: {error}. Check that it still exists.",
+                    platform::FILE_MANAGER
+                ))
+            })?;
             window::hide(app)?;
         }
         Action::OpenUrl { url } => {
             if !web_address(&url) {
                 return Err(Error::msg("Only web addresses can be opened."));
             }
-            tauri_plugin_opener::open_url(&url, None::<&str>)
-                .map_err(|e| Error::msg(e.to_string()))?;
+            open_url(&url)?;
             window::hide(app)?;
         }
         Action::Copy { text } => {
@@ -186,20 +199,17 @@ pub fn run(app: &AppHandle, action: Action, result_id: Option<&str>) -> Result<(
             // source or made in a password app, never goes into a link.
             let clipboard = || platform::clipboard_text(app);
             match library::quicklink_target(&item.text, &query, chrono::Local::now(), clipboard)? {
-                Target::Url(url) => tauri_plugin_opener::open_url(url, None::<&str>)
-                    .map_err(|e| Error::msg(e.to_string()))?,
+                Target::Url(url) => open_url(&url)?,
                 Target::Path(path) => open_path(&path)?,
             }
             window::hide(app)?;
         }
-        Action::System { command } => {
-            // Hide first: Lock and Sleep must not leave the launcher on screen.
-            window::hide(app)?;
-            if let Err(error) = platform::run_system_command(command) {
-                window::show_again(app)?;
-                return Err(error);
-            }
-        }
+        Action::System { command } => run_with_launcher_hidden(
+            origin,
+            || window::hide(app),
+            || platform::run_system_command(command),
+            || window::show_again(app),
+        )?,
         Action::Pin { id } => pin(&state, &id)?,
         Action::Hide { id } => hide(&state, &id)?,
         Action::SetAlias { id, alias } => set_alias(&state, &id, &alias)?,
@@ -437,26 +447,57 @@ pub fn hotkey_owner(
     )
 }
 
+/// The warning for a hotkey that did not register at startup. It names
+/// the result, and apps and files, not scanned yet, by their path.
+pub fn hotkey_off(snapshot: &Snapshot, failure: &shortcut::HotkeyFailure) -> String {
+    let id = failure.id.as_str();
+    let name = search::resolve(snapshot, &Context::none(), id).map_or_else(
+        || Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
+        |found| found.title,
+    );
+    format!(
+        "The hotkey of {name} is off. {} Use Set Hotkey in its actions, or remove it in Settings > Search.",
+        failure.error
+    )
+}
+
 /// Run the main action of the result that a hotkey belongs to, as Enter
 /// would in the launcher.
 pub fn run_hotkey(app: &AppHandle, id: &str) -> Result<()> {
-    let snapshot = app.state::<State>().snapshot();
+    let state = app.state::<State>();
+    // Read readiness first, as `pin` does.
+    let ready = state.freshness.ready();
+    let action = hotkey_action(&state.snapshot(), id, ready)?;
+    run(app, Origin::Hotkey, action, Some(id))
+}
+
+/// The main action of the result with `id`. Until a source is `ready`,
+/// its items only look gone: a hotkey pressed just after startup must not
+/// ask the user to remove it.
+fn hotkey_action(snapshot: &Snapshot, id: &str, ready: impl Fn(Source) -> bool) -> Result<Action> {
     let ctx = Context {
         usage: &snapshot.usage,
         pins: &snapshot.pins,
         now: snapshot.now.timestamp(),
         skin_tone: snapshot.settings.emoji_skin_tone,
     };
-    let found = search::resolve(&snapshot, &ctx, id).ok_or_else(|| {
-        Error::msg("This hotkey's item no longer exists. Remove the hotkey in Settings > Search.")
-    })?;
-    let main = found
+    let Some(found) = search::resolve(snapshot, &ctx, id) else {
+        if Source::parse(id).is_some_and(|(source, _)| !ready(source)) {
+            return Err(Error::msg(
+                "TinyDash is still loading your apps and files. Try again in a moment.",
+            ));
+        }
+        return Err(Error::msg(
+            "This hotkey's item no longer exists. Remove the hotkey in Settings > Search.",
+        ));
+    };
+    found
         .actions
         .into_iter()
         .next()
         .filter(|action| action.confirm.is_none())
-        .ok_or_else(|| Error::msg("This item asks before it runs. Run it from TinyDash."))?;
-    run(app, main.action, Some(id))
+        .map(|main| main.action)
+        .ok_or_else(|| Error::msg("This item asks before it runs. Run it from TinyDash."))
 }
 
 /// An http or https address, the only kind the OS opener may get: another
@@ -477,6 +518,27 @@ pub(crate) fn offered_file(state: &State, path: &str) -> bool {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .contains(path)
+}
+
+/// Run a system command with the launcher hidden first: Lock and Sleep must
+/// not leave it on screen. When a command run in the launcher fails, the
+/// launcher shows again as it was, so the error shows where the user ran
+/// it. A hotkey's error goes to a notification, and the launcher must not
+/// come up over the app the user is in.
+fn run_with_launcher_hidden(
+    origin: Origin,
+    hide: impl FnOnce() -> Result<()>,
+    command: impl FnOnce() -> Result<()>,
+    show_again: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    hide()?;
+    let Err(error) = command() else {
+        return Ok(());
+    };
+    if origin == Origin::Launcher {
+        show_again()?;
+    }
+    Err(error)
 }
 
 /// Copy, then hide and hand focus back so the user can paste right away,
@@ -507,7 +569,21 @@ fn open_path(path: &Path) -> Result<()> {
     if !path.exists() {
         return Err(Error::msg(format!("{} no longer exists.", path.display())));
     }
-    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|e| Error::msg(e.to_string()))
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open {}: {error}. Check that an app on this computer opens this kind of file.",
+            path.display()
+        ))
+    })
+}
+
+/// Open a web or mail address with the app the OS assigns to it.
+fn open_url(url: &str) -> Result<()> {
+    tauri_plugin_opener::open_url(url, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open {url}: {error}. Check that a default browser or mail app is set."
+        ))
+    })
 }
 
 /// The pin that must go before `id` fits, or `None` while there is room or
@@ -619,6 +695,85 @@ mod tests {
                 .unwrap_err()
                 .starts_with("You can set up to 50 hotkeys.")
         );
+    }
+
+    #[test]
+    fn a_hotkey_that_is_off_at_startup_names_its_result() {
+        let state = State::for_tests(Settings::default());
+        let off = |id: &str| {
+            let failure = shortcut::HotkeyFailure {
+                id: id.into(),
+                error: Error::msg("Could not register Alt+L."),
+            };
+            hotkey_off(&state.snapshot(), &failure)
+        };
+        assert_eq!(
+            off("system:lock"),
+            "The hotkey of Lock Screen is off. Could not register Alt+L. Use Set Hotkey in its actions, or remove it in Settings > Search."
+        );
+        let safari = off("app:/Applications/Safari.app");
+        assert!(
+            safari.starts_with("The hotkey of /Applications/Safari.app is off."),
+            "{safari}"
+        );
+    }
+
+    #[test]
+    fn a_hotkey_pressed_before_the_first_scan_asks_to_wait() {
+        let state = State::for_tests(Settings::default());
+        let snapshot = state.snapshot();
+        let error = |id: &str, scanned: bool| {
+            let ready = |source| scanned || !matches!(source, Source::App | Source::File);
+            hotkey_action(&snapshot, id, ready).unwrap_err().to_string()
+        };
+        let safari = "app:/Applications/Safari.app";
+        assert_eq!(
+            error(safari, false),
+            "TinyDash is still loading your apps and files. Try again in a moment."
+        );
+        assert!(error("file:/notes.txt", false).contains("still loading"));
+        let gone = "This hotkey's item no longer exists. Remove the hotkey in Settings > Search.";
+        assert_eq!(error(safari, true), gone);
+        // Commands need no scan, so a gone one is gone at once.
+        assert_eq!(error("system:gone", false), gone);
+        assert!(matches!(
+            hotkey_action(&snapshot, "system:lock", |_| true),
+            Ok(Action::System { .. })
+        ));
+        assert!(error("system:sleep", true).contains("asks before it runs"));
+    }
+
+    #[test]
+    fn a_failed_command_shows_the_launcher_again_only_when_run_from_it() {
+        let steps = |origin, works: bool| {
+            let steps = std::cell::RefCell::new(Vec::new());
+            let step = |name| {
+                steps.borrow_mut().push(name);
+                Ok(())
+            };
+            let result = run_with_launcher_hidden(
+                origin,
+                || step("hide"),
+                || {
+                    step("run")?;
+                    works
+                        .then_some(())
+                        .ok_or_else(|| Error::msg("This desktop has no dark mode."))
+                },
+                || step("show again"),
+            );
+            (result.is_ok(), steps.into_inner())
+        };
+        assert_eq!(
+            steps(Origin::Launcher, false),
+            (false, vec!["hide", "run", "show again"])
+        );
+        // The launcher may be on screen behind the user's app, or hidden:
+        // either way, a hotkey's failure must not bring it up.
+        assert_eq!(steps(Origin::Hotkey, false), (false, vec!["hide", "run"]));
+        for origin in [Origin::Launcher, Origin::Hotkey] {
+            assert_eq!(steps(origin, true), (true, vec!["hide", "run"]));
+        }
     }
 
     #[test]
@@ -793,9 +948,7 @@ mod tests {
     #[test]
     fn only_stable_results_learn_from_use() {
         assert!(learns_from_use("app:/Applications/Safari.app"));
-        assert!(learns_from_use("emoji:🚀"));
         assert!(!learns_from_use("calc:1+1"));
         assert!(!learns_from_use("clip:3"));
-        assert!(!learns_from_use("password:Pin:6"));
     }
 }

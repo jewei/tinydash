@@ -81,7 +81,7 @@ export function PreviewPane(props: {
 
 function Details(props: { preview: Preview }) {
   return (
-    <div class="preview-details">
+    <div class="preview-details" classList={{ facts: props.preview.type === "file" }}>
       <Switch>
         <Match when={props.preview.type === "text" && props.preview}>
           {(text) => <pre class="preview-text">{text().text}</pre>}

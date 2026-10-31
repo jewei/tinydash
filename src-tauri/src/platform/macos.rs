@@ -316,8 +316,11 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
 }
 
 pub fn launch_app(path: &Path) -> Result<()> {
-    tauri_plugin_opener::open_path(path, None::<&str>)
-        .map_err(|error| Error::msg(error.to_string()))
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open the app: {error}. Check that it is still installed."
+        ))
+    })
 }
 
 /// Draw the Finder icon of `path` into a square bitmap of `pixels` and
@@ -432,7 +435,7 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
     content.setBody(&NSString::from_str(body));
     content.setSound(Some(&UNNotificationSound::defaultSound()));
     // A new identifier each time, so a notification never replaces the last.
-    let id = format!("focus-{}", chrono::Utc::now().timestamp_millis());
+    let id = format!("tinydash-{}", chrono::Utc::now().timestamp_millis());
     let request = UNNotificationRequest::requestWithIdentifier_content_trigger(
         &NSString::from_str(&id),
         &content,
@@ -611,7 +614,12 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
 fn apple_script(script: &str) -> Result<()> {
     let output = Command::new("/usr/bin/osascript")
         .args(["-e", script])
-        .output()?;
+        .output()
+        .map_err(|error| {
+            Error::msg(format!(
+                "macOS could not run the command: {error}. Try again."
+            ))
+        })?;
     if output.status.success() {
         return Ok(());
     }
