@@ -997,7 +997,8 @@ body {
   margin-top: auto;
 }
 
-.weather-settings {
+.weather-settings,
+.up-next-ask {
   height: 26px;
   margin-top: var(--space-1);
   padding: 0 10px;
@@ -1007,6 +1008,71 @@ body {
   font-size: var(--text-small);
   font-weight: 600;
   cursor: pointer;
+}
+
+.up-next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.up-next-list {
+  display: grid;
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A fixed time column keeps the rows lined up. */
+.up-next-item {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 3px var(--space-1);
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.up-next-item:hover {
+  background: var(--hover);
+}
+
+.up-next-time {
+  font-size: var(--text-small);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.up-next-title,
+.up-next-source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.up-next-source {
+  max-width: 120px;
+}
+
+/* A reminder gets the open circle of a task. */
+.up-next-item.reminder .up-next-title::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
 }
 
 .weather-icon {

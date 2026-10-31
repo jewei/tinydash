@@ -10,9 +10,9 @@ use tauri_plugin_autostart::ManagerExt;
 use ts_rs::TS;
 
 use crate::{
-    actions,
+    actions::{self, Origin},
     error::{Error, Result},
-    events,
+    events, expander,
     features::{
         emoji::EmojiIndex,
         library::{LibraryItem, MAX_LIBRARY_ITEMS},
@@ -79,6 +79,8 @@ pub struct About {
     pub self_update: bool,
     /// A newer version found before Settings opened, ready to install.
     pub pending_update: Option<String>,
+    /// Why snippets cannot expand as you type here, such as on Wayland.
+    pub expand_snippets_unavailable: Option<String>,
 }
 
 async fn blocking<T: Send + 'static>(
@@ -86,7 +88,10 @@ async fn blocking<T: Send + 'static>(
 ) -> Result<T> {
     tauri::async_runtime::spawn_blocking(work)
         .await
-        .map_err(|error| Error::msg(error.to_string()))?
+        .map_err(|error| {
+            tracing::error!(%error, "A command stopped before it finished");
+            Error::msg("Something went wrong. Try again.")
+        })?
 }
 
 #[tauri::command]
@@ -126,7 +131,7 @@ pub async fn spotlight_files(app: AppHandle, query: String) -> Result<Vec<Search
 /// `result_id` is sent with a result's primary action so usage can be ranked.
 #[tauri::command]
 pub async fn run_action(app: AppHandle, action: Action, result_id: Option<String>) -> Result<()> {
-    blocking(move || actions::run(&app, action, result_id.as_deref())).await
+    blocking(move || actions::run(&app, Origin::Launcher, action, result_id.as_deref())).await
 }
 
 #[tauri::command]
@@ -199,14 +204,27 @@ pub fn get_settings(state: tauri::State<State>) -> Settings {
     Settings::clone(&state.settings.get())
 }
 
+/// Only the Settings window may turn shell commands on or off, so script in
+/// another window cannot turn them on and then run a command.
+fn check_caller(caller: &str, old: &Settings, new: &Settings) -> Result<()> {
+    if new.shell_commands != old.shell_commands && caller != window::SETTINGS {
+        return Err(Error::msg(
+            "Turn shell commands on or off in Settings > Search.",
+        ));
+    }
+    Ok(())
+}
+
 /// Validate, apply, and save changed settings, given as the fields that
 /// changed. Either everything applies, or the previous settings stay in
 /// effect and the error explains why.
 #[tauri::command]
 pub async fn update_settings(
     app: AppHandle,
+    webview: tauri::Webview,
     changes: serde_json::Map<String, serde_json::Value>,
 ) -> Result<Settings> {
+    let caller = webview.label().to_owned();
     blocking(move || {
         let state = app.state::<State>();
         let _one_change_at_a_time = state
@@ -215,6 +233,7 @@ pub async fn update_settings(
             .unwrap_or_else(|e| e.into_inner());
         let old = state.settings.get();
         let new = old.with_changes(changes)?.normalized();
+        check_caller(&caller, &old, &new)?;
         // Checked only when the list changes, so an entry from a hand-edited
         // file does not block other settings.
         if new.file_search_folders != old.file_search_folders
@@ -224,13 +243,13 @@ pub async fn update_settings(
                 "“{folder}” is not a full folder path. Enter the whole path, or start it with ~ for your home folder, such as ~/Projects."
             )));
         }
-        if new.shortcut != old.shortcut
-            && let Ok(keys) = shortcut::parse(&new.shortcut)
-            && let Some(name) = actions::hotkey_owner(&state.snapshot(), &keys, None)
-        {
-            return Err(Error::msg(format!(
-                "These keys already run {name}. Choose other keys, or remove that hotkey in Settings > Search."
-            )));
+        if new.shortcut != old.shortcut {
+            let keys = shortcut::launcher_keys(&new.shortcut)?;
+            if let Some(name) = actions::hotkey_owner(&state.snapshot(), &keys, None) {
+                return Err(Error::msg(format!(
+                    "These keys already run {name}. Choose other keys, or remove that hotkey in Settings > Search."
+                )));
+            }
         }
         if new.clock_cities != old.clock_cities
             && let Some(city) = new.unknown_clock_city()
@@ -282,6 +301,9 @@ pub async fn update_settings(
         if new.show_weather != old.show_weather || new.weather_city != old.weather_city {
             refresh::weather(&app, false);
         }
+        if new.show_up_next && !old.show_up_next {
+            widgets::ask_calendar_access(&app);
+        }
         events::settings_changed(&app, &new);
         events::results_stale(&app);
         Ok(new)
@@ -289,7 +311,8 @@ pub async fn update_settings(
     .await
 }
 
-/// The settings that change the OS: shortcut, login item, and tray icon.
+/// The settings that change the OS: shortcut, login item, tray icon, and
+/// snippet expansion as you type.
 fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()> {
     if to.shortcut != from.shortcut {
         shortcut::register(app, &to.shortcut)?;
@@ -301,10 +324,17 @@ fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()
         } else {
             autostart.disable()
         };
-        toggled.map_err(|error| Error::msg(format!("Could not change open at login: {error}")))?;
+        toggled.map_err(|error| {
+            Error::msg(format!(
+                "Could not change open at login: {error}. Try again, or change it in your system settings."
+            ))
+        })?;
     }
     if to.show_tray_icon != from.show_tray_icon {
         tray::set_visible(app, to.show_tray_icon)?;
+    }
+    if to.expand_snippets != from.expand_snippets {
+        expander::apply(app, to.expand_snippets)?;
     }
     Ok(())
 }
@@ -335,7 +365,9 @@ pub async fn save_library_item(app: AppHandle, item: LibraryItem) -> Result<Libr
             )));
         }
         let item = item.validated()?;
-        state.library.get().check_keyword(&item)?;
+        let library = state.library.get();
+        library.check_kind(&item)?;
+        library.check_keyword(&item)?;
         let saved = state.store.save_library_item(&item)?;
         state.reload_library()?;
         events::results_stale(&app);
@@ -368,9 +400,6 @@ pub async fn delete_library_item(app: AppHandle, id: i64) -> Result<()> {
         state
             .usage
             .update(|usage| ids.iter().for_each(|id| usage.remove(id)));
-        for id in &ids {
-            state.store.set_hidden(id, false, 0)?;
-        }
         state
             .hidden
             .update(|hidden| ids.iter().for_each(|id| hidden.remove(id)));
@@ -401,6 +430,7 @@ pub fn about(app: AppHandle) -> About {
         rich_clipboard: platform::RICH_CLIPBOARD,
         self_update: updates::supported(),
         pending_update: updates::pending_version(&app),
+        expand_snippets_unavailable: platform::typing_unavailable().map(String::from),
     }
 }
 
@@ -447,12 +477,13 @@ pub struct HiddenResult {
 /// uninstalled app, shows its ID.
 #[tauri::command]
 pub fn hidden_results(state: tauri::State<State>) -> Vec<HiddenResult> {
+    let ready = state.freshness.ready();
     let snapshot = state.snapshot();
     let mut results: Vec<HiddenResult> = snapshot
         .hidden
         .ids()
         .map(|id| {
-            let (title, subtitle) = describe(&snapshot, id);
+            let (title, subtitle) = describe(&snapshot, id, &ready);
             HiddenResult {
                 id: id.to_owned(),
                 title,
@@ -465,15 +496,26 @@ pub fn hidden_results(state: tauri::State<State>) -> Vec<HiddenResult> {
 }
 
 /// A result's title and subtitle for a Settings list, or its ID when the
-/// item is gone.
-fn describe(snapshot: &search::Snapshot, id: &str) -> (String, String) {
-    match search::resolve(snapshot, &search::Context::none(), id) {
-        Some(found) => (found.title, found.subtitle),
-        None => (
-            Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
-            "No longer found".into(),
-        ),
+/// item is gone. Until its source is `ready`, an item only looks gone, and
+/// the list refreshes when the scan ends.
+fn describe(
+    snapshot: &search::Snapshot,
+    id: &str,
+    ready: &impl Fn(Source) -> bool,
+) -> (String, String) {
+    if let Some(found) = search::resolve(snapshot, &search::Context::none(), id) {
+        return (found.title, found.subtitle);
     }
+    let parsed = Source::parse(id);
+    let subtitle = if parsed.is_some_and(|(source, _)| !ready(source)) {
+        "Still loading"
+    } else {
+        "No longer found"
+    };
+    (
+        parsed.map_or(id, |(_, key)| key).to_owned(),
+        subtitle.into(),
+    )
 }
 
 /// An alias the user set, as Settings lists it.
@@ -490,15 +532,16 @@ pub struct AliasedResult {
 /// The aliases the user set, in alphabetical order.
 #[tauri::command]
 pub fn aliases(state: tauri::State<State>) -> Vec<AliasedResult> {
-    aliased(&state.snapshot())
+    let ready = state.freshness.ready();
+    aliased(&state.snapshot(), &ready)
 }
 
-fn aliased(snapshot: &search::Snapshot) -> Vec<AliasedResult> {
+fn aliased(snapshot: &search::Snapshot, ready: &impl Fn(Source) -> bool) -> Vec<AliasedResult> {
     let mut results: Vec<AliasedResult> = snapshot
         .aliases
         .iter()
         .map(|(id, alias)| {
-            let (title, subtitle) = describe(snapshot, id);
+            let (title, subtitle) = describe(snapshot, id, ready);
             AliasedResult {
                 id: id.to_owned(),
                 alias: alias.to_owned(),
@@ -526,12 +569,13 @@ pub struct HotkeyResult {
 /// The hotkeys the user set, by result name.
 #[tauri::command]
 pub fn hotkeys(state: tauri::State<State>) -> Vec<HotkeyResult> {
+    let ready = state.freshness.ready();
     let snapshot = state.snapshot();
     let mut results: Vec<HotkeyResult> = snapshot
         .hotkeys
         .iter()
         .map(|(id, shortcut)| {
-            let (title, subtitle) = describe(&snapshot, id);
+            let (title, subtitle) = describe(&snapshot, id, &ready);
             HotkeyResult {
                 id: id.to_owned(),
                 shortcut: shortcut.to_owned(),
@@ -587,25 +631,57 @@ mod tests {
     use crate::search::usage::Aliases;
 
     #[test]
+    fn only_the_settings_window_turns_shell_commands_on_or_off() {
+        let off = Settings::default();
+        let on = Settings {
+            shell_commands: true,
+            ..Settings::default()
+        };
+        for caller in [window::LAUNCHER, crate::hud::HUD, ""] {
+            assert!(check_caller(caller, &off, &on).is_err(), "{caller}");
+            assert!(check_caller(caller, &on, &off).is_err(), "{caller}");
+            // Other changes from that window still apply.
+            let other = Settings {
+                clipboard_history_enabled: true,
+                ..on.clone()
+            };
+            assert!(check_caller(caller, &on, &other).is_ok(), "{caller}");
+        }
+        assert!(check_caller(window::SETTINGS, &off, &on).is_ok());
+        assert!(check_caller(window::SETTINGS, &on, &off).is_ok());
+    }
+
+    #[test]
     fn lists_aliases_by_word_and_names_gone_items_by_id() {
         let state = State::for_tests(Settings::default());
         state.aliases.set(Aliases::new([
             ("system:lock".into(), "lk".into()),
             ("app:/Gone.app".into(), "gn".into()),
         ]));
-        let listed: Vec<(String, String, String)> = aliased(&state.snapshot())
-            .into_iter()
-            .map(|entry| (entry.alias, entry.title, entry.subtitle))
-            .collect();
+        let listed = |scanned: bool| -> Vec<(String, String, String)> {
+            aliased(&state.snapshot(), &|_| scanned)
+                .into_iter()
+                .map(|entry| (entry.alias, entry.title, entry.subtitle))
+                .collect()
+        };
+        let lock = (
+            "lk".into(),
+            "Lock Screen".into(),
+            "Lock this computer".into(),
+        );
         assert_eq!(
-            listed,
+            listed(true),
             [
                 ("gn".into(), "/Gone.app".into(), "No longer found".into()),
-                (
-                    "lk".into(),
-                    "Lock Screen".into(),
-                    "Lock this computer".into()
-                ),
+                lock.clone(),
+            ]
+        );
+        // Before the first scan of apps, the app only looks gone.
+        assert_eq!(
+            listed(false),
+            [
+                ("gn".into(), "/Gone.app".into(), "Still loading".into()),
+                lock,
             ]
         );
     }

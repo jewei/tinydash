@@ -16,4 +16,8 @@ selfUpdate: boolean,
 /**
  * A newer version found before Settings opened, ready to install.
  */
-pendingUpdate: string | null, };
+pendingUpdate: string | null, 
+/**
+ * Why snippets cannot expand as you type here, such as on Wayland.
+ */
+expandSnippetsUnavailable: string | null, };

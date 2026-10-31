@@ -7,6 +7,10 @@
 //!   file index lists such a folder but not its contents.
 //! - `RECURSIVE_WATCH`: whether watching a folder also watches its subfolders.
 //! - `TEMPLATE_TRAY_ICON`: the OS tints a black tray icon (macOS menu bar).
+//! - `prepare_process()`: setup that must come before Tauri starts. On
+//!   Linux, it makes Xlib safe to call from several threads, which libX11
+//!   before 1.8 is not on its own: GTK, tao, and snippet expansion each use
+//!   Xlib on a thread of their own.
 //! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy
 //!   or the notification plugin.
 //! - `is_reopen(event)`: the user opened the running app again, and the OS
@@ -30,8 +34,38 @@
 //! - `app_icon(path, pixels)`: PNG bytes of a file's system icon.
 //! - `run_system_command(command)`. Sleep Displays calls
 //!   `wait_for_key_release` first, only where it is supported.
+//! - `run_in_terminal(command, data)`: open the user's terminal app in the
+//!   home folder, run `command` there as typed, and leave the user's login
+//!   shell open after it. The shell goes to the home folder itself, before
+//!   the command, because a terminal or a profile can start it elsewhere.
+//!   The command never goes into a string that another parser reads with
+//!   other quoting rules (see `terminal.rs`). macOS writes a script under
+//!   `data` (zsh, in the app for `.command` files); Windows runs PowerShell
+//!   in a new console; Linux writes the command to a file under `data` and
+//!   runs `sh` in `$TERMINAL`, or in the first terminal it finds, and says
+//!   to set `$TERMINAL` when it finds none.
 //! - `notify(app, title, body)`: show a system notification.
-//! - `disk_space(path)`: the [`Volume`] that holds `path`.
+//! - `disk_space(path)`: the [`Volume`] that holds `path`. Its error is the
+//!   OS's own reason; the disk widget says what failed.
+//! - `read_up_next(from_ms, to_ms)`: the events between two Unix times and
+//!   the incomplete reminders due before `to_ms`, from the OS calendars
+//!   (EventKit on macOS), each kind with why it cannot be read, such as
+//!   access the user has not given. It never asks for access. It reads
+//!   nothing when TinyDash is not its own responsible process: macOS would
+//!   check the access of the terminal or other app that started it. `None`
+//!   where TinyDash reads no calendars. Waits up to two seconds for
+//!   reminders; call it off the main thread.
+//! - `ask_calendar_access(done)`: ask the user to let TinyDash read
+//!   calendars and reminders, for each kind not answered yet, and call
+//!   `done` once both are answered. Returns at once. Does nothing while an
+//!   earlier request waits, when TinyDash is not its own responsible
+//!   process (macOS would ask for the other app, and end TinyDash if that
+//!   app lacks the usage strings), in a build without the usage strings
+//!   (macOS ends an app that asks without them), or where TinyDash reads no
+//!   calendars.
+//! - `open_calendar_app(kind)`: open the app that holds an Up Next item:
+//!   Calendar for an event, Reminders for a reminder. An error where
+//!   TinyDash reads no calendars.
 //! - `find_files(name, folder, limit)`: up to `limit` paths under `folder`
 //!   whose names contain `name`, from the OS's own file index (Spotlight on
 //!   macOS), or none where TinyDash uses no such index. Blocks up to a second.
@@ -51,7 +85,7 @@
 //!   keeps. The size comes from the image header before the image is
 //!   decoded. On macOS the encoded bytes are copied in first. Only macOS
 //!   and Windows, where `read_clipboard` saves images; call it with the
-//!   clipboard reader lock held.
+//!   clipboard lock held.
 //! - `exclude_from_history(set)`: mark a copy secret for clipboard managers.
 //! - `clipboard_text(app)`: the clipboard's text now, or `None` when there
 //!   is none or its source marked it secret. History need not be on. Call
@@ -66,11 +100,68 @@
 //! - `launcher_position(window)`: where the launcher is now, in the units
 //!   `place_launcher` takes.
 //! - `remember_frontmost_app()` / `restore_frontmost_app()`: return focus after Escape.
+//!
+//! Snippet expansion as you type (`expander.rs`):
+//!
+//! - `typing_unavailable()`: why snippets cannot expand in this session (a
+//!   Wayland session on Linux), or `None`.
+//! - `typing_access(ask)`: `Ok` when TinyDash may read and send keys, else
+//!   an error that says what to allow. On macOS that is Accessibility and
+//!   Input Monitoring, which may count only once TinyDash starts again, so
+//!   the error also says to quit and reopen it; `ask` shows the macOS
+//!   prompts for what is missing.
+//! - `Focus`: the app (macOS) or window that gets typed keys. It can go to
+//!   another thread and is only compared.
+//! - `watch_typing(on_key)`: read the keys typed in every app on a thread of
+//!   its own, and pass each to `on_key` on that thread as a
+//!   [`Key`](crate::features::expansion::Key), with the `Focus` that got the
+//!   latest key: Backspace, the characters a key typed, or a reset (a key
+//!   pressed with Command, Control, Alt, or Windows; Return, Tab, Escape,
+//!   arrows, Home, End, Page Up or Down; a dead key; a click; a key in
+//!   another app, or on Windows and Linux another window, which passes a
+//!   reset first). A click is a press of a mouse button other than the
+//!   scroll wheel. A modifier key alone passes nothing. On macOS and
+//!   Windows, the keys that TinyDash types never reach `on_key`, so every
+//!   call while it types is a key or click from someone else, or the reset
+//!   after the watch turns on again. X11 does not mark them, so Linux
+//!   passes every key as a reset while TinyDash types. TinyDash sends no
+//!   clicks, so on every OS a click came from someone else.
+//!   Keep `on_key` quick: on Windows, typing waits for it. When the OS
+//!   stops passing keys but the thread runs on (the macOS tap turned off
+//!   after a timeout, or a Windows hook removed for answering too slowly),
+//!   the thread turns the watch on again and passes a reset, as it may have
+//!   missed keys. `TypingWatch::stop()` ends the thread and drops `on_key`.
+//!   `TypingWatch::is_running()` is false once the thread has ended, also
+//!   on its own, as on macOS when access is taken away; the thread then
+//!   logs why. Never log what it reads.
+//! - `type_text(focus, erase, text, interrupted)`: press Backspace `erase`
+//!   times, then type `text`, with Return for each line break, into
+//!   `focus`: the app or window that got the trigger, as `watch_typing`
+//!   passed it. It never pastes with the clipboard. Call it on a thread
+//!   other than the watch thread. It stops with an error before a part,
+//!   the first Backspace too, in these cases:
+//!   - `focus` is no longer in front. So focus that moved before typing
+//!     started, even while the clipboard was read for the snippet, leaves
+//!     the trigger as typed.
+//!   - `interrupted` is set: a key or click came after the trigger, or the
+//!     watch turned on again, so the text before the cursor may no longer
+//!     end with it. Every OS checks it with `no_input_since_trigger` before
+//!     the first Backspace, after any wait for modifiers. macOS and Windows
+//!     also check it before each later part, so a key or click while
+//!     TinyDash types stops it. Linux checks it before the first Backspace
+//!     only, as the keys that TinyDash types set it too.
+//!   - On Linux, a click came since typing started. So on Linux, a click
+//!     while TinyDash types stops it, and a key does not.
+//!   - A modifier stays down. Typed keys never take on a modifier that the
+//!     user holds: macOS clears the modifiers of each key, and Windows and
+//!     Linux wait with `modifiers_released` before each part until the user
+//!     lets go.
 
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
+mod terminal;
 #[cfg(target_os = "windows")]
 mod windows;
 
@@ -204,15 +295,61 @@ fn physical_position(window: &tauri::WebviewWindow) -> tauri::Result<LauncherPos
     })
 }
 
-/// Held while reading the clipboard. AppKit's pasteboard is not safe to
-/// read from two threads at once, and Windows lets one thread open the
-/// clipboard at a time; the capture thread and the widget pane both read.
+/// Held while reading or writing the clipboard. AppKit's pasteboard is not
+/// safe to use from two threads at once, and Windows lets one thread open
+/// the clipboard at a time; the capture thread, the widget pane, and
+/// actions all use it.
 #[cfg(not(target_os = "linux"))]
-static CLIPBOARD_READ: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static CLIPBOARD_USE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// This thread's hold on the clipboard lock, until it is dropped.
+#[cfg(not(target_os = "linux"))]
+struct ClipboardUser {
+    _lock: std::sync::MutexGuard<'static, ()>,
+}
 
 #[cfg(not(target_os = "linux"))]
-fn one_clipboard_reader() -> std::sync::MutexGuard<'static, ()> {
-    CLIPBOARD_READ.lock().unwrap_or_else(|e| e.into_inner())
+fn one_clipboard_user() -> ClipboardUser {
+    let lock = CLIPBOARD_USE.lock().unwrap_or_else(|e| e.into_inner());
+    #[cfg(test)]
+    HOLDS_CLIPBOARD.set(true);
+    ClipboardUser { _lock: lock }
+}
+
+// Tests that run at the same time also take the lock, so a test asks
+// whether its own thread holds it, not whether any thread does.
+#[cfg(all(test, not(target_os = "linux")))]
+thread_local! {
+    static HOLDS_CLIPBOARD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(all(test, not(target_os = "linux")))]
+impl Drop for ClipboardUser {
+    fn drop(&mut self) {
+        HOLDS_CLIPBOARD.set(false);
+    }
+}
+
+/// Whether this thread holds the clipboard lock now.
+#[cfg(all(test, not(target_os = "linux")))]
+pub fn clipboard_in_use() -> bool {
+    HOLDS_CLIPBOARD.get()
+}
+
+/// The clipboard's text now, also when its source marked it secret, so
+/// keep what is made from it secret too. Reads like every other read, one
+/// at a time.
+pub fn clipboard_text_unchecked() -> Option<String> {
+    #[cfg(not(target_os = "linux"))]
+    let _one_user = one_clipboard_user();
+    arboard::Clipboard::new().ok()?.get_text().ok()
+}
+
+/// Run `write`, which writes the clipboard, while no read runs.
+pub fn write_clipboard<T>(write: impl FnOnce() -> T) -> T {
+    #[cfg(not(target_os = "linux"))]
+    let _one_user = one_clipboard_user();
+    write()
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -248,7 +385,11 @@ fn read_with_arboard(images: bool, files: bool) -> Option<Content> {
 fn launch(program: &str) -> Result<()> {
     let mut child = std::process::Command::new(program)
         .spawn()
-        .map_err(|error| Error::msg(format!("Could not open {program}: {error}")))?;
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not open {program}: {error}. Check that it is installed."
+            ))
+        })?;
     // Reap it when it exits, so no zombie process stays behind.
     std::thread::spawn(move || child.wait());
     Ok(())
@@ -258,6 +399,41 @@ fn launch(program: &str) -> Result<()> {
 /// would wake the displays again.
 fn wait_for_key_release() {
     std::thread::sleep(std::time::Duration::from_secs(1));
+}
+
+/// How long typing a snippet waits for the user to let go of a modifier,
+/// such as the Shift of a keyword that ends in `@`.
+#[cfg(any(not(target_os = "macos"), test))]
+const MODIFIER_WAIT: std::time::Duration = std::time::Duration::from_millis(300);
+
+/// Wait until `held()` is false, for at most [`MODIFIER_WAIT`]. On Windows
+/// and Linux, the keys TinyDash types take on the modifiers that the user
+/// holds, so a held Control would turn them into shortcuts. False when a
+/// modifier stays down.
+#[cfg(any(not(target_os = "macos"), test))]
+fn modifiers_released(held: impl Fn() -> bool) -> bool {
+    let deadline = std::time::Instant::now() + MODIFIER_WAIT;
+    while held() {
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    true
+}
+
+/// An error when the key watch saw a key or click after the trigger, as
+/// `interrupted` says. The user typed on, clicked elsewhere, or switched
+/// tabs, so a Backspace could erase their text and not the trigger, and
+/// the snippet could land somewhere they did not mean.
+pub fn no_input_since_trigger(interrupted: &std::sync::atomic::AtomicBool) -> Result<()> {
+    if interrupted.load(std::sync::atomic::Ordering::Acquire) {
+        Err(Error::msg(
+            "Stopped typing the snippet: a key or click came after the trigger.",
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 /// Run a helper program with fixed arguments. Never pass user text here.
@@ -270,18 +446,54 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         command.creation_flags(CREATE_NO_WINDOW);
     }
-    let output = command
-        .output()
-        .map_err(|error| Error::msg(format!("Could not run {program}: {error}")))?;
+    let output = command.output().map_err(|error| {
+        Error::msg(format!(
+            "Could not run {program}: {error}. Check that it is installed."
+        ))
+    })?;
     if output.status.success() {
         return Ok(());
     }
     let detail = String::from_utf8_lossy(&output.stderr);
-    Err(Error::msg(format!("{program} failed: {}", detail.trim())))
+    let detail = detail.trim().trim_end_matches('.');
+    let reason = if detail.is_empty() {
+        String::new()
+    } else {
+        format!(": {detail}")
+    };
+    Err(Error::msg(format!("{program} failed{reason}. Try again.")))
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn typing_waits_briefly_for_modifiers_to_be_released() {
+        use super::{MODIFIER_WAIT, modifiers_released};
+        // The user lets go of Shift soon after the keyword's last key.
+        let checks = std::cell::Cell::new(0);
+        assert!(modifiers_released(|| {
+            checks.set(checks.get() + 1);
+            checks.get() < 3
+        }));
+        assert_eq!(checks.get(), 3);
+        // Control stays down: typing would press shortcuts, so it stops.
+        let started = std::time::Instant::now();
+        assert!(!modifiers_released(|| true));
+        assert!(started.elapsed() >= MODIFIER_WAIT);
+    }
+
+    #[test]
+    fn typing_stops_after_a_key_or_click_that_follows_the_trigger() {
+        use super::no_input_since_trigger;
+        use std::sync::atomic::AtomicBool;
+        assert!(no_input_since_trigger(&AtomicBool::new(false)).is_ok());
+        let error = no_input_since_trigger(&AtomicBool::new(true)).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Stopped typing the snippet: a key or click came after the trigger."
+        );
+    }
+
     mod monitor_containing {
         use super::super::monitor_containing;
         use tauri::{PhysicalPosition, PhysicalSize};
@@ -380,6 +592,24 @@ mod tests {
                     for _ in 0..20 {
                         super::clipboard_change();
                         super::read_clipboard(false, false);
+                    }
+                });
+            }
+        });
+    }
+
+    #[test]
+    fn unchecked_reads_wait_for_other_reads() {
+        // A snippet's {clipboard} reads while the capture thread checks a copy.
+        std::thread::scope(|scope| {
+            for reader in 0..8 {
+                scope.spawn(move || {
+                    for _ in 0..20 {
+                        if reader % 2 == 0 {
+                            super::read_clipboard(false, false);
+                        } else {
+                            super::clipboard_text_unchecked();
+                        }
                     }
                 });
             }

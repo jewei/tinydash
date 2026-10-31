@@ -40,6 +40,7 @@ src-tauri/src/
   spotlight.rs         More Files tab results from the OS's file index (Spotlight on macOS).
   hud.rs               The "Copied" message window, which never takes focus.
   monitor.rs           Clipboard capture thread.
+  expander.rs          Snippet expansion as you type: reads keys in other apps, types the snippet.
   updates.rs           Update checks and installs (macOS and Windows release builds).
   window.rs, tray.rs, shortcut.rs, images.rs, events.rs, system_clipboard.rs, error.rs
 src/

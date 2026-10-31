@@ -21,10 +21,12 @@ export const testSettings: Settings = {
   fileSearchFolders: ["~/Desktop", "~/Documents", "~/Downloads"],
   fileSearchExcludedDirs: ["node_modules", "target"],
   spotlightFiles: false,
+  expandSnippets: false,
   emojiSkinTone: 0,
   emojiLanguages: [],
   currencyRatesEnabled: false,
   searchEngine: "google",
+  shellCommands: false,
   checkForUpdates: true,
   launcherPosition: null,
   tabs: (["apps", "files", "clipboard", "snippets", "emoji", "system"] as const).map(
@@ -36,6 +38,7 @@ export const testSettings: Settings = {
   ),
   showClocks: true,
   clockCities: [],
+  showUpNext: false,
   showDiskSpace: true,
   showNotepad: false,
   showFocusTimer: false,
@@ -52,6 +55,7 @@ export const testSettings: Settings = {
 /** Every widget off, so an empty All search shows the preview. */
 export const noWidgets: Partial<Settings> = {
   showClocks: false,
+  showUpNext: false,
   showDiskSpace: false,
   showNotepad: false,
   showFocusTimer: false,
@@ -131,6 +135,7 @@ export function fakeBackend(
     install_update: () => null,
     widgets: () => ({
       clocks: [],
+      upNext: null,
       disk: null,
       note: null,
       focus: null,
@@ -151,6 +156,7 @@ export function fakeBackend(
       richClipboard: true,
       selfUpdate: true,
       pendingUpdate: null,
+      expandSnippetsUnavailable: null,
     }),
   };
   clearMocks();

@@ -28,7 +28,7 @@ use crate::{
         files::FileIndex,
         keywords,
         library::Library,
-        password, permissions, system, url_cleaner, web,
+        password, permissions, shell, system, url_cleaner, web,
     },
     settings::Settings,
 };
@@ -362,17 +362,23 @@ pub fn resolve(s: &Snapshot, ctx: &Context, id: &str) -> Option<SearchResult> {
 }
 
 /// All: instant answers, then name matches across sources, then fuzzy
-/// matches, then a web search unless a web keyword already answered. Inside
-/// each tier, sources keep a fixed order so that, for example, an app named
-/// like the query beats an emoji code.
+/// matches, then a web search unless a web keyword already answered or the
+/// text can be a shell command. Inside each tier, sources keep a fixed order
+/// so that, for example, an app named like the query beats an emoji code.
 fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<SearchResult> {
     // `=` asks for the calculation history and nothing else.
     if let Some(history) = s.calculations.answer(query) {
         return history;
     }
     // So does `?`, for the list of keywords.
-    if let Some(list) = keywords::answer(query, &s.library) {
+    if let Some(list) = keywords::answer(query, &s.library, s.settings.shell_commands) {
         return list;
+    }
+    // And `>`, a space, and a command, while the user allows them.
+    if s.settings.shell_commands
+        && let Some(command) = shell::answer(query)
+    {
+        return vec![command];
     }
     let mut results = answers(s, query);
     let keyword_search = results.iter().any(|r| r.kind == ResultKind::WebSearch);
@@ -424,6 +430,11 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         .map(|(_, hit)| hit.result)
         .filter(|result| !s.hidden.contains(&result.id) && seen.insert(result.id.clone()))
         .collect();
+    // While `>` runs commands, text that starts with it can be a command
+    // typed without the space, which may hold a password or a token. No
+    // web search or quicklink gets it, as either one would be the first
+    // row, which Enter opens, when nothing else matches.
+    let maybe_command = s.settings.shell_commands && query.trim_start().starts_with('>');
     // Quicklinks that can open the query, unless the user already chose a
     // keyword, such as `g` or a quicklink's own, or keeps snippets out of
     // All. A quicklink that shows as a name match is not offered again.
@@ -433,16 +444,18 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
             ResultKind::WebSearch | ResultKind::Quicklink | ResultKind::Snippet
         )
     });
-    let candidates: Vec<SearchResult> = if chose || !s.settings.in_all(Category::Snippets) {
-        Vec::new()
-    } else {
-        s.library
-            .fallbacks(query, ctx, s.now)
-            .into_iter()
-            .filter(|link| !s.hidden.contains(&link.id) && !answered.contains(&link.id))
-            .collect()
-    };
-    let fallback = usize::from(!keyword_search);
+    let candidates: Vec<SearchResult> =
+        if chose || maybe_command || !s.settings.in_all(Category::Snippets) {
+            Vec::new()
+        } else {
+            s.library
+                .fallbacks(query, ctx, s.now)
+                .into_iter()
+                .filter(|link| !s.hidden.contains(&link.id) && !answered.contains(&link.id))
+                .collect()
+        };
+    let web_search = !keyword_search && !maybe_command;
+    let fallback = usize::from(web_search);
     let room = |links: usize| ALL_LIMIT.saturating_sub(results.len() + fallback + links);
     // The links take room from the name matches, and the name matches that
     // show decide which links are left; fewer links leave more room, so
@@ -462,7 +475,7 @@ fn all(s: &Snapshot, ctx: &Context, query: &str, matcher: &mut Matcher) -> Vec<S
         links = offered.len();
     };
     results.extend(ranked.into_iter().take(room));
-    if !keyword_search {
+    if web_search {
         results.push(web::fallback(query, s.settings.search_engine));
     }
     results.extend(links);
@@ -930,10 +943,231 @@ mod tests {
         let state = crate::state::State::for_tests(Settings::default());
         let s = state.snapshot();
         for example in keywords::examples() {
-            let answered =
-                s.calculations.answer(example).is_some() || !answers(&s, example).is_empty();
+            let answered = s.calculations.answer(example).is_some()
+                || shell::answer(example).is_some()
+                || !answers(&s, example).is_empty();
             assert!(answered, "{example}");
         }
+    }
+
+    #[test]
+    fn a_shell_command_is_one_row_that_no_one_can_pin_alias_hide_or_bind() {
+        let state = crate::state::State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        let results = search(&state.snapshot(), "  > git pull ", Category::All);
+        assert_eq!(results.len(), 1, "{results:?}");
+        let row = &results[0];
+        assert_eq!(
+            (row.kind, row.title.as_str()),
+            (ResultKind::Shell, "git pull")
+        );
+        let actions: Vec<&Action> = row.actions.iter().map(|entry| &entry.action).collect();
+        assert_eq!(
+            actions,
+            [
+                &Action::RunInTerminal {
+                    command: "git pull".into()
+                },
+                &Action::Copy {
+                    text: "git pull".into()
+                },
+            ]
+        );
+        assert!(!row.actions.iter().any(|entry| matches!(
+            entry.action,
+            Action::Pin { .. }
+                | Action::Unpin { .. }
+                | Action::SetAlias { .. }
+                | Action::SetHotkey { .. }
+                | Action::Hide { .. }
+        )));
+        // Saved data never brings it back: its ID names no source.
+        assert!(resolve(&state.snapshot(), &Context::none(), &row.id).is_none());
+        // `>` alone, also with the space that its `?` row types, is not a
+        // command. Nothing here is named `>`, and no website gets it.
+        for query in [">", "> "] {
+            let results = search(&state.snapshot(), query, Category::All);
+            assert!(results.is_empty(), "{query:?}: {results:?}");
+        }
+        // It is an answer in All only.
+        assert!(
+            search(&state.snapshot(), "> git pull", Category::Apps)
+                .iter()
+                .all(|result| result.kind != ResultKind::Shell)
+        );
+
+        // Turned off, `>` searches as before.
+        let off = crate::state::State::for_tests(Settings::default());
+        let results = search(&off.snapshot(), "> git pull", Category::All);
+        assert!(
+            results
+                .iter()
+                .all(|result| result.kind != ResultKind::Shell)
+        );
+        assert_eq!(results.last().map(|r| r.kind), Some(ResultKind::WebSearch));
+    }
+
+    #[test]
+    fn only_the_sign_and_a_space_start_a_command_so_keywords_and_aliases_stay() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        for (kind, name, keyword, text) in [
+            (
+                LibraryKind::Quicklink,
+                "Jira",
+                ">j",
+                "https://jira.test/{query}",
+            ),
+            (LibraryKind::Snippet, "Signature", ">sig", "Best, Sam"),
+        ] {
+            let item = LibraryItem {
+                id: None,
+                kind,
+                name: name.into(),
+                keyword: keyword.into(),
+                text: text.into(),
+            };
+            state.store.save_library_item(&item).unwrap();
+        }
+        state.reload_library().unwrap();
+        state.aliases.set(Aliases::new([
+            ("system:sleep".into(), ">zz".into()),
+            // An alias stays when its item is gone for now.
+            ("app:/Applications/Gone.app".into(), ">t".into()),
+        ]));
+        let results = |query: &str| search(&state.snapshot(), query, Category::All);
+        let jira = results(">j ABC-12")[0].clone();
+        assert_eq!(jira.title, "Jira: ABC-12");
+        assert_eq!(jira.kind, ResultKind::Quicklink);
+        assert_eq!(results(">J")[0].title, "Jira");
+        assert_eq!(results(">sig")[0].title, "Signature");
+        assert_eq!(results(">zz")[0].id, "system:sleep");
+        // The `?` list types `>j `, and the text after it opens the link.
+        let list = results("? >j");
+        assert!(list.iter().any(|row| row.title == ">j"), "{list:?}");
+        // Without a space after `>`, other text searches as before, also
+        // the alias of an app that is gone, but it may be a command, so no
+        // website gets it.
+        for query in [">jq .", ">t", ">sig x"] {
+            let found = results(query);
+            assert!(
+                found.iter().all(|row| !matches!(
+                    row.kind,
+                    ResultKind::Shell | ResultKind::WebSearch
+                ) && !row.title.starts_with("Jira: ")),
+                "{query}: {found:?}"
+            );
+        }
+        // With a space, the text is a command, also when it names a keyword.
+        for (query, command) in [("> j ABC-12", "j ABC-12"), ("> sig", "sig"), ("> zz", "zz")] {
+            let found = results(query);
+            assert_eq!(found.len(), 1, "{query}: {found:?}");
+            assert_eq!(
+                (found[0].kind, found[0].title.as_str()),
+                (ResultKind::Shell, command)
+            );
+        }
+    }
+
+    #[test]
+    fn a_keyword_or_alias_that_is_the_sign_alone_keeps_its_item() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let state = crate::state::State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        for (kind, name, text) in [
+            (LibraryKind::Quicklink, "Jira", "https://jira.test/{query}"),
+            (LibraryKind::Snippet, "Signature", "Best, Sam"),
+        ] {
+            let item = LibraryItem {
+                id: None,
+                kind,
+                name: name.into(),
+                keyword: ">".into(),
+                text: text.into(),
+            };
+            state.store.save_library_item(&item).unwrap();
+        }
+        state.reload_library().unwrap();
+        state
+            .aliases
+            .set(Aliases::new([("system:sleep".into(), ">".into())]));
+        let results = |query: &str| search(&state.snapshot(), query, Category::All);
+        // Typed alone, `>` finds each of them, the whole alias first.
+        let found = results(">");
+        assert_eq!(found[0].id, "system:sleep", "{found:?}");
+        for (kind, name) in [
+            (ResultKind::Quicklink, "Jira"),
+            (ResultKind::Snippet, "Signature"),
+        ] {
+            assert!(
+                found
+                    .iter()
+                    .any(|row| row.kind == kind && row.title == name),
+                "{name}: {found:?}"
+            );
+        }
+        // The quicklink's `?` row types `> `, which shows the same rows.
+        let list = results("? >");
+        let own = list
+            .iter()
+            .find(|row| row.subtitle.starts_with("Jira"))
+            .unwrap();
+        assert_eq!(
+            own.actions[0].action,
+            Action::TypeQuery { text: "> ".into() }
+        );
+        assert_eq!(results("> "), found);
+        // The one exception: the text after it is a command, not the link's.
+        let found = results("> ABC-12");
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0].kind, ResultKind::Shell);
+    }
+
+    #[test]
+    fn text_after_the_sign_goes_to_no_website_only_while_shell_commands_are_on() {
+        use crate::features::library::{LibraryItem, LibraryKind};
+        let search_with = |shell_commands: bool, query: &str| {
+            let state = crate::state::State::for_tests(Settings {
+                shell_commands,
+                ..Settings::default()
+            });
+            let item = LibraryItem {
+                id: None,
+                kind: LibraryKind::Quicklink,
+                name: "Translate".into(),
+                keyword: String::new(),
+                text: "https://translate.test/?q={query}".into(),
+            };
+            state.store.save_library_item(&item).unwrap();
+            state.reload_library().unwrap();
+            search(&state.snapshot(), query, Category::All)
+                .into_iter()
+                .map(|result| result.kind)
+                .collect::<Vec<_>>()
+        };
+        let websites = [ResultKind::WebSearch, ResultKind::Quicklink];
+        // A command typed without the space, with a token in it.
+        let command = r#">curl -H "Authorization: Bearer sk_live_abc" https://api.test/x"#;
+        for query in [command, " >jq .", ">"] {
+            let on = search_with(true, query);
+            assert!(
+                !on.iter().any(|kind| websites.contains(kind)),
+                "{query}: {on:?}"
+            );
+            // Turned off, `>` is plain text, which a web search and a
+            // quicklink with `{query}` can open as before.
+            let off = search_with(false, query);
+            assert_eq!(off, websites, "{query}");
+        }
+        // Other text still ends with them.
+        assert_eq!(search_with(true, "jq ."), websites);
     }
 
     #[test]
@@ -946,6 +1180,18 @@ mod tests {
         assert!(results.iter().all(|r| r.actions.len() == 1));
         let results = search(&state.snapshot(), "?", Category::Apps);
         assert!(results.iter().all(|r| r.kind != ResultKind::Keyword));
+        // `>` joins the list only while it runs commands.
+        let shell_row = |settings| {
+            let state = crate::state::State::for_tests(settings);
+            search(&state.snapshot(), "?", Category::All)
+                .iter()
+                .any(|result| result.title == ">")
+        };
+        assert!(!shell_row(Settings::default()));
+        assert!(shell_row(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        }));
     }
 
     #[test]

@@ -29,6 +29,11 @@ fileSearchExcludedDirs: Array<string>,
  */
 spotlightFiles: boolean, 
 /**
+ * Typing `;` and a snippet's keyword in any app replaces it with the
+ * snippet. Off by default: it reads the keys typed in other apps.
+ */
+expandSnippets: boolean, 
+/**
  * 0 is the default yellow; 1–5 are light to dark.
  */
 emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnabled: boolean, 
@@ -37,6 +42,11 @@ emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnable
  * hours. Only builds that can update themselves look.
  */
 checkForUpdates: boolean, searchEngine: SearchEngine, 
+/**
+ * `>`, a space, and a command run that command in the terminal. Off by
+ * default.
+ */
+shellCommands: boolean, 
 /**
  * Where the user dragged the launcher, in the units of
  * `platform::launcher_position`. `None` centers it on the screen with
@@ -57,7 +67,12 @@ showClocks: boolean,
 /**
  * Places the clocks widget shows next to local time, as typed.
  */
-clockCities: Array<string>, showDiskSpace: boolean, showNotepad: boolean, showFocusTimer: boolean, focusMinutes: number, shortBreakMinutes: number, longBreakMinutes: number, 
+clockCities: Array<string>, 
+/**
+ * The rest of today's events and the reminders due today (macOS).
+ * Off by default: turning it on asks the OS for access to them.
+ */
+showUpNext: boolean, showDiskSpace: boolean, showNotepad: boolean, showFocusTimer: boolean, focusMinutes: number, shortBreakMinutes: number, longBreakMinutes: number, 
 /**
  * Focus sessions in a cycle; the last one earns the long break.
  */

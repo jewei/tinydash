@@ -8,6 +8,7 @@ mod cli;
 mod commands;
 mod error;
 mod events;
+mod expander;
 mod features;
 mod hud;
 mod images;
@@ -56,6 +57,8 @@ pub fn run() {
         )
         .init();
 
+    // Before Tauri starts GTK, which opens the X display on Linux.
+    platform::prepare_process();
     tauri::Builder::default()
         // Must be first: a second process hands over its arguments and exits.
         .plugin(tauri_plugin_single_instance::init(
@@ -112,6 +115,11 @@ pub fn run() {
             if platform::is_reopen(&event) {
                 open(app, Launch::Launcher, true);
             }
+            // Stop reading keys before the process ends; this forgets what
+            // was typed.
+            if matches!(event, tauri::RunEvent::Exit) {
+                expander::stop();
+            }
         });
 }
 
@@ -135,11 +143,12 @@ fn setup(app: &mut App) {
 
     let mut warnings = Vec::new();
     let settings::Loaded {
-        settings,
+        mut settings,
         warning,
         file: settings_file,
     } = settings::load(&config_dir);
     warnings.extend(warning);
+    warnings.extend(shortcut::checked_at_startup(&mut settings));
     if legacy_dir.join(LEGACY_DATABASE).exists() {
         warnings.push(format!(
             "This version starts with new history and pins. Data from TinyDash 0.1 is still in {}: delete {LEGACY_DATABASE} and recovery.tar there if you no longer need it.",
@@ -152,14 +161,13 @@ fn setup(app: &mut App) {
             store
         }
         Err(error) => {
-            warnings.push(format!(
-                "Could not open saved data ({error}). Changes this session will not be saved."
-            ));
+            warnings.push(data_not_opened(&error));
             store::Store::in_memory()
         }
     };
     let shortcut = settings.shortcut.clone();
     let tray_visible = settings.show_tray_icon;
+    let expand_snippets = settings.expand_snippets;
     app.manage(State::new(
         settings,
         settings_file,
@@ -178,10 +186,12 @@ fn setup(app: &mut App) {
         state.warn(error.to_string());
     }
     for failure in shortcut::sync(handle, &state.hotkeys.get()) {
-        state.warn(format!("A hotkey is off. {}", failure.error));
+        state.warn(actions::hotkey_off(&state.snapshot(), &failure));
     }
     if let Err(error) = tray::set_visible(handle, tray_visible) {
-        state.warn(format!("The tray icon is unavailable: {error}"));
+        state.warn(format!(
+            "The tray icon is unavailable: {error}. Open TinyDash with its shortcut instead."
+        ));
     }
     if let Some(launcher) = handle.get_webview_window(window::LAUNCHER) {
         platform::prepare_launcher(&launcher);
@@ -190,12 +200,25 @@ fn setup(app: &mut App) {
         tracing::warn!(%error, "Copy messages are unavailable");
     }
     monitor::start(handle);
+    if expand_snippets && let Err(error) = expander::start(handle, false) {
+        state.warn(format!("Snippets do not expand as you type. {error}"));
+    }
     timer::start(handle);
     watcher::watch(handle);
     refresh::apps(handle);
     refresh::files(handle);
     refresh::rates(handle, false);
     refresh::weather(handle, false);
+}
+
+/// The warning when saved data cannot open. Only a file error has no step of
+/// its own, so only it gets one here; a second step would repeat the first.
+fn data_not_opened(error: &error::Error) -> String {
+    let step = match error {
+        error::Error::Io(_) => " To try again, quit and reopen TinyDash.",
+        _ => "",
+    };
+    format!("Could not open saved data, so changes this session will not be saved. {error}{step}")
 }
 
 /// Act on launch arguments. With no arguments, a second launch toggles the
@@ -225,5 +248,26 @@ mod tests {
             capability["permissions"],
             serde_json::json!(["core:event:allow-listen", "core:event:allow-unlisten"])
         );
+    }
+
+    #[test]
+    fn the_data_warning_gives_one_next_step() {
+        use crate::error::Error;
+        use rusqlite::ffi;
+        let file =
+            super::data_not_opened(&std::io::Error::from(std::io::ErrorKind::NotFound).into());
+        assert!(
+            file.ends_with(". To try again, quit and reopen TinyDash."),
+            "{file}"
+        );
+        let data = super::data_not_opened(&Error::from(rusqlite::Error::SqliteFailure(
+            ffi::Error::new(ffi::SQLITE_IOERR),
+            None,
+        )));
+        assert!(
+            data.ends_with(". Try again, or restart TinyDash."),
+            "{data}"
+        );
+        assert!(!data.contains("quit and reopen"), "{data}");
     }
 }

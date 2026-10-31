@@ -2,14 +2,17 @@
 //! Each widget is `None` while its switch in Settings is off.
 
 use serde::Serialize;
+use tauri::AppHandle;
 use ts_rs::TS;
 
 use crate::{
     error::{Error, Result},
+    events,
     features::{
         clip_card::{self, ClipCard},
         datetime::{self, CityClock},
         focus::FocusTimer,
+        up_next::{self, UpNext},
         weather::WeatherView,
     },
     platform,
@@ -20,7 +23,8 @@ use crate::{
 
 /// Below this share of free space, the disk widget warns.
 const LOW_DISK_PERCENT: u64 = 10;
-/// The longest scratch note, in characters. The launcher's field stops here too.
+/// The longest scratch note, in characters. The launcher's field sets no
+/// `maxLength`, which counts UTF-16 units; `save_note` reports this limit.
 pub const MAX_NOTE_CHARS: usize = 10_000;
 
 #[derive(Serialize, TS)]
@@ -30,6 +34,9 @@ pub struct Widgets {
     /// The cities next to local time. A city that names no time zone, as a
     /// hand-edited file may hold, is left out.
     pub clocks: Option<Vec<CityClock>>,
+    /// The rest of today's events and the reminders due today. `None`
+    /// also where TinyDash reads no calendars.
+    pub up_next: Option<UpNext>,
     /// The disk that holds the home folder.
     pub disk: Option<Disk>,
     /// The scratch note.
@@ -128,6 +135,14 @@ pub fn load(state: &State, clipboard: impl FnOnce() -> Option<String>) -> Widget
                 .filter_map(|city| datetime::city_clock(city, now))
                 .collect()
         }),
+        up_next: settings
+            .show_up_next
+            .then(|| {
+                let (from, to) = up_next::window(&now);
+                platform::read_up_next(from, to)
+            })
+            .flatten()
+            .map(|agenda| up_next::view(agenda, &now)),
         disk: settings
             .show_disk_space
             .then(|| Disk::read(&state.dirs.home)),
@@ -140,6 +155,13 @@ pub fn load(state: &State, clipboard: impl FnOnce() -> Option<String>) -> Widget
             .flatten()
             .and_then(|text| clip_card::detect(&text, now)),
     }
+}
+
+/// Ask the OS to let Up Next read calendars and reminders, for each kind
+/// the user has not answered, and load the pane again after the answers.
+pub fn ask_calendar_access(app: &AppHandle) {
+    let app = app.clone();
+    platform::ask_calendar_access(move || events::widgets_changed(&app));
 }
 
 /// The latest weather for the city, or how getting it is going.
@@ -191,7 +213,10 @@ mod tests {
             show_clocks: false,
             ..Settings::default()
         });
-        assert!(load(&off, || None).clocks.is_none());
+        let widgets = load(&off, || None);
+        assert!(widgets.clocks.is_none());
+        // Off by default, so nothing asks the OS for calendars.
+        assert!(widgets.up_next.is_none());
     }
 
     #[test]
@@ -239,6 +264,10 @@ mod tests {
         assert!(total_bytes > 0 && free_bytes <= total_bytes, "{name}");
         for missing in [home.join("tinydash-missing-folder"), PathBuf::new()] {
             assert!(matches!(Disk::read(&missing), Disk::Unavailable { .. }));
+            // The OS's reason alone: a file error's own words would repeat
+            // what the widget says.
+            let error = platform::disk_space(&missing).err();
+            assert!(matches!(error, Some(Error::Message(_))), "{error:?}");
         }
     }
 

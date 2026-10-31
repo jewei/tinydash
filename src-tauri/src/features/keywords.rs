@@ -8,7 +8,10 @@ use crate::{
         library::{Library, LibraryKind},
         web,
     },
-    search::result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
+    search::{
+        matcher::normalize,
+        result::{Action, Icon, ResultAction, ResultKind, SearchResult, Symbol},
+    },
 };
 
 /// Rows in the list. Up to 500 snippets and quicklinks can have keywords,
@@ -89,21 +92,35 @@ const BUILT_IN: &[BuiltIn] = &[
     },
 ];
 
+/// Listed after the built-in rows, only while shell commands are on.
+const SHELL: BuiltIn = BuiltIn {
+    keywords: ">",
+    what: "Run a shell command in your terminal",
+    example: "> git pull",
+    typed: "> ",
+    symbol: Symbol::Terminal,
+};
+
 /// The examples of the built-in rows, for the test that each one answers.
 #[cfg(test)]
 pub fn examples() -> impl Iterator<Item = &'static str> {
-    BUILT_IN.iter().map(|entry| entry.example)
+    BUILT_IN.iter().chain([&SHELL]).map(|entry| entry.example)
 }
 
-/// `?` or `? words` in All; `None` for any other query.
-pub fn answer(query: &str, library: &Library) -> Option<Vec<SearchResult>> {
+/// `?` or `? words` in All; `None` for any other query. `shell_commands`
+/// says whether `>` runs commands, so the list shows it.
+pub fn answer(query: &str, library: &Library, shell_commands: bool) -> Option<Vec<SearchResult>> {
     let filter = query.trim().strip_prefix('?')?;
     // `?x` is not this list; a space must follow, as for `=`.
     if !(filter.is_empty() || filter.starts_with(char::is_whitespace)) {
         return None;
     }
-    let words: Vec<String> = filter.split_whitespace().map(str::to_lowercase).collect();
-    let built_in = BUILT_IN.iter().map(|entry| {
+    let words: Vec<String> = normalize(filter)
+        .split_whitespace()
+        .map(String::from)
+        .collect();
+    let shell = shell_commands.then_some(&SHELL);
+    let built_in = BUILT_IN.iter().chain(shell).map(|entry| {
         row(
             format!("keyword:{}", entry.keywords),
             entry.keywords,
@@ -216,7 +233,7 @@ mod tests {
             item(3, LibraryKind::Snippet, "No keyword", "", "text"),
             item(4, LibraryKind::Snippet, "Bank PIN", "pin", "1234"),
         ]);
-        let rows = answer("?", &library).unwrap();
+        let rows = answer("?", &library, false).unwrap();
         let titles: Vec<&str> = rows.iter().map(|row| row.title.as_str()).collect();
         assert_eq!(titles[0], "=");
         assert!(titles.contains(&"g, google"));
@@ -244,26 +261,62 @@ mod tests {
             "jira",
             "https://jira.test/{query}",
         )]);
-        let rows = answer("?  JIRA ", &library).unwrap();
+        let rows = answer("?  JIRA ", &library, false).unwrap();
         assert_eq!(rows.len(), 1);
-        let rows = answer("? search git", &library).unwrap();
+        let rows = answer("? search git", &library, false).unwrap();
         assert_eq!(rows[0].title, "gh, github");
         // A word matches the start of a word: "digits" in the PIN row has
         // "git" inside it, not at its start.
-        let titles: Vec<String> = answer("? git", &library)
+        let titles: Vec<String> = answer("? git", &library, false)
             .unwrap()
             .into_iter()
             .map(|row| row.title)
             .collect();
         assert_eq!(titles, ["gh, github"]);
-        assert_eq!(answer("? =", &library).unwrap()[0].title, "=");
+        assert_eq!(answer("? =", &library, false).unwrap()[0].title, "=");
         assert_eq!(typed(&rows[0]), "gh ");
-        assert!(answer("? nothing-like-this", &library).unwrap().is_empty());
+        assert!(
+            answer("? nothing-like-this", &library, false)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn the_shell_sign_is_listed_only_while_shell_commands_are_on() {
+        let library = Library::new(Vec::new());
+        let has_shell = |rows: Vec<SearchResult>| rows.iter().any(|row| row.title == ">");
+        assert!(!has_shell(answer("?", &library, false).unwrap()));
+        let rows = answer("?", &library, true).unwrap();
+        let shell = rows.iter().find(|row| row.title == ">").unwrap();
+        assert_eq!(typed(shell), "> ");
+        assert!(shell.subtitle.ends_with("> git pull"), "{}", shell.subtitle);
+        // It comes after the other built-in rows, before the web keywords.
+        let after = rows.iter().position(|row| row.title == ">").unwrap();
+        assert_eq!(rows[after - 1].title, "chmod");
+        for words in ["? shell", "? terminal", "? >"] {
+            assert!(has_shell(answer(words, &library, true).unwrap()), "{words}");
+        }
+    }
+
+    #[test]
+    fn words_match_in_either_unicode_form() {
+        let library = Library::new(vec![item(
+            1,
+            LibraryKind::Snippet,
+            "Caf\u{e9} menu",
+            "menu",
+            "Soup",
+        )]);
+        // Pasted text can hold decomposed accents.
+        let rows = answer("? cafe\u{301}", &library, false).unwrap();
+        let titles: Vec<&str> = rows.iter().map(|row| row.title.as_str()).collect();
+        assert_eq!(titles, ["menu"]);
     }
 
     #[test]
     fn each_built_in_row_types_the_start_of_its_example() {
-        for entry in BUILT_IN {
+        for entry in BUILT_IN.iter().chain([&SHELL]) {
             assert!(
                 entry.example.starts_with(entry.typed.trim_end()),
                 "{}",
@@ -276,8 +329,8 @@ mod tests {
     #[test]
     fn other_queries_are_not_the_list() {
         let library = Library::new(Vec::new());
-        for query in ["", "?x", "what?", "x ?"] {
-            assert!(answer(query, &library).is_none(), "{query}");
+        for query in ["", "?x", "what?"] {
+            assert!(answer(query, &library, false).is_none(), "{query}");
         }
     }
 }

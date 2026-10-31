@@ -1,15 +1,23 @@
 use std::{
+    cell::{OnceCell, RefCell},
+    ffi::{c_ulong, c_void},
     path::{Path, PathBuf},
     process::Command,
+    ptr::NonNull,
     sync::{
-        Mutex,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex, OnceLock,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        mpsc,
     },
+    thread::JoinHandle,
+    time::Duration,
 };
 
+use block2::RcBlock;
 use objc2::{
-    AllocAnyThread,
+    AllocAnyThread, msg_send,
     rc::{Retained, autoreleasepool},
+    runtime::AnyObject,
 };
 use objc2_app_kit::{
     NSApplicationActivationOptions, NSBitmapImageFileType, NSBitmapImageRep,
@@ -17,8 +25,19 @@ use objc2_app_kit::{
     NSPasteboard, NSPasteboardTypeTIFF, NSRunningApplication, NSWindow, NSWindowCollectionBehavior,
     NSWorkspace,
 };
+use objc2_core_foundation::{CFMachPort, CFRetained, CFRunLoop, kCFRunLoopCommonModes};
+use objc2_core_graphics::{
+    CGEvent, CGEventField, CGEventFlags, CGEventSource, CGEventSourceStateID, CGEventTapLocation,
+    CGEventTapOptions, CGEventTapPlacement, CGEventTapProxy, CGEventType,
+    CGPreflightListenEventAccess, CGRequestListenEventAccess,
+};
+use objc2_event_kit::{
+    EKAuthorizationStatus, EKCalendarItem, EKEntityType, EKEvent, EKEventStatus, EKEventStore,
+    EKParticipantStatus, EKReminder,
+};
 use objc2_foundation::{
-    NSArray, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
+    NSArray, NSBundle, NSCalendar, NSCalendarIdentifierGregorian, NSDate, NSDateComponentUndefined,
+    NSDateComponents, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString, NSURL,
     NSURLVolumeAvailableCapacityForImportantUsageKey, NSURLVolumeLocalizedNameKey,
     NSURLVolumeTotalCapacityKey,
 };
@@ -29,7 +48,9 @@ use crate::{
     features::{
         apps::App,
         clipboard::{Content, pixels_fit},
+        expansion::{self, Key, Piece},
         system::SystemCommand,
+        up_next::{self, Agenda, Due, Unreadable, UpNextKind},
     },
     settings::LauncherPosition,
 };
@@ -288,6 +309,8 @@ fn describe(bundle_id: Option<&str>, category: Option<&str>) -> Option<&'static 
     })
 }
 
+pub fn prepare_process() {}
+
 pub fn prepare_app(app: &mut tauri::App) {
     // A launcher lives in the menu bar, not the Dock.
     app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -316,8 +339,11 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
 }
 
 pub fn launch_app(path: &Path) -> Result<()> {
-    tauri_plugin_opener::open_path(path, None::<&str>)
-        .map_err(|error| Error::msg(error.to_string()))
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open the app: {error}. Check that it is still installed."
+        ))
+    })
 }
 
 /// Draw the Finder icon of `path` into a square bitmap of `pixels` and
@@ -413,7 +439,7 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
 /// nothing, so each one asks and is added only when allowed.
 pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
     use objc2::runtime::Bool;
-    use objc2_foundation::{NSBundle, NSError};
+    use objc2_foundation::NSError;
     use objc2_user_notifications::{
         UNAuthorizationOptions, UNMutableNotificationContent, UNNotificationRequest,
         UNNotificationSound, UNUserNotificationCenter,
@@ -432,7 +458,7 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
     content.setBody(&NSString::from_str(body));
     content.setSound(Some(&UNNotificationSound::defaultSound()));
     // A new identifier each time, so a notification never replaces the last.
-    let id = format!("focus-{}", chrono::Utc::now().timestamp_millis());
+    let id = format!("tinydash-{}", chrono::Utc::now().timestamp_millis());
     let request = UNNotificationRequest::requestWithIdentifier_content_trigger(
         &NSString::from_str(&id),
         &content,
@@ -452,6 +478,341 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
             &add,
         );
     Ok(())
+}
+
+/// The usage strings macOS needs before it asks for calendars and
+/// reminders: the full-access ones from macOS 14, the others before.
+const CALENDAR_USAGE_KEYS: [&str; 4] = [
+    "NSCalendarsFullAccessUsageDescription",
+    "NSCalendarsUsageDescription",
+    "NSRemindersFullAccessUsageDescription",
+    "NSRemindersUsageDescription",
+];
+/// Reminders come back on a queue of EventKit's; stop waiting after this.
+const REMINDERS_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+/// Set while a request for access waits for the user.
+static ASKING_FOR_CALENDARS: AtomicBool = AtomicBool::new(false);
+/// The store that reads Up Next. Apple advises keeping one, since a store
+/// is slow to make and to release.
+static EVENT_STORE: Mutex<Option<KeptStore>> = Mutex::new(None);
+
+struct KeptStore {
+    store: Retained<EKEventStore>,
+    /// Whether events and reminders could be read when the store was made.
+    /// A store made before the user allowed access keeps seeing nothing,
+    /// so a new answer needs a new store.
+    readable: [bool; 2],
+}
+
+// SAFETY: A thread may use a store that another thread made, as Apple's
+// guide does to fetch events off the main thread, and the mutex lets one
+// read at a time use this one.
+unsafe impl Send for KeptStore {}
+
+pub fn read_up_next(from_ms: i64, to_ms: i64) -> Option<Agenda> {
+    let own = is_own_responsible_process();
+    let events = calendar_access(EKEntityType::Event, own);
+    let reminders = calendar_access(EKEntityType::Reminder, own);
+    if let (Err(events), Err(reminders)) = (&events, &reminders) {
+        return Some(Agenda {
+            events: Err(events.clone()),
+            reminders: Err(reminders.clone()),
+        });
+    }
+    let readable = [events.is_ok(), reminders.is_ok()];
+    autoreleasepool(|_| {
+        // Held until the read ends, so one read at a time uses the store.
+        let mut kept = EVENT_STORE.lock().unwrap_or_else(|e| e.into_inner());
+        let store = match &mut *kept {
+            Some(current) if current.readable == readable => current.store.clone(),
+            slot => {
+                // SAFETY: `new` takes no arguments and makes an empty store.
+                let store = unsafe { EKEventStore::new() };
+                *slot = Some(KeptStore {
+                    store: store.clone(),
+                    readable,
+                });
+                store
+            }
+        };
+        let to = ns_date(to_ms);
+        Some(Agenda {
+            events: events.map(|()| read_events(&store, &ns_date(from_ms), &to)),
+            reminders: reminders.and_then(|()| read_reminders(&store, &to)),
+        })
+    })
+}
+
+pub fn ask_calendar_access(done: impl Fn() + Send + Sync + 'static) {
+    use objc2::runtime::Bool;
+    use objc2_foundation::NSError;
+    let own = is_own_responsible_process();
+    let kinds: Vec<EKEntityType> = [EKEntityType::Event, EKEntityType::Reminder]
+        .into_iter()
+        .filter(|&kind| calendar_access(kind, own) == Err(Unreadable::NotAsked))
+        .collect();
+    if kinds.is_empty() || ASKING_FOR_CALENDARS.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    // SAFETY: `new` takes no arguments and makes an empty store.
+    let store = unsafe { EKEventStore::new() };
+    let waiting = Arc::new(AtomicUsize::new(kinds.len()));
+    let done = Arc::new(done);
+    for kind in kinds {
+        let (waiting, done, kept) = (Arc::clone(&waiting), Arc::clone(&done), store.clone());
+        // EventKit calls this once, on a queue of its own. The store only
+        // has to live until then; the handler never uses it, and releasing
+        // an object is safe on any thread.
+        let answered = RcBlock::new(move |_granted: Bool, _error: *mut NSError| {
+            let _store = &kept;
+            if waiting.fetch_sub(1, Ordering::AcqRel) == 1 {
+                ASKING_FOR_CALENDARS.store(false, Ordering::Release);
+                done();
+            }
+        });
+        let handler = RcBlock::as_ptr(&answered);
+        // SAFETY: `handler` points to a live block of the expected type,
+        // which EventKit copies. Each request method exists on the macOS
+        // versions it is called on.
+        unsafe {
+            if objc2::available!(macos = 14.0) {
+                if kind == EKEntityType::Reminder {
+                    store.requestFullAccessToRemindersWithCompletion(handler);
+                } else {
+                    store.requestFullAccessToEventsWithCompletion(handler);
+                }
+            } else {
+                #[allow(deprecated)]
+                store.requestAccessToEntityType_completion(kind, handler);
+            }
+        }
+    }
+}
+
+pub fn open_calendar_app(kind: UpNextKind) -> Result<()> {
+    let app = match kind {
+        UpNextKind::Event => "com.apple.iCal",
+        UpNextKind::Reminder => "com.apple.reminders",
+    };
+    super::run("/usr/bin/open", &["-b", app])
+}
+
+/// Whether TinyDash may read one kind, from the answer macOS keeps. Never
+/// asks. `own_responsible_process` comes from `is_own_responsible_process`.
+fn calendar_access(
+    kind: EKEntityType,
+    own_responsible_process: bool,
+) -> std::result::Result<(), Unreadable> {
+    if !own_responsible_process {
+        // The saved answer would be the other app's, so it is not read.
+        return Err(Unreadable::OpenedByAnotherApp);
+    }
+    // SAFETY: A class method that reads the saved answer for a valid kind.
+    match unsafe { EKEventStore::authorizationStatusForEntityType(kind) } {
+        EKAuthorizationStatus::FullAccess => Ok(()),
+        EKAuthorizationStatus::NotDetermined
+            if has_calendar_usage_strings(&NSBundle::mainBundle()) =>
+        {
+            Err(Unreadable::NotAsked)
+        }
+        EKAuthorizationStatus::NotDetermined => Err(Unreadable::CannotAsk),
+        EKAuthorizationStatus::Restricted => Err(Unreadable::Restricted),
+        // Denied, or Add Events Only, which cannot read.
+        _ => Err(Unreadable::Denied),
+    }
+}
+
+/// `pid_t responsibility_get_pid_responsible_for_pid(pid_t)`, a private
+/// libSystem function: the process that macOS holds responsible for a
+/// process, or -1 when it cannot tell.
+type ResponsibleFor = extern "C" fn(libc::pid_t) -> libc::pid_t;
+
+/// Whether TinyDash is its own responsible process. macOS checks the access
+/// and the usage strings of the responsible process, not of the process
+/// that reads or asks, and a program that a terminal or another app starts
+/// belongs to that app. An app that launchd starts is its own: from Finder,
+/// Launchpad, the Dock, or `open`. So are the login item, a LaunchAgent
+/// that runs the binary, and the restart after an update, which Tauri runs
+/// through `/usr/bin/open -n`. The answer cannot change while TinyDash
+/// runs, so it is looked up once.
+fn is_own_responsible_process() -> bool {
+    static OWN: OnceLock<bool> = OnceLock::new();
+    *OWN.get_or_init(|| {
+        let pid = std::process::id() as libc::pid_t;
+        responsible_for_itself(find_responsible_for(), pid)
+    })
+}
+
+/// The private function, where this macOS has it.
+fn find_responsible_for() -> Option<ResponsibleFor> {
+    // SAFETY: dlsym receives a valid C string, and returns null when no
+    // loaded library defines the symbol.
+    let symbol = unsafe {
+        libc::dlsym(
+            libc::RTLD_DEFAULT,
+            c"responsibility_get_pid_responsible_for_pid".as_ptr(),
+        )
+    };
+    // SAFETY: libSystem defines the symbol with the C signature of
+    // `ResponsibleFor` on every supported macOS. It is safe to call with any
+    // process ID, because it only reads what the kernel keeps about it.
+    (!symbol.is_null())
+        .then(|| unsafe { std::mem::transmute::<*mut libc::c_void, ResponsibleFor>(symbol) })
+}
+
+/// Whether `responsible_for` names `pid` as its own responsible process.
+/// Without the function, TinyDash cannot tell, so it takes the safe answer.
+fn responsible_for_itself(responsible_for: Option<ResponsibleFor>, pid: libc::pid_t) -> bool {
+    responsible_for.is_some_and(|responsible_for| responsible_for(pid) == pid)
+}
+
+/// Whether the app carries the usage strings. macOS ends its own responsible
+/// process when it asks without them. The app bundle has them, and `tauri
+/// dev` embeds them in the binary; a build made with `--no-bundle` does not.
+fn has_calendar_usage_strings(bundle: &NSBundle) -> bool {
+    CALENDAR_USAGE_KEYS.iter().all(|key| {
+        bundle
+            .objectForInfoDictionaryKey(&NSString::from_str(key))
+            .is_some()
+    })
+}
+
+fn ns_date(unix_ms: i64) -> Retained<NSDate> {
+    NSDate::dateWithTimeIntervalSince1970(unix_ms as f64 / 1000.0)
+}
+
+fn unix_ms(date: &NSDate) -> i64 {
+    // Rounded, as seconds in a double miss some milliseconds by a hair.
+    // `as` saturates; real dates fit by far.
+    (date.timeIntervalSince1970() * 1000.0).round() as i64
+}
+
+fn read_events(store: &EKEventStore, from: &NSDate, to: &NSDate) -> Vec<up_next::Event> {
+    // SAFETY: The predicate comes from this store, as the search requires.
+    // The search may return nil, though its header says otherwise.
+    let found: Option<Retained<NSArray<EKEvent>>> = unsafe {
+        let predicate = store.predicateForEventsWithStartDate_endDate_calendars(from, to, None);
+        msg_send![store, eventsMatchingPredicate: &*predicate]
+    };
+    found
+        .iter()
+        .flat_map(|found| found.iter())
+        .take(up_next::MAX_READ)
+        .filter_map(|event| read_event(&event))
+        .collect()
+}
+
+fn read_event(event: &EKEvent) -> Option<up_next::Event> {
+    // SAFETY: Getters of an event from the store. The title and the dates
+    // may be nil, though the headers do not promise them, so they are read
+    // as optional.
+    let (title, start, end, all_day) = unsafe {
+        let title: Option<Retained<NSString>> = msg_send![event, title];
+        let start: Option<Retained<NSDate>> = msg_send![event, startDate];
+        let end: Option<Retained<NSDate>> = msg_send![event, endDate];
+        (title, start?, end?, event.isAllDay())
+    };
+    Some(up_next::Event {
+        title: title.map(|title| title.to_string()).unwrap_or_default(),
+        calendar: calendar_name(event),
+        start_ms: unix_ms(&start),
+        end_ms: unix_ms(&end),
+        all_day,
+        declined: canceled_or_declined(event),
+    })
+}
+
+/// Whether the organizer canceled the event, or the user declined it.
+/// EventKit returns both, and Calendar hides them.
+fn canceled_or_declined(event: &EKEvent) -> bool {
+    // SAFETY: Getters of an event from the store and of its attendees.
+    unsafe {
+        event.status() == EKEventStatus::Canceled
+            || event.attendees().is_some_and(|attendees| {
+                attendees.iter().any(|attendee| {
+                    attendee.isCurrentUser()
+                        && attendee.participantStatus() == EKParticipantStatus::Declined
+                })
+            })
+    }
+}
+
+/// Read incomplete reminders due before `to`, overdue ones included.
+fn read_reminders(
+    store: &EKEventStore,
+    to: &NSDate,
+) -> std::result::Result<Vec<up_next::Reminder>, Unreadable> {
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    // EventKit calls this once, on a queue of its own.
+    let handler = RcBlock::new(move |found: *mut NSArray<EKReminder>| {
+        // SAFETY: EventKit passes null or an array that lives for this call.
+        let found = unsafe { found.as_ref() };
+        let reminders: Vec<up_next::Reminder> = found
+            .iter()
+            .flat_map(|found| found.iter())
+            .take(up_next::MAX_READ)
+            .filter_map(|reminder| read_reminder(&reminder))
+            .collect();
+        // The reader may have stopped waiting.
+        send.try_send(reminders).ok();
+    });
+    // SAFETY: The predicate comes from this store, as the fetch requires,
+    // and EventKit copies the handler. The fetch's identifier may be nil,
+    // though its header says otherwise.
+    let fetch: Option<Retained<AnyObject>> = unsafe {
+        let predicate = store.predicateForIncompleteRemindersWithDueDateStarting_ending_calendars(
+            None,
+            Some(to),
+            None,
+        );
+        msg_send![store, fetchRemindersMatchingPredicate: &*predicate, completion: &*handler]
+    };
+    receive.recv_timeout(REMINDERS_WAIT).map_err(|_| {
+        if let Some(fetch) = fetch {
+            // SAFETY: `fetch` is what this store returned for the fetch.
+            unsafe { store.cancelFetchRequest(&fetch) };
+        }
+        Unreadable::Failed("Reminders did not answer in time. Open the launcher again.".into())
+    })
+}
+
+fn read_reminder(reminder: &EKReminder) -> Option<up_next::Reminder> {
+    // SAFETY: Getters of a reminder from the store. The title may be nil,
+    // though the header does not promise it, so it is read as optional.
+    let (title, due) = unsafe {
+        let title: Option<Retained<NSString>> = msg_send![reminder, title];
+        (title, reminder.dueDateComponents()?)
+    };
+    Some(up_next::Reminder {
+        title: title.map(|title| title.to_string()).unwrap_or_default(),
+        list: calendar_name(reminder),
+        due: due_date(&due)?,
+    })
+}
+
+/// When a reminder is due. EventKit keeps due dates in the Gregorian
+/// calendar, whichever calendar the user chose in the region settings.
+fn due_date(due: &NSDateComponents) -> Option<Due> {
+    if due.hour() == NSDateComponentUndefined {
+        return Some(Due::Day(chrono::NaiveDate::from_ymd_opt(
+            i32::try_from(due.year()).ok()?,
+            u32::try_from(due.month()).ok()?,
+            u32::try_from(due.day()).ok()?,
+        )?));
+    }
+    // SAFETY: A constant that Foundation defines.
+    let gregorian = NSCalendar::calendarWithIdentifier(unsafe { NSCalendarIdentifierGregorian })?;
+    // The calendar uses the components' own time zone when they have one,
+    // and the system's otherwise.
+    let date = gregorian.dateFromComponents(due)?;
+    Some(Due::At(unix_ms(&date)))
+}
+
+/// The name of the calendar or reminder list that holds `item`.
+fn calendar_name(item: &EKCalendarItem) -> String {
+    // SAFETY: Getters of an item from the store and of its calendar, whose
+    // title is never nil.
+    unsafe { item.calendar().map(|calendar| calendar.title().to_string()) }.unwrap_or_default()
 }
 
 /// Ask Spotlight for names that contain `name`, with fixed arguments and no
@@ -608,10 +969,32 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     }
 }
 
+/// Write the command to a script that only the user can read, and open it
+/// with the app for `.command` files: Terminal, or the one the user chose,
+/// such as iTerm. No Apple Events, so no permission prompt.
+pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
+    let script = super::terminal::command_file(data, &super::terminal::macos_script(command))
+        .map_err(|error| {
+            Error::msg(format!(
+                "TinyDash could not prepare the command for Terminal: {error}"
+            ))
+        })?;
+    let opened = super::run("/usr/bin/open", &[&script.to_string_lossy()]);
+    if opened.is_err() {
+        std::fs::remove_file(&script).ok();
+    }
+    opened
+}
+
 fn apple_script(script: &str) -> Result<()> {
     let output = Command::new("/usr/bin/osascript")
         .args(["-e", script])
-        .output()?;
+        .output()
+        .map_err(|error| {
+            Error::msg(format!(
+                "macOS could not run the command: {error}. Try again."
+            ))
+        })?;
     if output.status.success() {
         return Ok(());
     }
@@ -650,7 +1033,7 @@ fn lock_screen() -> Result<()> {
 }
 
 pub fn clipboard_change() -> u64 {
-    let _one_reader = super::one_clipboard_reader();
+    let _one_user = super::one_clipboard_user();
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
@@ -704,7 +1087,7 @@ fn note_change(change: u64) -> bool {
     now_front
 }
 
-/// Call with the reader lock held; it reads the change counter directly.
+/// Call with the clipboard lock held; it reads the change counter directly.
 /// It looks at the counter too: a read can come before the monitor's next
 /// tick, just after the user copied in a password app and switched away.
 fn clipboard_is_concealed() -> bool {
@@ -724,7 +1107,7 @@ fn clipboard_is_concealed() -> bool {
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
-    let _one_reader = super::one_clipboard_reader();
+    let _one_user = super::one_clipboard_user();
     let change = || NSPasteboard::generalPasteboard().changeCount();
     let before = change();
     if clipboard_is_concealed() {
@@ -859,7 +1242,7 @@ static PREVIOUS_APP: Mutex<Option<Retained<NSRunningApplication>>> = Mutex::new(
 pub fn remember_frontmost_app() {
     // A copy made in a password app just before the shortcut may be newer
     // than the clipboard monitor's last look; it must stay secret too. The
-    // counter waits for the reader lock, so it is read only then.
+    // counter waits for the clipboard lock, so it is read only then.
     if password_app_in_front() {
         note_clipboard_change(clipboard_change());
     }
@@ -890,8 +1273,442 @@ pub fn restore_frontmost_app() {
     }
 }
 
+/// Marks the key events TinyDash types ("TDSH"), so its own tap skips them.
+const OWN_EVENTS: i64 = 0x5444_5348;
+/// Virtual key codes from `<HIToolbox/Events.h>`: `kVK_Delete` is Backspace.
+const BACKSPACE_KEY: u16 = 0x33;
+const RETURN_KEY: u16 = 0x24;
+/// `CGEventKeyboardSetUnicodeString` types at most 20 UTF-16 units an event.
+const MAX_UNITS_PER_EVENT: usize = 20;
+/// A pause after each typed key, so a busy app does not drop keys.
+const KEY_GAP: Duration = Duration::from_millis(1);
+
+#[link(name = "ApplicationServices", kind = "framework")]
+unsafe extern "C" {
+    /// Returns a CoreFoundation `Boolean`, an unsigned char. Read as a Rust
+    /// `bool`, any value other than 0 or 1 would be undefined behavior.
+    fn AXIsProcessTrustedWithOptions(options: *const c_void) -> u8;
+    static kAXTrustedCheckOptionPrompt: &'static NSString;
+}
+
+pub fn typing_unavailable() -> Option<&'static str> {
+    None
+}
+
+/// Reading keys needs Input Monitoring, and typing needs Accessibility.
+pub fn typing_access(ask: bool) -> Result<()> {
+    let accessibility = accessibility_trusted(ask);
+    let mut input_monitoring = CGPreflightListenEventAccess();
+    if !input_monitoring && ask {
+        input_monitoring = CGRequestListenEventAccess();
+    }
+    missing_access(accessibility, input_monitoring)
+        .map_or(Ok(()), |message| Err(Error::msg(message)))
+}
+
+/// What to allow. Access that the user allows may count only once TinyDash
+/// starts again, so the message also says to quit and reopen it.
+fn missing_access(accessibility: bool, input_monitoring: bool) -> Option<String> {
+    let missing = match (accessibility, input_monitoring) {
+        (true, true) => return None,
+        (false, true) => "Accessibility",
+        (true, false) => "Input Monitoring",
+        (false, false) => "Accessibility and Input Monitoring",
+    };
+    Some(format!(
+        "Allow TinyDash under {missing} in System Settings > Privacy & Security. Then quit and reopen TinyDash."
+    ))
+}
+
+/// Whether TinyDash may send keys. `ask` shows the macOS prompt that leads
+/// to System Settings when it may not.
+fn accessibility_trusted(ask: bool) -> bool {
+    autoreleasepool(|_| {
+        // SAFETY: The framework defines the key as a constant string that
+        // lives for the whole process.
+        let prompt = unsafe { kAXTrustedCheckOptionPrompt };
+        let options = NSDictionary::from_slices(&[prompt], &[&*NSNumber::new_bool(ask)]);
+        // SAFETY: An NSDictionary is a CFDictionary, and it outlives the call.
+        unsafe { AXIsProcessTrustedWithOptions(Retained::as_ptr(&options).cast()) != 0 }
+    })
+}
+
+/// Reads keys with an event tap on a thread that runs its own run loop.
+pub struct TypingWatch {
+    run_loop: TapRunLoop,
+    stopped: Arc<AtomicBool>,
+    thread: JoinHandle<()>,
+}
+
+/// The tap thread's run loop, kept only to stop it.
+struct TapRunLoop(CFRetained<CFRunLoop>);
+
+// SAFETY: `CFRunLoopStop` may be called from any thread, and this handle
+// is used for nothing else.
+unsafe impl Send for TapRunLoop {}
+
+impl TypingWatch {
+    /// False once the thread has ended, also on its own when macOS turned
+    /// the tap off for good, as it does when access is taken away.
+    pub fn is_running(&self) -> bool {
+        !self.thread.is_finished()
+    }
+
+    pub fn stop(self) {
+        self.stopped.store(true, Ordering::Release);
+        // A stop that comes before the loop runs is lost, so repeat it
+        // until the thread ends.
+        while !self.thread.is_finished() {
+            self.run_loop.0.stop();
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        if self.thread.join().is_err() {
+            tracing::warn!("The key watch ended with a panic");
+        }
+    }
+}
+
+/// The app in front, which gets typed keys.
+#[derive(Clone, PartialEq)]
+pub struct Focus(Option<Retained<NSRunningApplication>>);
+
+/// What the tap callback works with, on the tap thread only.
+struct Tap {
+    /// The tap itself, to turn it on again after macOS turns it off.
+    port: OnceCell<CFRetained<CFMachPort>>,
+    on_key: RefCell<Box<dyn FnMut(Key, Focus)>>,
+    /// The app that got the latest key; a key in another app starts afresh.
+    front_app: RefCell<Focus>,
+}
+
+pub fn watch_typing(on_key: impl FnMut(Key, Focus) + Send + 'static) -> Result<TypingWatch> {
+    let (ready, started) = mpsc::channel();
+    let stopped = Arc::new(AtomicBool::new(false));
+    let thread = std::thread::Builder::new()
+        .name("key-watch".into())
+        .spawn({
+            let stopped = Arc::clone(&stopped);
+            move || run_tap(Box::new(on_key), &stopped, &ready)
+        })?;
+    match started.recv() {
+        Ok(Ok(run_loop)) => Ok(TypingWatch {
+            run_loop,
+            stopped,
+            thread,
+        }),
+        Ok(Err(error)) => {
+            let _ = thread.join();
+            Err(error)
+        }
+        Err(_) => {
+            let _ = thread.join();
+            Err(Error::msg("Could not start reading keys."))
+        }
+    }
+}
+
+fn run_tap(
+    on_key: Box<dyn FnMut(Key, Focus)>,
+    stopped: &AtomicBool,
+    ready: &mpsc::Sender<Result<TapRunLoop>>,
+) {
+    let tap = Box::new(Tap {
+        port: OnceCell::new(),
+        on_key: RefCell::new(on_key),
+        front_app: RefCell::new(Focus(None)),
+    });
+    let mask = [
+        CGEventType::KeyDown,
+        CGEventType::LeftMouseDown,
+        CGEventType::RightMouseDown,
+        CGEventType::OtherMouseDown,
+    ]
+    .iter()
+    .fold(0, |mask, kind| mask | 1 << kind.0);
+    // SAFETY: `on_tap_event` has the callback's type, and `tap` outlives
+    // the port, which is invalidated before `tap` drops.
+    let port = unsafe {
+        CGEvent::tap_create(
+            CGEventTapLocation::SessionEventTap,
+            CGEventTapPlacement::HeadInsertEventTap,
+            CGEventTapOptions::ListenOnly,
+            mask,
+            Some(on_tap_event),
+            std::ptr::from_ref::<Tap>(&tap).cast_mut().cast(),
+        )
+    };
+    let Some(port) = port else {
+        let _ = ready.send(Err(Error::msg(
+            "macOS did not let TinyDash read keys. Allow TinyDash under Input Monitoring in System Settings > Privacy & Security. Then quit and reopen TinyDash.",
+        )));
+        return;
+    };
+    let source = CFMachPort::new_run_loop_source(None, Some(&port), 0);
+    let (Some(source), Some(run_loop)) = (source, CFRunLoop::current()) else {
+        port.invalidate();
+        let _ = ready.send(Err(Error::msg("Could not start reading keys.")));
+        return;
+    };
+    // SAFETY: CoreFoundation sets the mode constant up before any code runs.
+    run_loop.add_source(Some(&source), unsafe { kCFRunLoopCommonModes });
+    CGEvent::tap_enable(&port, true);
+    let port = tap.port.get_or_init(|| port);
+    if ready.send(Ok(TapRunLoop(run_loop.clone()))).is_ok() {
+        // macOS invalidates the tap when access is taken away; the loop
+        // would then return at once, so the thread ends instead.
+        while !stopped.load(Ordering::Acquire) && port.is_valid() && source.is_valid() {
+            CFRunLoop::run();
+        }
+        if !stopped.load(Ordering::Acquire) {
+            tracing::warn!(
+                "Snippets stopped expanding as you type: macOS turned off the key watch, as it does when access is taken away"
+            );
+        }
+    }
+    CGEvent::tap_enable(port, false);
+    port.invalidate();
+    source.invalidate();
+}
+
+/// The tap callback. A listen-only tap returns the event unchanged.
+unsafe extern "C-unwind" fn on_tap_event(
+    _proxy: CGEventTapProxy,
+    kind: CGEventType,
+    event: NonNull<CGEvent>,
+    tap: *mut c_void,
+) -> *mut CGEvent {
+    // SAFETY: `tap` is the `Tap` that `run_tap` passed; it lives until the
+    // port is invalidated, and only the tap thread uses it.
+    let tap = unsafe { &*tap.cast::<Tap>() };
+    // SAFETY: macOS passes an event that is valid during the call.
+    read_tap_event(tap, kind, unsafe { event.as_ref() });
+    event.as_ptr()
+}
+
+fn read_tap_event(tap: &Tap, kind: CGEventType, event: &CGEvent) {
+    // Each key goes with the app that got the latest key.
+    let send = |key| {
+        if let Ok(mut on_key) = tap.on_key.try_borrow_mut() {
+            let front_app = tap.front_app.borrow().clone();
+            on_key(key, front_app);
+        }
+    };
+    match kind {
+        CGEventType::KeyDown => {
+            let field = |field| CGEvent::integer_value_field(Some(event), field);
+            if field(CGEventField::EventSourceUserData) == OWN_EVENTS {
+                return;
+            }
+            let front_app = front_app();
+            if tap.front_app.replace(front_app.clone()) != front_app {
+                send(Key::Reset);
+            }
+            let mut units = [0; 8];
+            let mut length: c_ulong = 0;
+            // SAFETY: Both pointers are valid, and the buffer holds the
+            // length passed.
+            unsafe {
+                CGEvent::keyboard_get_unicode_string(
+                    Some(event),
+                    units.len() as c_ulong,
+                    &mut length,
+                    units.as_mut_ptr(),
+                );
+            }
+            let typed = &units[..units.len().min(length as usize)];
+            let keycode = field(CGEventField::KeyboardEventKeycode);
+            for key in keys_for(keycode, CGEvent::flags(Some(event)), typed) {
+                send(key);
+            }
+        }
+        // macOS turns off a tap that took too long, and may turn it off
+        // after some user input; keys missed meanwhile are unknown. A tap
+        // that lost its access stays off, and its thread ends.
+        CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput => {
+            if let Some(port) = tap.port.get() {
+                CGEvent::tap_enable(port, true);
+            }
+            send(Key::Reset);
+        }
+        // A click.
+        _ => send(Key::Reset),
+    }
+}
+
+fn front_app() -> Focus {
+    Focus(autoreleasepool(|_| {
+        NSWorkspace::sharedWorkspace().frontmostApplication()
+    }))
+}
+
+/// The keys for a key press: a reset for a shortcut (Command, Control, or
+/// Option held), Backspace, or what the key typed.
+fn keys_for(keycode: i64, flags: CGEventFlags, typed: &[u16]) -> Vec<Key> {
+    let shortcut =
+        CGEventFlags::MaskCommand | CGEventFlags::MaskControl | CGEventFlags::MaskAlternate;
+    if flags.intersects(shortcut) {
+        vec![Key::Reset]
+    } else if keycode == i64::from(BACKSPACE_KEY) {
+        vec![Key::Backspace]
+    } else {
+        expansion::keys_for(typed)
+    }
+}
+
+/// Types with key events posted at the system level, which reach the app in
+/// front. Each carries [`OWN_EVENTS`], so the tap skips it. Each key goes
+/// only while `focus` is in front and no key or click came since the
+/// trigger. So typing stops at the user's next key or click, or soon after
+/// another app comes to the front, and types nothing when one came before
+/// it started.
+pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBool) -> Result<()> {
+    let source = CGEventSource::new(CGEventSourceStateID::Private)
+        .ok_or_else(|| Error::msg("Could not type the snippet."))?;
+    CGEventSource::set_user_data(Some(&source), OWN_EVENTS);
+    // Keys the user presses meanwhile still arrive.
+    CGEventSource::set_local_events_suppression_interval(Some(&source), 0.0);
+    // The key code does not matter once the event carries text.
+    let presses = std::iter::repeat_n((BACKSPACE_KEY, Vec::new()), erase).chain(
+        expansion::pieces(text, MAX_UNITS_PER_EVENT)
+            .into_iter()
+            .map(|piece| match piece {
+                Piece::Return => (RETURN_KEY, Vec::new()),
+                Piece::Text(units) => (0, units),
+            }),
+    );
+    for (keycode, units) in presses {
+        if front_app() != focus {
+            return Err(Error::msg(
+                "Stopped typing the snippet: another app came to the front.",
+            ));
+        }
+        // The tap skips TinyDash's own keys, so each key or click that it
+        // passed since the trigger came from someone else, or is the reset
+        // after the tap turned on again.
+        super::no_input_since_trigger(interrupted)?;
+        press(&source, keycode, &units)?;
+    }
+    Ok(())
+}
+
+/// Press and release a key, typing `text` (at most 20 UTF-16 units) when
+/// there is any.
+fn press(source: &CGEventSource, keycode: u16, text: &[u16]) -> Result<()> {
+    for down in [true, false] {
+        let event = CGEvent::new_keyboard_event(Some(source), keycode, down)
+            .ok_or_else(|| Error::msg("Could not type the snippet."))?;
+        CGEvent::set_integer_value_field(
+            Some(&event),
+            CGEventField::EventSourceUserData,
+            OWN_EVENTS,
+        );
+        // Without the modifiers the user may still hold, such as Shift.
+        CGEvent::set_flags(Some(&event), CGEventFlags::empty());
+        if !text.is_empty() {
+            // SAFETY: The pointer and length describe `text`.
+            unsafe {
+                CGEvent::keyboard_set_unicode_string(
+                    Some(&event),
+                    text.len() as c_ulong,
+                    text.as_ptr(),
+                );
+            }
+        }
+        CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&event));
+    }
+    std::thread::sleep(KEY_GAP);
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn says_which_access_is_missing() {
+        use super::missing_access;
+        assert_eq!(missing_access(true, true), None);
+        let message = |accessibility, input| missing_access(accessibility, input).unwrap();
+        assert_eq!(
+            message(false, false),
+            "Allow TinyDash under Accessibility and Input Monitoring in System Settings > Privacy & Security. Then quit and reopen TinyDash."
+        );
+        assert!(message(false, true).contains("under Accessibility in"));
+        assert!(message(true, false).contains("under Input Monitoring in"));
+        // Access allowed while TinyDash runs may count only after a restart.
+        assert!(message(true, false).ends_with(" Then quit and reopen TinyDash."));
+    }
+
+    #[test]
+    fn reads_key_presses() {
+        use super::{BACKSPACE_KEY, keys_for};
+        use crate::features::expansion::Key;
+        use objc2_core_graphics::CGEventFlags;
+        let none = CGEventFlags::empty();
+        let utf16 = |text: &str| text.encode_utf16().collect::<Vec<u16>>();
+        let backspace = i64::from(BACKSPACE_KEY);
+        // kVK_ANSI_S, without and with Shift.
+        assert_eq!(keys_for(1, none, &utf16("s")), [Key::Char('s')]);
+        assert_eq!(
+            keys_for(1, CGEventFlags::MaskShift, &utf16("S")),
+            [Key::Char('S')]
+        );
+        assert_eq!(keys_for(backspace, none, &utf16("\u{8}")), [Key::Backspace]);
+        // Shortcuts, and Option+Backspace, which deletes a word.
+        for flags in [
+            CGEventFlags::MaskCommand,
+            CGEventFlags::MaskControl,
+            CGEventFlags::MaskAlternate,
+        ] {
+            assert_eq!(keys_for(1, flags, &utf16("s")), [Key::Reset]);
+            assert_eq!(keys_for(backspace, flags, &[]), [Key::Reset]);
+        }
+        // Arrows carry the Fn flag on Mac keyboards, and still reset.
+        assert_eq!(
+            keys_for(0x7B, CGEventFlags::MaskSecondaryFn, &utf16("\u{F702}")),
+            [Key::Reset]
+        );
+        // Return and Escape.
+        assert_eq!(keys_for(0x24, none, &utf16("\r")), [Key::Reset]);
+        assert_eq!(keys_for(0x35, none, &utf16("\u{1b}")), [Key::Reset]);
+    }
+
+    #[test]
+    fn a_script_runs_the_command_deletes_itself_and_opens_the_login_shell() {
+        let data = std::env::temp_dir().join(format!("tinydash-script-{}", std::process::id()));
+        std::fs::remove_dir_all(&data).ok();
+        let home = data.join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        // `echo` stands in for the login shell and prints `-l` where it
+        // would open. The app for `.command` files can start the script in
+        // any folder, such as `/`.
+        let run = |command: &str| {
+            let script = super::super::terminal::command_file(
+                &data,
+                &super::super::terminal::macos_script(command),
+            )
+            .unwrap();
+            let output = std::process::Command::new(&script)
+                .current_dir("/")
+                // zsh reads `.zshenv` in `ZDOTDIR`, else in `HOME`: here, none.
+                .env("HOME", &home)
+                .env_remove("ZDOTDIR")
+                .env("SHELL", "/bin/echo")
+                .stdin(std::process::Stdio::null())
+                .output()
+                .unwrap();
+            assert!(!script.exists(), "{command}");
+            String::from_utf8(output.stdout).unwrap()
+        };
+        assert_eq!(run("echo {clipboard} \"it's\""), "{clipboard} it's\n-l\n");
+        // The command starts in the home folder, and can leave it.
+        assert_eq!(run("pwd"), format!("{}\n-l\n", home.display()));
+        assert_eq!(run("cd / && pwd"), "/\n-l\n");
+        // Exit, a syntax error, or a line that runs on still leave a shell.
+        assert_eq!(run("exit 3"), "-l\n");
+        assert_eq!(run("echo it's"), "-l\n");
+        assert_eq!(run("echo a \\"), "a\n-l\n");
+        std::fs::remove_dir_all(&data).unwrap();
+    }
+
     #[test]
     fn decodes_a_tiff_that_fits() {
         let mut tiff = Vec::new();
@@ -989,6 +1806,92 @@ mod tests {
         let paths = read_paths(output, 10, std::time::Duration::from_secs(5), |_| true);
         child.wait().ok();
         assert_eq!(paths, [PathBuf::from("/a"), PathBuf::from("/b")]);
+    }
+
+    #[test]
+    fn dates_keep_their_milliseconds() {
+        for unix_ms in [0, 1_772_000_000_123, -86_400_000] {
+            assert_eq!(super::unix_ms(&ns_date(unix_ms)), unix_ms);
+        }
+    }
+
+    #[test]
+    fn asks_for_calendars_only_with_every_usage_string() {
+        let folder = std::env::temp_dir().join(format!("tinydash-usage-{}", std::process::id()));
+        // TinyDash's own Info.plist, then one that lacks a key. NSBundle
+        // keeps a bundle per path, so each case has its own.
+        let shipped =
+            std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("Info.plist"))
+                .unwrap();
+        let cases = [
+            ("Shipped.app", shipped.clone(), true),
+            (
+                "Partial.app",
+                shipped.replace("NSRemindersFullAccessUsageDescription", "Unrelated"),
+                false,
+            ),
+        ];
+        for (name, info, can_ask) in cases {
+            let contents = folder.join(name).join("Contents");
+            std::fs::create_dir_all(&contents).unwrap();
+            std::fs::write(contents.join("Info.plist"), info).unwrap();
+            let path = NSString::from_str(&folder.join(name).to_string_lossy());
+            let bundle = NSBundle::bundleWithPath(&path).expect("a bundle");
+            assert_eq!(has_calendar_usage_strings(&bundle), can_ask, "{name}");
+        }
+        std::fs::remove_dir_all(&folder).ok();
+    }
+
+    #[test]
+    fn reads_and_asks_for_calendars_only_as_its_own_responsible_process() {
+        extern "C" fn itself(pid: libc::pid_t) -> libc::pid_t {
+            pid
+        }
+        extern "C" fn terminal(_pid: libc::pid_t) -> libc::pid_t {
+            4242
+        }
+        extern "C" fn unknown(_pid: libc::pid_t) -> libc::pid_t {
+            -1
+        }
+        assert!(responsible_for_itself(Some(itself), 1234));
+        assert!(!responsible_for_itself(Some(terminal), 1234));
+        assert!(!responsible_for_itself(Some(unknown), 1234));
+        assert!(!responsible_for_itself(None, 1234));
+
+        // Started by another app, TinyDash does not even read the saved
+        // answer, and so never asks either.
+        for kind in [EKEntityType::Event, EKEntityType::Reminder] {
+            assert_eq!(
+                calendar_access(kind, false),
+                Err(Unreadable::OpenedByAnotherApp)
+            );
+        }
+    }
+
+    #[test]
+    fn finds_the_process_responsible_for_tinydash() {
+        let responsible_for = find_responsible_for().expect("the private function");
+        let pid = std::process::id() as libc::pid_t;
+        // This process, or the app that started the tests.
+        assert!(responsible_for(pid) > 0);
+    }
+
+    #[test]
+    fn reads_due_dates_in_the_gregorian_calendar() {
+        let due = NSDateComponents::new();
+        due.setYear(2026);
+        due.setMonth(10);
+        due.setDay(30);
+        let day = chrono::NaiveDate::from_ymd_opt(2026, 10, 30).unwrap();
+        assert_eq!(due_date(&due), Some(Due::Day(day)));
+
+        // Without a time zone of its own, a due time is local.
+        due.setHour(16);
+        due.setMinute(30);
+        let local = chrono::TimeZone::with_ymd_and_hms(&chrono::Local, 2026, 10, 30, 16, 30, 0)
+            .unwrap()
+            .timestamp_millis();
+        assert_eq!(due_date(&due), Some(Due::At(local)));
     }
 
     #[test]

@@ -826,13 +826,7 @@ mod tests {
         assert!(milliseconds);
         assert_eq!(rows[2].value, "2026-10-07T06:25:01.250Z");
 
-        for text in [
-            "123",
-            "999999999",
-            "12345678901",
-            "4300000000",
-            "17913543x1",
-        ] {
+        for text in ["999999999", "12345678901", "4300000000", "17913543x1"] {
             assert_eq!(content(text), None, "{text}");
         }
         assert_eq!(relative(30), "Just now");
@@ -954,7 +948,7 @@ mod tests {
         );
         assert_eq!(time.actions[0].label, "Copy Local Time");
 
-        for query in ["{\"a\": 1}", "755", "hello", ""] {
+        for query in ["{\"a\": 1}", "755", ""] {
             assert_eq!(answer(query, now()), None, "{query}");
         }
     }

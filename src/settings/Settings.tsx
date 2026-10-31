@@ -13,12 +13,13 @@ import {
 
 import type { About as AboutInfo } from "../generated/About";
 import type { EmojiLanguage } from "../generated/EmojiLanguage";
+import type { Platform } from "../generated/Platform";
 import type { SearchEngine } from "../generated/SearchEngine";
 import type { TemperatureUnit } from "../generated/TemperatureUnit";
 import type { Settings as Values } from "../generated/Settings";
 import type { Theme } from "../generated/Theme";
 import * as ipc from "../lib/ipc";
-import { IS_MAC } from "../lib/keys";
+import { IS_MAC, PLATFORM } from "../lib/keys";
 import { applyTheme } from "../lib/theme";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { ShortcutRecorder } from "../ui/ShortcutRecorder";
@@ -43,6 +44,14 @@ const SECTIONS = [
 
 type Section = (typeof SECTIONS)[number]["id"];
 
+// The Snippets and Quicklinks sections. Their editors stay open, hidden,
+// after the first visit, so an unsaved edit, and a save that still runs with
+// its reply or error, wait there.
+const LIBRARIES = [
+  { section: "snippets", kind: "snippet" },
+  { section: "quicklinks", kind: "quicklink" },
+] as const;
+
 const THEMES: ReadonlyArray<{ value: Theme; label: string }> = [
   { value: "system", label: "Match System" },
   { value: "light", label: "Light" },
@@ -60,6 +69,13 @@ const UNITS: ReadonlyArray<{ value: TemperatureUnit; label: string }> = [
   { value: "celsius", label: "Celsius (°C)" },
   { value: "fahrenheit", label: "Fahrenheit (°F)" },
 ];
+
+/** Where `>` runs a command on each OS. */
+const TERMINALS: Record<Platform, string> = {
+  macos: "Terminal",
+  windows: "PowerShell",
+  linux: "your terminal",
+};
 
 const SKIN_TONES = [
   "👋 Default",
@@ -101,6 +117,11 @@ export function Settings() {
     return base && changes().reduce(apply, base);
   });
   const [section, setSection] = createSignal<Section>("general");
+  // Every section opened so far.
+  const opened = createMemo<ReadonlySet<Section>>(
+    (before) => (before.has(section()) ? before : new Set([...before, section()])),
+    new Set<Section>(),
+  );
   const [error, setError] = createSignal<string>();
   // Read when Settings opens, and again on opening About after a failure:
   // About shows it, and the Clipboard section hides what this OS cannot save.
@@ -284,6 +305,18 @@ export function Settings() {
                     onChange={(showClocks) => void save({ showClocks })}
                   />
                 </Row>
+                <Show when={IS_MAC}>
+                  <Row
+                    label="Up Next"
+                    description="Shows the rest of today's events and the reminders due today. macOS asks for access to Calendars and Reminders when you turn this on."
+                  >
+                    <Toggle
+                      label="Up Next"
+                      checked={settings().showUpNext}
+                      onChange={(showUpNext) => void save({ showUpNext })}
+                    />
+                  </Row>
+                </Show>
                 <Row label="Disk space" description="Free space on the disk of your home folder.">
                   <Toggle
                     label="Disk space"
@@ -519,6 +552,16 @@ export function Settings() {
                     onChange={(currencyRatesEnabled) => void save({ currencyRatesEnabled })}
                   />
                 </Row>
+                <Row
+                  label="Run shell commands"
+                  description={`Type >, a space, and a command, then press Enter, to run it in ${TERMINALS[PLATFORM]}. TinyDash runs exactly what you type, and only when you press Enter.`}
+                >
+                  <Toggle
+                    label="Run shell commands"
+                    checked={settings().shellCommands}
+                    onChange={(shellCommands) => void save({ shellCommands })}
+                  />
+                </Row>
                 <Row label="Emoji skin tone">
                   <Select
                     label="Emoji skin tone"
@@ -566,11 +609,25 @@ export function Settings() {
               </Match>
 
               <Match when={section() === "snippets"}>
-                <Library kind="snippet" />
-              </Match>
-
-              <Match when={section() === "quicklinks"}>
-                <Library kind="quicklink" />
+                {/* 64 matches MAX_TYPED in features/expansion.rs. */}
+                <Row
+                  label="Expand snippets as you type"
+                  description={[
+                    "Type ; and a snippet's keyword in any app, such as ;sig, to replace it with the snippet. To see the keyword, TinyDash reads what you type in other apps. It keeps only the last 64 characters, in memory, and never saves or sends them.",
+                    IS_MAC ? "macOS asks for Accessibility and Input Monitoring." : "",
+                    about()?.expandSnippetsUnavailable ?? "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {/* Where it cannot work, a value set by hand can still turn off. */}
+                  <Toggle
+                    label="Expand snippets as you type"
+                    checked={settings().expandSnippets}
+                    disabled={!!about()?.expandSnippetsUnavailable && !settings().expandSnippets}
+                    onChange={(expandSnippets) => void save({ expandSnippets })}
+                  />
+                </Row>
               </Match>
 
               <Match when={section() === "privacy"}>
@@ -582,6 +639,17 @@ export function Settings() {
               </Match>
             </Switch>
           )}
+        </Show>
+        <Show when={values()}>
+          <For each={LIBRARIES}>
+            {(library) => (
+              <Show when={opened().has(library.section)}>
+                <div hidden={section() !== library.section}>
+                  <Library kind={library.kind} shown={section() === library.section} />
+                </div>
+              </Show>
+            )}
+          </For>
         </Show>
       </main>
 
