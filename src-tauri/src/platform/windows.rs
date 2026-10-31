@@ -54,6 +54,7 @@ use crate::{
         clipboard::{Content, pixels_fit},
         expansion::{self, Key, Piece},
         system::SystemCommand,
+        up_next::{Agenda, UpNextKind},
     },
 };
 
@@ -215,6 +216,17 @@ pub fn find_files(_name: &str, _folder: &Path, _limit: usize) -> Vec<PathBuf> {
     Vec::new()
 }
 
+/// No calendars here: the Up Next widget reads only the macOS calendars.
+pub fn read_up_next(_from_ms: i64, _to_ms: i64) -> Option<Agenda> {
+    None
+}
+
+pub fn ask_calendar_access(_done: impl Fn() + Send + Sync + 'static) {}
+
+pub fn open_calendar_app(_kind: UpNextKind) -> Result<()> {
+    Err(Error::msg("Up Next works only on macOS."))
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let failed = |what: &str| {
         Error::msg(format!(
@@ -268,6 +280,30 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
                 .map_err(|error| Error::msg(format!("Could not open the Recycle Bin: {error}"))),
         }
     }
+}
+
+/// Run the command in PowerShell, in a new console in the home folder, and
+/// keep PowerShell open after it. Windows 11 shows the console in the
+/// default terminal app, such as Windows Terminal.
+pub fn run_in_terminal(command: &str, _data: &Path) -> Result<()> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+    let mut powershell = std::process::Command::new("powershell.exe");
+    powershell
+        .args(super::terminal::powershell_arguments(command))
+        .creation_flags(CREATE_NEW_CONSOLE);
+    // The script goes home itself, after the user's profile. This start
+    // folder is for the profile, and for the prompt when the script has a
+    // syntax error and does not run at all.
+    if let Some(home) = std::env::home_dir() {
+        powershell.current_dir(home);
+    }
+    let mut child = powershell
+        .spawn()
+        .map_err(|error| Error::msg(format!("Could not open PowerShell: {error}")))?;
+    // Reap it when its window closes.
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }
 
 /// Whether an `SHEmptyRecycleBinW` result means the bin is now empty. An

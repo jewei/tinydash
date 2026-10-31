@@ -61,6 +61,9 @@ pub struct Settings {
     /// hours. Only builds that can update themselves look.
     pub check_for_updates: bool,
     pub search_engine: SearchEngine,
+    /// `>`, a space, and a command run that command in the terminal. Off by
+    /// default.
+    pub shell_commands: bool,
     /// Where the user dragged the launcher, in the units of
     /// `platform::launcher_position`. `None` centers it on the screen with
     /// the pointer. A spot no longer on any screen counts as `None`.
@@ -74,6 +77,9 @@ pub struct Settings {
     pub show_clocks: bool,
     /// Places the clocks widget shows next to local time, as typed.
     pub clock_cities: Vec<String>,
+    /// The rest of today's events and the reminders due today (macOS).
+    /// Off by default: turning it on asks the OS for access to them.
+    pub show_up_next: bool,
     pub show_disk_space: bool,
     pub show_notepad: bool,
     pub show_focus_timer: bool,
@@ -207,6 +213,7 @@ impl Default for Settings {
             currency_rates_enabled: false,
             check_for_updates: true,
             search_engine: SearchEngine::Google,
+            shell_commands: false,
             launcher_position: None,
             tabs: Category::ALL[1..]
                 .iter()
@@ -218,6 +225,7 @@ impl Default for Settings {
                 .collect(),
             show_clocks: true,
             clock_cities: Vec::new(),
+            show_up_next: false,
             show_disk_space: true,
             show_notepad: false,
             show_focus_timer: false,

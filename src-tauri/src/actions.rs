@@ -15,6 +15,7 @@ use crate::{
     features::{
         calculator, clip_card, keywords,
         library::{self, LibraryKind, Target},
+        shell,
     },
     hud, platform, refresh,
     search::{
@@ -25,7 +26,7 @@ use crate::{
     },
     shortcut,
     state::State,
-    system_clipboard, timer, window,
+    system_clipboard, timer, widgets, window,
 };
 
 /// Pins kept in all, including pins of items that are hidden for now.
@@ -236,6 +237,21 @@ pub fn run(app: &AppHandle, origin: Origin, action: Action, result_id: Option<&s
             events::launcher_query(app, &text);
         }
         Action::Focus { control } => timer::control(app, control)?,
+        Action::OpenUpNext { kind } => {
+            platform::open_calendar_app(kind)?;
+            window::hide(app)?;
+        }
+        Action::AskCalendarAccess => {
+            if !state.settings.get().show_up_next {
+                return Err(Error::msg("Turn on Up Next in Settings > Widgets first."));
+            }
+            widgets::ask_calendar_access(app);
+        }
+        Action::RunInTerminal { command } => {
+            shell::runnable(state.settings.get().shell_commands, &command)?;
+            platform::run_in_terminal(&command, &state.dirs.data)?;
+            window::hide(app)?;
+        }
         // Exits below, once the use is saved: exit ends the process from
         // the main thread while this worker may still be writing.
         Action::Quit => {}
@@ -950,5 +966,23 @@ mod tests {
         assert!(learns_from_use("app:/Applications/Safari.app"));
         assert!(!learns_from_use("calc:1+1"));
         assert!(!learns_from_use("clip:3"));
+        assert!(!learns_from_use("shell:git pull"));
+    }
+
+    #[test]
+    fn a_shell_command_is_never_pinned_hidden_aliased_or_given_a_hotkey() {
+        let state = State::for_tests(Settings {
+            shell_commands: true,
+            ..Settings::default()
+        });
+        let id = "shell:git pull";
+        assert!(pin(&state, id).is_err());
+        assert!(hide(&state, id).is_err());
+        assert!(set_alias(&state, id, "gp").is_err());
+        assert!(checked_hotkey(&state.snapshot(), id, "Alt+G").is_err());
+        assert!(state.pins.get().ids().is_empty());
+        assert_eq!(state.hidden.get().len(), 0);
+        assert_eq!(state.aliases.get().len(), 0);
+        assert_eq!(state.hotkeys.get().len(), 0);
     }
 }

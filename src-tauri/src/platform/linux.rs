@@ -27,6 +27,7 @@ use crate::{
         clipboard::{Content, MAX_TEXT_BYTES},
         expansion::{self, Key, Piece},
         system::SystemCommand,
+        up_next::{Agenda, UpNextKind},
     },
 };
 
@@ -279,6 +280,17 @@ pub fn find_files(_name: &str, _folder: &Path, _limit: usize) -> Vec<PathBuf> {
     Vec::new()
 }
 
+/// No calendars here: the Up Next widget reads only the macOS calendars.
+pub fn read_up_next(_from_ms: i64, _to_ms: i64) -> Option<Agenda> {
+    None
+}
+
+pub fn ask_calendar_access(_done: impl Fn() + Send + Sync + 'static) {}
+
+pub fn open_calendar_app(_kind: UpNextKind) -> Result<()> {
+    Err(Error::msg("Up Next works only on macOS."))
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")
         .unwrap_or_default()
@@ -320,6 +332,80 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
         | SystemCommand::SleepDisplays
         | SystemCommand::ToggleDarkMode => unsupported(),
     }
+}
+
+/// Run the command in `sh` in the user's terminal, in the home folder, and
+/// keep the user's login shell open after it: `$TERMINAL` when it is set,
+/// else the first known terminal found. `sh` reads the command from a
+/// private file under `data`, because a terminal keeps its arguments while
+/// its window is open, and other users can read them.
+pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
+    use super::terminal;
+    use std::process::Stdio;
+    let file = terminal::command_file(data, &format!("{command}\n")).map_err(|error| {
+        Error::msg(format!(
+            "TinyDash could not prepare the command for the terminal: {error}"
+        ))
+    })?;
+    let preferred = std::env::var("TERMINAL").ok();
+    let Some((program, arguments)) =
+        terminal::linux_terminal(preferred.as_deref(), find_program, &file)
+    else {
+        std::fs::remove_file(&file).ok();
+        return Err(Error::msg(
+            "TinyDash found no terminal app. Set the TERMINAL environment variable to yours, such as kitty, then restart TinyDash.",
+        ));
+    };
+    let mut launch = std::process::Command::new(&program);
+    launch
+        .args(arguments)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    // The script goes home itself, because a terminal can start it in a
+    // folder of its own. This start folder is for the terminal.
+    if let Some(home) = std::env::home_dir() {
+        launch.current_dir(home);
+    }
+    let mut child = match launch.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            std::fs::remove_file(&file).ok();
+            return Err(Error::msg(format!(
+                "Could not open {}: {error}",
+                program.display()
+            )));
+        }
+    };
+    // Reap it when it exits, so no zombie process stays behind. Its output
+    // is discarded (see `open_trash`), so a terminal that fails at once,
+    // such as one that cannot open a window, leaves only this log entry.
+    std::thread::spawn(move || match child.wait() {
+        Ok(status) => {
+            if terminal::failed_before_reading(status.success(), &file) {
+                tracing::warn!(%status, terminal = %program.display(), "The terminal ended with an error");
+            }
+        }
+        Err(error) => tracing::warn!(%error, "Could not wait for the terminal"),
+    });
+    Ok(())
+}
+
+/// The full path of a program that can run: `name` itself when it is a
+/// path, else the first match on `PATH`.
+fn find_program(name: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let runs = |path: &Path| {
+        std::fs::metadata(path)
+            .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+    };
+    if name.contains('/') {
+        let path = PathBuf::from(name);
+        return runs(&path).then_some(path);
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|folder| folder.join(name))
+        .find(|path| runs(path))
 }
 
 /// Show the trash in the file manager. The output is discarded, not
@@ -1254,6 +1340,17 @@ mod tests {
                 PathBuf::from("/opt/share/applications"),
             ]
         );
+    }
+
+    #[test]
+    fn finds_programs_that_can_run() {
+        let sh = find_program("sh").unwrap();
+        assert!(sh.is_absolute(), "{}", sh.display());
+        assert_eq!(find_program(&sh.to_string_lossy()), Some(sh));
+        assert_eq!(find_program("no-such-terminal-here"), None);
+        assert_eq!(find_program("/no/such/terminal"), None);
+        // A file that cannot run is not a program.
+        assert_eq!(find_program("/etc/passwd"), None);
     }
 
     #[test]

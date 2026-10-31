@@ -204,14 +204,27 @@ pub fn get_settings(state: tauri::State<State>) -> Settings {
     Settings::clone(&state.settings.get())
 }
 
+/// Only the Settings window may turn shell commands on or off, so script in
+/// another window cannot turn them on and then run a command.
+fn check_caller(caller: &str, old: &Settings, new: &Settings) -> Result<()> {
+    if new.shell_commands != old.shell_commands && caller != window::SETTINGS {
+        return Err(Error::msg(
+            "Turn shell commands on or off in Settings > Search.",
+        ));
+    }
+    Ok(())
+}
+
 /// Validate, apply, and save changed settings, given as the fields that
 /// changed. Either everything applies, or the previous settings stay in
 /// effect and the error explains why.
 #[tauri::command]
 pub async fn update_settings(
     app: AppHandle,
+    webview: tauri::Webview,
     changes: serde_json::Map<String, serde_json::Value>,
 ) -> Result<Settings> {
+    let caller = webview.label().to_owned();
     blocking(move || {
         let state = app.state::<State>();
         let _one_change_at_a_time = state
@@ -220,6 +233,7 @@ pub async fn update_settings(
             .unwrap_or_else(|e| e.into_inner());
         let old = state.settings.get();
         let new = old.with_changes(changes)?.normalized();
+        check_caller(&caller, &old, &new)?;
         // Checked only when the list changes, so an entry from a hand-edited
         // file does not block other settings.
         if new.file_search_folders != old.file_search_folders
@@ -286,6 +300,9 @@ pub async fn update_settings(
         }
         if new.show_weather != old.show_weather || new.weather_city != old.weather_city {
             refresh::weather(&app, false);
+        }
+        if new.show_up_next && !old.show_up_next {
+            widgets::ask_calendar_access(&app);
         }
         events::settings_changed(&app, &new);
         events::results_stale(&app);
@@ -612,6 +629,27 @@ pub async fn remove_alias(app: AppHandle, id: String) -> Result<()> {
 mod tests {
     use super::*;
     use crate::search::usage::Aliases;
+
+    #[test]
+    fn only_the_settings_window_turns_shell_commands_on_or_off() {
+        let off = Settings::default();
+        let on = Settings {
+            shell_commands: true,
+            ..Settings::default()
+        };
+        for caller in [window::LAUNCHER, crate::hud::HUD, ""] {
+            assert!(check_caller(caller, &off, &on).is_err(), "{caller}");
+            assert!(check_caller(caller, &on, &off).is_err(), "{caller}");
+            // Other changes from that window still apply.
+            let other = Settings {
+                clipboard_history_enabled: true,
+                ..on.clone()
+            };
+            assert!(check_caller(caller, &on, &other).is_ok(), "{caller}");
+        }
+        assert!(check_caller(window::SETTINGS, &off, &on).is_ok());
+        assert!(check_caller(window::SETTINGS, &on, &off).is_ok());
+    }
 
     #[test]
     fn lists_aliases_by_word_and_names_gone_items_by_id() {

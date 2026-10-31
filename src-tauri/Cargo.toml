@@ -30,6 +30,8 @@ chrono-tz = "0.10.4"
 emojis = "0.9.0"
 fend-core = "1.5.8"
 getrandom = "0.4.3"
+# Unicode properties of the characters in shell commands. url already builds it.
+icu_properties = "2.3.0"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 notify = "8.2.0"
 nucleo-matcher = "0.3.1"
@@ -60,7 +62,9 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std"
 # objc2-app-kit already builds both crates.
 objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFMachPort", "CFRunLoop"] }
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGEvent", "CGEventSource", "CGEventTypes", "CGRemoteOperation"] }
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSBundle", "NSData", "NSDictionary", "NSError", "NSGeometry", "NSString", "NSURL", "NSValue"] }
+# The Up Next widget reads today's events and reminders.
+objc2-event-kit = { version = "0.3.2", default-features = false, features = ["std", "bitflags", "block2", "EKCalendar", "EKCalendarItem", "EKEvent", "EKEventStore", "EKObject", "EKParticipant", "EKReminder", "EKTypes"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSBundle", "NSCalendar", "NSData", "NSDate", "NSDictionary", "NSError", "NSGeometry", "NSPredicate", "NSString", "NSURL", "NSValue"] }
 objc2-user-notifications = { version = "0.3.2", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }
 plist = "1.10.1"
 
