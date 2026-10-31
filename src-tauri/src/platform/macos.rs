@@ -611,6 +611,23 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     }
 }
 
+/// Write the command to a script that only the user can read, and open it
+/// with the app for `.command` files: Terminal, or the one the user chose,
+/// such as iTerm. No Apple Events, so no permission prompt.
+pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
+    let script = super::terminal::command_file(data, &super::terminal::macos_script(command))
+        .map_err(|error| {
+            Error::msg(format!(
+                "TinyDash could not prepare the command for Terminal: {error}"
+            ))
+        })?;
+    let opened = super::run("/usr/bin/open", &[&script.to_string_lossy()]);
+    if opened.is_err() {
+        std::fs::remove_file(&script).ok();
+    }
+    opened
+}
+
 fn apple_script(script: &str) -> Result<()> {
     let output = Command::new("/usr/bin/osascript")
         .args(["-e", script])
@@ -900,6 +917,44 @@ pub fn restore_frontmost_app() {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_script_runs_the_command_deletes_itself_and_opens_the_login_shell() {
+        let data = std::env::temp_dir().join(format!("tinydash-script-{}", std::process::id()));
+        std::fs::remove_dir_all(&data).ok();
+        let home = data.join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        // `echo` stands in for the login shell and prints `-l` where it
+        // would open. The app for `.command` files can start the script in
+        // any folder, such as `/`.
+        let run = |command: &str| {
+            let script = super::super::terminal::command_file(
+                &data,
+                &super::super::terminal::macos_script(command),
+            )
+            .unwrap();
+            let output = std::process::Command::new(&script)
+                .current_dir("/")
+                // zsh reads `.zshenv` in `ZDOTDIR`, else in `HOME`: here, none.
+                .env("HOME", &home)
+                .env_remove("ZDOTDIR")
+                .env("SHELL", "/bin/echo")
+                .stdin(std::process::Stdio::null())
+                .output()
+                .unwrap();
+            assert!(!script.exists(), "{command}");
+            String::from_utf8(output.stdout).unwrap()
+        };
+        assert_eq!(run("echo {clipboard} \"it's\""), "{clipboard} it's\n-l\n");
+        // The command starts in the home folder, and can leave it.
+        assert_eq!(run("pwd"), format!("{}\n-l\n", home.display()));
+        assert_eq!(run("cd / && pwd"), "/\n-l\n");
+        // Exit, a syntax error, or a line that runs on still leave a shell.
+        assert_eq!(run("exit 3"), "-l\n");
+        assert_eq!(run("echo it's"), "-l\n");
+        assert_eq!(run("echo a \\"), "a\n-l\n");
+        std::fs::remove_dir_all(&data).unwrap();
+    }
+
     #[test]
     fn decodes_a_tiff_that_fits() {
         let mut tiff = Vec::new();

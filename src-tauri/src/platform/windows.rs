@@ -243,6 +243,30 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     }
 }
 
+/// Run the command in PowerShell, in a new console in the home folder, and
+/// keep PowerShell open after it. Windows 11 shows the console in the
+/// default terminal app, such as Windows Terminal.
+pub fn run_in_terminal(command: &str, _data: &Path) -> Result<()> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+    let mut powershell = std::process::Command::new("powershell.exe");
+    powershell
+        .args(super::terminal::powershell_arguments(command))
+        .creation_flags(CREATE_NEW_CONSOLE);
+    // The script goes home itself, after the user's profile. This start
+    // folder is for the profile, and for the prompt when the script has a
+    // syntax error and does not run at all.
+    if let Some(home) = std::env::home_dir() {
+        powershell.current_dir(home);
+    }
+    let mut child = powershell
+        .spawn()
+        .map_err(|error| Error::msg(format!("Could not open PowerShell: {error}")))?;
+    // Reap it when its window closes.
+    std::thread::spawn(move || child.wait());
+    Ok(())
+}
+
 /// Whether an `SHEmptyRecycleBinW` result means the bin is now empty. An
 /// already empty bin reports E_UNEXPECTED; that is not a failure.
 fn recycle_bin_emptied(result: i32) -> bool {

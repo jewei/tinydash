@@ -38,6 +38,11 @@ emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnable
  */
 checkForUpdates: boolean, searchEngine: SearchEngine, 
 /**
+ * `>`, a space, and a command run that command in the terminal. Off by
+ * default.
+ */
+shellCommands: boolean, 
+/**
  * Where the user dragged the launcher, in the units of
  * `platform::launcher_position`. `None` centers it on the screen with
  * the pointer. A spot no longer on any screen counts as `None`.

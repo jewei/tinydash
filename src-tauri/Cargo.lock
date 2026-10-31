@@ -4713,6 +4713,7 @@ dependencies = [
  "getrandom 0.4.3",
  "gio",
  "gtk",
+ "icu_properties",
  "image",
  "libc",
  "notify",

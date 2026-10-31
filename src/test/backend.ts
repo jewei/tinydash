@@ -25,6 +25,7 @@ export const testSettings: Settings = {
   emojiLanguages: [],
   currencyRatesEnabled: false,
   searchEngine: "google",
+  shellCommands: false,
   checkForUpdates: true,
   launcherPosition: null,
   tabs: (["apps", "files", "clipboard", "snippets", "emoji", "system"] as const).map(
