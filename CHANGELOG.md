@@ -11,6 +11,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Type `;` and a snippet's keyword in any app, such as `;sig`, to replace it with the snippet. Turn it on in Settings > Snippets. To see the keyword, TinyDash reads what you type in other apps; it keeps only the last 64 characters, in memory, and never saves or sends them. On macOS it needs Accessibility and Input Monitoring; on Linux it needs X11.
 - The calculator reads `rmb`, `yuan`, and `renminbi` as the Chinese yuan (CNY), so `20k rmb to myr` works like `20k cny to myr`.
 
+### Changed
+
+- A currency conversion with a currency that the daily ECB rates do not have, such as `100 twd to myr`, now says so instead of showing nothing.
+
 ## [0.8.0] - 2026-11-01
 
 ### Added
