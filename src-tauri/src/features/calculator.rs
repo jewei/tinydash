@@ -657,19 +657,38 @@ fn percentage_phrases(query: &str) -> Cow<'_, str> {
     Cow::Owned(input)
 }
 
-/// Whether a value after `text` stands on its own: at the start, or after
-/// `(` or a `+`, `-`, or `*` between two values. A word that fend reads as
-/// an operator, such as `mod` in `400 mod -10% off 200`, is not a value.
+/// Whether a value after `text` stands on its own: at the start, after `(`,
+/// or after a `+`, `-`, or `*` that follows a plain amount or a `)`. `text`
+/// is what the user typed, so a phrase already rewritten ends with its
+/// amount. After anything else, the sign can belong to the percentage, as
+/// after fend's operator word `mod` in `400 mod +10% off 200` or
+/// `1e1mod +10% off 200`.
 fn starts_value(text: &str) -> bool {
     let text = text.trim_end();
     match text.strip_suffix(['+', '-', '*']) {
         Some(left) => {
             let left = left.trim_end();
-            left.ends_with(|c: char| c.is_alphanumeric() || matches!(c, ')' | '.' | '!'))
-                && !ends_with_operator_word(left)
+            left.ends_with(')') || ends_with_amount(left)
         }
         None => text.is_empty() || text.ends_with('('),
     }
+}
+
+/// Whether `text` ends with a plain amount (see `amount_len`) that fend
+/// reads as one: it starts at the start of `text`, after a space, or after
+/// one of `()+-*/^`. So `1e1`, `0x10`, and `5²` do not end with one.
+fn ends_with_amount(text: &str) -> bool {
+    let start = |text: &str| {
+        text.trim_end_matches(|c: char| !c.is_whitespace() && !"()+-*/^".contains(c))
+            .len()
+    };
+    let mut at = start(text);
+    // A unit after a space, such as `kg` in `5 kg`.
+    let unit = &text[at..];
+    if !unit.is_empty() && unit.chars().all(char::is_alphabetic) {
+        at = start(text[..at].trim_end());
+    }
+    is_amount(&text[at..])
 }
 
 /// The words that fend-core 1.5.8 reads as operators (`lexer.rs`).
@@ -677,11 +696,9 @@ const OPERATOR_WORDS: [&str; 13] = [
     "to", "as", "in", "per", "of", "mod", "and", "or", "xor", "choose", "nCr", "permute", "nPr",
 ];
 
-/// Whether `text` ends with one of fend's operator words, in any case. fend
-/// starts a word after the digits of a number, so `5mod` ends with `mod`.
-fn ends_with_operator_word(text: &str) -> bool {
-    let before = text.trim_end_matches(char::is_alphanumeric);
-    let word = text[before.len()..].trim_start_matches(|c: char| c.is_ascii_digit());
+/// Whether fend can read `word` as an operator. It matches in any case, so
+/// it also holds for `Mod`, which fend reads as a name.
+fn is_operator_word(word: &str) -> bool {
     OPERATOR_WORDS
         .iter()
         .any(|operator| word.eq_ignore_ascii_case(operator))
@@ -749,12 +766,16 @@ fn amount_len(text: &str) -> Option<usize> {
     let number = unsigned.strip_prefix(['$', '£', '¥']).unwrap_or(unsigned);
     let mut rest = &number[number_len(number)?..];
     // A unit is a word after a space, such as `kg` or `EUR`: in `2e-3`, `e`
-    // is part of the number.
+    // is part of the number, and in `5 per`, `per` is fend's `/`.
     let unit = rest.trim_start();
     let letters = unit
         .find(|c: char| !c.is_alphabetic())
         .unwrap_or(unit.len());
-    if letters > 0 && unit.len() < rest.len() && ends_token(&unit[letters..]) {
+    if letters > 0
+        && unit.len() < rest.len()
+        && ends_token(&unit[letters..])
+        && !is_operator_word(&unit[..letters])
+    {
         rest = &unit[letters..];
     }
     Some(text.len() - rest.len())
@@ -1124,6 +1145,14 @@ mod tests {
             "400 per +10% off 200",
             "400 mod +10% off 200",
             "5 choose +10% of 20",
+            // After a number with letters or superscripts, fend still reads
+            // the word as an operator.
+            "1e1mod +10% off 200",
+            "5²mod +10% off 200",
+            "0x10mod +10% off 200",
+            "1e1per -10% off 200",
+            // Anything else before the sign.
+            "5! + 10% of 200",
             // A sign or a value right before the percentage.
             "10% of 200 - -10% of 50",
             "-10% off 200",
@@ -1151,7 +1180,23 @@ mod tests {
     }
 
     #[test]
-    fn an_operator_word_is_not_a_value() {
+    fn a_phrase_after_a_sign_needs_an_amount_or_a_parenthesis_before_it() {
+        for text in [
+            "",
+            "(",
+            "400 -",
+            "5 kg *",
+            "(2) +",
+            "-$5 +",
+            "1,000.5 -",
+            "2^5 +",
+            "10% of 200 +",
+            // A word that only ends like an operator word is a unit.
+            "5 min -",
+        ] {
+            assert!(starts_value(text), "{text}");
+        }
+        // fend reads these words as operators, also right after a number.
         for word in [
             "to", "as", "in", "per", "of", "mod", "and", "AND", "or", "OR", "xor", "XOR", "choose",
             "nCr", "permute", "nPr",
@@ -1159,9 +1204,26 @@ mod tests {
             assert!(!starts_value(&format!("400 {word} -")), "{word}");
             assert!(!starts_value(&format!("400{word}+")), "{word}");
         }
-        // A word that only ends like one, such as `min`, is a value.
-        for text in ["400 -", "5 kg *", "(2) +", "5 min -", "x2mod -"] {
-            assert!(starts_value(text), "{text}");
+        for text in [
+            // A number with letters or superscripts, or a word right after
+            // a number.
+            "1e1mod +",
+            "1e1 +",
+            "0x10mod +",
+            "16#ff -",
+            "5²mod +",
+            "5² +",
+            "5kg -",
+            // Anything else.
+            "x2mod -",
+            "pi +",
+            "5! +",
+            "-",
+            "2 * -",
+            "2 ** ",
+            "5 kg to g +",
+        ] {
+            assert!(!starts_value(text), "{text}");
         }
     }
 
