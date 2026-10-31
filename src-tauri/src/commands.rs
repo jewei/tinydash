@@ -10,7 +10,7 @@ use tauri_plugin_autostart::ManagerExt;
 use ts_rs::TS;
 
 use crate::{
-    actions,
+    actions::{self, Origin},
     error::{Error, Result},
     events,
     features::{
@@ -86,7 +86,10 @@ async fn blocking<T: Send + 'static>(
 ) -> Result<T> {
     tauri::async_runtime::spawn_blocking(work)
         .await
-        .map_err(|error| Error::msg(error.to_string()))?
+        .map_err(|error| {
+            tracing::error!(%error, "A command stopped before it finished");
+            Error::msg("Something went wrong. Try again.")
+        })?
 }
 
 #[tauri::command]
@@ -126,7 +129,7 @@ pub async fn spotlight_files(app: AppHandle, query: String) -> Result<Vec<Search
 /// `result_id` is sent with a result's primary action so usage can be ranked.
 #[tauri::command]
 pub async fn run_action(app: AppHandle, action: Action, result_id: Option<String>) -> Result<()> {
-    blocking(move || actions::run(&app, action, result_id.as_deref())).await
+    blocking(move || actions::run(&app, Origin::Launcher, action, result_id.as_deref())).await
 }
 
 #[tauri::command]
@@ -224,13 +227,13 @@ pub async fn update_settings(
                 "“{folder}” is not a full folder path. Enter the whole path, or start it with ~ for your home folder, such as ~/Projects."
             )));
         }
-        if new.shortcut != old.shortcut
-            && let Ok(keys) = shortcut::parse(&new.shortcut)
-            && let Some(name) = actions::hotkey_owner(&state.snapshot(), &keys, None)
-        {
-            return Err(Error::msg(format!(
-                "These keys already run {name}. Choose other keys, or remove that hotkey in Settings > Search."
-            )));
+        if new.shortcut != old.shortcut {
+            let keys = shortcut::launcher_keys(&new.shortcut)?;
+            if let Some(name) = actions::hotkey_owner(&state.snapshot(), &keys, None) {
+                return Err(Error::msg(format!(
+                    "These keys already run {name}. Choose other keys, or remove that hotkey in Settings > Search."
+                )));
+            }
         }
         if new.clock_cities != old.clock_cities
             && let Some(city) = new.unknown_clock_city()
@@ -301,7 +304,11 @@ fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()
         } else {
             autostart.disable()
         };
-        toggled.map_err(|error| Error::msg(format!("Could not change open at login: {error}")))?;
+        toggled.map_err(|error| {
+            Error::msg(format!(
+                "Could not change open at login: {error}. Try again, or change it in your system settings."
+            ))
+        })?;
     }
     if to.show_tray_icon != from.show_tray_icon {
         tray::set_visible(app, to.show_tray_icon)?;
@@ -447,12 +454,13 @@ pub struct HiddenResult {
 /// uninstalled app, shows its ID.
 #[tauri::command]
 pub fn hidden_results(state: tauri::State<State>) -> Vec<HiddenResult> {
+    let ready = state.freshness.ready();
     let snapshot = state.snapshot();
     let mut results: Vec<HiddenResult> = snapshot
         .hidden
         .ids()
         .map(|id| {
-            let (title, subtitle) = describe(&snapshot, id);
+            let (title, subtitle) = describe(&snapshot, id, &ready);
             HiddenResult {
                 id: id.to_owned(),
                 title,
@@ -465,15 +473,26 @@ pub fn hidden_results(state: tauri::State<State>) -> Vec<HiddenResult> {
 }
 
 /// A result's title and subtitle for a Settings list, or its ID when the
-/// item is gone.
-fn describe(snapshot: &search::Snapshot, id: &str) -> (String, String) {
-    match search::resolve(snapshot, &search::Context::none(), id) {
-        Some(found) => (found.title, found.subtitle),
-        None => (
-            Source::parse(id).map_or(id, |(_, key)| key).to_owned(),
-            "No longer found".into(),
-        ),
+/// item is gone. Until its source is `ready`, an item only looks gone, and
+/// the list refreshes when the scan ends.
+fn describe(
+    snapshot: &search::Snapshot,
+    id: &str,
+    ready: &impl Fn(Source) -> bool,
+) -> (String, String) {
+    if let Some(found) = search::resolve(snapshot, &search::Context::none(), id) {
+        return (found.title, found.subtitle);
     }
+    let parsed = Source::parse(id);
+    let subtitle = if parsed.is_some_and(|(source, _)| !ready(source)) {
+        "Still loading"
+    } else {
+        "No longer found"
+    };
+    (
+        parsed.map_or(id, |(_, key)| key).to_owned(),
+        subtitle.into(),
+    )
 }
 
 /// An alias the user set, as Settings lists it.
@@ -490,15 +509,16 @@ pub struct AliasedResult {
 /// The aliases the user set, in alphabetical order.
 #[tauri::command]
 pub fn aliases(state: tauri::State<State>) -> Vec<AliasedResult> {
-    aliased(&state.snapshot())
+    let ready = state.freshness.ready();
+    aliased(&state.snapshot(), &ready)
 }
 
-fn aliased(snapshot: &search::Snapshot) -> Vec<AliasedResult> {
+fn aliased(snapshot: &search::Snapshot, ready: &impl Fn(Source) -> bool) -> Vec<AliasedResult> {
     let mut results: Vec<AliasedResult> = snapshot
         .aliases
         .iter()
         .map(|(id, alias)| {
-            let (title, subtitle) = describe(snapshot, id);
+            let (title, subtitle) = describe(snapshot, id, ready);
             AliasedResult {
                 id: id.to_owned(),
                 alias: alias.to_owned(),
@@ -526,12 +546,13 @@ pub struct HotkeyResult {
 /// The hotkeys the user set, by result name.
 #[tauri::command]
 pub fn hotkeys(state: tauri::State<State>) -> Vec<HotkeyResult> {
+    let ready = state.freshness.ready();
     let snapshot = state.snapshot();
     let mut results: Vec<HotkeyResult> = snapshot
         .hotkeys
         .iter()
         .map(|(id, shortcut)| {
-            let (title, subtitle) = describe(&snapshot, id);
+            let (title, subtitle) = describe(&snapshot, id, &ready);
             HotkeyResult {
                 id: id.to_owned(),
                 shortcut: shortcut.to_owned(),
@@ -593,19 +614,30 @@ mod tests {
             ("system:lock".into(), "lk".into()),
             ("app:/Gone.app".into(), "gn".into()),
         ]));
-        let listed: Vec<(String, String, String)> = aliased(&state.snapshot())
-            .into_iter()
-            .map(|entry| (entry.alias, entry.title, entry.subtitle))
-            .collect();
+        let listed = |scanned: bool| -> Vec<(String, String, String)> {
+            aliased(&state.snapshot(), &|_| scanned)
+                .into_iter()
+                .map(|entry| (entry.alias, entry.title, entry.subtitle))
+                .collect()
+        };
+        let lock = (
+            "lk".into(),
+            "Lock Screen".into(),
+            "Lock this computer".into(),
+        );
         assert_eq!(
-            listed,
+            listed(true),
             [
                 ("gn".into(), "/Gone.app".into(), "No longer found".into()),
-                (
-                    "lk".into(),
-                    "Lock Screen".into(),
-                    "Lock this computer".into()
-                ),
+                lock.clone(),
+            ]
+        );
+        // Before the first scan of apps, the app only looks gone.
+        assert_eq!(
+            listed(false),
+            [
+                ("gn".into(), "/Gone.app".into(), "Still loading".into()),
+                lock,
             ]
         );
     }

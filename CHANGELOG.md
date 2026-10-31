@@ -18,6 +18,14 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Fixed
 
 - The details of an app or file show Where, Size, and Modified again at the default window size. Before, a result with many actions left no room for them. Now the details pane scrolls instead.
+- A hotkey that cannot run now says why in a system notification. Before, the reason showed in the small "Copied" message, cut short and next to a check mark.
+- A command that fails when you run it with its hotkey, such as Toggle Dark Mode on a desktop without it, no longer brings up the launcher over the app you are in.
+- An app or file hotkey pressed just after TinyDash starts, before it has found your apps and files, now asks you to try again in a moment. Before, it said the item was gone and to remove the hotkey. Settings > Search shows such items as still loading.
+- If TinyDash cannot pause the shortcuts when you record keys, the launcher shortcut and the hotkeys stay on. Before, some could stay off until TinyDash restarted.
+- After you record a launcher shortcut, Settings no longer shows an error about a hotkey that another app holds as if the new shortcut had failed.
+- Keys that TinyDash could not release from a deleted snippet or quicklink now run the result you give them next. Before, they kept saying the deleted item was gone.
+- TinyDash no longer registers a launcher shortcut that would block typing, such as a plain letter in a hand-edited settings.json. At startup it uses Control+Shift+Space instead and says so.
+- More error messages say what to do, for example when a link, file, or app cannot open, an update check fails, or settings cannot be saved. The warning for a hotkey that cannot register at startup now names its result.
 
 ## [0.7.0] - 2026-10-19
 
