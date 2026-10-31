@@ -259,6 +259,12 @@ body {
   overflow: auto;
 }
 
+/* A file's facts are a few short lines. With many actions they would shrink
+   to nothing, so the pane scrolls instead. */
+.preview-details.facts {
+  flex-shrink: 0;
+}
+
 .preview-text {
   margin: 0;
   max-height: 220px;

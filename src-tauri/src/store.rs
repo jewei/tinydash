@@ -399,6 +399,10 @@ impl Store {
                 "DELETE FROM hotkeys WHERE id IN (?1, ?2)",
                 [Source::Snippet.id(id), Source::Link.id(id)],
             )?;
+            transaction.execute(
+                "DELETE FROM hidden WHERE id IN (?1, ?2)",
+                [Source::Snippet.id(id), Source::Link.id(id)],
+            )?;
             transaction.commit()
         })
     }
@@ -802,6 +806,9 @@ mod tests {
         let saved = store.save_library_item(&item).unwrap();
         let id = saved.id.unwrap();
         store.set_pinned(&format!("snippet:{id}"), true).unwrap();
+        store.set_hidden(&Source::Snippet.id(id), true, 1).unwrap();
+        store.set_hidden(&Source::Link.id(id), true, 1).unwrap();
+        store.set_hidden("app:/a", true, 1).unwrap();
         store
             .save_library_item(&LibraryItem {
                 text: "Cheers".into(),
@@ -812,6 +819,7 @@ mod tests {
         store.delete_library_item(id).unwrap();
         assert!(store.library().unwrap().is_empty());
         assert!(store.pins().unwrap().ids().is_empty());
+        assert_eq!(store.hidden().unwrap(), ["app:/a"]);
         assert!(store.save_library_item(&saved).is_err());
         assert!(store.library().unwrap().is_empty());
     }
@@ -918,6 +926,19 @@ mod tests {
         drop(store);
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(warning, None);
+    }
+
+    #[test]
+    fn a_damaged_database_says_to_move_it_aside_not_to_free_space() {
+        let dir = std::env::temp_dir().join(format!("tinydash-damaged-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(FILE_NAME), [b'x'; 4096]).unwrap();
+        let error = Store::open(&dir).err().unwrap().to_string();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(
+            error.contains("move tinydash.db out of its data folder") && !error.contains("disk"),
+            "{error}"
+        );
     }
 
     #[test]

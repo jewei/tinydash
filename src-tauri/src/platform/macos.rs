@@ -324,8 +324,11 @@ pub fn restrict_to_owner(path: &Path) -> std::io::Result<()> {
 }
 
 pub fn launch_app(path: &Path) -> Result<()> {
-    tauri_plugin_opener::open_path(path, None::<&str>)
-        .map_err(|error| Error::msg(error.to_string()))
+    tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| {
+        Error::msg(format!(
+            "Could not open the app: {error}. Check that it is still installed."
+        ))
+    })
 }
 
 /// Draw the Finder icon of `path` into a square bitmap of `pixels` and
@@ -440,7 +443,7 @@ pub fn notify(_app: &tauri::AppHandle, title: &str, body: &str) -> Result<()> {
     content.setBody(&NSString::from_str(body));
     content.setSound(Some(&UNNotificationSound::defaultSound()));
     // A new identifier each time, so a notification never replaces the last.
-    let id = format!("focus-{}", chrono::Utc::now().timestamp_millis());
+    let id = format!("tinydash-{}", chrono::Utc::now().timestamp_millis());
     let request = UNNotificationRequest::requestWithIdentifier_content_trigger(
         &NSString::from_str(&id),
         &content,
@@ -954,7 +957,12 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
 fn apple_script(script: &str) -> Result<()> {
     let output = Command::new("/usr/bin/osascript")
         .args(["-e", script])
-        .output()?;
+        .output()
+        .map_err(|error| {
+            Error::msg(format!(
+                "macOS could not run the command: {error}. Try again."
+            ))
+        })?;
     if output.status.success() {
         return Ok(());
     }
@@ -993,7 +1001,7 @@ fn lock_screen() -> Result<()> {
 }
 
 pub fn clipboard_change() -> u64 {
-    let _one_reader = super::one_clipboard_reader();
+    let _one_user = super::one_clipboard_user();
     NSPasteboard::generalPasteboard().changeCount() as u64
 }
 
@@ -1047,7 +1055,7 @@ fn note_change(change: u64) -> bool {
     now_front
 }
 
-/// Call with the reader lock held; it reads the change counter directly.
+/// Call with the clipboard lock held; it reads the change counter directly.
 /// It looks at the counter too: a read can come before the monitor's next
 /// tick, just after the user copied in a password app and switched away.
 fn clipboard_is_concealed() -> bool {
@@ -1067,7 +1075,7 @@ fn clipboard_is_concealed() -> bool {
 /// The clipboard content for the latest change, or `None` when its source
 /// marked it secret.
 pub fn read_clipboard(images: bool, files: bool) -> Option<Content> {
-    let _one_reader = super::one_clipboard_reader();
+    let _one_user = super::one_clipboard_user();
     let change = || NSPasteboard::generalPasteboard().changeCount();
     let before = change();
     if clipboard_is_concealed() {
@@ -1202,7 +1210,7 @@ static PREVIOUS_APP: Mutex<Option<Retained<NSRunningApplication>>> = Mutex::new(
 pub fn remember_frontmost_app() {
     // A copy made in a password app just before the shortcut may be newer
     // than the clipboard monitor's last look; it must stay secret too. The
-    // counter waits for the reader lock, so it is read only then.
+    // counter waits for the clipboard lock, so it is read only then.
     if password_app_in_front() {
         note_clipboard_change(clipboard_change());
     }

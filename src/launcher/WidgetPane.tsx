@@ -55,8 +55,6 @@ const cardKeys = () => [modKey(), "⇧", "↩"];
 export const inNote = (target: EventTarget | null) =>
   target instanceof Element && target.closest(".notepad") !== null;
 
-/** 10,000 matches MAX_NOTE_CHARS in the Rust code. */
-const MAX_NOTE_CHARS = 10_000;
 /** Typing pauses this long before the note saves. */
 const SAVE_DELAY_MS = 400;
 
@@ -551,7 +549,6 @@ function Notepad(props: {
         ref={props.field}
         class="notepad-text"
         placeholder="Jot something down…"
-        maxLength={MAX_NOTE_CHARS}
         spellcheck={false}
         value={text()}
         onInput={(event) => {
