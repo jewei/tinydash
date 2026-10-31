@@ -155,24 +155,68 @@ pub fn launch_app(path: &Path) -> Result<()> {
     let app = gio::DesktopAppInfo::from_filename(path)
         .ok_or_else(|| Error::msg("The application is no longer installed."))?;
     app.launch(&[], None::<&gio::AppLaunchContext>)
-        .map_err(|error| Error::msg(error.to_string()))
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not open the app: {error}. Check that it is still installed."
+            ))
+        })
 }
 
 pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
     None
 }
 
-/// Calls KDE's session manager directly: its command-line client is
-/// `qdbus`, `qdbus6`, or `qdbus-qt6` depending on the distribution.
-fn kde_log_out() -> Result<()> {
-    let failed = |error: gio::glib::Error| Error::msg(format!("Could not log out: {error}"));
+/// How a desktop's session manager ends the session. It asks apps to quit
+/// first, so that they can offer to save, as macOS and Windows do.
+#[derive(Debug, PartialEq, Eq)]
+enum SessionEnd {
+    /// A program with fixed arguments.
+    Program(&'static str, &'static [&'static str]),
+    /// A method of KDE's session manager, called directly: its
+    /// command-line client is `qdbus`, `qdbus6`, or `qdbus-qt6`, depending
+    /// on the distribution.
+    Kde(&'static str),
+}
+
+/// How to log out, restart, or shut down on `desktop`, the lowercase
+/// `XDG_CURRENT_DESKTOP`. GNOME shows its own dialog to restart or shut
+/// down, as its system menu does: it has no way to skip it. Without a known
+/// session manager, systemd ends the session, which stops apps without
+/// asking, and Log Out is not supported.
+fn session_end(desktop: &str, command: SystemCommand) -> Option<SessionEnd> {
+    use SessionEnd::{Kde, Program};
+    let gnome = desktop.contains("gnome");
+    let kde = desktop.contains("kde");
+    let xfce = desktop.contains("xfce");
+    let end = match command {
+        SystemCommand::LogOut if gnome => {
+            Program("gnome-session-quit", &["--logout", "--no-prompt"])
+        }
+        SystemCommand::Restart if gnome => Program("gnome-session-quit", &["--reboot"]),
+        SystemCommand::ShutDown if gnome => Program("gnome-session-quit", &["--power-off"]),
+        SystemCommand::LogOut if kde => Kde("logout"),
+        SystemCommand::Restart if kde => Kde("logoutAndReboot"),
+        SystemCommand::ShutDown if kde => Kde("logoutAndShutdown"),
+        SystemCommand::LogOut if xfce => Program("xfce4-session-logout", &["--logout"]),
+        SystemCommand::Restart if xfce => Program("xfce4-session-logout", &["--reboot"]),
+        SystemCommand::ShutDown if xfce => Program("xfce4-session-logout", &["--halt"]),
+        SystemCommand::Restart => Program("systemctl", &["reboot"]),
+        SystemCommand::ShutDown => Program("systemctl", &["poweroff"]),
+        _ => return None,
+    };
+    Some(end)
+}
+
+fn ask_kde_session_manager(method: &str) -> Result<()> {
+    let failed =
+        |error: gio::glib::Error| Error::msg(format!("KDE could not end the session: {error}"));
     gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>)
         .map_err(failed)?
         .call_sync(
             Some("org.kde.Shutdown"),
             "/Shutdown",
             "org.kde.Shutdown",
-            "logout",
+            method,
             None,
             None,
             gio::DBusCallFlags::NONE,
@@ -191,7 +235,9 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
         .query_filesystem_info("filesystem::size,filesystem::free", gio::Cancellable::NONE)
         .map_err(|error| Error::msg(error.to_string()))?;
     // The mount point is the highest folder on the same device.
-    let device = std::fs::metadata(path)?.dev();
+    let device = std::fs::metadata(path)
+        .map_err(|error| Error::msg(error.to_string()))?
+        .dev();
     let mount = path
         .ancestors()
         .take_while(|folder| std::fs::metadata(folder).is_ok_and(|meta| meta.dev() == device))
@@ -217,16 +263,14 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     match command {
         SystemCommand::Lock => run("loginctl", &["lock-session"]),
         SystemCommand::Sleep => run("systemctl", &["suspend"]),
-        SystemCommand::Restart => run("systemctl", &["reboot"]),
-        SystemCommand::ShutDown => run("systemctl", &["poweroff"]),
+        SystemCommand::LogOut | SystemCommand::Restart | SystemCommand::ShutDown => {
+            match session_end(&desktop, command) {
+                Some(SessionEnd::Program(program, args)) => run(program, args),
+                Some(SessionEnd::Kde(method)) => ask_kde_session_manager(method),
+                None => unsupported(),
+            }
+        }
         SystemCommand::EmptyTrash => run("gio", &["trash", "--empty"]),
-        SystemCommand::LogOut if desktop.contains("gnome") => {
-            run("gnome-session-quit", &["--logout", "--no-prompt"])
-        }
-        SystemCommand::LogOut if desktop.contains("kde") => kde_log_out(),
-        SystemCommand::LogOut if desktop.contains("xfce") => {
-            run("xfce4-session-logout", &["--logout"])
-        }
         SystemCommand::OpenSystemSettings if desktop.contains("gnome") => {
             super::launch("gnome-control-center")
         }
@@ -248,8 +292,7 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
             run("kscreen-doctor", &["--dpms", "off"])
         }
         SystemCommand::ToggleDarkMode if desktop.contains("gnome") => toggle_gnome_dark_mode(),
-        SystemCommand::LogOut
-        | SystemCommand::OpenSystemSettings
+        SystemCommand::OpenSystemSettings
         | SystemCommand::SleepDisplays
         | SystemCommand::ToggleDarkMode => unsupported(),
     }
@@ -550,6 +593,67 @@ mod tests {
             Some("firefox")
         );
         assert_eq!(executable_alias(Path::new("")), None);
+    }
+
+    #[test]
+    fn restart_and_shut_down_go_through_the_session_manager() {
+        use SessionEnd::{Kde, Program};
+        assert_eq!(
+            session_end("ubuntu:gnome", SystemCommand::Restart),
+            Some(Program("gnome-session-quit", &["--reboot"]))
+        );
+        assert_eq!(
+            session_end("ubuntu:gnome", SystemCommand::ShutDown),
+            Some(Program("gnome-session-quit", &["--power-off"]))
+        );
+        assert_eq!(
+            session_end("kde", SystemCommand::Restart),
+            Some(Kde("logoutAndReboot"))
+        );
+        assert_eq!(
+            session_end("kde", SystemCommand::ShutDown),
+            Some(Kde("logoutAndShutdown"))
+        );
+        assert_eq!(
+            session_end("xfce", SystemCommand::Restart),
+            Some(Program("xfce4-session-logout", &["--reboot"]))
+        );
+        assert_eq!(
+            session_end("xfce", SystemCommand::ShutDown),
+            Some(Program("xfce4-session-logout", &["--halt"]))
+        );
+    }
+
+    #[test]
+    fn other_desktops_restart_and_shut_down_through_systemd() {
+        use SessionEnd::Program;
+        assert_eq!(
+            session_end("x-cinnamon", SystemCommand::Restart),
+            Some(Program("systemctl", &["reboot"]))
+        );
+        assert_eq!(
+            session_end("", SystemCommand::ShutDown),
+            Some(Program("systemctl", &["poweroff"]))
+        );
+        assert_eq!(session_end("x-cinnamon", SystemCommand::LogOut), None);
+        assert_eq!(session_end("kde", SystemCommand::Sleep), None);
+    }
+
+    #[test]
+    fn log_out_goes_through_the_session_manager() {
+        use SessionEnd::{Kde, Program};
+        assert_eq!(
+            session_end("gnome", SystemCommand::LogOut),
+            Some(Program("gnome-session-quit", &["--logout", "--no-prompt"]))
+        );
+        assert_eq!(
+            session_end("kde", SystemCommand::LogOut),
+            Some(Kde("logout"))
+        );
+        assert_eq!(
+            session_end("xfce", SystemCommand::LogOut),
+            Some(Program("xfce4-session-logout", &["--logout"]))
+        );
     }
 
     #[test]
