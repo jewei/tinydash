@@ -6,6 +6,15 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Added
 
+- Run a shell command from the launcher. Turn on Run shell commands in Settings > Search, then type `>`, a space, and a command, such as `> git pull`, and press Enter. It runs in Terminal (PowerShell on Windows), and your shell stays open after it. It is off by default.
+- On macOS, the Up Next widget shows the rest of today's events and the reminders due today. Click one to open Calendar or Reminders. Turn it on in Settings > Widgets; macOS then asks for access to Calendars and Reminders.
+- Type `;` and a snippet's keyword in any app, such as `;sig`, to replace it with the snippet. Turn it on in Settings > Snippets. To see the keyword, TinyDash reads what you type in other apps; it keeps only the last 64 characters, in memory, and never saves or sends them. On macOS it needs Accessibility and Input Monitoring; on Linux it needs X11.
+- The calculator reads `rmb`, `yuan`, and `renminbi` as the Chinese yuan (CNY), so `20k rmb to myr` works like `20k cny to myr`.
+
+## [0.8.0] - 2026-11-01
+
+### Added
+
 - The calculator reads percentages as people say them: `$30 + 20%`, `20% off $50`, `20 is what % of 200`, `50 to 75 is what %`, and `20 is 10% of what`.
 - The calculator reads `plus`, `minus`, `times`, `multiplied by`, and `divided by`, and amounts such as `€20`.
 - Date answers read phrases such as `3 days from now`, `a week ago`, `2 weeks after dec 25`, and dates with month names, such as `25 dec` or `December 25, 2026`.
@@ -13,11 +22,37 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Changed
 
-- `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
+- `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` (also with the typeset minus sign `−`) gives 180.
+- The calculator answers a percentage only in the shapes that it reads as people say them: an amount with percentages added or subtracted, `10% of`, `on`, or `off` an amount, and questions such as `20 is what % of 200`. Any other calculation with a percentage, such as `10% + 20%` or `200 * 10%`, now gives no answer.
+- The calculator no longer answers lambda functions, such as `(x: x + 1) 5` or `(\x.x + 1) 5`, or calculations that define a name, such as `a = 5; a * 2`.
+- The calculator no longer shows an answer that only repeats the query with other spacing, such as `2 kg` for `2kg`.
+- Search finds up to 5,000 installed apps. On a computer with more, TinyDash leaves out the rest.
 
 ### Fixed
 
+- A snippet or quicklink name or keyword pasted with separate accent marks, as some macOS file names have them, now matches an accented search such as `résumé`. So do the other names an app is found by, and words typed after `?`.
+- Settings are written to disk before they replace the old file, so a crash or power loss right after a change no longer resets every setting. A disk that refuses this step, such as some network shares, still saves the change.
+- Deleting a snippet or quicklink also removes it from the hidden results in one step, so a failure partway can no longer leave the deleted item in search.
 - The details of an app or file show Where, Size, and Modified again at the default window size. Before, a result with many actions left no room for them. Now the details pane scrolls instead.
+- A hotkey that cannot run now says why in a system notification. Before, the reason showed in the small "Copied" message, cut short and next to a check mark.
+- A command that fails when you run it with its hotkey, such as Toggle Dark Mode on a desktop without it, no longer brings up the launcher over the app you are in.
+- An app or file hotkey pressed just after TinyDash starts, before it has found your apps and files, now asks you to try again in a moment. Before, it said the item was gone and to remove the hotkey. Settings > Search shows such items as still loading.
+- If TinyDash cannot pause the shortcuts when you record keys, the launcher shortcut and the hotkeys stay on. Before, some could stay off until TinyDash restarted.
+- After you record a launcher shortcut, Settings no longer shows an error about a hotkey that another app holds as if the new shortcut had failed.
+- Keys that TinyDash could not release from a deleted snippet or quicklink now run the result you give them next. Before, they kept saying the deleted item was gone.
+- TinyDash no longer registers a launcher shortcut that would block typing, such as a plain letter in a hand-edited settings.json. At startup it uses Control+Shift+Space instead and says so.
+- More error messages say what to do, for example when a link, file, or app cannot open, an update check fails, or settings cannot be saved. The warning for a hotkey that cannot register at startup now names its result.
+- On macOS, a snippet with `{clipboard}`, or a copy, can no longer crash TinyDash when it uses the clipboard at the same moment as clipboard history.
+- On Windows, clipboard history skips a copy when it cannot read whether the app that made the copy allows it in history. Before, it saved the copy.
+- On Linux with GNOME, KDE, or Xfce, Restart and Shut Down now ask apps to quit first, so apps can offer to save your work. Before, they closed apps without asking. Other Linux desktops still close apps without asking, so on Linux the confirmation now tells you to save your work first instead of saying that apps will be asked to quit.
+- Holding ↑ to go back to the top of a list no longer fills the search field with your past searches. Press ↑ again on the first row to bring one back.
+- In the hotkey dialog, Escape and Tab work again after a click on the dialog's text or a failed Remove Hotkey, and keys no longer reach the search field behind it. A held Enter or Escape acts only once there.
+- On macOS 12.0 to 12.2, the actions menu opens again when exchange rates or the weather is on.
+- A long paste into the Notepad, such as one with many emoji, is no longer cut short without a message. A note over 10,000 characters says so and is not saved until you shorten it.
+- In Settings, a snippet or quicklink that you did not save is still there when you come back from another section. So is one that was still saving, with its error if the save failed.
+- The calculator no longer reads a percentage in a way that people do not mean: `100 + 10% + 5` and `(100 + 10%) * 2` now give no answer instead of 105.1 and 200.2, and `200 / 10%` gives none instead of 20%. `200 - 10% - 5%` gives 171, and `20 percent` works like `20%`.
+- A very long or deeply nested calculation, such as hundreds of parentheses, no longer freezes search or crashes TinyDash. The calculator gives no answer for it.
+- A function that calls itself, such as `(x: x x)(x: x x) 1` or `cos = cis; cis 1`, no longer crashes TinyDash.
 
 ## [0.7.0] - 2026-10-19
 
@@ -218,7 +253,8 @@ A rewrite: the same keyboard-first launcher, with much less code.
 
 The first public release: search apps, files, folders, and clipboard history; calculate, convert units, currencies, dates, and times; find emoji; generate passwords; clean URLs; and search the web.
 
-[Unreleased]: https://github.com/jewei/tinydash/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/jewei/tinydash/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/jewei/tinydash/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jewei/tinydash/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/jewei/tinydash/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/jewei/tinydash/compare/v0.6.0...v0.6.1

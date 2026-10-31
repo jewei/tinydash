@@ -4,7 +4,7 @@ import type { Platform } from "../generated/Platform";
 
 export const IS_MAC = /Mac/.test(navigator.userAgent);
 
-const PLATFORM: Platform = IS_MAC
+export const PLATFORM: Platform = IS_MAC
   ? "macos"
   : /Windows/.test(navigator.userAgent)
     ? "windows"

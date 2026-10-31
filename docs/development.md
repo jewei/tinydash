@@ -38,6 +38,15 @@ bunx tauri build --debug --no-bundle --config src-tauri/tauri.dev.conf.json
 
 If another TinyDash holds the global shortcut, run the binary again to toggle the launcher.
 
+On macOS, the Up Next widget reads and asks for calendars and reminders only when TinyDash is its own responsible process. macOS checks the access and the Info.plist usage strings of the responsible process, and a program that a terminal starts usually belongs to the terminal. So `bun run dev` and the binary above, started from a terminal, never ask: the widget says that another app opened TinyDash. To test Up Next, build the app bundle and open it with `open`, which starts it through launchd:
+
+```sh
+bunx tauri build --debug --bundles app --config src-tauri/tauri.dev.conf.json
+open "src-tauri/target/debug/bundle/macos/TinyDash Dev.app"
+```
+
+It asks for access as TinyDash Dev. A few terminals make each program its own responsible process. There, `bun run dev` asks for itself, because it embeds `src-tauri/Info.plist` in its binary. The binary above does not embed it, so there the widget says that this build cannot ask.
+
 ## Tests
 
 - **Rust:** unit tests in each module. Platform tests in `platform/macos.rs` read the real system (apps, icons) without changing it.

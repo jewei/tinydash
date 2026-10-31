@@ -1,12 +1,23 @@
 use std::{
+    cell::Cell,
+    ffi::{CStr, CString, OsStr, c_char, c_int, c_uint, c_ulong},
     path::{Path, PathBuf},
+    ptr,
     sync::{
-        Mutex,
-        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        mpsc,
     },
+    thread::JoinHandle,
+    time::{Duration, Instant},
 };
 
 use gio::prelude::*;
+use x11_dl::{
+    xlib::{self, Display, Xlib},
+    xrecord::{self, Xf86vmode as Xrecord},
+};
+use xkeysym::Keysym;
 
 use super::{SECRET_FORMATS, run};
 use crate::{
@@ -14,7 +25,9 @@ use crate::{
     features::{
         apps::App,
         clipboard::{Content, MAX_TEXT_BYTES},
+        expansion::{self, Key, Piece},
         system::SystemCommand,
+        up_next::{Agenda, UpNextKind},
     },
 };
 
@@ -118,6 +131,18 @@ fn executable_alias(executable: &Path) -> Option<String> {
     (!LAUNCHER_WRAPPERS.contains(&name.as_ref())).then(|| name.into_owned())
 }
 
+/// Turn on Xlib's locks before GTK opens its display, as Firefox and
+/// Chromium do. Xlib keeps some state for the whole process, and GTK, tao's
+/// device thread, and snippet expansion call it on threads of their own.
+/// libX11 1.8 and later turn the locks on by themselves.
+pub fn prepare_process() {
+    if let Ok(xlib) = Xlib::open() {
+        // SAFETY: Takes no arguments, and runs on the main thread before
+        // any other Xlib call.
+        unsafe { (xlib.XInitThreads)() };
+    }
+}
+
 pub fn prepare_app(app: &mut tauri::App) {
     if let Err(error) = app.handle().plugin(tauri_plugin_notification::init()) {
         tracing::warn!(%error, "Notifications are unavailable");
@@ -155,24 +180,68 @@ pub fn launch_app(path: &Path) -> Result<()> {
     let app = gio::DesktopAppInfo::from_filename(path)
         .ok_or_else(|| Error::msg("The application is no longer installed."))?;
     app.launch(&[], None::<&gio::AppLaunchContext>)
-        .map_err(|error| Error::msg(error.to_string()))
+        .map_err(|error| {
+            Error::msg(format!(
+                "Could not open the app: {error}. Check that it is still installed."
+            ))
+        })
 }
 
 pub fn app_icon(_path: &Path, _pixels: u32) -> Option<Vec<u8>> {
     None
 }
 
-/// Calls KDE's session manager directly: its command-line client is
-/// `qdbus`, `qdbus6`, or `qdbus-qt6` depending on the distribution.
-fn kde_log_out() -> Result<()> {
-    let failed = |error: gio::glib::Error| Error::msg(format!("Could not log out: {error}"));
+/// How a desktop's session manager ends the session. It asks apps to quit
+/// first, so that they can offer to save, as macOS and Windows do.
+#[derive(Debug, PartialEq, Eq)]
+enum SessionEnd {
+    /// A program with fixed arguments.
+    Program(&'static str, &'static [&'static str]),
+    /// A method of KDE's session manager, called directly: its
+    /// command-line client is `qdbus`, `qdbus6`, or `qdbus-qt6`, depending
+    /// on the distribution.
+    Kde(&'static str),
+}
+
+/// How to log out, restart, or shut down on `desktop`, the lowercase
+/// `XDG_CURRENT_DESKTOP`. GNOME shows its own dialog to restart or shut
+/// down, as its system menu does: it has no way to skip it. Without a known
+/// session manager, systemd ends the session, which stops apps without
+/// asking, and Log Out is not supported.
+fn session_end(desktop: &str, command: SystemCommand) -> Option<SessionEnd> {
+    use SessionEnd::{Kde, Program};
+    let gnome = desktop.contains("gnome");
+    let kde = desktop.contains("kde");
+    let xfce = desktop.contains("xfce");
+    let end = match command {
+        SystemCommand::LogOut if gnome => {
+            Program("gnome-session-quit", &["--logout", "--no-prompt"])
+        }
+        SystemCommand::Restart if gnome => Program("gnome-session-quit", &["--reboot"]),
+        SystemCommand::ShutDown if gnome => Program("gnome-session-quit", &["--power-off"]),
+        SystemCommand::LogOut if kde => Kde("logout"),
+        SystemCommand::Restart if kde => Kde("logoutAndReboot"),
+        SystemCommand::ShutDown if kde => Kde("logoutAndShutdown"),
+        SystemCommand::LogOut if xfce => Program("xfce4-session-logout", &["--logout"]),
+        SystemCommand::Restart if xfce => Program("xfce4-session-logout", &["--reboot"]),
+        SystemCommand::ShutDown if xfce => Program("xfce4-session-logout", &["--halt"]),
+        SystemCommand::Restart => Program("systemctl", &["reboot"]),
+        SystemCommand::ShutDown => Program("systemctl", &["poweroff"]),
+        _ => return None,
+    };
+    Some(end)
+}
+
+fn ask_kde_session_manager(method: &str) -> Result<()> {
+    let failed =
+        |error: gio::glib::Error| Error::msg(format!("KDE could not end the session: {error}"));
     gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>)
         .map_err(failed)?
         .call_sync(
             Some("org.kde.Shutdown"),
             "/Shutdown",
             "org.kde.Shutdown",
-            "logout",
+            method,
             None,
             None,
             gio::DBusCallFlags::NONE,
@@ -191,7 +260,9 @@ pub fn disk_space(path: &Path) -> Result<super::Volume> {
         .query_filesystem_info("filesystem::size,filesystem::free", gio::Cancellable::NONE)
         .map_err(|error| Error::msg(error.to_string()))?;
     // The mount point is the highest folder on the same device.
-    let device = std::fs::metadata(path)?.dev();
+    let device = std::fs::metadata(path)
+        .map_err(|error| Error::msg(error.to_string()))?
+        .dev();
     let mount = path
         .ancestors()
         .take_while(|folder| std::fs::metadata(folder).is_ok_and(|meta| meta.dev() == device))
@@ -209,6 +280,17 @@ pub fn find_files(_name: &str, _folder: &Path, _limit: usize) -> Vec<PathBuf> {
     Vec::new()
 }
 
+/// No calendars here: the Up Next widget reads only the macOS calendars.
+pub fn read_up_next(_from_ms: i64, _to_ms: i64) -> Option<Agenda> {
+    None
+}
+
+pub fn ask_calendar_access(_done: impl Fn() + Send + Sync + 'static) {}
+
+pub fn open_calendar_app(_kind: UpNextKind) -> Result<()> {
+    Err(Error::msg("Up Next works only on macOS."))
+}
+
 pub fn run_system_command(command: SystemCommand) -> Result<()> {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")
         .unwrap_or_default()
@@ -217,16 +299,14 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
     match command {
         SystemCommand::Lock => run("loginctl", &["lock-session"]),
         SystemCommand::Sleep => run("systemctl", &["suspend"]),
-        SystemCommand::Restart => run("systemctl", &["reboot"]),
-        SystemCommand::ShutDown => run("systemctl", &["poweroff"]),
+        SystemCommand::LogOut | SystemCommand::Restart | SystemCommand::ShutDown => {
+            match session_end(&desktop, command) {
+                Some(SessionEnd::Program(program, args)) => run(program, args),
+                Some(SessionEnd::Kde(method)) => ask_kde_session_manager(method),
+                None => unsupported(),
+            }
+        }
         SystemCommand::EmptyTrash => run("gio", &["trash", "--empty"]),
-        SystemCommand::LogOut if desktop.contains("gnome") => {
-            run("gnome-session-quit", &["--logout", "--no-prompt"])
-        }
-        SystemCommand::LogOut if desktop.contains("kde") => kde_log_out(),
-        SystemCommand::LogOut if desktop.contains("xfce") => {
-            run("xfce4-session-logout", &["--logout"])
-        }
         SystemCommand::OpenSystemSettings if desktop.contains("gnome") => {
             super::launch("gnome-control-center")
         }
@@ -248,11 +328,84 @@ pub fn run_system_command(command: SystemCommand) -> Result<()> {
             run("kscreen-doctor", &["--dpms", "off"])
         }
         SystemCommand::ToggleDarkMode if desktop.contains("gnome") => toggle_gnome_dark_mode(),
-        SystemCommand::LogOut
-        | SystemCommand::OpenSystemSettings
+        SystemCommand::OpenSystemSettings
         | SystemCommand::SleepDisplays
         | SystemCommand::ToggleDarkMode => unsupported(),
     }
+}
+
+/// Run the command in `sh` in the user's terminal, in the home folder, and
+/// keep the user's login shell open after it: `$TERMINAL` when it is set,
+/// else the first known terminal found. `sh` reads the command from a
+/// private file under `data`, because a terminal keeps its arguments while
+/// its window is open, and other users can read them.
+pub fn run_in_terminal(command: &str, data: &Path) -> Result<()> {
+    use super::terminal;
+    use std::process::Stdio;
+    let file = terminal::command_file(data, &format!("{command}\n")).map_err(|error| {
+        Error::msg(format!(
+            "TinyDash could not prepare the command for the terminal: {error}"
+        ))
+    })?;
+    let preferred = std::env::var("TERMINAL").ok();
+    let Some((program, arguments)) =
+        terminal::linux_terminal(preferred.as_deref(), find_program, &file)
+    else {
+        std::fs::remove_file(&file).ok();
+        return Err(Error::msg(
+            "TinyDash found no terminal app. Set the TERMINAL environment variable to yours, such as kitty, then restart TinyDash.",
+        ));
+    };
+    let mut launch = std::process::Command::new(&program);
+    launch
+        .args(arguments)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    // The script goes home itself, because a terminal can start it in a
+    // folder of its own. This start folder is for the terminal.
+    if let Some(home) = std::env::home_dir() {
+        launch.current_dir(home);
+    }
+    let mut child = match launch.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            std::fs::remove_file(&file).ok();
+            return Err(Error::msg(format!(
+                "Could not open {}: {error}",
+                program.display()
+            )));
+        }
+    };
+    // Reap it when it exits, so no zombie process stays behind. Its output
+    // is discarded (see `open_trash`), so a terminal that fails at once,
+    // such as one that cannot open a window, leaves only this log entry.
+    std::thread::spawn(move || match child.wait() {
+        Ok(status) => {
+            if terminal::failed_before_reading(status.success(), &file) {
+                tracing::warn!(%status, terminal = %program.display(), "The terminal ended with an error");
+            }
+        }
+        Err(error) => tracing::warn!(%error, "Could not wait for the terminal"),
+    });
+    Ok(())
+}
+
+/// The full path of a program that can run: `name` itself when it is a
+/// path, else the first match on `PATH`.
+fn find_program(name: &str) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let runs = |path: &Path| {
+        std::fs::metadata(path)
+            .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+    };
+    if name.contains('/') {
+        let path = PathBuf::from(name);
+        return runs(&path).then_some(path);
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|folder| folder.join(name))
+        .find(|path| runs(path))
 }
 
 /// Show the trash in the file manager. The output is discarded, not
@@ -422,9 +575,743 @@ pub fn remember_frontmost_app() {}
 
 pub fn restore_frontmost_app() {}
 
+/// X11 does not mark the keys a program sends, so the recording also gets
+/// TinyDash's own typing. Keys count again this long after the X server
+/// handled the last one.
+const OWN_KEYS_AFTER: Duration = Duration::from_millis(300);
+/// How long the recording thread waits for keys before it checks whether
+/// to stop.
+const POLL_MILLISECONDS: c_int = 200;
+/// libxdo's pause between keys, in microseconds, as `xdotool type` uses.
+const KEY_DELAY: c_uint = 12_000;
+/// UTF-16 units typed between focus checks: under half a second.
+const PIECE_UNITS: usize = 32;
+/// libxdo's `CURRENTWINDOW`: type into the window that has focus.
+const CURRENT_WINDOW: c_ulong = 0;
+/// Modifiers that make a key a shortcut: Control, Alt (Mod1), and Super
+/// (Mod4). AltGr (Mod5) types characters.
+const SHORTCUT_MODIFIERS: c_uint = xlib::ControlMask | xlib::Mod1Mask | xlib::Mod4Mask;
+/// Modifiers that change the keys libxdo sends, as XTEST keys take on the
+/// modifiers that are down: Shift and Caps Lock change the case, and
+/// Control, Alt, Mod3, Super, and AltGr (Mod5) change the key. Num Lock
+/// (Mod2) changes only the number pad, which libxdo does not use.
+const MODIFIERS_THAT_CHANGE_KEYS: c_uint = xlib::ShiftMask
+    | xlib::LockMask
+    | xlib::ControlMask
+    | xlib::Mod1Mask
+    | xlib::Mod3Mask
+    | xlib::Mod4Mask
+    | xlib::Mod5Mask;
+
+/// libxdo's context.
+#[repr(C)]
+struct Xdo {
+    _private: [u8; 0],
+}
+
+// libxdo 3, which the .deb and .rpm packages depend on.
+#[link(name = "xdo")]
+unsafe extern "C" {
+    fn xdo_new_with_opened_display(
+        display: *mut Display,
+        name: *const c_char,
+        close_display_when_freed: c_int,
+    ) -> *mut Xdo;
+    fn xdo_free(xdo: *mut Xdo);
+    fn xdo_enter_text_window(
+        xdo: *const Xdo,
+        window: c_ulong,
+        text: *const c_char,
+        delay: c_uint,
+    ) -> c_int;
+    fn xdo_send_keysequence_window(
+        xdo: *const Xdo,
+        window: c_ulong,
+        keys: *const c_char,
+        delay: c_uint,
+    ) -> c_int;
+}
+
+/// Until when keys come from TinyDash's own typing.
+static OWN_TYPING_UNTIL: Mutex<Option<Instant>> = Mutex::new(None);
+
+fn own_typing_until(until: Instant) {
+    *OWN_TYPING_UNTIL.lock().unwrap_or_else(|e| e.into_inner()) = Some(until);
+}
+
+fn own_typing() -> bool {
+    OWN_TYPING_UNTIL
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .is_some_and(|until| Instant::now() < until)
+}
+
+/// Set by each click that the recording gets. libxdo sends no clicks, so a
+/// click while TinyDash types came from the user or another program.
+static CLICKED: AtomicBool = AtomicBool::new(false);
+
+pub fn typing_unavailable() -> Option<&'static str> {
+    wayland_session(
+        std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
+        std::env::var_os("WAYLAND_DISPLAY").as_deref(),
+    )
+    .then_some("Not available on Wayland.")
+}
+
+/// Wayland lets no app read the keys typed in another app.
+fn wayland_session(session_type: Option<&str>, wayland_display: Option<&OsStr>) -> bool {
+    session_type.is_some_and(|kind| kind.eq_ignore_ascii_case("wayland"))
+        || wayland_display.is_some_and(|display| !display.is_empty())
+}
+
+/// X11 asks for no permission to read or send keys.
+pub fn typing_access(_ask: bool) -> Result<()> {
+    Ok(())
+}
+
+/// Reads keys with the X RECORD extension, on a thread of its own.
+pub struct TypingWatch {
+    stopped: Arc<AtomicBool>,
+    thread: JoinHandle<()>,
+}
+
+impl TypingWatch {
+    /// False once the thread has ended, which it does only when stopped or
+    /// after a panic.
+    pub fn is_running(&self) -> bool {
+        !self.thread.is_finished()
+    }
+
+    /// The thread looks at `stopped` at least every `POLL_MILLISECONDS`.
+    pub fn stop(self) {
+        self.stopped.store(true, Ordering::Release);
+        if self.thread.join().is_err() {
+            tracing::warn!("The key watch ended with a panic");
+        }
+    }
+}
+
+/// The window with the input focus, which gets typed keys.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Focus(xlib::Window);
+
+pub fn watch_typing(on_key: impl FnMut(Key, Focus) + Send + 'static) -> Result<TypingWatch> {
+    if let Some(reason) = typing_unavailable() {
+        return Err(Error::msg(reason));
+    }
+    let (ready, started) = mpsc::channel();
+    let stopped = Arc::new(AtomicBool::new(false));
+    let thread = std::thread::Builder::new()
+        .name("key-watch".into())
+        .spawn({
+            let stopped = Arc::clone(&stopped);
+            move || record_keys(Box::new(on_key), &stopped, &ready)
+        })?;
+    match started.recv() {
+        Ok(Ok(())) => Ok(TypingWatch { stopped, thread }),
+        Ok(Err(error)) => {
+            let _ = thread.join();
+            Err(error)
+        }
+        Err(_) => {
+            let _ = thread.join();
+            Err(Error::msg("Could not start reading keys."))
+        }
+    }
+}
+
+/// Two connections to the X server: RECORD sends keys on `data`, and
+/// `control` runs RECORD and translates keys. Both close when dropped.
+struct Connections<'a> {
+    xlib: &'a Xlib,
+    control: *mut Display,
+    data: *mut Display,
+}
+
+impl<'a> Connections<'a> {
+    fn open(xlib: &'a Xlib) -> Option<Self> {
+        // SAFETY: A null name opens the display that DISPLAY names.
+        let (control, data) = unsafe {
+            (
+                (xlib.XOpenDisplay)(ptr::null()),
+                (xlib.XOpenDisplay)(ptr::null()),
+            )
+        };
+        let connections = Self {
+            xlib,
+            control,
+            data,
+        };
+        (!control.is_null() && !data.is_null()).then_some(connections)
+    }
+}
+
+impl Drop for Connections<'_> {
+    fn drop(&mut self) {
+        // `data` first: closing it may still pass keys to the callback.
+        for display in [self.data, self.control] {
+            if !display.is_null() {
+                // SAFETY: Opened in `open`, and closed once.
+                unsafe { (self.xlib.XCloseDisplay)(display) };
+            }
+        }
+    }
+}
+
+/// What the RECORD callback works with, on the recording thread only.
+struct Recording<'a> {
+    xlib: &'a Xlib,
+    xrecord: &'a Xrecord,
+    /// The connection that translates keys and asks for the focus.
+    lookup: *mut Display,
+    on_key: Box<dyn FnMut(Key, Focus)>,
+    /// The window that had focus at the latest key.
+    focus: Focus,
+}
+
+fn record_keys(
+    on_key: Box<dyn FnMut(Key, Focus)>,
+    stopped: &AtomicBool,
+    ready: &mpsc::Sender<Result<()>>,
+) {
+    let fail = |message: &str| {
+        let _ = ready.send(Err(Error::msg(message)));
+    };
+    let (Ok(xlib), Ok(xrecord)) = (Xlib::open(), Xrecord::open()) else {
+        return fail("Snippet expansion needs the libX11 and libXtst libraries.");
+    };
+    let Some(connections) = Connections::open(&xlib) else {
+        return fail("Could not connect to the X server.");
+    };
+    let Some(context) = record_context(&xlib, &xrecord, connections.control) else {
+        return fail("The X server did not let TinyDash read keys. It needs the RECORD extension.");
+    };
+    let recording = Box::into_raw(Box::new(Recording {
+        xlib: &xlib,
+        xrecord: &xrecord,
+        lookup: connections.control,
+        on_key,
+        focus: Focus(0),
+    }));
+    // SAFETY: `recording` stays valid until the data connection closes, and
+    // only this thread uses it: RECORD calls back inside the calls on the
+    // data connection below.
+    let enabled = unsafe {
+        (xrecord.XRecordEnableContextAsync)(
+            connections.data,
+            context,
+            Some(on_record),
+            recording.cast(),
+        )
+    };
+    if enabled == 0 {
+        fail("The X server did not let TinyDash read keys.");
+    } else if ready.send(Ok(())).is_ok() {
+        // SAFETY: The connection is open.
+        let fd = unsafe { (xlib.XConnectionNumber)(connections.data) };
+        while !stopped.load(Ordering::Acquire) {
+            let mut wait = libc::pollfd {
+                fd,
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            // SAFETY: One valid pollfd.
+            unsafe { libc::poll(&mut wait, 1, POLL_MILLISECONDS) };
+            // SAFETY: The connection is open; replies call `on_record` here.
+            unsafe { (xrecord.XRecordProcessReplies)(connections.data) };
+            drain_events(&xlib, connections.data);
+            drain_events(&xlib, connections.control);
+        }
+    }
+    // SAFETY: The context belongs to the control connection, which is open.
+    // While the context is on, the server reads nothing more from the data
+    // connection, and closing that connection waits for a reply. XSync sends
+    // the requests and waits until the server has handled them.
+    unsafe {
+        if enabled != 0 {
+            (xrecord.XRecordDisableContext)(connections.control, context);
+        }
+        (xrecord.XRecordFreeContext)(connections.control, context);
+        (xlib.XSync)(connections.control, xlib::False);
+    }
+    drop(connections);
+    // SAFETY: Made by Box::into_raw above. With the data connection closed,
+    // no callback can use it any more.
+    drop(unsafe { Box::from_raw(recording) });
+}
+
+/// A RECORD context for key and mouse button presses from every client.
+fn record_context(
+    xlib: &Xlib,
+    xrecord: &Xrecord,
+    control: *mut Display,
+) -> Option<xrecord::XRecordContext> {
+    let (mut major, mut minor) = (0, 0);
+    // SAFETY: The connection is open, and the call writes only the numbers.
+    if unsafe { (xrecord.XRecordQueryVersion)(control, &mut major, &mut minor) } == 0 {
+        return None;
+    }
+    // SAFETY: Returns a zeroed range, or null.
+    let mut range = unsafe { (xrecord.XRecordAllocRange)() };
+    if range.is_null() {
+        return None;
+    }
+    let mut clients = xrecord::XRecordAllClients;
+    // SAFETY: `range` is valid and writable. The server copies it, and it is
+    // freed once. XSync makes the context known before the data connection
+    // uses it.
+    unsafe {
+        (*range).device_events.first = xlib::KeyPress as u8;
+        (*range).device_events.last = xlib::ButtonPress as u8;
+        let context = (xrecord.XRecordCreateContext)(control, 0, &mut clients, 1, &mut range, 1);
+        (xlib.XFree)(range.cast());
+        (xlib.XSync)(control, xlib::False);
+        (context != 0).then_some(context)
+    }
+}
+
+/// RECORD's callback, with each recorded event in the X wire format.
+unsafe extern "C" fn on_record(recording: *mut c_char, data: *mut xrecord::XRecordInterceptData) {
+    // SAFETY: `recording` is the Recording that `record_keys` passed, used
+    // on this thread only, and `data` stays valid until it is freed here.
+    unsafe {
+        let recording = &mut *recording.cast::<Recording>();
+        let intercepted = &*data;
+        // A device event is 32 bytes; `data_len` counts 4-byte units.
+        if intercepted.category == xrecord::XRecordFromServer && intercepted.data_len >= 8 {
+            let event = std::slice::from_raw_parts(intercepted.data, 32);
+            // The type, the key code or button, and the modifiers before it.
+            recording.event(
+                event[0] & 0x7f,
+                event[1],
+                u16::from_ne_bytes([event[28], event[29]]),
+            );
+        }
+        (recording.xrecord.XRecordFreeData)(data);
+    }
+}
+
+impl Recording<'_> {
+    fn event(&mut self, kind: u8, detail: u8, state: u16) {
+        let keys = match c_int::from(kind) {
+            xlib::KeyPress => self.key(detail, state),
+            xlib::ButtonPress => {
+                return press_button(detail, |key| (self.on_key)(key, self.focus));
+            }
+            _ => return,
+        };
+        // Each key goes with the window that had focus at the latest key.
+        for key in keys {
+            (self.on_key)(key, self.focus);
+        }
+    }
+
+    fn key(&mut self, keycode: u8, state: u16) -> Vec<Key> {
+        // The user's keys among TinyDash's own are lost too.
+        if own_typing() {
+            return vec![Key::Reset];
+        }
+        let mut keys = Vec::new();
+        let focus = input_focus(self.xlib, self.lookup);
+        if std::mem::replace(&mut self.focus, focus) != focus {
+            keys.push(Key::Reset);
+        }
+        let state = c_uint::from(state);
+        keys.extend(keys_for(self.keysym(keycode, state), state));
+        keys
+    }
+
+    /// What a key types with these modifiers, with Shift, Caps Lock, AltGr,
+    /// and the layout group applied.
+    fn keysym(&self, keycode: u8, state: c_uint) -> u32 {
+        let mut keysym: xlib::KeySym = 0;
+        let mut text: [c_char; 8] = [0; 8];
+        // SAFETY: An all-zero XKeyEvent is valid. XLookupString reads it and
+        // writes the keysym and at most `text.len()` bytes.
+        unsafe {
+            let mut event: xlib::XKeyEvent = std::mem::zeroed();
+            event.type_ = xlib::KeyPress;
+            event.display = self.lookup;
+            event.keycode = c_uint::from(keycode);
+            event.state = state;
+            (self.xlib.XLookupString)(
+                &mut event,
+                text.as_mut_ptr(),
+                text.len() as c_int,
+                &mut keysym,
+                ptr::null_mut(),
+            );
+        }
+        u32::try_from(keysym).unwrap_or_default()
+    }
+}
+
+/// Passes a press of mouse button `button` to `on_key`. Buttons 4 to 7
+/// scroll, which moves no cursor, so they pass nothing. Another button is a
+/// click: a reset, then a mark in [`CLICKED`], as TinyDash never clicks. The
+/// reset goes first, so a click after the trigger has set `interrupted` by
+/// the time typing clears the mark.
+fn press_button(button: u8, mut on_key: impl FnMut(Key)) {
+    if (4..=7).contains(&button) {
+        return;
+    }
+    on_key(Key::Reset);
+    CLICKED.store(true, Ordering::Release);
+}
+
+/// The window with the input focus. Window IDs are the same on every
+/// connection to the X server.
+fn input_focus(xlib: &Xlib, display: *mut Display) -> Focus {
+    let (mut focus, mut revert) = (0, 0);
+    // SAFETY: The connection is open and used by this thread only.
+    unsafe { (xlib.XGetInputFocus)(display, &mut focus, &mut revert) };
+    Focus(focus)
+}
+
+/// Read the events that X sends every client, such as a new key map, so
+/// they do not pile up. A new map also updates the one that reads keys.
+fn drain_events(xlib: &Xlib, display: *mut Display) {
+    // SAFETY: The connection is open and used by this thread only, and each
+    // event is read into a valid XEvent.
+    unsafe {
+        while (xlib.XPending)(display) > 0 {
+            let mut event: xlib::XEvent = std::mem::zeroed();
+            (xlib.XNextEvent)(display, &mut event);
+            if event.get_type() == xlib::MappingNotify {
+                (xlib.XRefreshKeyboardMapping)(&mut event.mapping);
+            }
+        }
+    }
+}
+
+/// The keys for a key press: none for a modifier alone, a reset for a
+/// shortcut, Backspace, or what the key typed. A key that types no
+/// character, such as an arrow or a dead key, resets.
+fn keys_for(keysym: u32, state: c_uint) -> Vec<Key> {
+    let keysym = Keysym::new(keysym);
+    if keysym.is_modifier_key() {
+        Vec::new()
+    } else if state & SHORTCUT_MODIFIERS != 0 {
+        vec![Key::Reset]
+    } else if keysym == Keysym::BackSpace {
+        vec![Key::Backspace]
+    } else {
+        keysym.key_char().map_or_else(
+            || vec![Key::Reset],
+            |c| expansion::keys_for(c.encode_utf16(&mut [0; 2])),
+        )
+    }
+}
+
+/// Types with libxdo, which sends keys with the XTEST extension and maps a
+/// character that no key types to a spare key for a moment. Each part goes
+/// only while `focus` has the input focus, so typing stops soon after
+/// another window gets it, and types nothing when one got it before typing
+/// started. Each part waits while the user holds a modifier, which the keys
+/// would take on, and goes only while `no_input_from_others` lets it.
+pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBool) -> Result<()> {
+    // Checked before the first Backspace, so the trigger stays.
+    if !xdo_can_type(text, session_locale_is_utf8) {
+        return Err(Error::msg(
+            "Could not type the snippet: it has characters outside ASCII, and the session's locale is not UTF-8. Set LANG to a UTF-8 locale, such as en_US.UTF-8.",
+        ));
+    }
+    let xlib =
+        Xlib::open().map_err(|_| Error::msg("Snippet expansion needs the libX11 library."))?;
+    // SAFETY: A null name opens the display that DISPLAY names.
+    let display = unsafe { (xlib.XOpenDisplay)(ptr::null()) };
+    if display.is_null() {
+        return Err(Error::msg("Could not connect to the X server."));
+    }
+    own_typing_until(Instant::now() + Duration::from_secs(60 * 60));
+    // SAFETY: The connection is open.
+    let root = unsafe { (xlib.XDefaultRootWindow)(display) };
+    let modifiers_held = || {
+        let (mut root_found, mut child) = (0, 0);
+        let (mut root_x, mut root_y, mut x, mut y) = (0, 0, 0, 0);
+        let mut state = 0;
+        // SAFETY: The connection is open, only this thread uses it, and the
+        // call writes only these values.
+        unsafe {
+            (xlib.XQueryPointer)(
+                display,
+                root,
+                &mut root_found,
+                &mut child,
+                &mut root_x,
+                &mut root_y,
+                &mut x,
+                &mut y,
+                &mut state,
+            )
+        };
+        state & MODIFIERS_THAT_CHANGE_KEYS != 0
+    };
+    let no_input = no_input_from_others(interrupted);
+    let ready = || {
+        if !super::modifiers_released(modifiers_held) {
+            return Err(Error::msg(
+                "Stopped typing the snippet: a key such as Shift or Control was held down, or Caps Lock is on.",
+            ));
+        }
+        if input_focus(&xlib, display) != focus {
+            return Err(Error::msg(
+                "Stopped typing the snippet: another window came to the front.",
+            ));
+        }
+        no_input()
+    };
+    let typed = type_with_xdo(display, erase, text, ready);
+    // SAFETY: The connection is open. XSync returns once the server handled
+    // every key, so the recording has them before the quiet time ends.
+    unsafe { (xlib.XSync)(display, xlib::False) };
+    own_typing_until(Instant::now() + OWN_KEYS_AFTER);
+    // SAFETY: Opened above and closed once; libxdo leaves it open.
+    unsafe { (xlib.XCloseDisplay)(display) };
+    typed
+}
+
+/// The check, before each part of typing, that no one else typed or
+/// clicked. Make it when typing starts. Before the first key, a key or
+/// click since the trigger stops typing, as `interrupted` says. After that,
+/// only a click stops it: X11 does not mark the keys that TinyDash sends,
+/// so the watch passes them too, and they set `interrupted`. libxdo sends
+/// no clicks, so each click since typing started came from someone else.
+fn no_input_from_others(interrupted: &AtomicBool) -> impl Fn() -> Result<()> + '_ {
+    // Forget older clicks: one before the trigger does not count, and one
+    // after it set `interrupted`, which the first check reads. A swap reads
+    // the latest mark, so when it takes one, the `interrupted` store before
+    // that mark is visible too.
+    CLICKED.swap(false, Ordering::Acquire);
+    let started = Cell::new(false);
+    move || {
+        if !started.replace(true) {
+            super::no_input_since_trigger(interrupted)?;
+        }
+        if CLICKED.load(Ordering::Acquire) {
+            return Err(Error::msg(
+                "Stopped typing the snippet: a click came while it typed.",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Whether libxdo can type `text`. It reads the text in the encoding of
+/// the session's locale, which it sets with `setlocale(LC_CTYPE, "")`, so
+/// characters outside ASCII type only when that locale is UTF-8. In another
+/// locale, they fail partway or type as other characters.
+fn xdo_can_type(text: &str, locale_is_utf8: impl FnOnce() -> bool) -> bool {
+    text.is_ascii() || locale_is_utf8()
+}
+
+/// Whether the locale that `setlocale(LC_CTYPE, "")` picks from the
+/// environment is UTF-8. False when it names a locale that is not
+/// installed: setlocale then keeps the C locale, which is ASCII.
+fn session_locale_is_utf8() -> bool {
+    // SAFETY: An empty name reads the locale from the environment, and a
+    // null base starts from the C locale. Nothing else uses this locale; it
+    // is freed once, after its codeset name is read.
+    unsafe {
+        let locale = libc::newlocale(libc::LC_CTYPE_MASK, c"".as_ptr(), ptr::null_mut());
+        if locale.is_null() {
+            return false;
+        }
+        let codeset = libc::nl_langinfo_l(libc::CODESET, locale);
+        let utf8 = !codeset.is_null() && is_utf8(CStr::from_ptr(codeset));
+        libc::freelocale(locale);
+        utf8
+    }
+}
+
+/// Whether a codeset name, such as `UTF-8` or `ANSI_X3.4-1968`, is UTF-8.
+fn is_utf8(codeset: &CStr) -> bool {
+    let name: Vec<u8> = codeset
+        .to_bytes()
+        .iter()
+        .filter(|&&byte| byte != b'-')
+        .map(u8::to_ascii_lowercase)
+        .collect();
+    name == b"utf8"
+}
+
+fn type_with_xdo(
+    display: *mut Display,
+    erase: usize,
+    text: &str,
+    ready: impl Fn() -> Result<()>,
+) -> Result<()> {
+    // SAFETY: The connection is open; 0 tells libxdo to leave it open.
+    let xdo = unsafe { xdo_new_with_opened_display(display, ptr::null(), 0) };
+    if xdo.is_null() {
+        return Err(Error::msg(
+            "Could not type the snippet: libxdo did not start.",
+        ));
+    }
+    let typed = type_pieces(xdo, erase, text, ready);
+    // SAFETY: Made above and freed once.
+    unsafe { xdo_free(xdo) };
+    typed
+}
+
+/// Type with `xdo`, after `ready` lets each step through.
+fn type_pieces(
+    xdo: *mut Xdo,
+    erase: usize,
+    text: &str,
+    ready: impl Fn() -> Result<()>,
+) -> Result<()> {
+    let failed = || Error::msg("Could not type the snippet.");
+    let press = |keys: &CStr| {
+        // SAFETY: `xdo` is valid until its caller frees it, and `keys` is a
+        // C string.
+        let status =
+            unsafe { xdo_send_keysequence_window(xdo, CURRENT_WINDOW, keys.as_ptr(), KEY_DELAY) };
+        if status == 0 { Ok(()) } else { Err(failed()) }
+    };
+    // `None` is a Backspace. Short pieces let typing stop soon.
+    let steps = std::iter::repeat_with(|| None)
+        .take(erase)
+        .chain(expansion::pieces(text, PIECE_UNITS).into_iter().map(Some));
+    for step in steps {
+        ready()?;
+        match step {
+            None => press(c"BackSpace")?,
+            Some(Piece::Return) => press(c"Return")?,
+            Some(Piece::Text(units)) => {
+                // `pieces` leaves NUL out, so this does not fail.
+                let text = CString::new(String::from_utf16_lossy(&units)).map_err(|_| failed())?;
+                // SAFETY: As above; `text` is a C string. libxdo also calls
+                // setlocale(LC_CTYPE, "") here, which XInitThreads does not
+                // make safe: a thread that reads the locale name at that
+                // moment, as Xlib does when a connection first turns a key
+                // into text, may read the freed old name. Xlib reads it once
+                // per connection, and the window is a few instructions wide,
+                // so this is accepted.
+                let status =
+                    unsafe { xdo_enter_text_window(xdo, CURRENT_WINDOW, text.as_ptr(), KEY_DELAY) };
+                if status != 0 {
+                    return Err(failed());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn types_text_outside_ascii_only_in_a_utf8_locale() {
+        // ASCII needs no look at the locale.
+        assert!(xdo_can_type(";) Best regards,\n\tSam", || unreachable!()));
+        assert!(xdo_can_type("Café 😀", || true));
+        // In the C or an ISO-8859 locale, libxdo would fail after the
+        // trigger is erased, or type `CafÃ©`.
+        assert!(!xdo_can_type("Café", || false));
+        for codeset in [c"UTF-8", c"utf8", c"UTF8"] {
+            assert!(is_utf8(codeset), "{codeset:?}");
+        }
+        for codeset in [c"ANSI_X3.4-1968", c"ISO-8859-1", c"ASCII", c""] {
+            assert!(!is_utf8(codeset), "{codeset:?}");
+        }
+        // Reading the session's locale works, whatever it is.
+        let _ = session_locale_is_utf8();
+    }
+
+    #[test]
+    fn a_click_while_typing_stops_it_and_a_key_does_not() {
+        let click = |button| {
+            let mut keys = Vec::new();
+            press_button(button, |key| keys.push(key));
+            keys
+        };
+        let interrupted = AtomicBool::new(false);
+        // A click before the trigger does not count.
+        assert_eq!(click(1), [Key::Reset]);
+        let no_input = no_input_from_others(&interrupted);
+        assert!(no_input().is_ok());
+        // TinyDash's own keys set `interrupted`, and the scroll wheel does
+        // not click.
+        interrupted.store(true, Ordering::Release);
+        for button in 4..=7 {
+            assert!(click(button).is_empty(), "{button}");
+        }
+        assert!(no_input().is_ok());
+        // A click while TinyDash types stops it before the next part. Its
+        // reset reaches the watch before the click is marked.
+        let mut resets = 0;
+        press_button(3, |key| {
+            assert_eq!(key, Key::Reset);
+            assert!(!CLICKED.load(Ordering::Acquire));
+            resets += 1;
+        });
+        assert_eq!(resets, 1);
+        let error = no_input().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Stopped typing the snippet: a click came while it typed."
+        );
+        // A key or click after the trigger stops it before the first key.
+        let error = no_input_from_others(&interrupted)().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Stopped typing the snippet: a key or click came after the trigger."
+        );
+    }
+
+    #[test]
+    fn tells_a_wayland_session() {
+        assert!(wayland_session(Some("wayland"), None));
+        assert!(wayland_session(Some("x11"), Some(OsStr::new("wayland-0"))));
+        assert!(!wayland_session(Some("x11"), None));
+        assert!(!wayland_session(None, Some(OsStr::new(""))));
+        assert!(!wayland_session(Some("tty"), None));
+    }
+
+    #[test]
+    fn reads_key_presses() {
+        use x11_dl::xlib::{ControlMask, Mod1Mask, Mod2Mask, Mod4Mask, Mod5Mask, ShiftMask};
+        use xkeysym::key;
+        assert_eq!(keys_for(key::s, 0), [Key::Char('s')]);
+        assert_eq!(keys_for(key::S, ShiftMask), [Key::Char('S')]);
+        assert_eq!(keys_for(key::semicolon, 0), [Key::Char(';')]);
+        assert_eq!(keys_for(key::space, 0), [Key::Char(' ')]);
+        assert_eq!(keys_for(key::Cyrillic_a, 0), [Key::Char('а')]);
+        // Number pad digits with Num Lock (Mod2), and AltGr (Mod5) signs.
+        assert_eq!(keys_for(key::KP_1, Mod2Mask), [Key::Char('1')]);
+        assert_eq!(keys_for(key::at, Mod5Mask), [Key::Char('@')]);
+        assert_eq!(keys_for(key::BackSpace, 0), [Key::Backspace]);
+        for modifier in [
+            key::Shift_L,
+            key::Control_R,
+            key::Caps_Lock,
+            key::ISO_Level3_Shift,
+        ] {
+            assert!(keys_for(modifier, 0).is_empty(), "{modifier:#x}");
+        }
+        for shortcut in [ControlMask, Mod1Mask, Mod4Mask] {
+            assert_eq!(keys_for(key::s, shortcut), [Key::Reset]);
+            assert_eq!(keys_for(key::BackSpace, shortcut), [Key::Reset]);
+        }
+        for keysym in [
+            key::Return,
+            key::KP_Enter,
+            key::Tab,
+            key::Escape,
+            key::Left,
+            key::Home,
+            key::Next,
+            key::Delete,
+            key::F5,
+            key::dead_acute,
+            0,
+        ] {
+            assert_eq!(keys_for(keysym, 0), [Key::Reset], "{keysym:#x}");
+        }
+    }
 
     #[test]
     fn a_capture_can_be_read_again() {
@@ -456,6 +1343,17 @@ mod tests {
     }
 
     #[test]
+    fn finds_programs_that_can_run() {
+        let sh = find_program("sh").unwrap();
+        assert!(sh.is_absolute(), "{}", sh.display());
+        assert_eq!(find_program(&sh.to_string_lossy()), Some(sh));
+        assert_eq!(find_program("no-such-terminal-here"), None);
+        assert_eq!(find_program("/no/such/terminal"), None);
+        // A file that cannot run is not a program.
+        assert_eq!(find_program("/etc/passwd"), None);
+    }
+
+    #[test]
     fn launcher_wrappers_are_not_aliases() {
         assert_eq!(executable_alias(Path::new("/usr/bin/flatpak")), None);
         assert_eq!(executable_alias(Path::new("env")), None);
@@ -465,6 +1363,67 @@ mod tests {
             Some("firefox")
         );
         assert_eq!(executable_alias(Path::new("")), None);
+    }
+
+    #[test]
+    fn restart_and_shut_down_go_through_the_session_manager() {
+        use SessionEnd::{Kde, Program};
+        assert_eq!(
+            session_end("ubuntu:gnome", SystemCommand::Restart),
+            Some(Program("gnome-session-quit", &["--reboot"]))
+        );
+        assert_eq!(
+            session_end("ubuntu:gnome", SystemCommand::ShutDown),
+            Some(Program("gnome-session-quit", &["--power-off"]))
+        );
+        assert_eq!(
+            session_end("kde", SystemCommand::Restart),
+            Some(Kde("logoutAndReboot"))
+        );
+        assert_eq!(
+            session_end("kde", SystemCommand::ShutDown),
+            Some(Kde("logoutAndShutdown"))
+        );
+        assert_eq!(
+            session_end("xfce", SystemCommand::Restart),
+            Some(Program("xfce4-session-logout", &["--reboot"]))
+        );
+        assert_eq!(
+            session_end("xfce", SystemCommand::ShutDown),
+            Some(Program("xfce4-session-logout", &["--halt"]))
+        );
+    }
+
+    #[test]
+    fn other_desktops_restart_and_shut_down_through_systemd() {
+        use SessionEnd::Program;
+        assert_eq!(
+            session_end("x-cinnamon", SystemCommand::Restart),
+            Some(Program("systemctl", &["reboot"]))
+        );
+        assert_eq!(
+            session_end("", SystemCommand::ShutDown),
+            Some(Program("systemctl", &["poweroff"]))
+        );
+        assert_eq!(session_end("x-cinnamon", SystemCommand::LogOut), None);
+        assert_eq!(session_end("kde", SystemCommand::Sleep), None);
+    }
+
+    #[test]
+    fn log_out_goes_through_the_session_manager() {
+        use SessionEnd::{Kde, Program};
+        assert_eq!(
+            session_end("gnome", SystemCommand::LogOut),
+            Some(Program("gnome-session-quit", &["--logout", "--no-prompt"]))
+        );
+        assert_eq!(
+            session_end("kde", SystemCommand::LogOut),
+            Some(Kde("logout"))
+        );
+        assert_eq!(
+            session_end("xfce", SystemCommand::LogOut),
+            Some(Program("xfce4-session-logout", &["--logout"]))
+        );
     }
 
     #[test]

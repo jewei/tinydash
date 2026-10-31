@@ -4,6 +4,7 @@ import type { ClipCard } from "./ClipCard";
 import type { Disk } from "./Disk";
 import type { FocusTimer } from "./FocusTimer";
 import type { Note } from "./Note";
+import type { UpNext } from "./UpNext";
 import type { WeatherView } from "./WeatherView";
 
 export type Widgets = { 
@@ -12,6 +13,11 @@ export type Widgets = {
  * hand-edited file may hold, is left out.
  */
 clocks: Array<CityClock> | null, 
+/**
+ * The rest of today's events and the reminders due today. `None`
+ * also where TinyDash reads no calendars.
+ */
+upNext: UpNext | null, 
 /**
  * The disk that holds the home folder.
  */
