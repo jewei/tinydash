@@ -310,14 +310,15 @@ fn currency_shorthand(query: &str) -> Option<String> {
         .then(|| format!("{amount} {from} to {to}"))
 }
 
-/// The query in fend's syntax, or `None` when fend would read a percentage
-/// in it differently from people or could not parse it fast.
+/// The query in fend's syntax, or `None` when it binds a name, when fend
+/// would read a percentage in it differently from people, or when fend could
+/// not parse it fast.
 fn fend_input(query: &str) -> Option<String> {
     let ascii = ascii_signs(query);
     // The limits that the user sees, on what they typed.
     if query.chars().nth(MAX_INPUT).is_some()
         || query.matches(['(', ')']).count() > MAX_PARENTHESES
-        || has_lambda(&ascii)
+        || binds_name(&ascii)
     {
         return None;
     }
@@ -348,13 +349,29 @@ fn ascii_signs(query: &str) -> String {
     input
 }
 
-/// Whether `input` has a lambda in any of fend's spellings: `\x.x + 1`,
-/// `x: x + 1`, or `x => x + 1` (`λ` is `\` by now). A launcher needs none.
-/// fend parses the body of a `\` lambda again for each reading around it,
-/// and a lambda that calls itself, such as `(x: x x)(x: x x) 1`, recurses
-/// until it overflows the stack, which crashes TinyDash.
-fn has_lambda(input: &str) -> bool {
-    input.contains(['\\', ':']) || input.contains("=>")
+/// Whether `input` binds a name, in one of the two ways that fend-core 1.5.8
+/// has: a lambda in any of its spellings (`\x.x + 1`, `x: x + 1`, or
+/// `x => x + 1`; `λ` is `\` by now), or an assignment such as `a = 5`. A
+/// launcher needs neither. fend parses the body of a `\` lambda again for
+/// each reading around it. And a function that calls itself recurses until
+/// it overflows the stack, which crashes TinyDash: a lambda can call itself,
+/// as in `(x: x x)(x: x x) 1`, and so can fend's own `cis` after an
+/// assignment points `cos` at it, as in `cos = cis; cis 1`.
+fn binds_name(input: &str) -> bool {
+    let mut chars = input.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' | ':' => return true,
+            // `!=` compares. fend cannot read `<=` or `>=`.
+            '!' | '<' | '>' => {
+                chars.next_if_eq(&'=');
+            }
+            // `==` compares. A lone `=` assigns, and `=>` is a lambda.
+            '=' if chars.next_if_eq(&'=').is_none() => return true,
+            _ => {}
+        }
+    }
+    false
 }
 
 /// Whether fend parses `input` fast and within the stack. fend cannot stop
@@ -1169,21 +1186,32 @@ mod tests {
     }
 
     #[test]
-    fn refuses_lambdas() {
+    fn refuses_input_that_binds_a_name() {
         for query in [
             "(\\x.x + 1) 5",
             "(\u{3bb}x.x + 1) 5",
             "(x: x + 1) 5",
             "(x => x * 2) 5",
             "f = x: x * 2; f 5",
-            // Each calls itself until the stack overflows.
+            "a = 5; a * 2",
+            // Each calls itself until the stack overflows. fend's `cis` is
+            // `theta => cos theta + i * sin theta`.
             "(x: x x)(x: x x) 1",
             "(x => x x)(x => x x) 1",
             "f = x: f x; f 1",
+            "cos = cis; cis 1",
+            "(cos = cis) 1",
+            "sin = cis; cis 1",
         ] {
             assert_eq!(value(query), None, "{query}");
             assert!(rates_off_answer(query).is_none(), "{query}");
         }
+        // A comparison binds no name.
+        for comparison in ["1 == 1", "1 != 2", "1 ≠ 2", "1 <= 2", "2 >= 1"] {
+            assert!(!binds_name(&ascii_signs(comparison)), "{comparison}");
+        }
+        // fend reads `===` as `==` and a lone `=`.
+        assert!(binds_name("1 === 1"));
     }
 
     #[test]
