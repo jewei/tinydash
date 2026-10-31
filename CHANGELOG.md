@@ -4,6 +4,8 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-01
+
 ### Added
 
 - Run a shell command from the launcher. Turn on Run shell commands in Settings > Search, then type `>`, a space, and a command, such as `> git pull`, and press Enter. It runs in Terminal (PowerShell on Windows), and your shell stays open after it. It is off by default.
@@ -257,7 +259,8 @@ A rewrite: the same keyboard-first launcher, with much less code.
 
 The first public release: search apps, files, folders, and clipboard history; calculate, convert units, currencies, dates, and times; find emoji; generate passwords; clean URLs; and search the web.
 
-[Unreleased]: https://github.com/jewei/tinydash/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/jewei/tinydash/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/jewei/tinydash/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jewei/tinydash/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jewei/tinydash/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/jewei/tinydash/compare/v0.6.1...v0.6.2
