@@ -45,6 +45,9 @@ pub const MAX_CALCULATIONS: usize = 50;
 pub const MAX_EXPRESSION: usize = 500;
 /// Most history rows one search shows.
 const HISTORY_ROWS: usize = 20;
+/// Names that people use for a currency, where fend knows only the ISO
+/// code. `RMB` is not an ISO code, but people write it for the yuan.
+const CURRENCY_NAMES: [(&str, &str); 3] = [("rmb", "CNY"), ("renminbi", "CNY"), ("yuan", "CNY")];
 
 pub fn answer(query: &str, rates: Option<&Rates>) -> Option<SearchResult> {
     let (value, used_rates) = evaluate(query, rates)?;
@@ -193,8 +196,7 @@ fn needs_rates(query: &str) -> bool {
         return false;
     };
     let asked = Arc::new(AtomicBool::new(false));
-    let mut context = fend_core::Context::new();
-    context.disable_rng();
+    let mut context = fend_context();
     context.set_exchange_rate_handler_v2(Probe {
         asked: asked.clone(),
     });
@@ -212,16 +214,7 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
         return None;
     }
     let input = fend_input(query)?;
-    let mut context = fend_core::Context::new();
-    context.disable_rng();
-    // fend matches units case-insensitively and reads `Bps` as bits. Define
-    // bytes per second so `8 Mbps to MBps` gives 1 MBps.
-    context.define_custom_unit_v1(
-        "Bps",
-        "",
-        "byte / second",
-        &fend_core::CustomUnitAttribute::AllowShortPrefix,
-    );
+    let mut context = fend_context();
     let used_rates = Arc::new(AtomicBool::new(false));
     if let Some(rates) = rates {
         context.set_exchange_rate_handler_v2(RateLookup {
@@ -252,6 +245,25 @@ fn evaluate(query: &str, rates: Option<&Rates>) -> Option<(String, bool)> {
         return Some((value, false));
     }
     Some((money(&value).unwrap_or(value), true))
+}
+
+/// fend with the units it lacks, and without random numbers.
+fn fend_context() -> fend_core::Context {
+    let mut context = fend_core::Context::new();
+    context.disable_rng();
+    // fend matches units case-insensitively and reads `Bps` as bits. Define
+    // bytes per second so `8 Mbps to MBps` gives 1 MBps.
+    context.define_custom_unit_v1(
+        "Bps",
+        "",
+        "byte / second",
+        &fend_core::CustomUnitAttribute::AllowShortPrefix,
+    );
+    // Case-insensitive too, so `20k RMB to MYR` works as well.
+    for (name, code) in CURRENCY_NAMES {
+        context.define_custom_unit_v1(name, name, code, &fend_core::CustomUnitAttribute::Alias);
+    }
+    context
 }
 
 /// Whether fend 1.5.8 computed the value through an f64 and got it wrong. A
@@ -995,7 +1007,8 @@ mod tests {
         let answer = rates_off_answer("100 usd to eur").unwrap();
         assert_eq!(answer.actions[0].action, Action::TurnOnCurrencyRates);
         assert!(rates_off_answer("100 USD MYR").is_some());
-        for query in ["12 * 8", "5 ft to cm", "usd"] {
+        assert!(rates_off_answer("20k rmb to myr").is_some());
+        for query in ["12 * 8", "5 ft to cm", "usd", "rmb"] {
             assert!(rates_off_answer(query).is_none(), "{query}");
         }
     }
@@ -1009,6 +1022,23 @@ mod tests {
         let answer = answer("100 USD to MYR", Some(&rates)).unwrap();
         assert!(answer.subtitle.contains("2026-10-02"));
         assert_eq!(evaluate("100 USD to MYR", None), None);
+    }
+
+    #[test]
+    fn reads_the_names_people_use_for_a_currency() {
+        let rates = Rates::fixture();
+        let value = |query| evaluate(query, Some(&rates)).map(|(value, _)| value);
+        for query in [
+            "20k rmb to myr",
+            "20k RMB to MYR",
+            "20000 yuan to myr",
+            "20k renminbi to myr",
+        ] {
+            assert_eq!(value(query).as_deref(), Some("11750.00 MYR"), "{query}");
+        }
+        assert_eq!(value("100 usd to rmb").as_deref(), Some("683.76 CNY"));
+        // The ECB table has no Taiwan dollar.
+        assert_eq!(value("100 twd to myr"), None);
     }
 
     #[test]

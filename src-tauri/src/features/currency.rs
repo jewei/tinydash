@@ -72,7 +72,7 @@ impl Rates {
     #[cfg(test)]
     pub fn fixture() -> Self {
         Self::parse(
-            br#"{"amount":1.0,"base":"EUR","date":"2026-10-02","rates":{"USD":1.17,"MYR":4.7}}"#,
+            br#"{"amount":1.0,"base":"EUR","date":"2026-10-02","rates":{"USD":1.17,"MYR":4.7,"CNY":8.0}}"#,
             0,
         )
         .unwrap()

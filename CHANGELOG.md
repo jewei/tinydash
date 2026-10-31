@@ -9,6 +9,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Run a shell command from the launcher. Turn on Run shell commands in Settings > Search, then type `>`, a space, and a command, such as `> git pull`, and press Enter. It runs in Terminal (PowerShell on Windows), and your shell stays open after it. It is off by default.
 - On macOS, the Up Next widget shows the rest of today's events and the reminders due today. Click one to open Calendar or Reminders. Turn it on in Settings > Widgets; macOS then asks for access to Calendars and Reminders.
 - Type `;` and a snippet's keyword in any app, such as `;sig`, to replace it with the snippet. Turn it on in Settings > Snippets. To see the keyword, TinyDash reads what you type in other apps; it keeps only the last 64 characters, in memory, and never saves or sends them. On macOS it needs Accessibility and Input Monitoring; on Linux it needs X11.
+- The calculator reads `rmb`, `yuan`, and `renminbi` as the Chinese yuan (CNY), so `20k rmb to myr` works like `20k cny to myr`.
 
 ## [0.8.0] - 2026-11-01
 
