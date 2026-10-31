@@ -12,7 +12,7 @@ use ts_rs::TS;
 use crate::{
     actions::{self, Origin},
     error::{Error, Result},
-    events,
+    events, expander,
     features::{
         emoji::EmojiIndex,
         library::{LibraryItem, MAX_LIBRARY_ITEMS},
@@ -79,6 +79,8 @@ pub struct About {
     pub self_update: bool,
     /// A newer version found before Settings opened, ready to install.
     pub pending_update: Option<String>,
+    /// Why snippets cannot expand as you type here, such as on Wayland.
+    pub expand_snippets_unavailable: Option<String>,
 }
 
 async fn blocking<T: Send + 'static>(
@@ -309,7 +311,8 @@ pub async fn update_settings(
     .await
 }
 
-/// The settings that change the OS: shortcut, login item, and tray icon.
+/// The settings that change the OS: shortcut, login item, tray icon, and
+/// snippet expansion as you type.
 fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()> {
     if to.shortcut != from.shortcut {
         shortcut::register(app, &to.shortcut)?;
@@ -329,6 +332,9 @@ fn apply_to_system(app: &AppHandle, from: &Settings, to: &Settings) -> Result<()
     }
     if to.show_tray_icon != from.show_tray_icon {
         tray::set_visible(app, to.show_tray_icon)?;
+    }
+    if to.expand_snippets != from.expand_snippets {
+        expander::apply(app, to.expand_snippets)?;
     }
     Ok(())
 }
@@ -424,6 +430,7 @@ pub fn about(app: AppHandle) -> About {
         rich_clipboard: platform::RICH_CLIPBOARD,
         self_update: updates::supported(),
         pending_update: updates::pending_version(&app),
+        expand_snippets_unavailable: platform::typing_unavailable().map(String::from),
     }
 }
 

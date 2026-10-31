@@ -116,6 +116,12 @@ body {
   background: var(--accent);
 }
 
+/* As .button:disabled: a switch that cannot change looks dimmed. */
+.toggle:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .toggle:checked::after {
   transform: translateX(16px);
 }

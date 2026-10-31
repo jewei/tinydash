@@ -7,6 +7,10 @@
 //!   file index lists such a folder but not its contents.
 //! - `RECURSIVE_WATCH`: whether watching a folder also watches its subfolders.
 //! - `TEMPLATE_TRAY_ICON`: the OS tints a black tray icon (macOS menu bar).
+//! - `prepare_process()`: setup that must come before Tauri starts. On
+//!   Linux, it makes Xlib safe to call from several threads, which libX11
+//!   before 1.8 is not on its own: GTK, tao, and snippet expansion each use
+//!   Xlib on a thread of their own.
 //! - `prepare_app(app)`: app-wide setup at startup, such as the Dock policy
 //!   or the notification plugin.
 //! - `is_reopen(event)`: the user opened the running app again, and the OS
@@ -96,6 +100,62 @@
 //! - `launcher_position(window)`: where the launcher is now, in the units
 //!   `place_launcher` takes.
 //! - `remember_frontmost_app()` / `restore_frontmost_app()`: return focus after Escape.
+//!
+//! Snippet expansion as you type (`expander.rs`):
+//!
+//! - `typing_unavailable()`: why snippets cannot expand in this session (a
+//!   Wayland session on Linux), or `None`.
+//! - `typing_access(ask)`: `Ok` when TinyDash may read and send keys, else
+//!   an error that says what to allow. On macOS that is Accessibility and
+//!   Input Monitoring, which may count only once TinyDash starts again, so
+//!   the error also says to quit and reopen it; `ask` shows the macOS
+//!   prompts for what is missing.
+//! - `Focus`: the app (macOS) or window that gets typed keys. It can go to
+//!   another thread and is only compared.
+//! - `watch_typing(on_key)`: read the keys typed in every app on a thread of
+//!   its own, and pass each to `on_key` on that thread as a
+//!   [`Key`](crate::features::expansion::Key), with the `Focus` that got the
+//!   latest key: Backspace, the characters a key typed, or a reset (a key
+//!   pressed with Command, Control, Alt, or Windows; Return, Tab, Escape,
+//!   arrows, Home, End, Page Up or Down; a dead key; a click; a key in
+//!   another app, or on Windows and Linux another window, which passes a
+//!   reset first). A click is a press of a mouse button other than the
+//!   scroll wheel. A modifier key alone passes nothing. On macOS and
+//!   Windows, the keys that TinyDash types never reach `on_key`, so every
+//!   call while it types is a key or click from someone else, or the reset
+//!   after the watch turns on again. X11 does not mark them, so Linux
+//!   passes every key as a reset while TinyDash types. TinyDash sends no
+//!   clicks, so on every OS a click came from someone else.
+//!   Keep `on_key` quick: on Windows, typing waits for it. When the OS
+//!   stops passing keys but the thread runs on (the macOS tap turned off
+//!   after a timeout, or a Windows hook removed for answering too slowly),
+//!   the thread turns the watch on again and passes a reset, as it may have
+//!   missed keys. `TypingWatch::stop()` ends the thread and drops `on_key`.
+//!   `TypingWatch::is_running()` is false once the thread has ended, also
+//!   on its own, as on macOS when access is taken away; the thread then
+//!   logs why. Never log what it reads.
+//! - `type_text(focus, erase, text, interrupted)`: press Backspace `erase`
+//!   times, then type `text`, with Return for each line break, into
+//!   `focus`: the app or window that got the trigger, as `watch_typing`
+//!   passed it. It never pastes with the clipboard. Call it on a thread
+//!   other than the watch thread. It stops with an error before a part,
+//!   the first Backspace too, in these cases:
+//!   - `focus` is no longer in front. So focus that moved before typing
+//!     started, even while the clipboard was read for the snippet, leaves
+//!     the trigger as typed.
+//!   - `interrupted` is set: a key or click came after the trigger, or the
+//!     watch turned on again, so the text before the cursor may no longer
+//!     end with it. Every OS checks it with `no_input_since_trigger` before
+//!     the first Backspace, after any wait for modifiers. macOS and Windows
+//!     also check it before each later part, so a key or click while
+//!     TinyDash types stops it. Linux checks it before the first Backspace
+//!     only, as the keys that TinyDash types set it too.
+//!   - On Linux, a click came since typing started. So on Linux, a click
+//!     while TinyDash types stops it, and a key does not.
+//!   - A modifier stays down. Typed keys never take on a modifier that the
+//!     user holds: macOS clears the modifiers of each key, and Windows and
+//!     Linux wait with `modifiers_released` before each part until the user
+//!     lets go.
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -341,6 +401,41 @@ fn wait_for_key_release() {
     std::thread::sleep(std::time::Duration::from_secs(1));
 }
 
+/// How long typing a snippet waits for the user to let go of a modifier,
+/// such as the Shift of a keyword that ends in `@`.
+#[cfg(any(not(target_os = "macos"), test))]
+const MODIFIER_WAIT: std::time::Duration = std::time::Duration::from_millis(300);
+
+/// Wait until `held()` is false, for at most [`MODIFIER_WAIT`]. On Windows
+/// and Linux, the keys TinyDash types take on the modifiers that the user
+/// holds, so a held Control would turn them into shortcuts. False when a
+/// modifier stays down.
+#[cfg(any(not(target_os = "macos"), test))]
+fn modifiers_released(held: impl Fn() -> bool) -> bool {
+    let deadline = std::time::Instant::now() + MODIFIER_WAIT;
+    while held() {
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    true
+}
+
+/// An error when the key watch saw a key or click after the trigger, as
+/// `interrupted` says. The user typed on, clicked elsewhere, or switched
+/// tabs, so a Backspace could erase their text and not the trigger, and
+/// the snippet could land somewhere they did not mean.
+pub fn no_input_since_trigger(interrupted: &std::sync::atomic::AtomicBool) -> Result<()> {
+    if interrupted.load(std::sync::atomic::Ordering::Acquire) {
+        Err(Error::msg(
+            "Stopped typing the snippet: a key or click came after the trigger.",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 /// Run a helper program with fixed arguments. Never pass user text here.
 fn run(program: &str, args: &[&str]) -> Result<()> {
     let mut command = std::process::Command::new(program);
@@ -371,6 +466,34 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn typing_waits_briefly_for_modifiers_to_be_released() {
+        use super::{MODIFIER_WAIT, modifiers_released};
+        // The user lets go of Shift soon after the keyword's last key.
+        let checks = std::cell::Cell::new(0);
+        assert!(modifiers_released(|| {
+            checks.set(checks.get() + 1);
+            checks.get() < 3
+        }));
+        assert_eq!(checks.get(), 3);
+        // Control stays down: typing would press shortcuts, so it stops.
+        let started = std::time::Instant::now();
+        assert!(!modifiers_released(|| true));
+        assert!(started.elapsed() >= MODIFIER_WAIT);
+    }
+
+    #[test]
+    fn typing_stops_after_a_key_or_click_that_follows_the_trigger() {
+        use super::no_input_since_trigger;
+        use std::sync::atomic::AtomicBool;
+        assert!(no_input_since_trigger(&AtomicBool::new(false)).is_ok());
+        let error = no_input_since_trigger(&AtomicBool::new(true)).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Stopped typing the snippet: a key or click came after the trigger."
+        );
+    }
+
     mod monitor_containing {
         use super::super::monitor_containing;
         use tauri::{PhysicalPosition, PhysicalSize};

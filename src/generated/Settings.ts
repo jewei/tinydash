@@ -29,6 +29,11 @@ fileSearchExcludedDirs: Array<string>,
  */
 spotlightFiles: boolean, 
 /**
+ * Typing `;` and a snippet's keyword in any app replaces it with the
+ * snippet. Off by default: it reads the keys typed in other apps.
+ */
+expandSnippets: boolean, 
+/**
  * 0 is the default yellow; 1–5 are light to dark.
  */
 emojiSkinTone: number, emojiLanguages: Array<EmojiLanguage>, currencyRatesEnabled: boolean, 

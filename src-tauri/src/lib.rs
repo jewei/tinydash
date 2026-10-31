@@ -8,6 +8,7 @@ mod cli;
 mod commands;
 mod error;
 mod events;
+mod expander;
 mod features;
 mod hud;
 mod images;
@@ -56,6 +57,8 @@ pub fn run() {
         )
         .init();
 
+    // Before Tauri starts GTK, which opens the X display on Linux.
+    platform::prepare_process();
     tauri::Builder::default()
         // Must be first: a second process hands over its arguments and exits.
         .plugin(tauri_plugin_single_instance::init(
@@ -112,6 +115,11 @@ pub fn run() {
             if platform::is_reopen(&event) {
                 open(app, Launch::Launcher, true);
             }
+            // Stop reading keys before the process ends; this forgets what
+            // was typed.
+            if matches!(event, tauri::RunEvent::Exit) {
+                expander::stop();
+            }
         });
 }
 
@@ -159,6 +167,7 @@ fn setup(app: &mut App) {
     };
     let shortcut = settings.shortcut.clone();
     let tray_visible = settings.show_tray_icon;
+    let expand_snippets = settings.expand_snippets;
     app.manage(State::new(
         settings,
         settings_file,
@@ -191,6 +200,9 @@ fn setup(app: &mut App) {
         tracing::warn!(%error, "Copy messages are unavailable");
     }
     monitor::start(handle);
+    if expand_snippets && let Err(error) = expander::start(handle, false) {
+        state.warn(format!("Snippets do not expand as you type. {error}"));
+    }
     timer::start(handle);
     watcher::watch(handle);
     refresh::apps(handle);

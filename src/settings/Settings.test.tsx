@@ -85,6 +85,60 @@ describe("Settings", () => {
     expect(screen.queryByText(/No snippets yet/)).toBeNull();
   });
 
+  it("turns on snippet expansion and says what it reads", async () => {
+    const backend = fakeBackend();
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    const row = await screen.findByRole("group", { name: "Expand snippets as you type" });
+    expect(row.textContent).toContain("keeps only the last 64 characters, in memory");
+    fireEvent.click(within(row).getByRole("switch"));
+    await waitFor(() => expect(backend.called("update_settings")).toHaveLength(1));
+    expect(backend.called("update_settings")[0]?.args).toEqual({
+      changes: { expandSnippets: true },
+    });
+  });
+
+  it("turns off the snippet expansion switch where it cannot work", async () => {
+    fakeBackend({
+      about: () => ({
+        version: "0.2.0",
+        settingsFolder: "/data",
+        dataFolder: "/data",
+        richClipboard: false,
+        selfUpdate: false,
+        pendingUpdate: null,
+        expandSnippetsUnavailable: "Not available on Wayland.",
+      }),
+    });
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    const row = await screen.findByRole("group", { name: "Expand snippets as you type" });
+    await waitFor(() => expect(row.textContent).toContain("Not available on Wayland."));
+    expect((within(row).getByRole("switch") as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("lets a snippet expansion setting that cannot work be turned off", async () => {
+    fakeBackend(
+      {
+        about: () => ({
+          version: "0.2.0",
+          settingsFolder: "/data",
+          dataFolder: "/data",
+          richClipboard: false,
+          selfUpdate: false,
+          pendingUpdate: null,
+          expandSnippetsUnavailable: "Not available on Wayland.",
+        }),
+      },
+      { expandSnippets: true },
+    );
+    render(() => <Settings />);
+    fireEvent.click(await screen.findByRole("button", { name: "Snippets" }));
+    const row = await screen.findByRole("group", { name: "Expand snippets as you type" });
+    await waitFor(() => expect(row.textContent).toContain("Not available on Wayland."));
+    expect((within(row).getByRole("switch") as HTMLInputElement).disabled).toBe(false);
+  });
+
   it("says when the app details cannot be read, and tries again on opening About", async () => {
     let fail = true;
     const backend = fakeBackend({

@@ -4732,6 +4732,8 @@ dependencies = [
  "nucleo-matcher",
  "objc2",
  "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
  "objc2-event-kit",
  "objc2-foundation",
  "objc2-user-notifications",
@@ -4757,6 +4759,8 @@ dependencies = [
  "url",
  "walkdir",
  "windows-sys 0.61.2",
+ "x11-dl",
+ "xkeysym",
 ]
 
 [[package]]

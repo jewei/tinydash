@@ -39,6 +39,7 @@ A `SearchResult` carries a stable `id` (`app:/Applications/Safari.app`, `clip:42
 | Weather            | Startup and launcher opens when the weather is 30 minutes old (retry after 10 minutes); a new city; turning it on; Refresh                    | `refresh.rs`, `weather.rs`      |
 | Focus timer        | A thread wakes when the running phase ends (and at least every 30 seconds, as waits stop during sleep), notifies, and emits `widgets:changed` | `timer.rs`, `features/focus.rs` |
 | Update check       | Launcher opens and the last check is 6 hours old (macOS and Windows release builds, when the setting is on); Check for Updates                | `updates.rs`                    |
+| Snippet expansion  | Each key typed in any app while the setting is on; a thread of its own reads keys, and a worker types the snippet                             | `expander.rs`, `platform/*`     |
 
 When data changes, Rust emits `results:stale` and the launcher searches again, keeping its selection.
 
@@ -57,7 +58,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 ## Platform layer
 
-`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection and reads (one thread at a time), disk space, a search of the OS's file index (Spotlight on macOS), today's events and reminders (EventKit on macOS), a terminal for shell commands, launcher window setup, and returning focus. Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (AGENTS.md rule 6).
+`platform/mod.rs` lists the functions each OS provides: app discovery and launch, icons, system commands, clipboard change detection and reads (one thread at a time), disk space, a search of the OS's file index (Spotlight on macOS), today's events and reminders (EventKit on macOS), a terminal for shell commands, launcher window setup, returning focus, and reading and typing keys for snippet expansion (an event tap on macOS, low-level hooks and `SendInput` on Windows, XRecord and libxdo on X11). Only this folder decides behavior by OS; elsewhere `cfg!` picks only a label or a default, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (AGENTS.md rule 6).
 
 | Concern          | macOS                                 | Windows                      | Linux                                                                                                         |
 | ---------------- | ------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -70,6 +71,7 @@ Images use custom protocols rather than IPC: `icon://` serves system icons (macO
 
 - All three windows (launcher, Settings, and the HUD) load only bundled code under a strict CSP. They get the Tauri event permission and TinyDash's own commands, nothing else.
 - External programs run only with fixed arguments. User text reaches a shell only as a shell command (`>`), which is off by default, is turned on only from the Settings window, and runs only on Enter: a script line of its own on macOS, a line that `sh` reads from a file on Linux, and encoded on Windows, never inside another quoted string. On macOS and Linux the command stays out of every program's arguments, which other users can read.
+- Snippet expansion as you type is opt-in. While it is on, TinyDash reads the keys typed in other apps, keeps the last 64 characters in memory (`features/expansion.rs`), and never logs, saves, or sends them. It ignores its own typing, and types key presses rather than pasting.
 - Clipboard history is opt-in, skips marked secrets, and is never sent anywhere. Clipboard cards read the text when the widget pane loads, skip marked secrets the same way, and keep nothing. Up Next (macOS, off by default) reads calendars and reminders when the widget pane loads, only after the user allows access, and keeps nothing. macOS checks the access and the usage strings of the responsible process: the terminal or other app that started TinyDash, if one did. So Up Next reads and asks only when TinyDash is its own responsible process, which a private libSystem function (`responsibility_get_pid_responsible_for_pid`, looked up at run time) tells. Otherwise TinyDash would read with that app's access, and macOS could end TinyDash when it asks. Network requests: the ECB rate table (when currency rates are on, which they are not by default), the weather (when the widget is on: the city name to Open-Meteo's geocoding service, then its coordinates to the forecast service), and on macOS and Windows the update feed on GitHub (when Check for updates is on) and an update the user chooses to install.
 
 ## Decisions
