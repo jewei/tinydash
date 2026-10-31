@@ -766,7 +766,9 @@ impl Recording<'_> {
     fn event(&mut self, kind: u8, detail: u8, state: u16) {
         let keys = match c_int::from(kind) {
             xlib::KeyPress => self.key(detail, state),
-            xlib::ButtonPress => button_keys(detail),
+            xlib::ButtonPress => {
+                return press_button(detail, |key| (self.on_key)(key, self.focus));
+            }
             _ => return,
         };
         // Each key goes with the window that had focus at the latest key.
@@ -815,15 +817,17 @@ impl Recording<'_> {
     }
 }
 
-/// The keys for a press of mouse button `button`. Buttons 4 to 7 scroll,
-/// which moves no cursor, so they pass nothing. Another button is a click:
-/// a reset, also kept in [`CLICKED`], as TinyDash never clicks.
-fn button_keys(button: u8) -> Vec<Key> {
+/// Passes a press of mouse button `button` to `on_key`. Buttons 4 to 7
+/// scroll, which moves no cursor, so they pass nothing. Another button is a
+/// click: a reset, then a mark in [`CLICKED`], as TinyDash never clicks. The
+/// reset goes first, so a click before typing starts has set `interrupted`
+/// by the time typing clears the mark.
+fn press_button(button: u8, mut on_key: impl FnMut(Key)) {
     if (4..=7).contains(&button) {
-        return Vec::new();
+        return;
     }
-    CLICKED.store(true, Ordering::Release);
-    vec![Key::Reset]
+    on_key(Key::Reset);
+    CLICKED.store(true, Ordering::SeqCst);
 }
 
 /// The window with the input focus. Window IDs are the same on every
@@ -947,13 +951,13 @@ pub fn type_text(focus: Focus, erase: usize, text: &str, interrupted: &AtomicBoo
 fn no_input_from_others(interrupted: &AtomicBool) -> impl Fn() -> Result<()> + '_ {
     // Forget older clicks: one before the trigger does not count, and one
     // after it set `interrupted`, which the first check reads.
-    CLICKED.store(false, Ordering::Release);
+    CLICKED.store(false, Ordering::SeqCst);
     let started = Cell::new(false);
     move || {
         if !started.replace(true) {
             super::no_input_since_trigger(interrupted)?;
         }
-        if CLICKED.load(Ordering::Acquire) {
+        if CLICKED.load(Ordering::SeqCst) {
             return Err(Error::msg(
                 "Stopped typing the snippet: a click came while it typed.",
             ));
@@ -1088,20 +1092,29 @@ mod tests {
 
     #[test]
     fn a_click_while_typing_stops_it_and_a_key_does_not() {
+        let click = |button| {
+            let mut keys = Vec::new();
+            press_button(button, |key| keys.push(key));
+            keys
+        };
         let interrupted = AtomicBool::new(false);
         // A click before the trigger does not count.
-        assert_eq!(button_keys(1), [Key::Reset]);
+        assert_eq!(click(1), [Key::Reset]);
         let no_input = no_input_from_others(&interrupted);
         assert!(no_input().is_ok());
         // TinyDash's own keys set `interrupted`, and the scroll wheel does
         // not click.
         interrupted.store(true, Ordering::Release);
         for button in 4..=7 {
-            assert!(button_keys(button).is_empty(), "{button}");
+            assert!(click(button).is_empty(), "{button}");
         }
         assert!(no_input().is_ok());
-        // A click while TinyDash types stops it before the next part.
-        assert_eq!(button_keys(3), [Key::Reset]);
+        // A click while TinyDash types stops it before the next part. Its
+        // reset reaches the watch before the click is marked.
+        press_button(3, |key| {
+            assert_eq!(key, Key::Reset);
+            assert!(!CLICKED.load(Ordering::SeqCst));
+        });
         let error = no_input().unwrap_err();
         assert_eq!(
             error.to_string(),
