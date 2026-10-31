@@ -15,6 +15,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - `30 + 20%` now gives 36, which adds 20% of 30, instead of 30.2. `200 - 10%` gives 180.
 
+### Fixed
+
+- The details of an app or file show Where, Size, and Modified again at the default window size. Before, a result with many actions left no room for them. Now the details pane scrolls instead.
+
 ## [0.7.0] - 2026-10-19
 
 ### Added
