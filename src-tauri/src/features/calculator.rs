@@ -483,8 +483,7 @@ fn euro_amounts(query: &str) -> Cow<'_, str> {
 }
 
 /// `plus`, `minus`, `times`, `multiplied by`, and `divided by` as signs, and
-/// `percent` as `%`. Also `per` as `/`, which fend reads the same, so that
-/// the checks here see the division.
+/// `percent` as `%`.
 fn word_operators(query: &str) -> Cow<'_, str> {
     let words: Vec<&str> = query.split_whitespace().collect();
     let is = |i: usize, word: &str| words.get(i).is_some_and(|w| w.eq_ignore_ascii_case(word));
@@ -502,9 +501,6 @@ fn word_operators(query: &str) -> Cow<'_, str> {
             ("*", 2)
         } else if is(i, "divided") && is(i + 1, "by") {
             ("/", 2)
-        } else if words[i] == "per" {
-            // Only this spelling: fend reads `Per` as a name.
-            ("/", 1)
         } else if is(i, "percent") {
             ("%", 1)
         } else if let Some(number) = strip_suffix(words[i], "percent").filter(|n| is_number(n)) {
@@ -939,6 +935,14 @@ mod tests {
         assert_eq!(value("sqrt(144)").as_deref(), Some("12"));
         assert_eq!(value("8 Mbps to MBps").as_deref(), Some("1 MBps"));
         assert!(value("5 ft to cm").is_some_and(|v| v.starts_with("152.4")));
+        // fend writes `per` as `/`, which does not repeat the query.
+        for (query, expected) in [
+            ("5 m per s", "5 m / s"),
+            ("100 km per hour", "100 km / hour"),
+            ("5 meters per second", "5 meters / second"),
+        ] {
+            assert_eq!(value(query).as_deref(), Some(expected), "{query}");
+        }
     }
 
     #[test]
@@ -1094,7 +1098,6 @@ mod tests {
             ("3 * 10% of 200", "60"),
             ("(10% of 200) / 4", "5"),
             ("10 percent of 200", "20"),
-            ("10% of 200 per 4", "5"),
             // A phrase right after another one.
             ("10% of 200 + 20% of 300", "80"),
             ("10% of 200 * 10% of 50", "100"),
@@ -1130,6 +1133,7 @@ mod tests {
             "10% of 2^3",
             "10% of 5!",
             "10% of 200 mod 3",
+            "10% of 200 per 4",
             "10% of 20% of 200",
             "10% of 200 - 5%",
         ] {
