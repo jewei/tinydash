@@ -133,18 +133,9 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	}
 
 	a.engine = engine.New(db, first, a.dataChanged)
-	go a.engine.Run(ctx)
 	a.desktop = &desktop{clip: NewClipboard(a.capture)}
 	a.actions = engine.NewActions(a.engine, a.desktop, (*appShell)(a), a.keys, time.Now)
 	a.more = a.newMoreFiles()
-	a.watchFolders()
-
-	a.apps = engine.NewSlot(a.engine.RebuildApps(installedApps))
-	a.files = engine.NewSlot(a.engine.RebuildFiles(a.fileDisk()))
-	go a.apps.Run(ctx)
-	go a.files.Run(ctx)
-	a.rebuild(a.apps)
-	a.rebuild(a.files)
 
 	// Without its fonts, text falls back to the system's, which still reads.
 	if err := kit.RegisterFonts(); err != nil {
@@ -175,6 +166,17 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 		a.panel.Hide()
 	})
 	a.hud = newHUD(a.panel)
+	// The writer and the slots tell the panel and the model about changes,
+	// so they start once both exist.
+	go a.engine.Run(ctx)
+	a.watchFolders()
+	a.apps = engine.NewSlot(a.engine.RebuildApps(installedApps))
+	a.files = engine.NewSlot(a.engine.RebuildFiles(a.fileDisk()))
+	go a.apps.Run(ctx)
+	go a.files.Run(ctx)
+	a.rebuild(a.apps)
+	a.rebuild(a.files)
+
 	a.panel.OnBlur(func() {
 		a.blurredAt = time.Now()
 		if a.engine.Snapshot(time.Now()).Settings.HideOnBlur {
@@ -219,12 +221,10 @@ func (a *App) warn(message any) {
 // again, and Settings reads the data again.
 func (a *App) dataChanged() {
 	a.watchFolders()
-	if a.panel != nil {
-		a.panel.Update(func() {
-			a.model.Stale()
-			a.settingsChanged()
-		})
-	}
+	a.panel.Update(func() {
+		a.model.Stale()
+		a.settingsChanged()
+	})
 }
 
 func (a *App) toggle() {
