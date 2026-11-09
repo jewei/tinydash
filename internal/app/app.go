@@ -88,6 +88,9 @@ type App struct {
 	ratesTriedAt time.Time
 	// blurredAt is when the panel last lost focus; main thread only.
 	blurredAt time.Time
+	// movedAt is when the panel last moved, as in a drag, and dragStartedAt
+	// when a press on the tab bar or footer began one; main thread only.
+	movedAt, dragStartedAt time.Time
 	// placed is where TinyDash last put the panel, and dragSave saves
 	// where the user dragged it; main thread only.
 	placed   mygo.Point
@@ -174,7 +177,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	a.panel.OnBlur(func() {
 		a.blurredAt = time.Now()
 		if a.engine.Snapshot(time.Now()).Settings.HideOnBlur {
-			a.panel.Hide()
+			a.hideUnlessDragged()
 		}
 	})
 	a.panel.OnMove(a.panelMoved)
@@ -308,7 +311,55 @@ func contains(r mygo.Rectangle, x, y int) bool {
 
 // panelMoved saves where the user dragged the panel, once the drag
 // settles. TinyDash's own moves go to placed, so they save nothing.
+// hideUnlessDragged hides the panel after a blur, unless the blur came
+// from a drag: where the window manager moves windows itself (X11), the
+// move takes focus from the panel before the first move event, so the
+// decision waits a moment and waits again while the panel moves.
+func (a *App) hideUnlessDragged() {
+	time.AfterFunc(blurGrace, func() {
+		mygo.RunOnMain(func() {
+			if !a.panel.IsVisible() {
+				return
+			}
+			switch blurOutcome(a.panel.IsFocused(), time.Since(a.movedAt), time.Since(a.dragStartedAt), a.movedAt.After(a.dragStartedAt)) {
+			case hideAfterBlur:
+				a.panel.Hide()
+			case waitForDrag:
+				a.hideUnlessDragged()
+			}
+		})
+	})
+}
+
+// blurGrace is how long a blur waits for a move that shows it was a drag.
+const blurGrace = 250 * time.Millisecond
+
+type blurStep uint8
+
+const (
+	stayAfterBlur blurStep = iota
+	waitForDrag
+	hideAfterBlur
+)
+
+// dragLimit bounds how long a drag that reports no move holds off a hide.
+const dragLimit = 10 * time.Second
+
+// blurOutcome decides a blur once blurGrace passed. A panel that has the
+// focus again stays. A drag that started and has not moved yet, or a panel
+// that moved within blurGrace, is still being dragged. Any other hides.
+func blurOutcome(focused bool, sinceMove, sinceDrag time.Duration, movedSinceDrag bool) blurStep {
+	switch {
+	case focused:
+		return stayAfterBlur
+	case sinceDrag < dragLimit && !movedSinceDrag, sinceMove < blurGrace:
+		return waitForDrag
+	}
+	return hideAfterBlur
+}
+
 func (a *App) panelMoved() {
+	a.movedAt = time.Now()
 	if !a.panel.IsVisible() {
 		return
 	}
@@ -570,6 +621,8 @@ func (b *backend) EnableClipboardHistory(done func(error)) {
 }
 
 func (b *backend) Hide() { b.app().panel.Hide() }
+
+func (b *backend) DragStarted() { b.app().dragStartedAt = time.Now() }
 
 // appShell is what actions ask of TinyDash's own windows.
 type appShell App

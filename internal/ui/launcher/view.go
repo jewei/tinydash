@@ -84,7 +84,7 @@ func (m *Model) searchBar(c *ui.Context, p kit.Palette) {
 
 func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 	tabs := m.tabs()
-	dragArea(ui.Row(c).Padding(4, 16, 12, 16).Gap(4).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule)).Children(func() {
+	m.dragArea(ui.Row(c).Padding(4, 16, 12, 16).Gap(4).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule)).Children(func() {
 		ui.Row(c).Gap(4).Role(ui.RoleTabList).Label("Categories").Grow(1).Children(func() {
 			for _, tab := range tabs {
 				chosen := tab == m.category
@@ -116,7 +116,14 @@ func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 // dragArea makes the empty parts of a bar move the panel, which has no
 // title bar; its buttons still take their clicks. The focus stays in the
 // search field, so typing goes on after the move.
-func dragArea(bar ui.Element) ui.Element { return bar.DragWindow().KeepFocus() }
+func (m *Model) dragArea(bar ui.Element) ui.Element {
+	return bar.DragWindow().KeepFocus().HandleInput(func(ev ui.InputEvent) bool {
+		if ev.Kind == ui.InputPointerDown {
+			m.backend.DragStarted()
+		}
+		return false // the press still moves the window
+	})
+}
 
 // noticeBar says what went wrong under the tabs. A startup warning has a
 // Dismiss button; an action's failure goes with the next edit.
@@ -303,7 +310,7 @@ func (m *Model) icon(c *ui.Context, p kit.Palette, r core.Result, size float32) 
 // a press on it must toggle the menu, not close it as a press outside.
 func (m *Model) footer(c *ui.Context, p kit.Palette) ui.Element {
 	var actions ui.Element
-	dragArea(ui.Row(c).Height(40).Padding(0, 16).Gap(12).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.Rule)).Children(func() {
+	m.dragArea(ui.Row(c).Height(40).Padding(0, 16).Gap(12).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.Rule)).Children(func() {
 		if r, ok := m.selectedRow(); ok && len(r.Actions) > 0 {
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, r.Actions[0].Label).FontSize(12).TextColor(p.Ink)

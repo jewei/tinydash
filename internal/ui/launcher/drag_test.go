@@ -27,4 +27,9 @@ func TestPressingTheEmptyBarsKeepsTheSearchFocused(t *testing.T) {
 			t.Errorf("a press on %s took the focus from the search field", at.name)
 		}
 	}
+	// Each press told the app that a drag may start, so the blur that a
+	// window manager's move causes does not hide the panel.
+	if f.drags != 2 {
+		t.Errorf("%d drag notices for 2 presses on the bars", f.drags)
+	}
 }
