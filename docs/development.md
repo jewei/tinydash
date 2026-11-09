@@ -66,6 +66,8 @@ It needs Docker or OrbStack. The first launch downloads mygo's SQLite library fr
 
 The version is in `mygo.json`.
 
+`app-icon.svg` is the source of `resources/icon.png`; the PNG cannot be scaled up without loss. To change the icon, edit the SVG, then render it at 1024 × 1024 px, for example with `rsvg-convert -w 1024 -h 1024 app-icon.svg -o resources/icon.png`.
+
 ## Dependencies
 
 - `go.mod` lists the modules. `internal/archtest/rules.go` allowlists each module and the packages that may import it. A new module fails the tests until it is added there.
