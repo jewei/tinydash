@@ -81,14 +81,14 @@ func (m *Model) detailsPane(c *ui.Context, p kit.Palette) {
 			m.loadedDetails(c, p, m.details)
 		}
 		ui.Box(c).Grow(1)
-		ui.Column(c).Gap(2).Children(func() {
+		ui.Column(c).Gap(2).AlignItems(ui.Stretch).Children(func() {
 			for i, ra := range r.Actions {
-				b := ui.ButtonBase(c).Padding(6, 8).Radius(6).Label(ra.Label)
+				b := ui.ButtonBase(c).Padding(6, 8).Radius(6).Justify(ui.Start).Label(ra.Label)
 				if b.Hovered() && !m.running {
 					b.Background(p.Hover)
 				}
 				b.Disabled(m.running).Children(func() {
-					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+					ui.Row(c).Grow(1).Gap(8).AlignItems(ui.Center).Children(func() {
 						ui.Text(c, ra.Label).TextColor(p.Ink).Grow(1)
 						if keys := shortcutFor(ra.Action, i); keys != nil {
 							keyCaps(c, p, keys...)
