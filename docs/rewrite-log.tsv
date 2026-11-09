@@ -47,3 +47,5 @@ ts	phase	decision	why	evidence	result
 2026-11-09T11:07:14Z	audit	871f603 (Slot) was also committed while verify failed (; chaining), not only dbc201b	correcting the 10:02 and 10:03 gate rows	commit 871f603	fixed later by f18acfb
 2026-11-09T11:07:14Z	audit	not done yet: verify-tinydash skill (needs a runnable app), critic review loop, app layer; deferred by order of units, not dropped	the user's prompt and the saved plan require them	memory tinydash-mygo-rewrite.md	open
 2026-11-09T11:07:14Z	audit	deleted the spike's full-screen screenshot of the user's desktop from the scratchpad	it held the user's private screen	scratchpad/spike-shown.png	deleted
+2026-11-09T11:11:27Z	spike	user ran mygo's launcher example and pressed Option+Shift+Space: the shortcut test passed	the riskiest unknown; decides native UI over the webview fallback	user reply 'shortcut test passed'	VERIFIED by the user; native UI confirmed
+2026-11-09T11:11:27Z	decision	user followed the recs: fix Windows CI first; keep ties in input order; keep ST1005 off; keep Go, TLC, and the mygo cache	answers to the five numbered decisions	user reply 'follow your rec'	decided
