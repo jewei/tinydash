@@ -25,8 +25,9 @@ trap 'rm -rf "$work"' EXIT
 
 status=0
 # Each config is <Spec>.<variant>.cfg beside <Spec>.tla. A config whose name
-# holds ".broken" models a known bug and must fail on an invariant; every
-# other config must pass.
+# holds ".broken" models a known bug: it must fail on the invariant that its
+# "\* must break: <Invariant>" line names, so a broken config that fails for
+# another reason does not count. Every other config must pass.
 for config in formal/*.cfg; do
   base="$(basename "$config" .cfg)"
   spec="formal/${base%%.*}.tla"
@@ -34,10 +35,13 @@ for config in formal/*.cfg; do
   "$java" -XX:+UseParallelGC -cp "$jar" tlc2.TLC -workers auto -metadir "$work/meta-$base" \
     -config "$config" "$spec" >"$out" 2>&1 && passed=1 || passed=0
   if [[ "$base" == *.broken* ]]; then
-    if [ $passed = 0 ] && grep -q "is violated" "$out"; then
-      echo "ok    $config fails as it must: $(grep -m1 'is violated' "$out" | sed 's/^Error: //')"
+    want="$(sed -n 's/^\\\* must break: *\([A-Za-z0-9_]*\) *$/\1/p' "$config" | head -1)"
+    if [ -z "$want" ]; then
+      echo "FAIL  $config has no '\\* must break: <Invariant>' line" >&2; status=1
+    elif [ $passed = 0 ] && grep -q "^Error: Invariant $want is violated" "$out"; then
+      echo "ok    $config fails as it must: Invariant $want is violated."
     else
-      echo "FAIL  $config should break an invariant but did not" >&2; tail -20 "$out" >&2; status=1
+      echo "FAIL  $config should break $want but did not" >&2; grep -E 'violated|Error' "$out" >&2 || tail -20 "$out" >&2; status=1
     fi
   elif [ $passed = 1 ]; then
     echo "ok    $config: $(grep -m1 'distinct states found' "$out")"

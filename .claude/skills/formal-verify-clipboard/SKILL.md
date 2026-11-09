@@ -19,7 +19,7 @@ A copy that the user cleared never comes back, nothing that the monitor read bef
 - Each config covers up to 3 copies and 3 user requests (Clear, history off, history on), in every interleaving with the monitor's steps and the writer. The configs that model the code must pass:
   - `ClipboardHistory.counted.cfg`: macOS and Windows, which have a change counter (about 62,000 states).
   - `ClipboardHistory.linux.cfg`: Linux, where the monitor compares content (about 138,000 states).
-- The `.broken` configs model known bugs and must fail. They show the check can catch them:
+- The `.broken` configs model known bugs and must fail on the invariant that their first line names (`\* must break: <Invariant>`). The script fails a `.broken` config that breaks a different rule or has no such line. They show the check can catch them:
   - `counted.broken` (`EpochFirst = FALSE`: the clipboard read before the epoch) fails `NothingStaleIsSaved`.
   - `counted.unfixed.broken` (`Fixed = FALSE`: no counter recheck after the read) fails `ClearedNeverReturns`.
   - `linux.broken` (`Fixed = FALSE`: a switch-off reset the seen content) fails `ClearedNeverReturns`.
@@ -60,7 +60,7 @@ go test -count=1 -race -run 'AClearDuringATickWins|ContentReadBefore|DuringATick
 Read every result with the `/statechart` skill: on a violation it gives the shortest path to the broken rule in plain steps; on a pass it draws the chart.
 
 - A config that models the code fails: the design allows the bug. Turn the shortest path into a test in `internal/engine/monitor_test.go`, one step per action, run it for both `counted: true` and `counted: false` where it applies, the way `TestACopyDuringATickIsSavedOnceByTheNextTick` replays a path the model found. If the test passes on the real code, suspect the model before the code: a step in the model that the code does not take, or a missing guard.
-- A `.broken` config passes: the model no longer catches the bug it guards. Fix the model; never delete a broken config.
+- A `.broken` config passes, or breaks a rule other than its `must break` line: the model no longer catches the bug it guards. Fix the model; never delete a broken config.
 - Never weaken a rule or the bounds to make a check pass.
 
 ## When the code changes on purpose
