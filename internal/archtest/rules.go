@@ -1,4 +1,4 @@
-// Package archtest checks the import rules of docs/go-architecture.md. The
+// Package archtest checks the import rules of docs/architecture.md. The
 // rules are data in this file; archtest_test.go runs them over the real
 // module with `go list` and the standard library only.
 package archtest
