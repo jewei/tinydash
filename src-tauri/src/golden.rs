@@ -382,7 +382,7 @@ fn golden_search() {
         fs::write(&path, b"x").unwrap();
     }
     let files = FileIndex::scan(
-        &[root.clone()],
+        std::slice::from_ref(&root),
         &["node_modules".to_owned()],
         &["app"],
         None,
