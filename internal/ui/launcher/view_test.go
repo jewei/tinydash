@@ -7,6 +7,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 // The tests below port src/launcher/Launcher.test.tsx, the spec of the
@@ -831,7 +832,7 @@ func TestFollowsTheDesktopsAppearance(t *testing.T) {
 	for _, c := range []struct {
 		dark bool
 		want ui.Color
-	}{{false, light.paper}, {true, dark.paper}, {false, light.paper}} {
+	}{{false, kit.Light.Paper}, {true, kit.Dark.Paper}, {false, kit.Light.Paper}} {
 		tt.SetDark(c.dark)
 		got := tt.Image().RGBAAt(2, 300)
 		if got.R != c.want.R || got.G != c.want.G || got.B != c.want.B {

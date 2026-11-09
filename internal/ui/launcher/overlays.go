@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 // The menu and the dialogs are drawn inside the panel, not as windows or
@@ -12,11 +13,11 @@ import (
 
 // menuView is the actions menu above the footer. It takes no backdrop, so
 // a press on a tab closes it and goes on to the tab.
-func (m *Model) menuView(c *ui.Context, p palette, actions ui.Element) {
+func (m *Model) menuView(c *ui.Context, p kit.Palette, actions ui.Element) {
 	mn := m.menu
 	ui.Overlay(c, func() {
 		panel := ui.Column(c).Absolute().Right(16).Bottom(48).Width(320).MaxHeight(320).Clip().
-			Border(1, p.border).Radius(10).Background(p.paper).Shadow(0, 12, 40, 0, p.shadow).
+			Border(1, p.Border).Radius(10).Background(p.Paper).Shadow(0, 12, 40, 0, p.Shadow).
 			Role(ui.RoleDialog).Label("Actions").ObserveInput(m.observe)
 		panel.Children(func() {
 			filter := ui.TextInputBase(c, &mn.filter).AutoFocus().Padding(12).
@@ -33,7 +34,7 @@ func (m *Model) menuView(c *ui.Context, p palette, actions ui.Element) {
 				}
 			})
 			if len(items) == 0 {
-				ui.Text(c, "No matching actions").Padding(0, 12, 8, 12).TextColor(p.muted).Role(ui.RoleStatus)
+				ui.Text(c, "No matching actions").Padding(0, 12, 8, 12).TextColor(p.Muted).Role(ui.RoleStatus)
 			}
 		})
 		if panel.PressedOutside() && !actions.Hovered() {
@@ -42,14 +43,14 @@ func (m *Model) menuView(c *ui.Context, p palette, actions ui.Element) {
 	})
 }
 
-func (m *Model) menuRow(c *ui.Context, p palette, item menuItem, i int) {
+func (m *Model) menuRow(c *ui.Context, p kit.Palette, item menuItem, i int) {
 	chosen := i == m.menu.active
 	row := ui.Row(c).Padding(6, 8).Radius(6).Gap(8).AlignItems(ui.Center).
 		Role(ui.RoleOption).Label(item.label).AccessSelected(chosen)
-	ink, weight := p.ink, 400
+	ink, weight := p.Ink, 400
 	if chosen {
-		row.Background(p.selected)
-		ink, weight = p.selectedInk, 600
+		row.Background(p.Selected)
+		ink, weight = p.SelectedInk, 600
 	}
 	row.Children(func() {
 		ui.Text(c, item.label).TextColor(ink).FontWeight(weight).Grow(1).SingleLine()
@@ -88,13 +89,13 @@ func (m *Model) menuKey(k ui.TextKey) bool {
 
 // dialog draws a modal panel over the dimmed launcher. A press outside
 // dismisses it; Escape acts as the model's escape does, once while held.
-func (m *Model) dialog(c *ui.Context, p palette, role ui.Role, label string, dismiss func(), children func()) {
+func (m *Model) dialog(c *ui.Context, p kit.Palette, role ui.Role, label string, dismiss func(), children func()) {
 	ui.Overlay(c, func() {
 		back := ui.Column(c).Absolute().Left(0).Top(0).Right(0).Bottom(0).
-			Background(p.backdrop).Justify(ui.Center).AlignItems(ui.Center).Modal()
+			Background(p.Backdrop).Justify(ui.Center).AlignItems(ui.Center).Modal()
 		back.Children(func() {
-			panel := ui.Column(c).Width(360).Padding(24).Gap(16).Radius(10).Border(1, p.border).
-				Background(p.paper).Shadow(0, 12, 40, 0, p.shadow).
+			panel := ui.Column(c).Width(360).Padding(24).Gap(16).Radius(10).Border(1, p.Border).
+				Background(p.Paper).Shadow(0, 12, 40, 0, p.Shadow).
 				Role(role).Label(label).ObserveInput(m.observe).Children(children)
 			if panel.PressedOutside() {
 				dismiss()
@@ -116,19 +117,19 @@ func (m *Model) button(b ui.Element, disabled bool, fn func()) {
 	})
 }
 
-func (m *Model) confirmView(c *ui.Context, p palette) {
+func (m *Model) confirmView(c *ui.Context, p kit.Palette) {
 	cf := m.confirm
 	m.dialog(c, p, ui.RoleAlertDialog, "Confirm", m.cancelConfirm, func() {
 		ui.Text(c, cf.action.Confirm)
 		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
 			// Cancel comes first, so it has the focus and Enter is safe.
 			m.button(ui.Button(c, "Cancel"), false, m.cancelConfirm)
-			m.button(ui.Button(c, cf.action.Label).Background(p.danger).TextColor(p.dangerInk), false, m.confirmPending)
+			m.button(ui.Button(c, cf.action.Label).Background(p.Danger).TextColor(p.DangerInk), false, m.confirmPending)
 		})
 	})
 }
 
-func (m *Model) aliasView(c *ui.Context, p palette) {
+func (m *Model) aliasView(c *ui.Context, p kit.Palette) {
 	d := m.alias
 	label := "Alias for " + d.title
 	m.dialog(c, p, ui.RoleDialog, label, m.cancelAlias, func() {
@@ -143,9 +144,9 @@ func (m *Model) aliasView(c *ui.Context, p palette) {
 			return true
 		})
 		if d.err != "" {
-			ui.Text(c, d.err).TextColor(p.danger).Role(ui.RoleAlert)
+			ui.Text(c, d.err).TextColor(p.Danger).Role(ui.RoleAlert)
 		}
-		ui.Text(c, "One word. Typing it puts this result first. Leave it empty to remove the alias.").FontSize(12).TextColor(p.muted)
+		ui.Text(c, "One word. Typing it puts this result first. Leave it empty to remove the alias.").FontSize(12).TextColor(p.Muted)
 		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
 			m.button(ui.Button(c, "Cancel"), d.saving, m.cancelAlias)
 			m.button(ui.PrimaryButton(c, "Save Alias"), d.saving, m.saveAlias)
@@ -153,16 +154,16 @@ func (m *Model) aliasView(c *ui.Context, p palette) {
 	})
 }
 
-func (m *Model) hotkeyView(c *ui.Context, p palette) {
+func (m *Model) hotkeyView(c *ui.Context, p kit.Palette) {
 	d := m.hotkey
 	label := "Hotkey for " + d.title
 	m.dialog(c, p, ui.RoleDialog, label, m.closeHotkey, func() {
 		ui.Text(c, label)
 		m.recorder(c, p, d, label)
 		if d.err != "" {
-			ui.Text(c, d.err).TextColor(p.danger).Role(ui.RoleAlert)
+			ui.Text(c, d.err).TextColor(p.Danger).Role(ui.RoleAlert)
 		}
-		ui.Text(c, "Press keys with a modifier, such as Control or Alt, or a function key. They run this result from any app. Escape stops recording.").FontSize(12).TextColor(p.muted)
+		ui.Text(c, "Press keys with a modifier, such as Control or Alt, or a function key. They run this result from any app. Escape stops recording.").FontSize(12).TextColor(p.Muted)
 		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
 			if d.shortcut != "" {
 				m.button(ui.Button(c, "Remove Hotkey"), m.savingHotkey, func() { m.saveHotkey("") })
@@ -175,19 +176,19 @@ func (m *Model) hotkeyView(c *ui.Context, p palette) {
 // recorder takes every key while it records, so no key reaches the
 // launcher or the dialog's buttons; Escape stops it. A click or a new
 // press of Enter or Space starts it again.
-func (m *Model) recorder(c *ui.Context, p palette, d *hotkeyDialog, label string) {
+func (m *Model) recorder(c *ui.Context, p kit.Palette, d *hotkeyDialog, label string) {
 	name := label + ": None"
 	if d.recording {
 		name = label + ": press the new keys, or Escape to cancel"
 	} else if d.shortcut != "" {
-		name = label + ": " + strings.Join(displayKeys(d.shortcut, mac, superName), " ")
+		name = label + ": " + strings.Join(kit.DisplayKeys(d.shortcut, mac, kit.SuperName), " ")
 	}
-	edge := p.border
+	edge := p.Border
 	if d.recording {
-		edge = p.accent
+		edge = p.Accent
 	}
 	rec := ui.Row(c).Focusable().AutoFocus().MinWidth(140).Height(32).Padding(0, 12).Radius(6).
-		Border(1, edge).Background(p.field).Justify(ui.Center).AlignItems(ui.Center).
+		Border(1, edge).Background(p.Field).Justify(ui.Center).AlignItems(ui.Center).
 		Role(ui.RoleButton).Label(name)
 	rec.HandleInput(func(ev ui.InputEvent) bool {
 		if ev.Kind != ui.InputKeyDown {
@@ -197,7 +198,7 @@ func (m *Model) recorder(c *ui.Context, p palette, d *hotkeyDialog, label string
 		case d.recording && ev.Key == ui.KeyEscape:
 			m.stopRecording("")
 		case d.recording:
-			if keys := accelerator(ev, mac); keys != "" {
+			if keys := kit.Accelerator(ev, mac); keys != "" {
 				m.stopRecording(keys)
 			}
 		case ev.Key == ui.KeyEnter || ev.Key == ui.KeySpace:
@@ -219,11 +220,11 @@ func (m *Model) recorder(c *ui.Context, p palette, d *hotkeyDialog, label string
 	rec.Children(func() {
 		switch {
 		case d.recording:
-			ui.Text(c, "Press keys…").TextColor(p.ink)
+			ui.Text(c, "Press keys…").TextColor(p.Ink)
 		case d.shortcut != "":
-			keyCaps(c, p, displayKeys(d.shortcut, mac, superName)...)
+			keyCaps(c, p, kit.DisplayKeys(d.shortcut, mac, kit.SuperName)...)
 		default:
-			ui.Text(c, "None").TextColor(p.muted)
+			ui.Text(c, "None").TextColor(p.Muted)
 		}
 	})
 }

@@ -1,4 +1,4 @@
-package launcher
+package kit
 
 import (
 	"slices"
@@ -41,7 +41,7 @@ func TestAccelerator(t *testing.T) {
 		{"Scroll Lock off macOS", ui.InputEvent{Code: ui.CodeScrollLock, Mods: ui.Ctrl}, false, "Control+ScrollLock"},
 		{"no Scroll Lock on macOS", ui.InputEvent{Code: ui.CodeScrollLock, Mods: ui.Super}, true, ""},
 	} {
-		if got := accelerator(c.ev, c.onMac); got != c.want {
+		if got := Accelerator(c.ev, c.onMac); got != c.want {
 			t.Errorf("%s: %q, want %q", c.name, got, c.want)
 		}
 	}
@@ -61,8 +61,25 @@ func TestDisplayKeys(t *testing.T) {
 		{"CommandOrControl+Up", false, "Super", []string{"Ctrl", "↑"}},
 		{"", true, "Super", nil},
 	} {
-		if got := displayKeys(c.accelerator, c.onMac, c.superKey); !slices.Equal(got, c.want) {
+		if got := DisplayKeys(c.accelerator, c.onMac, c.superKey); !slices.Equal(got, c.want) {
 			t.Errorf("%q mac %v: %q, want %q", c.accelerator, c.onMac, got, c.want)
+		}
+	}
+}
+
+func TestRecordsTheLauncherShortcutAsSettingsStoreIt(t *testing.T) {
+	for _, c := range []struct {
+		ev    ui.InputEvent
+		onMac bool
+		want  string
+	}{
+		{ui.InputEvent{Key: ui.KeySpace, Mods: ui.Alt}, false, "Alt+Space"},
+		{ui.InputEvent{Key: ui.KeySpace, Mods: ui.Shift}, false, "Shift+Space"},
+		{ui.InputEvent{Key: ui.KeyK, Mods: ui.Shift}, false, ""},
+		{ui.InputEvent{Key: ui.KeyA, PhysicalKey: ui.KeyQ, Mods: ui.Super}, true, "Super+Q"},
+	} {
+		if got := Accelerator(c.ev, c.onMac); got != c.want {
+			t.Errorf("%+v: %q, want %q", c.ev, got, c.want)
 		}
 	}
 }
