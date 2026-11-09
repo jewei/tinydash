@@ -99,6 +99,33 @@ func (a *App) applyToSystem(from, to settings.Settings) error {
 	return nil
 }
 
+// checkedAtStartup replaces a saved launcher shortcut that cannot be one,
+// such as a plain letter in a hand-edited settings.json, with the default,
+// and says why. The file keeps it until the next save.
+func checkedAtStartup(s *settings.Settings, parse func(string) (engine.Keys, error)) string {
+	keys, err := parse(s.Shortcut)
+	if err == nil && !engine.CanOpenLauncher(keys) {
+		err = fmt.Errorf("“%s” would block typing in every app. The launcher shortcut needs a modifier such as Control or Alt, or a function key.", s.Shortcut)
+	}
+	if err == nil {
+		return ""
+	}
+	s.Shortcut = settings.Default().Shortcut
+	return fmt.Sprintf("%v TinyDash uses %s until you choose other keys in Settings > General.", err, s.Shortcut)
+}
+
+// keepOpenAtLogin registers this copy of TinyDash as the login item while
+// the setting is on. The Rust app's login item ran its own executable.
+func keepOpenAtLogin(on bool, setOpenAtLogin func(bool) error) error {
+	if !on {
+		return nil
+	}
+	if err := setOpenAtLogin(true); err != nil {
+		return fmt.Errorf("TinyDash could not set itself to open at login: %v. Turn Open at login off and on again in Settings > General.", err)
+	}
+	return nil
+}
+
 // settingsBackend is the Settings view's way into the app.
 type settingsBackend App
 

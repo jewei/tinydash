@@ -78,8 +78,8 @@ const (
 	// FromLauncher: the launcher shows the error under the query. Settings
 	// runs its actions this way too and shows their errors itself.
 	FromLauncher Origin = iota
-	// FromHotkey: the user pressed a hotkey in another app; the error goes
-	// to a notification.
+	// FromHotkey: the user pressed a hotkey in another app. RunHotkey
+	// returns the error, and the app shows it in a system notification.
 	FromHotkey
 )
 
