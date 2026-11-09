@@ -1,0 +1,4 @@
+query	reason
+empty-array	A JSON array is not settings: Go moves any non-object aside with a warning, where serde read "[]" as a struct with no fields and kept the file.
+not-an-object	Go moves any non-object aside with its own reason ("the file is not a JSON object") in place of serde's type error; the rest of the warning, the defaults, and the backup are the same.
+damaged	The parser's own words for the error differ ("unexpected end of JSON input" for serde's "EOF while parsing a value"); the position, the rest of the warning, the defaults, and the backup are the same.
