@@ -1,7 +1,6 @@
 package platform
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 )
@@ -35,5 +34,3 @@ func AppDirs(identifier string) (Dirs, error) {
 		Home:   home,
 	}, nil
 }
-
-var errNoHome = errors.New("TinyDash could not find your home folder.")

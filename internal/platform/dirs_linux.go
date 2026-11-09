@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 )
@@ -16,3 +17,5 @@ func localDataDir() (string, error) {
 	}
 	return filepath.Join(home, ".local", "share"), nil
 }
+
+var errNoHome = errors.New("TinyDash could not find your home folder.")
