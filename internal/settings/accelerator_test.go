@@ -55,7 +55,7 @@ func TestEveryStoredKeyTranslates(t *testing.T) {
 // Keys mygo cannot name fail with a message, rather than turning into
 // another key.
 func TestKeysWithoutAMygoNameFail(t *testing.T) {
-	for _, stored := range []string{"Control+NumpadEnter", "Control+NumpadEqual", "Control+F25", "Control+F0", "Hyper+K", "Control+", "", "Control+KeyK", "Control+a"} {
+	for _, stored := range []string{"Control+NumpadEnter", "Control+NumpadEqual", "Control+F25", "Control+F0", "Hyper+K", "Control+", "", "Control+a", "Control+KeyKK", "Control+Digit10"} {
 		if got, err := Accelerator(stored); err == nil {
 			t.Errorf("%q gave %q", stored, got)
 		}

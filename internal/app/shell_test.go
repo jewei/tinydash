@@ -308,3 +308,20 @@ func TestTheLauncherOpensCenteredOrWhereItWasDragged(t *testing.T) {
 		}
 	}
 }
+
+// A hand-edited W3C key code and the recorder's letter are one shortcut,
+// so the engine's conflict checks see them as the same keys.
+func TestTwoSpellingsOfOneShortcutAreTheSameKeys(t *testing.T) {
+	var s shortcuts
+	a, err := s.Parse("Super+KeyK")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.Parse("Super+K")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatalf("%+v and %+v", a, b)
+	}
+}

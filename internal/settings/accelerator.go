@@ -52,6 +52,13 @@ var named = map[string]bool{
 }
 
 func keyName(key string) (string, bool) {
+	// Tauri also read W3C key codes, so a hand-edited "Super+KeyK" or
+	// "Alt+Digit1" works as the recorder's "Super+K" and "Alt+1" do.
+	if rest, ok := strings.CutPrefix(key, "Key"); ok && len(rest) == 1 {
+		key = rest
+	} else if rest, ok := strings.CutPrefix(key, "Digit"); ok && len(rest) == 1 {
+		key = rest
+	}
 	switch {
 	case len(key) == 1 && (key >= "A" && key <= "Z" || key >= "0" && key <= "9"):
 		return key, true

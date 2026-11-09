@@ -38,10 +38,13 @@ var modifierBits = map[string]engine.Modifiers{
 // Parse reads a stored shortcut, so the engine can compare two shortcuts
 // and check that one can be a hotkey.
 func (s *shortcuts) Parse(stored string) (engine.Keys, error) {
-	if _, err := settings.Accelerator(stored); err != nil {
+	accelerator, err := settings.Accelerator(stored)
+	if err != nil {
 		return engine.Keys{}, err
 	}
-	parts := strings.Split(stored, "+")
+	// The key comes from the accelerator, so two spellings of one key, as
+	// "Super+KeyK" and "Super+K", compare equal.
+	parts := strings.Split(accelerator, "+")
 	var keys engine.Keys
 	for _, part := range parts[:len(parts)-1] {
 		keys.Mods |= modifierBits[strings.ToLower(part)]
