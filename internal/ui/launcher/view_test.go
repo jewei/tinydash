@@ -757,26 +757,24 @@ func TestClearsTheHistoryFromTheClipboardTabAfterAsking(t *testing.T) {
 	}
 }
 
-func TestEscapeClosesTheMenuThenClearsTheQueryThenHides(t *testing.T) {
+// Escape closes the menu, then hides the launcher, as docs/features.md
+// says; it never clears the query.
+func TestEscapeClosesTheMenuThenHides(t *testing.T) {
 	f := newFake(always(safari))
 	m, tt := open(t, f)
 	tt.Type("saf")
 	tt.Key(ui.Cmd, ui.KeyK)
 	tt.Key(0, ui.KeyEscape)
-	if m.menu != nil || m.query != "saf" {
-		t.Fatalf("menu %v, query %q", m.menu != nil, m.query)
-	}
-	tt.Key(0, ui.KeyEscape)
-	if m.query != "" || f.hidden != 0 {
-		t.Fatalf("query %q, hidden %d", m.query, f.hidden)
+	if m.menu != nil || m.query != "saf" || f.hidden != 0 {
+		t.Fatalf("menu %v, query %q, hidden %d", m.menu != nil, m.query, f.hidden)
 	}
 	tt.KeyRepeat(0, ui.KeyEscape)
 	if f.hidden != 0 {
 		t.Fatal("a held Escape hid the launcher")
 	}
 	tt.Key(0, ui.KeyEscape)
-	if f.hidden != 1 {
-		t.Errorf("hidden %d", f.hidden)
+	if f.hidden != 1 || m.query != "saf" {
+		t.Errorf("hidden %d, query %q", f.hidden, m.query)
 	}
 }
 

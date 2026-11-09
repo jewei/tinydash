@@ -357,8 +357,8 @@ func (m *Model) enableClipboard() {
 	})
 }
 
-// escape closes what is on top: a dialog, then the menu, then the query;
-// with nothing open, it hides the panel.
+// escape closes what is on top: a dialog, then the menu; with nothing
+// open it hides the launcher with its query, as the Rust app did.
 func (m *Model) escape() {
 	switch {
 	case m.confirm != nil:
@@ -371,8 +371,6 @@ func (m *Model) escape() {
 		m.closeHotkey()
 	case m.menu != nil:
 		m.closeMenu()
-	case m.query != "":
-		m.setQuery("")
 	default:
 		m.backend.Hide()
 	}

@@ -45,7 +45,7 @@ func TestKeymap(t *testing.T) {
 		{"Mod+, opens Settings", ui.Cmd, ui.KeyComma, false, nil, func(_ *Model, f *fake) bool {
 			return len(f.runs) == 1 && f.runs[0] == ran{core.OpenSettings{}, ""}
 		}},
-		{"Escape clears the query", 0, ui.KeyEscape, false, func(m *Model) { m.setQuery("saf") }, func(m *Model, f *fake) bool { return m.query == "" && f.hidden == 0 }},
+		{"Escape hides with the query kept", 0, ui.KeyEscape, false, func(m *Model) { m.setQuery("saf") }, func(m *Model, f *fake) bool { return m.query == "saf" && f.hidden == 1 }},
 		{"Escape on an empty query hides", 0, ui.KeyEscape, false, nil, func(_ *Model, f *fake) bool { return f.hidden == 1 }},
 		{"Escape closes the menu first", 0, ui.KeyEscape, false, func(m *Model) { m.setQuery("saf"); m.openMenu() }, func(m *Model, _ *fake) bool { return m.menu == nil && m.query == "saf" }},
 	} {
