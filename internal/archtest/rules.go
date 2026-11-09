@@ -65,25 +65,32 @@ var external = map[string][]string{
 	// app; only the e2e build of internal/app links it, never a release.
 	"github.com/egoist/mygo/plugins/automation": []string{"internal/app"},
 	"github.com/ebitengine/purego/":             []string{"internal/platform"},
-	"golang.org/x/sys/":                         []string{"internal/platform"},
 	"golang.org/x/text/":                        []string{"internal/match", "internal/feature/"},
 }
 
 // pure packages get disk, network, clock, and randomness as arguments, so
 // tests control them and a search never blocks on the OS.
+// testOnly packages support tests. Only tests and each other import them,
+// so no other layer's allow list can let the app link them.
+var testOnly = []string{"internal/golden", "internal/archtest"}
+
 var pure = []string{"internal/core", "internal/match", "internal/weburl", "internal/zoneinfo", "internal/feature/", "internal/settings", "internal/search"}
 
 var impureImports = []string{"os", "os/exec", "os/signal", "os/user", "io/ioutil", "net", "net/", "syscall", "unsafe", "plugin", "crypto/rand", "math/rand", "math/rand/v2"}
 
-// impureCalls are the standard library functions, by import path, that
-// read the clock or the disk although their package does not need the OS.
-var impureCalls = []struct {
+type impureCall struct {
 	pkg, fix string
-	funcs    []string
-}{
+	funcs    []string // functions and variables
+}
+
+// impureCalls are the standard library functions and variables, by import
+// path, that read the clock or the disk although their package does not
+// need the OS.
+var impureCalls = []impureCall{
 	{"time", "take the time as an argument", []string{"Now", "Since", "Until", "Sleep", "After", "Tick", "NewTimer", "NewTicker", "AfterFunc"}},
-	// LoadLocation reads $ZONEINFO and the system's zoneinfo first.
-	{"time", "use internal/zoneinfo", []string{"LoadLocation"}},
+	// LoadLocation reads $ZONEINFO and the system's zoneinfo first, and the
+	// first use of Local reads /etc/localtime.
+	{"time", "use internal/zoneinfo", []string{"LoadLocation", "Local"}},
 	{"path/filepath", "take an fs.FS or the result as an argument", []string{"Abs", "EvalSymlinks", "Glob", "Walk", "WalkDir"}},
 	// The first call reads the system's MIME tables.
 	{"mime", "take the type as an argument", []string{"TypeByExtension", "ExtensionsByType"}},
@@ -109,7 +116,9 @@ func Check(pkgs []Package) []string {
 		}
 		for _, imp := range p.Imports {
 			if dep, ok := strings.CutPrefix(imp, module+"/"); ok {
-				if !matchesAny(dep, allow) {
+				if matchesAny(dep, testOnly) && !matchesAny(rel, testOnly) {
+					out = append(out, fmt.Sprintf("%s imports %s; only tests may", rel, dep))
+				} else if !matchesAny(dep, allow) {
 					out = append(out, fmt.Sprintf("%s imports %s; its layer allows %v", rel, dep, allow))
 				}
 				continue
@@ -156,6 +165,14 @@ func checkFiles(rel string, files map[string][]byte) []string {
 		callNames := make([]string, len(impureCalls))
 		for i, c := range impureCalls {
 			callNames[i] = importName(f, c.pkg)
+		}
+		if isPure {
+			for _, spec := range f.Imports {
+				imp := strings.Trim(spec.Path.Value, `"`)
+				if spec.Name != nil && spec.Name.Name == "." && slices.ContainsFunc(impureCalls, func(c impureCall) bool { return c.pkg == imp }) {
+					out = append(out, fmt.Sprintf("%s:%d: dot import of %s in a pure package; its clock and disk calls must stay visible", where, fset.Position(spec.Pos()).Line, imp))
+				}
+			}
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)

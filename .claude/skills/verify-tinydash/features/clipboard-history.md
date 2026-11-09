@@ -25,6 +25,7 @@ Preconditions:
 
 - **Open the tab.** Run `$V auto press "$($V ref '[tab] "Clipboard"')" --settle`. The diff shows `[tab] "Clipboard" checked`, `[heading] "Clipboard history is off"`, and `[button] "Turn On Clipboard History"`. Run `$V evidence clip-0-off`.
 - **Turn it on.** Run `$V auto press "$($V ref '"Turn On Clipboard History"')"`. Then run `$V box 'grep clipboardHistoryEnabled /scratch/data/settings.json' | tee .local/verify/runs/$TD_RUN/clip-1-settings.txt`. It prints `"clipboardHistoryEnabled": true,`.
+- **Wait one capture tick.** Run `sleep 1` (on the Mac, not in the box). On Linux the first read after Turn On is the baseline: the monitor takes it as seen and does not save it.
 - **Copy in another app.** Run `$V box 'printf "verify clip 7f3a" | xclip -selection clipboard -i'`. xclip is another X client, as a text editor would be.
 - **See it captured.** Run `$V auto wait --text "verify clip 7f3a" --timeout 5s`. It prints `ok`. Then run `$V auto snapshot` and `$V evidence clip-2-captured`. The list shows `[listItem] "verify clip 7f3a" key=clip:<n>` with `Text · Just now`.
 - **Side effect: stored.** Run `$V sql 'select kind, title, content from clipboard' | tee .local/verify/runs/$TD_RUN/clip-2-rows.sql.txt`. The output has `text|verify clip 7f3a|verify clip 7f3a`.
@@ -33,8 +34,9 @@ Preconditions:
 ## Gotchas
 
 - The search text filters the Clipboard tab too. With a leftover query, a capture is stored but the tab shows `No results`. Empty the field first.
+- On Linux the first clipboard read after Turn On is a baseline, not a capture. A copy made before that tick (about 1 s, two 500 ms polls) becomes the baseline and never appears. Wait about 1 s after Turn On before the copy.
 - The press on `Turn On Clipboard History` returns `(no changes)` with `--settle`: the setting is saved on a goroutine, and the view draws afterwards. Wait for the captured text, not for the diff.
-- When history turns on, the text that is already on the clipboard (for example `96` from the calculator journey) is captured too. Count rows from a fresh box.
+- Count rows from a fresh box: other journeys add rows and usage.
 - The selection stays on the row it was on when a new capture arrives (it is kept by ID). The newest row is first, but it is not always `checked`.
 - The monitor polls every 500 ms and compares the text. Two copies of the same text make one row.
 - On Linux, images and copied files are never kept (`RichClipboard = false`). Do not try to prove them here.

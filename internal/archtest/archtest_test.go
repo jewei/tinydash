@@ -64,6 +64,10 @@ func TestEachRuleCanFail(t *testing.T) {
 		{"mime table in a pure package", Package{Path: module + "/internal/feature/files", Files: file("package files\n\nimport \"mime\"\n\nvar t = mime.TypeByExtension(\".txt\")\n")}, "mime.TypeByExtension in a pure package"},
 		{"user account in a pure package", Package{Path: module + "/internal/core", Imports: []string{"os/user"}}, "imports os/user; pure packages"},
 		{"ioutil in a pure package", Package{Path: module + "/internal/match", Imports: []string{"io/ioutil"}}, "imports io/ioutil; pure packages"},
+		{"dot import of time in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport . \"time\"\n\nvar now = Now()\n")}, "dot import of time in a pure package"},
+		{"local zone in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport \"time\"\n\nvar here = time.Local\n")}, "time.Local in a pure package"},
+		{"app imports golden", Package{Path: module + "/internal/app", Imports: []string{module + "/internal/golden"}}, "imports internal/golden; only tests may"},
+		{"engine imports archtest", Package{Path: module + "/internal/engine", Imports: []string{module + "/internal/archtest"}}, "imports internal/archtest"},
 		{"runtime.GOOS outside platform", Package{Path: module + "/internal/engine", Files: file("package engine\n\nimport \"runtime\"\n\nvar mac = runtime.GOOS == \"darwin\"\n")}, "runtime.GOOS outside"},
 	}
 	for _, c := range cases {

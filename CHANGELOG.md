@@ -22,7 +22,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Snippet expansion as you type.
 - The Up Next, Weather, Focus timer, Notepad, and clipboard card widgets. Clocks and Disk space stay.
 - Shell commands (`>`) and the file permissions answer (`chmod 755`).
-- Update checks and installs. TinyDash no longer connects to GitHub.
+- Update checks and installs. The packaged app no longer connects to GitHub. (A run from source downloads the SQLite library from GitHub once.)
 - The Privacy and About sections of Settings.
 - Hyperbolic functions in the calculator, such as `sinh(40)`.
 

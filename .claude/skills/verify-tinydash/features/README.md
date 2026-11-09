@@ -17,7 +17,7 @@ This folder is the maintained source for verifying what a user does in the TinyD
 - Prefer result-row keys (`key=file:/root/…`) and labels (`[tab] "Clipboard"`) over refs. Refs change when an overlay opens or closes, so take them from the latest diff, or run `$V ref '<text>'`.
 - Type with `$V auto type` and press keys with `$V auto key`, as the user does. Use `press` only for buttons and tabs that the user clicks.
 - Run X-level actions (the global shortcut, a copy by another app) only through `$V box`. They reach the container's display `:99`.
-- Wait for state (`wait --text`, `wait --gone`, `--settle`), never a fixed sleep. The one exception is the X shortcut, which has no automation event: poll `$V auto windows`.
+- Wait for state (`wait --text`, `wait --gone`, `--settle`), never a fixed sleep. The exceptions are the timing windows that the app has on purpose: wait 1 s after Turn On Clipboard History (Linux baseline read) and 0.5 s after a shortcut hide (`blurWithin`). The X shortcut has no automation event: poll `$V auto windows`.
 
 ## Proof and skip reporting
 
@@ -45,4 +45,8 @@ Each feature file starts with an H1 title and one paragraph about the user-visib
 
 ## Known app failures
 
-None. The two this skill found on 2026-11-09 (the shortcut that did not hide a focused panel on X11, and a Quit that only hid the panel) are fixed; their journeys pass (run `fix-shortcut`).
+None. The two this skill found on 2026-11-09 (the shortcut that did not hide a focused panel on X11, and a Quit that only hid the panel) are fixed.
+
+## Last full run
+
+On 2026-11-09, at build `v0.2.0-822-g050947908c40`, all five journeys passed as written, each in a fresh box. The evidence is in `.local/verify/runs/`: `r2docs-search`, `r2docs-calc`, `r2docs-clip`, `r2docs-shortcut`, and `r2docs-alias`.
