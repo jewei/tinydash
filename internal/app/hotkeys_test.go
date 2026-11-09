@@ -60,6 +60,8 @@ func TestAHotkeySyncedWhilePausedIsStillCheckedWithTheOS(t *testing.T) {
 	if held := os.held(); len(held) != 0 {
 		t.Errorf("held %v during the pause", held)
 	}
+	// The engine saves no refused hotkey: it syncs back without it.
+	s.sync(search.NewHotkeys(map[core.ID]string{safari: "Alt+S"}))
 	if err := s.pause(false); err != nil {
 		t.Fatal(err)
 	}
@@ -86,34 +88,56 @@ func TestResumingSaysWhichKeysTheOSRefused(t *testing.T) {
 	}
 }
 
-// Keys that another app took during a pause are refused as it ends. When
-// the other app lets them go, the next sync registers them again: the
-// registry keeps only keys that the OS accepted, as the Rust app's did.
-func TestKeysRefusedAtResumeAreTriedAgainByTheNextSync(t *testing.T) {
-	os := newFakeRegistry()
-	s := &shortcuts{os: os, toggle: func() {}, run: func(core.ID) {}}
-	notes := core.ID("app:notes")
-	wanted := search.NewHotkeys(map[core.ID]string{notes: "Alt+N"})
-	if failed := s.sync(wanted); len(failed) != 0 {
-		t.Fatal(failed)
+// Keys that the OS refused, at startup or as a pause ends, stay saved. When
+// the other app lets them go, the next resume registers them again, as the
+// Rust registry did: re-recording the same keys in Settings only resumes,
+// because nothing changed.
+func TestRefusedKeysAreTriedAgainByTheNextResume(t *testing.T) {
+	for _, at := range []string{"startup", "resume"} {
+		os := newFakeRegistry()
+		s := &shortcuts{os: os, toggle: func() {}, run: func(core.ID) {}}
+		notes := core.ID("app:notes")
+		wanted := search.NewHotkeys(map[core.ID]string{notes: "Alt+N"})
+		if at == "startup" {
+			os.taken["Alt+N"], os.taken["Control+Shift+Space"] = true, true
+		}
+		s.sync(wanted)
+		s.setLauncher("Control+Shift+Space", "Control+Shift+Space")
+		if at == "resume" {
+			s.pause(true)
+			os.taken["Alt+N"], os.taken["Control+Shift+Space"] = true, true
+			if err := s.pause(false); err == nil {
+				t.Fatal("resuming with taken keys gave no error")
+			}
+		}
+		if held := os.held(); len(held) != 0 {
+			t.Fatalf("%s: held %v while the keys were taken", at, held)
+		}
+		delete(os.taken, "Alt+N")
+		delete(os.taken, "Control+Shift+Space")
+		s.pause(true)
+		if err := s.pause(false); err != nil {
+			t.Fatalf("%s: resuming with free keys: %v", at, err)
+		}
+		if held := os.held(); !slices.Equal(held, []string{"Alt+N", "Control+Shift+Space"}) {
+			t.Errorf("%s: held %v, want the hotkey and the launcher shortcut", at, held)
+		}
 	}
-	if err := s.setLauncher("Control+Shift+Space", "Control+Shift+Space"); err != nil {
-		t.Fatal(err)
-	}
-	s.pause(true)
-	os.taken["Alt+N"], os.taken["Control+Shift+Space"] = true, true
-	if err := s.pause(false); err == nil {
-		t.Fatal("resuming with taken keys gave no error")
+}
+
+// A sync with the same hotkeys tries a refused one again.
+func TestRefusedHotkeysAreTriedAgainByTheNextSync(t *testing.T) {
+	os := newFakeRegistry("Alt+N")
+	s := &shortcuts{os: os, run: func(core.ID) {}}
+	wanted := search.NewHotkeys(map[core.ID]string{"app:notes": "Alt+N"})
+	if failed := s.sync(wanted); len(failed) != 1 {
+		t.Fatalf("failed %v, want Alt+N", failed)
 	}
 	delete(os.taken, "Alt+N")
-	delete(os.taken, "Control+Shift+Space")
 	if failed := s.sync(wanted); len(failed) != 0 {
 		t.Fatalf("failed %v once the keys were free", failed)
 	}
-	if err := s.setLauncher("Control+Shift+Space", "Control+Shift+Space"); err != nil {
-		t.Fatal(err)
-	}
-	if held := os.held(); !slices.Equal(held, []string{"Alt+N", "Control+Shift+Space"}) {
-		t.Errorf("held %v, want the hotkey and the launcher shortcut", held)
+	if held := os.held(); !slices.Equal(held, []string{"Alt+N"}) {
+		t.Errorf("held %v", held)
 	}
 }
