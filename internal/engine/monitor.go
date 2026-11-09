@@ -9,9 +9,9 @@ type Monitor struct {
 	// count is the OS clipboard change counter; ok is false where the OS
 	// has none, and the monitor compares the content instead.
 	count func() (n uint64, ok bool)
-	// read returns the clipboard content; ok is false when it holds
-	// nothing to keep, such as a password manager's secret.
-	read func() (content clipboard.Content, ok bool)
+	// read returns the clipboard content, and whether the read found
+	// content to keep, nothing to keep, or failed.
+	read func() (clipboard.Content, clipboard.Read)
 
 	seen     uint64
 	seenHash int64
@@ -25,7 +25,7 @@ type Monitor struct {
 
 // NewMonitor returns a monitor that takes what is on the clipboard now as
 // already seen, so starting TinyDash does not save it.
-func NewMonitor(e *Engine, count func() (uint64, bool), read func() (clipboard.Content, bool)) *Monitor {
+func NewMonitor(e *Engine, count func() (uint64, bool), read func() (clipboard.Content, clipboard.Read)) *Monitor {
 	return &Monitor{engine: e, count: count, read: read}
 }
 
@@ -63,7 +63,7 @@ func (m *Monitor) Tick(now int64) <-chan error {
 		return nil
 	}
 	m.rebase = false
-	content, ok := m.read()
+	content, got := m.read()
 	// A copy made during the read means the content may be newer than the
 	// counter this tick saw. Keep neither: the next tick sees the new count
 	// and reads again, so a saved read always matches its count, and a copy
@@ -73,8 +73,13 @@ func (m *Monitor) Tick(now int64) <-chan error {
 	}
 	// Nothing to keep, or the read failed. Keep what was seen: where the OS
 	// has no counter, forgetting it would make the unchanged text look new
-	// at the next tick, and a cleared copy would come back.
-	if !ok {
+	// at the next tick, and a cleared copy would come back. A first look
+	// that failed saw nothing, so there the next read that works is the
+	// baseline; with a counter, this tick took the change as seen.
+	if got != clipboard.ReadContent {
+		if got == clipboard.ReadFailed && first && !counted {
+			m.rebase = true
+		}
 		return nil
 	}
 	hash := content.Hash()

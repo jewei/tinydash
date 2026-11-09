@@ -439,7 +439,7 @@ func (a *App) capture() clipboard.Capture {
 
 // watchClipboard saves what the user copies, twice a second.
 func (a *App) watchClipboard() {
-	monitor := engine.NewMonitor(a.engine, a.desktop.clip.Count, a.desktop.clip.Read)
+	monitor := engine.NewMonitor(a.engine, a.desktop.clip.Count, a.desktop.clip.Capture)
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 	for {

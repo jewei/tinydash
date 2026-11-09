@@ -18,15 +18,18 @@ type fakeClipboard struct {
 
 func (f *fakeClipboard) copy(text string)      { f.text, f.changes = text, f.changes+1 }
 func (f *fakeClipboard) count() (uint64, bool) { return f.changes, f.counted }
-func (f *fakeClipboard) read() (clipboard.Content, bool) {
+func (f *fakeClipboard) read() (clipboard.Content, clipboard.Read) {
 	if f.onRead != nil {
 		f.onRead()
 	}
 	if f.fail > 0 {
 		f.fail--
-		return clipboard.Content{}, false
+		return clipboard.Content{}, clipboard.ReadFailed
 	}
-	return clipboard.Text(f.text), f.text != ""
+	if f.text == "" {
+		return clipboard.Content{}, clipboard.ReadNothing
+	}
+	return clipboard.Text(f.text), clipboard.ReadContent
 }
 
 func tick(t *testing.T, m *Monitor, now int64) {
@@ -242,6 +245,54 @@ func TestAFailedReadDoesNotBringAClearedCopyBack(t *testing.T) {
 		tick(t, m, 4)
 		if n := clips(t, e); n != 0 {
 			t.Fatalf("counted %v: %d clips: a failed read brought the cleared copy back", counted, n)
+		}
+	}
+}
+
+// A first look whose read fails takes nothing as seen: the next read that
+// works is the baseline. Else on Linux the content at startup, or a copy
+// made while history was off, would be saved by the next tick.
+func TestAFailedFirstLookKeepsTheBaselinePending(t *testing.T) {
+	for _, counted := range []bool{true, false} {
+		e, _ := start(t)
+		cb := &fakeClipboard{text: "there at startup", counted: counted, fail: 1}
+		m := NewMonitor(e, cb.count, cb.read)
+		tick(t, m, 1)
+		tick(t, m, 2)
+		if n := clips(t, e); n != 0 {
+			t.Errorf("counted %v: %d clips: the content at startup was saved", counted, n)
+		}
+
+		e, _ = start(t)
+		cb = &fakeClipboard{text: "before", counted: counted}
+		m = NewMonitor(e, cb.count, cb.read)
+		tick(t, m, 1)
+		setHistory(t, e, false)
+		tick(t, m, 2)
+		cb.copy("copied while off")
+		tick(t, m, 3)
+		setHistory(t, e, true)
+		cb.fail = 1
+		tick(t, m, 4)
+		tick(t, m, 5)
+		if n := clips(t, e); n != 0 {
+			t.Errorf("counted %v: %d clips: a copy made while history was off was saved", counted, n)
+		}
+	}
+}
+
+// An empty clipboard at startup is a baseline like any other: the first
+// copy after it is saved.
+func TestTheFirstCopyAfterAnEmptyStartIsSaved(t *testing.T) {
+	for _, counted := range []bool{true, false} {
+		e, _ := start(t)
+		cb := &fakeClipboard{counted: counted}
+		m := NewMonitor(e, cb.count, cb.read)
+		tick(t, m, 1)
+		cb.copy("first copy")
+		tick(t, m, 2)
+		if n := clips(t, e); n != 1 {
+			t.Errorf("counted %v: %d clips, want the first copy", counted, n)
 		}
 	}
 }

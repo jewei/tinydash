@@ -36,6 +36,20 @@ const (
 	KindFiles Kind = "files"
 )
 
+// Read is what one read of the clipboard found.
+type Read int
+
+const (
+	// ReadNothing: nothing to keep, such as an empty clipboard, a copy that
+	// its source marked secret, a kind the user did not opt into, or
+	// content over the limits.
+	ReadNothing Read = iota
+	// ReadContent: content to keep.
+	ReadContent
+	// ReadFailed: the read failed, so the clipboard may hold anything.
+	ReadFailed
+)
+
 // Content is what the clipboard held at capture time. Only the fields of its
 // Kind are set.
 type Content struct {

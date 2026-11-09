@@ -333,3 +333,27 @@ func TestAnEmptyClipboardHoldsNothing(t *testing.T) {
 		t.Errorf("Read() = %+v", got)
 	}
 }
+
+// Capture tells a failed read from one that found nothing to keep: after a
+// failed first look, the monitor's next read that works is the baseline.
+func TestCaptureTellsAFailedReadFromNothingToKeep(t *testing.T) {
+	f := newFake(t)
+	f.copy(macText, textRep("hello"))
+	f.readErr = []transfer.Format{transfer.Text}
+	if _, got := f.reader(true, all).Capture(); got != clipboard.ReadFailed {
+		t.Errorf("a busy clipboard: %v, want ReadFailed", got)
+	}
+	f.readErr = nil
+	if _, got := f.reader(true, all).Capture(); got != clipboard.ReadContent {
+		t.Errorf("text: %v, want ReadContent", got)
+	}
+	marker := clipboard.MarkerFormats()[0]
+	f.copy(append(slices.Clone(macText), marker), textRep("hunter2"), formatRep(marker, nil))
+	if _, got := f.reader(true, all).Capture(); got != clipboard.ReadNothing {
+		t.Errorf("a copy marked secret: %v, want ReadNothing", got)
+	}
+	f.copy(nil)
+	if _, got := f.reader(true, all).Capture(); got != clipboard.ReadNothing {
+		t.Errorf("an empty clipboard: %v, want ReadNothing", got)
+	}
+}
