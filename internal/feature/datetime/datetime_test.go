@@ -215,6 +215,10 @@ func TestParsesClocks(t *testing.T) {
 		{[]string{"10"}, 0, 0, 0, false},
 		{[]string{"24:00"}, 0, 0, 0, false},
 		{[]string{"9:5"}, 0, 0, 0, false},
+		// An hour past 32 bits must not wrap to a small or negative int.
+		{[]string{"4294967295:00"}, 0, 0, 0, false},
+		{[]string{"4294967307pm"}, 0, 0, 0, false},
+		{[]string{"99999999999:00"}, 0, 0, 0, false},
 	} {
 		hour, minute, used, ok := clock(c.words)
 		if hour != c.hour || minute != c.minute || used != c.used || ok != c.ok {

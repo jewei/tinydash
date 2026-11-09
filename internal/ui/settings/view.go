@@ -144,8 +144,9 @@ func (m *Model) search(c *ui.Context, p kit.Palette, v settings.Settings) {
 	m.toggle(c, p, "Currency rates", "Off until you turn it on. Downloads the daily ECB rate table; your amounts stay on this computer. Turning it off deletes the saved rates.",
 		v.CurrencyRatesEnabled, func(s *settings.Settings, on bool) { s.CurrencyRatesEnabled = on })
 	m.choice(c, p, "Emoji skin tone", "", skinTones, strconv.Itoa(int(v.EmojiSkinTone)), func(s *settings.Settings, value string) {
-		n, _ := strconv.Atoi(value)
-		s.EmojiSkinTone = uint8(n)
+		if tone, ok := skinTone(value); ok {
+			s.EmojiSkinTone = tone
+		}
 	})
 
 	heading(c, p, "Emoji keywords")
@@ -244,6 +245,13 @@ func (m *Model) toggle(c *ui.Context, p kit.Palette, label, description string, 
 			m.save(func(s *settings.Settings) { set(s, on) }, nil)
 		}
 	})
+}
+
+// skinTone reads a skin tone option. A value that does not fit a uint8 is
+// not a tone, and must not wrap to one.
+func skinTone(value string) (uint8, bool) {
+	n, err := strconv.ParseUint(value, 10, 8)
+	return uint8(n), err == nil
 }
 
 func (m *Model) choice(c *ui.Context, p kit.Palette, label, description string, options []option, value string, set func(*settings.Settings, string)) {
