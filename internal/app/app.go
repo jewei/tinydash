@@ -6,7 +6,6 @@ package app
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -65,6 +64,7 @@ type App struct {
 	files    *engine.Slot
 	icons    iconCache
 	tray     *mygo.Tray
+	settings *settingsWindow
 	mu       sync.Mutex
 	builtAt  map[*engine.Slot]time.Time
 	warnings []string
@@ -138,7 +138,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	for id, err := range a.keys.Sync(first.Hotkeys) {
 		a.warn(engine.HotkeyOff(&first, id, err))
 	}
-	a.setTray(s.ShowTrayIcon)
+	a.warn(a.setTray(s.ShowTrayIcon))
 	go a.watchClipboard()
 	if !opts.Hidden {
 		a.Show()
@@ -161,10 +161,14 @@ func (a *App) warn(message any) {
 	}
 }
 
-// dataChanged runs on the writer after each change: the view searches again.
+// dataChanged runs on the writer after each change: the view searches
+// again, and Settings reads the data again.
 func (a *App) dataChanged() {
 	if a.panel != nil {
-		a.panel.Update(a.model.Stale)
+		a.panel.Update(func() {
+			a.model.Stale()
+			a.settingsChanged()
+		})
 	}
 }
 
@@ -287,21 +291,22 @@ func (a *App) refreshRates(force bool) {
 	<-a.engine.SetRates(rates)
 }
 
-func (a *App) setTray(visible bool) {
+// setTray shows or removes the tray icon. Start calls it before Settings
+// can open, and then only the writer does, so calls never overlap.
+func (a *App) setTray(visible bool) error {
 	if !visible {
 		if a.tray != nil {
 			a.tray.Destroy()
 			a.tray = nil
 		}
-		return
+		return nil
 	}
 	if a.tray != nil {
-		return
+		return nil
 	}
 	tray, err := mygo.NewTray(mygo.TrayOptions{ID: "tinydash", Icon: trayIcon(), IconIsTemplate: templateTrayIcon, ToolTip: "TinyDash"})
 	if err != nil {
-		a.warn(fmt.Sprintf("The tray icon is unavailable: %v. Open TinyDash with its shortcut instead.", err))
-		return
+		return fmt.Errorf("The tray icon is unavailable: %v. Open TinyDash with its shortcut instead.", err)
 	}
 	tray.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Open TinyDash", Click: func(*mygo.MenuItem, *mygo.Window) { a.Show() }},
@@ -309,6 +314,7 @@ func (a *App) setTray(visible bool) {
 		{Label: "Quit TinyDash", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
 	}))
 	a.tray = tray
+	return nil
 }
 
 // restrictToOwner keeps tinydash.db, which can hold private clipboard text,
@@ -376,9 +382,7 @@ func (s *appShell) ShowAgain() error {
 
 func (s *appShell) ShowHUD(text string) { slog.Info(text) }
 
-func (s *appShell) OpenSettings() error {
-	return errors.New("The settings window is not in this build yet. Edit settings.json while TinyDash is closed.")
-}
+func (s *appShell) OpenSettings() error { return s.app().openSettings() }
 
 func (s *appShell) CenterLauncher() error {
 	return <-s.app().engine.UpdateSettings(s.app().file, func(st *settings.Settings) { st.LauncherPosition = nil })

@@ -101,12 +101,14 @@ func (s *shortcuts) SetLauncher(stored string) error {
 		mygo.GlobalShortcut.Unregister(s.launcher)
 	}
 	s.launcher = ""
-	if s.paused {
-		s.launcher = accelerator
-		return nil
-	}
 	if err := mygo.GlobalShortcut.Register(accelerator, s.toggle); err != nil {
 		return fmt.Errorf("TinyDash could not use %s to open the launcher: %v. Choose another shortcut in Settings.", stored, err)
+	}
+	// Settings saves a new shortcut while the shortcuts pause to record
+	// it. Registering checked that another app does not hold the keys;
+	// they stay off until the pause ends.
+	if s.paused {
+		mygo.GlobalShortcut.Unregister(accelerator)
 	}
 	s.launcher = accelerator
 	return nil
