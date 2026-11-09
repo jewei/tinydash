@@ -34,9 +34,9 @@ var Dark = Palette{
 }
 
 // Themed sets the frame's theme to the palette of the Appearance setting,
-// or of the desktop's appearance for Match System, keeping the desktop's
-// other settings (text size, contrast), and returns the palette for the
-// view's own elements.
+// or of the desktop's appearance for Match System, and to TextFont,
+// keeping the desktop's other settings (text size, contrast), and returns
+// the palette for the view's own elements.
 func Themed(c *ui.Context, theme settings.Theme) Palette {
 	t := *c.Theme()
 	t.Dark = theme == settings.ThemeDark || theme != settings.ThemeLight && t.Dark
@@ -50,6 +50,7 @@ func Themed(c *ui.Context, theme settings.Theme) Palette {
 	t.InactiveAccent = p.Accent
 	t.Danger, t.Focus, t.Selection = p.Danger, p.Accent, p.Selected
 	t.Radius = 10
+	t.Font = TextFont
 	c.SetTheme(&t)
 	return p
 }

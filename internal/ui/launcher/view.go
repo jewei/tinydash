@@ -193,7 +193,7 @@ func (m *Model) emptyResults(c *ui.Context, p kit.Palette) {
 
 func empty(c *ui.Context, p kit.Palette, title string, children func()) {
 	ui.Column(c).Grow(1).Padding(24).Gap(12).Justify(ui.Center).Children(func() {
-		ui.Text(c, title).FontSize(24).TextColor(p.Ink).Role(ui.RoleHeading)
+		ui.Text(c, title).Font(kit.DisplayFont).FontSize(24).TextColor(p.Ink).Role(ui.RoleHeading)
 		children()
 	})
 }

@@ -44,7 +44,7 @@ func (m *Model) View(c *ui.Context) {
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Background(p.Paper).Children(func() {
 		m.sidebar(c, p)
 		ui.Scroll(c).Grow(1).Padding(24, 32).Gap(12).Children(func() {
-			ui.Text(c, string(m.section)).FontSize(24).FontWeight(700).TextColor(p.Ink).Role(ui.RoleHeading)
+			ui.Text(c, string(m.section)).Font(kit.DisplayFont).FontSize(24).TextColor(p.Ink).Role(ui.RoleHeading)
 			if m.err != "" {
 				ui.Text(c, m.err).TextColor(p.Danger).Role(ui.RoleAlert)
 			}

@@ -42,7 +42,7 @@ func clocks(c *ui.Context, p kit.Palette, now time.Time, cities []City) {
 	card(c, p, "Clocks", func() {
 		if len(cities) == 0 {
 			ui.Row(c).AlignItems(ui.End).Justify(ui.SpaceBetween).Gap(12).Children(func() {
-				ui.Text(c, now.Format("15:04")).FontSize(46).TextColor(p.Ink).FontFeatures("tnum")
+				ui.Text(c, now.Format("15:04")).Font(kit.DisplayFont).FontSize(46).TextColor(p.Ink).FontFeatures("tnum")
 				ui.Column(c).AlignItems(ui.End).Children(func() {
 					ui.Text(c, now.Format("Monday")).FontWeight(600).TextColor(p.Ink)
 					ui.Text(c, now.Format("2 January 2006")).FontSize(12).TextColor(p.Muted)
@@ -52,7 +52,7 @@ func clocks(c *ui.Context, p kit.Palette, now time.Time, cities []City) {
 		}
 		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 			ui.Column(c).Gap(4).Padding(0, 12, 0, 0).BorderWidth(0, 1, 0, 0).BorderColor(p.Rule).Children(func() {
-				ui.Text(c, now.Format("15:04")).FontSize(30).TextColor(p.Ink).FontFeatures("tnum")
+				ui.Text(c, now.Format("15:04")).Font(kit.DisplayFont).FontSize(30).TextColor(p.Ink).FontFeatures("tnum")
 				ui.Text(c, now.Format("Mon 2 Jan")).FontSize(12).TextColor(p.Muted)
 			})
 			ui.Row(c).Grow(1).Gap(8).Children(func() {
