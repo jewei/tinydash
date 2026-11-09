@@ -59,12 +59,17 @@ func (e *Engine) settingsChange(file SettingsFile, change func(*settings.Setting
 			e.clipEpoch.Add(1)
 		}
 		ctx := context.Background()
-		if old.ClipboardHistoryLimit != updated.ClipboardHistoryLimit && updated.ClipboardHistoryEnabled {
-			if err := db.TrimClipboard(ctx, updated.ClipboardHistoryLimit); err != nil {
-				return err
+		// A lower limit applies at once, also while history is off, so the
+		// entries that it saved do not come back over the limit. The
+		// settings are saved: a failed trim is retried by the next save of
+		// a copy.
+		if updated.ClipboardHistoryLimit < old.ClipboardHistoryLimit {
+			err := db.TrimClipboard(ctx, updated.ClipboardHistoryLimit)
+			if err == nil {
+				err = reloadClips(ctx, next, db)
 			}
-			if err := reloadClips(ctx, next, db); err != nil {
-				return err
+			if err != nil {
+				slog.Warn("Could not remove old clipboard entries", "error", err)
 			}
 		}
 		if !slices.Equal(old.EmojiLanguages, updated.EmojiLanguages) {
