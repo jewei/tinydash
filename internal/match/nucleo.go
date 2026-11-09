@@ -1,5 +1,7 @@
 package match
 
+import "slices"
+
 // The scoring of nucleo-matcher 0.3.1 for the calls TinyDash makes: one atom
 // per query word, case ignored, Smart normalization, the default
 // configuration, and the fuzzy or substring kind. It keeps nucleo's quirks,
@@ -344,7 +346,7 @@ func (a atom) substringASCII(hay text) (uint16, bool) {
 func occurrences(h, n []rune) []int {
 	var out []int
 	for i := 0; i+len(n) <= len(h); {
-		if string(h[i:i+len(n)]) == string(n) {
+		if slices.Equal(h[i:i+len(n)], n) {
 			out = append(out, i)
 			i += len(n)
 			continue
