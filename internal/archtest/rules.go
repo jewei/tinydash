@@ -35,7 +35,8 @@ var layers = []struct {
 	{"internal/core", nil},
 	{"internal/golden", []string{"internal/core"}}, // test support: tests import it, the app never does
 	{"internal/match", []string{"internal/core"}},
-	{"internal/feature/", []string{"internal/core", "internal/match"}},
+	{"internal/weburl", nil}, // one WHATWG URL parser for the features that read web URLs
+	{"internal/feature/", []string{"internal/core", "internal/match", "internal/weburl"}},
 	{"internal/settings", []string{"internal/core"}},
 	{"internal/search", []string{"internal/core", "internal/match", "internal/feature/", "internal/settings"}},
 	{"internal/store", []string{"internal/core", "internal/feature/"}},
@@ -64,7 +65,7 @@ var external = map[string][]string{
 
 // pure packages get disk, network, clock, and randomness as arguments, so
 // tests control them and a search never blocks on the OS.
-var pure = []string{"internal/core", "internal/match", "internal/feature/", "internal/settings", "internal/search"}
+var pure = []string{"internal/core", "internal/match", "internal/weburl", "internal/feature/", "internal/settings", "internal/search"}
 
 var impureImports = []string{"os", "os/exec", "os/signal", "net", "net/", "syscall", "unsafe", "plugin", "crypto/rand", "math/rand", "math/rand/v2"}
 

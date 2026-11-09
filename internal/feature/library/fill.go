@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/jewei/tinydash/internal/weburl"
 )
 
 // Target is where a quicklink goes once its placeholders are filled:
@@ -24,7 +26,7 @@ func QuicklinkTarget(template, query string, now time.Time, home string, clipboa
 	lower := strings.ToLower(template)
 	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "mailto:") {
 		url, _ := fill(template, query, now, clipboard, func(value string) (string, error) { return encode(value), nil })
-		if err := checkURL(url); err != nil {
+		if err := weburl.Check(url); err != nil {
 			return Target{}, fmt.Errorf("Invalid quicklink URL: %w", err)
 		}
 		return Target{URL: url}, nil

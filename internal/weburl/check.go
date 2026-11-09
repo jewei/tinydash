@@ -1,4 +1,4 @@
-package library
+package weburl
 
 import (
 	"errors"
@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-// checkURL refuses a filled http, https, or mailto URL that a browser could
+// Check refuses a filled http, https, or mailto URL that a browser could
 // not open, with the WHATWG URL Standard's reasons, as the Rust app's url
 // crate did. Only the host and port can fail: a browser encodes anything
 // else. Unicode hosts pass unchecked.
-func checkURL(url string) error {
+func Check(url string) error {
 	// Browsers drop tabs and newlines anywhere, and spaces and controls at
 	// either end.
 	url = strings.Map(func(r rune) rune {
@@ -37,7 +37,7 @@ func checkURL(url string) error {
 	host, port := authority, ""
 	if strings.HasPrefix(authority, "[") {
 		end := strings.IndexByte(authority, ']')
-		if end < 0 || strings.Trim(authority[1:end], "0123456789abcdefABCDEF:.") != "" || end == 1 {
+		if end < 0 || !ipv6Chars(authority[1:end]) || end == 1 {
 			return errors.New("invalid IPv6 address")
 		}
 		host, port = authority[:end+1], authority[end+1:]
@@ -51,21 +51,14 @@ func checkURL(url string) error {
 	if host == "" {
 		return errors.New("empty host")
 	}
-	if port != "" {
-		if strings.Trim(port, "0123456789") != "" {
-			return errors.New("invalid port number")
-		}
-		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
-			return errors.New("invalid port number")
-		}
+	if _, ok := parsePort(port); port != "" && !ok {
+		return errors.New("invalid port number")
 	}
 	if strings.HasPrefix(host, "[") {
 		return nil
 	}
 	host = percentDecode(host)
-	if strings.ContainsFunc(host, func(r rune) bool {
-		return r <= ' ' || r == 0x7f || strings.ContainsRune(`#%/:<>?@[\]^|`, r)
-	}) {
+	if strings.ContainsFunc(host, forbiddenHost) {
 		return errors.New("invalid domain character")
 	}
 	if endsInNumber(host) && !ipv4(host) {
