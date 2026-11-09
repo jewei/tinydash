@@ -130,16 +130,23 @@ func noticeBar(c *ui.Context, p kit.Palette, text string, dismiss func()) {
 	})
 }
 
-// body shows the results, and the widget pane beside them while it shows.
+// body shows the results, and beside them the widget pane on an empty All
+// search, or else the selected result's details.
 func (m *Model) body(c *ui.Context, p kit.Palette) {
-	if !m.showsWidgets() {
+	m.loadDetails()
+	widgets, details := m.showsWidgets(), m.showsDetails()
+	if !widgets && !details {
 		m.resultsView(c, p)
 		return
 	}
 	// The Solid app split the body 11 to 9 between the results and the pane.
 	ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
 		ui.Column(c).Grow(11).Children(func() { m.resultsView(c, p) })
-		m.widgetPane(c, p)
+		if widgets {
+			m.widgetPane(c, p)
+		} else {
+			m.detailsPane(c, p)
+		}
 	})
 }
 
@@ -219,7 +226,7 @@ func (m *Model) row(c *ui.Context, p kit.Palette, r core.Result, i int) {
 		title = p.SelectedInk
 	}
 	row.Children(func() {
-		m.icon(c, p, r)
+		m.icon(c, p, r, 32)
 		ui.Column(c).Grow(1).Gap(1).Children(func() {
 			t := ui.Text(c, r.Title).TextColor(title).SingleLine()
 			if chosen {
@@ -264,27 +271,29 @@ func (m *Model) row(c *ui.Context, p kit.Palette, r core.Result, i int) {
 	}
 }
 
-// icon is a file's system icon, an emoji, a color swatch, or a glyph.
-func (m *Model) icon(c *ui.Context, p kit.Palette, r core.Result) {
-	ui.Row(c).Size(32, 32).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
+// icon is a file's system icon, an emoji, a color swatch, or a glyph, in a
+// square of size: 32 on a row, 56 in the details.
+func (m *Model) icon(c *ui.Context, p kit.Palette, r core.Result, size float32) {
+	scale := size / 32
+	ui.Row(c).Size(size, size).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
 		if r.Icon.File != "" {
 			if b := m.backend.FileIcon(r.Icon.File); b != nil {
-				ui.Image(c, b).Size(32, 32)
+				ui.Image(c, b).Size(size, size)
 				return
 			}
 		}
 		switch {
 		case r.Icon.Emoji != "":
-			ui.Text(c, r.Icon.Emoji).FontSize(26)
+			ui.Text(c, r.Icon.Emoji).FontSize(26 * scale)
 		case r.Icon.Color != "":
-			ui.Box(c).Size(24, 24).Radius(6).Background(ui.Hex(r.Icon.Color)).Border(1, p.Border)
+			ui.Box(c).Size(24*scale, 24*scale).Radius(6*scale).Background(ui.Hex(r.Icon.Color)).Border(1, p.Border)
 		default:
 			name := string(r.Icon.Symbol)
 			if glyphs[name] == nil {
 				name = kinds[r.Kind].glyph
 			}
 			if svg := glyphs[name]; svg != nil {
-				ui.Icon(c, svg).FontSize(19).TextColor(p.Muted)
+				ui.Icon(c, svg).FontSize(19 * scale).TextColor(p.Muted)
 			}
 		}
 	})

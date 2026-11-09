@@ -192,7 +192,7 @@ func TestAsksForAnAliasAndSendsTheOneTyped(t *testing.T) {
 	f := newFake(always(named))
 	m, tt := open(t, f)
 	tt.Key(ui.Cmd, ui.KeyK)
-	click(t, tt, "Change Alias “saf”…")
+	chooseItem(t, tt, "Change Alias “saf”…")
 	if _, ok := tt.AccessByRole(ui.RoleDialog, "Alias for Safari"); !ok {
 		t.Fatalf("no alias dialog: %q", tt.Texts())
 	}
@@ -281,7 +281,7 @@ func TestLeavesTheAliasDialogFreeWhileAnotherActionRuns(t *testing.T) {
 	m, tt := open(t, f)
 	tt.Key(0, ui.KeyEnter)
 	tt.Key(ui.Cmd, ui.KeyK)
-	click(t, tt, "Add Alias…")
+	chooseItem(t, tt, "Add Alias…")
 	click(t, tt, "Save Alias")
 	if !tt.HasText("Another action is still running. Save again when it ends.") || len(f.runs) != 1 {
 		t.Fatalf("texts %q, runs %+v", tt.Texts(), f.runs)
@@ -316,7 +316,7 @@ func hotkeyResult(shortcut string) core.Result {
 func openHotkey(t *testing.T, tt *ui.Tester, label string) {
 	t.Helper()
 	tt.Key(ui.Cmd, ui.KeyK)
-	click(t, tt, label)
+	chooseItem(t, tt, label)
 	if _, ok := tt.AccessByRole(ui.RoleDialog, "Hotkey for Safari"); !ok {
 		t.Fatalf("no hotkey dialog: %q", tt.Texts())
 	}

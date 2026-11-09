@@ -47,11 +47,13 @@ Give any app, indexed file, snippet, quicklink, emoji, or command a hotkey from 
 
 Hide any app, file, snippet, quicklink, emoji, or command from its actions (Hide from Results): search leaves it out for good, and hiding a pinned item unpins it. Settings > Search lists hidden results, with Show Again (up to 500 hidden). A hidden result cannot be pinned; show it again first. Clipboard entries are deleted instead.
 
+The details to the right of the results show the selected result large, with its kind and every action (click one to run it). A clipboard entry shows its whole text, its image, or its file paths; a snippet shows its text; an app, file, or folder shows where it is, its size (not for folders), and when it changed. Only apps TinyDash found and files it offered show their facts.
+
 Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system command raises it among similar matches (frequency up to 20 uses, recency by day). Copying a path or showing in Finder does not count. TinyDash remembers the 1,000 most recently used items. Results with equal scores keep the order in which their source lists them.
 
 ## Widgets
 
-An empty All search shows widgets to the right of the results. Typing, or another tab, hides them. Settings > Widgets turns each widget on or off; with every widget off, the results take the whole width.
+An empty All search shows widgets to the right of the results, in place of the details. Typing, or another tab, shows the details again. Settings > Widgets turns each widget on or off; with every widget off, the details stay.
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
@@ -144,7 +146,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same settings and data, with these differences:
 
-- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, the details pane, the Files, Privacy, and About sections of Settings, and the `--settings`, `--background`, and `--mode` options. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
+- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, the Files, Privacy, and About sections of Settings, and the `--settings`, `--background`, and `--mode` options. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
 - **Windows:** app IDs changed, so the pins, usage, aliases, and hotkeys of Windows apps reset once.
 - **Ranking:** results with equal scores keep the order in which their source lists them.
 - **Apps** are found by name only, not by bundle name or executable, and show their folder rather than a description.

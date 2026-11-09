@@ -36,6 +36,14 @@ type fake struct {
 	loading     []func(Widgets)
 	// warnings wait until the launcher asks for them.
 	warnings []string
+
+	// details are what a load of a result's details gives; detailLoads
+	// are the results asked for. holdDetails keeps their done functions
+	// in detailsWaiting.
+	details        map[core.ID]Details
+	detailLoads    []core.ID
+	holdDetails    bool
+	detailsWaiting []func()
 }
 
 type searched struct {
@@ -100,6 +108,16 @@ func (f *fake) Widgets(done func(Widgets)) {
 		return
 	}
 	done(f.widgets)
+}
+
+func (f *fake) Details(id core.ID, done func(Details, bool)) {
+	f.detailLoads = append(f.detailLoads, id)
+	d, ok := f.details[id]
+	if f.holdDetails {
+		f.detailsWaiting = append(f.detailsWaiting, func() { done(d, ok) })
+		return
+	}
+	done(d, ok)
 }
 
 func (f *fake) Warnings() []string {
@@ -205,6 +223,17 @@ func pressButton(t *testing.T, tt *ui.Tester, name string) {
 	b, ok := tt.AccessByRole(ui.RoleButton, name)
 	if !ok {
 		t.Fatalf("no button %q", name)
+	}
+	tt.ClickAt(b.Bounds.X+b.Bounds.W/2, b.Bounds.Y+b.Bounds.H/2)
+}
+
+// chooseItem clicks the item of the open actions menu with that label: the
+// details pane has a button with the same words.
+func chooseItem(t *testing.T, tt *ui.Tester, label string) {
+	t.Helper()
+	b, ok := tt.AccessByRole(ui.RoleOption, label)
+	if !ok {
+		t.Fatalf("no menu item %q", label)
 	}
 	tt.ClickAt(b.Bounds.X+b.Bounds.W/2, b.Bounds.Y+b.Bounds.H/2)
 }
