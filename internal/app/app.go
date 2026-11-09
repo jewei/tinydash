@@ -68,7 +68,9 @@ type App struct {
 	settings *settingsWindow
 	mu       sync.Mutex
 	builtAt  map[*engine.Slot]time.Time
-	warnings []string
+	// blurHiddenAt is when blur last hid the panel; main thread only.
+	blurHiddenAt time.Time
+	warnings     []string
 }
 
 // Start loads the user's data and starts TinyDash. Call it once mygo is
@@ -139,6 +141,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	})
 	a.panel.OnBlur(func() {
 		if a.engine.Snapshot(time.Now()).Settings.HideOnBlur {
+			a.blurHiddenAt = time.Now()
 			a.panel.Hide()
 		}
 	})
@@ -186,8 +189,18 @@ func (a *App) toggle() {
 		a.panel.Hide()
 		return
 	}
-	a.Show()
+	if !blurWasThisPress(time.Since(a.blurHiddenAt)) {
+		a.Show()
+	}
 }
+
+// blurWithin is how soon after a blur hid the panel a shortcut press counts
+// as the cause of that blur. Where the OS grabs the shortcut's keys (X11),
+// the press takes focus from the panel, so blur hides it first; the press
+// meant to hide it, and must not show it again.
+const blurWithin = 400 * time.Millisecond
+
+func blurWasThisPress(sinceBlurHide time.Duration) bool { return sinceBlurHide < blurWithin }
 
 // Show puts the launcher on the display with the pointer, a third of the way
 // down, and refreshes what is old.
