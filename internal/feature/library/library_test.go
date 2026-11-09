@@ -1,6 +1,7 @@
 package library
 
 import (
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -112,7 +113,8 @@ func TestPathQuicklinksTakeANameNotAPath(t *testing.T) {
 		}
 	}
 	got, err := QuicklinkTarget("~/Projects/{query}", "notes", now, home, nil)
-	if err != nil || got != (Target{Path: golden.Abs("/Users/me/Projects/notes")}) {
+	// Windows takes both separators; the Rust app joined them the same way.
+	if err != nil || got.URL != "" || filepath.Clean(got.Path) != golden.Abs("/Users/me/Projects/notes") {
 		t.Errorf("%+v %v", got, err)
 	}
 	if got, _ := QuicklinkTarget("~", "", now, home, nil); got.Path != home {
