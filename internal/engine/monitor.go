@@ -71,8 +71,10 @@ func (m *Monitor) Tick(now int64) <-chan error {
 	if after, _ := m.count(); counted && after != n {
 		return nil
 	}
+	// Nothing to keep, or the read failed. Keep what was seen: where the OS
+	// has no counter, forgetting it would make the unchanged text look new
+	// at the next tick, and a cleared copy would come back.
 	if !ok {
-		m.seenHash = 0
 		return nil
 	}
 	hash := content.Hash()
