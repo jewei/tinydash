@@ -1,7 +1,5 @@
 name: Coverage
 
-# Shows how much code the tests run, in each job's summary. It is a report,
-# not a gate: branch protection does not require it, and no level fails it.
 on:
   pull_request:
   push:
@@ -15,44 +13,15 @@ permissions:
   contents: read
 
 jobs:
-  frontend:
-    name: Frontend coverage
+  go:
+    name: Go coverage
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          bun-version-file: package.json
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-      - run: bun install --frozen-lockfile
+          go-version-file: go.mod
       - name: Test with coverage
         run: |
-          bunx vp test --coverage | tee coverage.txt
-          { echo '```'; sed -n '/Coverage summary/,$p' coverage.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-
-  rust:
-    name: Rust coverage
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install Linux libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
-            libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
-      - name: Install Rust from rust-toolchain.toml
-        run: |
-          rustup toolchain install
-          rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@68a389c788b2cd04016ce8c80ee23b80d2ab3d68 # v2.88.1
-        with:
-          tool: cargo-llvm-cov@0.9.1
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          workspaces: src-tauri
-      - name: Test with coverage
-        run: |
-          cargo llvm-cov --manifest-path src-tauri/Cargo.toml --locked --summary-only | tee coverage.txt
-          { echo '```'; cat coverage.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          go test -count=1 -coverprofile=coverage.out ./... > /dev/null
+          { echo '```'; go tool cover -func=coverage.out | tail -1; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
