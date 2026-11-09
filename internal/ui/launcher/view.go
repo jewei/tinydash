@@ -124,12 +124,27 @@ func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 // search field, so typing goes on after the move.
 func (m *Model) dragArea(bar ui.Element) ui.Element {
 	return bar.DragWindow().KeepFocus().HandleInput(func(ev ui.InputEvent) bool {
-		if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
+		drag, take := barPress(ev)
+		if drag {
 			m.dragPending = true
 			m.backend.DragStarted()
 		}
-		return false // the press still moves the window
+		return take
 	})
+}
+
+// barPress decides a press on a drag area. A single press moves the window,
+// so the area leaves it to mygo. A double press is taken here: mygo would
+// treat it as a title bar's double-click, which maximizes on Linux and zooms
+// or minimizes on macOS, and the panel is not that kind of window.
+func barPress(ev ui.InputEvent) (startsDrag, taken bool) {
+	if ev.Kind != ui.InputPointerDown || ev.Button != 0 {
+		return false, false
+	}
+	if ev.Clicks >= 2 {
+		return false, true
+	}
+	return true, false
 }
 
 // ownPress keeps a press on a control inside a drag area from reaching

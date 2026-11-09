@@ -82,3 +82,21 @@ func TestReleasingABarPressEndsTheDrag(t *testing.T) {
 		t.Errorf("drags %d, ends %d after a click on a tab", f.drags, f.dragEnds)
 	}
 }
+
+// A double press on a bar must not reach mygo's title bar double-click.
+func TestADoublePressOnABarIsTakenAndStartsNoDrag(t *testing.T) {
+	for _, c := range []struct {
+		ev          ui.InputEvent
+		drag, taken bool
+	}{
+		{ui.InputEvent{Kind: ui.InputPointerDown, Button: 0, Clicks: 1}, true, false},
+		{ui.InputEvent{Kind: ui.InputPointerDown, Button: 0, Clicks: 2}, false, true},
+		{ui.InputEvent{Kind: ui.InputPointerDown, Button: 0, Clicks: 3}, false, true},
+		{ui.InputEvent{Kind: ui.InputPointerDown, Button: 1, Clicks: 1}, false, false},
+		{ui.InputEvent{Kind: ui.InputPointerUp, Button: 0, Clicks: 2}, false, false},
+	} {
+		if drag, taken := barPress(c.ev); drag != c.drag || taken != c.taken {
+			t.Errorf("%+v: drag %v taken %v, want %v %v", c.ev, drag, taken, c.drag, c.taken)
+		}
+	}
+}
