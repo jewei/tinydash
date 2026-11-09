@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -71,7 +72,8 @@ func newTestMoreFiles(index *fakeIndex, folders map[string]bool) (*moreFiles, *[
 func slashIDs(results []core.Result) []string {
 	var out []string
 	for _, r := range results {
-		out = append(out, golden.Slash(string(r.ID)))
+		// The volume name is only a volume name at the start of a path.
+		out = append(out, "file:"+golden.Slash(strings.TrimPrefix(string(r.ID), "file:")))
 	}
 	return out
 }
