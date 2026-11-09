@@ -157,19 +157,34 @@ func (s *shortcuts) pause(paused bool) error {
 		return nil
 	}
 	s.paused = paused
-	all := map[string]func(){}
+	if paused {
+		if s.launcher != "" {
+			s.os.Unregister(s.launcher)
+		}
+		for _, accelerator := range s.hotkeys {
+			s.os.Unregister(accelerator)
+		}
+		return nil
+	}
+	// Keys that another app took during the pause are refused now. The
+	// registry keeps only keys that the OS accepted, so the next sync or
+	// save tries the refused ones again.
+	var first error
+	refused := func(accelerator string, err error) {
+		if first == nil {
+			first = registerError(accelerator, err)
+		}
+	}
 	if s.launcher != "" {
-		all[s.launcher] = s.toggle
+		if err := s.os.Register(s.launcher, s.toggle); err != nil {
+			refused(s.launcher, err)
+			s.launcher = ""
+		}
 	}
 	for id, accelerator := range s.hotkeys {
-		all[accelerator] = func() { go s.run(id) }
-	}
-	var first error
-	for accelerator, fn := range all {
-		if paused {
-			s.os.Unregister(accelerator)
-		} else if err := s.os.Register(accelerator, fn); err != nil && first == nil {
-			first = registerError(accelerator, err)
+		if err := s.os.Register(accelerator, func() { go s.run(id) }); err != nil {
+			refused(accelerator, err)
+			delete(s.hotkeys, id)
 		}
 	}
 	return first
