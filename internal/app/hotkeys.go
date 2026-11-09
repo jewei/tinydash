@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/egoist/mygo"
 
@@ -16,8 +15,12 @@ import (
 // shortcuts holds the launcher shortcut and the per-result hotkeys
 // registered with the OS. Shortcuts are stored in the Rust app's Tauri
 // syntax and turned into mygo accelerators only to register them.
+//
+// Its state lives on the main thread: each method runs there, as mygo's
+// shortcut calls do anyway. A lock instead could deadlock: the writer
+// would hold it while mygo waits on the main thread, and the main thread
+// would wait on it to pause the shortcuts for the hotkey recorder.
 type shortcuts struct {
-	mu       sync.Mutex
 	launcher string // mygo accelerator, "" when none
 	toggle   func()
 	hotkeys  map[core.ID]string // result ID -> mygo accelerator
@@ -51,9 +54,12 @@ func (s *shortcuts) Parse(stored string) (engine.Keys, error) {
 }
 
 // Sync makes the registered hotkeys match wanted.
-func (s *shortcuts) Sync(wanted search.Hotkeys) map[core.ID]error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *shortcuts) Sync(wanted search.Hotkeys) (failed map[core.ID]error) {
+	mygo.RunOnMain(func() { failed = s.sync(wanted) })
+	return failed
+}
+
+func (s *shortcuts) sync(wanted search.Hotkeys) map[core.ID]error {
 	next := map[core.ID]string{}
 	failed := map[core.ID]error{}
 	for _, pair := range wanted.All() {
@@ -95,8 +101,11 @@ func (s *shortcuts) SetLauncher(stored string) error {
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	mygo.RunOnMain(func() { err = s.setLauncher(stored, accelerator) })
+	return err
+}
+
+func (s *shortcuts) setLauncher(stored, accelerator string) error {
 	if s.launcher != "" && !s.paused {
 		mygo.GlobalShortcut.Unregister(s.launcher)
 	}
@@ -116,9 +125,12 @@ func (s *shortcuts) SetLauncher(stored string) error {
 
 // Pause turns every shortcut off while the hotkey dialog records keys, so a
 // press records instead of running, and on again after.
-func (s *shortcuts) Pause(paused bool) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *shortcuts) Pause(paused bool) (err error) {
+	mygo.RunOnMain(func() { err = s.pause(paused) })
+	return err
+}
+
+func (s *shortcuts) pause(paused bool) error {
 	if paused == s.paused {
 		return nil
 	}
