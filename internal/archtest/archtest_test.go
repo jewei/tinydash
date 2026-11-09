@@ -87,6 +87,81 @@ func TestEachRuleCanFail(t *testing.T) {
 	}
 }
 
+// TestArchitectureTableMatchesTheRules keeps the "May import" column of
+// docs/architecture.md equal to the layers and the external allowlist, so
+// the doc can say that the column is complete.
+func TestArchitectureTableMatchesTheRules(t *testing.T) {
+	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "architecture.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := packageTable(string(doc))
+	for _, l := range layers {
+		got, ok := table[l.pkg]
+		if !ok {
+			t.Errorf("docs/architecture.md has no row for %s", l.pkg)
+			continue
+		}
+		delete(table, l.pkg)
+		if want := allowedImports(l.pkg, l.allow); !slices.Equal(got, want) {
+			t.Errorf("%s: the doc allows %q, the rules allow %q", l.pkg, got, want)
+		}
+	}
+	for pkg := range table {
+		t.Errorf("docs/architecture.md has a row for %s, which is in no layer", pkg)
+	}
+}
+
+// packageTable reads the table under "## Packages": the package of each row
+// (`internal/feature/<name>` as the layer "internal/feature/") and the
+// sorted code spans of its last column.
+func packageTable(doc string) map[string][]string {
+	_, section, _ := strings.Cut(doc, "\n## Packages\n")
+	section, _, _ = strings.Cut(section, "\n## ")
+	spans := func(cell string) []string {
+		var out []string
+		for i, part := range strings.Split(cell, "`") {
+			if i%2 == 1 {
+				out = append(out, part)
+			}
+		}
+		return out
+	}
+	table := map[string][]string{}
+	for line := range strings.Lines(section) {
+		cells := strings.Split(strings.TrimSpace(line), "|")
+		if len(cells) < 4 || !strings.HasPrefix(strings.TrimSpace(cells[1]), "`") {
+			continue
+		}
+		pkg := spans(cells[1])[0]
+		if before, _, ok := strings.Cut(pkg, "<"); ok {
+			pkg = before
+		}
+		imports := spans(cells[len(cells)-2])
+		slices.Sort(imports)
+		table[pkg] = imports
+	}
+	return table
+}
+
+// allowedImports is what the rules let a layer import, as the doc writes
+// it: a prefix ends in "/*".
+func allowedImports(pkg string, allow []string) []string {
+	out := slices.Clone(allow)
+	for dep, users := range external {
+		if matchesAny(pkg, users) {
+			out = append(out, dep)
+		}
+	}
+	for i, dep := range out {
+		if strings.HasSuffix(dep, "/") {
+			out[i] = dep + "*"
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
 // loadModule lists every package with `go list`, with all of its files,
 // whatever their build tags, and the imports of both its default and its
 // e2e build: the e2e build links test-only packages the rules must see.
