@@ -181,8 +181,8 @@ func (m *Model) hotkeyView(c *ui.Context, p kit.Palette) {
 }
 
 // recorder takes every key while it records, so no key reaches the
-// launcher or the dialog's buttons; Escape stops it. A click or a new
-// press of Enter or Space starts it again.
+// launcher or the dialog's buttons; Escape, or leaving it, as for another
+// app, stops it. A click or a new press of Enter or Space starts it again.
 func (m *Model) recorder(c *ui.Context, p kit.Palette, d *hotkeyDialog, label string) {
 	name := label + ": None"
 	if d.recording {
@@ -224,6 +224,11 @@ func (m *Model) recorder(c *ui.Context, p kit.Palette, d *hotkeyDialog, label st
 			m.startRecording()
 		}
 	})
+	focused := rec.Focused()
+	if d.recording && d.recorderFocused && !focused {
+		m.stopRecording("")
+	}
+	d.recorderFocused = focused
 	rec.Children(func() {
 		switch {
 		case d.recording:
