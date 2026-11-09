@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/golden"
 	"github.com/jewei/tinydash/internal/match"
 )
 
-const home = "/Users/me"
+var home = golden.Abs("/Users/me")
 
 var now = time.Date(2026, 10, 4, 9, 5, 0, 0, time.UTC)
 
@@ -111,7 +112,7 @@ func TestPathQuicklinksTakeANameNotAPath(t *testing.T) {
 		}
 	}
 	got, err := QuicklinkTarget("~/Projects/{query}", "notes", now, home, nil)
-	if err != nil || got != (Target{Path: "/Users/me/Projects/notes"}) {
+	if err != nil || got != (Target{Path: golden.Abs("/Users/me/Projects/notes")}) {
 		t.Errorf("%+v %v", got, err)
 	}
 	if got, _ := QuicklinkTarget("~", "", now, home, nil); got.Path != home {

@@ -247,3 +247,18 @@ func CheckRanked(t testing.TB, feature, query string, want, got []Ranked, scoreO
 		start = end
 	}
 }
+
+// Abs turns a slash path such as "/Users/me" into an absolute path of the OS
+// the test runs on: "C:\Users\me" on Windows. Tests write paths once.
+func Abs(slashPath string) string {
+	p := filepath.FromSlash(slashPath)
+	if !filepath.IsAbs(p) {
+		p = "C:" + p
+	}
+	return p
+}
+
+// Slash is the reverse of Abs: the path without its volume, with "/".
+func Slash(path string) string {
+	return filepath.ToSlash(strings.TrimPrefix(path, filepath.VolumeName(path)))
+}

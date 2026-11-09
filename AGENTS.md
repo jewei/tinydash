@@ -22,7 +22,8 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The
 
 TinyDash is moving to Go on mygo, beside the Rust code, on branch `rewrite/mygo`. Read `docs/go-architecture.md` before you touch Go code; `docs/rewrite-log.tsv` records each decision.
 
-- Run every Go gate with `bash scripts/verify-go.sh` (vet on three OSes, staticcheck, tests with `-race`, import rules, gofmt).
+- Run every Go gate with `bash scripts/verify-go.sh` (vet on three OSes, staticcheck, tests with `-race`, import rules, gofmt). It runs the tests on this machine's OS only. Windows and Linux test results come from CI: after you push, wait for `gh pr checks <branch> --watch` before you call a change verified.
+- Write paths in tests as slash paths through `golden.Abs` (`/Users/me` becomes `C:\Users\me` on Windows); a literal `/root` is not absolute on Windows.
 - The import rules are data in `internal/archtest/rules.go`. Change them there, in their own commit, with the reason.
 - `testdata/golden` pins the Rust app's answers. A Go result that differs must be listed in `testdata/golden/divergences/<feature>.tsv`.
 - Concurrency that tests reach least has TLA+ models in `formal/`; `bash scripts/formal-verify.sh` checks them (Java 11+). Before you change clipboard capture, Clear, or history on/off, use the `formal-verify-clipboard` skill.

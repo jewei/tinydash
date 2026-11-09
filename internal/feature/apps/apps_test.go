@@ -2,10 +2,12 @@ package apps
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/golden"
 	"github.com/jewei/tinydash/internal/match"
 )
 
@@ -74,12 +76,12 @@ func TestSaysWhatAnAppIsForOrWhereItIs(t *testing.T) {
 	if got := result(&described, Context{}).Subtitle; got != "Web browser" {
 		t.Errorf("subtitle %q", got)
 	}
-	plain := app("Tool", "/Applications/Tool.app")
-	if got := result(&plain, Context{}).Subtitle; got != "/Applications" {
+	plain := app("Tool", golden.Abs("/Applications/Tool.app"))
+	if got := result(&plain, Context{}).Subtitle; got != golden.Abs("/Applications") {
 		t.Errorf("subtitle %q", got)
 	}
-	home := app("Mine", "/Users/me/Applications/Mine.app")
-	if got := result(&home, Context{Home: "/Users/me"}).Subtitle; got != "~/Applications" {
+	home := app("Mine", golden.Abs("/Users/me/Applications/Mine.app"))
+	if got := result(&home, Context{Home: golden.Abs("/Users/me")}).Subtitle; got != filepath.FromSlash("~/Applications") {
 		t.Errorf("subtitle %q", got)
 	}
 }

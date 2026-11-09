@@ -3,6 +3,8 @@ package clipboard
 import (
 	"strings"
 	"testing"
+
+	"github.com/jewei/tinydash/internal/golden"
 )
 
 func TestDecidesWhatFits(t *testing.T) {
@@ -19,7 +21,7 @@ func TestDecidesWhatFits(t *testing.T) {
 		{"text that is not UTF-8", Text("S\xe3o"), false},
 		{"relative file", Files([]string{"relative"}), false},
 		{"no files", Files(nil), false},
-		{"absolute file", Files([]string{"/tmp/a.txt"}), true},
+		{"absolute file", Files([]string{golden.Abs("/tmp/a.txt")}), true},
 		{"too many files", Files(make([]string, MaxFiles+1)), false},
 		{"16 megapixels", Image(nil, 4000, 4000), true},
 		{"25 megapixels", Image(nil, 5000, 5000), false},

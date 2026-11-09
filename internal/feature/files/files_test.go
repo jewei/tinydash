@@ -3,12 +3,14 @@ package files
 import (
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/golden"
 	"github.com/jewei/tinydash/internal/match"
 )
 
@@ -28,13 +30,13 @@ func (d disk) resolve(path string) string {
 }
 
 func (d disk) ReadDir(dir string) ([]fs.DirEntry, error) {
-	return fs.ReadDir(d.fsys, strings.TrimPrefix(d.resolve(dir), "/"))
+	return fs.ReadDir(d.fsys, strings.TrimPrefix(d.resolve(golden.Slash(dir)), "/"))
 }
 
 func (d disk) RealDir(dir string) (string, bool) {
-	real := d.resolve(dir)
+	real := d.resolve(golden.Slash(dir))
 	info, err := fs.Stat(d.fsys, strings.TrimPrefix(real, "/"))
-	return real, err == nil && info.IsDir()
+	return golden.Abs(real), err == nil && info.IsDir()
 }
 
 // tree makes a disk with these files and folders (a trailing "/") under
@@ -55,7 +57,7 @@ func tree(paths []string, links map[string]string) disk {
 }
 
 func hiddenSet(paths ...string) func(string) bool {
-	return func(path string) bool { return slices.Contains(paths, path) }
+	return func(path string) bool { return slices.Contains(paths, golden.Slash(path)) }
 }
 
 func TestScansNamesSkipsHiddenAndExcludedAndMatchesPaths(t *testing.T) {
@@ -64,7 +66,7 @@ func TestScansNamesSkipsHiddenAndExcludedAndMatchesPaths(t *testing.T) {
 		"notes/todo.txt", "notes/hidden.txt", "Tool.APP/Contents/Info.plist",
 	}, map[string]string{"/root/notes/link": "/root/docs"})
 	x := Scan(d, Options{
-		Roots:    []string{"/root", "/root/notes"},
+		Roots:    []string{golden.Abs("/root"), golden.Abs("/root/notes")},
 		Excluded: []string{"node_modules"},
 		Packages: []string{"app"},
 		Hidden:   hiddenSet("/root/notes/hidden.txt"),
@@ -99,7 +101,7 @@ func TestScansNamesSkipsHiddenAndExcludedAndMatchesPaths(t *testing.T) {
 			t.Errorf("does not contain %s", x.entries[i].osPath())
 		}
 	}
-	if !x.Contains("/root/notes/todo.txt") || x.Contains("/root/notes/missing.txt") {
+	if !x.Contains(golden.Abs("/root/notes/todo.txt")) || x.Contains(golden.Abs("/root/notes/missing.txt")) {
 		t.Error("contains is wrong")
 	}
 }
@@ -109,11 +111,11 @@ func TestStopsAtTheLimit(t *testing.T) {
 	for n := range Limit + 1 {
 		paths = append(paths, fmt.Sprintf("f%d", n))
 	}
-	x := Scan(tree(paths, nil), Options{Roots: []string{"/root"}})
+	x := Scan(tree(paths, nil), Options{Roots: []string{golden.Abs("/root")}})
 	if x.Len() != Limit || !x.Truncated {
 		t.Errorf("len %d, truncated %v", x.Len(), x.Truncated)
 	}
-	x = Scan(tree(paths[:Limit], nil), Options{Roots: []string{"/root"}})
+	x = Scan(tree(paths[:Limit], nil), Options{Roots: []string{golden.Abs("/root")}})
 	if x.Len() != Limit || x.Truncated {
 		t.Errorf("len %d, truncated %v", x.Len(), x.Truncated)
 	}
@@ -121,16 +123,16 @@ func TestStopsAtTheLimit(t *testing.T) {
 
 func TestKeepsTheOSSpellingOfDecomposedNames(t *testing.T) {
 	decomposed := "Cafe\u0301.txt"
-	x := Scan(tree([]string{decomposed}, nil), Options{Roots: []string{"/root"}})
+	x := Scan(tree([]string{decomposed}, nil), Options{Roots: []string{golden.Abs("/root")}})
 	hits := x.Search(match.New("caf\u00e9"), Context{}, 10)
 	if len(hits) != 1 {
 		t.Fatalf("%d hits", len(hits))
 	}
 	r := hits[0].Result
-	if r.ID != core.ID("file:/root/"+decomposed) || r.Title != "Caf\u00e9.txt" || r.Actions[0].Action != (core.Open{Path: "/root/" + decomposed}) {
+	if r.ID != core.ID("file:"+golden.Abs("/root/")+decomposed) || r.Title != "Caf\u00e9.txt" || r.Actions[0].Action != (core.Open{Path: golden.Abs("/root/") + decomposed}) {
 		t.Errorf("%+v", r)
 	}
-	if _, ok := x.Get("/root/"+decomposed, Context{}); !ok {
+	if _, ok := x.Get(golden.Abs("/root/")+decomposed, Context{}); !ok {
 		t.Error("Get by the OS spelling failed")
 	}
 }
@@ -158,23 +160,23 @@ func TestPathQueriesTypedWithSlashesMatchBackslashPaths(t *testing.T) {
 
 func TestDisplayPathsShortenTheHomeFolder(t *testing.T) {
 	for _, c := range []struct{ path, want string }{
-		{"/Users/me", "~"},
-		{"/Users/me/Notes", "~/Notes"},
-		{"/Users/me2/Notes", "/Users/me2/Notes"},
-		{"/Applications", "/Applications"},
-		{"/Users/me/Cafe\u0301", "~/Caf\u00e9"},
+		{golden.Abs("/Users/me"), "~"},
+		{golden.Abs("/Users/me/Notes"), filepath.FromSlash("~/Notes")},
+		{golden.Abs("/Users/me2/Notes"), golden.Abs("/Users/me2/Notes")},
+		{golden.Abs("/Applications"), golden.Abs("/Applications")},
+		{golden.Abs("/Users/me/Cafe\u0301"), filepath.FromSlash("~/Caf\u00e9")},
 	} {
-		if got := DisplayPath(c.path, "/Users/me"); got != c.want {
+		if got := DisplayPath(c.path, golden.Abs("/Users/me")); got != c.want {
 			t.Errorf("%q: %q, want %q", c.path, got, c.want)
 		}
 	}
 }
 
 func TestListsOnlyWhatTheScanWalksInto(t *testing.T) {
-	roots := []string{"/nowhere/Documents"}
+	roots := []string{golden.Abs("/nowhere/Documents")}
 	listed := func(rest string) bool {
-		return Lists(roots[0]+"/"+rest, false, roots, []string{"target"}, []string{"app"},
-			func(path string) bool { return strings.HasSuffix(path, "/Library") })
+		return Lists(filepath.Join(roots[0], filepath.FromSlash(rest)), false, roots, []string{"target"}, []string{"app"},
+			func(path string) bool { return strings.HasSuffix(golden.Slash(path), "/Library") })
 	}
 	for rest, want := range map[string]bool{
 		"notes/todo.txt": true, "Tool.app": true, "notes/target": true,
@@ -185,7 +187,7 @@ func TestListsOnlyWhatTheScanWalksInto(t *testing.T) {
 			t.Errorf("%s: listed %v", rest, !want)
 		}
 	}
-	if Lists("/elsewhere/a.txt", false, roots, nil, nil, nil) {
+	if Lists(golden.Abs("/elsewhere/a.txt"), false, roots, nil, nil, nil) {
 		t.Error("lists a path outside the roots")
 	}
 }
@@ -194,11 +196,11 @@ func TestNestedRootsAreScannedOnceUnlessTheOuterScanSkipsThem(t *testing.T) {
 	d := tree([]string{"docs/", ".config/", "target/", "Tool.app/"}, nil)
 	var folders []string
 	for _, name := range []string{"docs", ".config", "target", "Tool.app", ""} {
-		folders = append(folders, strings.TrimSuffix("/root/"+name, "/"))
+		folders = append(folders, golden.Abs(strings.TrimSuffix("/root/"+name, "/")))
 	}
 	kept := distinctRoots(d, Options{Roots: folders, Excluded: []string{"target"}, Packages: []string{"app"}})
 	slices.Sort(kept)
-	want := []string{"/root", "/root/.config", "/root/Tool.app", "/root/target"}
+	want := []string{golden.Abs("/root"), golden.Abs("/root/.config"), golden.Abs("/root/Tool.app"), golden.Abs("/root/target")}
 	if !slices.Equal(kept, want) {
 		t.Errorf("kept %q, want %q", kept, want)
 	}
@@ -206,7 +208,7 @@ func TestNestedRootsAreScannedOnceUnlessTheOuterScanSkipsThem(t *testing.T) {
 
 func TestANestedRootUnderAHiddenFolderIsScanned(t *testing.T) {
 	d := tree([]string{"AppData/Roaming/Notes/"}, nil)
-	folders := []string{"/root", "/root/AppData/Roaming/Notes"}
+	folders := []string{golden.Abs("/root"), golden.Abs("/root/AppData/Roaming/Notes")}
 	kept := distinctRoots(d, Options{Roots: folders, Hidden: hiddenSet("/root/AppData")})
 	if !slices.Equal(kept, folders) {
 		t.Errorf("kept %q", kept)
@@ -224,14 +226,14 @@ func TestANestedRootReachedThroughALinkIsComparedByRealPath(t *testing.T) {
 		"/root/External": "/elsewhere",
 	})
 	d.fsys["elsewhere/a.txt"] = &fstest.MapFile{}
-	folders := []string{"/root", "/root/Dropbox", "/root/External"}
+	folders := []string{golden.Abs("/root"), golden.Abs("/root/Dropbox"), golden.Abs("/root/External")}
 	kept := distinctRoots(d, Options{Roots: folders})
 	slices.Sort(kept)
-	if want := []string{"/root", "/root/External"}; !slices.Equal(kept, want) {
+	if want := []string{golden.Abs("/root"), golden.Abs("/root/External")}; !slices.Equal(kept, want) {
 		t.Errorf("kept %q, want %q", kept, want)
 	}
 	x := Scan(d, Options{Roots: folders})
-	if !x.Contains("/root/External/a.txt") || x.Contains("/root/Dropbox") || x.Contains("/root/External") {
+	if !x.Contains(golden.Abs("/root/External/a.txt")) || x.Contains(golden.Abs("/root/Dropbox")) || x.Contains(golden.Abs("/root/External")) {
 		t.Error("the scan followed a link inside a root, or not a link that is a root")
 	}
 }
@@ -252,12 +254,12 @@ func TestFoundPathsKeepTheNewestAndNoRepeats(t *testing.T) {
 
 // The shape the Rust app gave, from testdata/golden/search.jsonl.
 func TestResultShape(t *testing.T) {
-	x := Scan(tree([]string{"Documents/report.pdf"}, nil), Options{Roots: []string{"/root"}})
-	r, ok := x.Get("/root/Documents/report.pdf", Context{})
+	x := Scan(tree([]string{"Documents/report.pdf"}, nil), Options{Roots: []string{golden.Abs("/root")}})
+	r, ok := x.Get(golden.Abs("/root/Documents/report.pdf"), Context{})
 	if !ok {
 		t.Fatal("not found")
 	}
-	if r.ID != "file:/root/Documents/report.pdf" || r.Kind != core.KindFile || r.Title != "report.pdf" || r.Subtitle != "/root/Documents" {
+	if r.ID != core.ID("file:"+golden.Abs("/root/Documents/report.pdf")) || r.Kind != core.KindFile || r.Title != "report.pdf" || r.Subtitle != golden.Abs("/root/Documents") {
 		t.Errorf("%+v", r)
 	}
 	var labels []string
@@ -267,11 +269,11 @@ func TestResultShape(t *testing.T) {
 	if want := []string{"Open", "Show in " + fileManager, "Copy Path", "Pin"}; !slices.Equal(labels, want) {
 		t.Errorf("labels %q", labels)
 	}
-	folder, _ := x.Get("/root/Documents", Context{Home: "/root"})
+	folder, _ := x.Get(golden.Abs("/root/Documents"), Context{Home: golden.Abs("/root")})
 	if folder.Kind != core.KindFolder || folder.Subtitle != "~" {
 		t.Errorf("%+v", folder)
 	}
-	if found := FoundResult("/root/a.txt", false, ""); len(found.Actions) != 3 || found.Pinned {
+	if found := FoundResult(golden.Abs("/root/a.txt"), false, ""); len(found.Actions) != 3 || found.Pinned {
 		t.Errorf("found result %+v", found)
 	}
 }

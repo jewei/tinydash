@@ -2,6 +2,8 @@ package settings
 
 import (
 	"encoding/json"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jewei/tinydash/internal/golden"
@@ -51,7 +53,9 @@ func TestSettingsMatchRust(t *testing.T) {
 		modeled.kept = nil
 		var warning any
 		if w := loaded.Warning("<dir>", loaded.Backup); w != "" {
-			warning = w
+			// The fixture was written on macOS; the backup path uses this
+			// OS's separator, as the Rust app's did.
+			warning = strings.ReplaceAll(w, "<dir>"+string(filepath.Separator), "<dir>/")
 		}
 		golden.Check(t, "settings", row.Name,
 			mustJSON(t, map[string]any{"settings": want, "warning": row.Warning, "backup": row.Backup}),
