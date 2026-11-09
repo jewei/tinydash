@@ -12,7 +12,7 @@ For the formal checks, install Java 11 or later. For the `verify-tinydash` skill
 
 | Command                                        | What it does                                                                                                                                 |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bash scripts/verify-go.sh`                    | Every gate: `go vet` and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`. Run it before every commit. |
+| `bash scripts/verify-go.sh`                    | Every gate: `go vet` and staticcheck as macOS, Windows, and Linux see the code, `go test -race -count=1 ./...`, then the search speed gate without the race detector. Run it before every commit. |
 | `go test ./internal/<pkg>`                     | The tests of one package.                                                                                                                    |
 | `bash scripts/formal-verify.sh`                | Model-checks the TLA+ models in `formal/` (see "Formal checks").                                                                            |
 | `go build ./cmd/tinydash`                      | Builds the binary for this OS.                                                                                                               |
@@ -39,8 +39,8 @@ Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the 
 - Write paths in tests as slash paths through `golden.Abs`. It turns `/Users/me` into `C:\Users\me` on Windows.
 - Views are tested headless with mygo's `ui.NewTester` and a fake backend. Tests move time with `Advance`, never `Sleep`.
 - The tests run on this machine's OS only. CI (`.github/workflows/ci.yml`) runs `verify-go.sh` on macOS, Windows, and Linux. After you push, wait for `gh pr checks <branch> --watch`.
-- The Coverage workflow writes the share of code that the tests run to its job summary. It never fails. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
-- `internal/search/search_bench_test.go` measures search against a budget of 8 ms at p95, with 5,000 apps and 50,000 files: `go test ./internal/search -bench .`.
+- The Coverage workflow runs the tests on Linux with coverage, and writes the share of code that they run to its job summary. It fails when a test fails, and its log shows the test output. Branch protection does not require it. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
+- Search has a budget of 8 ms at p95, with 5,000 apps and 50,000 files. `TestSearchStaysWithinBudget` fails above 16 ms, which leaves room for slower CI machines; `verify-go.sh` runs it without the race detector. To see the numbers: `go test ./internal/search -run '^$' -bench .`.
 
 Automated tests do not cover these OS effects. Check them by hand on a real desktop, with throwaway data, when you change them: the global shortcut and hotkeys, the panel focus, the tray icon, open at login, the system commands, Spotlight results, and clipboard capture of images and files.
 
@@ -66,6 +66,8 @@ It needs Docker or OrbStack. The first launch downloads mygo's SQLite library fr
 
 The version is in `mygo.json`.
 
+`app-icon.svg` is the source of `resources/icon.png`; the PNG cannot be scaled up without loss. To change the icon, edit the SVG, then render it at 1024 × 1024 px, for example with `rsvg-convert -w 1024 -h 1024 app-icon.svg -o resources/icon.png`.
+
 ## Dependencies
 
 - `go.mod` lists the modules. `internal/archtest/rules.go` allowlists each module and the packages that may import it. A new module fails the tests until it is added there.
@@ -77,6 +79,7 @@ The version is in `mygo.json`.
 
 - Emoji: `internal/feature/emoji/catalog.go`, generated from the Rust `emojis` crate 0.9.1 (Unicode 18.0), and the keyword files in `internal/feature/emoji/data/` (Unicode License, in `data/LICENSE`). Both are frozen: the generator was removed with the Rust app.
 - Passwords: the EFF large wordlist, in `internal/feature/password/`.
+- Time zones: `internal/zoneinfo/zoneinfo.zip`, a copy of `$(go env GOROOT)/lib/time/zoneinfo.zip` from Go 1.27.3 (IANA 2026c). To update the rules, copy that file from a newer Go and change the release in the comment in `zoneinfo.go`. Then run the tests: the datetime golden test shows any answer that the new rules change.
 - Fonts: Figtree and Caprasimo in `internal/ui/kit/fonts/`, under the SIL Open Font License.
 
 ## Release

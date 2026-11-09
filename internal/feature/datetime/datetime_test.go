@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/zoneinfo"
 )
 
 // testNow is Sunday, 4 October 2026, 12:00 UTC, seen from Kuala Lumpur.
 func testNow(t *testing.T) time.Time {
 	t.Helper()
-	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	loc, err := zoneinfo.Load("Asia/Kuala_Lumpur")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,6 +216,10 @@ func TestParsesClocks(t *testing.T) {
 		{[]string{"10"}, 0, 0, 0, false},
 		{[]string{"24:00"}, 0, 0, 0, false},
 		{[]string{"9:5"}, 0, 0, 0, false},
+		// An hour past 32 bits must not wrap to a small or negative int.
+		{[]string{"4294967295:00"}, 0, 0, 0, false},
+		{[]string{"4294967307pm"}, 0, 0, 0, false},
+		{[]string{"99999999999:00"}, 0, 0, 0, false},
 	} {
 		hour, minute, used, ok := clock(c.words)
 		if hour != c.hour || minute != c.minute || used != c.used || ok != c.ok {

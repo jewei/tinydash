@@ -201,7 +201,9 @@ func clock(words []string) (hour, minute, used int, ok bool) {
 	hourText, minuteText, hasColon := strings.Cut(number, ":")
 	switch {
 	case hasColon && len(minuteText) == 2:
-		m, err := strconv.ParseUint(minuteText, 10, 32)
+		// 8 bits hold every valid minute and hour, and an int holds 8
+		// bits on every platform, so the conversion cannot wrap.
+		m, err := strconv.ParseUint(minuteText, 10, 8)
 		if err != nil {
 			return 0, 0, 0, false
 		}
@@ -210,7 +212,7 @@ func clock(words []string) (hour, minute, used int, ok bool) {
 	default:
 		return 0, 0, 0, false
 	}
-	h, err := strconv.ParseUint(hourText, 10, 32)
+	h, err := strconv.ParseUint(hourText, 10, 8)
 	if err != nil {
 		return 0, 0, 0, false
 	}

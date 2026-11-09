@@ -14,6 +14,8 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - The file folders and Spotlight moved to Settings > Search.
 - Command-line options: `--hidden` and `--data-dir` are new. `--settings`, `--background`, and `--mode` work as before.
 - A launcher position saved on Windows or Linux on a scaled display may open in another spot once. Drag the launcher there again.
+- Clock dates are in English, in the order of your regional formats. Before, they were in the system's language.
+- A `settings.json` that holds `[]` is now moved aside to `settings.invalid.json`, as any other file that is not a JSON object. TinyDash still starts with the default settings.
 
 ### Removed
 

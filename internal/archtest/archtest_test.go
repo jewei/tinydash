@@ -57,6 +57,13 @@ func TestEachRuleCanFail(t *testing.T) {
 		{"OS file name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_darwin.go": []byte("package engine\n")}}, "OS-specific file"},
 		{"OS build tag", Package{Path: module + "/internal/engine", Files: file("//go:build cgo || windows\n\npackage engine\n")}, "OS build tag"},
 		{"clock in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport clock \"time\"\n\nvar now = clock.Now()\n")}, "time.Now in a pure package"},
+		{"zone from the disk in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport \"time\"\n\nvar kl, _ = time.LoadLocation(\"Asia/Kuala_Lumpur\")\n")}, "time.LoadLocation in a pure package"},
+		{"glob in a pure package", Package{Path: module + "/internal/search", Files: file("package search\n\nimport fp \"path/filepath\"\n\nvar m, _ = fp.Glob(\"*\")\n")}, "filepath.Glob in a pure package"},
+		{"absolute path in a pure package", Package{Path: module + "/internal/settings", Files: file("package settings\n\nimport \"path/filepath\"\n\nvar p, _ = filepath.Abs(\"x\")\n")}, "filepath.Abs in a pure package"},
+		{"walk in a pure package", Package{Path: module + "/internal/feature/files", Files: file("package files\n\nimport \"path/filepath\"\n\nvar err = filepath.WalkDir(\".\", nil)\n")}, "filepath.WalkDir in a pure package"},
+		{"mime table in a pure package", Package{Path: module + "/internal/feature/files", Files: file("package files\n\nimport \"mime\"\n\nvar t = mime.TypeByExtension(\".txt\")\n")}, "mime.TypeByExtension in a pure package"},
+		{"user account in a pure package", Package{Path: module + "/internal/core", Imports: []string{"os/user"}}, "imports os/user; pure packages"},
+		{"ioutil in a pure package", Package{Path: module + "/internal/match", Imports: []string{"io/ioutil"}}, "imports io/ioutil; pure packages"},
 		{"runtime.GOOS outside platform", Package{Path: module + "/internal/engine", Files: file("package engine\n\nimport \"runtime\"\n\nvar mac = runtime.GOOS == \"darwin\"\n")}, "runtime.GOOS outside"},
 	}
 	for _, c := range cases {
@@ -68,6 +75,8 @@ func TestEachRuleCanFail(t *testing.T) {
 	// And the allowed shapes pass.
 	ok := []Package{
 		{Path: module + "/internal/feature/calc", Imports: []string{"strings", module + "/internal/core", module + "/internal/match"}, Files: file("package calc\n\nimport \"time\"\n\nvar d = time.Hour\n")},
+		{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport (\n\t\"path/filepath\"\n\t\"time\"\n)\n\nvar kl, _ = time.LoadLocationFromTZData(\"KL\", nil)\n\nvar base = filepath.Base(\"/a/b\")\n")},
+		{Path: module + "/internal/engine", Imports: []string{"os/user"}, Files: file("package engine\n\nimport \"time\"\n\nvar kl, _ = time.LoadLocation(\"Asia/Kuala_Lumpur\")\n")},
 		{Path: module + "/internal/platform", Imports: []string{"github.com/ebitengine/purego"}, Files: map[string][]byte{"clipboard_darwin.go": []byte("//go:build darwin\n\npackage platform\n")}},
 		{Path: module + "/internal/ui/kit", Imports: []string{"github.com/egoist/mygo/ui", module + "/internal/core", module + "/internal/settings"}},
 		{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/kit"}},
@@ -76,6 +85,81 @@ func TestEachRuleCanFail(t *testing.T) {
 	if problems := Check(ok); len(problems) > 0 {
 		t.Errorf("allowed shapes failed: %q", problems)
 	}
+}
+
+// TestArchitectureTableMatchesTheRules keeps the "May import" column of
+// docs/architecture.md equal to the layers and the external allowlist, so
+// the doc can say that the column is complete.
+func TestArchitectureTableMatchesTheRules(t *testing.T) {
+	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "architecture.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := packageTable(string(doc))
+	for _, l := range layers {
+		got, ok := table[l.pkg]
+		if !ok {
+			t.Errorf("docs/architecture.md has no row for %s", l.pkg)
+			continue
+		}
+		delete(table, l.pkg)
+		if want := allowedImports(l.pkg, l.allow); !slices.Equal(got, want) {
+			t.Errorf("%s: the doc allows %q, the rules allow %q", l.pkg, got, want)
+		}
+	}
+	for pkg := range table {
+		t.Errorf("docs/architecture.md has a row for %s, which is in no layer", pkg)
+	}
+}
+
+// packageTable reads the table under "## Packages": the package of each row
+// (`internal/feature/<name>` as the layer "internal/feature/") and the
+// sorted code spans of its last column.
+func packageTable(doc string) map[string][]string {
+	_, section, _ := strings.Cut(doc, "\n## Packages\n")
+	section, _, _ = strings.Cut(section, "\n## ")
+	spans := func(cell string) []string {
+		var out []string
+		for i, part := range strings.Split(cell, "`") {
+			if i%2 == 1 {
+				out = append(out, part)
+			}
+		}
+		return out
+	}
+	table := map[string][]string{}
+	for line := range strings.Lines(section) {
+		cells := strings.Split(strings.TrimSpace(line), "|")
+		if len(cells) < 4 || !strings.HasPrefix(strings.TrimSpace(cells[1]), "`") {
+			continue
+		}
+		pkg := spans(cells[1])[0]
+		if before, _, ok := strings.Cut(pkg, "<"); ok {
+			pkg = before
+		}
+		imports := spans(cells[len(cells)-2])
+		slices.Sort(imports)
+		table[pkg] = imports
+	}
+	return table
+}
+
+// allowedImports is what the rules let a layer import, as the doc writes
+// it: a prefix ends in "/*".
+func allowedImports(pkg string, allow []string) []string {
+	out := slices.Clone(allow)
+	for dep, users := range external {
+		if matchesAny(pkg, users) {
+			out = append(out, dep)
+		}
+	}
+	for i, dep := range out {
+		if strings.HasSuffix(dep, "/") {
+			out[i] = dep + "*"
+		}
+	}
+	slices.Sort(out)
+	return out
 }
 
 // loadModule lists every package with `go list`, with all of its files,

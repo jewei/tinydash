@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Every Go gate in one command: vet on all three OSes, staticcheck, and the
-# tests with the race detector (they include the import rules and gofmt).
+# Every Go gate in one command: vet on all three OSes, staticcheck, the
+# tests with the race detector (they include the import rules and gofmt),
+# and the search speed gate.
 # The tests run on this OS only; CI runs them on macOS, Windows, and Linux.
 set -euo pipefail
 for os in darwin windows linux; do
@@ -17,3 +18,6 @@ done
 # -count=1: archtest reads the module through `go list`, which the test
 # cache cannot see, so a cached pass could hide a new violation.
 go test -race -count=1 ./...
+# Search speed: TestSearchStaysWithinBudget skips under the race detector,
+# which slows search several times, so it runs again here without it.
+go test -count=1 -run '^TestSearchStaysWithinBudget$' ./internal/search

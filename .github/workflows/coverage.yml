@@ -21,7 +21,8 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      # The test output stays in the log, so a failed test shows why.
       - name: Test with coverage
         run: |
-          go test -count=1 -coverprofile=coverage.out ./... > /dev/null
+          go test -count=1 -coverprofile=coverage.out ./...
           { echo '```'; go tool cover -func=coverage.out | tail -1; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

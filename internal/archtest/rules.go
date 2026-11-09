@@ -33,10 +33,13 @@ var layers = []struct {
 	{"cmd/tinydash", []string{"internal/app"}},
 	{"internal/archtest", nil},
 	{"internal/core", nil},
-	{"internal/golden", []string{"internal/core"}}, // test support: tests import it, the app never does
+	{"internal/golden", []string{"internal/core", "internal/zoneinfo"}}, // test support: tests import it, the app never does
 	{"internal/match", []string{"internal/core"}},
 	{"internal/weburl", nil}, // one WHATWG URL parser for the features that read web URLs
-	{"internal/feature/", []string{"internal/core", "internal/match", "internal/weburl"}},
+	// Time zones from the binary, never from the disk, so answers and the
+	// golden tests do not depend on the host.
+	{"internal/zoneinfo", nil},
+	{"internal/feature/", []string{"internal/core", "internal/match", "internal/weburl", "internal/zoneinfo"}},
 	{"internal/settings", []string{"internal/core"}},
 	{"internal/search", []string{"internal/core", "internal/match", "internal/feature/", "internal/settings"}},
 	{"internal/store", []string{"internal/core", "internal/feature/"}},
@@ -68,12 +71,26 @@ var external = map[string][]string{
 
 // pure packages get disk, network, clock, and randomness as arguments, so
 // tests control them and a search never blocks on the OS.
-var pure = []string{"internal/core", "internal/match", "internal/weburl", "internal/feature/", "internal/settings", "internal/search"}
+var pure = []string{"internal/core", "internal/match", "internal/weburl", "internal/zoneinfo", "internal/feature/", "internal/settings", "internal/search"}
 
-var impureImports = []string{"os", "os/exec", "os/signal", "net", "net/", "syscall", "unsafe", "plugin", "crypto/rand", "math/rand", "math/rand/v2"}
+var impureImports = []string{"os", "os/exec", "os/signal", "os/user", "io/ioutil", "net", "net/", "syscall", "unsafe", "plugin", "crypto/rand", "math/rand", "math/rand/v2"}
 
-// Clock reads that pure packages must not make.
-var clockCalls = []string{"Now", "Since", "Until", "Sleep", "After", "Tick", "NewTimer", "NewTicker", "AfterFunc"}
+// impureCalls are the standard library functions, by import path, that
+// read the clock or the disk although their package does not need the OS.
+var impureCalls = []struct {
+	pkg, fix string
+	funcs    []string
+}{
+	{"time", "take the time as an argument", []string{"Now", "Since", "Until", "Sleep", "After", "Tick", "NewTimer", "NewTicker", "AfterFunc"}},
+	// LoadLocation reads $ZONEINFO and the system's zoneinfo first.
+	{"time", "use internal/zoneinfo", []string{"LoadLocation"}},
+	{"path/filepath", "take an fs.FS or the result as an argument", []string{"Abs", "EvalSymlinks", "Glob", "Walk", "WalkDir"}},
+	// The first call reads the system's MIME tables.
+	{"mime", "take the type as an argument", []string{"TypeByExtension", "ExtensionsByType"}},
+	{"crypto/x509", "take the pool as an argument", []string{"SystemCertPool"}},
+	{"text/template", "take an fs.FS as an argument", []string{"ParseFiles", "ParseGlob"}},
+	{"html/template", "take an fs.FS as an argument", []string{"ParseFiles", "ParseGlob"}},
+}
 
 var goosNames = []string{"aix", "android", "darwin", "dragonfly", "freebsd", "illumos", "ios", "js", "linux", "netbsd", "openbsd", "plan9", "solaris", "wasip1", "windows"}
 
@@ -134,8 +151,12 @@ func checkFiles(rel string, files map[string][]byte) []string {
 		if !platform && buildTagNamesGOOS(f) {
 			out = append(out, where+": OS build tag outside internal/platform")
 		}
-		timeName, runtimeName := importName(f, "time"), importName(f, "runtime")
+		runtimeName := importName(f, "runtime")
 		isPure := matchesAny(rel, pure)
+		callNames := make([]string, len(impureCalls))
+		for i, c := range impureCalls {
+			callNames[i] = importName(f, c.pkg)
+		}
 		ast.Inspect(f, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
 			if !ok {
@@ -146,8 +167,12 @@ func checkFiles(rel string, files map[string][]byte) []string {
 				return true
 			}
 			pos := fset.Position(sel.Pos())
-			if isPure && id.Name == timeName && slices.Contains(clockCalls, sel.Sel.Name) {
-				out = append(out, fmt.Sprintf("%s:%d: time.%s in a pure package; take the time as an argument", where, pos.Line, sel.Sel.Name))
+			if isPure {
+				for i, c := range impureCalls {
+					if id.Name == callNames[i] && slices.Contains(c.funcs, sel.Sel.Name) {
+						out = append(out, fmt.Sprintf("%s:%d: %s.%s in a pure package; %s", where, pos.Line, path.Base(c.pkg), sel.Sel.Name, c.fix))
+					}
+				}
 			}
 			if !platform && name != "labels.go" && id.Name == runtimeName && sel.Sel.Name == "GOOS" {
 				out = append(out, fmt.Sprintf("%s:%d: runtime.GOOS outside internal/platform and labels.go", where, pos.Line))

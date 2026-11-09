@@ -13,7 +13,7 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux, wri
 | Packaged app for this OS            | `go tool mygo build` (into `build/`)                                        |
 | Run from source                     | `go run ./cmd/tinydash --data-dir <scratch folder>`                         |
 
-`verify-go.sh` runs vet and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`, which includes the import rules and gofmt. It runs the tests on this machine's OS only. CI runs them on all three: after you push, wait for `gh pr checks <branch> --watch` before you call a change verified. Branch protection requires only the `Required checks` job; keep its name. A change to Markdown, `docs/`, or `LICENSE` alone skips the Go jobs in CI.
+`verify-go.sh` runs vet and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`, which includes the import rules and gofmt, then the search speed gate (p95 under 16 ms) without the race detector. It runs the tests on this machine's OS only. CI runs them on all three: after you push, wait for `gh pr checks <branch> --watch` before you call a change verified. Branch protection requires only the `Required checks` job; keep its name. A change to Markdown, `docs/`, or `LICENSE` alone skips the Go jobs in CI.
 
 ## Where things are
 
@@ -29,11 +29,13 @@ internal/
   feature/<name>/      One pure feature each (apps, files, clipboard, library, calc, ...).
   match/               Scoring (a port of nucleo).
   weburl/              The one WHATWG URL parser.
+  zoneinfo/            Time zone rules built into the binary; never the disk's.
   settings/            settings.json model, load, Normalize, Tauri shortcut translation.
   store/               All SQL and the migrations.
   platform/            OS work that mygo lacks. The only package with _darwin/_windows/_linux files.
   ui/kit/              Keys, palette, fonts shared by both views.
-  ui/launcher/         Launcher view and model; keymap.go holds every key.
+  ui/launcher/         Launcher view and model. keymap.go holds the panel's keys;
+                       overlays.go holds the keys of the menu and the dialogs.
   ui/settings/         Settings view and model.
   archtest/            The import rules as data (rules.go).
   golden/              Test support for the frozen Rust answers in testdata/golden.
@@ -48,7 +50,7 @@ The package table in `docs/architecture.md` lists what each package owns and may
 
 Rules marked _(test)_ fail `go test` when broken.
 
-1. **Logic lives in the pure packages.** `core`, `match`, `weburl`, `feature/*`, `settings`, and `search` take disk, network, clock, and randomness as arguments (`fs.FS`, `io.Reader`, `time.Time`). They import no `os`, `net`, `syscall`, `unsafe`, or random source, and call no `time.Now`. _(test: `internal/archtest`)_
+1. **Logic lives in the pure packages.** `core`, `match`, `weburl`, `zoneinfo`, `feature/*`, `settings`, and `search` take disk, network, clock, and randomness as arguments (`fs.FS`, `io.Reader`, `time.Time`). They import no `os`, `net`, `syscall`, `unsafe`, or random source. They call no `time.Now`, and no standard function that reads the disk, such as `time.LoadLocation` (use `zoneinfo.Load`) or `filepath.Glob`. _(test: `internal/archtest`)_
 2. **Each package imports only its layer.** The layers and the allowlisted modules are data in `internal/archtest/rules.go`. Change them there, in their own commit, with the reason. _(test)_
 3. **OS code lives only in `internal/platform`.** Only it has OS file suffixes or OS build tags. Elsewhere, only a file named `labels.go` reads `runtime.GOOS`, to pick a label or a default. Add a platform function to all three OS files. _(test)_
 4. **The compiler asks for each action.** `core.Handler` has one method per action, so a new action does not compile until `engine` handles it. `engine.Actions` checks each action again before it runs it. _(test: `internal/core`)_
