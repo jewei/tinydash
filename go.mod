@@ -10,11 +10,10 @@ ignore (
 	./src-tauri
 )
 
-require golang.org/x/text v0.43.0
-
 require (
 	github.com/ebitengine/purego v0.11.1
 	github.com/egoist/mygo v0.8.3
+	golang.org/x/text v0.43.0
 )
 
 require (
