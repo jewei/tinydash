@@ -2,14 +2,6 @@ module github.com/jewei/tinydash
 
 go 1.27.3
 
-// The Rust and TypeScript app lives beside the Go code until the port ends.
-ignore (
-	./dist
-	./node_modules
-	./src
-	./src-tauri
-)
-
 require (
 	github.com/ebitengine/purego v0.11.1
 	github.com/egoist/mygo v0.8.3
