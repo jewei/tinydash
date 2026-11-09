@@ -39,18 +39,6 @@ func (e *Engine) ClearClipboard() <-chan error {
 	})
 }
 
-// SetClipboardHistory turns clipboard history on or off. Saved entries stay
-// in the database while it is off; search hides them.
-func (e *Engine) SetClipboardHistory(enabled bool) <-chan error {
-	return e.Change(func(next *search.Snapshot, _ *store.Store) error {
-		if !enabled {
-			e.clipEpoch.Add(1)
-		}
-		next.Settings.ClipboardHistoryEnabled = enabled
-		return nil
-	})
-}
-
 func reloadClips(ctx context.Context, next *search.Snapshot, db *store.Store) error {
 	entries, err := db.ClipboardHistory(ctx)
 	if err != nil {

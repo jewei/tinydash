@@ -76,8 +76,8 @@ func TestContentReadBeforeAClearIsNeverSaved(t *testing.T) {
 func TestContentReadBeforeHistoryWasTurnedOffIsNeverSaved(t *testing.T) {
 	e, _ := start(t)
 	epoch := e.ClipEpoch()
-	<-e.SetClipboardHistory(false)
-	<-e.SetClipboardHistory(true)
+	setHistory(t, e, false)
+	setHistory(t, e, true)
 	if err := <-e.SaveClip(epoch, clipboard.Text("secret"), 100); err != nil {
 		t.Fatal(err)
 	}

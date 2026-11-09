@@ -342,9 +342,7 @@ func TestClipActionsUseOnlySavedEntriesWhileHistoryIsOn(t *testing.T) {
 	}
 
 	// While history is off, saved entries look gone.
-	if err := <-w.engine.SetClipboardHistory(false); err != nil {
-		t.Fatal(err)
-	}
+	setHistory(t, w.engine, false)
 	if err := w.run(core.CopyClip{ID: files}, ""); errorText(err) != "This entry is no longer in the history." {
 		t.Errorf("%v", err)
 	}

@@ -22,6 +22,10 @@ type Engine struct {
 	// clipEpoch counts clipboard history clears and switch-offs. Only the
 	// writer moves it; see ClipEpoch.
 	clipEpoch atomic.Uint64
+	// historyOffs counts switch-offs of clipboard history, so the monitor
+	// can tell that history was off since its last tick even when it never
+	// saw it off. Only the writer moves it.
+	historyOffs atomic.Uint64
 }
 
 type change struct {

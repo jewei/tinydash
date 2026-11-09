@@ -23,7 +23,7 @@ type System func(from, to settings.Settings) error
 
 // UpdateSettings changes the settings on the writer, saves settings.json,
 // and publishes them. A save that fails changes nothing. Turning clipboard
-// history off moves the clipboard epoch, as SetClipboardHistory does, so
+// history off moves the clipboard epoch, so
 // content read before is never saved after.
 func (e *Engine) UpdateSettings(file SettingsFile, change func(*settings.Settings)) <-chan error {
 	return e.Change(e.settingsChange(file, change, nil, nil))
@@ -56,6 +56,7 @@ func (e *Engine) settingsChange(file SettingsFile, change func(*settings.Setting
 			return err
 		}
 		if old.ClipboardHistoryEnabled && !updated.ClipboardHistoryEnabled {
+			e.historyOffs.Add(1)
 			e.clipEpoch.Add(1)
 		}
 		ctx := context.Background()
