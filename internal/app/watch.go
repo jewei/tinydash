@@ -14,6 +14,7 @@ import (
 
 	"github.com/egoist/mygo"
 
+	"github.com/jewei/tinydash/internal/engine"
 	"github.com/jewei/tinydash/internal/feature/files"
 	"github.com/jewei/tinydash/internal/platform"
 )
@@ -132,10 +133,36 @@ func newFileWatch() *fileWatch {
 	return &fileWatch{start: startMygoWatch, recursive: platform.RecursiveWatch, packages: platform.PackageExtensions, hidden: platform.HiddenCheck()}
 }
 
-// watchFolders watches the folders that the settings index. It runs at
-// start and after every change, and restarts the watches only when the
-// folders or the names to skip changed.
+// newAppWatch watches the folders apps are installed in, as the Rust app
+// did. It follows what the app list can change with: names other than dot
+// names, and bundles but not what is inside them.
+func newAppWatch() *fileWatch {
+	return &fileWatch{start: startMygoWatch, recursive: platform.RecursiveWatch, packages: platform.PackageExtensions}
+}
+
+// watchFolders watches the folders that the settings index, and the app
+// folders. It runs at start and after every change, and restarts the
+// watches only when the folders or the names to skip changed.
 func (a *App) watchFolders() {
 	s := a.engine.Snapshot(time.Now())
 	a.watch.sync(a.ctx, s.Settings.FileFolders(s.Home), s.Settings.FileSearchExcludedDirs)
+	a.appWatch.sync(a.ctx, platform.AppFolders(), nil)
+}
+
+// watchOf is the watch that marks slot's index dirty, or nil.
+func (a *App) watchOf(slot *engine.Slot) *fileWatch {
+	switch slot {
+	case a.files:
+		return a.watch
+	case a.apps:
+		return a.appWatch
+	}
+	return nil
+}
+
+// changed reports whether names changed under slot's folders since its
+// last rebuild was asked for.
+func (a *App) changed(slot *engine.Slot) bool {
+	w := a.watchOf(slot)
+	return w != nil && w.dirty.Load()
 }

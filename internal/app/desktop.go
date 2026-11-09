@@ -2,7 +2,6 @@ package app
 
 import (
 	"errors"
-	"sync/atomic"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/transfer"
@@ -16,19 +15,12 @@ import (
 // engine checked each action before it gets here.
 type desktop struct {
 	clip *Clipboard
-	// apps are the installed apps of the last listing, by path: mygo
-	// launches an app it listed.
-	apps atomic.Pointer[map[string]mygo.InstalledApp]
 }
 
+// LaunchApp launches by path: mygo's Shell.LaunchApp reads only the path
+// on every OS, so an app that mygo did not list launches too.
 func (d *desktop) LaunchApp(path string) error {
-	app := mygo.InstalledApp{Path: path}
-	if listed := d.apps.Load(); listed != nil {
-		if found, ok := (*listed)[path]; ok {
-			app = found
-		}
-	}
-	return mygo.Shell.LaunchApp(app)
+	return mygo.Shell.LaunchApp(mygo.InstalledApp{Path: path})
 }
 
 func (d *desktop) OpenPath(path string) error { return mygo.Shell.OpenPath(path) }

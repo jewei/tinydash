@@ -10,7 +10,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Your settings, clipboard history, pins, aliases, hotkeys, snippets, quicklinks, and calculator history carry over. The settings of removed features stay in the file, so an older version still finds them.
 - On Windows, pinned apps, app usage, and the aliases and hotkeys of apps reset once, because Windows apps now have new IDs.
 - Results with equal scores keep the order in which their source lists them.
-- Apps are found by their name only, and show their folder instead of a description.
+- On Windows, apps are found by their name only, and show their folder.
 - The file folders and Spotlight moved to Settings > Search. Settings no longer lists aliases and hotkeys: change them from the result's actions (Mod+K).
 - Command-line options: `--hidden` and `--data-dir` are new. `--settings`, `--background`, and `--mode` work as before.
 - A launcher position saved on Windows or Linux on a scaled display may open in another spot once. Drag the launcher there again.

@@ -163,3 +163,25 @@ func TestEmojiLanguagesAndRatesApplyAtOnce(t *testing.T) {
 		t.Error("rates that are off are kept")
 	}
 }
+
+// Lowering the limit removes the oldest entries at once, as the Rust app
+// did, even while history is off: they are saved, and come back when it is
+// on again.
+func TestLoweringTheClipboardLimitTrimsAtOnceEvenWhileHistoryIsOff(t *testing.T) {
+	e, _ := start(t)
+	_, _, file := LoadSettings(t.TempDir())
+	for _, text := range []string{"one", "two", "three"} {
+		if err := <-e.SaveClip(e.ClipEpoch(), clipboard.Text(text), 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	<-e.UpdateSettings(file, func(s *settings.Settings) { s.ClipboardHistoryEnabled = false })
+	if err := <-e.UpdateSettings(file, func(s *settings.Settings) { s.ClipboardHistoryLimit = 1 }); err != nil {
+		t.Fatal(err)
+	}
+	<-e.UpdateSettings(file, func(s *settings.Settings) { s.ClipboardHistoryEnabled = true })
+	entries := e.Snapshot(e.current.Load().Now).Clipboard.Browse(clipboard.Context{})
+	if len(entries) != 1 || entries[0].Title != "three" {
+		t.Fatalf("after lowering the limit to 1 with history off: %d entries %v, want only the newest", len(entries), entries)
+	}
+}
