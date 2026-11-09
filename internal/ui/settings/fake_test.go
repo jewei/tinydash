@@ -36,6 +36,12 @@ type fake struct {
 	hidden  []engine.Listed
 	unhides []core.ID
 	clears  int
+
+	aliases, hotkeys             []engine.Listed
+	aliasRemovals, hotkeyRemoval []core.ID
+	// removeErr, if set, is the error of each removal of an alias or a
+	// hotkey.
+	removeErr error
 }
 
 func newFake() *fake { return &fake{saved: settings.Default(), nextID: 100} }
@@ -125,6 +131,26 @@ func (f *fake) Unhide(id core.ID, done func(error)) {
 	f.unhides = append(f.unhides, id)
 	f.hidden = slices.DeleteFunc(f.hidden, func(r engine.Listed) bool { return r.ID == id })
 	done(nil)
+}
+
+func (f *fake) Aliases() []engine.Listed { return slices.Clone(f.aliases) }
+func (f *fake) Hotkeys() []engine.Listed { return slices.Clone(f.hotkeys) }
+
+func (f *fake) RemoveAlias(id core.ID, done func(error)) {
+	f.aliasRemovals = append(f.aliasRemovals, id)
+	f.remove(&f.aliases, id, done)
+}
+
+func (f *fake) RemoveHotkey(id core.ID, done func(error)) {
+	f.hotkeyRemoval = append(f.hotkeyRemoval, id)
+	f.remove(&f.hotkeys, id, done)
+}
+
+func (f *fake) remove(list *[]engine.Listed, id core.ID, done func(error)) {
+	if f.removeErr == nil {
+		*list = slices.DeleteFunc(*list, func(r engine.Listed) bool { return r.ID == id })
+	}
+	done(f.removeErr)
 }
 
 func (f *fake) ClearClipboard(done func(error)) {

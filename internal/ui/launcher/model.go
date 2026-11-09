@@ -33,6 +33,17 @@ type Model struct {
 	widgets     Widgets
 	widgetLoads int
 
+	// detailsWanted is the result whose details were asked for last, and
+	// detailsStale asks for them again after a search.
+	// detailLoads counts loads, so only the latest one shows. details
+	// belong to detailsOf.
+	detailsWanted core.ID
+	detailsStale  bool
+	detailLoads   int
+	detailsOf     core.ID
+	details       Details
+	hasDetails    bool
+
 	// history holds queries that ran a result, newest first, only while
 	// TinyDash runs: a query can hold private text, so it is never saved.
 	// recalled is the entry in the search field, until the user edits it,
@@ -169,6 +180,9 @@ func (m *Model) search(keep bool) {
 		id = m.results[m.selected].ID
 	}
 	m.results = m.backend.Search(m.query, m.category)
+	// New results may hold an edited item, as the Rust pane's revision
+	// had it: its details load again.
+	m.detailsStale = true
 	switch i := slices.IndexFunc(m.results, func(r core.Result) bool { return r.ID == id }); {
 	case !keep:
 		m.selected = 0

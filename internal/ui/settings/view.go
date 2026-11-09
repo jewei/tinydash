@@ -6,6 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/engine"
 	"github.com/jewei/tinydash/internal/settings"
 	"github.com/jewei/tinydash/internal/ui/kit"
 )
@@ -106,6 +107,10 @@ func (m *Model) general(c *ui.Context, p kit.Palette, v settings.Settings) {
 			}
 		})
 	})
+
+	heading(c, p, "Tabs")
+	intro(c, p, "Choose which tabs show after All, and in what order. Turn off “in All” to keep a tab's results out of All, such as emoji; its tab still finds them. A tab is never both hidden and out of All: turning one off turns the other on.")
+	m.tabsView(c, p, v.Tabs)
 }
 
 func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
@@ -143,10 +148,6 @@ func (m *Model) search(c *ui.Context, p kit.Palette, v settings.Settings) {
 		s.EmojiSkinTone = uint8(n)
 	})
 
-	heading(c, p, "Tabs")
-	intro(c, p, "Choose which tabs show after All, and in what order. Turn off “in All” to keep a tab's results out of All, such as emoji; its tab still finds them. A tab is never both hidden and out of All: turning one off turns the other on.")
-	m.tabsView(c, p, v.Tabs)
-
 	heading(c, p, "Emoji keywords")
 	intro(c, p, "English names and :shortcodes: always work. Add keywords in:")
 	for _, language := range languages {
@@ -181,9 +182,32 @@ func (m *Model) search(c *ui.Context, p kit.Palette, v settings.Settings) {
 			v.SpotlightFiles, func(s *settings.Settings, on bool) { s.SpotlightFiles = on })
 	}
 
+	heading(c, p, "Aliases")
+	intro(c, p, "Typing an alias puts its result first. Up to 500.")
+	m.personalView(c, p, &m.aliases, personalText{
+		list:  "Aliases",
+		empty: "None. To add one, choose Add Alias in a result's actions (" + modKeys[m.mac] + " K).",
+		value: func(r engine.Listed) { ui.Text(c, r.Value).FontWeight(600).TextColor(p.Ink) },
+		label: func(r engine.Listed) string { return "Remove the alias " + r.Value + " of " + r.Title },
+	}, m.backend.RemoveAlias, m.backend.Aliases)
+
+	heading(c, p, "Hotkeys")
+	intro(c, p, "Keys that run a result from any app. Up to 50.")
+	m.personalView(c, p, &m.hotkeys, personalText{
+		list:  "Hotkeys",
+		empty: "None. To add one, choose Set Hotkey in a result's actions (" + modKeys[m.mac] + " K).",
+		value: func(r engine.Listed) { keyCaps(c, p, kit.DisplayKeys(r.Value, m.mac, kit.SuperName)...) },
+		label: func(r engine.Listed) string { return "Remove the hotkey of " + r.Title },
+	}, m.backend.RemoveHotkey, m.backend.Hotkeys)
+
 	heading(c, p, "Hidden results")
 	intro(c, p, "Search leaves these out. Up to 500.")
-	m.hiddenView(c, p)
+	m.personalView(c, p, &m.hidden, personalText{
+		list:   "Hidden results",
+		empty:  "None. To hide one, choose Hide from Results in its actions (" + modKeys[m.mac] + " K).",
+		button: "Show Again",
+		label:  func(r engine.Listed) string { return "Show " + r.Title + " again" },
+	}, m.backend.Unhide, m.backend.Hidden)
 }
 
 // row is one labeled setting: text on the left, its control on the right.
@@ -419,35 +443,57 @@ func (m *Model) tabsView(c *ui.Context, p kit.Palette, tabs []settings.Tab) {
 	})
 }
 
-// hiddenView lists the hidden results with Show Again. After Show Again,
-// the row now in its place, or the list when it is empty, takes the focus,
-// so keyboard users keep their place.
-func (m *Model) hiddenView(c *ui.Context, p kit.Palette) {
-	focus := m.hiddenFocus
-	m.hiddenFocus = -1
-	list := ui.Column(c).Role(ui.RoleList).Label("Hidden results")
+// personalText is what a personal list says.
+type personalText struct {
+	list, empty string
+	// button is the text of each row's button; "" is Remove.
+	button string
+	// value, if set, draws the alias or keys before the title.
+	value func(engine.Listed)
+	label func(engine.Listed) string
+}
+
+// personalView lists the results of l, each with a button that undoes the
+// change. After one is undone, the row now in its place, or the list when
+// it is empty, takes the focus, so keyboard users keep their place.
+func (m *Model) personalView(c *ui.Context, p kit.Palette, l *personalList, text personalText, undo func(core.ID, func(error)), reload func() []engine.Listed) {
+	focus := -1
+	if l.refocus {
+		focus = l.focus
+	}
+	l.refocus = false
+	button := text.button
+	if button == "" {
+		button = "Remove"
+	}
+	list := ui.Column(c).Role(ui.RoleList).Label(text.list)
 	list.Children(func() {
-		if len(m.hidden) == 0 {
-			ui.Text(c, "None. To hide one, choose Hide from Results in its actions ("+modKeys[m.mac]+" K).").TextColor(p.Muted)
+		if len(l.items) == 0 {
+			ui.Text(c, text.empty).TextColor(p.Muted)
 		}
-		for i, r := range m.hidden {
+		for i, r := range l.items {
 			ui.Row(c).Key(r.ID).Gap(8).Padding(4, 0).AlignItems(ui.Center).Role(ui.RoleListItem).Children(func() {
 				ui.Column(c).Grow(1).Children(func() {
-					ui.Text(c, r.Title).TextColor(p.Ink)
+					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+						if text.value != nil {
+							text.value(r)
+						}
+						ui.Text(c, r.Title).TextColor(p.Ink)
+					})
 					ui.Text(c, r.Subtitle).FontSize(12).TextColor(p.Muted)
 				})
-				b := linkButton(c, p, "Show Again", "Show "+r.Title+" again").OnClick(func() { m.showAgain(r.ID, i) })
-				if focus >= 0 && i == min(focus, len(m.hidden)-1) {
+				b := linkButton(c, p, button, text.label(r)).OnClick(func() { l.remove(r.ID, i, undo, reload) })
+				if focus >= 0 && i == min(focus, len(l.items)-1) {
 					b.Focus()
 				}
 			})
 		}
 	})
-	if focus >= 0 && len(m.hidden) == 0 {
+	if focus >= 0 && len(l.items) == 0 {
 		list.Focusable().Focus()
 	}
-	if m.hiddenErr != "" {
-		ui.Text(c, m.hiddenErr).FontSize(12).TextColor(p.Danger).Role(ui.RoleStatus)
+	if l.err != "" {
+		ui.Text(c, l.err).FontSize(12).TextColor(p.Danger).Role(ui.RoleStatus)
 	}
 }
 

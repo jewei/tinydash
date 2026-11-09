@@ -210,3 +210,29 @@ func (b *settingsBackend) ClearClipboard(done func(error)) {
 		a.toSettings(func() { done(err) })
 	}()
 }
+
+func (b *settingsBackend) Aliases() []engine.Listed {
+	return engine.AliasResults(b.app().engine.Snapshot(time.Now()))
+}
+
+func (b *settingsBackend) Hotkeys() []engine.Listed {
+	return engine.HotkeyResults(b.app().engine.Snapshot(time.Now()))
+}
+
+// RemoveAlias and RemoveHotkey save an empty alias or hotkey, which removes
+// it also when its item is gone.
+func (b *settingsBackend) RemoveAlias(id core.ID, done func(error)) {
+	b.runFromSettings(core.SetAlias{ID: id}, done)
+}
+
+func (b *settingsBackend) RemoveHotkey(id core.ID, done func(error)) {
+	b.runFromSettings(core.SetHotkey{ID: id}, done)
+}
+
+func (b *settingsBackend) runFromSettings(action core.Action, done func(error)) {
+	a := b.app()
+	go func() {
+		err := a.actions.Run(engine.FromLauncher, action, "")
+		a.toSettings(func() { done(err) })
+	}()
+}

@@ -84,7 +84,7 @@ func (m *Model) searchBar(c *ui.Context, p kit.Palette) {
 
 func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 	tabs := m.tabs()
-	ui.Row(c).Padding(4, 16, 12, 16).Gap(4).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule).Children(func() {
+	dragArea(ui.Row(c).Padding(4, 16, 12, 16).Gap(4).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule)).Children(func() {
 		ui.Row(c).Gap(4).Role(ui.RoleTabList).Label("Categories").Grow(1).Children(func() {
 			for _, tab := range tabs {
 				chosen := tab == m.category
@@ -113,6 +113,11 @@ func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 	})
 }
 
+// dragArea makes the empty parts of a bar move the panel, which has no
+// title bar; its buttons still take their clicks. The focus stays in the
+// search field, so typing goes on after the move.
+func dragArea(bar ui.Element) ui.Element { return bar.DragWindow().KeepFocus() }
+
 // noticeBar says what went wrong under the tabs. A startup warning has a
 // Dismiss button; an action's failure goes with the next edit.
 func noticeBar(c *ui.Context, p kit.Palette, text string, dismiss func()) {
@@ -125,16 +130,23 @@ func noticeBar(c *ui.Context, p kit.Palette, text string, dismiss func()) {
 	})
 }
 
-// body shows the results, and the widget pane beside them while it shows.
+// body shows the results, and beside them the widget pane on an empty All
+// search, or else the selected result's details.
 func (m *Model) body(c *ui.Context, p kit.Palette) {
-	if !m.showsWidgets() {
+	m.loadDetails()
+	widgets, details := m.showsWidgets(), m.showsDetails()
+	if !widgets && !details {
 		m.resultsView(c, p)
 		return
 	}
 	// The Solid app split the body 11 to 9 between the results and the pane.
 	ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
 		ui.Column(c).Grow(11).Children(func() { m.resultsView(c, p) })
-		m.widgetPane(c, p)
+		if widgets {
+			m.widgetPane(c, p)
+		} else {
+			m.detailsPane(c, p)
+		}
 	})
 }
 
@@ -214,7 +226,7 @@ func (m *Model) row(c *ui.Context, p kit.Palette, r core.Result, i int) {
 		title = p.SelectedInk
 	}
 	row.Children(func() {
-		m.icon(c, p, r)
+		m.icon(c, p, r, 32)
 		ui.Column(c).Grow(1).Gap(1).Children(func() {
 			t := ui.Text(c, r.Title).TextColor(title).SingleLine()
 			if chosen {
@@ -236,6 +248,17 @@ func (m *Model) row(c *ui.Context, p kit.Palette, r core.Result, i int) {
 			}
 		})
 	})
+	// Moving the pointer onto a row selects it. Only a real move counts:
+	// mygo sends InputPointerMove only when the pointer's position in the
+	// window changed, never for a list that scrolls, or new results that
+	// come, under a still pointer, so those never take the selection from
+	// the keyboard.
+	row.HandleInput(func(ev ui.InputEvent) bool {
+		if ev.Kind == ui.InputPointerMove && i < len(m.rows()) {
+			m.selected = i
+		}
+		return false
+	})
 	// A click runs the row the user sees; a right-click opens its actions.
 	row.OnClick(func() {
 		m.selected = i
@@ -248,27 +271,29 @@ func (m *Model) row(c *ui.Context, p kit.Palette, r core.Result, i int) {
 	}
 }
 
-// icon is a file's system icon, an emoji, a color swatch, or a glyph.
-func (m *Model) icon(c *ui.Context, p kit.Palette, r core.Result) {
-	ui.Row(c).Size(32, 32).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
+// icon is a file's system icon, an emoji, a color swatch, or a glyph, in a
+// square of size: 32 on a row, 56 in the details.
+func (m *Model) icon(c *ui.Context, p kit.Palette, r core.Result, size float32) {
+	scale := size / 32
+	ui.Row(c).Size(size, size).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
 		if r.Icon.File != "" {
 			if b := m.backend.FileIcon(r.Icon.File); b != nil {
-				ui.Image(c, b).Size(32, 32)
+				ui.Image(c, b).Size(size, size)
 				return
 			}
 		}
 		switch {
 		case r.Icon.Emoji != "":
-			ui.Text(c, r.Icon.Emoji).FontSize(26)
+			ui.Text(c, r.Icon.Emoji).FontSize(26 * scale)
 		case r.Icon.Color != "":
-			ui.Box(c).Size(24, 24).Radius(6).Background(ui.Hex(r.Icon.Color)).Border(1, p.Border)
+			ui.Box(c).Size(24*scale, 24*scale).Radius(6*scale).Background(ui.Hex(r.Icon.Color)).Border(1, p.Border)
 		default:
 			name := string(r.Icon.Symbol)
 			if glyphs[name] == nil {
 				name = kinds[r.Kind].glyph
 			}
 			if svg := glyphs[name]; svg != nil {
-				ui.Icon(c, svg).FontSize(19).TextColor(p.Muted)
+				ui.Icon(c, svg).FontSize(19 * scale).TextColor(p.Muted)
 			}
 		}
 	})
@@ -278,7 +303,7 @@ func (m *Model) icon(c *ui.Context, p kit.Palette, r core.Result) {
 // a press on it must toggle the menu, not close it as a press outside.
 func (m *Model) footer(c *ui.Context, p kit.Palette) ui.Element {
 	var actions ui.Element
-	ui.Row(c).Height(40).Padding(0, 16).Gap(12).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.Rule).Children(func() {
+	dragArea(ui.Row(c).Height(40).Padding(0, 16).Gap(12).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.Rule)).Children(func() {
 		if r, ok := m.selectedRow(); ok && len(r.Actions) > 0 {
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, r.Actions[0].Label).FontSize(12).TextColor(p.Ink)

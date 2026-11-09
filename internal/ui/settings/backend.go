@@ -45,6 +45,15 @@ type Backend interface {
 	Hidden() []engine.Listed
 	// Unhide shows a hidden result in search again.
 	Unhide(id core.ID, done func(error))
+	// Aliases lists the aliases the user set, by alias; Value is the alias.
+	Aliases() []engine.Listed
+	// RemoveAlias removes a result's alias, also when its item is gone.
+	RemoveAlias(id core.ID, done func(error))
+	// Hotkeys lists the hotkeys the user set, by title; Value is the
+	// accelerator text.
+	Hotkeys() []engine.Listed
+	// RemoveHotkey removes a result's hotkey, also when its item is gone.
+	RemoveHotkey(id core.ID, done func(error))
 	// ClearClipboard deletes the clipboard history except pins.
 	ClearClipboard(done func(error))
 }

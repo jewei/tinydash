@@ -132,3 +132,26 @@ func TestListsHiddenResultsByTitle(t *testing.T) {
 		t.Errorf("%q, want %q", got, want)
 	}
 }
+
+// Ports aliased and hotkeys of commands.rs: aliases by alias, hotkeys by
+// title, each with its result's title, or its key when the item is gone.
+func TestListsAliasesAndHotkeys(t *testing.T) {
+	gone := safari + "x"
+	w := newWorld(t, func(first *search.Snapshot, _ *store.Store) {
+		first.Aliases = search.NewAliases(map[core.ID]string{"system:sleep": "zz", "system:lock": "lk", core.SourceApp.ID(gone): "old"})
+		first.Hotkeys = search.NewHotkeys(map[core.ID]string{"system:sleep": "Control+Alt+S", "system:lock": "Control+Alt+L"})
+	})
+	list := func(rows []Listed) []string {
+		var out []string
+		for _, r := range rows {
+			out = append(out, r.Value+" "+r.Title+" / "+r.Subtitle)
+		}
+		return out
+	}
+	if got, want := list(AliasResults(w.snapshot())), []string{"lk Lock Screen / Lock this computer", "old " + gone + " / No longer found", "zz Sleep / Put the computer to sleep"}; !slices.Equal(got, want) {
+		t.Errorf("aliases %q, want %q", got, want)
+	}
+	if got, want := list(HotkeyResults(w.snapshot())), []string{"Control+Alt+L Lock Screen / Lock this computer", "Control+Alt+S Sleep / Put the computer to sleep"}; !slices.Equal(got, want) {
+		t.Errorf("hotkeys %q, want %q", got, want)
+	}
+}

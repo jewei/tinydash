@@ -55,6 +55,7 @@ var layers = []struct {
 var external = map[string][]string{
 	"github.com/egoist/mygo":                []string{"internal/app", "internal/platform"},
 	"github.com/egoist/mygo/ui":             []string{"internal/app", "internal/ui/"},
+	"github.com/egoist/mygo/i18n":           []string{"internal/ui/"}, // dates in the user's regional formats
 	"github.com/egoist/mygo/transfer":       []string{"internal/app"}, // clipboard formats and data, as mygo.Clipboard reads them
 	"github.com/egoist/mygo/plugins/sqlite": []string{"internal/store"},
 	// The automation socket lets the verify-tinydash skill drive a built

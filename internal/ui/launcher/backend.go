@@ -7,6 +7,7 @@ package launcher
 import (
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/engine"
 	"github.com/jewei/tinydash/internal/settings"
 )
 
@@ -42,6 +43,12 @@ type Backend interface {
 	// launcher shows and after the data changed; done as for Run. Reading
 	// the disk can wait on the OS, so the app loads it outside the frame.
 	Widgets(done func(Widgets))
+	// Details loads the details of the selected result, which the pane
+	// beside a typed search shows; done gets them, or false when the
+	// result has none. Only apps, files, folders, clipboard entries, and
+	// snippets have them. Reading them can wait on the disk, so the app
+	// loads them outside the frame.
+	Details(id core.ID, done func(Details, bool))
 	// Warnings are the problems found since the last call, such as a
 	// hotkey that did not register at startup, each returned once. They
 	// come after the launcher was made, so it asks each time it shows.
@@ -88,4 +95,12 @@ type Disk struct {
 	TotalBytes, FreeBytes uint64
 	// Err is why the OS did not report the disk, or nil.
 	Err error
+}
+
+// Details are a result's details as the pane shows them.
+type Details struct {
+	engine.Details
+	// Image is the decoded engine.DetailsImage, or nil when it did not
+	// decode.
+	Image *ui.Bitmap
 }
