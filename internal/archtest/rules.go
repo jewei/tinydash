@@ -73,10 +73,24 @@ var external = map[string][]string{
 // tests control them and a search never blocks on the OS.
 var pure = []string{"internal/core", "internal/match", "internal/weburl", "internal/zoneinfo", "internal/feature/", "internal/settings", "internal/search"}
 
-var impureImports = []string{"os", "os/exec", "os/signal", "net", "net/", "syscall", "unsafe", "plugin", "crypto/rand", "math/rand", "math/rand/v2"}
+var impureImports = []string{"os", "os/exec", "os/signal", "os/user", "io/ioutil", "net", "net/", "syscall", "unsafe", "plugin", "crypto/rand", "math/rand", "math/rand/v2"}
 
-// Clock reads that pure packages must not make.
-var clockCalls = []string{"Now", "Since", "Until", "Sleep", "After", "Tick", "NewTimer", "NewTicker", "AfterFunc"}
+// impureCalls are the standard library functions, by import path, that
+// read the clock or the disk although their package does not need the OS.
+var impureCalls = []struct {
+	pkg, fix string
+	funcs    []string
+}{
+	{"time", "take the time as an argument", []string{"Now", "Since", "Until", "Sleep", "After", "Tick", "NewTimer", "NewTicker", "AfterFunc"}},
+	// LoadLocation reads $ZONEINFO and the system's zoneinfo first.
+	{"time", "use internal/zoneinfo", []string{"LoadLocation"}},
+	{"path/filepath", "take an fs.FS or the result as an argument", []string{"Abs", "EvalSymlinks", "Glob", "Walk", "WalkDir"}},
+	// The first call reads the system's MIME tables.
+	{"mime", "take the type as an argument", []string{"TypeByExtension", "ExtensionsByType"}},
+	{"crypto/x509", "take the pool as an argument", []string{"SystemCertPool"}},
+	{"text/template", "take an fs.FS as an argument", []string{"ParseFiles", "ParseGlob"}},
+	{"html/template", "take an fs.FS as an argument", []string{"ParseFiles", "ParseGlob"}},
+}
 
 var goosNames = []string{"aix", "android", "darwin", "dragonfly", "freebsd", "illumos", "ios", "js", "linux", "netbsd", "openbsd", "plan9", "solaris", "wasip1", "windows"}
 
@@ -137,8 +151,12 @@ func checkFiles(rel string, files map[string][]byte) []string {
 		if !platform && buildTagNamesGOOS(f) {
 			out = append(out, where+": OS build tag outside internal/platform")
 		}
-		timeName, runtimeName := importName(f, "time"), importName(f, "runtime")
+		runtimeName := importName(f, "runtime")
 		isPure := matchesAny(rel, pure)
+		callNames := make([]string, len(impureCalls))
+		for i, c := range impureCalls {
+			callNames[i] = importName(f, c.pkg)
+		}
 		ast.Inspect(f, func(n ast.Node) bool {
 			sel, ok := n.(*ast.SelectorExpr)
 			if !ok {
@@ -149,8 +167,12 @@ func checkFiles(rel string, files map[string][]byte) []string {
 				return true
 			}
 			pos := fset.Position(sel.Pos())
-			if isPure && id.Name == timeName && slices.Contains(clockCalls, sel.Sel.Name) {
-				out = append(out, fmt.Sprintf("%s:%d: time.%s in a pure package; take the time as an argument", where, pos.Line, sel.Sel.Name))
+			if isPure {
+				for i, c := range impureCalls {
+					if id.Name == callNames[i] && slices.Contains(c.funcs, sel.Sel.Name) {
+						out = append(out, fmt.Sprintf("%s:%d: %s.%s in a pure package; %s", where, pos.Line, path.Base(c.pkg), sel.Sel.Name, c.fix))
+					}
+				}
 			}
 			if !platform && name != "labels.go" && id.Name == runtimeName && sel.Sel.Name == "GOOS" {
 				out = append(out, fmt.Sprintf("%s:%d: runtime.GOOS outside internal/platform and labels.go", where, pos.Line))

@@ -49,7 +49,7 @@ The package table in `docs/architecture.md` lists what each package owns and may
 
 Rules marked _(test)_ fail `go test` when broken.
 
-1. **Logic lives in the pure packages.** `core`, `match`, `weburl`, `zoneinfo`, `feature/*`, `settings`, and `search` take disk, network, clock, and randomness as arguments (`fs.FS`, `io.Reader`, `time.Time`). They import no `os`, `net`, `syscall`, `unsafe`, or random source, and call no `time.Now`. _(test: `internal/archtest`)_
+1. **Logic lives in the pure packages.** `core`, `match`, `weburl`, `zoneinfo`, `feature/*`, `settings`, and `search` take disk, network, clock, and randomness as arguments (`fs.FS`, `io.Reader`, `time.Time`). They import no `os`, `net`, `syscall`, `unsafe`, or random source. They call no `time.Now`, and no standard function that reads the disk, such as `time.LoadLocation` (use `zoneinfo.Load`) or `filepath.Glob`. _(test: `internal/archtest`)_
 2. **Each package imports only its layer.** The layers and the allowlisted modules are data in `internal/archtest/rules.go`. Change them there, in their own commit, with the reason. _(test)_
 3. **OS code lives only in `internal/platform`.** Only it has OS file suffixes or OS build tags. Elsewhere, only a file named `labels.go` reads `runtime.GOOS`, to pick a label or a default. Add a platform function to all three OS files. _(test)_
 4. **The compiler asks for each action.** `core.Handler` has one method per action, so a new action does not compile until `engine` handles it. `engine.Actions` checks each action again before it runs it. _(test: `internal/core`)_

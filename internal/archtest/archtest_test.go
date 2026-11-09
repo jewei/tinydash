@@ -57,6 +57,13 @@ func TestEachRuleCanFail(t *testing.T) {
 		{"OS file name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_darwin.go": []byte("package engine\n")}}, "OS-specific file"},
 		{"OS build tag", Package{Path: module + "/internal/engine", Files: file("//go:build cgo || windows\n\npackage engine\n")}, "OS build tag"},
 		{"clock in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport clock \"time\"\n\nvar now = clock.Now()\n")}, "time.Now in a pure package"},
+		{"zone from the disk in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport \"time\"\n\nvar kl, _ = time.LoadLocation(\"Asia/Kuala_Lumpur\")\n")}, "time.LoadLocation in a pure package"},
+		{"glob in a pure package", Package{Path: module + "/internal/search", Files: file("package search\n\nimport fp \"path/filepath\"\n\nvar m, _ = fp.Glob(\"*\")\n")}, "filepath.Glob in a pure package"},
+		{"absolute path in a pure package", Package{Path: module + "/internal/settings", Files: file("package settings\n\nimport \"path/filepath\"\n\nvar p, _ = filepath.Abs(\"x\")\n")}, "filepath.Abs in a pure package"},
+		{"walk in a pure package", Package{Path: module + "/internal/feature/files", Files: file("package files\n\nimport \"path/filepath\"\n\nvar err = filepath.WalkDir(\".\", nil)\n")}, "filepath.WalkDir in a pure package"},
+		{"mime table in a pure package", Package{Path: module + "/internal/feature/files", Files: file("package files\n\nimport \"mime\"\n\nvar t = mime.TypeByExtension(\".txt\")\n")}, "mime.TypeByExtension in a pure package"},
+		{"user account in a pure package", Package{Path: module + "/internal/core", Imports: []string{"os/user"}}, "imports os/user; pure packages"},
+		{"ioutil in a pure package", Package{Path: module + "/internal/match", Imports: []string{"io/ioutil"}}, "imports io/ioutil; pure packages"},
 		{"runtime.GOOS outside platform", Package{Path: module + "/internal/engine", Files: file("package engine\n\nimport \"runtime\"\n\nvar mac = runtime.GOOS == \"darwin\"\n")}, "runtime.GOOS outside"},
 	}
 	for _, c := range cases {
@@ -68,6 +75,8 @@ func TestEachRuleCanFail(t *testing.T) {
 	// And the allowed shapes pass.
 	ok := []Package{
 		{Path: module + "/internal/feature/calc", Imports: []string{"strings", module + "/internal/core", module + "/internal/match"}, Files: file("package calc\n\nimport \"time\"\n\nvar d = time.Hour\n")},
+		{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport (\n\t\"path/filepath\"\n\t\"time\"\n)\n\nvar kl, _ = time.LoadLocationFromTZData(\"KL\", nil)\n\nvar base = filepath.Base(\"/a/b\")\n")},
+		{Path: module + "/internal/engine", Imports: []string{"os/user"}, Files: file("package engine\n\nimport \"time\"\n\nvar kl, _ = time.LoadLocation(\"Asia/Kuala_Lumpur\")\n")},
 		{Path: module + "/internal/platform", Imports: []string{"github.com/ebitengine/purego"}, Files: map[string][]byte{"clipboard_darwin.go": []byte("//go:build darwin\n\npackage platform\n")}},
 		{Path: module + "/internal/ui/kit", Imports: []string{"github.com/egoist/mygo/ui", module + "/internal/core", module + "/internal/settings"}},
 		{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/kit"}},

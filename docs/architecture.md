@@ -35,7 +35,7 @@ Other folders:
 
 ## Rules the tests enforce
 
-1. `core`, `match`, `weburl`, `zoneinfo`, `feature/*`, `settings`, and `search` are pure. They import no `os`, `os/exec`, `os/signal`, `net`, `syscall`, `unsafe`, `plugin`, `crypto/rand`, or `math/rand`, and do not call `time.Now`, `time.Sleep`, or the other clock functions. Disk, network, clock, and randomness come in as arguments: `fs.FS`, `io.Reader`, `time.Time`. (`internal/archtest`)
+1. `core`, `match`, `weburl`, `zoneinfo`, `feature/*`, `settings`, and `search` are pure. They import no `os`, `os/exec`, `os/signal`, `os/user`, `io/ioutil`, `net`, `syscall`, `unsafe`, `plugin`, `crypto/rand`, or `math/rand`. They do not call `time.Now`, `time.Sleep`, or the other clock functions. They do not call the standard functions that read the disk: `time.LoadLocation` (use `zoneinfo.Load`), `filepath.Abs`, `EvalSymlinks`, `Glob`, `Walk`, and `WalkDir`, `mime.TypeByExtension`, `x509.SystemCertPool`, and the `ParseFiles` and `ParseGlob` of the template packages. Disk, network, clock, and randomness come in as arguments: `fs.FS`, `io.Reader`, `time.Time`. (`internal/archtest`)
 2. Each package imports only its layer's packages, and only allowlisted modules outside the standard library. Only `store` imports the SQLite plugin. Only `platform` imports purego and `x/sys`. (`internal/archtest`)
 3. Only `platform` has `_darwin.go`, `_windows.go`, or `_linux.go` files or OS build tags. Outside `platform`, only a file named `labels.go` reads `runtime.GOOS`, to pick a label or a default. (`internal/archtest`)
 4. Every Go file is gofmt-formatted. (`internal/archtest`)
