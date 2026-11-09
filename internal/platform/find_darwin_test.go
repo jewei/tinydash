@@ -75,8 +75,8 @@ func TestLiveSpotlightFindsAFileByName(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	paths := FindFiles(context.Background(), "go-architecture", folder, 5)
-	if want := filepath.Join(folder, "docs", "go-architecture.md"); !slices.Contains(paths, want) {
+	paths := FindFiles(context.Background(), "architecture", folder, 5)
+	if want := filepath.Join(folder, "docs", "architecture.md"); !slices.Contains(paths, want) {
 		t.Errorf("got %q, want %q among them", paths, want)
 	}
 }

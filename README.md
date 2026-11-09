@@ -2,51 +2,36 @@
 
 A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut, type a few letters, and press Enter.
 
-![TinyDash in use: "saf" finds Safari, "next friday + 2 weeks" answers with a date that Enter copies, Command+K pins Safari, and Tab moves through the tabs](docs/demo.avif)
-
 - **Find** apps, files, clipboard history, snippets, quicklinks, emoji, and system commands.
 - **Answer** calculations, unit and currency conversions, dates, time zones, passwords, and clean URLs.
-- **Stay private:** everything runs on your computer. The only downloads are the daily currency rate table and the weather for one city, each only after you turn it on, and, on macOS and Windows, a check for new versions on GitHub (you can turn it off) and, when you choose to install one, the new version.
+- **Stay private:** everything runs on your computer. The only download is the daily currency rate table, and only after you turn it on.
 
-![The TinyDash launcher: app results with descriptions, and the widget pane with a clipboard card, clocks, weather, and the focus timer](docs/screenshot.png)
-
-![TinyDash Settings: the General section with the tab order](docs/settings.png)
-
-## Install
-
-- **macOS (Homebrew):**
-
-  ```sh
-  brew install jewei/tap/tinydash
-  ```
-
-- **macOS (download):** the `.dmg` from [Releases](https://github.com/jewei/tinydash/releases). The app is signed with a Developer ID and notarized by Apple.
-- **Windows:** the `-setup.exe` from [Releases](https://github.com/jewei/tinydash/releases). It is not signed, so Windows SmartScreen may ask you to confirm (More info > Run anyway).
-- **Linux:** from [Releases](https://github.com/jewei/tinydash/releases), the `.deb` (Debian, Ubuntu), the `.rpm` (Fedora, openSUSE), or the AppImage (most other distributions; make it executable, then run it). These are not signed.
-
-On macOS and Windows, TinyDash updates itself. On Linux, download new versions from Releases.
-
-From the release after 0.6.2 on, you can check that a download was built from this repository by its release workflow. Run `gh attestation verify FILE --repo jewei/tinydash` with the [GitHub CLI](https://cli.github.com).
+TinyDash is written in Go with [mygo](https://github.com/egoist/mygo) native UI. Versions up to 0.9.0 were a Rust and Tauri app; the Go app reads their settings and data.
 
 Press **Control+Shift+Space** to open TinyDash. See [all features and shortcuts](docs/features.md).
 
+## Install
+
+The Go app has no release yet. The downloads on the [Releases page](https://github.com/jewei/tinydash/releases) and the Homebrew cask are the earlier Rust app. To use the Go app now, build it from source.
+
 ## Build from source
 
-Install Bun 1.4.2, Node.js 24, Rust (rustup), and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), then:
+Install Go 1.27.3 or later. On Linux, also install `libgtk-3-dev` and `libayatana-appindicator3-dev`. Then:
 
 ```sh
-bun install
-bun run dev      # run with hot reload
-bun run build    # build installers for this OS
+go tool mygo build                                # the packaged app, into build/
+go run ./cmd/tinydash --data-dir "$(mktemp -d)"    # try it with empty, throwaway data
 ```
+
+On macOS, `go tool mygo build` makes `build/darwin-arm64/TinyDash.app` and a disk image. Without `--data-dir`, TinyDash uses your real settings and data.
 
 ## Documentation
 
-- [Features](docs/features.md): what TinyDash does and its limits.
+- [Features](docs/features.md): what TinyDash does, its limits, and what changed from the Rust app.
 - [Architecture](docs/architecture.md): how it works and why.
-- [Development](docs/development.md): commands, tests, and releases.
+- [Development](docs/development.md): setup, checks, tests, and packaging.
 - [AGENTS.md](AGENTS.md): rules for contributors, human or AI.
 
 ## License
 
-MIT. Bundled fonts (Figtree, Caprasimo) use the SIL Open Font License; see `public/fonts`. Third-party data is listed in [`src-tauri/data/README.md`](src-tauri/data/README.md).
+MIT (see [LICENSE](LICENSE)). The bundled fonts, Figtree and Caprasimo, use the SIL Open Font License; see `internal/ui/kit/fonts`. The emoji keyword data uses the Unicode License; see `internal/feature/emoji/data/LICENSE`.

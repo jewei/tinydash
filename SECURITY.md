@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest release gets security fixes. On macOS and Windows, TinyDash updates itself; on Linux, download the latest release.
+Only the latest release gets security fixes. The Go app has no release yet; until it does, the latest release is the Rust app 0.9.0, which updates itself on macOS and Windows.
 
 ## Report a vulnerability
 
@@ -13,12 +13,11 @@ Include what you did, what happened, and the TinyDash version and OS. A fix is r
 ## What counts
 
 - A way for a web page, a file, a clipboard entry, or another app to make TinyDash run, open, or send something the user did not choose.
-- A way around the checks on update files or release downloads.
+- A way around the checks on release downloads.
 - Saved data, such as clipboard history, leaving the computer.
 
-## How releases are protected
+## How the code is checked
 
-- Updates are signed, and TinyDash refuses an update whose signature does not match its own key.
-- The macOS app is signed with a Developer ID and notarized by Apple.
-- Each release file has a build provenance attestation. Check one with `gh attestation verify FILE --repo jewei/tinydash`.
-- CodeQL scans the code on each pull request, and `cargo audit` checks the Rust dependencies every week.
+- CodeQL scans the Go and workflow code on each pull request, on `main`, and every Monday.
+- `govulncheck` checks the Go dependencies every Monday.
+- The release process for the Go app is not set up yet. The earlier Rust releases are signed and notarized on macOS, and each file has a build provenance attestation: check one with `gh attestation verify FILE --repo jewei/tinydash`.
