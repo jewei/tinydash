@@ -34,9 +34,15 @@ func (m *Monitor) Tick(now int64) <-chan error {
 	// The epoch first, then the clipboard: a Clear or a switch-off that
 	// lands between the two makes the save stale, and the writer drops it.
 	epoch := m.engine.ClipEpoch()
-	content, ok := m.read()
 	first := !m.started
 	m.started, m.seen = true, n
+	// While history is off, nothing is read: the counter is enough to see
+	// a change, and the content of a copy is none of TinyDash's business.
+	if !m.engine.current.Load().Settings.ClipboardHistoryEnabled {
+		m.seenHash = 0
+		return nil
+	}
+	content, ok := m.read()
 	if !ok {
 		return nil
 	}

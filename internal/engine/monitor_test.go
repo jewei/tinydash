@@ -67,3 +67,25 @@ func TestAClearDuringATickWins(t *testing.T) {
 		t.Fatalf("%d clips after a clear during the tick", n)
 	}
 }
+
+// While history is off, the monitor reads no content at all.
+func TestTheMonitorReadsNothingWhileHistoryIsOff(t *testing.T) {
+	e, _ := start(t)
+	<-e.SetClipboardHistory(false)
+	cb := &fakeClipboard{counted: true}
+	reads := 0
+	cb.onRead = func() { reads++ }
+	m := NewMonitor(e, cb.count, cb.read)
+	tick(t, m, 1)
+	cb.copy("private")
+	tick(t, m, 2)
+	if reads != 0 {
+		t.Fatalf("%d reads while history is off", reads)
+	}
+	<-e.SetClipboardHistory(true)
+	cb.copy("kept")
+	tick(t, m, 3)
+	if reads != 1 || clips(t, e) != 1 {
+		t.Fatalf("after turning history on: %d reads, %d clips", reads, clips(t, e))
+	}
+}

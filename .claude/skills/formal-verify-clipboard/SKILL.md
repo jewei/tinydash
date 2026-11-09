@@ -14,6 +14,7 @@ Nothing that the clipboard monitor read before a Clear or a switch-off of clipbo
 - Model: `formal/ClipboardHistory.tla`. Rule: `NothingStaleIsSaved` (each saved entry was read in the same history generation in which it was saved). Also `TypeOK`, which includes `epoch = gen`.
 - `formal/ClipboardHistory.cfg` models the code: up to 3 copies and 3 user requests (Clear, history off, history on), in every interleaving with the monitor's steps and the writer. It passes: about 94,000 distinct states.
 - `formal/ClipboardHistoryBroken.cfg` sets `EpochFirst = FALSE`: the monitor reads the clipboard before the epoch. It must fail with `NothingStaleIsSaved`. This shows the check can catch the bug.
+- `Monitor.Tick` reads no content while history is off; the model lets the monitor read then too. The model allows more than the code does, so a pass still holds for the code.
 - Left out: the content of clips, image and file kinds, the history limit, deletes of single entries, pins, the store's SQL, and the OS clipboard itself. The bound covers 3 copies and 3 requests, not more.
 
 ## Coverage record
