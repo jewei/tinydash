@@ -7,6 +7,7 @@ package match
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 )
@@ -66,19 +67,36 @@ func (m *Matcher) Name(name string) (score uint32, ok bool) {
 	if !ok {
 		return 0, false
 	}
-	switch {
-	case equalFold(name, m.query):
+	switch prefix, equal := foldMatch(name, m.query); {
+	case equal:
 		return fuzzy + Exact, true
-	case hasPrefixFold(name, m.query):
+	case prefix:
 		return fuzzy + Prefix, true
 	}
-	isSeparator := func(r rune) bool { return !isAlphanumeric(r) }
-	for _, word := range strings.FieldsFunc(name, isSeparator) {
-		if hasPrefixFold(word, m.query) {
-			return fuzzy + WordPrefix, true
-		}
+	if hasWordPrefix(name, m.query) {
+		return fuzzy + WordPrefix, true
 	}
 	return fuzzy, true
+}
+
+// hasWordPrefix reports whether a word of name (a run of alphanumeric
+// runes) starts with the query.
+func hasWordPrefix(name, query string) bool {
+	start := -1
+	for i, r := range name {
+		switch {
+		case isAlphanumeric(r):
+			if start < 0 {
+				start = i
+			}
+		case start >= 0:
+			if hasPrefixFold(name[start:i], query) {
+				return true
+			}
+			start = -1
+		}
+	}
+	return start >= 0 && hasPrefixFold(name[start:], query)
 }
 
 // Words scores text in which every query word appears as written, for long
@@ -117,6 +135,9 @@ func (m *Matcher) Best(name string, aliases ...string) (uint32, bool) {
 }
 
 func scoreAtoms(atoms []atom, text string) (uint32, bool) {
+	if isASCII(text) && !mayMatchASCII(atoms, text) {
+		return 0, false
+	}
 	hay := newText(text)
 	var total uint32
 	for _, a := range atoms {
@@ -127,6 +148,29 @@ func scoreAtoms(atoms []atom, text string) (uint32, bool) {
 		total += uint32(s)
 	}
 	return squeeze(total), true
+}
+
+// mayMatchASCII rejects most ASCII text before it is copied for scoring.
+// Every way nucleo matches an atom in ASCII text finds the atom's runes in
+// order, case ignored, and an atom that is not ASCII never matches ASCII
+// text.
+func mayMatchASCII(atoms []atom, text string) bool {
+	for _, a := range atoms {
+		if !a.needle.ascii {
+			return false
+		}
+		i := 0
+		for _, r := range a.needle.runes {
+			for i < len(text) && !equalFoldASCII(rune(text[i]), r) {
+				i++
+			}
+			if i == len(text) {
+				return false
+			}
+			i++
+		}
+	}
+	return true
 }
 
 // squeeze maps a fuzzy score below maxFuzzy. A higher score never maps
@@ -188,22 +232,40 @@ func caseIgnorable(r rune) bool {
 		strings.ContainsRune("'.:··՟״‘’․‧︓﹒﹕＇．：", r)
 }
 
-// lowerRunes is text in lowercase, rune by rune, without NFC.
-func lowerRunes(text string) []rune {
-	var out []rune
+// foldMatch walks text in lowercase, rune by rune without NFC, against a
+// query that Normalize made. It reports whether the query starts the
+// lowercase text and whether it is all of it. It does not allocate: it runs
+// for every name of every search.
+func foldMatch(text, query string) (prefix, equal bool) {
+	rest := query
 	for _, r := range text {
-		out = append(out, []rune(lower(r))...)
+		low, n := [2]rune{unicode.ToLower(r)}, 1
+		if r == 'İ' {
+			low, n = [2]rune{'i', '\u0307'}, 2
+		}
+		for _, l := range low[:n] {
+			if rest == "" {
+				return true, false
+			}
+			want, size := utf8.DecodeRuneInString(rest)
+			if want != l {
+				return false, false
+			}
+			rest = rest[size:]
+		}
 	}
-	return out
+	return rest == "", rest == ""
 }
 
-// hasPrefixFold compares a lowercased text with a query that Normalize made.
 func hasPrefixFold(text, prefix string) bool {
-	runes, want := lowerRunes(text), []rune(prefix)
-	return len(runes) >= len(want) && string(runes[:len(want)]) == prefix
+	ok, _ := foldMatch(text, prefix)
+	return ok
 }
 
-func equalFold(text, query string) bool { return string(lowerRunes(text)) == query }
+func equalFold(text, query string) bool {
+	_, ok := foldMatch(text, query)
+	return ok
+}
 
 func isAlphanumeric(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.Is(unicode.Other_Alphabetic, r)
