@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
 	"path/filepath"
 	"slices"
@@ -81,7 +82,8 @@ func (f *fileWatch) watch(ctx context.Context, folder string, excluded []string)
 		},
 	})
 	if err != nil {
-		if ctx.Err() == nil {
+		// A folder that does not exist has nothing to index, as a scan finds.
+		if ctx.Err() == nil && !errors.Is(err, fs.ErrNotExist) {
 			slog.Warn("Could not watch an indexed folder; the index rebuilds when it is 15 minutes old", "folder", folder, "error", err)
 		}
 		return

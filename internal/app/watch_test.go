@@ -1,9 +1,12 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"io/fs"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -183,5 +186,19 @@ func TestADirtyFileIndexRebuildsAtTheNextShow(t *testing.T) {
 	}
 	if n := len(built); n != 0 {
 		t.Errorf("%d rebuilds of a fresh, clean index", n)
+	}
+}
+
+func TestAMissingFolderIsSkippedWithoutAWarning(t *testing.T) {
+	var logged bytes.Buffer
+	defer slog.SetDefault(slog.Default())
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logged, nil)))
+	f := &fileWatch{start: func(context.Context, string, mygo.FileWatchOptions) (watcher, error) {
+		// What mygo.WatchFiles returns for a folder that does not exist.
+		return nil, &fs.PathError{Op: "lstat", Path: "/home/me/gone", Err: fs.ErrNotExist}
+	}}
+	f.watch(context.Background(), golden.Abs("/home/me/gone"), nil)
+	if logged.Len() != 0 || f.dirty.Load() {
+		t.Errorf("dirty %v, logged %q", f.dirty.Load(), logged.String())
 	}
 }
