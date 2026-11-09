@@ -21,7 +21,7 @@ All steps go through one script. Run it from the repo root:
 ```sh
 V=.claude/skills/verify-tinydash/verify.sh
 export TD_RUN=proof-1          # names the box and the evidence folder; default "local"
-$V build                       # Docker image + linux binaries; prints BUILD (commit, sha256, arch)
+$V build                       # Docker image + this run's linux binaries; prints BUILD (commit, sha256, arch)
 $V launch                      # start the box, seed it, start TinyDash, wait until ready
 $V doctor                      # read-only health check; exit 1 on a failure
 $V auto <mygo-automation args> # e.g. $V auto snapshot -i ; $V auto key Enter --settle
@@ -38,7 +38,7 @@ The `mygo-automation` guide for the pinned mygo version: `$V auto skills`. Read 
 
 ## Launch
 
-1. `$V build`. It cross-builds `./cmd/tinydash` with `GOOS=linux GOARCH=<Docker's arch> CGO_ENABLED=0 -tags e2e`, and `mygo-automation` from this module, so the client has the mygo version that `go.mod` pins. The output goes to `.local/verify/bin/`. Run it again after each code change.
+1. `$V build`. It cross-builds `./cmd/tinydash` with `GOOS=linux GOARCH=<Docker's arch> CGO_ENABLED=0 -tags e2e`, and `mygo-automation` from this module, so the client has the mygo version that `go.mod` pins. The output goes to `.local/verify/builds/$TD_RUN/`, so build with the same `TD_RUN` as the launch. Run it again after each code change.
 2. `$V launch`. It starts the container `tinydash-verify-$TD_RUN` and then, inside it:
    - It seeds the data. `/scratch/data/settings.json` is `{"fileSearchFolders": ["~/Documents"]}`, and all other settings keep their defaults (clipboard history is off, the shortcut is `Control+Shift+Space`, hideOnBlur is on). The files are `~/Documents/Quarterly Report.txt`, `~/Documents/grocery-list.md`, and `~/Documents/projects/roadmap-2027.md`. The app is `~/.local/share/applications/verify-notes.desktop` ("Verify Notes"). When it runs, it writes `/scratch/launched-verify-notes`.
    - It starts Xvfb `:99`, openbox, a D-Bus session, and then `MYGO_AUTOMATION=/run/td/automation.sock tinydash --data-dir /scratch/data`, without `--hidden`.
@@ -82,11 +82,11 @@ It also prints any `WARN`/`ERROR` lines from the app. Run doctor first whenever 
 
 ## Cleanup
 
-`$V cleanup` copies `/scratch/app.log` to the run folder and stops the container by its name `tinydash-verify-$TD_RUN`. The app ends on SIGTERM, and the end of the container ends every process in it anyway. The container was started with `--rm --init`, so its data dir, home, and socket go with it. It never kills by process name. The evidence in `.local/verify/runs/$TD_RUN/`, the binaries, and the SQLite cache stay. Run cleanup after every failed attempt too. Remove old run folders by hand when you no longer need them.
+`$V cleanup` copies `/scratch/app.log` to the run folder and stops the container by its name `tinydash-verify-$TD_RUN`. The app ends on SIGTERM, and the end of the container ends every process in it anyway. The container was started with `--rm --init`, so its data dir, home, and socket go with it. It never kills by process name. The evidence in `.local/verify/runs/$TD_RUN/`, the binaries in `.local/verify/builds/$TD_RUN/`, and the SQLite cache stay. Run cleanup after every failed attempt too. Remove old run and build folders by hand when you no longer need them.
 
 ## Isolation and limits
 
-- Each `TD_RUN` has its own container, socket, data dir, and automation session (`MYGO_AUTOMATION_SESSION=$TD_RUN`), so runs side by side do not share state. `launch` refuses a `TD_RUN` whose container exists.
+- Each `TD_RUN` has its own binaries (`.local/verify/builds/<run>/`, mounted read-only at `/opt/td`), container, socket, data dir, and automation session (`MYGO_AUTOMATION_SESSION=$TD_RUN`), so runs side by side do not share state, and a build for one run never replaces the app of another. Only the Docker image and the SQLite library cache (`.local/verify/cache/`) are shared. `launch` refuses a `TD_RUN` whose container exists.
 - This is Linux with X11 and openbox, a stand-in for the user's macOS. The Linux run cannot check these macOS-only behaviors: the nonactivating NSPanel and its focus, Carbon hot keys, Spotlight results, rich clipboard (images and files; Linux keeps text only), password-app detection, and tray template icons. Prove those on a Mac by hand, not with this skill.
 - Without a window manager the panel never gets the focus, and with hideOnBlur on it hides as soon as it shows. The image therefore runs openbox. Do not remove it.
 - Context menus and tray menus cannot be driven through automation. Use the `Actions` menu (`CmdOrCtrl+K`), which is drawn inside the panel.

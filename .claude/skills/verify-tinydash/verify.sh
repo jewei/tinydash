@@ -3,7 +3,7 @@
 # display. Nothing here touches the Mac's desktop, clipboard, or TinyDash
 # data. Run from anywhere in the repo; see SKILL.md for the journeys.
 #
-#   verify.sh build                 image + linux binaries (e2e build)
+#   verify.sh build                 image + linux binaries (e2e build) for this run
 #   verify.sh launch                start a box, seed it, start the app, wait
 #   verify.sh doctor                read-only health check of the running box
 #   verify.sh auto <args...>        mygo-automation inside the box
@@ -24,6 +24,9 @@ run="${TD_RUN:-local}"
 box="tinydash-verify-$run"
 image="tinydash-verify"
 evidence="$root/runs/$run"
+# Each run has its own binaries, so a build for one run never changes the
+# app that another run's box is running.
+bin="$root/builds/$run"
 
 in_box() { docker exec -e MYGO_AUTOMATION_SESSION="$run" "$box" "$@"; }
 
@@ -34,29 +37,29 @@ build)
   docker build -q -t "$image" "$skill" >/dev/null
   arch="$(docker version --format '{{.Server.Arch}}')"
   case "$arch" in aarch64) arch=arm64 ;; x86_64) arch=amd64 ;; esac
-  mkdir -p "$root/bin"
-  (cd "$repo" && GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build -tags e2e -o "$root/bin/tinydash" ./cmd/tinydash)
+  mkdir -p "$bin"
+  (cd "$repo" && GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build -tags e2e -o "$bin/tinydash" ./cmd/tinydash)
   # From the app's module, so the client is the mygo version go.mod pins.
-  (cd "$repo" && GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build -o "$root/bin/mygo-automation" github.com/egoist/mygo/plugins/automation/cmd/mygo-automation)
+  (cd "$repo" && GOOS=linux GOARCH="$arch" CGO_ENABLED=0 go build -o "$bin/mygo-automation" github.com/egoist/mygo/plugins/automation/cmd/mygo-automation)
   {
     echo "commit $(git -C "$repo" describe --always --dirty --abbrev=12)"
-    echo "sha256 $(shasum -a 256 "$root/bin/tinydash" | cut -d' ' -f1)"
+    echo "sha256 $(shasum -a 256 "$bin/tinydash" | cut -d' ' -f1)"
     echo "arch linux/$arch"
-  } >"$root/bin/BUILD"
-  cat "$root/bin/BUILD"
+  } >"$bin/BUILD"
+  cat "$bin/BUILD"
   ;;
 launch)
-  [[ -x "$root/bin/tinydash" ]] || { echo "no build: run verify.sh build" >&2; exit 1; }
+  [[ -x "$bin/tinydash" ]] || { echo "no build for $run: run verify.sh build with this TD_RUN" >&2; exit 1; }
   if docker inspect "$box" >/dev/null 2>&1; then
     echo "$box exists: run verify.sh cleanup first, or set another TD_RUN" >&2
     exit 1
   fi
   mkdir -p "$evidence" "$root/cache"
-  cp "$root/bin/BUILD" "$evidence/BUILD"
+  cp "$bin/BUILD" "$evidence/BUILD"
   # cache: mygo's SQLite library, downloaded once and SHA-256-checked.
   # --init reaps exited processes, so a pid that ended is gone, not a zombie.
   docker run -d --rm --init --name "$box" --label tinydash-verify="$run" \
-    -v "$root/bin:/opt/td:ro" -v "$skill:/opt/skill:ro" \
+    -v "$bin:/opt/td:ro" -v "$skill:/opt/skill:ro" \
     -v "$root/cache:/cache" -v "$evidence:/evidence" \
     -e XDG_CACHE_HOME=/cache -e DISPLAY=:99 \
     "$image" sleep infinity >/dev/null
@@ -68,7 +71,7 @@ doctor)
   echo "ok   container $box"
   in_box /opt/skill/box.sh doctor
   want="$(git -C "$repo" describe --always --dirty --abbrev=12)"
-  built="$(sed -n 's/^commit //p' "$root/bin/BUILD")"
+  built="$(sed -n 's/^commit //p' "$bin/BUILD")"
   if [[ "$built" == "$want" ]]; then
     echo "ok   build $built is this checkout"
   else
