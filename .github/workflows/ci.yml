@@ -99,6 +99,29 @@ jobs:
         if: runner.os == 'Linux'
         run: bun scripts/bindings.ts
 
+  go:
+    name: Go (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install Linux libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev
+      - name: Vet, lint, and test
+        shell: bash
+        run: bash scripts/verify-go.sh
+
   # Branch protection on main requires this one name, so the job list can
   # change without a settings change. It runs even when a job fails, and
   # passes only when every job passed. A skipped job counts only for a
@@ -106,7 +129,7 @@ jobs:
   required:
     name: Required checks
     if: always()
-    needs: [changes, frontend, rust]
+    needs: [changes, frontend, rust, go]
     runs-on: ubuntu-24.04
     steps:
       - name: Fail unless every job passed

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Every Go gate in one command: vet on all three OSes, staticcheck, and the
+# tests with the race detector (they include the import rules and gofmt).
+set -euo pipefail
+for os in darwin windows linux; do
+  GOOS=$os go vet ./...
+done
+go tool staticcheck ./...
+go test -race ./...

@@ -18,6 +18,15 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The
 
 `bun run verify` runs `check`, the frontend tests, the frontend build, then `scripts/bindings.ts`, which runs the Rust tests and fails if that regenerated anything in `src/generated`. CI runs the frontend checks, rustfmt, and the binding check on Linux, and Clippy and the Rust tests on macOS, Windows, and Linux. A change to Markdown files, `docs/`, or `LICENSE` alone needs only `bunx vp check`, which formats and checks them; CI skips the rest for it. Branch protection requires only the `Required checks` job, which passes when every other job passed; keep its name.
 
+## Go port (in progress)
+
+TinyDash is moving to Go on mygo, beside the Rust code, on branch `rewrite/mygo`. Read `docs/go-architecture.md` before you touch Go code; `docs/rewrite-log.tsv` records each decision.
+
+- Run every Go gate with `bash scripts/verify-go.sh` (vet on three OSes, staticcheck, tests with `-race`, import rules, gofmt).
+- The import rules are data in `internal/archtest/rules.go`. Change them there, in their own commit, with the reason.
+- `testdata/golden` pins the Rust app's answers. A Go result that differs must be listed in `testdata/golden/divergences.tsv`.
+- Never drive the desktop with synthetic keys or clicks. Test views with mygo's `ui.NewTester`.
+
 ## Where things are
 
 ```
