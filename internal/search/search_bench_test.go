@@ -149,11 +149,14 @@ func BenchmarkSearch(b *testing.B) {
 }
 
 // TestSearchStaysWithinBudget is the gate on search speed. The race
-// detector makes search several times slower, so scripts/verify-go.sh runs
-// this test again without it.
+// detector and coverage make search slower, so scripts/verify-go.sh runs
+// this test again without them.
 func TestSearchStaysWithinBudget(t *testing.T) {
 	if raceDetector {
 		t.Skip("timing is meaningless under the race detector; verify-go.sh runs this test without it")
+	}
+	if testing.CoverMode() != "" {
+		t.Skip("coverage counters slow search; verify-go.sh runs this test without them")
 	}
 	s := largeChecked(t)
 	for _, c := range budgetQueries {
