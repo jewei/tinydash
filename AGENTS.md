@@ -29,6 +29,7 @@ internal/
   feature/<name>/      One pure feature each (apps, files, clipboard, library, calc, ...).
   match/               Scoring (a port of nucleo).
   weburl/              The one WHATWG URL parser.
+  zoneinfo/            Time zone rules built into the binary; never the disk's.
   settings/            settings.json model, load, Normalize, Tauri shortcut translation.
   store/               All SQL and the migrations.
   platform/            OS work that mygo lacks. The only package with _darwin/_windows/_linux files.
@@ -48,7 +49,7 @@ The package table in `docs/architecture.md` lists what each package owns and may
 
 Rules marked _(test)_ fail `go test` when broken.
 
-1. **Logic lives in the pure packages.** `core`, `match`, `weburl`, `feature/*`, `settings`, and `search` take disk, network, clock, and randomness as arguments (`fs.FS`, `io.Reader`, `time.Time`). They import no `os`, `net`, `syscall`, `unsafe`, or random source, and call no `time.Now`. _(test: `internal/archtest`)_
+1. **Logic lives in the pure packages.** `core`, `match`, `weburl`, `zoneinfo`, `feature/*`, `settings`, and `search` take disk, network, clock, and randomness as arguments (`fs.FS`, `io.Reader`, `time.Time`). They import no `os`, `net`, `syscall`, `unsafe`, or random source, and call no `time.Now`. _(test: `internal/archtest`)_
 2. **Each package imports only its layer.** The layers and the allowlisted modules are data in `internal/archtest/rules.go`. Change them there, in their own commit, with the reason. _(test)_
 3. **OS code lives only in `internal/platform`.** Only it has OS file suffixes or OS build tags. Elsewhere, only a file named `labels.go` reads `runtime.GOOS`, to pick a label or a default. Add a platform function to all three OS files. _(test)_
 4. **The compiler asks for each action.** `core.Handler` has one method per action, so a new action does not compile until `engine` handles it. `engine.Actions` checks each action again before it runs it. _(test: `internal/core`)_
