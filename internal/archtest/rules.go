@@ -52,6 +52,7 @@ var layers = []struct {
 var external = map[string][]string{
 	"github.com/egoist/mygo":                []string{"internal/app", "internal/platform"},
 	"github.com/egoist/mygo/ui":             []string{"internal/app", "internal/ui/"},
+	"github.com/egoist/mygo/transfer":       []string{"internal/app"}, // clipboard formats and data, as mygo.Clipboard reads them
 	"github.com/egoist/mygo/plugins/sqlite": []string{"internal/store"},
 	"github.com/ebitengine/purego/":         []string{"internal/platform"},
 	"golang.org/x/sys/":                     []string{"internal/platform"},

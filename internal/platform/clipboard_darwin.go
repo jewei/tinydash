@@ -25,3 +25,24 @@ func changeCount(pasteboard objc.ID) (uint64, bool) {
 	}
 	return uint64(objc.Send[int](pasteboard, objc.RegisterName("changeCount"))), true
 }
+
+// RichClipboard reports whether clipboard history can keep images and
+// copied files.
+const RichClipboard = true
+
+// FrontmostAppID returns the bundle ID of the app in front, or "" when
+// there is none. Apple's Passwords and Keychain Access copy passwords
+// without a secret marker, so capture checks which app made a copy.
+func FrontmostAppID() string {
+	if appKit() != nil {
+		return ""
+	}
+	pool := objc.ID(objc.GetClass("NSAutoreleasePool")).Send(objc.RegisterName("new"))
+	defer pool.Send(objc.RegisterName("drain"))
+	workspace := objc.ID(objc.GetClass("NSWorkspace")).Send(objc.RegisterName("sharedWorkspace"))
+	app := workspace.Send(objc.RegisterName("frontmostApplication"))
+	if app == 0 {
+		return ""
+	}
+	return goString(app.Send(objc.RegisterName("bundleIdentifier")))
+}

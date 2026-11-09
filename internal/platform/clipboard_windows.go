@@ -15,3 +15,11 @@ func ClipboardChangeCount() (count uint64, ok bool) {
 	// Zero means the process lacks access to the window station.
 	return uint64(n), n != 0
 }
+
+// FrontmostAppID returns "": only macOS has password apps that copy
+// without a secret marker.
+func FrontmostAppID() string { return "" }
+
+// RichClipboard reports whether clipboard history can keep images and
+// copied files.
+const RichClipboard = true
