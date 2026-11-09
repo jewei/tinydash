@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
 	"github.com/jewei/tinydash/internal/settings"
@@ -101,7 +102,7 @@ func TestShowsLocalTimeAloneWithoutCities(t *testing.T) {
 	f.widgets = Widgets{Clocks: true}
 	_, tt := showLauncher(t, f)
 	now := tt.Now().Local()
-	for _, text := range []string{now.Format("15:04"), now.Format("Monday"), now.Format("2 January 2006")} {
+	for _, text := range []string{now.Format("15:04"), now.Format("Monday"), now.Format("January 2, 2006")} {
 		if !tt.HasText(text) {
 			t.Errorf("no %q in %q", text, tt.Texts())
 		}
@@ -259,5 +260,36 @@ func TestFormatsBytesAsTheSolidAppDid(t *testing.T) {
 		if got := formatBytes(bytes); got != want {
 			t.Errorf("formatBytes(%d) = %q, want %q", bytes, got, want)
 		}
+	}
+}
+
+// The dates follow the user's regional formats, as the Rust app's Intl did;
+// the time is 24-hour in every region, as the Rust app had it.
+func TestTheClockDatesFollowTheRegion(t *testing.T) {
+	for _, tc := range []struct {
+		locale      string
+		long, short string
+	}{
+		{"en-US", "January 2, 2006", "Mon, Jan 2"},
+		{"en-GB", "2 January 2006", "Mon 2 Jan"},
+	} {
+		t.Run(tc.locale, func(t *testing.T) {
+			f := newFake(always())
+			f.widgets = Widgets{Clocks: true}
+			m, tt := showLauncher(t, f)
+			tt.SetRegion(i18n.Region{Locale: tc.locale, HourCycle: 12})
+			now := tt.Now().Local()
+			for _, text := range []string{now.Format("15:04"), now.Format("Monday"), now.Format(tc.long)} {
+				if !tt.HasText(text) {
+					t.Errorf("no %q in %q", text, tt.Texts())
+				}
+			}
+			f.widgets.Cities = []City{{Name: "UTC", Difference: "+0h"}}
+			m.Show("")
+			tt.Frame()
+			if text := now.Format(tc.short); !tt.HasText(text) {
+				t.Errorf("no %q in %q", text, tt.Texts())
+			}
+		})
 	}
 }

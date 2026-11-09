@@ -53,7 +53,7 @@ Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system co
 
 An empty All search shows widgets to the right of the results. Typing, or another tab, hides them. Settings > Widgets turns each widget on or off; with every widget off, the results take the whole width.
 
-- **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates show in English.
+- **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
 
 ## Instant answers (All only)
@@ -150,6 +150,7 @@ TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same 
 - **Apps** are found by name only, not by bundle name or executable, and show their folder rather than a description.
 - **Launcher position:** the launcher always opens centered. A position saved by the Rust app stays in `settings.json`.
 - **Aliases and hotkeys** have no lists in Settings. Change or remove them from the result's actions.
+- **Clock dates** are in English, in the order of your regional formats. The Rust app wrote them in the system's language.
 - **A hotkey that cannot run** writes the reason to the log, not to a system notification.
 - **A launcher shortcut that blocks typing**, such as a plain letter in a hand-edited `settings.json`, is no longer replaced with Control+Shift+Space at startup.
 - **A `settings.json` that holds `[]`** is moved to `settings.invalid.json`, as any other file that is not a JSON object.

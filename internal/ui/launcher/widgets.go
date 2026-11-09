@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/ui/kit"
 )
@@ -19,7 +20,7 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 			// c.Now is the frame's time, which a Tester moves; the local
 			// zone is read each frame, so the clock follows a change of it.
 			now := c.Now().Local()
-			clocks(c, p, now, w.Cities)
+			clocks(c, p, now, w.Cities, c.Region().FormatLocale(c.Locale()))
 			// A new frame as the minute turns, not a timer that polls.
 			c.After(now.Truncate(time.Minute).Add(time.Minute).Sub(now))
 		}
@@ -37,15 +38,19 @@ func card(c *ui.Context, p kit.Palette, name string, children func()) ui.Element
 
 // clocks shows local time large on its own, or beside up to three cities.
 // A city's time is UTC shifted by its offset, so a fixed offset such as
-// UTC+8 works too.
-func clocks(c *ui.Context, p kit.Palette, now time.Time, cities []City) {
+// UTC+8 works too. Dates follow locale, the user's regional formats, as
+// the Rust app's Intl did; times are 24-hour everywhere, as there.
+func clocks(c *ui.Context, p kit.Palette, now time.Time, cities []City, locale string) {
+	date := func(skeleton string) string {
+		return i18n.FormatDate(locale, now, i18n.DateOptions{Skeleton: skeleton})
+	}
 	card(c, p, "Clocks", func() {
 		if len(cities) == 0 {
 			ui.Row(c).AlignItems(ui.End).Justify(ui.SpaceBetween).Gap(12).Children(func() {
 				ui.Text(c, now.Format("15:04")).Font(kit.DisplayFont).FontSize(46).TextColor(p.Ink).FontFeatures("tnum")
 				ui.Column(c).AlignItems(ui.End).Children(func() {
-					ui.Text(c, now.Format("Monday")).FontWeight(600).TextColor(p.Ink)
-					ui.Text(c, now.Format("2 January 2006")).FontSize(12).TextColor(p.Muted)
+					ui.Text(c, date("EEEE")).FontWeight(600).TextColor(p.Ink)
+					ui.Text(c, date("yMMMMd")).FontSize(12).TextColor(p.Muted)
 				})
 			})
 			return
@@ -53,7 +58,7 @@ func clocks(c *ui.Context, p kit.Palette, now time.Time, cities []City) {
 		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 			ui.Column(c).Gap(4).Padding(0, 12, 0, 0).BorderWidth(0, 1, 0, 0).BorderColor(p.Rule).Children(func() {
 				ui.Text(c, now.Format("15:04")).Font(kit.DisplayFont).FontSize(30).TextColor(p.Ink).FontFeatures("tnum")
-				ui.Text(c, now.Format("Mon 2 Jan")).FontSize(12).TextColor(p.Muted)
+				ui.Text(c, date("MMMEd")).FontSize(12).TextColor(p.Muted)
 			})
 			ui.Row(c).Grow(1).Gap(8).Children(func() {
 				for _, city := range cities {
