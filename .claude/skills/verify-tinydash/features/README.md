@@ -45,5 +45,4 @@ Each feature file starts with an H1 title and one paragraph about the user-visib
 
 ## Known app failures
 
-- The global shortcut does not hide a focused panel on X11 (see [Global shortcut](./global-shortcut.md)).
-- `Quit TinyDash` in the Actions menu does not quit. The tray item calls the same `mygo.App.Quit`, so it fails in the same way (not driven: tray menus cannot be automated). The panel's `OnClose` refuses the close, and that refusal cancels `mygo.App.Quit`, so the panel only hides. The first SIGTERM is refused in the same way. Evidence (local, from the run that found it): `.local/verify/runs/check-2/bug-quit-1-after.txt`. Check this with `$V auto key CmdOrCtrl+K`, `type "quit"`, `key Enter`, and then `$V box 'ps -p $(cat /scratch/app.pid)'`. The process must be gone.
+None. The two this skill found on 2026-11-09 (the shortcut that did not hide a focused panel on X11, and a Quit that only hid the panel) are fixed; their journeys pass (run `fix-shortcut`).

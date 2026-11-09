@@ -26,7 +26,7 @@ Preconditions:
 
 ## Gotchas
 
-- **Known failure (found 2026-11-09, build `v0.2.0-713-g487627244b05`).** `shortcut-hide` fails on X11 with the default hideOnBlur on. The key grab takes the focus from the panel (FocusOut). `OnBlur` hides the panel before the shortcut's `toggle` runs, so `toggle` sees a hidden panel and shows it again, with the query reset. A debug build logged `blur`, then `toggle visible=false`, then `show` on each press. Evidence: `.local/verify/runs/check-2/bug-shortcut-does-not-hide.txt`. Report this step as failed until the app is fixed. Do not turn hideOnBlur off to make it pass. `shortcut-show` from a hidden panel passes.
+- **Fixed failure (found 2026-11-09).** On X11 the key grab takes focus from the panel, so blur hid it before the shortcut's toggle ran, and the toggle showed it again. The app now treats a press within 400 ms of a blur-hide as the cause of that blur (`blurWasThisPress` in `internal/app/app.go`). If `shortcut-hide` fails again, check that first.
 - The shortcut is an X11 key grab. xdotool's XTEST events reach it on display `:99` only through `$V box`. Never send it on the Mac.
 - `mygo-automation key` sends keys into the app's content. It cannot press a global shortcut. Use xdotool for this journey.
 - No window manager means no focus, and with hideOnBlur on the panel hides as soon as it shows. The image runs openbox for this reason. If the panel hides at launch, check `$V box 'cat /scratch/wm.log'`.

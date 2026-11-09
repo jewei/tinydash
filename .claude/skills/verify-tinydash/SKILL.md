@@ -82,7 +82,7 @@ It also prints any `WARN`/`ERROR` lines from the app. Run doctor first whenever 
 
 ## Cleanup
 
-`$V cleanup` copies `/scratch/app.log` to the run folder and stops the container by its name `tinydash-verify-$TD_RUN`. The app does not end on the first SIGTERM (a known bug: the cancelled quit), but the end of the container ends every process in it. The container was started with `--rm --init`, so its data dir, home, and socket go with it. It never kills by process name. The evidence in `.local/verify/runs/$TD_RUN/`, the binaries, and the SQLite cache stay. Run cleanup after every failed attempt too. Remove old run folders by hand when you no longer need them.
+`$V cleanup` copies `/scratch/app.log` to the run folder and stops the container by its name `tinydash-verify-$TD_RUN`. The app ends on SIGTERM, and the end of the container ends every process in it anyway. The container was started with `--rm --init`, so its data dir, home, and socket go with it. It never kills by process name. The evidence in `.local/verify/runs/$TD_RUN/`, the binaries, and the SQLite cache stay. Run cleanup after every failed attempt too. Remove old run folders by hand when you no longer need them.
 
 ## Isolation and limits
 
