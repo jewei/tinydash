@@ -121,6 +121,9 @@ jobs:
       - name: Vet, lint, and test
         shell: bash
         run: bash scripts/verify-go.sh
+      - name: Model-check the TLA+ models
+        if: runner.os == 'Linux'
+        run: bash scripts/formal-verify.sh
 
   # Branch protection on main requires this one name, so the job list can
   # change without a settings change. It runs even when a job fails, and

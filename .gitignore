@@ -15,5 +15,6 @@ src-tauri/gen/
 /designs/
 /.hallmark/
 
-# Claude Code settings and worktrees (per machine)
-/.claude/
+# Claude Code settings and worktrees (per machine); project skills are shared
+/.claude/*
+!/.claude/skills/
