@@ -3,6 +3,7 @@ package platform
 import (
 	"errors"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"unsafe"
 
@@ -62,6 +63,10 @@ func DiskSpace(path string) (Volume, error) {
 		}
 		keys[i] = key
 	}
+	// An autorelease pool belongs to the thread that made it; draining it
+	// on another one crashes. Keep this goroutine on one thread until then.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	pool := objc.ID(objc.GetClass("NSAutoreleasePool")).Send(objc.RegisterName("new"))
 	defer pool.Send(objc.RegisterName("drain"))
 	url := objc.ID(objc.GetClass("NSURL")).Send(objc.RegisterName("fileURLWithPath:"), nsString(path))
