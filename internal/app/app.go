@@ -36,7 +36,8 @@ const Identifier = "dev.tinydash.launcher"
 const (
 	panelWidth, panelHeight = 880, 560
 	// staleAfter: an index older than this is rebuilt when the launcher
-	// shows. File events would say sooner; this bounds how old it can get.
+	// shows. File events say sooner (fileWatch); this bounds how old it
+	// gets where they cannot.
 	staleAfter = 15 * time.Minute
 	tick       = 500 * time.Millisecond
 	ratesURL   = "https://api.frankfurter.dev/v1/latest"
@@ -65,6 +66,7 @@ type App struct {
 	files    *engine.Slot
 	icons    iconCache
 	more     *moreFiles
+	watch    *fileWatch
 	tray     *mygo.Tray
 	settings *settingsWindow
 	mu       sync.Mutex
@@ -85,7 +87,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	if opts.DataDir != "" {
 		dirs.Config, dirs.Data = opts.DataDir, opts.DataDir
 	}
-	a := &App{ctx: ctx, builtAt: map[*engine.Slot]time.Time{}}
+	a := &App{ctx: ctx, builtAt: map[*engine.Slot]time.Time{}, watch: newFileWatch()}
 
 	s, warning, file := engine.LoadSettings(dirs.Config)
 	a.file = file
@@ -109,6 +111,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	a.keys = &shortcuts{toggle: a.toggle, run: a.runHotkey}
 	a.actions = engine.NewActions(a.engine, a.desktop, (*appShell)(a), a.keys, time.Now)
 	a.more = a.newMoreFiles()
+	a.watchFolders()
 
 	a.apps = engine.NewSlot(a.engine.RebuildApps(a.listApps))
 	a.files = engine.NewSlot(a.engine.RebuildFiles(a.fileDisk()))
@@ -178,6 +181,7 @@ func (a *App) warn(message any) {
 // dataChanged runs on the writer after each change: the view searches
 // again, and Settings reads the data again.
 func (a *App) dataChanged() {
+	a.watchFolders()
 	if a.panel != nil {
 		a.panel.Update(func() {
 			a.model.Stale()
@@ -223,6 +227,9 @@ func (a *App) rebuild(slot *engine.Slot) {
 	a.mu.Lock()
 	a.builtAt[slot] = time.Now()
 	a.mu.Unlock()
+	if slot == a.files {
+		a.watch.dirty.Store(false)
+	}
 	slot.Request()
 }
 
@@ -230,7 +237,7 @@ func (a *App) rebuildIfOld(slot *engine.Slot) {
 	a.mu.Lock()
 	old := time.Since(a.builtAt[slot]) > staleAfter
 	a.mu.Unlock()
-	if old {
+	if old || slot == a.files && a.watch.dirty.Load() {
 		a.rebuild(slot)
 	}
 }
