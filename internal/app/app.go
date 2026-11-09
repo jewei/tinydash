@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -124,7 +125,15 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 		DisableResize: true,
 		Content:       ui.View(a.model.View),
 	})
+	// Escape, Cmd-W, and Alt-F4 hide the panel, so it shows again at once.
+	// Quitting closes it for good: mygo quits on SIGTERM by closing windows,
+	// and a close the panel always refused would cancel the quit.
+	var quitting atomic.Bool
+	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { quitting.Store(true) })
 	a.panel.OnClose(func(e *mygo.CloseEvent) {
+		if quitting.Load() {
+			return
+		}
 		e.PreventDefault()
 		a.panel.Hide()
 	})
