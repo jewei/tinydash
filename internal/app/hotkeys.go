@@ -23,11 +23,15 @@ import (
 type shortcuts struct {
 	// os registers keys with the OS: mygo.GlobalShortcut, or a fake in tests.
 	os       registry
-	launcher string // mygo accelerator, "" when none
+	launcher string // the saved launcher shortcut as a mygo accelerator, "" when none
 	toggle   func()
-	hotkeys  map[core.ID]string // result ID -> mygo accelerator
+	hotkeys  map[core.ID]string // saved hotkeys: result ID -> mygo accelerator
 	run      func(core.ID)
 	paused   bool
+	// held is the accelerators that the OS accepted and holds for us. The
+	// saved keys stay saved when the OS refuses them, so the next resume,
+	// sync, or save tries them again, as in the Rust registry.
+	held map[string]bool
 }
 
 // registry is the part of mygo.GlobalShortcut that shortcuts uses.
@@ -82,35 +86,46 @@ func (s *shortcuts) sync(wanted search.Hotkeys) map[core.ID]error {
 		next[pair.ID] = accelerator
 	}
 	for id, accelerator := range s.hotkeys {
-		if next[id] != accelerator && !s.paused {
-			s.os.Unregister(accelerator)
-		}
-	}
-	for id, accelerator := range next {
-		if s.hotkeys[id] == accelerator {
-			continue
-		}
-		if err := s.register(id, accelerator); err != nil {
-			failed[id] = err
-			delete(next, id)
-			continue
-		}
-		// The launcher saves keys while the shortcuts pause to record
-		// them. Registering checked that another app does not hold them;
-		// they stay off until the pause ends.
-		if s.paused {
-			s.os.Unregister(accelerator)
+		if next[id] != accelerator {
+			s.release(accelerator)
 		}
 	}
 	s.hotkeys = next
+	for id, accelerator := range next {
+		if s.held[accelerator] {
+			continue
+		}
+		if err := s.take(accelerator, func() { go s.run(id) }); err != nil {
+			failed[id] = err
+		}
+	}
 	return failed
 }
 
-func (s *shortcuts) register(id core.ID, accelerator string) error {
-	if err := s.os.Register(accelerator, func() { go s.run(id) }); err != nil {
+// take registers keys with the OS. While the shortcuts pause, the launcher
+// and Settings save keys that they recorded: registering checks that
+// another app does not hold them, and they stay off until the pause ends.
+func (s *shortcuts) take(accelerator string, fn func()) error {
+	if err := s.os.Register(accelerator, fn); err != nil {
 		return registerError(accelerator, err)
 	}
+	if s.paused {
+		s.os.Unregister(accelerator)
+		return nil
+	}
+	if s.held == nil {
+		s.held = map[string]bool{}
+	}
+	s.held[accelerator] = true
 	return nil
+}
+
+// release gives keys back to the OS if it holds them for us.
+func (s *shortcuts) release(accelerator string) {
+	if s.held[accelerator] {
+		s.os.Unregister(accelerator)
+		delete(s.held, accelerator)
+	}
 }
 
 // registerError says that the OS refused keys, and what to do.
@@ -129,19 +144,11 @@ func (s *shortcuts) SetLauncher(stored string) error {
 }
 
 func (s *shortcuts) setLauncher(stored, accelerator string) error {
-	if s.launcher != "" && !s.paused {
-		s.os.Unregister(s.launcher)
-	}
-	s.launcher = ""
-	if err := s.os.Register(accelerator, s.toggle); err != nil {
+	s.release(s.launcher)
+	s.launcher = accelerator
+	if err := s.take(accelerator, s.toggle); err != nil {
 		return registerError(stored, err)
 	}
-	// Settings saves a new shortcut while the shortcuts pause to record
-	// it; registering checked it, as in sync.
-	if s.paused {
-		s.os.Unregister(accelerator)
-	}
-	s.launcher = accelerator
 	return nil
 }
 
@@ -156,35 +163,23 @@ func (s *shortcuts) pause(paused bool) error {
 	if paused == s.paused {
 		return nil
 	}
-	s.paused = paused
 	if paused {
-		if s.launcher != "" {
-			s.os.Unregister(s.launcher)
+		for accelerator := range s.held {
+			s.release(accelerator)
 		}
-		for _, accelerator := range s.hotkeys {
-			s.os.Unregister(accelerator)
-		}
+		s.paused = true
 		return nil
 	}
-	// Keys that another app took during the pause are refused now. The
-	// registry keeps only keys that the OS accepted, so the next sync or
-	// save tries the refused ones again.
+	s.paused = false
+	// Register every saved key again. Keys that another app holds now are
+	// refused and stay saved, so the next resume tries them again.
 	var first error
-	refused := func(accelerator string, err error) {
-		if first == nil {
-			first = registerError(accelerator, err)
-		}
-	}
 	if s.launcher != "" {
-		if err := s.os.Register(s.launcher, s.toggle); err != nil {
-			refused(s.launcher, err)
-			s.launcher = ""
-		}
+		first = s.take(s.launcher, s.toggle)
 	}
 	for id, accelerator := range s.hotkeys {
-		if err := s.os.Register(accelerator, func() { go s.run(id) }); err != nil {
-			refused(accelerator, err)
-			delete(s.hotkeys, id)
+		if err := s.take(accelerator, func() { go s.run(id) }); err != nil && first == nil {
+			first = err
 		}
 	}
 	return first
