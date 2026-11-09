@@ -11,7 +11,7 @@ import (
 
 // View builds the panel's content: give it to the window as ui.View(m.View).
 func (m *Model) View(c *ui.Context) {
-	p := themed(c)
+	p := themed(c, m.backend.Settings().Theme)
 	// The menu and the dialogs take the keyboard while they show; keys
 	// behind them must not act.
 	if !m.overlay() {
@@ -25,10 +25,13 @@ func (m *Model) View(c *ui.Context) {
 	ui.Column(c).Fill().ObserveInput(m.observe).Children(func() {
 		m.searchBar(c, p)
 		m.tabBar(c, p)
-		if m.notice != "" {
-			ui.Row(c).Padding(8, 24).Gap(8).AlignItems(ui.Center).Background(p.notice).Role(ui.RoleAlert).Children(func() {
-				ui.Icon(c, glyphs["warning"]).FontSize(16)
-				ui.Text(c, m.notice).FontSize(12).Grow(1)
+		switch {
+		case m.notice != "":
+			noticeBar(c, p, m.notice, nil)
+		case m.warning() != "":
+			noticeBar(c, p, m.warning(), func() {
+				m.dismissWarning()
+				m.focusInput()
 			})
 		}
 		m.body(c, p)
@@ -109,7 +112,32 @@ func (m *Model) tabBar(c *ui.Context, p palette) {
 	})
 }
 
+// noticeBar says what went wrong under the tabs. A startup warning has a
+// Dismiss button; an action's failure goes with the next edit.
+func noticeBar(c *ui.Context, p palette, text string, dismiss func()) {
+	ui.Row(c).Padding(8, 24).Gap(8).AlignItems(ui.Center).Background(p.notice).Role(ui.RoleAlert).Children(func() {
+		ui.Icon(c, glyphs["warning"]).FontSize(16)
+		ui.Text(c, text).FontSize(12).Grow(1)
+		if dismiss != nil {
+			footerButton(c, p, "Dismiss", []string{"esc"}).OnClick(dismiss)
+		}
+	})
+}
+
+// body shows the results, and the widget pane beside them while it shows.
 func (m *Model) body(c *ui.Context, p palette) {
+	if !m.showsWidgets() {
+		m.resultsView(c, p)
+		return
+	}
+	// The Solid app split the body 11 to 9 between the results and the pane.
+	ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
+		ui.Column(c).Grow(11).Children(func() { m.resultsView(c, p) })
+		m.widgetPane(c, p)
+	})
+}
+
+func (m *Model) resultsView(c *ui.Context, p palette) {
 	rows := m.rows()
 	switch {
 	case m.clipboardOff():

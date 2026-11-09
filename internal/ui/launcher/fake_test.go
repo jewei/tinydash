@@ -27,6 +27,15 @@ type fake struct {
 	hidden    int
 	enabled   int
 	enableErr error
+
+	// widgets is what a load of the widgets gives; widgetLoads counts
+	// loads. holdWidgets keeps their done functions in loading.
+	widgets     Widgets
+	widgetLoads int
+	holdWidgets bool
+	loading     []func(Widgets)
+	// warnings wait until the launcher asks for them.
+	warnings []string
 }
 
 type searched struct {
@@ -82,6 +91,21 @@ func (f *fake) PauseShortcuts(paused bool) error {
 func (f *fake) EnableClipboardHistory(done func(error)) {
 	f.enabled++
 	done(f.enableErr)
+}
+
+func (f *fake) Widgets(done func(Widgets)) {
+	f.widgetLoads++
+	if f.holdWidgets {
+		f.loading = append(f.loading, done)
+		return
+	}
+	done(f.widgets)
+}
+
+func (f *fake) Warnings() []string {
+	w := f.warnings
+	f.warnings = nil
+	return w
 }
 
 func (f *fake) lastSearch() searched { return f.searches[len(f.searches)-1] }

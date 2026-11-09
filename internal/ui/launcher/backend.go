@@ -7,6 +7,7 @@ package launcher
 import (
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/settings"
 )
 
 // Backend is what the launcher needs from the app. Every method runs on the
@@ -37,6 +38,14 @@ type Backend interface {
 	EnableClipboardHistory(done func(error))
 	// Hide hides the panel, as Escape with nothing else to close does.
 	Hide()
+	// Widgets loads the pane beside an empty All search, each time the
+	// launcher shows and after the data changed; done as for Run. Reading
+	// the disk can wait on the OS, so the app loads it outside the frame.
+	Widgets(done func(Widgets))
+	// Warnings are the problems found since the last call, such as a
+	// hotkey that did not register at startup, each returned once. They
+	// come after the launcher was made, so it asks each time it shows.
+	Warnings() []string
 }
 
 // ViewSettings are the settings that the launcher shows.
@@ -49,4 +58,34 @@ type ViewSettings struct {
 	// CurrencyRates makes Refresh also download exchange rates, so its
 	// label says so.
 	CurrencyRates bool
+	// Theme is the Appearance setting.
+	Theme settings.Theme
+}
+
+// Widgets are what the pane beside an empty All search shows. With no
+// widget on, there is no pane.
+type Widgets struct {
+	// Clocks is on while the clocks widget shows: local time, and Cities.
+	Clocks bool
+	Cities []City
+	// Disk is nil while the disk widget is off.
+	Disk *Disk
+}
+
+// City is a city's clock, read as the pane loads. The view keeps its time
+// current from the offset; the difference is new by the next load.
+type City struct {
+	Name string
+	// OffsetSeconds is seconds east of UTC.
+	OffsetSeconds int
+	// Difference is how far it is from local time, such as +8h.
+	Difference string
+}
+
+// Disk is the disk of the home folder.
+type Disk struct {
+	Name                  string
+	TotalBytes, FreeBytes uint64
+	// Err is why the OS did not report the disk, or nil.
+	Err error
 }
