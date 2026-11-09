@@ -67,8 +67,8 @@ It also prints any `WARN`/`ERROR` lines from the app. Run doctor first whenever 
 - **Type as the user does.** The search field has focus when the panel shows. Use `$V auto type "<text>" --settle`, then `$V auto key Enter --settle` (the main action), `CmdOrCtrl+Enter` (the second action), `CmdOrCtrl+K` (the actions menu), `Tab` (the next tab), and `Escape`. `fill <ref> ""` empties a field.
 - **Wait for state, not time.** Use `$V auto wait --text "<text>" --timeout 5s`, `wait --gone <ref>`, or `--settle` on an action. Work that the app does on a goroutine, such as turning on clipboard history or the capture tick, draws after `--settle` returns. Wait for its text.
 - **An action that hides the panel** sometimes prints `warning: the window did not settle in 10s`: a hidden window draws no more frames. Check the result with `$V auto windows` and the side effect, not with the diff.
-- **Restarting the app inside a box** is not supported. Clean up and launch again. The app ignores the first SIGTERM, and a second instance quits at once because of the single-instance lock.
-- **Show and hide** the panel with the real shortcut on the virtual display: `$V box 'xdotool key ctrl+shift+space'`. Then `$V auto windows` shows `focused` or `hidden`. The hide fails at present: see `features/global-shortcut.md`.
+- **Restarting the app inside a box** is not supported. Clean up and launch again. A second instance quits at once because of the single-instance lock.
+- **Show and hide** the panel with the real shortcut on the virtual display: `$V box 'xdotool key ctrl+shift+space'`. Then `$V auto windows` shows `focused` or `hidden`.
 
 ## Evidence
 
