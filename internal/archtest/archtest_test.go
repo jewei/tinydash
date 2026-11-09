@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -48,6 +49,7 @@ func TestEachRuleCanFail(t *testing.T) {
 		{"pure package reads randomness", Package{Path: module + "/internal/feature/password", Imports: []string{"crypto/rand"}}, "imports crypto/rand"},
 		{"new dependency", Package{Path: module + "/internal/engine", Imports: []string{"github.com/some/lib"}}, "not in archtest.external"},
 		{"sqlite outside store", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/sqlite"}}, "only [internal/store] may"},
+		{"automation outside app", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/automation"}}, "only [internal/app] may"},
 		{"view imports the mygo root", Package{Path: module + "/internal/ui/launcher", Imports: []string{"github.com/egoist/mygo"}}, "only [internal/app internal/platform] may"},
 		{"OS file name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_darwin.go": []byte("package engine\n")}}, "OS-specific file"},
 		{"OS build tag", Package{Path: module + "/internal/engine", Files: file("//go:build cgo || windows\n\npackage engine\n")}, "OS build tag"},
@@ -72,7 +74,8 @@ func TestEachRuleCanFail(t *testing.T) {
 }
 
 // loadModule lists every package with `go list`, with all of its files,
-// whatever their build tags.
+// whatever their build tags, and the imports of both its default and its
+// e2e build: the e2e build links test-only packages the rules must see.
 func loadModule(t *testing.T) []Package {
 	t.Helper()
 	cmd := exec.Command("go", "list", "-json", module+"/...")
@@ -104,5 +107,32 @@ func loadModule(t *testing.T) []Package {
 		}
 		pkgs = append(pkgs, p)
 	}
+	e2e := e2eImports(t)
+	for i := range pkgs {
+		for _, imp := range e2e[pkgs[i].Path] {
+			if !slices.Contains(pkgs[i].Imports, imp) {
+				pkgs[i].Imports = append(pkgs[i].Imports, imp)
+			}
+		}
+	}
 	return pkgs
+}
+
+// e2eImports maps each package to its imports when built with -tags e2e.
+func e2eImports(t *testing.T) map[string][]string {
+	t.Helper()
+	cmd := exec.Command("go", "list", "-tags", "e2e", "-f", "{{.ImportPath}}{{range .Imports}} {{.}}{{end}}", module+"/...")
+	cmd.Env = append(os.Environ(), "GOFLAGS=")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list -tags e2e: %v", err)
+	}
+	imports := map[string][]string{}
+	for line := range strings.Lines(string(out)) {
+		fields := strings.Fields(line)
+		if len(fields) > 0 {
+			imports[fields[0]] = fields[1:]
+		}
+	}
+	return imports
 }
