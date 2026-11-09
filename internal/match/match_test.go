@@ -166,28 +166,10 @@ func TestTopKeepsTheBestHitsInOrder(t *testing.T) {
 	}
 }
 
-// Equal scores come in the order Rust's select_nth_unstable left them; the
-// wanted orders are what the Rust app's top() returned.
-func TestTopOrdersTiesAsRust(t *testing.T) {
-	fixture := func(n, mul, mod int) []Hit[int] {
-		var hits []Hit[int]
-		for i := range n {
-			hits = append(hits, Hit[int]{uint32(i * mul % mod), i})
-		}
-		return hits
-	}
-	for _, c := range []struct {
-		hits  []Hit[int]
-		limit int
-		want  []int
-	}{
-		{fixture(40, 7, 5), 8, []int{2, 7, 12, 17, 22, 27, 32, 37}},
-		{fixture(40, 7, 5), 20, []int{2, 7, 12, 17, 22, 27, 32, 37, 4, 9, 14, 19, 24, 29, 34, 39, 21, 26, 16, 31}},
-		{fixture(40, 7, 5), 39, []int{2, 7, 12, 17, 22, 27, 32, 37, 39, 4, 9, 14, 19, 24, 29, 34, 1, 6, 11, 16, 21, 26, 31, 36, 3, 8, 13, 18, 23, 28, 33, 38, 5, 10, 15, 20, 25, 30, 35}},
-		{fixture(300, 13, 4), 10, []int{159, 7, 11, 15, 19, 23, 27, 31, 35, 39}},
-	} {
-		if got := items(Top(c.hits, c.limit)); !slices.Equal(got, c.want) {
-			t.Errorf("top %d of %d:\n got  %v\n want %v", c.limit, len(c.hits), got, c.want)
-		}
+// Equal scores keep the order they came in, also across the cut.
+func TestTopKeepsTiesInInputOrder(t *testing.T) {
+	hits := []Hit[int]{{2, 'a'}, {5, 'b'}, {2, 'c'}, {5, 'd'}, {2, 'e'}}
+	if got := items(Top(hits, 4)); !slices.Equal(got, []int{'b', 'd', 'a', 'c'}) {
+		t.Errorf("%c", got)
 	}
 }

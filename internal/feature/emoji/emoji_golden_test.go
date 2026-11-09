@@ -1,7 +1,6 @@
 package emoji
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/jewei/tinydash/internal/golden"
@@ -13,7 +12,7 @@ import (
 func TestEmojiGolden(t *testing.T) {
 	rows := golden.Rows[struct {
 		Query string          `json:"query"`
-		Top   json.RawMessage `json:"top"`
+		Top   []golden.Ranked `json:"top"`
 	}](t, "emoji")
 	if len(rows) == 0 {
 		t.Fatal("no golden rows")
@@ -21,10 +20,17 @@ func TestEmojiGolden(t *testing.T) {
 	index := NewIndex()
 	for _, row := range rows {
 		hits := index.Search(match.New(row.Query), Context{}, 8)
-		top := make([]map[string]any, len(hits))
+		got := make([]golden.Ranked, len(hits))
 		for i, hit := range hits {
-			top[i] = map[string]any{"id": string(hit.Result.ID), "score": hit.Score}
+			got[i] = golden.Ranked{ID: string(hit.Result.ID), Score: hit.Score}
 		}
-		golden.Check(t, "emoji", row.Query, row.Top, top)
+		all := map[string]uint32{}
+		for _, hit := range index.Search(match.New(row.Query), Context{}, 100_000) {
+			all[string(hit.Result.ID)] = hit.Score
+		}
+		golden.CheckRanked(t, "emoji", row.Query, row.Top, got, func(id string) (uint32, bool) {
+			score, ok := all[id]
+			return score, ok
+		})
 	}
 }

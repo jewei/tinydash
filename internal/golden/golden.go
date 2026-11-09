@@ -196,3 +196,54 @@ func Check(t testing.TB, feature, query string, want json.RawMessage, got any) {
 
 // Quote formats a query for messages.
 func Quote(s string) string { return fmt.Sprintf("%q", s) }
+
+// Ranked is one entry of a ranked list, with the score that placed it.
+type Ranked struct {
+	ID    string `json:"id"`
+	Score uint32 `json:"score"`
+}
+
+// CheckRanked compares a ranked list with Rust's, where only the order
+// within equal scores may differ: the order of ties in Rust came from an
+// unstable selection and is not behavior. The scores must match in order,
+// every Rust entry must score the same in Go (scoreOf), and each group of
+// equal scores must hold the same entries, except the last group, which a
+// limit may have cut.
+func CheckRanked(t testing.TB, feature, query string, want, got []Ranked, scoreOf func(id string) (uint32, bool)) {
+	t.Helper()
+	fail := func(format string, args ...any) {
+		t.Errorf("%s %q: "+format+"\n Rust: %v\n Go:   %v", append(append([]any{feature, query}, args...), want, got)...)
+	}
+	if len(want) != len(got) {
+		fail("%d entries, Rust had %d", len(got), len(want))
+		return
+	}
+	for i := range want {
+		if want[i].Score != got[i].Score {
+			fail("score %d at %d, Rust had %d", got[i].Score, i, want[i].Score)
+			return
+		}
+		if score, ok := scoreOf(want[i].ID); !ok || score != want[i].Score {
+			fail("%s scores %d (found %v) in Go, %d in Rust", want[i].ID, score, ok, want[i].Score)
+			return
+		}
+	}
+	for start := 0; start < len(want); {
+		end := start
+		for end < len(want) && want[end].Score == want[start].Score {
+			end++
+		}
+		if end == len(want) {
+			break // the last group: the limit may have cut it anywhere
+		}
+		wantIDs, gotIDs := map[string]bool{}, map[string]bool{}
+		for i := start; i < end; i++ {
+			wantIDs[want[i].ID], gotIDs[got[i].ID] = true, true
+		}
+		if !reflect.DeepEqual(wantIDs, gotIDs) {
+			fail("entries scoring %d differ", want[start].Score)
+			return
+		}
+		start = end
+	}
+}
