@@ -18,9 +18,13 @@ const module = "github.com/jewei/tinydash"
 
 // Package is what the rules need to know about one Go package.
 type Package struct {
-	Path    string            // import path
-	Imports []string          // imports of its non-test files
-	Files   map[string][]byte // file name -> source, test files included
+	Path    string   // import path
+	Imports []string // imports of its non-test files
+	// TestImports are the imports of its test files. Tests may cross
+	// layers, as to a fake or to golden, but a new module is a decision
+	// for tests too.
+	TestImports []string
+	Files       map[string][]byte // file name -> source, test files included
 }
 
 // layers lists, for each internal package (by prefix, after the module),
@@ -99,7 +103,9 @@ var impureCalls = []impureCall{
 	{"html/template", "take an fs.FS as an argument", []string{"ParseFiles", "ParseGlob"}},
 }
 
-var goosNames = []string{"aix", "android", "darwin", "dragonfly", "freebsd", "illumos", "ios", "js", "linux", "netbsd", "openbsd", "plan9", "solaris", "wasip1", "windows"}
+// goosNames is Go's list of known OS names (internal/syslist.KnownOS), so that a file
+// for any OS counts, even one TinyDash does not build for.
+var goosNames = []string{"aix", "android", "darwin", "dragonfly", "freebsd", "hurd", "illumos", "ios", "js", "linux", "nacl", "netbsd", "openbsd", "plan9", "solaris", "wasip1", "windows", "zos"}
 
 // Check returns every rule the packages break, one line each.
 func Check(pkgs []Package) []string {
@@ -135,6 +141,11 @@ func Check(pkgs []Package) []string {
 				out = append(out, fmt.Sprintf("%s imports %s, which is not in archtest.external", rel, imp))
 			case !matchesAny(rel, users):
 				out = append(out, fmt.Sprintf("%s imports %s; only %v may", rel, imp, users))
+			}
+		}
+		for _, imp := range p.TestImports {
+			if _, known := externalUsers(imp); !known && !isStd(imp) && !strings.HasPrefix(imp, module+"/") {
+				out = append(out, fmt.Sprintf("%s test imports %s, which is not in archtest.external", rel, imp))
 			}
 		}
 		out = append(out, checkFiles(rel, p.Files)...)

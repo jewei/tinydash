@@ -48,6 +48,9 @@ func TestEachRuleCanFail(t *testing.T) {
 		{"pure package reads the disk", Package{Path: module + "/internal/feature/files", Imports: []string{"os"}}, "imports os; pure packages"},
 		{"pure package reads randomness", Package{Path: module + "/internal/feature/password", Imports: []string{"crypto/rand"}}, "imports crypto/rand"},
 		{"new dependency", Package{Path: module + "/internal/engine", Imports: []string{"github.com/some/lib"}}, "not in archtest.external"},
+		{"new dependency in a test", Package{Path: module + "/internal/engine", TestImports: []string{"github.com/some/assert"}}, "test imports github.com/some/assert, which is not in archtest.external"},
+		{"OS-only OS name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_zos.go": []byte("package engine\n")}}, "OS-specific file"},
+		{"OS-only build tag", Package{Path: module + "/internal/engine", Files: file("//go:build hurd\n\npackage engine\n")}, "OS build tag"},
 		{"sqlite outside store", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/sqlite"}}, "only [internal/store] may"},
 		{"automation outside app", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/automation"}}, "only [internal/app] may"},
 		{"views import each other", Package{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/launcher"}}, "imports internal/ui/launcher"},
@@ -182,13 +185,13 @@ func loadModule(t *testing.T) []Package {
 	for dec.More() {
 		var listed struct {
 			ImportPath, Dir                                              string
-			Imports                                                      []string
+			Imports, TestImports, XTestImports                           []string
 			GoFiles, IgnoredGoFiles, TestGoFiles, XTestGoFiles, CgoFiles []string
 		}
 		if err := dec.Decode(&listed); err != nil {
 			t.Fatal(err)
 		}
-		p := Package{Path: listed.ImportPath, Imports: listed.Imports, Files: map[string][]byte{}}
+		p := Package{Path: listed.ImportPath, Imports: listed.Imports, TestImports: append(listed.TestImports, listed.XTestImports...), Files: map[string][]byte{}}
 		for _, group := range [][]string{listed.GoFiles, listed.IgnoredGoFiles, listed.TestGoFiles, listed.XTestGoFiles, listed.CgoFiles} {
 			for _, name := range group {
 				src, err := os.ReadFile(filepath.Join(listed.Dir, name))

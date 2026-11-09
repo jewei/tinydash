@@ -70,7 +70,7 @@ The version is in `mygo.json`.
 
 ## Dependencies
 
-- `go.mod` lists the modules. `internal/archtest/rules.go` allowlists each module and the packages that may import it. A new module fails the tests until it is added there.
+- `go.mod` lists the modules. `internal/archtest/rules.go` allowlists each module and the packages that may import it. A new module fails the tests until it is added there, also when only a test imports it.
 - Dependabot opens one weekly PR for all Go modules and one for GitHub Actions.
 - The Audit workflow runs `govulncheck` every Monday (or from Actions > Audit > Run workflow) and fails on a vulnerable code path.
 - CodeQL scans the Go and workflow code on each pull request, on `main`, and every Monday. OpenSSF Scorecard grades the repository setup on `main` and every Monday. Both report to Security > Code scanning and never block a merge.
