@@ -63,6 +63,12 @@ func canBeHotkey(keys Keys) bool {
 	return err == nil
 }
 
+// CanOpenLauncher reports whether keys can be the launcher shortcut: the
+// keys a hotkey can be, and also Shift+Space, as the recorder takes.
+func CanOpenLauncher(keys Keys) bool {
+	return canBeHotkey(keys) || keys == (Keys{Mods: ModShift, Key: "Space"})
+}
+
 var errGone = errors.New("This item no longer exists.")
 
 // Pin pins an item that exists and is not hidden.

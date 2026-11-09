@@ -90,9 +90,14 @@ func (s *shortcuts) sync(wanted search.Hotkeys) map[core.ID]error {
 
 func (s *shortcuts) register(id core.ID, accelerator string) error {
 	if err := mygo.GlobalShortcut.Register(accelerator, func() { go s.run(id) }); err != nil {
-		return fmt.Errorf("%s is taken by another app or by the system: %v", accelerator, err)
+		return registerError(accelerator, err)
 	}
 	return nil
+}
+
+// registerError says that the OS refused keys, and what to do.
+func registerError(keys string, err error) error {
+	return fmt.Errorf("Could not register %s: %v.%s", keys, err, shortcutTaken)
 }
 
 // SetLauncher registers the launcher shortcut, stored in Tauri syntax.
@@ -111,7 +116,7 @@ func (s *shortcuts) setLauncher(stored, accelerator string) error {
 	}
 	s.launcher = ""
 	if err := mygo.GlobalShortcut.Register(accelerator, s.toggle); err != nil {
-		return fmt.Errorf("TinyDash could not use %s to open the launcher: %v. Choose another shortcut in Settings.", stored, err)
+		return registerError(stored, err)
 	}
 	// Settings saves a new shortcut while the shortcuts pause to record
 	// it. Registering checked that another app does not hold the keys;

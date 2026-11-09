@@ -13,6 +13,22 @@ import (
 // match the bar; elsewhere the icon is drawn in color.
 const templateTrayIcon = runtime.GOOS == "darwin"
 
+// menuTakesEveryTrayClick: on macOS a status item with a menu opens it on
+// every click, so a click could not show the launcher.
+const menuTakesEveryTrayClick = runtime.GOOS == "darwin"
+
+// shortcutTakenHint is the next step when the OS refuses a shortcut. On
+// Wayland no app can register one, but a desktop shortcut can run
+// tinydash, which toggles the running launcher.
+func shortcutTakenHint(goos string) string {
+	if goos == "linux" {
+		return " Another app may already use it, so choose other keys. On Wayland, assign a desktop shortcut that runs `tinydash` instead."
+	}
+	return " Another app may already use it, so choose other keys."
+}
+
+var shortcutTaken = shortcutTakenHint(runtime.GOOS)
+
 // trayIcon draws a magnifying glass at 32 pixels.
 func trayIcon() []byte {
 	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))

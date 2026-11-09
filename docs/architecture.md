@@ -8,7 +8,7 @@ Module `github.com/jewei/tinydash`. The "May import" column is the complete list
 
 | Package                                        | Owns                                                                                                                                                                                     | May import                                                     |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `cmd/tinydash`                                 | `main`: the `--data-dir` and `--hidden` flags, then `app.Main`                                                                                                                           | `app`                                                          |
+| `cmd/tinydash`                                 | `main`: the command line (`app.ParseArgs`), then `app.Main`                                                                                                                           | `app`                                                          |
 | `internal/core`                                | `Result`, `Kind`, `Icon`, `Action` (sealed) and `Handler`, `Source` and its traits table, `ID`, `Category`, `SystemCommand`, `Personal`                                                  | stdlib only                                                    |
 | `internal/match`                               | Normalization, and name, word, and alias scoring (a port of nucleo)                                                                                                                      | `core`, stdlib                                                 |
 | `internal/weburl`                              | WHATWG URL parse, write, and check, shared by `cleanurl` and `library`                                                                                                                   | stdlib minus OS, network, and clock                            |
@@ -63,7 +63,7 @@ Other folders:
 | App and file scans | Startup; the launcher shows and the index is 15 minutes old (files also when marked dirty); Refresh; a change of the folder settings (files) | `internal/app/app.go`, `engine/rebuild.go`       |
 | Dirty marking      | mygo `WatchFiles` events under the indexed folders (with subfolders on macOS and Windows, one level on Linux)                           | `internal/app/watch.go`                          |
 | Clipboard capture  | Every 500 ms. The content is read only when the change counter moved; Linux has no counter                                               | `internal/app/clipboard.go`, `engine/monitor.go` |
-| Exchange rates     | The launcher shows and the rates are 12 hours old; turning rates on; Refresh                                                             | `internal/app/app.go`, `feature/currency`        |
+| Exchange rates     | Startup and launcher shows while the rates are 12 hours old, at most once an hour; turning rates on; Refresh                               | `internal/app/app.go`, `feature/currency`        |
 | Spotlight results  | Each Files search of two or more characters while the setting is on (macOS), through `mdfind` on a pseudo-terminal                       | `internal/app/spotlight.go`, `platform`          |
 
 ## UI
