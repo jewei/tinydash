@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/weburl"
 )
 
 const maxLength = 8192
@@ -63,13 +64,13 @@ func clean(input string) (string, bool) {
 	if len(input) > maxLength || strings.IndexFunc(input, unicode.IsSpace) >= 0 {
 		return "", false
 	}
-	u, ok := parse(input)
-	if !ok || !u.hasQuery {
+	u, ok := weburl.Parse(input)
+	if !ok || !u.HasQuery {
 		return "", false
 	}
 	var site []string
 	for _, s := range siteTrackers {
-		if slices.ContainsFunc(s.domains, func(domain string) bool { return onDomain(u.host, domain) }) {
+		if slices.ContainsFunc(s.domains, func(domain string) bool { return onDomain(u.Host, domain) }) {
 			site = append(site, s.keys...)
 		}
 	}
@@ -80,7 +81,7 @@ func clean(input string) (string, bool) {
 	// Untouched pairs stay byte for byte, so encoded values survive.
 	var kept []string
 	total := 0
-	for pair := range strings.SplitSeq(u.query, "&") {
+	for pair := range strings.SplitSeq(u.Query, "&") {
 		if pair == "" {
 			continue
 		}
@@ -93,8 +94,8 @@ func clean(input string) (string, bool) {
 	if len(kept) == total {
 		return "", false
 	}
-	u.hasQuery = len(kept) > 0
-	u.query = strings.Join(kept, "&")
+	u.HasQuery = len(kept) > 0
+	u.Query = strings.Join(kept, "&")
 	return u.String(), true
 }
 
@@ -123,4 +124,13 @@ func percentDecode(text string) string {
 
 func isHex(c byte) bool {
 	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
+}
+
+func asciiLower(s string) string {
+	return strings.Map(func(r rune) rune {
+		if 'A' <= r && r <= 'Z' {
+			return r + 'a' - 'A'
+		}
+		return r
+	}, s)
 }
