@@ -11,7 +11,8 @@ Module `github.com/jewei/tinydash`. Arrows are the only imports allowed; `intern
 | `cmd/tinydash`                                 | `main`: single-instance lock, CLI, `app.Run`                                                                                                                                      | `app`                                                                     |
 | `internal/core`                                | `Result`, `Kind`, `Icon`, `Action` (sealed), `Source` and its traits table, `ID`, `Category`, personal lists (usage, pins, hidden, aliases, hotkeys)                              | stdlib only                                                               |
 | `internal/match`                               | Normalize, name, word, and alias scoring                                                                                                                                          | `core`, stdlib                                                            |
-| `internal/feature/<name>`                      | One pure feature each: `apps`, `files`, `clipboard`, `library`, `emoji`, `system`, `calc`, `currency`, `datetime`, `password`, `cleanurl`, `color`, `unixtime`, `web`, `keywords` | `core`, `match`, stdlib minus OS, network, and clock                      |
+| `internal/weburl`                              | WHATWG URL parse, write, and check, shared by `cleanurl` and `library`                                                                                                            | stdlib minus OS, network, and clock                                       |
+| `internal/feature/<name>`                      | One pure feature each: `apps`, `files`, `clipboard`, `library`, `emoji`, `system`, `calc`, `currency`, `datetime`, `password`, `cleanurl`, `color`, `unixtime`, `web`, `keywords` | `core`, `match`, `weburl`, stdlib minus OS, network, and clock            |
 | `internal/search`                              | `Snapshot`, `Search`, `Browse`, `Resolve`, the source table and the answer list                                                                                                   | `core`, `match`, `feature/*`, `settings`                                  |
 | `internal/settings`                            | `settings.json` model, tolerant load, `Normalize`, save, unknown-key passthrough, Tauri accelerator translation                                                                   | `core`, stdlib                                                            |
 | `internal/store`                               | All SQL and the append-only migrations                                                                                                                                            | `core`, `feature/*` (row types), `mygo/plugins/sqlite`                    |
@@ -22,7 +23,7 @@ Module `github.com/jewei/tinydash`. Arrows are the only imports allowed; `intern
 
 ## Rules the tests enforce
 
-1. `feature/*`, `match`, and `core` import no `os`, `os/exec`, `net/...`, `syscall`, `unsafe`, or mygo package, and do not call `time.Now`. Disk, network, clock, and randomness come in as arguments: `fs.FS`, `io.Reader`, `time.Time`.
+1. `feature/*`, `match`, `weburl`, and `core` import no `os`, `os/exec`, `net/...`, `syscall`, `unsafe`, or mygo package, and do not call `time.Now`. Disk, network, clock, and randomness come in as arguments: `fs.FS`, `io.Reader`, `time.Time`.
 2. Only `store` imports the sqlite plugin.
 3. Only `platform` has `_darwin.go`, `_windows.go`, or `_linux.go` files or OS build tags.
 4. `ui/*` never imports `store`, `platform`, `engine` internals, or the mygo root package.
