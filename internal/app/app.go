@@ -67,6 +67,7 @@ type App struct {
 	icons    iconCache
 	more     *moreFiles
 	watch    *fileWatch
+	hud      *hud
 	tray     *mygo.Tray
 	settings *settingsWindow
 	mu       sync.Mutex
@@ -144,6 +145,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 		e.PreventDefault()
 		a.panel.Hide()
 	})
+	a.hud = newHUD(a.panel)
 	a.panel.OnBlur(func() {
 		if a.engine.Snapshot(time.Now()).Settings.HideOnBlur {
 			a.blurHiddenAt = time.Now()
@@ -412,7 +414,7 @@ func (s *appShell) ShowAgain() error {
 	return nil
 }
 
-func (s *appShell) ShowHUD(text string) { slog.Info(text) }
+func (s *appShell) ShowHUD(text string) { s.app().hud.show(text) }
 
 func (s *appShell) OpenSettings() error { return s.app().openSettings() }
 
