@@ -17,14 +17,15 @@ A copy that the user cleared never comes back, nothing that the monitor read bef
   - `StartupNeverSaved`: the content at startup is never saved.
   - `TypeOK`, which includes `epoch = gen`.
 - Each config covers up to 3 copies and 3 user requests (Clear, history off, history on), in every interleaving with the monitor's steps and the writer. The configs that model the code must pass:
-  - `ClipboardHistory.counted.cfg`: macOS and Windows, which have a change counter (about 62,000 states).
-  - `ClipboardHistory.linux.cfg`: Linux, where the monitor compares content (about 138,000 states).
+  - `ClipboardHistory.counted.cfg`: macOS and Windows, which have a change counter (about 85,000 states).
+  - `ClipboardHistory.linux.cfg`: Linux, where the monitor compares content (about 156,000 states).
 - The `.broken` configs model known bugs and must fail on the invariant that their first line names (`\* must break: <Invariant>`). The script fails a `.broken` config that breaks a different rule or has no such line. They show the check can catch them:
   - `counted.broken` (`EpochFirst = FALSE`: the clipboard read before the epoch) fails `NothingStaleIsSaved`.
   - `counted.unfixed.broken` (`Fixed = FALSE`: no counter recheck after the read) fails `ClearedNeverReturns`.
-  - `linux.broken` (`Fixed = FALSE`: a switch-off reset the seen content) fails `ClearedNeverReturns`.
+  - `linux.broken` (`Fixed = FALSE`: a switch-off or a failed read reset the seen content) fails `ClearedNeverReturns`. It checks that rule alone: the same code also broke `StartupNeverSaved`, which `linux.firstlook.broken` covers.
+  - `linux.firstlook.broken` (`FailedFirstLookWaits = FALSE`: a first look whose read failed used up the baseline) fails `StartupNeverSaved`.
 - Not a rule: "nothing copied while history was off is saved". With a counter, a copy made in the last half second before history comes back on can be saved; the Rust app polled the same counter and had the same race.
-- Left out: the content of clips, image and file kinds, the history limit, deletes of single entries, pins, the store's SQL, and the OS clipboard itself. A content read and the counter recheck are one step in the model; in the code they are two calls, and a copy between them only makes the recheck drop the read. The bound covers 3 copies and 3 requests, not more.
+- Left out: the content of clips, reads that find nothing to keep (an empty clipboard, a secret copy; the code treats such a read as seen), image and file kinds, the history limit, deletes of single entries, pins, the store's SQL, and the OS clipboard itself. A content read and the counter recheck are one step in the model; in the code they are two calls, and a copy between them only makes the recheck drop the read. The bound covers 3 copies and 3 requests, not more.
 
 ## Coverage record
 
@@ -34,6 +35,8 @@ Each part of the model is one step of this code:
 | --- | --- |
 | `MonitorStarts`: `seen`, `monOffs`, `rebase`, the `enabled` check | `Monitor.Tick` in `internal/engine/monitor.go`, up to `m.read()`: the counter check, `historyOffs`, `ClipEpoch()`, and the history-off branch |
 | `MonitorFinishes`: the second read, the counter recheck, `monFirst`, `seenCopy` | `Monitor.Tick` from `m.read()` to the `first` check: the recheck `after != n`, `seenHash` |
+| `MonitorReadFails`: `seenCopy` kept, `rebase` after a first look | `Monitor.Tick`, the `got != clipboard.ReadContent` branch with `clipboard.ReadFailed`; `Clipboard.Capture` in `internal/app/clipboard.go` reports a failed OS read as `ReadFailed` |
+| `None` | `seenHash = 0`: nothing read yet |
 | `MonitorQueuesSave` | `m.engine.SaveClip(epoch, content, now)` |
 | `EpochFirst = TRUE` | `epoch := m.engine.ClipEpoch()` before `content, ok := m.read()` |
 | `queue`, `WriterApplies` | `Engine.Change` and `Engine.Run` in `internal/engine/engine.go`: one writer, changes in order |
@@ -52,7 +55,7 @@ bash scripts/formal-verify.sh
 It needs Java 11 or later. The first run downloads TLC 1.7.4 into `~/.cache/tinydash` and checks its SHA-256; set `TLA2TOOLS` to use another copy, and `JAVA` for another Java. It takes about a minute. Then run the replays of the model's paths against the real code:
 
 ```sh
-go test -count=1 -race -run 'AClearDuringATickWins|ContentReadBefore|DuringATickIsSavedOnce|WhileHistoryIsOff|ClearedCopy|ShortOffPeriod|RightAfterAClear' ./internal/engine/
+go test -count=1 -race -run 'AClearDuringATickWins|ContentReadBefore|DuringATickIsSavedOnce|WhileHistoryIsOff|ClearedCopy|ShortOffPeriod|RightAfterAClear|FailedRead|FailedFirstLook|EmptyStart' ./internal/engine/
 ```
 
 ## Read a result

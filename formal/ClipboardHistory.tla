@@ -21,12 +21,15 @@
 (*   Fixed: the code as it is: switch-offs counted; after history was off  *)
 (*     where no counter kept up, the next read is a baseline; and a copy   *)
 (*     during a read drops that read. FALSE is the code before the fixes:  *)
-(*     a switch-off reset the seen content, and no recheck.                *)
+(*     a switch-off reset the seen content, a failed read reset it too,    *)
+(*     and no recheck.                                                     *)
+(*   FailedFirstLookWaits: where no counter keeps up, a first look whose   *)
+(*     read failed leaves the baseline to the next read that works (code). *)
 (* The configs whose names hold ".broken" must fail; the others must pass. *)
 (***************************************************************************)
 EXTENDS Naturals, Sequences
 
-CONSTANTS EpochFirst, Counted, Fixed, MaxCopies, MaxRequests
+CONSTANTS EpochFirst, Counted, Fixed, FailedFirstLookWaits, MaxCopies, MaxRequests
 
 VARIABLES
     clip,      \* what the OS clipboard holds: the number of the copy; 0 was there at startup
@@ -40,11 +43,14 @@ VARIABLES
     requests,  \* clears and switches the user asked for, to bound the model
     started,   \* Monitor.started
     seen,      \* Monitor.seen: the change counter at the last tick
-    seenCopy,  \* Monitor.seenHash: the content last read (Linux compares it)
+    seenCopy,  \* Monitor.seenHash: the content last read (Linux compares it); None at first
     rebase,    \* Monitor.rebase
     monOffs,   \* Monitor.offs
     mon,       \* where Monitor.Tick is: "idle", "half", "ready"
     monFirst, monEpoch, monCopy, monReadGen
+
+\* No copy: what Monitor.seenHash = 0 means, as nothing was read yet.
+None == MaxCopies + 1
 
 world == <<clip, gen, epoch, offs, enabled, history, cleared, queue, requests>>
 monVars == <<started, seen, seenCopy, rebase, monOffs, mon, monFirst, monEpoch, monCopy, monReadGen>>
@@ -53,7 +59,7 @@ vars == <<world, monVars>>
 Init ==
     /\ clip = 0 /\ gen = 0 /\ epoch = 0 /\ offs = 0 /\ enabled = TRUE
     /\ history = {} /\ cleared = {} /\ queue = <<>> /\ requests = 0
-    /\ started = FALSE /\ seen = 0 /\ seenCopy = 0 /\ rebase = FALSE /\ monOffs = 0
+    /\ started = FALSE /\ seen = 0 /\ seenCopy = None /\ rebase = FALSE /\ monOffs = 0
     /\ mon = "idle" /\ monFirst = FALSE /\ monEpoch = 0 /\ monCopy = 0 /\ monReadGen = 0
 
 UserCopies ==
@@ -85,7 +91,7 @@ MonitorStarts ==
             \* took the change as seen; without one, the next read is a
             \* baseline. Before the fix, the seen content was reset.
             /\ rebase' = (Fixed /\ ~Counted)
-            /\ seenCopy' = IF Fixed THEN seenCopy ELSE 0
+            /\ seenCopy' = IF Fixed THEN seenCopy ELSE None
             /\ seen' = clip /\ started' = TRUE /\ monOffs' = offs
             /\ UNCHANGED <<mon, monFirst, monEpoch, monCopy, monReadGen>>
        ELSE
@@ -110,6 +116,17 @@ MonitorFinishes ==
        ELSE IF ~Counted /\ c = seenCopy THEN mon' = "idle" /\ UNCHANGED seenCopy
        ELSE seenCopy' = c /\ mon' = "ready"
     /\ UNCHANGED <<started, seen, rebase, monOffs, monFirst>>
+    /\ UNCHANGED world
+
+\* The second read fails, as when the clipboard's owner does not answer in
+\* time: the tick ends with nothing read. What was seen stays seen (Fixed);
+\* after a first look, the baseline waits for the next read that works.
+MonitorReadFails ==
+    /\ mon = "half"
+    /\ mon' = "idle"
+    /\ seenCopy' = IF Fixed THEN seenCopy ELSE None
+    /\ rebase' = (rebase \/ (FailedFirstLookWaits /\ monFirst /\ ~Counted))
+    /\ UNCHANGED <<started, seen, monOffs, monFirst, monEpoch, monCopy, monReadGen>>
     /\ UNCHANGED world
 
 MonitorQueuesSave ==
@@ -150,7 +167,7 @@ Done == clip = MaxCopies /\ requests = MaxRequests /\ queue = <<>> /\ mon = "idl
 Next ==
     \/ UserCopies
     \/ UserAsks("clear") \/ UserAsks("off") \/ UserAsks("on")
-    \/ MonitorStarts \/ MonitorFinishes \/ MonitorQueuesSave
+    \/ MonitorStarts \/ MonitorFinishes \/ MonitorReadFails \/ MonitorQueuesSave
     \/ WriterApplies
     \/ Done
 
