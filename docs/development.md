@@ -29,7 +29,7 @@ The tests in `go test ./...` include the import rules and the gofmt check (`inte
 go run ./cmd/tinydash --data-dir "$(mktemp -d)"
 ```
 
-`--hidden` starts without showing the launcher. Quit an installed TinyDash first: both would use the same launcher shortcut. A second start of the same build shows the running launcher and quits.
+`--hidden` starts without showing the launcher. Quit an installed TinyDash first: both would use the same launcher shortcut. A second start of the same build hands its options to the running one (with none, it toggles the launcher) and quits. `--settings`, `--mode <category>`, and `--background` (the same as `--hidden`) are the Rust app's options.
 
 Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the user's real data: on macOS, `~/Library/Application Support/dev.tinydash.launcher`. Never run it that way for development.
 
