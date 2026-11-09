@@ -1,0 +1,299 @@
+package launcher
+
+import (
+	"strconv"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/egoist/mygo/ui"
+	"github.com/jewei/tinydash/internal/core"
+)
+
+// View builds the panel's content: give it to the window as ui.View(m.View).
+func (m *Model) View(c *ui.Context) {
+	p := themed(c)
+	// The menu and the dialogs take the keyboard while they show; keys
+	// behind them must not act.
+	if !m.overlay() {
+		for _, b := range keymap {
+			if b.when == nil || b.when(m) {
+				c.OnShortcut(b.mods, b.key, func() { b.run(m, c.ShortcutRepeated()) })
+			}
+		}
+	}
+	var actions ui.Element
+	ui.Column(c).Fill().ObserveInput(m.observe).Children(func() {
+		m.searchBar(c, p)
+		m.tabBar(c, p)
+		if m.notice != "" {
+			ui.Row(c).Padding(8, 24).Gap(8).AlignItems(ui.Center).Background(p.notice).Role(ui.RoleAlert).Children(func() {
+				ui.Icon(c, glyphs["warning"]).FontSize(16)
+				ui.Text(c, m.notice).FontSize(12).Grow(1)
+			})
+		}
+		m.body(c, p)
+		actions = m.footer(c, p)
+	})
+	switch {
+	case m.confirm != nil:
+		m.confirmView(c, p)
+	case m.alias != nil:
+		m.aliasView(c, p)
+	case m.hotkey != nil:
+		m.hotkeyView(c, p)
+	case m.menu != nil:
+		m.menuView(c, p, actions)
+	}
+}
+
+// observe notes whether the last key came as a repeat; a press of the
+// pointer is no repeat.
+func (m *Model) observe(ev ui.InputEvent) {
+	switch ev.Kind {
+	case ui.InputKeyDown:
+		m.repeat = ev.Repeat
+	case ui.InputPointerDown:
+		m.repeat = false
+	}
+}
+
+func (m *Model) searchBar(c *ui.Context, p palette) {
+	ui.Row(c).Padding(16, 24, 8, 24).Gap(12).AlignItems(ui.Center).Children(func() {
+		ui.Icon(c, glyphs["search"]).FontSize(20).TextColor(p.accent)
+		field := ui.TextInputBase(c, &m.query).Bind(&m.input).AutoFocus().Grow(1).FontSize(22).
+			Placeholder("Search apps, files, clipboard, and more").Label("Search")
+		// The field takes Enter and its editing keys, such as Mod+Backspace,
+		// before any shortcut; it leaves those the keymap does not take.
+		field.OnTextKey(func(k ui.TextKey) bool { return m.press(k.Mods, k.Key, m.repeat) })
+		if field.Changed() {
+			m.edited()
+		}
+		// A query put in the field, as Up brings one back, is typed on at
+		// its end.
+		if m.caretToEnd {
+			n := utf8.RuneCountInString(m.query)
+			field.SetTextSelection(n, n)
+			m.caretToEnd = false
+		}
+	})
+}
+
+func (m *Model) tabBar(c *ui.Context, p palette) {
+	tabs := m.tabs()
+	ui.Row(c).Padding(4, 16, 12, 16).Gap(4).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.rule).Children(func() {
+		ui.Row(c).Gap(4).Role(ui.RoleTabList).Label("Categories").Grow(1).Children(func() {
+			for _, tab := range tabs {
+				chosen := tab == m.category
+				t := ui.ButtonBase(c).Padding(4, 12).Radius(999).Role(ui.RoleTab).Label(categoryLabels[tab]).AccessSelected(chosen)
+				ink, weight := p.muted, 400
+				switch {
+				case chosen:
+					t.Background(p.selected)
+					ink, weight = p.selectedInk, 600
+				case t.Hovered():
+					t.Background(p.hover)
+				}
+				t.Children(func() { ui.Text(c, categoryLabels[tab]).TextColor(ink).FontWeight(weight) })
+				t.OnClick(func() {
+					m.setCategory(tab)
+					m.input.Focus()
+				})
+			}
+		})
+		if len(tabs) > 1 {
+			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				keyCaps(c, p, "Tab")
+				ui.Text(c, "next").FontSize(12).TextColor(p.muted)
+			})
+		}
+	})
+}
+
+func (m *Model) body(c *ui.Context, p palette) {
+	rows := m.rows()
+	switch {
+	case m.clipboardOff():
+		empty(c, p, "Clipboard history is off", func() {
+			muted(c, p, "TinyDash saves text you copy, on this computer only. Passwords are skipped.")
+			ui.PrimaryButton(c, "Turn On Clipboard History").OnClick(m.enableClipboard)
+			if m.enableError != "" {
+				ui.Text(c, m.enableError).TextColor(p.danger).Role(ui.RoleAlert)
+			}
+		})
+	case len(rows) == 0:
+		m.emptyResults(c, p)
+	default:
+		m.list.Key = func(i int) any { return rows[i].ID }
+		m.list.Label = func(i int) string { return rows[i].Title }
+		ui.List(c, &m.list, len(rows), func(i int) { m.row(c, p, rows[i], i) }).Grow(1).Padding(8).Label("Results")
+	}
+}
+
+// emptyResults says what an empty list means, by tab, before and after
+// typing.
+func (m *Model) emptyResults(c *ui.Context, p palette) {
+	q := strings.TrimSpace(m.query)
+	switch {
+	case q != "":
+		empty(c, p, "No results", func() { muted(c, p, "Nothing matches “"+q+"”.") })
+	case m.category == core.CategoryClipboard:
+		empty(c, p, "Nothing copied yet", func() { muted(c, p, "Text you copy appears here, newest first.") })
+	case m.category == core.CategorySnippets:
+		empty(c, p, "No snippets yet", func() {
+			muted(c, p, "Save text you type often, or links you open with a keyword.")
+			ui.PrimaryButton(c, "Add in Settings").OnClick(m.openSettings)
+		})
+	case m.category == core.CategoryFiles:
+		empty(c, p, "Search your files", func() {
+			muted(c, p, "Type part of a file or folder name. Choose the folders in Settings.")
+		})
+	default:
+		empty(c, p, "What do you need?", func() {
+			for _, tip := range []string{
+				"Type an app, file, snippet, or emoji name",
+				"Calculate 12 * 8, 5 ft to cm, 100 usd to eur; = lists past results",
+				"Ask time in tokyo or next friday + 2 weeks",
+				"Generate password, or search the web with g rust",
+				"? lists every keyword; ↑ brings back a past search",
+			} {
+				muted(c, p, "• "+tip)
+			}
+		})
+	}
+}
+
+func empty(c *ui.Context, p palette, title string, children func()) {
+	ui.Column(c).Grow(1).Padding(24).Gap(12).Justify(ui.Center).Children(func() {
+		ui.Text(c, title).FontSize(24).TextColor(p.ink).Role(ui.RoleHeading)
+		children()
+	})
+}
+
+func muted(c *ui.Context, p palette, text string) ui.Element {
+	return ui.Text(c, text).TextColor(p.muted)
+}
+
+// row shows a result: its icon, title, subtitle, and on the right a pin,
+// its kind while selected, and the key that runs it.
+func (m *Model) row(c *ui.Context, p palette, r core.Result, i int) {
+	chosen := i == m.selected
+	row := ui.Row(c).Height(52).Padding(0, 12).Gap(12).AlignItems(ui.Center).Radius(10).
+		Role(ui.RoleOption).Label(r.Title).AccessSelected(chosen)
+	title := p.ink
+	if chosen {
+		row.Background(p.selected).Border(1, p.edge)
+		title = p.selectedInk
+	}
+	row.Children(func() {
+		m.icon(c, p, r)
+		ui.Column(c).Grow(1).Gap(1).Children(func() {
+			t := ui.Text(c, r.Title).TextColor(title).SingleLine()
+			if chosen {
+				t.FontWeight(600)
+			}
+			if r.Subtitle != "" {
+				ui.Text(c, r.Subtitle).FontSize(12).TextColor(p.muted).SingleLine()
+			}
+		})
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			if r.Pinned {
+				ui.Icon(c, glyphs["pin"]).FontSize(13).TextColor(p.muted).Label("Pinned")
+			}
+			if chosen {
+				ui.Text(c, kinds[r.Kind].label).FontSize(12).TextColor(p.muted)
+			}
+			if i < 9 {
+				keyCaps(c, p, modKey, strconv.Itoa(i+1))
+			}
+		})
+	})
+	// A click runs the row the user sees; a right-click opens its actions.
+	row.OnClick(func() {
+		m.selected = i
+		m.runRow(i, 0)
+		m.focusInput()
+	})
+	if row.RightClicked() {
+		m.selected = i
+		m.openMenu()
+	}
+}
+
+// icon is a file's system icon, an emoji, a color swatch, or a glyph.
+func (m *Model) icon(c *ui.Context, p palette, r core.Result) {
+	ui.Row(c).Size(32, 32).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
+		if r.Icon.File != "" {
+			if b := m.backend.FileIcon(r.Icon.File); b != nil {
+				ui.Image(c, b).Size(32, 32)
+				return
+			}
+		}
+		switch {
+		case r.Icon.Emoji != "":
+			ui.Text(c, r.Icon.Emoji).FontSize(26)
+		case r.Icon.Color != "":
+			ui.Box(c).Size(24, 24).Radius(6).Background(ui.Hex(r.Icon.Color)).Border(1, p.border)
+		default:
+			name := string(r.Icon.Symbol)
+			if glyphs[name] == nil {
+				name = kinds[r.Kind].glyph
+			}
+			if svg := glyphs[name]; svg != nil {
+				ui.Icon(c, svg).FontSize(19).TextColor(p.muted)
+			}
+		}
+	})
+}
+
+// footer shows what Enter runs and the Actions button, which it returns:
+// a press on it must toggle the menu, not close it as a press outside.
+func (m *Model) footer(c *ui.Context, p palette) ui.Element {
+	var actions ui.Element
+	ui.Row(c).Height(40).Padding(0, 16).Gap(12).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.rule).Children(func() {
+		if r, ok := m.selectedRow(); ok && len(r.Actions) > 0 {
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, r.Actions[0].Label).FontSize(12).TextColor(p.ink)
+				keyCaps(c, p, "↩")
+			})
+		}
+		ui.Box(c).Grow(1)
+		if m.canClearHistory() {
+			footerButton(c, p, "Clear History…", nil).OnClick(func() {
+				m.menu = nil
+				m.start(clearHistory, "", "")
+			})
+		}
+		actions = footerButton(c, p, "Actions", []string{modKey, "K"}).OnClick(func() {
+			if m.menu != nil {
+				m.closeMenu()
+			} else {
+				m.openMenu()
+			}
+		})
+	})
+	return actions
+}
+
+func footerButton(c *ui.Context, p palette, label string, keys []string) ui.Element {
+	b := ui.ButtonBase(c).Padding(4, 8).Radius(6).Label(label)
+	if b.Hovered() {
+		b.Background(p.hover)
+	}
+	return b.Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(p.muted)
+			if keys != nil {
+				keyCaps(c, p, keys...)
+			}
+		})
+	})
+}
+
+// keyCaps shows the keys of a shortcut, such as ⌘ K.
+func keyCaps(c *ui.Context, p palette, keys ...string) {
+	ui.Row(c).Gap(3).Children(func() {
+		for _, k := range keys {
+			ui.Text(c, k).FontSize(11).Padding(0, 5).Radius(4).Border(1, p.border).TextColor(p.muted)
+		}
+	})
+}
