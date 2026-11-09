@@ -18,3 +18,10 @@ The output is deterministic: two runs give identical files.
 ## Allowed differences
 
 The port drops some features on purpose (for example fend's long tail of units). A query where Go differs from Rust must be listed in `divergences/<feature>.tsv`: one line per query, then a tab, then the reason. The first line is a header. A difference that is not listed fails the Go tests.
+
+## Fixtures
+
+`fixtures/` pins how the Rust app reads and writes the user's data, written by `golden_fixtures` in the same file (run it like the command above, with `golden_fixtures` in place of `golden`).
+
+- `settings.jsonl`: each input `settings.json` (or none), the settings Rust loaded from it, its warning (`<dir>` in place of the folder), and whether it copied the file to `settings.invalid.json`.
+- `tinydash.db`: a database that the Rust `Store` filled by a fixed sequence of calls (see `golden_fixtures`). `store.jsonl` dumps every table of it, its `user_version`, and the clipboard hash of sample contents. The Go store must read this file and, given the same calls, write the same rows.
