@@ -59,6 +59,10 @@ type Model struct {
 	savingHotkey bool
 	// paused is set while the global shortcuts are off for recording.
 	paused bool
+	// dragPending is set from a press on a drag area until a release. A
+	// window manager that moves the panel can take that release; the next
+	// one ends it then, which the app takes as no drag.
+	dragPending bool
 
 	menu    *menu
 	alias   *aliasDialog

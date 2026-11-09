@@ -58,6 +58,12 @@ func (m *Model) observe(ev ui.InputEvent) {
 		m.repeat = ev.Repeat
 	case ui.InputPointerDown:
 		m.repeat = false
+	case ui.InputPointerUp:
+		// A press on a bar that is let go of moves the panel no more.
+		if m.dragPending {
+			m.dragPending = false
+			m.backend.DragEnded()
+		}
 	}
 }
 
@@ -88,7 +94,7 @@ func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 		ui.Row(c).Gap(4).Role(ui.RoleTabList).Label("Categories").Grow(1).Children(func() {
 			for _, tab := range tabs {
 				chosen := tab == m.category
-				t := ui.ButtonBase(c).Padding(4, 12).Radius(999).Role(ui.RoleTab).Label(categoryLabels[tab]).AccessSelected(chosen)
+				t := ownPress(ui.ButtonBase(c)).Padding(4, 12).Radius(999).Role(ui.RoleTab).Label(categoryLabels[tab]).AccessSelected(chosen)
 				ink, weight := p.Muted, 400
 				switch {
 				case chosen:
@@ -118,11 +124,19 @@ func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 // search field, so typing goes on after the move.
 func (m *Model) dragArea(bar ui.Element) ui.Element {
 	return bar.DragWindow().KeepFocus().HandleInput(func(ev ui.InputEvent) bool {
-		if ev.Kind == ui.InputPointerDown {
+		if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
+			m.dragPending = true
 			m.backend.DragStarted()
 		}
 		return false // the press still moves the window
 	})
+}
+
+// ownPress keeps a press on a control inside a drag area from reaching
+// the area's handler: mygo gives a press to the innermost element with an
+// input function, and the press is the control's click, not a drag.
+func ownPress(control ui.Element) ui.Element {
+	return control.HandleInput(func(ui.InputEvent) bool { return false })
 }
 
 // noticeBar says what went wrong under the tabs. A startup warning has a
@@ -319,12 +333,12 @@ func (m *Model) footer(c *ui.Context, p kit.Palette) ui.Element {
 		}
 		ui.Box(c).Grow(1)
 		if m.canClearHistory() {
-			footerButton(c, p, "Clear History…", nil).OnClick(func() {
+			ownPress(footerButton(c, p, "Clear History…", nil)).OnClick(func() {
 				m.menu = nil
 				m.start(clearHistory, "", "")
 			})
 		}
-		actions = footerButton(c, p, "Actions", []string{modKey, "K"}).OnClick(func() {
+		actions = ownPress(footerButton(c, p, "Actions", []string{modKey, "K"})).OnClick(func() {
 			if m.menu != nil {
 				m.closeMenu()
 			} else {

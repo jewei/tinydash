@@ -39,11 +39,13 @@ type Backend interface {
 	EnableClipboardHistory(done func(error))
 	// Hide hides the panel, as Escape with nothing else to close does.
 	Hide()
-	// DragStarted says that a press on the tab bar or the footer is moving
-	// the panel. Where the window manager moves windows itself (X11), the
-	// move takes focus from the panel, and the app must not take that blur
-	// for the user leaving.
+	// DragStarted says that a press on the empty part of the tab bar or the
+	// footer is moving the panel. Where the window manager moves windows
+	// itself (X11), the move takes focus from the panel, and the app must
+	// not take that blur for the user leaving.
 	DragStarted()
+	// DragEnded says that the press DragStarted told of was let go of.
+	DragEnded()
 	// Widgets loads the pane beside an empty All search, each time the
 	// launcher shows and after the data changed; done as for Run. Reading
 	// the disk can wait on the OS, so the app loads it outside the frame.

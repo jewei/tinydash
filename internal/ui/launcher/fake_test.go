@@ -12,6 +12,7 @@ import (
 // fake is a Backend that records what the launcher asks.
 type fake struct {
 	drags    int
+	dragEnds int
 	results  func(query string, category core.Category) []core.Result
 	settings ViewSettings
 	// fail, if set, is the error an action ends with.
@@ -93,6 +94,7 @@ func (f *fake) Settings() ViewSettings     { return f.settings }
 func (f *fake) FileIcon(string) *ui.Bitmap { return nil }
 func (f *fake) Hide()                      { f.hidden++ }
 func (f *fake) DragStarted()               { f.drags++ }
+func (f *fake) DragEnded()                 { f.dragEnds++ }
 func (f *fake) PauseShortcuts(paused bool) error {
 	f.paused = append(f.paused, paused)
 	return f.pauseErr

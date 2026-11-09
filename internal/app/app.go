@@ -89,7 +89,8 @@ type App struct {
 	// blurredAt is when the panel last lost focus; main thread only.
 	blurredAt time.Time
 	// movedAt is when the panel last moved, as in a drag, and dragStartedAt
-	// when a press on the tab bar or footer began one; main thread only.
+	// when a press on the tab bar or footer began one, or zero once it was
+	// let go of; main thread only.
 	movedAt, dragStartedAt time.Time
 	// placed is where TinyDash last put the panel, and dragSave saves
 	// where the user dragged it; main thread only.
@@ -344,11 +345,14 @@ const (
 )
 
 // dragLimit bounds how long a drag that reports no move holds off a hide.
+// Where the window manager moves the panel (X11), mygo reports the move
+// only as the drag ends, so a drag in progress has no other sign.
 const dragLimit = 10 * time.Second
 
 // blurOutcome decides a blur once blurGrace passed. A panel that has the
 // focus again stays. A drag that started and has not moved yet, or a panel
-// that moved within blurGrace, is still being dragged. Any other hides.
+// that moved within blurGrace, is still being dragged. Any other hides: a
+// press on a bar that was let go of (DragEnded) is no drag.
 func blurOutcome(focused bool, sinceMove, sinceDrag time.Duration, movedSinceDrag bool) blurStep {
 	switch {
 	case focused:
@@ -624,6 +628,8 @@ func (b *backend) EnableClipboardHistory(done func(error)) {
 func (b *backend) Hide() { b.app().panel.Hide() }
 
 func (b *backend) DragStarted() { b.app().dragStartedAt = time.Now() }
+
+func (b *backend) DragEnded() { b.app().dragStartedAt = time.Time{} }
 
 // appShell is what actions ask of TinyDash's own windows.
 type appShell App
