@@ -24,7 +24,7 @@ TinyDash is moving to Go on mygo, beside the Rust code, on branch `rewrite/mygo`
 
 - Run every Go gate with `bash scripts/verify-go.sh` (vet on three OSes, staticcheck, tests with `-race`, import rules, gofmt).
 - The import rules are data in `internal/archtest/rules.go`. Change them there, in their own commit, with the reason.
-- `testdata/golden` pins the Rust app's answers. A Go result that differs must be listed in `testdata/golden/divergences.tsv`.
+- `testdata/golden` pins the Rust app's answers. A Go result that differs must be listed in `testdata/golden/divergences/<feature>.tsv`.
 - Never drive the desktop with synthetic keys or clicks. Test views with mygo's `ui.NewTester`.
 
 ## Where things are

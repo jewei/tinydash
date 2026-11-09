@@ -33,6 +33,7 @@ var layers = []struct {
 	{"cmd/tinydash", []string{"internal/app"}},
 	{"internal/archtest", nil},
 	{"internal/core", nil},
+	{"internal/golden", []string{"internal/core"}}, // test support: tests import it, the app never does
 	{"internal/match", []string{"internal/core"}},
 	{"internal/feature/", []string{"internal/core", "internal/match"}},
 	{"internal/settings", []string{"internal/core"}},

@@ -54,7 +54,7 @@ Views read a model and call methods on it. Key bindings are one table in `keymap
 
 - Same data folders (the Tauri identifier `dev.tinydash.launcher`), same `tinydash.db` schema, same `settings.json` keys. Keys of dropped features pass through unchanged, so a downgrade loses nothing.
 - Stored shortcuts stay in Tauri syntax and are translated at the edge.
-- `testdata/golden` pins the Rust app's answers; differences are listed in `divergences.tsv`.
+- `testdata/golden` pins the Rust app's answers; differences are listed in `divergences/<feature>.tsv`.
 
 ## Decided
 

@@ -17,4 +17,4 @@ The output is deterministic: two runs give identical files.
 
 ## Allowed differences
 
-The port drops some features on purpose (for example fend's long tail of units). A query where Go differs from Rust must be listed, with the reason, in `divergences.tsv` beside these files. A difference that is not listed fails the Go tests.
+The port drops some features on purpose (for example fend's long tail of units). A query where Go differs from Rust must be listed in `divergences/<feature>.tsv`: one line per query, then a tab, then the reason. The first line is a header. A difference that is not listed fails the Go tests.
