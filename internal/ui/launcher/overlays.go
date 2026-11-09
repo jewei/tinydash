@@ -52,6 +52,13 @@ func (m *Model) menuRow(c *ui.Context, p kit.Palette, item menuItem, i int) {
 		row.Background(p.Selected)
 		ink, weight = p.SelectedInk, 600
 	}
+	// As in a native menu, the item under the pointer is the active one.
+	row.HandleInput(func(ev ui.InputEvent) bool {
+		if ev.Kind == ui.InputPointerMove && m.menu != nil {
+			m.menu.active = i
+		}
+		return false
+	})
 	row.Children(func() {
 		ui.Text(c, item.label).TextColor(ink).FontWeight(weight).Grow(1).SingleLine()
 		if item.keys != nil {

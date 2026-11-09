@@ -236,6 +236,17 @@ func (m *Model) row(c *ui.Context, p kit.Palette, r core.Result, i int) {
 			}
 		})
 	})
+	// Moving the pointer onto a row selects it. Only a real move counts:
+	// mygo sends InputPointerMove only when the pointer's position in the
+	// window changed, never for a list that scrolls, or new results that
+	// come, under a still pointer, so those never take the selection from
+	// the keyboard.
+	row.HandleInput(func(ev ui.InputEvent) bool {
+		if ev.Kind == ui.InputPointerMove && i < len(m.rows()) {
+			m.selected = i
+		}
+		return false
+	})
 	// A click runs the row the user sees; a right-click opens its actions.
 	row.OnClick(func() {
 		m.selected = i
