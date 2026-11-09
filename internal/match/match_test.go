@@ -173,3 +173,50 @@ func TestTopKeepsTiesInInputOrder(t *testing.T) {
 		t.Errorf("%c", got)
 	}
 }
+
+func TestFoldMatchComparesTheLowercaseText(t *testing.T) {
+	for _, c := range []struct {
+		text, query   string
+		prefix, equal bool
+	}{
+		{"Code", "code", true, true},
+		{"Code", "co", true, false},
+		{"Co", "code", false, false},
+		{"Code", "", true, false},
+		{"", "", true, true},
+		{"İstanbul", "i", true, false}, // İ lowercases to two runes
+		{"İ", "i̇", true, true},
+		{"İs", "i̇s", true, true},
+		{"ΣΟΦΊΑ", "σοφία", true, true},
+		{"a\xffb", "a�b", true, true},
+	} {
+		prefix, equal := foldMatch(c.text, c.query)
+		if prefix != c.prefix || equal != c.equal {
+			t.Errorf("foldMatch(%q, %q) = %v, %v, want %v, %v", c.text, c.query, prefix, equal, c.prefix, c.equal)
+		}
+	}
+}
+
+func TestTheASCIIPrefilterKeepsEveryMatch(t *testing.T) {
+	candidates := []string{"Report Budget.txt", "home/rep 1/bud 2.txt", "s", "S", "Safari", "x12*8", "café", "zz", "áb"}
+	for _, query := range []string{"s", "sa", "rep bud", "12 * 8", "zzzz", "ab", "café", "REP"} {
+		m := New(query)
+		for _, c := range candidates {
+			_, fuzzy := scoreAtoms(m.fuzzy, c)
+			_, words := scoreAtoms(m.words, c)
+			hay := newText(c)
+			wantFuzzy, wantWords := true, true
+			for _, a := range m.fuzzy {
+				_, ok := a.score(hay)
+				wantFuzzy = wantFuzzy && ok
+			}
+			for _, a := range m.words {
+				_, ok := a.score(hay)
+				wantWords = wantWords && ok
+			}
+			if fuzzy != wantFuzzy || words != wantWords {
+				t.Errorf("%q in %q: fuzzy %v, words %v; want %v, %v", query, c, fuzzy, words, wantFuzzy, wantWords)
+			}
+		}
+	}
+}
