@@ -3,6 +3,7 @@
 What the Rust app (v0.9.0 line, commit in `meta.jsonl`) answered for each query. The Go port must match it.
 
 - `queries/<feature>.txt`: the inputs, one per line. Harvested from the Rust test modules and the examples in `docs/features.md`, plus hand-written cases. Add cases here; never delete one to make a test pass.
+- `search.jsonl`: what `search` returned per category and query in a fixed world (see `golden_search`); file paths start with `<root>`.
 - `<feature>.jsonl`: one line per query, written by `src-tauri/src/golden.rs`. A `null` or `[]` answer is a case too: the Go port must also give no answer.
 - `meta.jsonl`: the fixed clock (Monday 2026-11-09 10:30), time zone (`Asia/Kuala_Lumpur`), and currency rates used.
 

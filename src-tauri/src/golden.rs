@@ -343,3 +343,260 @@ fn golden_fixtures() {
     );
     let _ = fs::remove_dir_all(&scratch);
 }
+
+/// What `search` returns, per category, in a fixed world: apps, a scanned
+/// file tree, clipboard entries, snippets and quicklinks, usage, pins,
+/// aliases, hidden results, and hotkeys.
+#[test]
+#[ignore = "writes the golden search corpus; run with GOLDEN_OUT set"]
+fn golden_search() {
+    use crate::features::apps::{App, AppIndex};
+    use crate::features::clipboard::{ClipKind, ClipboardHistory, Entry};
+    use crate::features::files::FileIndex;
+    use crate::features::library::{Library, LibraryItem, LibraryKind};
+    use crate::search::usage::{Aliases, Hidden, Hotkeys, Pins, Usage, Use};
+    use crate::search::{Category, search};
+    use crate::settings::Settings;
+    use crate::state::State;
+
+    let out = PathBuf::from(std::env::var("GOLDEN_OUT").expect("set GOLDEN_OUT"));
+    let (y, mo, d, h, mi) = NOW;
+    let now = Local.with_ymd_and_hms(y, mo, d, h, mi, 0).unwrap();
+    let day = 86_400;
+    let t = now.timestamp();
+
+    let root = std::env::temp_dir().join(format!("tinydash-golden-files-{}", std::process::id()));
+    for file in [
+        "Documents/report.pdf",
+        "Documents/Budget 2026.xlsx",
+        "Documents/notes.txt",
+        "Projects/tinydash/README.md",
+        "Projects/tinydash/node_modules/left-pad/index.js",
+        "Projects/notes-app/main.go",
+        ".hidden/secret.txt",
+        "Photos/beach.png",
+        "Photos/Report card.jpg",
+    ] {
+        let path = root.join(file);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, b"x").unwrap();
+    }
+    let files = FileIndex::scan(
+        &[root.clone()],
+        &["node_modules".to_owned()],
+        &["app"],
+        None,
+    );
+
+    let state = State::for_tests(Settings::default());
+    let app = |name: &str, path: &str, aliases: &[&str], description: Option<&str>| App {
+        name: name.into(),
+        path: path.into(),
+        aliases: aliases.iter().map(|a| (*a).to_owned()).collect(),
+        description: description.map(Into::into),
+    };
+    state.apps.set(AppIndex::new(vec![
+        app(
+            "Safari",
+            "/Applications/Safari.app",
+            &[],
+            Some("Web browser"),
+        ),
+        app(
+            "Visual Studio Code",
+            "/Applications/Visual Studio Code.app",
+            &["code"],
+            Some("Code editor"),
+        ),
+        app(
+            "Terminal",
+            "/System/Applications/Utilities/Terminal.app",
+            &[],
+            None,
+        ),
+        app(
+            "Notes",
+            "/System/Applications/Notes.app",
+            &[],
+            Some("Notes"),
+        ),
+        app("Chess", "/System/Applications/Chess.app", &[], None),
+        app(
+            "Calculator",
+            "/System/Applications/Calculator.app",
+            &[],
+            None,
+        ),
+        app(
+            "System Settings",
+            "/System/Applications/System Settings.app",
+            &[],
+            None,
+        ),
+        app("Slack", "/Applications/Slack.app", &[], Some("Team chat")),
+    ]));
+    state.files.set(files);
+    state.clipboard.set(ClipboardHistory::new(vec![
+        Entry::new(
+            3,
+            ClipKind::Text,
+            "hello world".into(),
+            "hello world",
+            t - 60,
+        ),
+        Entry::new(
+            2,
+            ClipKind::Files,
+            "report.pdf".into(),
+            "/tmp/report.pdf",
+            t - 3600,
+        ),
+        Entry::new(
+            1,
+            ClipKind::Text,
+            "ssh deploy@example.com".into(),
+            "ssh deploy@example.com",
+            t - day,
+        ),
+    ]));
+    let item = |id, kind, name: &str, keyword: &str, text: &str| LibraryItem {
+        id: Some(id),
+        kind,
+        name: name.into(),
+        keyword: keyword.into(),
+        text: text.into(),
+    };
+    state.library.set(Library::new(vec![
+        item(1, LibraryKind::Snippet, "Signature", "sig", "Best,\nJ"),
+        item(2, LibraryKind::Snippet, "Address", "addr", "1 Main St"),
+        item(
+            3,
+            LibraryKind::Quicklink,
+            "Search MDN",
+            "mdn",
+            "https://developer.mozilla.org/search?q={query}",
+        ),
+        item(
+            4,
+            LibraryKind::Quicklink,
+            "Tinydash repo",
+            "",
+            "https://github.com/jewei/tinydash",
+        ),
+    ]));
+    state.usage.set(Usage::new([
+        (
+            "app:/Applications/Slack.app".to_owned(),
+            Use {
+                count: 12,
+                last_used: t - 3600,
+            },
+        ),
+        (
+            "app:/System/Applications/Notes.app".to_owned(),
+            Use {
+                count: 3,
+                last_used: t - 10 * day,
+            },
+        ),
+        (
+            "emoji:🚀".to_owned(),
+            Use {
+                count: 4,
+                last_used: t - day,
+            },
+        ),
+        (
+            "snippet:1".to_owned(),
+            Use {
+                count: 2,
+                last_used: t - 2 * day,
+            },
+        ),
+        (
+            "system:lock".to_owned(),
+            Use {
+                count: 5,
+                last_used: t,
+            },
+        ),
+    ]));
+    state.pins.set(Pins::new(vec![
+        "app:/Applications/Safari.app".into(),
+        "clip:2".into(),
+        "emoji:🎉".into(),
+    ]));
+    state.hidden.set(Hidden::new([
+        "app:/System/Applications/Chess.app".to_owned()
+    ]));
+    state.aliases.set(Aliases::new([(
+        "app:/Applications/Visual Studio Code.app".to_owned(),
+        "vsc".to_owned(),
+    )]));
+    state.hotkeys.set(Hotkeys::new([(
+        "snippet:1".to_owned(),
+        "Control+Alt+S".to_owned(),
+    )]));
+
+    let mut snapshot = state.snapshot();
+    snapshot.now = now;
+    let shown = root.display().to_string();
+    let queries = [
+        "",
+        "s",
+        "sa",
+        "saf",
+        "safari",
+        "vsc",
+        "code",
+        "studio",
+        "term",
+        "notes",
+        "note",
+        "chess",
+        "report",
+        "rep",
+        "budget",
+        "beach",
+        "tiny",
+        "readme",
+        "secret",
+        "left",
+        "hello",
+        "ssh",
+        "sig",
+        "signature",
+        "addr",
+        "mdn",
+        "mdn array map",
+        "repo",
+        "rocket",
+        "party",
+        "lock",
+        "sleep",
+        "trash",
+        "settings",
+        "dark",
+        "quit",
+        "12 * 8",
+        "?",
+        "g rust",
+        "zzzz",
+    ];
+    let mut rows = Vec::new();
+    for category in Category::ALL {
+        for query in queries {
+            let results = search(&snapshot, query, category);
+            let text = serde_json::to_string(&results)
+                .unwrap()
+                .replace(&shown, "<root>");
+            rows.push(json!({
+                "category": category.name(),
+                "query": query,
+                "results": serde_json::from_str::<Value>(&text).unwrap(),
+            }));
+        }
+    }
+    write(&out, "search", rows);
+    let _ = fs::remove_dir_all(&root);
+}
