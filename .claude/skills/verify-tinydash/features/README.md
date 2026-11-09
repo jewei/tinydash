@@ -17,7 +17,7 @@ This folder is the maintained source for verifying what a user does in the TinyD
 - Prefer result-row keys (`key=file:/root/…`) and labels (`[tab] "Clipboard"`) over refs. Refs change when an overlay opens or closes, so take them from the latest diff, or run `$V ref '<text>'`.
 - Type with `$V auto type` and press keys with `$V auto key`, as the user does. Use `press` only for buttons and tabs that the user clicks.
 - Run X-level actions (the global shortcut, a copy by another app) only through `$V box`. They reach the container's display `:99`.
-- Wait for state (`wait --text`, `wait --gone`, `--settle`), never a fixed sleep. The one exception is the X shortcut, which has no automation event: poll `$V auto windows`.
+- Wait for state (`wait --text`, `wait --gone`, `--settle`), never a fixed sleep. The exceptions are the timing windows that the app has on purpose: wait 1 s after Turn On Clipboard History (Linux baseline read) and 0.5 s after a shortcut hide (`blurWithin`). The X shortcut has no automation event: poll `$V auto windows`.
 
 ## Proof and skip reporting
 
