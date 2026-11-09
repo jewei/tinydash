@@ -85,3 +85,35 @@ func TestResumingSaysWhichKeysTheOSRefused(t *testing.T) {
 		t.Errorf("error %v", err)
 	}
 }
+
+// Keys that another app took during a pause are refused as it ends. When
+// the other app lets them go, the next sync registers them again: the
+// registry keeps only keys that the OS accepted, as the Rust app's did.
+func TestKeysRefusedAtResumeAreTriedAgainByTheNextSync(t *testing.T) {
+	os := newFakeRegistry()
+	s := &shortcuts{os: os, toggle: func() {}, run: func(core.ID) {}}
+	notes := core.ID("app:notes")
+	wanted := search.NewHotkeys(map[core.ID]string{notes: "Alt+N"})
+	if failed := s.sync(wanted); len(failed) != 0 {
+		t.Fatal(failed)
+	}
+	if err := s.setLauncher("Control+Shift+Space", "Control+Shift+Space"); err != nil {
+		t.Fatal(err)
+	}
+	s.pause(true)
+	os.taken["Alt+N"], os.taken["Control+Shift+Space"] = true, true
+	if err := s.pause(false); err == nil {
+		t.Fatal("resuming with taken keys gave no error")
+	}
+	delete(os.taken, "Alt+N")
+	delete(os.taken, "Control+Shift+Space")
+	if failed := s.sync(wanted); len(failed) != 0 {
+		t.Fatalf("failed %v once the keys were free", failed)
+	}
+	if err := s.setLauncher("Control+Shift+Space", "Control+Shift+Space"); err != nil {
+		t.Fatal(err)
+	}
+	if held := os.held(); !slices.Equal(held, []string{"Alt+N", "Control+Shift+Space"}) {
+		t.Errorf("held %v, want the hotkey and the launcher shortcut", held)
+	}
+}
