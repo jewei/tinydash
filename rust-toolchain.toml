@@ -1,4 +1,0 @@
-# One Rust version for every machine and CI job, so lints never drift.
-[toolchain]
-channel = "1.99.0"
-components = ["clippy", "rustfmt"]
