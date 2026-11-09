@@ -13,7 +13,7 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux, wri
 | Packaged app for this OS            | `go tool mygo build` (into `build/`)                                        |
 | Run from source                     | `go run ./cmd/tinydash --data-dir <scratch folder>`                         |
 
-`verify-go.sh` runs vet and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`, which includes the import rules and gofmt. It runs the tests on this machine's OS only. CI runs them on all three: after you push, wait for `gh pr checks <branch> --watch` before you call a change verified. Branch protection requires only the `Required checks` job; keep its name. A change to Markdown, `docs/`, or `LICENSE` alone skips the Go jobs in CI.
+`verify-go.sh` runs vet and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`, which includes the import rules and gofmt, then the search speed gate (p95 under 16 ms) without the race detector. It runs the tests on this machine's OS only. CI runs them on all three: after you push, wait for `gh pr checks <branch> --watch` before you call a change verified. Branch protection requires only the `Required checks` job; keep its name. A change to Markdown, `docs/`, or `LICENSE` alone skips the Go jobs in CI.
 
 ## Where things are
 

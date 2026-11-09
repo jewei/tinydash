@@ -12,7 +12,7 @@ For the formal checks, install Java 11 or later. For the `verify-tinydash` skill
 
 | Command                                        | What it does                                                                                                                                 |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bash scripts/verify-go.sh`                    | Every gate: `go vet` and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`. Run it before every commit. |
+| `bash scripts/verify-go.sh`                    | Every gate: `go vet` and staticcheck as macOS, Windows, and Linux see the code, `go test -race -count=1 ./...`, then the search speed gate without the race detector. Run it before every commit. |
 | `go test ./internal/<pkg>`                     | The tests of one package.                                                                                                                    |
 | `bash scripts/formal-verify.sh`                | Model-checks the TLA+ models in `formal/` (see "Formal checks").                                                                            |
 | `go build ./cmd/tinydash`                      | Builds the binary for this OS.                                                                                                               |
@@ -40,7 +40,7 @@ Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the 
 - Views are tested headless with mygo's `ui.NewTester` and a fake backend. Tests move time with `Advance`, never `Sleep`.
 - The tests run on this machine's OS only. CI (`.github/workflows/ci.yml`) runs `verify-go.sh` on macOS, Windows, and Linux. After you push, wait for `gh pr checks <branch> --watch`.
 - The Coverage workflow writes the share of code that the tests run to its job summary. It never fails. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
-- `internal/search/search_bench_test.go` measures search against a budget of 8 ms at p95, with 5,000 apps and 50,000 files: `go test ./internal/search -bench .`.
+- Search has a budget of 8 ms at p95, with 5,000 apps and 50,000 files. `TestSearchStaysWithinBudget` fails above 16 ms, which leaves room for slower CI machines; `verify-go.sh` runs it without the race detector. To see the numbers: `go test ./internal/search -run '^$' -bench .`.
 
 Automated tests do not cover these OS effects. Check them by hand on a real desktop, with throwaway data, when you change them: the global shortcut and hotkeys, the panel focus, the tray icon, open at login, the system commands, Spotlight results, and clipboard capture of images and files.
 
