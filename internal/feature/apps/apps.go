@@ -31,17 +31,9 @@ type App struct {
 	Description string
 }
 
-// Personal is what ranking knows about the user. The usage bonus and pins
-// live outside this package; a nil Personal means neither.
-type Personal interface {
-	// Boost is the usage bonus of a result.
-	Boost(id core.ID) uint32
-	Pinned(id core.ID) bool
-}
-
 // Context is how one search ranks and shows its results.
 type Context struct {
-	Personal Personal
+	Personal core.Personal
 	// Home is the user's home folder, shown as "~"; empty shows full paths.
 	Home string
 }

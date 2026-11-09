@@ -8,17 +8,9 @@ import (
 	"github.com/jewei/tinydash/internal/match"
 )
 
-// Personal is what ranking knows about the user. Clipboard entries are not
-// ranked by use, but they can be pinned; a nil Personal means no pins.
-type Personal interface {
-	// Boost is the usage bonus of a result.
-	Boost(id core.ID) uint32
-	Pinned(id core.ID) bool
-}
-
 // Context is how one search shows its results.
 type Context struct {
-	Personal Personal
+	Personal core.Personal
 	// Now is the Unix time that ages are measured from.
 	Now int64
 }
