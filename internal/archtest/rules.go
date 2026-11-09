@@ -54,9 +54,12 @@ var external = map[string][]string{
 	"github.com/egoist/mygo/ui":             []string{"internal/app", "internal/ui/"},
 	"github.com/egoist/mygo/transfer":       []string{"internal/app"}, // clipboard formats and data, as mygo.Clipboard reads them
 	"github.com/egoist/mygo/plugins/sqlite": []string{"internal/store"},
-	"github.com/ebitengine/purego/":         []string{"internal/platform"},
-	"golang.org/x/sys/":                     []string{"internal/platform"},
-	"golang.org/x/text/":                    []string{"internal/match", "internal/feature/"},
+	// The automation socket lets the verify-tinydash skill drive a built
+	// app; only the e2e build of internal/app links it, never a release.
+	"github.com/egoist/mygo/plugins/automation": []string{"internal/app"},
+	"github.com/ebitengine/purego/":             []string{"internal/platform"},
+	"golang.org/x/sys/":                         []string{"internal/platform"},
+	"golang.org/x/text/":                        []string{"internal/match", "internal/feature/"},
 }
 
 // pure packages get disk, network, clock, and randomness as arguments, so
