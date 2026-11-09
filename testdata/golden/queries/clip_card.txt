@@ -1,0 +1,304 @@
+£
+-
+--background
+--greedy
+--mode <category>
+--mode clipboard
+--settings
+-rw-r--r--
+,
+;
+;sig
+;sig2
+:
+: [
+: {},
+: 1.50
+: null
+:[
+:{
+:{},
+:1.50}
+:6,
+:null},
+:true,
+?
+? git
+? jira
+? search
+.
+..
+.appref-ms
+.command
+.exe
+.lnk
+.url
+"text"
+(
+(\x.x + 1) 5
+(x => x + 1) 5
+(x: x + 1) 5
+)
+[{}]
+[1, [2, 3], {"a": []}]
+[1,]
+[2]
+],
+{
+{"a":
+{"a": 1}
+{}
+{} trailing
+{}{text}
+{0}
+{3}
+{clipboard}
+{date}
+{datetime}
+{query}
+{text}
+{text} is a color
+{text}: {hex}
+{time}
+}
+*
+**
+/
+#12345
+#2F6F5D
+#2f6f5e
+#2F6F5E
+#2F705E
+#ff000080
+#fff
+#FFF
+#ffff00
+#ggg
+%
++
+=
+= cm
+=5+3
+>
+> git pull
+> text
+>j
+~
+~/Library
+~/Projects
+$
+$30
+$30 + 20%
+$TERMINAL
+0.35 as %
+09:05
+1 day ago
+1 year ago
+1.0:1
+10 % 3
+10 plus 5
+10:30
+10%
+10% + 20%
+10% of 200
+10% of 200 + 20% of 300
+10% of 200 + 50
+10% off 200
+10% on 200
+100 + 10% + 5
+100 twd to myr
+100 USD MYR
+100 usd to eur
+10am pacific to kl
+12 * 8
+12-3-4
+12345678901
+1700000000
+1791354301
+1791354301250
+17913543x1
+180 is what % off 200
+180 is what % on 150
+2 months 3 days after 2026-06-05
+2 weeks from tomorrow
+€20
+20 as a % of 200
+20 is 10% of what
+20 is what % of 200
+200
+200 - 10%
+200 - 10% - 5%
+200 * 10%
+200 / 10%
+2026-10
+2026-10-07T06:25:01.250Z
+2026-10-07T06:25:01Z
+2026-10-11
+2026-10-17
+2026-12-15 9:30 new york
+2026-12-25
+20k rmb to myr
+21.0:1
+25 dec
+28 days before mar 12
+2e-3%
+3 days ago
+3 days from now
+3/20 is what %
+30 + 20%
+3pm
+400 / 10% of 200
+4102444800
+42
+4300000000
+5 + 10% of 200
+5 ft to cm
+5 kg
+5+3
+50 * 2 + 10%
+50 to 75 is what %
+6 hours ago
+755
+8 Mbps to MBps
+978307200
+999999999
+a = 5; a * 2
+a Unix time
+a Unix time in milliseconds
+a week ago
+a;sig
+AAA
+America/New_York
+bing
+brave
+brew install jewei/tap/tinydash
+brew upgrade
+chmod
+chmod 4755
+chmod 755
+Copy HEX
+Copy Local Time
+d
+days between 3 mar and 30 may
+days between A and B
+days between dec 20 and jan 5
+days since
+days since 2026-01-01
+days since dec 25
+days until
+days until dec 25
+ddg
+dec 25
+dec 25 - 3 weeks
+December 25, 2026
+desktop.ini
+divided by
+dollar
+é
+empty
+euro
+Europe/London
+Fail
+fbclid
+feb 29
+g rust
+gh
+gh, github
+Hello {query},
+Hello Sam,
+hi
+hi Sam
+HSL
+hsl(0 0% 100%)
+hsl(0, 0%, 100%)
+hsl(0, 100%, 50%)
+hsl(0, 120%, 50%)
+hsl(164, 41%, 31%)
+https://jira.example.com/browse/{query}
+id
+in %
+In 1 hour
+In 1 month
+in 10 days
+In 2 hours
+In 59 minutes
+jira
+jira ABC-12
+Jira: ABC-12
+JSON
+Just now
+kl
+last monday
+london time
+metrics
+minus
+mo
+mod
+multiplied by
+MYR
+n
+next friday
+next friday + 2 weeks
+node_modules
+now
+off what
+on what
+pacific
+passphrase
+passphrase 8
+password
+per
+percent
+pi + 10% of 200
+pin
+pin 4
+plus
+project readme
+project/readme
+project/README.md
+pst
+pw
+pw 32
+red
+renminbi
+rgb(0,0,0)
+rgb(1, 2)
+rgb(255, 255, 255)
+rgb(300, 0, 0)
+rgb(47 111 94)
+rgb(47, 111, 94)
+rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white
+rmb
+rwxr-xr-x
+sept 1st
+sh
+sig
+sig2
+sqrt(144)
+tags
+target
+till
+time in
+time in tokyo
+times
+tinydash
+tinydash.db
+to
+to %
+today
+today + 3 days
+Tokyo
+tomorrow
+usd
+using
+utm_*
+vsc
+w
+Wed 7 Oct 2026, 06:25:01 UTC
+Wed 7 Oct 2026, 06:25:01 UTC · 6 hours ago
+y
+yesterday
+yt
+yt lofi
+yuan
+YYYY-MM-DD

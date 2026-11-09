@@ -10,6 +10,8 @@ mod error;
 mod events;
 mod expander;
 mod features;
+#[cfg(test)]
+mod golden;
 mod hud;
 mod images;
 mod monitor;

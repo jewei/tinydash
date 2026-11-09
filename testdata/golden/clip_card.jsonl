@@ -1,0 +1,304 @@
+{"answer":null,"query":"£"}
+{"answer":null,"query":"-"}
+{"answer":null,"query":"--background"}
+{"answer":null,"query":"--greedy"}
+{"answer":null,"query":"--mode <category>"}
+{"answer":null,"query":"--mode clipboard"}
+{"answer":null,"query":"--settings"}
+{"answer":null,"query":"-rw-r--r--"}
+{"answer":null,"query":","}
+{"answer":null,"query":";"}
+{"answer":null,"query":";sig"}
+{"answer":null,"query":";sig2"}
+{"answer":null,"query":":"}
+{"answer":null,"query":": ["}
+{"answer":null,"query":": {},"}
+{"answer":null,"query":": 1.50"}
+{"answer":null,"query":": null"}
+{"answer":null,"query":":["}
+{"answer":null,"query":":{"}
+{"answer":null,"query":":{},"}
+{"answer":null,"query":":1.50}"}
+{"answer":null,"query":":6,"}
+{"answer":null,"query":":null},"}
+{"answer":null,"query":":true,"}
+{"answer":null,"query":"?"}
+{"answer":null,"query":"? git"}
+{"answer":null,"query":"? jira"}
+{"answer":null,"query":"? search"}
+{"answer":null,"query":"."}
+{"answer":null,"query":".."}
+{"answer":null,"query":".appref-ms"}
+{"answer":null,"query":".command"}
+{"answer":null,"query":".exe"}
+{"answer":null,"query":".lnk"}
+{"answer":null,"query":".url"}
+{"answer":null,"query":"\"text\""}
+{"answer":null,"query":"("}
+{"answer":null,"query":"(\\x.x + 1) 5"}
+{"answer":null,"query":"(x => x + 1) 5"}
+{"answer":null,"query":"(x: x + 1) 5"}
+{"answer":null,"query":")"}
+{"answer":null,"query":"[{}]"}
+{"answer":null,"query":"[1, [2, 3], {\"a\": []}]"}
+{"answer":null,"query":"[1,]"}
+{"answer":null,"query":"[2]"}
+{"answer":null,"query":"],"}
+{"answer":null,"query":"{"}
+{"answer":null,"query":"{\"a\":"}
+{"answer":null,"query":"{\"a\": 1}"}
+{"answer":null,"query":"{}"}
+{"answer":null,"query":"{} trailing"}
+{"answer":null,"query":"{}{text}"}
+{"answer":null,"query":"{0}"}
+{"answer":null,"query":"{3}"}
+{"answer":null,"query":"{clipboard}"}
+{"answer":null,"query":"{date}"}
+{"answer":null,"query":"{datetime}"}
+{"answer":null,"query":"{query}"}
+{"answer":null,"query":"{text}"}
+{"answer":null,"query":"{text} is a color"}
+{"answer":null,"query":"{text}: {hex}"}
+{"answer":null,"query":"{time}"}
+{"answer":null,"query":"}"}
+{"answer":null,"query":"*"}
+{"answer":null,"query":"**"}
+{"answer":null,"query":"/"}
+{"answer":null,"query":"#12345"}
+{"answer":{"actions":[{"action":{"text":"#2F6F5D","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(47, 111, 93)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(163, 41%, 31%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#2F6F5D","type":"color"},"id":"color:#2F6F5D","kind":"color","pinned":false,"subtitle":"rgb(47, 111, 93) · hsl(163, 41%, 31%) · 5.9:1 on white","title":"#2F6F5D"},"query":"#2F6F5D"}
+{"answer":{"actions":[{"action":{"text":"#2F6F5E","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(47, 111, 94)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(164, 41%, 31%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#2F6F5E","type":"color"},"id":"color:#2F6F5E","kind":"color","pinned":false,"subtitle":"rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white","title":"#2F6F5E"},"query":"#2f6f5e"}
+{"answer":{"actions":[{"action":{"text":"#2F6F5E","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(47, 111, 94)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(164, 41%, 31%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#2F6F5E","type":"color"},"id":"color:#2F6F5E","kind":"color","pinned":false,"subtitle":"rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white","title":"#2F6F5E"},"query":"#2F6F5E"}
+{"answer":{"actions":[{"action":{"text":"#2F705E","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(47, 112, 94)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(163, 41%, 31%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#2F705E","type":"color"},"id":"color:#2F705E","kind":"color","pinned":false,"subtitle":"rgb(47, 112, 94) · hsl(163, 41%, 31%) · 5.8:1 on white","title":"#2F705E"},"query":"#2F705E"}
+{"answer":null,"query":"#ff000080"}
+{"answer":{"actions":[{"action":{"text":"#FFFFFF","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(255, 255, 255)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(0, 0%, 100%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#FFFFFF","type":"color"},"id":"color:#FFFFFF","kind":"color","pinned":false,"subtitle":"rgb(255, 255, 255) · hsl(0, 0%, 100%) · 1.0:1 on white","title":"#FFFFFF"},"query":"#fff"}
+{"answer":{"actions":[{"action":{"text":"#FFFFFF","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(255, 255, 255)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(0, 0%, 100%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#FFFFFF","type":"color"},"id":"color:#FFFFFF","kind":"color","pinned":false,"subtitle":"rgb(255, 255, 255) · hsl(0, 0%, 100%) · 1.0:1 on white","title":"#FFFFFF"},"query":"#FFF"}
+{"answer":{"actions":[{"action":{"text":"#FFFF00","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(255, 255, 0)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(60, 100%, 50%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#FFFF00","type":"color"},"id":"color:#FFFF00","kind":"color","pinned":false,"subtitle":"rgb(255, 255, 0) · hsl(60, 100%, 50%) · 1.1:1 on white","title":"#FFFF00"},"query":"#ffff00"}
+{"answer":null,"query":"#ggg"}
+{"answer":null,"query":"%"}
+{"answer":null,"query":"+"}
+{"answer":null,"query":"="}
+{"answer":null,"query":"= cm"}
+{"answer":null,"query":"=5+3"}
+{"answer":null,"query":">"}
+{"answer":null,"query":"> git pull"}
+{"answer":null,"query":"> text"}
+{"answer":null,"query":">j"}
+{"answer":null,"query":"~"}
+{"answer":null,"query":"~/Library"}
+{"answer":null,"query":"~/Projects"}
+{"answer":null,"query":"$"}
+{"answer":null,"query":"$30"}
+{"answer":null,"query":"$30 + 20%"}
+{"answer":null,"query":"$TERMINAL"}
+{"answer":null,"query":"0.35 as %"}
+{"answer":null,"query":"09:05"}
+{"answer":null,"query":"1 day ago"}
+{"answer":null,"query":"1 year ago"}
+{"answer":null,"query":"1.0:1"}
+{"answer":null,"query":"10 % 3"}
+{"answer":null,"query":"10 plus 5"}
+{"answer":null,"query":"10:30"}
+{"answer":null,"query":"10%"}
+{"answer":null,"query":"10% + 20%"}
+{"answer":null,"query":"10% of 200"}
+{"answer":null,"query":"10% of 200 + 20% of 300"}
+{"answer":null,"query":"10% of 200 + 50"}
+{"answer":null,"query":"10% off 200"}
+{"answer":null,"query":"10% on 200"}
+{"answer":null,"query":"100 + 10% + 5"}
+{"answer":null,"query":"100 twd to myr"}
+{"answer":null,"query":"100 USD MYR"}
+{"answer":null,"query":"100 usd to eur"}
+{"answer":null,"query":"10am pacific to kl"}
+{"answer":null,"query":"12 * 8"}
+{"answer":null,"query":"12-3-4"}
+{"answer":null,"query":"12345678901"}
+{"answer":{"actions":[{"action":{"text":"Wed 15 Nov 2023, 06:13:20","type":"copy"},"confirm":null,"label":"Copy Local Time"},{"action":{"text":"Tue 14 Nov 2023, 22:13:20 UTC","type":"copy"},"confirm":null,"label":"Copy UTC Time"},{"action":{"text":"2023-11-14T22:13:20Z","type":"copy"},"confirm":null,"label":"Copy ISO 8601"}],"icon":{"name":"clock","type":"symbol"},"id":"unix:1700000000","kind":"dateTime","pinned":false,"subtitle":"Tue 14 Nov 2023, 22:13:20 UTC · 3 years ago","title":"Wed 15 Nov 2023, 06:13:20"},"query":"1700000000"}
+{"answer":{"actions":[{"action":{"text":"Wed 7 Oct 2026, 14:25:01","type":"copy"},"confirm":null,"label":"Copy Local Time"},{"action":{"text":"Wed 7 Oct 2026, 06:25:01 UTC","type":"copy"},"confirm":null,"label":"Copy UTC Time"},{"action":{"text":"2026-10-07T06:25:01Z","type":"copy"},"confirm":null,"label":"Copy ISO 8601"}],"icon":{"name":"clock","type":"symbol"},"id":"unix:1791354301","kind":"dateTime","pinned":false,"subtitle":"Wed 7 Oct 2026, 06:25:01 UTC · 1 month ago","title":"Wed 7 Oct 2026, 14:25:01"},"query":"1791354301"}
+{"answer":{"actions":[{"action":{"text":"Wed 7 Oct 2026, 14:25:01.250","type":"copy"},"confirm":null,"label":"Copy Local Time"},{"action":{"text":"Wed 7 Oct 2026, 06:25:01.250 UTC","type":"copy"},"confirm":null,"label":"Copy UTC Time"},{"action":{"text":"2026-10-07T06:25:01.250Z","type":"copy"},"confirm":null,"label":"Copy ISO 8601"}],"icon":{"name":"clock","type":"symbol"},"id":"unix:1791354301250","kind":"dateTime","pinned":false,"subtitle":"Wed 7 Oct 2026, 06:25:01.250 UTC · 1 month ago","title":"Wed 7 Oct 2026, 14:25:01.250"},"query":"1791354301250"}
+{"answer":null,"query":"17913543x1"}
+{"answer":null,"query":"180 is what % off 200"}
+{"answer":null,"query":"180 is what % on 150"}
+{"answer":null,"query":"2 months 3 days after 2026-06-05"}
+{"answer":null,"query":"2 weeks from tomorrow"}
+{"answer":null,"query":"€20"}
+{"answer":null,"query":"20 as a % of 200"}
+{"answer":null,"query":"20 is 10% of what"}
+{"answer":null,"query":"20 is what % of 200"}
+{"answer":null,"query":"200"}
+{"answer":null,"query":"200 - 10%"}
+{"answer":null,"query":"200 - 10% - 5%"}
+{"answer":null,"query":"200 * 10%"}
+{"answer":null,"query":"200 / 10%"}
+{"answer":null,"query":"2026-10"}
+{"answer":null,"query":"2026-10-07T06:25:01.250Z"}
+{"answer":null,"query":"2026-10-07T06:25:01Z"}
+{"answer":null,"query":"2026-10-11"}
+{"answer":null,"query":"2026-10-17"}
+{"answer":null,"query":"2026-12-15 9:30 new york"}
+{"answer":null,"query":"2026-12-25"}
+{"answer":null,"query":"20k rmb to myr"}
+{"answer":null,"query":"21.0:1"}
+{"answer":null,"query":"25 dec"}
+{"answer":null,"query":"28 days before mar 12"}
+{"answer":null,"query":"2e-3%"}
+{"answer":null,"query":"3 days ago"}
+{"answer":null,"query":"3 days from now"}
+{"answer":null,"query":"3/20 is what %"}
+{"answer":null,"query":"30 + 20%"}
+{"answer":null,"query":"3pm"}
+{"answer":null,"query":"400 / 10% of 200"}
+{"answer":{"actions":[{"action":{"text":"Fri 1 Jan 2100, 08:00:00","type":"copy"},"confirm":null,"label":"Copy Local Time"},{"action":{"text":"Fri 1 Jan 2100, 00:00:00 UTC","type":"copy"},"confirm":null,"label":"Copy UTC Time"},{"action":{"text":"2100-01-01T00:00:00Z","type":"copy"},"confirm":null,"label":"Copy ISO 8601"}],"icon":{"name":"clock","type":"symbol"},"id":"unix:4102444800","kind":"dateTime","pinned":false,"subtitle":"Fri 1 Jan 2100, 00:00:00 UTC · In 73 years","title":"Fri 1 Jan 2100, 08:00:00"},"query":"4102444800"}
+{"answer":null,"query":"42"}
+{"answer":null,"query":"4300000000"}
+{"answer":null,"query":"5 + 10% of 200"}
+{"answer":null,"query":"5 ft to cm"}
+{"answer":null,"query":"5 kg"}
+{"answer":null,"query":"5+3"}
+{"answer":null,"query":"50 * 2 + 10%"}
+{"answer":null,"query":"50 to 75 is what %"}
+{"answer":null,"query":"6 hours ago"}
+{"answer":null,"query":"755"}
+{"answer":null,"query":"8 Mbps to MBps"}
+{"answer":null,"query":"978307200"}
+{"answer":null,"query":"999999999"}
+{"answer":null,"query":"a = 5; a * 2"}
+{"answer":null,"query":"a Unix time"}
+{"answer":null,"query":"a Unix time in milliseconds"}
+{"answer":null,"query":"a week ago"}
+{"answer":null,"query":"a;sig"}
+{"answer":null,"query":"AAA"}
+{"answer":null,"query":"America/New_York"}
+{"answer":null,"query":"bing"}
+{"answer":null,"query":"brave"}
+{"answer":null,"query":"brew install jewei/tap/tinydash"}
+{"answer":null,"query":"brew upgrade"}
+{"answer":null,"query":"chmod"}
+{"answer":null,"query":"chmod 4755"}
+{"answer":null,"query":"chmod 755"}
+{"answer":null,"query":"Copy HEX"}
+{"answer":null,"query":"Copy Local Time"}
+{"answer":null,"query":"d"}
+{"answer":null,"query":"days between 3 mar and 30 may"}
+{"answer":null,"query":"days between A and B"}
+{"answer":null,"query":"days between dec 20 and jan 5"}
+{"answer":null,"query":"days since"}
+{"answer":null,"query":"days since 2026-01-01"}
+{"answer":null,"query":"days since dec 25"}
+{"answer":null,"query":"days until"}
+{"answer":null,"query":"days until dec 25"}
+{"answer":null,"query":"ddg"}
+{"answer":null,"query":"dec 25"}
+{"answer":null,"query":"dec 25 - 3 weeks"}
+{"answer":null,"query":"December 25, 2026"}
+{"answer":null,"query":"desktop.ini"}
+{"answer":null,"query":"divided by"}
+{"answer":null,"query":"dollar"}
+{"answer":null,"query":"é"}
+{"answer":null,"query":"empty"}
+{"answer":null,"query":"euro"}
+{"answer":null,"query":"Europe/London"}
+{"answer":null,"query":"Fail"}
+{"answer":null,"query":"fbclid"}
+{"answer":null,"query":"feb 29"}
+{"answer":null,"query":"g rust"}
+{"answer":null,"query":"gh"}
+{"answer":null,"query":"gh, github"}
+{"answer":null,"query":"Hello {query},"}
+{"answer":null,"query":"Hello Sam,"}
+{"answer":null,"query":"hi"}
+{"answer":null,"query":"hi Sam"}
+{"answer":null,"query":"HSL"}
+{"answer":{"actions":[{"action":{"text":"#FFFFFF","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(255, 255, 255)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(0, 0%, 100%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#FFFFFF","type":"color"},"id":"color:#FFFFFF","kind":"color","pinned":false,"subtitle":"rgb(255, 255, 255) · hsl(0, 0%, 100%) · 1.0:1 on white","title":"#FFFFFF"},"query":"hsl(0 0% 100%)"}
+{"answer":{"actions":[{"action":{"text":"#FFFFFF","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(255, 255, 255)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(0, 0%, 100%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#FFFFFF","type":"color"},"id":"color:#FFFFFF","kind":"color","pinned":false,"subtitle":"rgb(255, 255, 255) · hsl(0, 0%, 100%) · 1.0:1 on white","title":"#FFFFFF"},"query":"hsl(0, 0%, 100%)"}
+{"answer":{"actions":[{"action":{"text":"#FF0000","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(255, 0, 0)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(0, 100%, 50%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#FF0000","type":"color"},"id":"color:#FF0000","kind":"color","pinned":false,"subtitle":"rgb(255, 0, 0) · hsl(0, 100%, 50%) · 4.0:1 on white","title":"#FF0000"},"query":"hsl(0, 100%, 50%)"}
+{"answer":null,"query":"hsl(0, 120%, 50%)"}
+{"answer":{"actions":[{"action":{"text":"#2F6F5E","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(47, 111, 94)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(164, 41%, 31%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#2F6F5E","type":"color"},"id":"color:#2F6F5E","kind":"color","pinned":false,"subtitle":"rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white","title":"#2F6F5E"},"query":"hsl(164, 41%, 31%)"}
+{"answer":null,"query":"https://jira.example.com/browse/{query}"}
+{"answer":null,"query":"id"}
+{"answer":null,"query":"in %"}
+{"answer":null,"query":"In 1 hour"}
+{"answer":null,"query":"In 1 month"}
+{"answer":null,"query":"in 10 days"}
+{"answer":null,"query":"In 2 hours"}
+{"answer":null,"query":"In 59 minutes"}
+{"answer":null,"query":"jira"}
+{"answer":null,"query":"jira ABC-12"}
+{"answer":null,"query":"Jira: ABC-12"}
+{"answer":null,"query":"JSON"}
+{"answer":null,"query":"Just now"}
+{"answer":null,"query":"kl"}
+{"answer":null,"query":"last monday"}
+{"answer":null,"query":"london time"}
+{"answer":null,"query":"metrics"}
+{"answer":null,"query":"minus"}
+{"answer":null,"query":"mo"}
+{"answer":null,"query":"mod"}
+{"answer":null,"query":"multiplied by"}
+{"answer":null,"query":"MYR"}
+{"answer":null,"query":"n"}
+{"answer":null,"query":"next friday"}
+{"answer":null,"query":"next friday + 2 weeks"}
+{"answer":null,"query":"node_modules"}
+{"answer":null,"query":"now"}
+{"answer":null,"query":"off what"}
+{"answer":null,"query":"on what"}
+{"answer":null,"query":"pacific"}
+{"answer":null,"query":"passphrase"}
+{"answer":null,"query":"passphrase 8"}
+{"answer":null,"query":"password"}
+{"answer":null,"query":"per"}
+{"answer":null,"query":"percent"}
+{"answer":null,"query":"pi + 10% of 200"}
+{"answer":null,"query":"pin"}
+{"answer":null,"query":"pin 4"}
+{"answer":null,"query":"plus"}
+{"answer":null,"query":"project readme"}
+{"answer":null,"query":"project/readme"}
+{"answer":null,"query":"project/README.md"}
+{"answer":null,"query":"pst"}
+{"answer":null,"query":"pw"}
+{"answer":null,"query":"pw 32"}
+{"answer":null,"query":"red"}
+{"answer":null,"query":"renminbi"}
+{"answer":{"actions":[{"action":{"text":"#000000","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(0, 0, 0)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(0, 0%, 0%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#000000","type":"color"},"id":"color:#000000","kind":"color","pinned":false,"subtitle":"rgb(0, 0, 0) · hsl(0, 0%, 0%) · 21.0:1 on white","title":"#000000"},"query":"rgb(0,0,0)"}
+{"answer":null,"query":"rgb(1, 2)"}
+{"answer":{"actions":[{"action":{"text":"#FFFFFF","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(255, 255, 255)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(0, 0%, 100%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#FFFFFF","type":"color"},"id":"color:#FFFFFF","kind":"color","pinned":false,"subtitle":"rgb(255, 255, 255) · hsl(0, 0%, 100%) · 1.0:1 on white","title":"#FFFFFF"},"query":"rgb(255, 255, 255)"}
+{"answer":null,"query":"rgb(300, 0, 0)"}
+{"answer":{"actions":[{"action":{"text":"#2F6F5E","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(47, 111, 94)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(164, 41%, 31%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#2F6F5E","type":"color"},"id":"color:#2F6F5E","kind":"color","pinned":false,"subtitle":"rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white","title":"#2F6F5E"},"query":"rgb(47 111 94)"}
+{"answer":{"actions":[{"action":{"text":"#2F6F5E","type":"copy"},"confirm":null,"label":"Copy HEX"},{"action":{"text":"rgb(47, 111, 94)","type":"copy"},"confirm":null,"label":"Copy RGB"},{"action":{"text":"hsl(164, 41%, 31%)","type":"copy"},"confirm":null,"label":"Copy HSL"}],"icon":{"hex":"#2F6F5E","type":"color"},"id":"color:#2F6F5E","kind":"color","pinned":false,"subtitle":"rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white","title":"#2F6F5E"},"query":"rgb(47, 111, 94)"}
+{"answer":null,"query":"rgb(47, 111, 94) · hsl(164, 41%, 31%) · 5.9:1 on white"}
+{"answer":null,"query":"rmb"}
+{"answer":null,"query":"rwxr-xr-x"}
+{"answer":null,"query":"sept 1st"}
+{"answer":null,"query":"sh"}
+{"answer":null,"query":"sig"}
+{"answer":null,"query":"sig2"}
+{"answer":null,"query":"sqrt(144)"}
+{"answer":null,"query":"tags"}
+{"answer":null,"query":"target"}
+{"answer":null,"query":"till"}
+{"answer":null,"query":"time in"}
+{"answer":null,"query":"time in tokyo"}
+{"answer":null,"query":"times"}
+{"answer":null,"query":"tinydash"}
+{"answer":null,"query":"tinydash.db"}
+{"answer":null,"query":"to"}
+{"answer":null,"query":"to %"}
+{"answer":null,"query":"today"}
+{"answer":null,"query":"today + 3 days"}
+{"answer":null,"query":"Tokyo"}
+{"answer":null,"query":"tomorrow"}
+{"answer":null,"query":"usd"}
+{"answer":null,"query":"using"}
+{"answer":null,"query":"utm_*"}
+{"answer":null,"query":"vsc"}
+{"answer":null,"query":"w"}
+{"answer":null,"query":"Wed 7 Oct 2026, 06:25:01 UTC"}
+{"answer":null,"query":"Wed 7 Oct 2026, 06:25:01 UTC · 6 hours ago"}
+{"answer":null,"query":"y"}
+{"answer":null,"query":"yesterday"}
+{"answer":null,"query":"yt"}
+{"answer":null,"query":"yt lofi"}
+{"answer":null,"query":"yuan"}
+{"answer":null,"query":"YYYY-MM-DD"}

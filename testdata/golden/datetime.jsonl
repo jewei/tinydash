@@ -1,0 +1,365 @@
+{"answers":[],"is_date_or_clock":false,"query":"£"}
+{"answers":[],"is_date_or_clock":false,"query":"-"}
+{"answers":[],"is_date_or_clock":false,"query":"--background"}
+{"answers":[],"is_date_or_clock":false,"query":"--greedy"}
+{"answers":[],"is_date_or_clock":false,"query":"--mode <category>"}
+{"answers":[],"is_date_or_clock":false,"query":"--mode clipboard"}
+{"answers":[],"is_date_or_clock":false,"query":"--settings"}
+{"answers":[],"is_date_or_clock":false,"query":"-rw-r--r--"}
+{"answers":[],"is_date_or_clock":false,"query":";"}
+{"answers":[],"is_date_or_clock":false,"query":";sig"}
+{"answers":[],"is_date_or_clock":false,"query":";sig2"}
+{"answers":[],"is_date_or_clock":false,"query":"?"}
+{"answers":[],"is_date_or_clock":false,"query":"? git"}
+{"answers":[],"is_date_or_clock":false,"query":"? jira"}
+{"answers":[],"is_date_or_clock":false,"query":"? search"}
+{"answers":[],"is_date_or_clock":false,"query":"."}
+{"answers":[],"is_date_or_clock":false,"query":".."}
+{"answers":[],"is_date_or_clock":false,"query":".appref-ms"}
+{"answers":[],"is_date_or_clock":false,"query":".command"}
+{"answers":[],"is_date_or_clock":false,"query":".exe"}
+{"answers":[],"is_date_or_clock":false,"query":".lnk"}
+{"answers":[],"is_date_or_clock":false,"query":".url"}
+{"answers":[],"is_date_or_clock":false,"query":"("}
+{"answers":[],"is_date_or_clock":false,"query":"(\\x.x + 1) 5"}
+{"answers":[],"is_date_or_clock":false,"query":"(x => x + 1) 5"}
+{"answers":[],"is_date_or_clock":false,"query":"(x: x + 1) 5"}
+{"answers":[],"is_date_or_clock":false,"query":")"}
+{"answers":[],"is_date_or_clock":false,"query":"{}"}
+{"answers":[],"is_date_or_clock":false,"query":"{clipboard}"}
+{"answers":[],"is_date_or_clock":false,"query":"{date}"}
+{"answers":[],"is_date_or_clock":false,"query":"{datetime}"}
+{"answers":[],"is_date_or_clock":false,"query":"{glued}"}
+{"answers":[],"is_date_or_clock":false,"query":"{query}"}
+{"answers":[],"is_date_or_clock":false,"query":"{spaced}"}
+{"answers":[],"is_date_or_clock":false,"query":"{time}"}
+{"answers":[],"is_date_or_clock":false,"query":"{unknown}"}
+{"answers":[],"is_date_or_clock":false,"query":"*"}
+{"answers":[],"is_date_or_clock":false,"query":"**"}
+{"answers":[],"is_date_or_clock":false,"query":"/"}
+{"answers":[],"is_date_or_clock":false,"query":"#2F6F5E"}
+{"answers":[],"is_date_or_clock":false,"query":"#fff"}
+{"answers":[],"is_date_or_clock":false,"query":"%"}
+{"answers":[],"is_date_or_clock":false,"query":"+"}
+{"answers":[],"is_date_or_clock":false,"query":"+45m"}
+{"answers":[],"is_date_or_clock":false,"query":"+8h"}
+{"answers":[],"is_date_or_clock":false,"query":"="}
+{"answers":[],"is_date_or_clock":false,"query":"= cm"}
+{"answers":[],"is_date_or_clock":false,"query":"=5+3"}
+{"answers":[],"is_date_or_clock":false,"query":">"}
+{"answers":[],"is_date_or_clock":false,"query":"> git pull"}
+{"answers":[],"is_date_or_clock":false,"query":"> text"}
+{"answers":[],"is_date_or_clock":false,"query":">j"}
+{"answers":[],"is_date_or_clock":false,"query":"~"}
+{"answers":[],"is_date_or_clock":false,"query":"~/Library"}
+{"answers":[],"is_date_or_clock":false,"query":"~/Projects"}
+{"answers":[],"is_date_or_clock":false,"query":"$"}
+{"answers":[],"is_date_or_clock":false,"query":"$30"}
+{"answers":[],"is_date_or_clock":false,"query":"$30 + 20%"}
+{"answers":[],"is_date_or_clock":false,"query":"$TERMINAL"}
+{"answers":[],"is_date_or_clock":false,"query":"0.35 as %"}
+{"answers":[],"is_date_or_clock":false,"query":"02:00 · Thu 2 Jul"}
+{"answers":[],"is_date_or_clock":true,"query":"09:05"}
+{"answers":[],"is_date_or_clock":false,"query":"1 day"}
+{"answers":[],"is_date_or_clock":false,"query":"10"}
+{"answers":[],"is_date_or_clock":false,"query":"10 % 3"}
+{"answers":[],"is_date_or_clock":false,"query":"10 plus 5"}
+{"answers":[],"is_date_or_clock":true,"query":"10:30"}
+{"answers":[],"is_date_or_clock":false,"query":"10%"}
+{"answers":[],"is_date_or_clock":false,"query":"10% + 20%"}
+{"answers":[],"is_date_or_clock":false,"query":"10% of 200"}
+{"answers":[],"is_date_or_clock":false,"query":"10% of 200 + 20% of 300"}
+{"answers":[],"is_date_or_clock":false,"query":"10% of 200 + 50"}
+{"answers":[],"is_date_or_clock":false,"query":"10% off 200"}
+{"answers":[],"is_date_or_clock":false,"query":"10% on 200"}
+{"answers":[],"is_date_or_clock":false,"query":"100 + 10% + 5"}
+{"answers":[],"is_date_or_clock":false,"query":"100 twd to myr"}
+{"answers":[],"is_date_or_clock":false,"query":"100 USD MYR"}
+{"answers":[],"is_date_or_clock":false,"query":"100 usd to eur"}
+{"answers":[],"is_date_or_clock":true,"query":"10am"}
+{"answers":[{"actions":[{"action":{"text":"02:00","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:02:00 · Mon 9 Nov","kind":"dateTime","pinned":false,"subtitle":"10:00 Sun 8 Nov Los Angeles (UTC-08:00) in Local time","title":"02:00 · Mon 9 Nov"}],"is_date_or_clock":false,"query":"10am pacific time"}
+{"answers":[{"actions":[{"action":{"text":"02:00","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:02:00 · Mon 9 Nov","kind":"dateTime","pinned":false,"subtitle":"10:00 Sun 8 Nov Los Angeles (UTC-08:00) in Kuala Lumpur","title":"02:00 · Mon 9 Nov"}],"is_date_or_clock":false,"query":"10am pacific to kl"}
+{"answers":[],"is_date_or_clock":false,"query":"11 weeks 6 days · until Friday, 25 December 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"12 * 8"}
+{"answers":[],"is_date_or_clock":false,"query":"12 weeks 4 days · from Tue 3 Mar 2026 to Sat 30 May 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"12-3-4"}
+{"answers":[],"is_date_or_clock":true,"query":"12am"}
+{"answers":[],"is_date_or_clock":false,"query":"13pm"}
+{"answers":[],"is_date_or_clock":false,"query":"14 days"}
+{"answers":[],"is_date_or_clock":false,"query":"1460 days"}
+{"answers":[],"is_date_or_clock":false,"query":"16 days"}
+{"answers":[],"is_date_or_clock":true,"query":"17:00"}
+{"answers":[],"is_date_or_clock":false,"query":"1791354301"}
+{"answers":[],"is_date_or_clock":false,"query":"1791354301250"}
+{"answers":[],"is_date_or_clock":true,"query":"18:00"}
+{"answers":[],"is_date_or_clock":false,"query":"180 is what % off 200"}
+{"answers":[],"is_date_or_clock":false,"query":"180 is what % on 150"}
+{"answers":[],"is_date_or_clock":false,"query":"2 days"}
+{"answers":[],"is_date_or_clock":false,"query":"2 days ago · yesterday is Fri 2 Oct 2026"}
+{"answers":[{"actions":[{"action":{"text":"2026-08-08","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 8 August 2026","kind":"dateTime","pinned":false,"subtitle":"93 days ago","title":"Saturday, 8 August 2026"}],"is_date_or_clock":false,"query":"2 months 3 days after 2026-06-05"}
+{"answers":[{"actions":[{"action":{"text":"2026-04-02","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 2 April 2026","kind":"dateTime","pinned":false,"subtitle":"221 days ago","title":"Thursday, 2 April 2026"}],"is_date_or_clock":false,"query":"2 months and 3 days before 2026-06-05"}
+{"answers":[],"is_date_or_clock":false,"query":"2 weeks · until Saturday, 17 October 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"2 weeks 2 days · from Sun 20 Dec 2026 to Tue 5 Jan 2027"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-24","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 24 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 15 days · tomorrow is Tue 10 Nov 2026","title":"Tuesday, 24 November 2026"}],"is_date_or_clock":false,"query":"2 weeks from tomorrow"}
+{"answers":[],"is_date_or_clock":false,"query":"€20"}
+{"answers":[],"is_date_or_clock":false,"query":"20 as a % of 200"}
+{"answers":[],"is_date_or_clock":false,"query":"20 is 10% of what"}
+{"answers":[],"is_date_or_clock":false,"query":"20 is what % of 200"}
+{"answers":[],"is_date_or_clock":false,"query":"200"}
+{"answers":[],"is_date_or_clock":false,"query":"200 - 10%"}
+{"answers":[],"is_date_or_clock":false,"query":"200 - 10% - 5%"}
+{"answers":[],"is_date_or_clock":false,"query":"200 * 10%"}
+{"answers":[],"is_date_or_clock":false,"query":"200 / 10%"}
+{"answers":[{"actions":[{"action":{"text":"2025-10-03","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 3 October 2025","kind":"dateTime","pinned":false,"subtitle":"402 days ago","title":"Friday, 3 October 2025"}],"is_date_or_clock":true,"query":"2025-10-03"}
+{"answers":[{"actions":[{"action":{"text":"2026-01-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 12 January 2026","kind":"dateTime","pinned":false,"subtitle":"301 days ago","title":"Monday, 12 January 2026"}],"is_date_or_clock":true,"query":"2026-01-12"}
+{"answers":[{"actions":[{"action":{"text":"2026-02-28","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 28 February 2026","kind":"dateTime","pinned":false,"subtitle":"254 days ago","title":"Saturday, 28 February 2026"}],"is_date_or_clock":false,"query":"2026-01-31 + 1 month"}
+{"answers":[{"actions":[{"action":{"text":"2026-02-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 12 February 2026","kind":"dateTime","pinned":false,"subtitle":"270 days ago","title":"Thursday, 12 February 2026"}],"is_date_or_clock":true,"query":"2026-02-12"}
+{"answers":[{"actions":[{"action":{"text":"2026-02-28","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 28 February 2026","kind":"dateTime","pinned":false,"subtitle":"254 days ago","title":"Saturday, 28 February 2026"}],"is_date_or_clock":true,"query":"2026-02-28"}
+{"answers":[],"is_date_or_clock":false,"query":"2026-03-08 2:30 new york"}
+{"answers":[],"is_date_or_clock":false,"query":"2026-03-08 2:30am new york to utc"}
+{"answers":[{"actions":[{"action":{"text":"2026-04-02","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 2 April 2026","kind":"dateTime","pinned":false,"subtitle":"221 days ago","title":"Thursday, 2 April 2026"}],"is_date_or_clock":true,"query":"2026-04-02"}
+{"answers":[{"actions":[{"action":{"text":"17:00","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:17:00 · Wed 1 Jul","kind":"dateTime","pinned":false,"subtitle":"10:00 Wed 1 Jul Los Angeles (UTC-07:00) in UTC","title":"17:00 · Wed 1 Jul"}],"is_date_or_clock":false,"query":"2026-07-01 10am pacific time to utc"}
+{"answers":[{"actions":[{"action":{"text":"02:00","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:02:00 · Thu 2 Jul","kind":"dateTime","pinned":false,"subtitle":"10:00 Wed 1 Jul Los Angeles (UTC-07:00) in Tokyo","title":"02:00 · Thu 2 Jul"}],"is_date_or_clock":false,"query":"2026-07-01 10am pacific to tokyo"}
+{"answers":[{"actions":[{"action":{"text":"18:00","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:18:00 · Wed 1 Jul","kind":"dateTime","pinned":false,"subtitle":"10:00 Wed 1 Jul UTC-08:00 (UTC-08:00) in UTC","title":"18:00 · Wed 1 Jul"}],"is_date_or_clock":false,"query":"2026-07-01 10am pst to utc"}
+{"answers":[{"actions":[{"action":{"text":"2026-08-08","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 8 August 2026","kind":"dateTime","pinned":false,"subtitle":"93 days ago","title":"Saturday, 8 August 2026"}],"is_date_or_clock":true,"query":"2026-08-08"}
+{"answers":[{"actions":[{"action":{"text":"2026-09-01","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 1 September 2026","kind":"dateTime","pinned":false,"subtitle":"69 days ago","title":"Tuesday, 1 September 2026"}],"is_date_or_clock":true,"query":"2026-09-01"}
+{"answers":[{"actions":[{"action":{"text":"2026-09-26","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 26 September 2026","kind":"dateTime","pinned":false,"subtitle":"44 days ago","title":"Saturday, 26 September 2026"}],"is_date_or_clock":true,"query":"2026-09-26"}
+{"answers":[{"actions":[{"action":{"text":"2026-09-28","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 28 September 2026","kind":"dateTime","pinned":false,"subtitle":"42 days ago","title":"Monday, 28 September 2026"}],"is_date_or_clock":true,"query":"2026-09-28"}
+{"answers":[{"actions":[{"action":{"text":"2026-09-30","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Wednesday, 30 September 2026","kind":"dateTime","pinned":false,"subtitle":"40 days ago","title":"Wednesday, 30 September 2026"}],"is_date_or_clock":true,"query":"2026-09-30"}
+{"answers":[{"actions":[{"action":{"text":"2026-01-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 12 January 2026","kind":"dateTime","pinned":false,"subtitle":"301 days ago","title":"Monday, 12 January 2026"}],"is_date_or_clock":false,"query":"2026-1-5 + 1 week"}
+{"answers":[],"is_date_or_clock":false,"query":"2026-10"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-03","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 3 October 2026","kind":"dateTime","pinned":false,"subtitle":"37 days ago","title":"Saturday, 3 October 2026"}],"is_date_or_clock":true,"query":"2026-10-03"}
+{"answers":[{"actions":[{"action":{"text":"2025-10-03","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 3 October 2025","kind":"dateTime","pinned":false,"subtitle":"402 days ago","title":"Friday, 3 October 2025"}],"is_date_or_clock":false,"query":"2026-10-03 - 1 year"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-05","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 5 October 2026","kind":"dateTime","pinned":false,"subtitle":"35 days ago","title":"Monday, 5 October 2026"}],"is_date_or_clock":true,"query":"2026-10-05"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 6 October 2026","kind":"dateTime","pinned":false,"subtitle":"34 days ago","title":"Tuesday, 6 October 2026"}],"is_date_or_clock":true,"query":"2026-10-06"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-10","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 10 October 2026","kind":"dateTime","pinned":false,"subtitle":"30 days ago","title":"Saturday, 10 October 2026"}],"is_date_or_clock":true,"query":"2026-10-10"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-11","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Sunday, 11 October 2026","kind":"dateTime","pinned":false,"subtitle":"29 days ago","title":"Sunday, 11 October 2026"}],"is_date_or_clock":true,"query":"2026-10-11"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 12 October 2026","kind":"dateTime","pinned":false,"subtitle":"28 days ago","title":"Monday, 12 October 2026"}],"is_date_or_clock":true,"query":"2026-10-12"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-17","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 17 October 2026","kind":"dateTime","pinned":false,"subtitle":"23 days ago","title":"Saturday, 17 October 2026"}],"is_date_or_clock":true,"query":"2026-10-17"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-15","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 15 October 2026","kind":"dateTime","pinned":false,"subtitle":"25 days ago","title":"Thursday, 15 October 2026"}],"is_date_or_clock":false,"query":"2026-10-17 - 2d"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-15","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 15 October 2026","kind":"dateTime","pinned":false,"subtitle":"25 days ago","title":"Thursday, 15 October 2026"}],"is_date_or_clock":false,"query":"2026-10-17 -2d"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-18","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Sunday, 18 October 2026","kind":"dateTime","pinned":false,"subtitle":"22 days ago","title":"Sunday, 18 October 2026"}],"is_date_or_clock":true,"query":"2026-10-18"}
+{"answers":[{"actions":[{"action":{"text":"2026-10-23","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 23 October 2026","kind":"dateTime","pinned":false,"subtitle":"17 days ago","title":"Friday, 23 October 2026"}],"is_date_or_clock":true,"query":"2026-10-23"}
+{"answers":[{"actions":[{"action":{"text":"13:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:13:30 · Sun 1 Nov","kind":"dateTime","pinned":false,"subtitle":"01:30 Sun 1 Nov New York (UTC-04:00) in Local time","title":"13:30 · Sun 1 Nov"},{"actions":[{"action":{"text":"14:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:14:30 · Sun 1 Nov","kind":"dateTime","pinned":false,"subtitle":"01:30 Sun 1 Nov New York (UTC-05:00) in Local time","title":"14:30 · Sun 1 Nov"}],"is_date_or_clock":false,"query":"2026-11-01 1:30 new york"}
+{"answers":[{"actions":[{"action":{"text":"05:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:05:30 · Sun 1 Nov","kind":"dateTime","pinned":false,"subtitle":"01:30 Sun 1 Nov New York (UTC-04:00) in UTC","title":"05:30 · Sun 1 Nov"},{"actions":[{"action":{"text":"06:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:06:30 · Sun 1 Nov","kind":"dateTime","pinned":false,"subtitle":"01:30 Sun 1 Nov New York (UTC-05:00) in UTC","title":"06:30 · Sun 1 Nov"}],"is_date_or_clock":false,"query":"2026-11-01 1:30am new york to utc"}
+{"answers":[{"actions":[{"action":{"text":"22:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:22:30 · Tue 15 Dec","kind":"dateTime","pinned":false,"subtitle":"09:30 Tue 15 Dec New York (UTC-05:00) in Local time","title":"22:30 · Tue 15 Dec"}],"is_date_or_clock":false,"query":"2026-12-15 9:30 new york"}
+{"answers":[{"actions":[{"action":{"text":"2026-12-25","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 25 December 2026","kind":"dateTime","pinned":false,"subtitle":"in 46 days","title":"Friday, 25 December 2026"}],"is_date_or_clock":true,"query":"2026-12-25"}
+{"answers":[],"is_date_or_clock":false,"query":"2026-13-01"}
+{"answers":[{"actions":[{"action":{"text":"18:00","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:18:00 · Wed 1 Jul","kind":"dateTime","pinned":false,"subtitle":"10:00 Wed 1 Jul UTC-08:00 (UTC-08:00) in UTC","title":"18:00 · Wed 1 Jul"}],"is_date_or_clock":false,"query":"2026-7-1 10am pst to utc"}
+{"answers":[{"actions":[{"action":{"text":"2027-01-01","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 1 January 2027","kind":"dateTime","pinned":false,"subtitle":"in 53 days","title":"Friday, 1 January 2027"}],"is_date_or_clock":true,"query":"2027-01-01"}
+{"answers":[{"actions":[{"action":{"text":"2027-12-25","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 25 December 2027","kind":"dateTime","pinned":false,"subtitle":"in 411 days","title":"Saturday, 25 December 2027"}],"is_date_or_clock":true,"query":"2027-12-25"}
+{"answers":[{"actions":[{"action":{"text":"2028-02-29","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 29 February 2028","kind":"dateTime","pinned":false,"subtitle":"in 477 days","title":"Tuesday, 29 February 2028"}],"is_date_or_clock":false,"query":"2028-02-28 + 1 day"}
+{"answers":[{"actions":[{"action":{"text":"2028-02-29","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 29 February 2028","kind":"dateTime","pinned":false,"subtitle":"in 477 days","title":"Tuesday, 29 February 2028"}],"is_date_or_clock":true,"query":"2028-02-29"}
+{"answers":[{"actions":[{"action":{"text":"2028-03-01","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Wednesday, 1 March 2028","kind":"dateTime","pinned":false,"subtitle":"in 478 days","title":"Wednesday, 1 March 2028"}],"is_date_or_clock":true,"query":"2028-03-01"}
+{"answers":[],"is_date_or_clock":false,"query":"20k rmb to myr"}
+{"answers":[{"actions":[{"action":{"text":"2026-12-25","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 25 December 2026","kind":"dateTime","pinned":false,"subtitle":"in 46 days","title":"Friday, 25 December 2026"}],"is_date_or_clock":false,"query":"25 dec"}
+{"answers":[{"actions":[{"action":{"text":"2027-12-25","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 25 December 2027","kind":"dateTime","pinned":false,"subtitle":"in 411 days","title":"Saturday, 25 December 2027"}],"is_date_or_clock":false,"query":"25th december 2027"}
+{"answers":[],"is_date_or_clock":false,"query":"275 days"}
+{"answers":[{"actions":[{"action":{"text":"2026-02-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 12 February 2026","kind":"dateTime","pinned":false,"subtitle":"270 days ago","title":"Thursday, 12 February 2026"}],"is_date_or_clock":false,"query":"28 days before mar 12"}
+{"answers":[],"is_date_or_clock":false,"query":"282 days"}
+{"answers":[],"is_date_or_clock":false,"query":"2e-3%"}
+{"answers":[],"is_date_or_clock":false,"query":"3 apples ago"}
+{"answers":[],"is_date_or_clock":false,"query":"3 days"}
+{"answers":[],"is_date_or_clock":false,"query":"3 days after"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-16","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 16 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 7 days · next friday is Fri 13 Nov 2026","title":"Monday, 16 November 2026"}],"is_date_or_clock":false,"query":"3 days after next friday"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · today is Mon 9 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"3 days ago"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 12 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 3 days · today is Mon 9 Nov 2026","title":"Thursday, 12 November 2026"}],"is_date_or_clock":false,"query":"3 days from now"}
+{"answers":[],"is_date_or_clock":false,"query":"3/20 is what %"}
+{"answers":[],"is_date_or_clock":false,"query":"30 + 20%"}
+{"answers":[],"is_date_or_clock":false,"query":"349 days"}
+{"answers":[{"actions":[{"action":{"text":"2025-11-09","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Sunday, 9 November 2025","kind":"dateTime","pinned":false,"subtitle":"365 days ago · today is Mon 9 Nov 2026","title":"Sunday, 9 November 2025"}],"is_date_or_clock":false,"query":"365 days ago"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 12 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 3 days · today is Mon 9 Nov 2026","title":"Thursday, 12 November 2026"}],"is_date_or_clock":false,"query":"3d from today"}
+{"answers":[],"is_date_or_clock":true,"query":"3pm"}
+{"answers":[],"is_date_or_clock":false,"query":"400 / 10% of 200"}
+{"answers":[],"is_date_or_clock":false,"query":"5 + 10% of 200"}
+{"answers":[],"is_date_or_clock":false,"query":"5 days ago · last monday is Mon 28 Sep 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"5 ft to cm"}
+{"answers":[],"is_date_or_clock":false,"query":"5 kg"}
+{"answers":[],"is_date_or_clock":false,"query":"5+3"}
+{"answers":[],"is_date_or_clock":false,"query":"50 * 2 + 10%"}
+{"answers":[],"is_date_or_clock":false,"query":"50 to 75 is what %"}
+{"answers":[],"is_date_or_clock":false,"query":"514 days"}
+{"answers":[],"is_date_or_clock":false,"query":"−5h 30m"}
+{"answers":[],"is_date_or_clock":false,"query":"6 days"}
+{"answers":[],"is_date_or_clock":false,"query":"755"}
+{"answers":[],"is_date_or_clock":false,"query":"8 Mbps to MBps"}
+{"answers":[],"is_date_or_clock":false,"query":"83 days"}
+{"answers":[],"is_date_or_clock":false,"query":"88 days"}
+{"answers":[],"is_date_or_clock":true,"query":"9:30"}
+{"answers":[],"is_date_or_clock":false,"query":"90 days"}
+{"answers":[],"is_date_or_clock":false,"query":"947 days"}
+{"answers":[],"is_date_or_clock":false,"query":"a = 5; a * 2"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-02","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 2 November 2026","kind":"dateTime","pinned":false,"subtitle":"7 days ago · today is Mon 9 Nov 2026","title":"Monday, 2 November 2026"}],"is_date_or_clock":false,"query":"a week ago"}
+{"answers":[],"is_date_or_clock":false,"query":"a week from monday"}
+{"answers":[],"is_date_or_clock":false,"query":"a;sig"}
+{"answers":[],"is_date_or_clock":false,"query":"America/New_York"}
+{"answers":[],"is_date_or_clock":false,"query":"Atlantis"}
+{"answers":[],"is_date_or_clock":false,"query":"bing"}
+{"answers":[],"is_date_or_clock":false,"query":"brave"}
+{"answers":[],"is_date_or_clock":false,"query":"brew install jewei/tap/tinydash"}
+{"answers":[],"is_date_or_clock":false,"query":"brew upgrade"}
+{"answers":[],"is_date_or_clock":false,"query":"chmod"}
+{"answers":[],"is_date_or_clock":false,"query":"chmod 4755"}
+{"answers":[],"is_date_or_clock":false,"query":"chmod 755"}
+{"answers":[],"is_date_or_clock":false,"query":"Copy Days"}
+{"answers":[],"is_date_or_clock":false,"query":"d"}
+{"answers":[],"is_date_or_clock":false,"query":"days"}
+{"answers":[],"is_date_or_clock":false,"query":"days ago"}
+{"answers":[{"actions":[{"action":{"text":"14","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:14 days","kind":"dateTime","pinned":false,"subtitle":"2 weeks · from Thu 15 Jan 2026 to Thu 1 Jan 2026","title":"14 days"}],"is_date_or_clock":false,"query":"days between 2026-01-15 and 2026-01-01"}
+{"answers":[{"actions":[{"action":{"text":"88","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:88 days","kind":"dateTime","pinned":false,"subtitle":"12 weeks 4 days · from Tue 3 Mar 2026 to Sat 30 May 2026","title":"88 days"}],"is_date_or_clock":false,"query":"days between 3 mar and 30 may"}
+{"answers":[{"actions":[{"action":{"text":"88","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:88 days","kind":"dateTime","pinned":false,"subtitle":"12 weeks 4 days · from Tue 3 Mar 2026 to Sat 30 May 2026","title":"88 days"}],"is_date_or_clock":false,"query":"days between 3 march and 30 may"}
+{"answers":[],"is_date_or_clock":false,"query":"days between A and B"}
+{"answers":[{"actions":[{"action":{"text":"349","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:349 days","kind":"dateTime","pinned":false,"subtitle":"49 weeks 6 days · from Sun 20 Dec 2026 to Mon 5 Jan 2026","title":"349 days"}],"is_date_or_clock":false,"query":"days between dec 20 and 2026-01-05"}
+{"answers":[{"actions":[{"action":{"text":"16","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:16 days","kind":"dateTime","pinned":false,"subtitle":"2 weeks 2 days · from Sun 20 Dec 2026 to Tue 5 Jan 2027","title":"16 days"}],"is_date_or_clock":false,"query":"days between dec 20 and jan 5"}
+{"answers":[{"actions":[{"action":{"text":"1","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:1 day","kind":"dateTime","pinned":false,"subtitle":"from Tue 29 Feb 2028 to Wed 1 Mar 2028","title":"1 day"}],"is_date_or_clock":false,"query":"days between feb 29 and mar 1"}
+{"answers":[{"actions":[{"action":{"text":"349","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:349 days","kind":"dateTime","pinned":false,"subtitle":"49 weeks 6 days · from Mon 5 Jan 2026 to Sun 20 Dec 2026","title":"349 days"}],"is_date_or_clock":false,"query":"days between jan 5 and dec 20"}
+{"answers":[],"is_date_or_clock":false,"query":"days between today"}
+{"answers":[],"is_date_or_clock":false,"query":"days since"}
+{"answers":[{"actions":[{"action":{"text":"312","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:312 days","kind":"dateTime","pinned":false,"subtitle":"44 weeks 4 days · since Thursday, 1 January 2026","title":"312 days"}],"is_date_or_clock":false,"query":"days since 2026-01-01"}
+{"answers":[{"actions":[{"action":{"text":"319","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:319 days","kind":"dateTime","pinned":false,"subtitle":"45 weeks 4 days · since Thursday, 25 December 2025","title":"319 days"}],"is_date_or_clock":false,"query":"days since dec 25"}
+{"answers":[{"actions":[{"action":{"text":"984","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:984 days","kind":"dateTime","pinned":false,"subtitle":"140 weeks 4 days · since Thursday, 29 February 2024","title":"984 days"}],"is_date_or_clock":false,"query":"days since feb 29"}
+{"answers":[{"actions":[{"action":{"text":"312","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:312 days","kind":"dateTime","pinned":false,"subtitle":"44 weeks 4 days · since Thursday, 1 January 2026","title":"312 days"}],"is_date_or_clock":false,"query":"days since jan 1"}
+{"answers":[{"actions":[{"action":{"text":"4","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:4 days","kind":"dateTime","pinned":false,"subtitle":"until Friday, 13 November 2026","title":"4 days"}],"is_date_or_clock":false,"query":"days till next friday"}
+{"answers":[],"is_date_or_clock":false,"query":"days until"}
+{"answers":[{"actions":[{"action":{"text":"39","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:39 days","kind":"dateTime","pinned":false,"subtitle":"5 weeks 4 days · since Thursday, 1 October 2026","title":"39 days"}],"is_date_or_clock":false,"query":"days until 2026-10-01"}
+{"answers":[{"actions":[{"action":{"text":"23","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:23 days","kind":"dateTime","pinned":false,"subtitle":"3 weeks 2 days · since Saturday, 17 October 2026","title":"23 days"}],"is_date_or_clock":false,"query":"days until 2026-10-17"}
+{"answers":[{"actions":[{"action":{"text":"46","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:46 days","kind":"dateTime","pinned":false,"subtitle":"6 weeks 4 days · until Friday, 25 December 2026","title":"46 days"}],"is_date_or_clock":false,"query":"days until dec 25"}
+{"answers":[{"actions":[{"action":{"text":"46","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:46 days","kind":"dateTime","pinned":false,"subtitle":"6 weeks 4 days · until Friday, 25 December 2026","title":"46 days"}],"is_date_or_clock":false,"query":"Days until dec 25"}
+{"answers":[{"actions":[{"action":{"text":"477","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:477 days","kind":"dateTime","pinned":false,"subtitle":"68 weeks 1 day · until Tuesday, 29 February 2028","title":"477 days"}],"is_date_or_clock":false,"query":"days until feb 29"}
+{"answers":[{"actions":[{"action":{"text":"53","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:53 days","kind":"dateTime","pinned":false,"subtitle":"7 weeks 4 days · until Friday, 1 January 2027","title":"53 days"}],"is_date_or_clock":false,"query":"days until jan 1"}
+{"answers":[],"is_date_or_clock":false,"query":"days until soon"}
+{"answers":[{"actions":[{"action":{"text":"1","type":"copy"},"confirm":null,"label":"Copy Days"}],"icon":{"name":"clock","type":"symbol"},"id":"time:1 day","kind":"dateTime","pinned":false,"subtitle":"until Tuesday, 10 November 2026","title":"1 day"}],"is_date_or_clock":false,"query":"days until tomorrow"}
+{"answers":[],"is_date_or_clock":false,"query":"ddg"}
+{"answers":[{"actions":[{"action":{"text":"2026-12-25","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 25 December 2026","kind":"dateTime","pinned":false,"subtitle":"in 46 days","title":"Friday, 25 December 2026"}],"is_date_or_clock":false,"query":"dec 25"}
+{"answers":[{"actions":[{"action":{"text":"2026-12-04","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 4 December 2026","kind":"dateTime","pinned":false,"subtitle":"in 25 days","title":"Friday, 4 December 2026"}],"is_date_or_clock":false,"query":"dec 25 - 3 weeks"}
+{"answers":[],"is_date_or_clock":false,"query":"dec 25 26"}
+{"answers":[],"is_date_or_clock":false,"query":"dec 32"}
+{"answers":[{"actions":[{"action":{"text":"2026-12-25","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 25 December 2026","kind":"dateTime","pinned":false,"subtitle":"in 46 days","title":"Friday, 25 December 2026"}],"is_date_or_clock":false,"query":"December 25, 2026"}
+{"answers":[{"actions":[{"action":{"text":"2027-01-01","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 1 January 2027","kind":"dateTime","pinned":false,"subtitle":"in 53 days","title":"Friday, 1 January 2027"}],"is_date_or_clock":false,"query":"december 25, 2026 + 1 week"}
+{"answers":[],"is_date_or_clock":false,"query":"desktop.ini"}
+{"answers":[],"is_date_or_clock":false,"query":"divided by"}
+{"answers":[],"is_date_or_clock":false,"query":"dollar"}
+{"answers":[],"is_date_or_clock":false,"query":"é"}
+{"answers":[],"is_date_or_clock":false,"query":"etc/gmt+5"}
+{"answers":[],"is_date_or_clock":false,"query":"euro"}
+{"answers":[],"is_date_or_clock":false,"query":"Europe/London"}
+{"answers":[],"is_date_or_clock":false,"query":"fbclid"}
+{"answers":[{"actions":[{"action":{"text":"2028-02-29","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 29 February 2028","kind":"dateTime","pinned":false,"subtitle":"in 477 days","title":"Tuesday, 29 February 2028"}],"is_date_or_clock":false,"query":"feb 29"}
+{"answers":[],"is_date_or_clock":false,"query":"feb 29 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"feb 30"}
+{"answers":[],"is_date_or_clock":false,"query":"g rust"}
+{"answers":[],"is_date_or_clock":false,"query":"gh"}
+{"answers":[],"is_date_or_clock":false,"query":"gh, github"}
+{"answers":[],"is_date_or_clock":false,"query":"gmt+5"}
+{"answers":[],"is_date_or_clock":false,"query":"Hello {query},"}
+{"answers":[],"is_date_or_clock":false,"query":"Hello Sam,"}
+{"answers":[],"is_date_or_clock":false,"query":"hi"}
+{"answers":[],"is_date_or_clock":false,"query":"hi Sam"}
+{"answers":[],"is_date_or_clock":false,"query":"hsl(164, 41%, 31%)"}
+{"answers":[],"is_date_or_clock":false,"query":"https://jira.example.com/browse/{query}"}
+{"answers":[],"is_date_or_clock":false,"query":"in"}
+{"answers":[],"is_date_or_clock":false,"query":"in %"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-19","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 19 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 10 days · today is Mon 9 Nov 2026","title":"Thursday, 19 November 2026"}],"is_date_or_clock":false,"query":"in 10 days"}
+{"answers":[],"is_date_or_clock":false,"query":"in 14 days · today is Sat 3 Oct 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"in 2 days · tomorrow is Sun 4 Oct 2026"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-23","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 23 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 14 days · today is Mon 9 Nov 2026","title":"Monday, 23 November 2026"}],"is_date_or_clock":false,"query":"in 2 weeks"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-24","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 24 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 15 days · today is Mon 9 Nov 2026","title":"Tuesday, 24 November 2026"}],"is_date_or_clock":false,"query":"in 2 weeks + 1 day"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-24","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 24 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 15 days · today is Mon 9 Nov 2026","title":"Tuesday, 24 November 2026"}],"is_date_or_clock":false,"query":"in 2 weeks and 1 day"}
+{"answers":[],"is_date_or_clock":false,"query":"in 20 days · next friday is Fri 9 Oct 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"in bed"}
+{"answers":[],"is_date_or_clock":false,"query":"jan 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"jira"}
+{"answers":[],"is_date_or_clock":false,"query":"jira ABC-12"}
+{"answers":[],"is_date_or_clock":false,"query":"Jira: ABC-12"}
+{"answers":[],"is_date_or_clock":false,"query":"june 5 notes"}
+{"answers":[],"is_date_or_clock":false,"query":"kl"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-02","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 2 November 2026","kind":"dateTime","pinned":false,"subtitle":"7 days ago · last monday is Mon 2 Nov 2026","title":"Monday, 2 November 2026"}],"is_date_or_clock":false,"query":"last monday"}
+{"answers":[],"is_date_or_clock":false,"query":"local"}
+{"answers":[{"actions":[{"action":{"text":"02:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:02:30 · Monday, 9 November","kind":"dateTime","pinned":false,"subtitle":"London (UTC+00:00)","title":"02:30 · Monday, 9 November"}],"is_date_or_clock":false,"query":"london time"}
+{"answers":[],"is_date_or_clock":false,"query":"ma 5"}
+{"answers":[],"is_date_or_clock":false,"query":"may"}
+{"answers":[],"is_date_or_clock":false,"query":"meeting at 10am"}
+{"answers":[],"is_date_or_clock":false,"query":"minus"}
+{"answers":[],"is_date_or_clock":false,"query":"mo"}
+{"answers":[],"is_date_or_clock":false,"query":"mod"}
+{"answers":[],"is_date_or_clock":false,"query":"multiplied by"}
+{"answers":[],"is_date_or_clock":false,"query":"MYR"}
+{"answers":[],"is_date_or_clock":false,"query":"next"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-13","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 13 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 4 days · next friday is Fri 13 Nov 2026","title":"Friday, 13 November 2026"}],"is_date_or_clock":false,"query":"next friday"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · next friday is Fri 13 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"next friday - 1 week"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · next friday is Fri 13 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"next friday - 1w"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · next friday is Fri 13 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"next friday -1 week"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-27","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 27 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 18 days · next friday is Fri 13 Nov 2026","title":"Friday, 27 November 2026"}],"is_date_or_clock":false,"query":"next friday + 2 weeks"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · next friday is Fri 13 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"next friday-1w"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-14","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 14 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 5 days · next saturday is Sat 14 Nov 2026","title":"Saturday, 14 November 2026"}],"is_date_or_clock":false,"query":"next saturday"}
+{"answers":[],"is_date_or_clock":false,"query":"next week"}
+{"answers":[],"is_date_or_clock":false,"query":"node_modules"}
+{"answers":[],"is_date_or_clock":true,"query":"noon"}
+{"answers":[{"actions":[{"action":{"text":"10:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:10:30 · Monday, 9 November","kind":"dateTime","pinned":false,"subtitle":"Local time (UTC+08:00)","title":"10:30 · Monday, 9 November"}],"is_date_or_clock":false,"query":"now"}
+{"answers":[],"is_date_or_clock":false,"query":"off what"}
+{"answers":[],"is_date_or_clock":false,"query":"on what"}
+{"answers":[],"is_date_or_clock":false,"query":"p.m."}
+{"answers":[],"is_date_or_clock":false,"query":"pacific"}
+{"answers":[],"is_date_or_clock":false,"query":"passphrase"}
+{"answers":[],"is_date_or_clock":false,"query":"passphrase 8"}
+{"answers":[],"is_date_or_clock":false,"query":"password"}
+{"answers":[],"is_date_or_clock":false,"query":"per"}
+{"answers":[],"is_date_or_clock":false,"query":"percent"}
+{"answers":[],"is_date_or_clock":false,"query":"pi + 10% of 200"}
+{"answers":[],"is_date_or_clock":false,"query":"pin"}
+{"answers":[],"is_date_or_clock":false,"query":"pin 4"}
+{"answers":[],"is_date_or_clock":false,"query":"plus"}
+{"answers":[],"is_date_or_clock":false,"query":"project readme"}
+{"answers":[],"is_date_or_clock":false,"query":"project/readme"}
+{"answers":[],"is_date_or_clock":false,"query":"project/README.md"}
+{"answers":[],"is_date_or_clock":false,"query":"pst"}
+{"answers":[],"is_date_or_clock":false,"query":"pw"}
+{"answers":[],"is_date_or_clock":false,"query":"pw 32"}
+{"answers":[],"is_date_or_clock":false,"query":"renminbi"}
+{"answers":[],"is_date_or_clock":false,"query":"rgb(47, 111, 94)"}
+{"answers":[],"is_date_or_clock":false,"query":"rmb"}
+{"answers":[],"is_date_or_clock":false,"query":"rwxr-xr-x"}
+{"answers":[],"is_date_or_clock":false,"query":"Same time"}
+{"answers":[{"actions":[{"action":{"text":"2026-09-01","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 1 September 2026","kind":"dateTime","pinned":false,"subtitle":"69 days ago","title":"Tuesday, 1 September 2026"}],"is_date_or_clock":false,"query":"Sept 1"}
+{"answers":[{"actions":[{"action":{"text":"2026-09-01","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 1 September 2026","kind":"dateTime","pinned":false,"subtitle":"69 days ago","title":"Tuesday, 1 September 2026"}],"is_date_or_clock":false,"query":"sept 1st"}
+{"answers":[],"is_date_or_clock":false,"query":"sh"}
+{"answers":[],"is_date_or_clock":false,"query":"sig"}
+{"answers":[],"is_date_or_clock":false,"query":"sig2"}
+{"answers":[],"is_date_or_clock":false,"query":"since Thursday, 1 October 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"sqrt(144)"}
+{"answers":[],"is_date_or_clock":false,"query":"target"}
+{"answers":[],"is_date_or_clock":false,"query":"till"}
+{"answers":[],"is_date_or_clock":false,"query":"time in"}
+{"answers":[{"actions":[{"action":{"text":"02:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:02:30 · Monday, 9 November","kind":"dateTime","pinned":false,"subtitle":"London (UTC+00:00)","title":"02:30 · Monday, 9 November"}],"is_date_or_clock":false,"query":"time in Europe/London"}
+{"answers":[{"actions":[{"action":{"text":"11:30","type":"copy"},"confirm":null,"label":"Copy Time"}],"icon":{"name":"clock","type":"symbol"},"id":"time:11:30 · Monday, 9 November","kind":"dateTime","pinned":false,"subtitle":"Tokyo (UTC+09:00)","title":"11:30 · Monday, 9 November"}],"is_date_or_clock":false,"query":"time in tokyo"}
+{"answers":[],"is_date_or_clock":false,"query":"time machine"}
+{"answers":[],"is_date_or_clock":false,"query":"times"}
+{"answers":[],"is_date_or_clock":false,"query":"tinydash"}
+{"answers":[],"is_date_or_clock":false,"query":"tinydash.db"}
+{"answers":[],"is_date_or_clock":false,"query":"to"}
+{"answers":[],"is_date_or_clock":false,"query":"to %"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-09","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Monday, 9 November 2026","kind":"dateTime","pinned":false,"subtitle":"today · today is Mon 9 Nov 2026","title":"Monday, 9 November 2026"}],"is_date_or_clock":false,"query":"today"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · today is Mon 9 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"today - 3 days"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · today is Mon 9 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"today - 3d"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · today is Mon 9 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"today -3 days"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-12","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Thursday, 12 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 3 days · today is Mon 9 Nov 2026","title":"Thursday, 12 November 2026"}],"is_date_or_clock":false,"query":"today + 3 days"}
+{"answers":[],"is_date_or_clock":false,"query":"today plus"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-06","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Friday, 6 November 2026","kind":"dateTime","pinned":false,"subtitle":"3 days ago · today is Mon 9 Nov 2026","title":"Friday, 6 November 2026"}],"is_date_or_clock":false,"query":"today-3d"}
+{"answers":[],"is_date_or_clock":false,"query":"tokyo"}
+{"answers":[],"is_date_or_clock":false,"query":"Tokyo"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-10","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Tuesday, 10 November 2026","kind":"dateTime","pinned":false,"subtitle":"tomorrow · tomorrow is Tue 10 Nov 2026","title":"Tuesday, 10 November 2026"}],"is_date_or_clock":false,"query":"tomorrow"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-11","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Wednesday, 11 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 2 days · tomorrow is Tue 10 Nov 2026","title":"Wednesday, 11 November 2026"}],"is_date_or_clock":false,"query":"tomorrow + 1 day"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-11","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Wednesday, 11 November 2026","kind":"dateTime","pinned":false,"subtitle":"in 2 days · tomorrow is Tue 10 Nov 2026","title":"Wednesday, 11 November 2026"}],"is_date_or_clock":false,"query":"tomorrow+1d"}
+{"answers":[],"is_date_or_clock":false,"query":"until Sunday, 4 October 2026"}
+{"answers":[],"is_date_or_clock":false,"query":"usd"}
+{"answers":[],"is_date_or_clock":false,"query":"using"}
+{"answers":[],"is_date_or_clock":false,"query":"utm_*"}
+{"answers":[],"is_date_or_clock":false,"query":"vsc"}
+{"answers":[],"is_date_or_clock":false,"query":"w"}
+{"answers":[],"is_date_or_clock":false,"query":"y"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-08","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Sunday, 8 November 2026","kind":"dateTime","pinned":false,"subtitle":"yesterday · yesterday is Sun 8 Nov 2026","title":"Sunday, 8 November 2026"}],"is_date_or_clock":false,"query":"yesterday"}
+{"answers":[{"actions":[{"action":{"text":"2026-11-07","type":"copy"},"confirm":null,"label":"Copy Date"}],"icon":{"name":"clock","type":"symbol"},"id":"time:Saturday, 7 November 2026","kind":"dateTime","pinned":false,"subtitle":"2 days ago · yesterday is Sun 8 Nov 2026","title":"Saturday, 7 November 2026"}],"is_date_or_clock":false,"query":"yesterday - 1 day"}
+{"answers":[],"is_date_or_clock":false,"query":"yt"}
+{"answers":[],"is_date_or_clock":false,"query":"yt lofi"}
+{"answers":[],"is_date_or_clock":false,"query":"yuan"}
+{"answers":[],"is_date_or_clock":false,"query":"YYYY-MM-DD"}

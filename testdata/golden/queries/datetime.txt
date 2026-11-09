@@ -1,0 +1,365 @@
+£
+-
+--background
+--greedy
+--mode <category>
+--mode clipboard
+--settings
+-rw-r--r--
+;
+;sig
+;sig2
+?
+? git
+? jira
+? search
+.
+..
+.appref-ms
+.command
+.exe
+.lnk
+.url
+(
+(\x.x + 1) 5
+(x => x + 1) 5
+(x: x + 1) 5
+)
+{}
+{clipboard}
+{date}
+{datetime}
+{glued}
+{query}
+{spaced}
+{time}
+{unknown}
+*
+**
+/
+#2F6F5E
+#fff
+%
++
++45m
++8h
+=
+= cm
+=5+3
+>
+> git pull
+> text
+>j
+~
+~/Library
+~/Projects
+$
+$30
+$30 + 20%
+$TERMINAL
+0.35 as %
+02:00 · Thu 2 Jul
+09:05
+1 day
+10
+10 % 3
+10 plus 5
+10:30
+10%
+10% + 20%
+10% of 200
+10% of 200 + 20% of 300
+10% of 200 + 50
+10% off 200
+10% on 200
+100 + 10% + 5
+100 twd to myr
+100 USD MYR
+100 usd to eur
+10am
+10am pacific time
+10am pacific to kl
+11 weeks 6 days · until Friday, 25 December 2026
+12 * 8
+12 weeks 4 days · from Tue 3 Mar 2026 to Sat 30 May 2026
+12-3-4
+12am
+13pm
+14 days
+1460 days
+16 days
+17:00
+1791354301
+1791354301250
+18:00
+180 is what % off 200
+180 is what % on 150
+2 days
+2 days ago · yesterday is Fri 2 Oct 2026
+2 months 3 days after 2026-06-05
+2 months and 3 days before 2026-06-05
+2 weeks · until Saturday, 17 October 2026
+2 weeks 2 days · from Sun 20 Dec 2026 to Tue 5 Jan 2027
+2 weeks from tomorrow
+€20
+20 as a % of 200
+20 is 10% of what
+20 is what % of 200
+200
+200 - 10%
+200 - 10% - 5%
+200 * 10%
+200 / 10%
+2025-10-03
+2026-01-12
+2026-01-31 + 1 month
+2026-02-12
+2026-02-28
+2026-03-08 2:30 new york
+2026-03-08 2:30am new york to utc
+2026-04-02
+2026-07-01 10am pacific time to utc
+2026-07-01 10am pacific to tokyo
+2026-07-01 10am pst to utc
+2026-08-08
+2026-09-01
+2026-09-26
+2026-09-28
+2026-09-30
+2026-1-5 + 1 week
+2026-10
+2026-10-03
+2026-10-03 - 1 year
+2026-10-05
+2026-10-06
+2026-10-10
+2026-10-11
+2026-10-12
+2026-10-17
+2026-10-17 - 2d
+2026-10-17 -2d
+2026-10-18
+2026-10-23
+2026-11-01 1:30 new york
+2026-11-01 1:30am new york to utc
+2026-12-15 9:30 new york
+2026-12-25
+2026-13-01
+2026-7-1 10am pst to utc
+2027-01-01
+2027-12-25
+2028-02-28 + 1 day
+2028-02-29
+2028-03-01
+20k rmb to myr
+25 dec
+25th december 2027
+275 days
+28 days before mar 12
+282 days
+2e-3%
+3 apples ago
+3 days
+3 days after
+3 days after next friday
+3 days ago
+3 days from now
+3/20 is what %
+30 + 20%
+349 days
+365 days ago
+3d from today
+3pm
+400 / 10% of 200
+5 + 10% of 200
+5 days ago · last monday is Mon 28 Sep 2026
+5 ft to cm
+5 kg
+5+3
+50 * 2 + 10%
+50 to 75 is what %
+514 days
+−5h 30m
+6 days
+755
+8 Mbps to MBps
+83 days
+88 days
+9:30
+90 days
+947 days
+a = 5; a * 2
+a week ago
+a week from monday
+a;sig
+America/New_York
+Atlantis
+bing
+brave
+brew install jewei/tap/tinydash
+brew upgrade
+chmod
+chmod 4755
+chmod 755
+Copy Days
+d
+days
+days ago
+days between 2026-01-15 and 2026-01-01
+days between 3 mar and 30 may
+days between 3 march and 30 may
+days between A and B
+days between dec 20 and 2026-01-05
+days between dec 20 and jan 5
+days between feb 29 and mar 1
+days between jan 5 and dec 20
+days between today
+days since
+days since 2026-01-01
+days since dec 25
+days since feb 29
+days since jan 1
+days till next friday
+days until
+days until 2026-10-01
+days until 2026-10-17
+days until dec 25
+Days until dec 25
+days until feb 29
+days until jan 1
+days until soon
+days until tomorrow
+ddg
+dec 25
+dec 25 - 3 weeks
+dec 25 26
+dec 32
+December 25, 2026
+december 25, 2026 + 1 week
+desktop.ini
+divided by
+dollar
+é
+etc/gmt+5
+euro
+Europe/London
+fbclid
+feb 29
+feb 29 2026
+feb 30
+g rust
+gh
+gh, github
+gmt+5
+Hello {query},
+Hello Sam,
+hi
+hi Sam
+hsl(164, 41%, 31%)
+https://jira.example.com/browse/{query}
+in
+in %
+in 10 days
+in 14 days · today is Sat 3 Oct 2026
+in 2 days · tomorrow is Sun 4 Oct 2026
+in 2 weeks
+in 2 weeks + 1 day
+in 2 weeks and 1 day
+in 20 days · next friday is Fri 9 Oct 2026
+in bed
+jan 2026
+jira
+jira ABC-12
+Jira: ABC-12
+june 5 notes
+kl
+last monday
+local
+london time
+ma 5
+may
+meeting at 10am
+minus
+mo
+mod
+multiplied by
+MYR
+next
+next friday
+next friday - 1 week
+next friday - 1w
+next friday -1 week
+next friday + 2 weeks
+next friday-1w
+next saturday
+next week
+node_modules
+noon
+now
+off what
+on what
+p.m.
+pacific
+passphrase
+passphrase 8
+password
+per
+percent
+pi + 10% of 200
+pin
+pin 4
+plus
+project readme
+project/readme
+project/README.md
+pst
+pw
+pw 32
+renminbi
+rgb(47, 111, 94)
+rmb
+rwxr-xr-x
+Same time
+Sept 1
+sept 1st
+sh
+sig
+sig2
+since Thursday, 1 October 2026
+sqrt(144)
+target
+till
+time in
+time in Europe/London
+time in tokyo
+time machine
+times
+tinydash
+tinydash.db
+to
+to %
+today
+today - 3 days
+today - 3d
+today -3 days
+today + 3 days
+today plus
+today-3d
+tokyo
+Tokyo
+tomorrow
+tomorrow + 1 day
+tomorrow+1d
+until Sunday, 4 October 2026
+usd
+using
+utm_*
+vsc
+w
+y
+yesterday
+yesterday - 1 day
+yt
+yt lofi
+yuan
+YYYY-MM-DD

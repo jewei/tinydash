@@ -1,0 +1,240 @@
+{"answer":null,"query":"£"}
+{"answer":null,"query":"-"}
+{"answer":null,"query":"--background"}
+{"answer":null,"query":"--greedy"}
+{"answer":null,"query":"--mode <category>"}
+{"answer":null,"query":"--mode clipboard"}
+{"answer":null,"query":"--settings"}
+{"answer":null,"query":"-rw-r--r--"}
+{"answer":null,"query":";"}
+{"answer":null,"query":";sig"}
+{"answer":null,"query":";sig2"}
+{"answer":null,"query":"?"}
+{"answer":null,"query":"? git"}
+{"answer":null,"query":"? jira"}
+{"answer":null,"query":"? search"}
+{"answer":null,"query":"."}
+{"answer":null,"query":".."}
+{"answer":null,"query":".appref-ms"}
+{"answer":null,"query":".command"}
+{"answer":null,"query":".exe"}
+{"answer":null,"query":".lnk"}
+{"answer":null,"query":".url"}
+{"answer":null,"query":"("}
+{"answer":null,"query":"(\\x.x + 1) 5"}
+{"answer":null,"query":"(x => x + 1) 5"}
+{"answer":null,"query":"(x: x + 1) 5"}
+{"answer":null,"query":")"}
+{"answer":null,"query":"{clipboard}"}
+{"answer":null,"query":"{date}"}
+{"answer":null,"query":"{datetime}"}
+{"answer":null,"query":"{query}"}
+{"answer":null,"query":"{time}"}
+{"answer":null,"query":"*"}
+{"answer":null,"query":"**"}
+{"answer":null,"query":"/"}
+{"answer":null,"query":"#2F6F5E"}
+{"answer":null,"query":"#fff"}
+{"answer":null,"query":"%"}
+{"answer":null,"query":"+"}
+{"answer":null,"query":"="}
+{"answer":null,"query":"= cm"}
+{"answer":null,"query":"=5+3"}
+{"answer":null,"query":">"}
+{"answer":null,"query":"> git pull"}
+{"answer":null,"query":"> text"}
+{"answer":null,"query":">j"}
+{"answer":null,"query":"~"}
+{"answer":null,"query":"~/Library"}
+{"answer":null,"query":"~/Projects"}
+{"answer":null,"query":"$"}
+{"answer":null,"query":"$30"}
+{"answer":null,"query":"$30 + 20%"}
+{"answer":null,"query":"$TERMINAL"}
+{"answer":null,"query":"0.35 as %"}
+{"answer":null,"query":"09:05"}
+{"answer":null,"query":"10 % 3"}
+{"answer":null,"query":"10 plus 5"}
+{"answer":null,"query":"10:30"}
+{"answer":null,"query":"10%"}
+{"answer":null,"query":"10% + 20%"}
+{"answer":null,"query":"10% of 200"}
+{"answer":null,"query":"10% of 200 + 20% of 300"}
+{"answer":null,"query":"10% of 200 + 50"}
+{"answer":null,"query":"10% off 200"}
+{"answer":null,"query":"10% on 200"}
+{"answer":null,"query":"100 + 10% + 5"}
+{"answer":null,"query":"100 twd to myr"}
+{"answer":null,"query":"100 USD MYR"}
+{"answer":null,"query":"100 usd to eur"}
+{"answer":null,"query":"10am pacific to kl"}
+{"answer":null,"query":"12 * 8"}
+{"answer":null,"query":"12-3-4"}
+{"answer":null,"query":"1791354301"}
+{"answer":null,"query":"1791354301250"}
+{"answer":null,"query":"180 is what % off 200"}
+{"answer":null,"query":"180 is what % on 150"}
+{"answer":null,"query":"2 months 3 days after 2026-06-05"}
+{"answer":null,"query":"2 weeks from tomorrow"}
+{"answer":null,"query":"€20"}
+{"answer":null,"query":"20 as a % of 200"}
+{"answer":null,"query":"20 is 10% of what"}
+{"answer":null,"query":"20 is what % of 200"}
+{"answer":null,"query":"200"}
+{"answer":null,"query":"200 - 10%"}
+{"answer":null,"query":"200 - 10% - 5%"}
+{"answer":null,"query":"200 * 10%"}
+{"answer":null,"query":"200 / 10%"}
+{"answer":null,"query":"2026-10"}
+{"answer":null,"query":"2026-10-11"}
+{"answer":null,"query":"2026-10-17"}
+{"answer":null,"query":"2026-12-15 9:30 new york"}
+{"answer":null,"query":"2026-12-25"}
+{"answer":null,"query":"20k rmb to myr"}
+{"answer":null,"query":"25 dec"}
+{"answer":null,"query":"28 days before mar 12"}
+{"answer":null,"query":"2e-3%"}
+{"answer":null,"query":"3 days ago"}
+{"answer":null,"query":"3 days from now"}
+{"answer":null,"query":"3/20 is what %"}
+{"answer":null,"query":"30 + 20%"}
+{"answer":null,"query":"3pm"}
+{"answer":null,"query":"400 / 10% of 200"}
+{"answer":null,"query":"5 + 10% of 200"}
+{"answer":null,"query":"5 ft to cm"}
+{"answer":null,"query":"5 kg"}
+{"answer":null,"query":"5+3"}
+{"answer":null,"query":"50 * 2 + 10%"}
+{"answer":null,"query":"50 to 75 is what %"}
+{"answer":null,"query":"755"}
+{"answer":null,"query":"8 Mbps to MBps"}
+{"answer":null,"query":"a = 5; a * 2"}
+{"answer":null,"query":"a week ago"}
+{"answer":null,"query":"a;sig"}
+{"answer":null,"query":"America/New_York"}
+{"answer":null,"query":"bing"}
+{"answer":null,"query":"brave"}
+{"answer":null,"query":"brew install jewei/tap/tinydash"}
+{"answer":null,"query":"brew upgrade"}
+{"answer":null,"query":"chmod"}
+{"answer":null,"query":"chmod 4755"}
+{"answer":null,"query":"chmod 755"}
+{"answer":null,"query":"d"}
+{"answer":null,"query":"days between 3 mar and 30 may"}
+{"answer":null,"query":"days between A and B"}
+{"answer":null,"query":"days between dec 20 and jan 5"}
+{"answer":null,"query":"days since"}
+{"answer":null,"query":"days since 2026-01-01"}
+{"answer":null,"query":"days since dec 25"}
+{"answer":null,"query":"days until"}
+{"answer":null,"query":"days until dec 25"}
+{"answer":null,"query":"ddg"}
+{"answer":null,"query":"dec 25"}
+{"answer":null,"query":"dec 25 - 3 weeks"}
+{"answer":null,"query":"December 25, 2026"}
+{"answer":null,"query":"desktop.ini"}
+{"answer":null,"query":"divided by"}
+{"answer":null,"query":"dollar"}
+{"answer":null,"query":"é"}
+{"answer":null,"query":"euro"}
+{"answer":null,"query":"Europe/London"}
+{"answer":null,"query":"example.com/?utm_source=x"}
+{"answer":null,"query":"fbclid"}
+{"answer":null,"query":"feb 29"}
+{"answer":null,"query":"g rust"}
+{"answer":null,"query":"gh"}
+{"answer":null,"query":"gh, github"}
+{"answer":null,"query":"Hello {query},"}
+{"answer":null,"query":"Hello Sam,"}
+{"answer":null,"query":"hi"}
+{"answer":null,"query":"hi Sam"}
+{"answer":null,"query":"hsl(164, 41%, 31%)"}
+{"answer":{"actions":[{"action":{"text":"http://example.com/p","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"http://example.com/p"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:http://example.com/p","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"http://example.com/p"},"query":"http://example.com/p?igshid=1"}
+{"answer":null,"query":"https://example.com/"}
+{"answer":null,"query":"https://example.com/?id=1"}
+{"answer":{"actions":[{"action":{"text":"https://example.com/?page=3","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://example.com/?page=3"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://example.com/?page=3","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://example.com/?page=3"},"query":"https://example.com/?mc_eid=1&mc_cid=2&page=3"}
+{"answer":null,"query":"https://example.com/?tag=keep"}
+{"answer":null,"query":"https://example.com/a?id=1&q=a%26b#top"}
+{"answer":{"actions":[{"action":{"text":"https://example.com/a?id=1&q=a%26b#top","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://example.com/a?id=1&q=a%26b#top"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://example.com/a?id=1&q=a%26b#top","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://example.com/a?id=1&q=a%26b#top"},"query":"https://example.com/a?utm_source=x&id=1&q=a%26b&fbclid=y#top"}
+{"answer":null,"query":"https://jira.example.com/browse/{query}"}
+{"answer":{"actions":[{"action":{"text":"https://news.example.com/story","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://news.example.com/story"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://news.example.com/story","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://news.example.com/story"},"query":"https://news.example.com/story?utm_medium=email&utm_source=nl"}
+{"answer":{"actions":[{"action":{"text":"https://open.spotify.com/track/1","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://open.spotify.com/track/1"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://open.spotify.com/track/1","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://open.spotify.com/track/1"},"query":"https://open.spotify.com/track/1?si=xyz"}
+{"answer":{"actions":[{"action":{"text":"https://shop.example/","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://shop.example/"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://shop.example/","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://shop.example/"},"query":"https://shop.example?utm_campaign=x"}
+{"answer":null,"query":"https://shop.example/"}
+{"answer":{"actions":[{"action":{"text":"https://www.amazon.com/dp/B1?psc=1","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://www.amazon.com/dp/B1?psc=1"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://www.amazon.com/dp/B1?psc=1","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://www.amazon.com/dp/B1?psc=1"},"query":"https://www.amazon.com/dp/B1?ref_=nav&tag=x&psc=1"}
+{"answer":{"actions":[{"action":{"text":"https://www.amazon.de/dp/B0?th=1","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://www.amazon.de/dp/B0?th=1"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://www.amazon.de/dp/B0?th=1","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://www.amazon.de/dp/B0?th=1"},"query":"https://www.amazon.de/dp/B0?tag=aff&th=1"}
+{"answer":null,"query":"https://www.amazon.de/dp/B0?th=1"}
+{"answer":{"actions":[{"action":{"text":"https://www.google.com/search?q=rust","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://www.google.com/search?q=rust"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://www.google.com/search?q=rust","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://www.google.com/search?q=rust"},"query":"https://www.google.com/search?q=rust&gclid=1"}
+{"answer":{"actions":[{"action":{"text":"https://www.linkedin.com/posts/x?trk=public","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://www.linkedin.com/posts/x?trk=public"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://www.linkedin.com/posts/x?trk=public","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://www.linkedin.com/posts/x?trk=public"},"query":"https://www.linkedin.com/posts/x?trk=public&utm_source=share"}
+{"answer":null,"query":"https://www.youtube.com/watch?v=abc&t=42"}
+{"answer":{"actions":[{"action":{"text":"https://www.youtube.com/watch?v=abc&t=42","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://www.youtube.com/watch?v=abc&t=42"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://www.youtube.com/watch?v=abc&t=42","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://www.youtube.com/watch?v=abc&t=42"},"query":"https://www.youtube.com/watch?v=abc&t=42&si=share"}
+{"answer":{"actions":[{"action":{"text":"https://x.com/user/status/1","type":"copy"},"confirm":null,"label":"Copy Clean URL"},{"action":{"type":"openUrl","url":"https://x.com/user/status/1"},"confirm":null,"label":"Open Clean URL"}],"icon":{"name":"link","type":"symbol"},"id":"url:https://x.com/user/status/1","kind":"url","pinned":false,"subtitle":"Removed tracking parameters","title":"https://x.com/user/status/1"},"query":"https://x.com/user/status/1?s=20&t=abc"}
+{"answer":null,"query":"in %"}
+{"answer":null,"query":"in 10 days"}
+{"answer":null,"query":"jira"}
+{"answer":null,"query":"jira ABC-12"}
+{"answer":null,"query":"Jira: ABC-12"}
+{"answer":null,"query":"kl"}
+{"answer":null,"query":"last monday"}
+{"answer":null,"query":"london time"}
+{"answer":null,"query":"minus"}
+{"answer":null,"query":"mo"}
+{"answer":null,"query":"mod"}
+{"answer":null,"query":"multiplied by"}
+{"answer":null,"query":"MYR"}
+{"answer":null,"query":"next friday"}
+{"answer":null,"query":"next friday + 2 weeks"}
+{"answer":null,"query":"node_modules"}
+{"answer":null,"query":"now"}
+{"answer":null,"query":"off what"}
+{"answer":null,"query":"on what"}
+{"answer":null,"query":"pacific"}
+{"answer":null,"query":"passphrase"}
+{"answer":null,"query":"passphrase 8"}
+{"answer":null,"query":"password"}
+{"answer":null,"query":"per"}
+{"answer":null,"query":"percent"}
+{"answer":null,"query":"pi + 10% of 200"}
+{"answer":null,"query":"pin"}
+{"answer":null,"query":"pin 4"}
+{"answer":null,"query":"plus"}
+{"answer":null,"query":"project readme"}
+{"answer":null,"query":"project/readme"}
+{"answer":null,"query":"project/README.md"}
+{"answer":null,"query":"pst"}
+{"answer":null,"query":"pw"}
+{"answer":null,"query":"pw 32"}
+{"answer":null,"query":"renminbi"}
+{"answer":null,"query":"rgb(47, 111, 94)"}
+{"answer":null,"query":"rmb"}
+{"answer":null,"query":"rwxr-xr-x"}
+{"answer":null,"query":"see https://example.com/?utm_source=x"}
+{"answer":null,"query":"sept 1st"}
+{"answer":null,"query":"sh"}
+{"answer":null,"query":"sig"}
+{"answer":null,"query":"sig2"}
+{"answer":null,"query":"sqrt(144)"}
+{"answer":null,"query":"target"}
+{"answer":null,"query":"till"}
+{"answer":null,"query":"time in"}
+{"answer":null,"query":"time in tokyo"}
+{"answer":null,"query":"times"}
+{"answer":null,"query":"tinydash"}
+{"answer":null,"query":"tinydash.db"}
+{"answer":null,"query":"to"}
+{"answer":null,"query":"to %"}
+{"answer":null,"query":"today"}
+{"answer":null,"query":"today + 3 days"}
+{"answer":null,"query":"Tokyo"}
+{"answer":null,"query":"tomorrow"}
+{"answer":null,"query":"usd"}
+{"answer":null,"query":"using"}
+{"answer":null,"query":"utm_*"}
+{"answer":null,"query":"vsc"}
+{"answer":null,"query":"w"}
+{"answer":null,"query":"y"}
+{"answer":null,"query":"yesterday"}
+{"answer":null,"query":"yt"}
+{"answer":null,"query":"yt lofi"}
+{"answer":null,"query":"yuan"}
+{"answer":null,"query":"YYYY-MM-DD"}
