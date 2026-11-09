@@ -13,6 +13,7 @@ type fakeClipboard struct {
 	changes uint64
 	counted bool
 	onRead  func() // runs between the epoch read and the content read
+	fail    int    // reads that fail before the next one works
 }
 
 func (f *fakeClipboard) copy(text string)      { f.text, f.changes = text, f.changes+1 }
@@ -20,6 +21,10 @@ func (f *fakeClipboard) count() (uint64, bool) { return f.changes, f.counted }
 func (f *fakeClipboard) read() (clipboard.Content, bool) {
 	if f.onRead != nil {
 		f.onRead()
+	}
+	if f.fail > 0 {
+		f.fail--
+		return clipboard.Content{}, false
 	}
 	return clipboard.Text(f.text), f.text != ""
 }
@@ -217,5 +222,26 @@ func TestACopyDuringATickIsSavedOnceByTheNextTick(t *testing.T) {
 	tick(t, m, 4)
 	if n := clips(t, e); n != 1 {
 		t.Fatalf("%d clips after the next ticks, want the copy once", n)
+	}
+}
+
+// A read that fails once, as when the clipboard's owner does not answer in
+// time, with no new copy: the unchanged text was seen already and is not
+// saved again, so a cleared copy does not come back.
+func TestAFailedReadDoesNotBringAClearedCopyBack(t *testing.T) {
+	for _, counted := range []bool{true, false} {
+		e, _ := start(t)
+		cb := &fakeClipboard{counted: counted}
+		m := NewMonitor(e, cb.count, cb.read)
+		tick(t, m, 1)
+		cb.copy("password")
+		tick(t, m, 2)
+		<-e.ClearClipboard()
+		cb.fail = 1
+		tick(t, m, 3)
+		tick(t, m, 4)
+		if n := clips(t, e); n != 0 {
+			t.Fatalf("counted %v: %d clips: a failed read brought the cleared copy back", counted, n)
+		}
 	}
 }
