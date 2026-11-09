@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/ebitengine/purego/objc"
@@ -29,5 +30,13 @@ func TestChangeCountFollowsWrites(t *testing.T) {
 	}
 	if _, ok := ClipboardChangeCount(); !ok {
 		t.Fatal("the general pasteboard has no change count")
+	}
+}
+
+// Without a desktop session no app is in front, so only the form of an ID
+// is checked.
+func TestFrontmostAppIDIsABundleID(t *testing.T) {
+	if id := FrontmostAppID(); id != "" && !strings.Contains(id, ".") {
+		t.Errorf("FrontmostAppID() = %q, not a bundle ID", id)
 	}
 }
