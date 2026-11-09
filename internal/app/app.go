@@ -64,6 +64,7 @@ type App struct {
 	apps     *engine.Slot
 	files    *engine.Slot
 	icons    iconCache
+	more     *moreFiles
 	tray     *mygo.Tray
 	settings *settingsWindow
 	mu       sync.Mutex
@@ -107,6 +108,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	a.desktop = &desktop{clip: NewClipboard(a.capture)}
 	a.keys = &shortcuts{toggle: a.toggle, run: a.runHotkey}
 	a.actions = engine.NewActions(a.engine, a.desktop, (*appShell)(a), a.keys, time.Now)
+	a.more = a.newMoreFiles()
 
 	a.apps = engine.NewSlot(a.engine.RebuildApps(a.listApps))
 	a.files = engine.NewSlot(a.engine.RebuildFiles(a.fileDisk()))
@@ -349,7 +351,8 @@ type backend App
 func (b *backend) app() *App { return (*App)(b) }
 
 func (b *backend) Search(query string, category core.Category) []core.Result {
-	return search.Search(b.app().engine.Snapshot(time.Now()), query, category)
+	s := b.app().engine.Snapshot(time.Now())
+	return append(search.Search(s, query, category), b.app().more.results(b.app().ctx, s, query, category)...)
 }
 
 func (b *backend) Run(action core.Action, from core.ID, done func(error)) {
