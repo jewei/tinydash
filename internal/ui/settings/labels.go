@@ -11,8 +11,5 @@ var mac = runtime.GOOS == "darwin"
 // history to turn on.
 var richClipboard = runtime.GOOS != "linux"
 
-// superName is what the desktop calls the Super key: Windows calls it Win.
-var superName = map[bool]string{true: "Win", false: "Super"}[runtime.GOOS == "windows"]
-
 // trayName is what the desktop calls the tray.
 var trayName = map[bool]string{true: "Show menu bar icon", false: "Show tray icon"}[runtime.GOOS == "darwin"]

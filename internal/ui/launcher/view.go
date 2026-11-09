@@ -7,11 +7,12 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 // View builds the panel's content: give it to the window as ui.View(m.View).
 func (m *Model) View(c *ui.Context) {
-	p := themed(c, m.backend.Settings().Theme)
+	p := kit.Themed(c, m.backend.Settings().Theme)
 	// The menu and the dialogs take the keyboard while they show; keys
 	// behind them must not act.
 	if !m.overlay() {
@@ -60,9 +61,9 @@ func (m *Model) observe(ev ui.InputEvent) {
 	}
 }
 
-func (m *Model) searchBar(c *ui.Context, p palette) {
+func (m *Model) searchBar(c *ui.Context, p kit.Palette) {
 	ui.Row(c).Padding(16, 24, 8, 24).Gap(12).AlignItems(ui.Center).Children(func() {
-		ui.Icon(c, glyphs["search"]).FontSize(20).TextColor(p.accent)
+		ui.Icon(c, glyphs["search"]).FontSize(20).TextColor(p.Accent)
 		field := ui.TextInputBase(c, &m.query).Bind(&m.input).AutoFocus().Grow(1).FontSize(22).
 			Placeholder("Search apps, files, clipboard, and more").Label("Search")
 		// The field takes Enter and its editing keys, such as Mod+Backspace,
@@ -81,20 +82,20 @@ func (m *Model) searchBar(c *ui.Context, p palette) {
 	})
 }
 
-func (m *Model) tabBar(c *ui.Context, p palette) {
+func (m *Model) tabBar(c *ui.Context, p kit.Palette) {
 	tabs := m.tabs()
-	ui.Row(c).Padding(4, 16, 12, 16).Gap(4).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.rule).Children(func() {
+	ui.Row(c).Padding(4, 16, 12, 16).Gap(4).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule).Children(func() {
 		ui.Row(c).Gap(4).Role(ui.RoleTabList).Label("Categories").Grow(1).Children(func() {
 			for _, tab := range tabs {
 				chosen := tab == m.category
 				t := ui.ButtonBase(c).Padding(4, 12).Radius(999).Role(ui.RoleTab).Label(categoryLabels[tab]).AccessSelected(chosen)
-				ink, weight := p.muted, 400
+				ink, weight := p.Muted, 400
 				switch {
 				case chosen:
-					t.Background(p.selected)
-					ink, weight = p.selectedInk, 600
+					t.Background(p.Selected)
+					ink, weight = p.SelectedInk, 600
 				case t.Hovered():
-					t.Background(p.hover)
+					t.Background(p.Hover)
 				}
 				t.Children(func() { ui.Text(c, categoryLabels[tab]).TextColor(ink).FontWeight(weight) })
 				t.OnClick(func() {
@@ -106,7 +107,7 @@ func (m *Model) tabBar(c *ui.Context, p palette) {
 		if len(tabs) > 1 {
 			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
 				keyCaps(c, p, "Tab")
-				ui.Text(c, "next").FontSize(12).TextColor(p.muted)
+				ui.Text(c, "next").FontSize(12).TextColor(p.Muted)
 			})
 		}
 	})
@@ -114,8 +115,8 @@ func (m *Model) tabBar(c *ui.Context, p palette) {
 
 // noticeBar says what went wrong under the tabs. A startup warning has a
 // Dismiss button; an action's failure goes with the next edit.
-func noticeBar(c *ui.Context, p palette, text string, dismiss func()) {
-	ui.Row(c).Padding(8, 24).Gap(8).AlignItems(ui.Center).Background(p.notice).Role(ui.RoleAlert).Children(func() {
+func noticeBar(c *ui.Context, p kit.Palette, text string, dismiss func()) {
+	ui.Row(c).Padding(8, 24).Gap(8).AlignItems(ui.Center).Background(p.Notice).Role(ui.RoleAlert).Children(func() {
 		ui.Icon(c, glyphs["warning"]).FontSize(16)
 		ui.Text(c, text).FontSize(12).Grow(1)
 		if dismiss != nil {
@@ -125,7 +126,7 @@ func noticeBar(c *ui.Context, p palette, text string, dismiss func()) {
 }
 
 // body shows the results, and the widget pane beside them while it shows.
-func (m *Model) body(c *ui.Context, p palette) {
+func (m *Model) body(c *ui.Context, p kit.Palette) {
 	if !m.showsWidgets() {
 		m.resultsView(c, p)
 		return
@@ -137,7 +138,7 @@ func (m *Model) body(c *ui.Context, p palette) {
 	})
 }
 
-func (m *Model) resultsView(c *ui.Context, p palette) {
+func (m *Model) resultsView(c *ui.Context, p kit.Palette) {
 	rows := m.rows()
 	switch {
 	case m.clipboardOff():
@@ -145,7 +146,7 @@ func (m *Model) resultsView(c *ui.Context, p palette) {
 			muted(c, p, "TinyDash saves text you copy, on this computer only. Passwords are skipped.")
 			ui.PrimaryButton(c, "Turn On Clipboard History").OnClick(m.enableClipboard)
 			if m.enableError != "" {
-				ui.Text(c, m.enableError).TextColor(p.danger).Role(ui.RoleAlert)
+				ui.Text(c, m.enableError).TextColor(p.Danger).Role(ui.RoleAlert)
 			}
 		})
 	case len(rows) == 0:
@@ -159,7 +160,7 @@ func (m *Model) resultsView(c *ui.Context, p palette) {
 
 // emptyResults says what an empty list means, by tab, before and after
 // typing.
-func (m *Model) emptyResults(c *ui.Context, p palette) {
+func (m *Model) emptyResults(c *ui.Context, p kit.Palette) {
 	q := strings.TrimSpace(m.query)
 	switch {
 	case q != "":
@@ -190,27 +191,27 @@ func (m *Model) emptyResults(c *ui.Context, p palette) {
 	}
 }
 
-func empty(c *ui.Context, p palette, title string, children func()) {
+func empty(c *ui.Context, p kit.Palette, title string, children func()) {
 	ui.Column(c).Grow(1).Padding(24).Gap(12).Justify(ui.Center).Children(func() {
-		ui.Text(c, title).FontSize(24).TextColor(p.ink).Role(ui.RoleHeading)
+		ui.Text(c, title).Font(kit.DisplayFont).FontSize(24).TextColor(p.Ink).Role(ui.RoleHeading)
 		children()
 	})
 }
 
-func muted(c *ui.Context, p palette, text string) ui.Element {
-	return ui.Text(c, text).TextColor(p.muted)
+func muted(c *ui.Context, p kit.Palette, text string) ui.Element {
+	return ui.Text(c, text).TextColor(p.Muted)
 }
 
 // row shows a result: its icon, title, subtitle, and on the right a pin,
 // its kind while selected, and the key that runs it.
-func (m *Model) row(c *ui.Context, p palette, r core.Result, i int) {
+func (m *Model) row(c *ui.Context, p kit.Palette, r core.Result, i int) {
 	chosen := i == m.selected
 	row := ui.Row(c).Height(52).Padding(0, 12).Gap(12).AlignItems(ui.Center).Radius(10).
 		Role(ui.RoleOption).Label(r.Title).AccessSelected(chosen)
-	title := p.ink
+	title := p.Ink
 	if chosen {
-		row.Background(p.selected).Border(1, p.edge)
-		title = p.selectedInk
+		row.Background(p.Selected).Border(1, p.Edge)
+		title = p.SelectedInk
 	}
 	row.Children(func() {
 		m.icon(c, p, r)
@@ -220,15 +221,15 @@ func (m *Model) row(c *ui.Context, p palette, r core.Result, i int) {
 				t.FontWeight(600)
 			}
 			if r.Subtitle != "" {
-				ui.Text(c, r.Subtitle).FontSize(12).TextColor(p.muted).SingleLine()
+				ui.Text(c, r.Subtitle).FontSize(12).TextColor(p.Muted).SingleLine()
 			}
 		})
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			if r.Pinned {
-				ui.Icon(c, glyphs["pin"]).FontSize(13).TextColor(p.muted).Label("Pinned")
+				ui.Icon(c, glyphs["pin"]).FontSize(13).TextColor(p.Muted).Label("Pinned")
 			}
 			if chosen {
-				ui.Text(c, kinds[r.Kind].label).FontSize(12).TextColor(p.muted)
+				ui.Text(c, kinds[r.Kind].label).FontSize(12).TextColor(p.Muted)
 			}
 			if i < 9 {
 				keyCaps(c, p, modKey, strconv.Itoa(i+1))
@@ -248,7 +249,7 @@ func (m *Model) row(c *ui.Context, p palette, r core.Result, i int) {
 }
 
 // icon is a file's system icon, an emoji, a color swatch, or a glyph.
-func (m *Model) icon(c *ui.Context, p palette, r core.Result) {
+func (m *Model) icon(c *ui.Context, p kit.Palette, r core.Result) {
 	ui.Row(c).Size(32, 32).Justify(ui.Center).AlignItems(ui.Center).Children(func() {
 		if r.Icon.File != "" {
 			if b := m.backend.FileIcon(r.Icon.File); b != nil {
@@ -260,14 +261,14 @@ func (m *Model) icon(c *ui.Context, p palette, r core.Result) {
 		case r.Icon.Emoji != "":
 			ui.Text(c, r.Icon.Emoji).FontSize(26)
 		case r.Icon.Color != "":
-			ui.Box(c).Size(24, 24).Radius(6).Background(ui.Hex(r.Icon.Color)).Border(1, p.border)
+			ui.Box(c).Size(24, 24).Radius(6).Background(ui.Hex(r.Icon.Color)).Border(1, p.Border)
 		default:
 			name := string(r.Icon.Symbol)
 			if glyphs[name] == nil {
 				name = kinds[r.Kind].glyph
 			}
 			if svg := glyphs[name]; svg != nil {
-				ui.Icon(c, svg).FontSize(19).TextColor(p.muted)
+				ui.Icon(c, svg).FontSize(19).TextColor(p.Muted)
 			}
 		}
 	})
@@ -275,12 +276,12 @@ func (m *Model) icon(c *ui.Context, p palette, r core.Result) {
 
 // footer shows what Enter runs and the Actions button, which it returns:
 // a press on it must toggle the menu, not close it as a press outside.
-func (m *Model) footer(c *ui.Context, p palette) ui.Element {
+func (m *Model) footer(c *ui.Context, p kit.Palette) ui.Element {
 	var actions ui.Element
-	ui.Row(c).Height(40).Padding(0, 16).Gap(12).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.rule).Children(func() {
+	ui.Row(c).Height(40).Padding(0, 16).Gap(12).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.Rule).Children(func() {
 		if r, ok := m.selectedRow(); ok && len(r.Actions) > 0 {
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, r.Actions[0].Label).FontSize(12).TextColor(p.ink)
+				ui.Text(c, r.Actions[0].Label).FontSize(12).TextColor(p.Ink)
 				keyCaps(c, p, "↩")
 			})
 		}
@@ -302,14 +303,14 @@ func (m *Model) footer(c *ui.Context, p palette) ui.Element {
 	return actions
 }
 
-func footerButton(c *ui.Context, p palette, label string, keys []string) ui.Element {
+func footerButton(c *ui.Context, p kit.Palette, label string, keys []string) ui.Element {
 	b := ui.ButtonBase(c).Padding(4, 8).Radius(6).Label(label)
 	if b.Hovered() {
-		b.Background(p.hover)
+		b.Background(p.Hover)
 	}
 	return b.Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(p.muted)
+			ui.Text(c, label).FontSize(12).FontWeight(600).TextColor(p.Muted)
 			if keys != nil {
 				keyCaps(c, p, keys...)
 			}
@@ -318,10 +319,10 @@ func footerButton(c *ui.Context, p palette, label string, keys []string) ui.Elem
 }
 
 // keyCaps shows the keys of a shortcut, such as ⌘ K.
-func keyCaps(c *ui.Context, p palette, keys ...string) {
+func keyCaps(c *ui.Context, p kit.Palette, keys ...string) {
 	ui.Row(c).Gap(3).Children(func() {
 		for _, k := range keys {
-			ui.Text(c, k).FontSize(11).Padding(0, 5).Radius(4).Border(1, p.border).TextColor(p.muted)
+			ui.Text(c, k).FontSize(11).Padding(0, 5).Radius(4).Border(1, p.Border).TextColor(p.Muted)
 		}
 	})
 }

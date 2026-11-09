@@ -26,6 +26,7 @@ import (
 	"github.com/jewei/tinydash/internal/search"
 	"github.com/jewei/tinydash/internal/settings"
 	"github.com/jewei/tinydash/internal/store"
+	"github.com/jewei/tinydash/internal/ui/kit"
 	"github.com/jewei/tinydash/internal/ui/launcher"
 )
 
@@ -125,6 +126,10 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	a.rebuild(a.apps)
 	a.rebuild(a.files)
 
+	// Without its fonts, text falls back to the system's, which still reads.
+	if err := kit.RegisterFonts(); err != nil {
+		slog.Warn("fonts", "error", err)
+	}
 	a.model = launcher.New((*backend)(a))
 	a.panel = mygo.NewWindow(mygo.WindowOptions{
 		Title:         "TinyDash",

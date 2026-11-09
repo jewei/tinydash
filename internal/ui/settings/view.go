@@ -7,6 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
 	"github.com/jewei/tinydash/internal/settings"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 var categoryLabels = map[core.Category]string{
@@ -39,13 +40,13 @@ const (
 // ui.View(m.View).
 func (m *Model) View(c *ui.Context) {
 	v := m.values()
-	p := themed(c, v.Theme)
-	ui.Row(c).Fill().AlignItems(ui.Stretch).Background(p.paper).Children(func() {
+	p := kit.Themed(c, v.Theme)
+	ui.Row(c).Fill().AlignItems(ui.Stretch).Background(p.Paper).Children(func() {
 		m.sidebar(c, p)
 		ui.Scroll(c).Grow(1).Padding(24, 32).Gap(12).Children(func() {
-			ui.Text(c, string(m.section)).FontSize(24).FontWeight(700).TextColor(p.ink).Role(ui.RoleHeading)
+			ui.Text(c, string(m.section)).Font(kit.DisplayFont).FontSize(24).TextColor(p.Ink).Role(ui.RoleHeading)
 			if m.err != "" {
-				ui.Text(c, m.err).TextColor(p.danger).Role(ui.RoleAlert)
+				ui.Text(c, m.err).TextColor(p.Danger).Role(ui.RoleAlert)
 			}
 			switch m.section {
 			case general:
@@ -68,25 +69,25 @@ func (m *Model) View(c *ui.Context) {
 	}
 }
 
-func (m *Model) sidebar(c *ui.Context, p palette) {
-	ui.Column(c).Width(180).Padding(16, 8).Gap(2).Background(p.field).Role(ui.RoleNavigation).Label("Settings sections").Children(func() {
+func (m *Model) sidebar(c *ui.Context, p kit.Palette) {
+	ui.Column(c).Width(180).Padding(16, 8).Gap(2).Background(p.Field).Role(ui.RoleNavigation).Label("Settings sections").Children(func() {
 		for _, s := range sections {
 			chosen := s == m.section
 			b := ui.ButtonBase(c).Padding(6, 12).Radius(6).Justify(ui.Start).Label(string(s))
-			ink, weight := p.ink, 400
+			ink, weight := p.Ink, 400
 			switch {
 			case chosen:
-				b.Background(p.selected).Current(ui.CurrentPage)
-				ink, weight = p.selectedInk, 600
+				b.Background(p.Selected).Current(ui.CurrentPage)
+				ink, weight = p.SelectedInk, 600
 			case b.Hovered():
-				b.Background(p.hover)
+				b.Background(p.Hover)
 			}
 			b.Children(func() { ui.Text(c, string(s)).TextColor(ink).FontWeight(weight) }).OnClick(func() { m.open(s) })
 		}
 	})
 }
 
-func (m *Model) general(c *ui.Context, p palette, v settings.Settings) {
+func (m *Model) general(c *ui.Context, p kit.Palette, v settings.Settings) {
 	row(c, p, "Launcher shortcut", "Shows or hides TinyDash from any app.", func() { m.recorderView(c, p, v.Shortcut) })
 	m.choice(c, p, "Appearance", "", themes, string(v.Theme), func(s *settings.Settings, value string) { s.Theme = settings.Theme(value) })
 	m.toggle(c, p, "Hide when another app is focused", "", v.HideOnBlur, func(s *settings.Settings, on bool) { s.HideOnBlur = on })
@@ -107,7 +108,7 @@ func (m *Model) general(c *ui.Context, p palette, v settings.Settings) {
 	})
 }
 
-func (m *Model) widgets(c *ui.Context, p palette, v settings.Settings) {
+func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
 	intro(c, p, "Widgets show next to the results of an empty All search.")
 	m.toggle(c, p, "Clocks", "Local time and up to three cities.", v.ShowClocks, func(s *settings.Settings, on bool) { s.ShowClocks = on })
 	m.toggle(c, p, "Disk space", "Free space on the disk of your home folder.", v.ShowDiskSpace, func(s *settings.Settings, on bool) { s.ShowDiskSpace = on })
@@ -116,7 +117,7 @@ func (m *Model) widgets(c *ui.Context, p palette, v settings.Settings) {
 		func(s *settings.Settings) *[]string { return &s.ClockCities })
 }
 
-func (m *Model) clipboard(c *ui.Context, p palette, v settings.Settings) {
+func (m *Model) clipboard(c *ui.Context, p kit.Palette, v settings.Settings) {
 	m.toggle(c, p, "Save clipboard history", "Kept on this computer, unencrypted. Copies marked secret, such as passwords, are skipped.",
 		v.ClipboardHistoryEnabled, func(s *settings.Settings, on bool) { s.ClipboardHistoryEnabled = on })
 	m.number(c, p, &m.limit, "Entries to keep", "Pinned entries do not count.", int(v.ClipboardHistoryLimit), 1, settings.ClipboardLimitMax,
@@ -132,7 +133,7 @@ func (m *Model) clipboard(c *ui.Context, p palette, v settings.Settings) {
 	})
 }
 
-func (m *Model) search(c *ui.Context, p palette, v settings.Settings) {
+func (m *Model) search(c *ui.Context, p kit.Palette, v settings.Settings) {
 	m.choice(c, p, "Web search", "Used for the web search at the end of All results.", engines, string(v.SearchEngine),
 		func(s *settings.Settings, value string) { s.SearchEngine = settings.SearchEngine(value) })
 	m.toggle(c, p, "Currency rates", "Off until you turn it on. Downloads the daily ECB rate table; your amounts stay on this computer. Turning it off deletes the saved rates.",
@@ -188,31 +189,31 @@ func (m *Model) search(c *ui.Context, p palette, v settings.Settings) {
 // row is one labeled setting: text on the left, its control on the right.
 // The row is a group named and described by its text, so a screen reader
 // reads the description with the control.
-func row(c *ui.Context, p palette, label, description string, control func()) {
-	g := ui.Row(c).Gap(16).Padding(8, 0).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.rule).Role(ui.RoleGroup).Label(label)
+func row(c *ui.Context, p kit.Palette, label, description string, control func()) {
+	g := ui.Row(c).Gap(16).Padding(8, 0).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule).Role(ui.RoleGroup).Label(label)
 	if description != "" {
 		g.Description(description)
 	}
 	g.Children(func() {
 		ui.Column(c).Grow(1).Shrink(1).Gap(2).Children(func() {
-			ui.Text(c, label).TextColor(p.ink).AccessHidden(true)
+			ui.Text(c, label).TextColor(p.Ink).AccessHidden(true)
 			if description != "" {
-				ui.Text(c, description).FontSize(12).TextColor(p.muted).AccessHidden(true)
+				ui.Text(c, description).FontSize(12).TextColor(p.Muted).AccessHidden(true)
 			}
 		})
 		control()
 	})
 }
 
-func heading(c *ui.Context, p palette, text string) {
-	ui.Text(c, text).FontSize(17).FontWeight(600).TextColor(p.ink).Margin(12, 0, 0, 0).Role(ui.RoleHeading)
+func heading(c *ui.Context, p kit.Palette, text string) {
+	ui.Text(c, text).FontSize(17).FontWeight(600).TextColor(p.Ink).Margin(12, 0, 0, 0).Role(ui.RoleHeading)
 }
 
-func intro(c *ui.Context, p palette, text string) {
-	ui.Text(c, text).TextColor(p.muted)
+func intro(c *ui.Context, p kit.Palette, text string) {
+	ui.Text(c, text).TextColor(p.Muted)
 }
 
-func (m *Model) toggle(c *ui.Context, p palette, label, description string, value bool, set func(*settings.Settings, bool)) {
+func (m *Model) toggle(c *ui.Context, p kit.Palette, label, description string, value bool, set func(*settings.Settings, bool)) {
 	row(c, p, label, description, func() {
 		on := value
 		if ui.Switch(c, &on).Label(label).Changed() {
@@ -221,7 +222,7 @@ func (m *Model) toggle(c *ui.Context, p palette, label, description string, valu
 	})
 }
 
-func (m *Model) choice(c *ui.Context, p palette, label, description string, options []option, value string, set func(*settings.Settings, string)) {
+func (m *Model) choice(c *ui.Context, p kit.Palette, label, description string, options []option, value string, set func(*settings.Settings, string)) {
 	row(c, p, label, description, func() {
 		labels := make([]string, len(options))
 		chosen := ""
@@ -242,7 +243,7 @@ func (m *Model) choice(c *ui.Context, p palette, label, description string, opti
 	})
 }
 
-func (m *Model) number(c *ui.Context, p palette, f *numberField, label, description string, value, lo, hi int, set func(*settings.Settings, int)) {
+func (m *Model) number(c *ui.Context, p kit.Palette, f *numberField, label, description string, value, lo, hi int, set func(*settings.Settings, int)) {
 	if !f.editing {
 		f.draft = strconv.Itoa(value)
 	}
@@ -266,17 +267,17 @@ func (m *Model) number(c *ui.Context, p palette, f *numberField, label, descript
 
 // recorderView is the launcher shortcut: a click, Enter, or Space records
 // the next keys pressed, and Escape, another click, or leaving it stops.
-func (m *Model) recorderView(c *ui.Context, p palette, shortcut string) {
+func (m *Model) recorderView(c *ui.Context, p kit.Palette, shortcut string) {
 	const label = "Launcher shortcut"
-	keys := displayKeys(shortcut, m.mac, superName)
+	keys := kit.DisplayKeys(shortcut, m.mac, kit.SuperName)
 	name := label + ": " + strings.Join(keys, " ")
-	edge := p.border
+	edge := p.Border
 	if m.recording {
 		name = label + ": press the new keys, or Escape to cancel"
-		edge = p.accent
+		edge = p.Accent
 	}
 	rec := ui.Row(c).Bind(&m.recorder).Focusable().MinWidth(160).Height(32).Padding(0, 12).Radius(6).
-		Border(1, edge).Background(p.field).Justify(ui.Center).AlignItems(ui.Center).
+		Border(1, edge).Background(p.Field).Justify(ui.Center).AlignItems(ui.Center).
 		Role(ui.RoleButton).Label(name)
 	rec.HandleInput(func(ev ui.InputEvent) bool {
 		if ev.Kind != ui.InputKeyDown {
@@ -286,7 +287,7 @@ func (m *Model) recorderView(c *ui.Context, p palette, shortcut string) {
 		case m.recording && ev.Key == ui.KeyEscape:
 			m.stopRecording("")
 		case m.recording:
-			if keys := accelerator(ev, m.mac); keys != "" {
+			if keys := kit.Accelerator(ev, m.mac); keys != "" {
 				m.stopRecording(keys)
 			}
 		case ev.Key == ui.KeyEnter || ev.Key == ui.KeySpace:
@@ -312,7 +313,7 @@ func (m *Model) recorderView(c *ui.Context, p palette, shortcut string) {
 	m.recorderFocused = focused
 	rec.Children(func() {
 		if m.recording {
-			ui.Text(c, "Press keys…").TextColor(p.ink)
+			ui.Text(c, "Press keys…").TextColor(p.Ink)
 			return
 		}
 		keyCaps(c, p, keys...)
@@ -320,10 +321,10 @@ func (m *Model) recorderView(c *ui.Context, p palette, shortcut string) {
 }
 
 // keyCaps shows the keys of a shortcut, such as ⌃ ⇧ Space.
-func keyCaps(c *ui.Context, p palette, keys ...string) {
+func keyCaps(c *ui.Context, p kit.Palette, keys ...string) {
 	ui.Row(c).Gap(3).Children(func() {
 		for _, k := range keys {
-			ui.Text(c, k).FontSize(12).Padding(0, 5).Radius(4).Border(1, p.border).TextColor(p.muted)
+			ui.Text(c, k).FontSize(12).Padding(0, 5).Radius(4).Border(1, p.Border).TextColor(p.Muted)
 		}
 	})
 }
@@ -331,17 +332,17 @@ func keyCaps(c *ui.Context, p palette, keys ...string) {
 // listView shows a list of text with Remove on each entry, and a field and
 // Add below it. A failure shows next to the field: the page's error line
 // may be scrolled out of view.
-func (m *Model) listView(c *ui.Context, p palette, l *listEditor, label, placeholder string, items []string, limit int, ignoreCase bool, get func(*settings.Settings) *[]string) {
+func (m *Model) listView(c *ui.Context, p kit.Palette, l *listEditor, label, placeholder string, items []string, limit int, ignoreCase bool, get func(*settings.Settings) *[]string) {
 	full := len(items) >= limit
 	add := func() { m.addTo(l, items, limit, ignoreCase, get) }
 	ui.Column(c).Gap(6).Children(func() {
 		ui.Column(c).Role(ui.RoleList).Label(label).Children(func() {
 			if len(items) == 0 {
-				ui.Text(c, "None").TextColor(p.muted)
+				ui.Text(c, "None").TextColor(p.Muted)
 			}
 			for _, item := range items {
 				ui.Row(c).Key(item).Gap(8).Padding(4, 0).AlignItems(ui.Center).Role(ui.RoleListItem).Children(func() {
-					ui.Text(c, item).TextColor(p.ink).Grow(1)
+					ui.Text(c, item).TextColor(p.Ink).Grow(1)
 					linkButton(c, p, "Remove", "Remove "+item).OnClick(func() { m.removeFrom(l, item, get) })
 				})
 			}
@@ -365,35 +366,35 @@ func (m *Model) listView(c *ui.Context, p palette, l *listEditor, label, placeho
 			status = "The list is full (" + strconv.Itoa(limit) + "). Remove one to add another."
 		}
 		if status != "" {
-			ui.Text(c, status).FontSize(12).TextColor(p.muted).Role(ui.RoleStatus)
+			ui.Text(c, status).FontSize(12).TextColor(p.Muted).Role(ui.RoleStatus)
 		}
 	})
 }
 
-func linkButton(c *ui.Context, p palette, text, label string) ui.Element {
+func linkButton(c *ui.Context, p kit.Palette, text, label string) ui.Element {
 	b := ui.ButtonBase(c).Padding(2, 6).Radius(4).Label(label)
 	if b.Hovered() {
-		b.Background(p.hover)
+		b.Background(p.Hover)
 	}
-	return b.Children(func() { ui.Text(c, text).TextColor(p.accent) })
+	return b.Children(func() { ui.Text(c, text).TextColor(p.Accent) })
 }
 
 // tabsView lists the launcher's tabs after All: show or hide each one, keep
 // its results in or out of All, and move it. Rows are keyed by category,
 // so a button keeps the focus as its row moves; at the top or bottom, the
 // focus goes to the other move button.
-func (m *Model) tabsView(c *ui.Context, p palette, tabs []settings.Tab) {
+func (m *Model) tabsView(c *ui.Context, p kit.Palette, tabs []settings.Tab) {
 	moved := m.moved
 	m.moved = nil
 	ui.Column(c).Role(ui.RoleList).Label("Tabs, in order").Children(func() {
 		ui.Row(c).Gap(8).Padding(6, 0).Role(ui.RoleListItem).Children(func() {
-			ui.Text(c, categoryLabels[core.CategoryAll]).TextColor(p.ink).Grow(1)
-			ui.Text(c, "Always shown, always first").TextColor(p.muted)
+			ui.Text(c, categoryLabels[core.CategoryAll]).TextColor(p.Ink).Grow(1)
+			ui.Text(c, "Always shown, always first").TextColor(p.Muted)
 		})
 		for i, tab := range tabs {
 			name := categoryLabels[tab.Category]
 			ui.Row(c).Key(tab.Category).Gap(8).Padding(6, 0).AlignItems(ui.Center).Role(ui.RoleListItem).Children(func() {
-				ui.Text(c, name).TextColor(p.ink).Grow(1)
+				ui.Text(c, name).TextColor(p.Ink).Grow(1)
 				first, last := i == 0, i == len(tabs)-1
 				up := linkButton(c, p, "↑", "Move "+name+" up").Disabled(first).OnClick(func() { m.moveTab(tab.Category, true) })
 				down := linkButton(c, p, "↓", "Move "+name+" down").Disabled(last).OnClick(func() { m.moveTab(tab.Category, false) })
@@ -408,11 +409,11 @@ func (m *Model) tabsView(c *ui.Context, p palette, tabs []settings.Tab) {
 				if ui.Switch(c, &shown).Label("Show " + name).Changed() {
 					m.setTab(tab.Category, true, shown)
 				}
-				ui.Text(c, "Show").FontSize(12).TextColor(p.muted)
+				ui.Text(c, "Show").FontSize(12).TextColor(p.Muted)
 				if ui.Switch(c, &inAll).Label(name + " in All").Changed() {
 					m.setTab(tab.Category, false, inAll)
 				}
-				ui.Text(c, "In All").FontSize(12).TextColor(p.muted)
+				ui.Text(c, "In All").FontSize(12).TextColor(p.Muted)
 			})
 		}
 	})
@@ -421,19 +422,19 @@ func (m *Model) tabsView(c *ui.Context, p palette, tabs []settings.Tab) {
 // hiddenView lists the hidden results with Show Again. After Show Again,
 // the row now in its place, or the list when it is empty, takes the focus,
 // so keyboard users keep their place.
-func (m *Model) hiddenView(c *ui.Context, p palette) {
+func (m *Model) hiddenView(c *ui.Context, p kit.Palette) {
 	focus := m.hiddenFocus
 	m.hiddenFocus = -1
 	list := ui.Column(c).Role(ui.RoleList).Label("Hidden results")
 	list.Children(func() {
 		if len(m.hidden) == 0 {
-			ui.Text(c, "None. To hide one, choose Hide from Results in its actions ("+modKeys[m.mac]+" K).").TextColor(p.muted)
+			ui.Text(c, "None. To hide one, choose Hide from Results in its actions ("+modKeys[m.mac]+" K).").TextColor(p.Muted)
 		}
 		for i, r := range m.hidden {
 			ui.Row(c).Key(r.ID).Gap(8).Padding(4, 0).AlignItems(ui.Center).Role(ui.RoleListItem).Children(func() {
 				ui.Column(c).Grow(1).Children(func() {
-					ui.Text(c, r.Title).TextColor(p.ink)
-					ui.Text(c, r.Subtitle).FontSize(12).TextColor(p.muted)
+					ui.Text(c, r.Title).TextColor(p.Ink)
+					ui.Text(c, r.Subtitle).FontSize(12).TextColor(p.Muted)
 				})
 				b := linkButton(c, p, "Show Again", "Show "+r.Title+" again").OnClick(func() { m.showAgain(r.ID, i) })
 				if focus >= 0 && i == min(focus, len(m.hidden)-1) {
@@ -446,23 +447,23 @@ func (m *Model) hiddenView(c *ui.Context, p palette) {
 		list.Focusable().Focus()
 	}
 	if m.hiddenErr != "" {
-		ui.Text(c, m.hiddenErr).FontSize(12).TextColor(p.danger).Role(ui.RoleStatus)
+		ui.Text(c, m.hiddenErr).FontSize(12).TextColor(p.Danger).Role(ui.RoleStatus)
 	}
 }
 
-func (m *Model) clearDialog(c *ui.Context, p palette) {
+func (m *Model) clearDialog(c *ui.Context, p kit.Palette) {
 	ui.Overlay(c, func() {
 		back := ui.Column(c).Absolute().Left(0).Top(0).Right(0).Bottom(0).
-			Background(p.backdrop).Justify(ui.Center).AlignItems(ui.Center).Modal()
+			Background(p.Backdrop).Justify(ui.Center).AlignItems(ui.Center).Modal()
 		back.Children(func() {
-			panel := ui.Column(c).Width(360).Padding(24).Gap(16).Radius(10).Border(1, p.border).
-				Background(p.paper).Shadow(0, 12, 40, 0, p.shadow).Role(ui.RoleAlertDialog).Label("Confirm")
+			panel := ui.Column(c).Width(360).Padding(24).Gap(16).Radius(10).Border(1, p.Border).
+				Background(p.Paper).Shadow(0, 12, 40, 0, p.Shadow).Role(ui.RoleAlertDialog).Label("Confirm")
 			panel.Children(func() {
-				ui.Text(c, "Delete all clipboard history except pinned entries?").TextColor(p.ink)
+				ui.Text(c, "Delete all clipboard history except pinned entries?").TextColor(p.Ink)
 				ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
 					// Cancel comes first, so it has the focus and Enter is safe.
 					ui.Button(c, "Cancel").AutoFocus().OnClick(m.closeClear)
-					ui.Button(c, "Clear History").Background(p.danger).TextColor(p.dangerInk).OnClick(m.clearHistory)
+					ui.Button(c, "Clear History").Background(p.Danger).TextColor(p.DangerInk).OnClick(m.clearHistory)
 				})
 			})
 			if panel.PressedOutside() {
@@ -480,7 +481,7 @@ var libraryHelp = map[bool]string{
 	true:  "Opens an http, https, or mailto URL, or an absolute or ~ path. {query} is replaced by text typed after the keyword, as in “jira ABC-12”. Also: {clipboard}, {date}, {time}, and {datetime}.",
 }
 
-func (m *Model) libraryView(c *ui.Context, p palette, ed *libraryEditor) {
+func (m *Model) libraryView(c *ui.Context, p kit.Palette, ed *libraryEditor) {
 	focus := ed.focus
 	ed.focus = focusNone
 	ui.Row(c).Gap(24).AlignItems(ui.Start).Children(func() {
@@ -489,7 +490,7 @@ func (m *Model) libraryView(c *ui.Context, p palette, ed *libraryEditor) {
 			items := ed.items()
 			ui.Column(c).Gap(2).Role(ui.RoleList).Label(ed.noun() + "s").Children(func() {
 				if len(items) == 0 {
-					ui.Text(c, "No "+strings.ToLower(ed.noun())+"s yet").TextColor(p.muted)
+					ui.Text(c, "No "+strings.ToLower(ed.noun())+"s yet").TextColor(p.Muted)
 				}
 				for _, it := range items {
 					name := it.Name
@@ -498,15 +499,15 @@ func (m *Model) libraryView(c *ui.Context, p palette, ed *libraryEditor) {
 					}
 					b := ui.ButtonBase(c).Key(it.ID).Padding(6, 8).Radius(6).Justify(ui.Start).Label(name)
 					if it.ID == ed.draft.ID {
-						b.Background(p.selected).Current(ui.CurrentPage)
+						b.Background(p.Selected).Current(ui.CurrentPage)
 					} else if b.Hovered() {
-						b.Background(p.hover)
+						b.Background(p.Hover)
 					}
 					b.Children(func() {
 						ui.Row(c).Gap(8).Children(func() {
-							ui.Text(c, it.Name).TextColor(p.ink).Grow(1).SingleLine()
+							ui.Text(c, it.Name).TextColor(p.Ink).Grow(1).SingleLine()
 							if it.Keyword != "" {
-								ui.Text(c, it.Keyword).FontSize(12).TextColor(p.muted)
+								ui.Text(c, it.Keyword).FontSize(12).TextColor(p.Muted)
 							}
 						})
 					}).OnClick(func() { ed.edit(it) })
@@ -519,34 +520,34 @@ func (m *Model) libraryView(c *ui.Context, p palette, ed *libraryEditor) {
 
 // libraryForm edits the open item. It sets no length limits: the backend
 // counts characters, as the user does, and says what is too long.
-func (m *Model) libraryForm(c *ui.Context, p palette, ed *libraryEditor, focus libraryFocus) {
-	ui.Text(c, "Name").TextColor(p.ink).AccessHidden(true)
+func (m *Model) libraryForm(c *ui.Context, p kit.Palette, ed *libraryEditor, focus libraryFocus) {
+	ui.Text(c, "Name").TextColor(p.Ink).AccessHidden(true)
 	name := ui.TextInput(c, &ed.draft.Name).Label("Name")
 	if focus == focusName {
 		name.Focus()
 	}
-	ui.Text(c, "Keyword (optional, one word)").TextColor(p.ink).AccessHidden(true)
+	ui.Text(c, "Keyword (optional, one word)").TextColor(p.Ink).AccessHidden(true)
 	ui.TextInput(c, &ed.draft.Keyword).Label("Keyword")
 	if ed.quicklink {
-		ui.Text(c, "URL or path").TextColor(p.ink).AccessHidden(true)
+		ui.Text(c, "URL or path").TextColor(p.Ink).AccessHidden(true)
 		ui.TextInput(c, &ed.draft.Text).Label("URL or path").Placeholder("https://example.com/search?q={query}")
 	} else {
-		ui.Text(c, "Text").TextColor(p.ink).AccessHidden(true)
+		ui.Text(c, "Text").TextColor(p.Ink).AccessHidden(true)
 		ui.TextArea(c, &ed.draft.Text).Label("Text").Height(160)
 	}
-	ui.Text(c, libraryHelp[ed.quicklink]).FontSize(12).TextColor(p.muted)
+	ui.Text(c, libraryHelp[ed.quicklink]).FontSize(12).TextColor(p.Muted)
 	if ed.err != "" {
-		ui.Text(c, ed.err).TextColor(p.danger).Role(ui.RoleAlert)
+		ui.Text(c, ed.err).TextColor(p.Danger).Role(ui.RoleAlert)
 	}
 	ui.Row(c).Gap(8).Justify(ui.End).AlignItems(ui.Center).Children(func() {
 		if ed.draft.ID != 0 {
 			if ed.confirming {
-				question := ui.Text(c, "Delete “"+ed.savedName()+"”?").TextColor(p.ink)
+				question := ui.Text(c, "Delete “"+ed.savedName()+"”?").TextColor(p.Ink)
 				keep := ui.Button(c, "Keep").DescribedBy(question).OnClick(ed.keep)
 				if focus == focusKeep {
 					keep.Focus()
 				}
-				ui.Button(c, "Delete").Label("Delete").Background(p.danger).TextColor(p.dangerInk).OnClick(ed.remove)
+				ui.Button(c, "Delete").Label("Delete").Background(p.Danger).TextColor(p.DangerInk).OnClick(ed.remove)
 			} else {
 				del := ui.Button(c, "Delete").OnClick(ed.askDelete)
 				if focus == focusDelete {

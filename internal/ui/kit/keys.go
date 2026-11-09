@@ -1,8 +1,4 @@
-package settings
-
-// The recorder reads keys as the launcher's hotkey dialog does: this file
-// matches internal/ui/launcher/hotkey.go. The import rules keep one view
-// package out of another, so each has its copy.
+package kit
 
 import (
 	"strings"
@@ -57,14 +53,14 @@ var platformCodes = map[bool]map[ui.KeyCode]string{
 		ui.CodeF21: "F21", ui.CodeF22: "F22", ui.CodeF23: "F23", ui.CodeF24: "F24"},
 }
 
-// accelerator is a hotkey in Tauri accelerator syntax, such as
+// Accelerator is a hotkey in Tauri accelerator syntax, such as
 // "Control+Alt+K", or "" for a press that is not one: a lone modifier, a
 // key no OS registers the same way, or keys without Control, Alt, or
 // Super, which would block typing. Function keys and Shift+Space need no
 // modifier. macOS registers keys by position, so onMac reads letters and
 // digits where a US keyboard has them; Windows and X11 by what the layout
 // types. A key held with AltGr comes as no Key, so it is never a hotkey.
-func accelerator(ev ui.InputEvent, onMac bool) string {
+func Accelerator(ev ui.InputEvent, onMac bool) string {
 	key := ev.Key
 	// PhysicalKey is unknown where the platform does not report it.
 	if onMac && ev.PhysicalKey != ui.KeyUnknown {
@@ -134,9 +130,9 @@ var otherNames = map[string]string{
 	"Up": "↑", "Down": "↓", "Left": "←", "Right": "→",
 }
 
-// displayKeys are an accelerator's keys as the desktop names them, such as
+// DisplayKeys are an accelerator's keys as the desktop names them, such as
 // ⌃ ⇧ Space on macOS and Ctrl Shift Space elsewhere.
-func displayKeys(accelerator string, onMac bool, superKey string) []string {
+func DisplayKeys(accelerator string, onMac bool, superKey string) []string {
 	var out []string
 	for _, part := range strings.Split(accelerator, "+") {
 		switch {

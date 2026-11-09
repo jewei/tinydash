@@ -42,7 +42,10 @@ var layers = []struct {
 	{"internal/store", []string{"internal/core", "internal/feature/"}},
 	{"internal/platform", []string{"internal/core"}},
 	{"internal/engine", []string{"internal/core", "internal/match", "internal/feature/", "internal/search", "internal/settings", "internal/store"}},
-	{"internal/ui/", []string{"internal/core", "internal/search", "internal/settings", "internal/engine"}},
+	// The kit holds what both views draw the same way; it comes before
+	// "internal/ui/" because the first matching layer wins.
+	{"internal/ui/kit", []string{"internal/core", "internal/settings"}},
+	{"internal/ui/", []string{"internal/core", "internal/search", "internal/settings", "internal/engine", "internal/ui/kit"}},
 	{"internal/app", []string{"internal/"}},
 	{"tools/emojigen", nil}, // regenerates emoji data from the Rust app's sources
 }

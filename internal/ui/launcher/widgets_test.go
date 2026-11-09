@@ -9,6 +9,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
 	"github.com/jewei/tinydash/internal/settings"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 // showLauncher starts a launcher over f and shows it, as the app does, which
@@ -221,10 +222,10 @@ func TestFollowsTheAppearanceSetting(t *testing.T) {
 		desktopDark bool
 		want        ui.Color
 	}{
-		{settings.ThemeSystem, false, light.paper},
-		{settings.ThemeSystem, true, dark.paper},
-		{settings.ThemeLight, true, light.paper},
-		{settings.ThemeDark, false, dark.paper},
+		{settings.ThemeSystem, false, kit.Light.Paper},
+		{settings.ThemeSystem, true, kit.Dark.Paper},
+		{settings.ThemeLight, true, kit.Light.Paper},
+		{settings.ThemeDark, false, kit.Dark.Paper},
 	} {
 		f := newFake(always())
 		f.settings.Theme = c.theme

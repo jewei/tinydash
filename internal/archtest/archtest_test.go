@@ -50,6 +50,9 @@ func TestEachRuleCanFail(t *testing.T) {
 		{"new dependency", Package{Path: module + "/internal/engine", Imports: []string{"github.com/some/lib"}}, "not in archtest.external"},
 		{"sqlite outside store", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/sqlite"}}, "only [internal/store] may"},
 		{"automation outside app", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/automation"}}, "only [internal/app] may"},
+		{"views import each other", Package{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/launcher"}}, "imports internal/ui/launcher"},
+		{"kit imports a view", Package{Path: module + "/internal/ui/kit", Imports: []string{module + "/internal/ui/launcher"}}, "imports internal/ui/launcher"},
+		{"kit imports the engine", Package{Path: module + "/internal/ui/kit", Imports: []string{module + "/internal/engine"}}, "imports internal/engine"},
 		{"view imports the mygo root", Package{Path: module + "/internal/ui/launcher", Imports: []string{"github.com/egoist/mygo"}}, "only [internal/app internal/platform] may"},
 		{"OS file name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_darwin.go": []byte("package engine\n")}}, "OS-specific file"},
 		{"OS build tag", Package{Path: module + "/internal/engine", Files: file("//go:build cgo || windows\n\npackage engine\n")}, "OS build tag"},
@@ -66,6 +69,8 @@ func TestEachRuleCanFail(t *testing.T) {
 	ok := []Package{
 		{Path: module + "/internal/feature/calc", Imports: []string{"strings", module + "/internal/core", module + "/internal/match"}, Files: file("package calc\n\nimport \"time\"\n\nvar d = time.Hour\n")},
 		{Path: module + "/internal/platform", Imports: []string{"github.com/ebitengine/purego"}, Files: map[string][]byte{"clipboard_darwin.go": []byte("//go:build darwin\n\npackage platform\n")}},
+		{Path: module + "/internal/ui/kit", Imports: []string{"github.com/egoist/mygo/ui", module + "/internal/core", module + "/internal/settings"}},
+		{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/kit"}},
 		{Path: module + "/internal/ui/launcher", Imports: []string{"github.com/egoist/mygo/ui"}, Files: map[string][]byte{"labels.go": []byte("package launcher\n\nimport \"runtime\"\n\nvar mac = runtime.GOOS == \"darwin\"\n")}},
 	}
 	if problems := Check(ok); len(problems) > 0 {
