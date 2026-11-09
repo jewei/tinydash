@@ -10,7 +10,6 @@ import (
 	"github.com/jewei/tinydash/internal/feature/apps"
 	"github.com/jewei/tinydash/internal/feature/clipboard"
 	"github.com/jewei/tinydash/internal/feature/currency"
-	"github.com/jewei/tinydash/internal/feature/emoji"
 	"github.com/jewei/tinydash/internal/feature/files"
 	"github.com/jewei/tinydash/internal/feature/library"
 	"github.com/jewei/tinydash/internal/search"
@@ -31,17 +30,13 @@ func Load(ctx context.Context, db *store.Store, s settings.Settings, home string
 		}
 		return err == nil
 	}
-	languages := make([]emoji.Language, len(s.EmojiLanguages))
-	for i, language := range s.EmojiLanguages {
-		languages[i] = emoji.Language(language)
-	}
 	snapshot := search.Snapshot{
 		Settings:  s,
 		Apps:      apps.NewIndex(nil),
 		Files:     files.Scan(nil, files.Options{}),
 		Clipboard: clipboard.NewHistory(nil),
 		Library:   library.NewIndex(nil),
-		Emoji:     emoji.NewIndex(languages...),
+		Emoji:     emojiIndex(s.EmojiLanguages),
 		Home:      home,
 		Random:    random,
 	}
