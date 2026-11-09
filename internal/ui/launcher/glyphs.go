@@ -34,6 +34,7 @@ var glyphs = func() map[string]*ui.SVG {
 		"search":                      `<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>`,
 		"pin":                         `<path d="M12 16v5M8 3h8l-1 6 3 3v2H6v-2l3-3z"/>`,
 		"warning":                     `<path d="M12 4l9 16H3zM12 10v4M12 17h.01"/>`,
+		"disk":                        `<rect x="3" y="12" width="18" height="8" rx="2"/><path d="M5 12l2.5-7h9L19 12M17 16h.01"/>`,
 	}
 	out := make(map[string]*ui.SVG, len(shapes))
 	for name, shape := range shapes {

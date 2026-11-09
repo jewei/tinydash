@@ -66,11 +66,15 @@ type App struct {
 	icons    iconCache
 	tray     *mygo.Tray
 	settings *settingsWindow
-	mu       sync.Mutex
-	builtAt  map[*engine.Slot]time.Time
+	// home is the user's home folder, whose disk the disk widget shows.
+	home string
+	// mu guards builtAt and warnings.
+	mu      sync.Mutex
+	builtAt map[*engine.Slot]time.Time
 	// blurHiddenAt is when blur last hid the panel; main thread only.
 	blurHiddenAt time.Time
-	warnings     []string
+	// warnings wait here until the launcher shows them.
+	warnings []string
 }
 
 // Start loads the user's data and starts TinyDash. Call it once mygo is
@@ -84,7 +88,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	if opts.DataDir != "" {
 		dirs.Config, dirs.Data = opts.DataDir, opts.DataDir
 	}
-	a := &App{ctx: ctx, builtAt: map[*engine.Slot]time.Time{}}
+	a := &App{ctx: ctx, home: dirs.Home, builtAt: map[*engine.Slot]time.Time{}}
 
 	s, warning, file := engine.LoadSettings(dirs.Config)
 	a.file = file
@@ -164,7 +168,9 @@ func (a *App) warn(message any) {
 		if m == "" {
 			return
 		}
+		a.mu.Lock()
 		a.warnings = append(a.warnings, m)
+		a.mu.Unlock()
 		slog.Warn(m)
 	case error:
 		if m != nil {
@@ -367,7 +373,7 @@ func (b *backend) Settings() launcher.ViewSettings {
 			tabs = append(tabs, tab.Category)
 		}
 	}
-	return launcher.ViewSettings{Tabs: tabs, ClipboardHistory: s.ClipboardHistoryEnabled, CurrencyRates: s.CurrencyRatesEnabled}
+	return launcher.ViewSettings{Tabs: tabs, ClipboardHistory: s.ClipboardHistoryEnabled, CurrencyRates: s.CurrencyRatesEnabled, Theme: s.Theme}
 }
 
 func (b *backend) FileIcon(path string) *ui.Bitmap { return b.app().icons.get(path, b.app().panel) }

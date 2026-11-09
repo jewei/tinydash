@@ -24,6 +24,14 @@ type Model struct {
 	notice string
 	// enableError is why clipboard history did not turn on.
 	enableError string
+	// warnings are problems found at startup that the user has not
+	// dismissed yet, oldest first.
+	warnings []string
+
+	// widgets is what the pane showed from the last load. widgetLoads
+	// counts loads, so a slow one that ends after a newer one is dropped.
+	widgets     Widgets
+	widgetLoads int
 
 	// history holds queries that ran a result, newest first, only while
 	// TinyDash runs: a query can hold private text, so it is never saved.
@@ -100,13 +108,49 @@ func (m *Model) Show(category core.Category) {
 	m.notice, m.enableError = "", ""
 	m.query, m.recalled = "", -1
 	m.category = category
+	m.warnings = append(m.warnings, m.backend.Warnings()...)
 	m.search(false)
+	m.loadWidgets()
 	m.input.Focus()
 }
 
 // Stale searches again after the data changed, keeping the selected
-// result.
-func (m *Model) Stale() { m.search(true) }
+// result, and loads the widgets again: a setting may have changed them.
+func (m *Model) Stale() {
+	m.search(true)
+	m.loadWidgets()
+}
+
+func (m *Model) loadWidgets() {
+	m.widgetLoads++
+	load := m.widgetLoads
+	m.backend.Widgets(func(w Widgets) {
+		if load == m.widgetLoads {
+			m.widgets = w
+		}
+	})
+}
+
+// showsWidgets reports whether the widget pane shows: on All with nothing
+// typed, while a widget is on.
+func (m *Model) showsWidgets() bool {
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil)
+}
+
+// warning is the startup warning on screen, or "". An action's failure
+// takes its place until the next edit.
+func (m *Model) warning() string {
+	if m.notice != "" || len(m.warnings) == 0 {
+		return ""
+	}
+	return m.warnings[0]
+}
+
+func (m *Model) dismissWarning() {
+	if m.warning() != "" {
+		m.warnings = m.warnings[1:]
+	}
+}
 
 // TypeQuery puts text in the search field, as a keyword row asks once the
 // engine checked it.
@@ -357,8 +401,9 @@ func (m *Model) enableClipboard() {
 	})
 }
 
-// escape closes what is on top: a dialog, then the menu; with nothing
-// open it hides the launcher with its query, as the Rust app did.
+// escape closes what is on top: a dialog, then the menu, then a startup
+// warning; with nothing left it hides the launcher with its query, as the
+// Rust app did.
 func (m *Model) escape() {
 	switch {
 	case m.confirm != nil:
@@ -371,6 +416,8 @@ func (m *Model) escape() {
 		m.closeHotkey()
 	case m.menu != nil:
 		m.closeMenu()
+	case m.warning() != "":
+		m.dismissWarning()
 	default:
 		m.backend.Hide()
 	}
