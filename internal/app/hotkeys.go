@@ -21,11 +21,19 @@ import (
 // would hold it while mygo waits on the main thread, and the main thread
 // would wait on it to pause the shortcuts for the hotkey recorder.
 type shortcuts struct {
+	// os registers keys with the OS: mygo.GlobalShortcut, or a fake in tests.
+	os       registry
 	launcher string // mygo accelerator, "" when none
 	toggle   func()
 	hotkeys  map[core.ID]string // result ID -> mygo accelerator
 	run      func(core.ID)
 	paused   bool
+}
+
+// registry is the part of mygo.GlobalShortcut that shortcuts uses.
+type registry interface {
+	Register(accelerator string, fn func()) error
+	Unregister(accelerator string)
 }
 
 var modifierBits = map[string]engine.Modifiers{
@@ -75,16 +83,23 @@ func (s *shortcuts) sync(wanted search.Hotkeys) map[core.ID]error {
 	}
 	for id, accelerator := range s.hotkeys {
 		if next[id] != accelerator && !s.paused {
-			mygo.GlobalShortcut.Unregister(accelerator)
+			s.os.Unregister(accelerator)
 		}
 	}
 	for id, accelerator := range next {
-		if s.hotkeys[id] == accelerator || s.paused {
+		if s.hotkeys[id] == accelerator {
 			continue
 		}
 		if err := s.register(id, accelerator); err != nil {
 			failed[id] = err
 			delete(next, id)
+			continue
+		}
+		// The launcher saves keys while the shortcuts pause to record
+		// them. Registering checked that another app does not hold them;
+		// they stay off until the pause ends.
+		if s.paused {
+			s.os.Unregister(accelerator)
 		}
 	}
 	s.hotkeys = next
@@ -92,7 +107,7 @@ func (s *shortcuts) sync(wanted search.Hotkeys) map[core.ID]error {
 }
 
 func (s *shortcuts) register(id core.ID, accelerator string) error {
-	if err := mygo.GlobalShortcut.Register(accelerator, func() { go s.run(id) }); err != nil {
+	if err := s.os.Register(accelerator, func() { go s.run(id) }); err != nil {
 		return registerError(accelerator, err)
 	}
 	return nil
@@ -115,17 +130,16 @@ func (s *shortcuts) SetLauncher(stored string) error {
 
 func (s *shortcuts) setLauncher(stored, accelerator string) error {
 	if s.launcher != "" && !s.paused {
-		mygo.GlobalShortcut.Unregister(s.launcher)
+		s.os.Unregister(s.launcher)
 	}
 	s.launcher = ""
-	if err := mygo.GlobalShortcut.Register(accelerator, s.toggle); err != nil {
+	if err := s.os.Register(accelerator, s.toggle); err != nil {
 		return registerError(stored, err)
 	}
 	// Settings saves a new shortcut while the shortcuts pause to record
-	// it. Registering checked that another app does not hold the keys;
-	// they stay off until the pause ends.
+	// it; registering checked it, as in sync.
 	if s.paused {
-		mygo.GlobalShortcut.Unregister(accelerator)
+		s.os.Unregister(accelerator)
 	}
 	s.launcher = accelerator
 	return nil
@@ -153,9 +167,9 @@ func (s *shortcuts) pause(paused bool) error {
 	var first error
 	for accelerator, fn := range all {
 		if paused {
-			mygo.GlobalShortcut.Unregister(accelerator)
-		} else if err := mygo.GlobalShortcut.Register(accelerator, fn); err != nil && first == nil {
-			first = err
+			s.os.Unregister(accelerator)
+		} else if err := s.os.Register(accelerator, fn); err != nil && first == nil {
+			first = registerError(accelerator, err)
 		}
 	}
 	return first

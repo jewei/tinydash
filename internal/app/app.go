@@ -89,7 +89,8 @@ type App struct {
 	// blurredAt is when the panel last lost focus; main thread only.
 	blurredAt time.Time
 	// movedAt is when the panel last moved, as in a drag, and dragStartedAt
-	// when a press on the tab bar or footer began one; main thread only.
+	// when a press on the tab bar or footer began one, or zero once it was
+	// let go of; main thread only.
 	movedAt, dragStartedAt time.Time
 	// placed is where TinyDash last put the panel, and dragSave saves
 	// where the user dragged it; main thread only.
@@ -115,7 +116,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	s, warning, file := engine.LoadSettings(dirs.Config)
 	a.file = file
 	a.warn(warning)
-	a.keys = &shortcuts{toggle: a.toggle, run: a.runHotkey}
+	a.keys = &shortcuts{os: mygo.GlobalShortcut, toggle: a.toggle, run: a.runHotkey}
 	a.warn(checkedAtStartup(&s, a.keys.Parse))
 	a.warn(legacyDataWarning(dirs.Config, dirs.Data))
 	db, warning, err := store.Open(ctx, dirs.Data, restrictToOwner)
@@ -132,18 +133,9 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	}
 
 	a.engine = engine.New(db, first, a.dataChanged)
-	go a.engine.Run(ctx)
 	a.desktop = &desktop{clip: NewClipboard(a.capture)}
 	a.actions = engine.NewActions(a.engine, a.desktop, (*appShell)(a), a.keys, time.Now)
 	a.more = a.newMoreFiles()
-	a.watchFolders()
-
-	a.apps = engine.NewSlot(a.engine.RebuildApps(installedApps))
-	a.files = engine.NewSlot(a.engine.RebuildFiles(a.fileDisk()))
-	go a.apps.Run(ctx)
-	go a.files.Run(ctx)
-	a.rebuild(a.apps)
-	a.rebuild(a.files)
 
 	// Without its fonts, text falls back to the system's, which still reads.
 	if err := kit.RegisterFonts(); err != nil {
@@ -174,6 +166,18 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 		a.panel.Hide()
 	})
 	a.hud = newHUD(a.panel)
+	a.icons.load, a.icons.loaded = loadFileIcon, func() { a.panel.Update(func() {}) }
+	// The writer and the slots tell the panel and the model about changes,
+	// so they start once both exist.
+	go a.engine.Run(ctx)
+	a.watchFolders()
+	a.apps = engine.NewSlot(a.engine.RebuildApps(installedApps))
+	a.files = engine.NewSlot(a.engine.RebuildFiles(a.fileDisk()))
+	go a.apps.Run(ctx)
+	go a.files.Run(ctx)
+	a.rebuild(a.apps)
+	a.rebuild(a.files)
+
 	a.panel.OnBlur(func() {
 		a.blurredAt = time.Now()
 		if a.engine.Snapshot(time.Now()).Settings.HideOnBlur {
@@ -181,6 +185,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 		}
 	})
 	a.panel.OnMove(a.panelMoved)
+	a.panel.OnHide(a.model.Hidden)
 
 	a.warn(a.keys.SetLauncher(s.Shortcut))
 	for id, err := range a.keys.Sync(first.Hotkeys) {
@@ -217,12 +222,10 @@ func (a *App) warn(message any) {
 // again, and Settings reads the data again.
 func (a *App) dataChanged() {
 	a.watchFolders()
-	if a.panel != nil {
-		a.panel.Update(func() {
-			a.model.Stale()
-			a.settingsChanged()
-		})
-	}
+	a.panel.Update(func() {
+		a.model.Stale()
+		a.settingsChanged()
+	})
 }
 
 func (a *App) toggle() {
@@ -343,11 +346,14 @@ const (
 )
 
 // dragLimit bounds how long a drag that reports no move holds off a hide.
+// Where the window manager moves the panel (X11), mygo reports the move
+// only as the drag ends, so a drag in progress has no other sign.
 const dragLimit = 10 * time.Second
 
 // blurOutcome decides a blur once blurGrace passed. A panel that has the
 // focus again stays. A drag that started and has not moved yet, or a panel
-// that moved within blurGrace, is still being dragged. Any other hides.
+// that moved within blurGrace, is still being dragged. Any other hides: a
+// press on a bar that was let go of (DragEnded) is no drag.
 func blurOutcome(focused bool, sinceMove, sinceDrag time.Duration, movedSinceDrag bool) blurStep {
 	switch {
 	case focused:
@@ -609,7 +615,7 @@ func (b *backend) Settings() launcher.ViewSettings {
 	return launcher.ViewSettings{Tabs: tabs, ClipboardHistory: s.ClipboardHistoryEnabled, CurrencyRates: s.CurrencyRatesEnabled, Theme: s.Theme}
 }
 
-func (b *backend) FileIcon(path string) *ui.Bitmap { return b.app().icons.get(path, b.app().panel) }
+func (b *backend) FileIcon(path string) *ui.Bitmap { return b.app().icons.get(path) }
 
 func (b *backend) PauseShortcuts(paused bool) error { return b.app().keys.Pause(paused) }
 
@@ -623,6 +629,8 @@ func (b *backend) EnableClipboardHistory(done func(error)) {
 func (b *backend) Hide() { b.app().panel.Hide() }
 
 func (b *backend) DragStarted() { b.app().dragStartedAt = time.Now() }
+
+func (b *backend) DragEnded() { b.app().dragStartedAt = time.Time{} }
 
 // appShell is what actions ask of TinyDash's own windows.
 type appShell App
@@ -683,14 +691,26 @@ func (s *appShell) TurnOnCurrencyRates() error {
 
 func (s *appShell) Quit() { mygo.App.Quit() }
 
-// iconCache loads file icons off the main thread and keeps them by path.
+// maxFileIcons bounds the file icons kept: a 64-pixel icon takes 16 KB,
+// so the cache stays under 8 MB.
+const maxFileIcons = 512
+
+// iconCache loads file icons off the main thread and keeps the newest
+// maxFileIcons by path.
 type iconCache struct {
-	mu      sync.Mutex
-	icons   map[string]*ui.Bitmap
+	// load reads a file's icon, or nil; it runs off the main thread.
+	load func(path string) *ui.Bitmap
+	// loaded asks the panel to draw again once an icon came.
+	loaded func()
+
+	mu    sync.Mutex
+	icons map[string]*ui.Bitmap
+	// order holds the paths of icons, oldest first.
+	order   []string
 	loading map[string]bool
 }
 
-func (c *iconCache) get(path string, window *mygo.Window) *ui.Bitmap {
+func (c *iconCache) get(path string) *ui.Bitmap {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if icon, ok := c.icons[path]; ok {
@@ -704,15 +724,27 @@ func (c *iconCache) get(path string, window *mygo.Window) *ui.Bitmap {
 	}
 	c.loading[path] = true
 	go func() {
-		var icon *ui.Bitmap
-		if data, err := mygo.Shell.FileIcon(path, 64); err == nil {
-			icon, _ = ui.DecodeBitmap(data)
-		}
+		icon := c.load(path)
 		c.mu.Lock()
+		if len(c.order) == maxFileIcons {
+			delete(c.icons, c.order[0])
+			c.order = c.order[1:]
+		}
 		c.icons[path] = icon
+		c.order = append(c.order, path)
 		delete(c.loading, path)
 		c.mu.Unlock()
-		window.Update(func() {})
+		c.loaded()
 	}()
 	return nil
+}
+
+// loadFileIcon is the system icon of the file at path, or nil.
+func loadFileIcon(path string) *ui.Bitmap {
+	data, err := mygo.Shell.FileIcon(path, 64)
+	if err != nil {
+		return nil
+	}
+	icon, _ := ui.DecodeBitmap(data)
+	return icon
 }

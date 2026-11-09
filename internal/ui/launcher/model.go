@@ -59,6 +59,10 @@ type Model struct {
 	savingHotkey bool
 	// paused is set while the global shortcuts are off for recording.
 	paused bool
+	// dragPending is set from a press on a drag area until a release. A
+	// window manager that moves the panel can take that release; the next
+	// one ends it then, which the app takes as no drag.
+	dragPending bool
 
 	menu    *menu
 	alias   *aliasDialog
@@ -98,6 +102,9 @@ type hotkeyDialog struct {
 	shortcut  string // the hotkey the result has now, or ""
 	err       string
 	recording bool
+	// recorderFocused is whether the recorder had the focus in the last
+	// frame, so losing it, as to another app, stops recording.
+	recorderFocused bool
 }
 
 // New returns a launcher on the All tab with an empty query.
@@ -124,6 +131,11 @@ func (m *Model) Show(category core.Category) {
 	m.loadWidgets()
 	m.input.Focus()
 }
+
+// Hidden stops recording as the panel hides: recording pauses the
+// launcher shortcut and every hotkey, which must work again while the
+// panel is away. A hide need not blur the view first.
+func (m *Model) Hidden() { m.stopRecording("") }
 
 // Stale searches again after the data changed, keeping the selected
 // result, and loads the widgets again: a setting may have changed them.
