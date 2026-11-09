@@ -1,5 +1,6 @@
-// Package clipboard decides what clipboard history keeps and how it names
-// an entry. Capture belongs to the engine; storage belongs to the store.
+// Package clipboard decides what clipboard history keeps, how it names an
+// entry, and how the history is searched. Capture belongs to the engine;
+// storage belongs to the store.
 package clipboard
 
 import (
