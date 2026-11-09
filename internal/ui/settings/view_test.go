@@ -508,7 +508,7 @@ func TestMovesAndHidesLauncherTabsKeepingFocusOnThem(t *testing.T) {
 		}
 		return nil
 	}
-	_, tt := open(t, f, search)
+	_, tt := open(t, f, general)
 	if up, _ := tt.AccessByRole(ui.RoleButton, "Move Apps up"); !up.Disabled {
 		t.Error("the first tab moves up")
 	}
@@ -537,7 +537,7 @@ func TestMovesAndHidesLauncherTabsKeepingFocusOnThem(t *testing.T) {
 func TestLeavesFocusPutElsewhereWhileATabMoves(t *testing.T) {
 	f := newFake()
 	f.hold = true
-	_, tt := open(t, f, search)
+	_, tt := open(t, f, general)
 	press(t, tt, ui.RoleButton, "Move Files up")
 	if !tt.Focused("Move Files down") {
 		t.Fatal("the focus did not follow the moving tab")
@@ -551,7 +551,7 @@ func TestLeavesFocusPutElsewhereWhileATabMoves(t *testing.T) {
 
 func TestKeepsATabsResultsOutOfAllButNeverHidesItToo(t *testing.T) {
 	f := newFake()
-	_, tt := open(t, f, search)
+	_, tt := open(t, f, general)
 	emoji := func() settings.Tab {
 		i := slices.IndexFunc(f.last(t).Tabs, func(tab settings.Tab) bool { return tab.Category == core.CategoryEmoji })
 		return f.last(t).Tabs[i]
@@ -585,5 +585,63 @@ func TestReadsChangesMadeElsewhere(t *testing.T) {
 	tt.Frame()
 	if !checked(t, tt, "Currency rates") || !tt.HasText("Lock Screen") {
 		t.Errorf("texts %q", tt.Texts())
+	}
+}
+
+// Ports AliasList.tsx and HotkeyList.tsx: Settings > Search lists them,
+// and Remove removes one; the focus goes to the row in its place.
+func TestListsAliasesAndRemovesOne(t *testing.T) {
+	f := newFake()
+	f.aliases = []engine.Listed{
+		{ID: "app:Code", Title: "Visual Studio Code", Subtitle: "Applications", Value: "vsc"},
+		{ID: "system:sleep", Title: "Sleep", Subtitle: "Command", Value: "zz"},
+	}
+	_, tt := open(t, f, search)
+	if !tt.HasText("vsc") || !tt.HasText("Visual Studio Code") {
+		t.Fatalf("texts %q", tt.Texts())
+	}
+	press(t, tt, ui.RoleButton, "Remove the alias vsc of Visual Studio Code")
+	if !slices.Equal(f.aliasRemovals, []core.ID{"app:Code"}) || tt.HasText("Visual Studio Code") {
+		t.Errorf("removed %v; texts %q", f.aliasRemovals, tt.Texts())
+	}
+	if !tt.Focused("Remove the alias zz of Sleep") {
+		t.Error("the next row has no focus")
+	}
+	press(t, tt, ui.RoleButton, "Remove the alias zz of Sleep")
+	if !tt.HasText("None. To add one, choose Add Alias in a result's actions (Ctrl K).") || !tt.Focused("Aliases") {
+		t.Errorf("texts %q, list focused %v", tt.Texts(), tt.Focused("Aliases"))
+	}
+}
+
+func TestListsHotkeysAndSaysWhyOneStays(t *testing.T) {
+	f := newFake()
+	f.hotkeys = []engine.Listed{{ID: "app:Safari", Title: "Safari", Subtitle: "Applications", Value: "Control+Alt+S"}}
+	f.removeErr = errRefused
+	_, tt := open(t, f, search)
+	for _, text := range []string{"Ctrl", "Alt", "S", "Safari"} {
+		if !tt.HasText(text) {
+			t.Errorf("no %q in %q", text, tt.Texts())
+		}
+	}
+	press(t, tt, ui.RoleButton, "Remove the hotkey of Safari")
+	if !slices.Equal(f.hotkeyRemoval, []core.ID{"app:Safari"}) || !tt.HasText(errRefused.Error()) || !tt.HasText("Safari") {
+		t.Errorf("removed %v; texts %q", f.hotkeyRemoval, tt.Texts())
+	}
+	f.removeErr = nil
+	press(t, tt, ui.RoleButton, "Remove the hotkey of Safari")
+	if !tt.HasText("None. To add one, choose Set Hotkey in a result's actions (Ctrl K).") || tt.HasText(errRefused.Error()) {
+		t.Errorf("texts %q", tt.Texts())
+	}
+}
+
+func TestShowsTheTabsUnderGeneral(t *testing.T) {
+	f := newFake()
+	_, tt := open(t, f, general)
+	if _, ok := tt.AccessByRole(ui.RoleList, "Tabs, in order"); !ok {
+		t.Error("General has no tabs")
+	}
+	click(t, tt, string(search))
+	if _, ok := tt.AccessByRole(ui.RoleList, "Tabs, in order"); ok {
+		t.Error("Search still has the tabs")
 	}
 }

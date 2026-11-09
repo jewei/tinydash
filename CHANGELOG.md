@@ -12,7 +12,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - Results with equal scores keep the order in which their source lists them.
 - The launcher always opens in the center of the screen with the pointer.
 - Apps are found by their name only, and show their folder instead of a description.
-- The file folders and Spotlight moved to Settings > Search. Settings no longer lists aliases and hotkeys: change them from the result's actions (Mod+K).
+- The file folders and Spotlight moved to Settings > Search.
 - A hotkey that cannot run writes the reason to the log instead of a system notification.
 - Command-line options: `--hidden` and `--data-dir` are new; `--settings`, `--background`, and `--mode` are gone.
 

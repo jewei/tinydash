@@ -91,6 +91,8 @@ func (a *Actions) Unhide(id core.ID) error {
 type Listed struct {
 	ID              core.ID
 	Title, Subtitle string
+	// Value is the alias or the hotkey's accelerator text, in those lists.
+	Value string
 }
 
 // HiddenResults lists the results the user hid, by title. One whose item is
@@ -105,16 +107,40 @@ func HiddenResults(s *search.Snapshot) []Listed {
 	return out
 }
 
+// AliasResults lists the aliases the user set, by alias.
+func AliasResults(s *search.Snapshot) []Listed {
+	out := withValues(s, s.Aliases.All())
+	slices.SortStableFunc(out, func(a, b Listed) int { return cmp.Compare(a.Value, b.Value) })
+	return out
+}
+
+// HotkeyResults lists the hotkeys the user set, by title.
+func HotkeyResults(s *search.Snapshot) []Listed {
+	out := withValues(s, s.Hotkeys.All())
+	slices.SortStableFunc(out, func(a, b Listed) int { return cmp.Compare(strings.ToLower(a.Title), strings.ToLower(b.Title)) })
+	return out
+}
+
+func withValues(s *search.Snapshot, pairs []search.Pair) []Listed {
+	out := make([]Listed, 0, len(pairs))
+	for _, pair := range pairs {
+		r := describe(s, pair.ID)
+		r.Value = pair.Value
+		out = append(out, r)
+	}
+	return out
+}
+
 func describe(s *search.Snapshot, id core.ID) Listed {
 	if found, ok := search.Resolve(s, id); ok {
-		return Listed{id, found.Title, found.Subtitle}
+		return Listed{ID: id, Title: found.Title, Subtitle: found.Subtitle}
 	}
 	source, key, ok := core.ParseID(id)
 	switch {
 	case !ok:
-		return Listed{id, string(id), "No longer found"}
+		return Listed{ID: id, Title: string(id), Subtitle: "No longer found"}
 	case !s.Ready(source):
-		return Listed{id, key, "Still loading"}
+		return Listed{ID: id, Title: key, Subtitle: "Still loading"}
 	}
-	return Listed{id, key, "No longer found"}
+	return Listed{ID: id, Title: key, Subtitle: "No longer found"}
 }

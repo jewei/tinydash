@@ -62,11 +62,7 @@ type Model struct {
 	// follow it.
 	moved *tabMove
 
-	hidden []engine.Listed
-	// hiddenFocus is the place in the hidden list that takes the focus
-	// after Show Again, or -1.
-	hiddenFocus int
-	hiddenErr   string
+	hidden, aliases, hotkeys personalList
 
 	confirmClear bool
 	clearButton  ui.Handle
@@ -87,7 +83,7 @@ type tabMove struct {
 
 // New returns Settings on General, with the saved settings.
 func New(b Backend) *Model {
-	m := &Model{backend: b, mac: mac, richClipboard: richClipboard, section: general, hiddenFocus: -1}
+	m := &Model{backend: b, mac: mac, richClipboard: richClipboard, section: general}
 	m.editors = map[bool]*libraryEditor{false: newEditor(m, false), true: newEditor(m, true)}
 	m.saved = b.Settings()
 	m.reload()
@@ -109,7 +105,9 @@ func (m *Model) Stale() {
 func (m *Model) Close() { m.stopRecording("") }
 
 func (m *Model) reload() {
-	m.hidden = m.backend.Hidden()
+	m.hidden.items = m.backend.Hidden()
+	m.aliases.items = m.backend.Aliases()
+	m.hotkeys.items = m.backend.Hotkeys()
 	m.library = m.backend.Library()
 	for _, ed := range m.editors {
 		ed.listChanged()
@@ -156,7 +154,9 @@ func (m *Model) send() {
 func (m *Model) open(s section) {
 	m.section = s
 	if s == search {
-		m.hidden = m.backend.Hidden()
+		m.hidden.items = m.backend.Hidden()
+		m.aliases.items = m.backend.Aliases()
+		m.hotkeys.items = m.backend.Hotkeys()
 	}
 }
 
@@ -266,15 +266,28 @@ func (m *Model) setTab(category core.Category, shown bool, on bool) {
 	}, nil)
 }
 
-func (m *Model) showAgain(id core.ID, index int) {
-	m.hiddenErr = ""
-	m.backend.Unhide(id, func(err error) {
+// personalList is a Search list of results the user changed: the hidden
+// ones, the aliases, or the hotkeys, each with a button that undoes it.
+type personalList struct {
+	items []engine.Listed
+	// refocus asks the next frame to put the focus at place focus, after
+	// a removal.
+	refocus bool
+	focus   int
+	err     string
+}
+
+// remove undoes the change of the item at index through the backend, then
+// reads the list again and puts the focus on the row now in its place.
+func (l *personalList) remove(id core.ID, index int, undo func(core.ID, func(error)), reload func() []engine.Listed) {
+	l.err = ""
+	undo(id, func(err error) {
 		if err != nil {
-			m.hiddenErr = err.Error()
+			l.err = err.Error()
 			return
 		}
-		m.hidden = m.backend.Hidden()
-		m.hiddenFocus = index
+		l.items = reload()
+		l.focus, l.refocus = index, true
 	})
 }
 
