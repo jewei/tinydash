@@ -38,7 +38,7 @@ Each part of the model is one step of this code:
 | `MonitorReadFails`: `seenCopy` kept, `rebase` after a first look | `Monitor.Tick`, the `got != clipboard.ReadContent` branch with `clipboard.ReadFailed`; `Clipboard.Capture` in `internal/app/clipboard.go` reports a failed OS read as `ReadFailed` |
 | `None` | `seenHash = 0`: nothing read yet |
 | `MonitorQueuesSave` | `m.engine.SaveClip(epoch, content, now)` |
-| `EpochFirst = TRUE` | `epoch := m.engine.ClipEpoch()` before `content, ok := m.read()` |
+| `EpochFirst = TRUE` | `epoch := m.engine.ClipEpoch()` before `content, got := m.read()` |
 | `queue`, `WriterApplies` | `Engine.Change` and `Engine.Run` in `internal/engine/engine.go`: one writer, changes in order |
 | `WriterApplies` "save" | `Engine.SaveClip` in `internal/engine/clipboard.go`: the epoch and enabled check |
 | `WriterApplies` "clear" | `Engine.ClearClipboard` in `internal/engine/clipboard.go`: bumps `clipEpoch`, then clears |
