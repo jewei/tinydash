@@ -77,6 +77,7 @@ The version is in `mygo.json`.
 
 - Emoji: `internal/feature/emoji/catalog.go`, generated from the Rust `emojis` crate 0.9.1 (Unicode 18.0), and the keyword files in `internal/feature/emoji/data/` (Unicode License, in `data/LICENSE`). Both are frozen: the generator was removed with the Rust app.
 - Passwords: the EFF large wordlist, in `internal/feature/password/`.
+- Time zones: `internal/zoneinfo/zoneinfo.zip`, a copy of `$(go env GOROOT)/lib/time/zoneinfo.zip` from Go 1.27.3 (IANA 2026c). To update the rules, copy that file from a newer Go and change the release in the comment in `zoneinfo.go`. Then run the tests: the datetime golden test shows any answer that the new rules change.
 - Fonts: Figtree and Caprasimo in `internal/ui/kit/fonts/`, under the SIL Open Font License.
 
 ## Release

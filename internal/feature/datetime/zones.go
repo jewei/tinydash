@@ -6,9 +6,7 @@ import (
 	"sync"
 	"time"
 
-	// Zone rules come with the binary, so Windows, which has no zoneinfo
-	// files, finds every zone too.
-	_ "time/tzdata"
+	"github.com/jewei/tinydash/internal/zoneinfo"
 )
 
 // zone is a place whose clock a query names.
@@ -107,7 +105,7 @@ func location(name string) (*time.Location, bool) {
 	if loc, ok := locations.Load(name); ok {
 		return loc.(*time.Location), true
 	}
-	loc, err := time.LoadLocation(name)
+	loc, err := zoneinfo.Load(name)
 	if err != nil {
 		return nil, false
 	}

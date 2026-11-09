@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/zoneinfo"
 )
 
 // testNow is Sunday, 4 October 2026, 12:00 UTC, seen from Kuala Lumpur.
 func testNow(t *testing.T) time.Time {
 	t.Helper()
-	loc, err := time.LoadLocation("Asia/Kuala_Lumpur")
+	loc, err := zoneinfo.Load("Asia/Kuala_Lumpur")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/zoneinfo"
 )
 
 // Dir is testdata/golden at the module root.
@@ -66,10 +67,11 @@ type Meta struct {
 	} `json:"rates"`
 }
 
-// Now is the corpus clock, in its time zone.
+// Now is the corpus clock, in its time zone. The zone comes from the
+// binary, so the host's zoneinfo cannot change an answer.
 func (m Meta) Now(t testing.TB) time.Time {
 	t.Helper()
-	loc, err := time.LoadLocation(m.TZ)
+	loc, err := zoneinfo.Load(m.TZ)
 	if err != nil {
 		t.Fatal(err)
 	}
