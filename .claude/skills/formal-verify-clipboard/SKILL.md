@@ -1,6 +1,6 @@
 ---
 name: formal-verify-clipboard
-description: "Model-check TinyDash's clipboard history (the monitor, Clear, and history on/off) with TLA+. Use before you change internal/engine/monitor.go or internal/engine/clipboard.go, or how Engine.Run orders changes, and whenever a change could let a cleared or switched-off clipboard entry come back."
+description: "Model-check TinyDash's clipboard history (the monitor, Clear, and history on/off) with TLA+. Use before you change internal/engine/monitor.go, internal/engine/clipboard.go, or internal/engine/settings.go, or how Engine.Run orders changes, and whenever a change could let a cleared or switched-off clipboard entry come back."
 ---
 
 # Formal verification: clipboard history
@@ -21,16 +21,16 @@ Nothing that the clipboard monitor read before a Clear or a switch-off of clipbo
 
 Each part of the model is one step of this code:
 
-| Model                                                           | Code                                                                                               |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `MonitorStarts`, `MonitorFinishes`, `MonitorQueuesSave`, `seen` | `Monitor.Tick` in `internal/engine/monitor.go`: counter check, `ClipEpoch()`, `read()`, `SaveClip` |
-| `EpochFirst = TRUE`                                             | the order of `epoch := m.engine.ClipEpoch()` before `content, ok := m.read()` in `Monitor.Tick`    |
-| `queue`, `WriterApplies`                                        | `Engine.Change` and `Engine.Run` in `internal/engine/engine.go`: one writer, changes in order      |
-| `WriterApplies` "save"                                          | `Engine.SaveClip` in `internal/engine/clipboard.go`: the epoch and enabled check                   |
-| `WriterApplies` "clear"                                         | `Engine.ClearClipboard`: bumps `clipEpoch`, then clears                                            |
-| `WriterApplies` "off" / "on"                                    | `Engine.SetClipboardHistory`: bumps `clipEpoch` only when turning off                              |
+| Model                                                           | Code                                                                                                                                           |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MonitorStarts`, `MonitorFinishes`, `MonitorQueuesSave`, `seen` | `Monitor.Tick` in `internal/engine/monitor.go`: counter check, `ClipEpoch()`, `read()`, `SaveClip`                                             |
+| `EpochFirst = TRUE`                                             | the order of `epoch := m.engine.ClipEpoch()` before `content, ok := m.read()` in `Monitor.Tick`                                                |
+| `queue`, `WriterApplies`                                        | `Engine.Change` and `Engine.Run` in `internal/engine/engine.go`: one writer, changes in order                                                  |
+| `WriterApplies` "save"                                          | `Engine.SaveClip` in `internal/engine/clipboard.go`: the epoch and enabled check                                                               |
+| `WriterApplies` "clear"                                         | `Engine.ClearClipboard`: bumps `clipEpoch`, then clears                                                                                        |
+| `WriterApplies` "off" / "on"                                    | `Engine.SetClipboardHistory` and `Engine.UpdateSettings` (`internal/engine/settings.go`): each bumps `clipEpoch` only when turning history off |
 
-Sync commit: the model was last confirmed to describe the code at the commit that added this skill (`git log -1 --format=%h -- .claude/skills/formal-verify-clipboard/SKILL.md`). Move it forward only after you confirm, file by file, that the table above still describes the code. To see what changed since: `git diff <sync commit> -- internal/engine/monitor.go internal/engine/clipboard.go internal/engine/engine.go`.
+Sync commit: the model was last confirmed to describe the code at the commit that added this skill (`git log -1 --format=%h -- .claude/skills/formal-verify-clipboard/SKILL.md`). Move it forward only after you confirm, file by file, that the table above still describes the code. To see what changed since: `git diff <sync commit> -- internal/engine/monitor.go internal/engine/clipboard.go internal/engine/engine.go internal/engine/settings.go`.
 
 ## Run it
 
