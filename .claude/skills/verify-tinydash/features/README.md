@@ -45,4 +45,8 @@ Each feature file starts with an H1 title and one paragraph about the user-visib
 
 ## Known app failures
 
-None. The two this skill found on 2026-11-09 (the shortcut that did not hide a focused panel on X11, and a Quit that only hid the panel) are fixed; their journeys pass (run `fix-shortcut`).
+None. The two this skill found on 2026-11-09 (the shortcut that did not hide a focused panel on X11, and a Quit that only hid the panel) are fixed.
+
+## Last full run
+
+On 2026-11-09, at build `v0.2.0-822-g050947908c40`, all five journeys passed as written, each in a fresh box. The evidence is in `.local/verify/runs/`: `r2docs-search`, `r2docs-calc`, `r2docs-clip`, `r2docs-shortcut`, and `r2docs-alias`.
