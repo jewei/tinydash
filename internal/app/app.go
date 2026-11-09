@@ -115,7 +115,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	s, warning, file := engine.LoadSettings(dirs.Config)
 	a.file = file
 	a.warn(warning)
-	a.keys = &shortcuts{toggle: a.toggle, run: a.runHotkey}
+	a.keys = &shortcuts{os: mygo.GlobalShortcut, toggle: a.toggle, run: a.runHotkey}
 	a.warn(checkedAtStartup(&s, a.keys.Parse))
 	a.warn(legacyDataWarning(dirs.Config, dirs.Data))
 	db, warning, err := store.Open(ctx, dirs.Data, restrictToOwner)
