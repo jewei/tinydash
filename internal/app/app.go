@@ -166,6 +166,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 		a.panel.Hide()
 	})
 	a.hud = newHUD(a.panel)
+	a.icons.load, a.icons.loaded = loadFileIcon, func() { a.panel.Update(func() {}) }
 	// The writer and the slots tell the panel and the model about changes,
 	// so they start once both exist.
 	go a.engine.Run(ctx)
@@ -614,7 +615,7 @@ func (b *backend) Settings() launcher.ViewSettings {
 	return launcher.ViewSettings{Tabs: tabs, ClipboardHistory: s.ClipboardHistoryEnabled, CurrencyRates: s.CurrencyRatesEnabled, Theme: s.Theme}
 }
 
-func (b *backend) FileIcon(path string) *ui.Bitmap { return b.app().icons.get(path, b.app().panel) }
+func (b *backend) FileIcon(path string) *ui.Bitmap { return b.app().icons.get(path) }
 
 func (b *backend) PauseShortcuts(paused bool) error { return b.app().keys.Pause(paused) }
 
@@ -690,14 +691,26 @@ func (s *appShell) TurnOnCurrencyRates() error {
 
 func (s *appShell) Quit() { mygo.App.Quit() }
 
-// iconCache loads file icons off the main thread and keeps them by path.
+// maxFileIcons bounds the file icons kept: a 64-pixel icon takes 16 KB,
+// so the cache stays under 8 MB.
+const maxFileIcons = 512
+
+// iconCache loads file icons off the main thread and keeps the newest
+// maxFileIcons by path.
 type iconCache struct {
-	mu      sync.Mutex
-	icons   map[string]*ui.Bitmap
+	// load reads a file's icon, or nil; it runs off the main thread.
+	load func(path string) *ui.Bitmap
+	// loaded asks the panel to draw again once an icon came.
+	loaded func()
+
+	mu    sync.Mutex
+	icons map[string]*ui.Bitmap
+	// order holds the paths of icons, oldest first.
+	order   []string
 	loading map[string]bool
 }
 
-func (c *iconCache) get(path string, window *mygo.Window) *ui.Bitmap {
+func (c *iconCache) get(path string) *ui.Bitmap {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if icon, ok := c.icons[path]; ok {
@@ -711,15 +724,27 @@ func (c *iconCache) get(path string, window *mygo.Window) *ui.Bitmap {
 	}
 	c.loading[path] = true
 	go func() {
-		var icon *ui.Bitmap
-		if data, err := mygo.Shell.FileIcon(path, 64); err == nil {
-			icon, _ = ui.DecodeBitmap(data)
-		}
+		icon := c.load(path)
 		c.mu.Lock()
+		if len(c.order) == maxFileIcons {
+			delete(c.icons, c.order[0])
+			c.order = c.order[1:]
+		}
 		c.icons[path] = icon
+		c.order = append(c.order, path)
 		delete(c.loading, path)
 		c.mu.Unlock()
-		window.Update(func() {})
+		c.loaded()
 	}()
 	return nil
+}
+
+// loadFileIcon is the system icon of the file at path, or nil.
+func loadFileIcon(path string) *ui.Bitmap {
+	data, err := mygo.Shell.FileIcon(path, 64)
+	if err != nil {
+		return nil
+	}
+	icon, _ := ui.DecodeBitmap(data)
+	return icon
 }
