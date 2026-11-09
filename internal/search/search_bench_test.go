@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"math/rand/v2"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -39,8 +40,10 @@ func large() *Snapshot {
 	for folder := range 500 {
 		dir := fmt.Sprintf("%s %d", name(1), folder)
 		disk["home"] = append(disk["home"], entry{dir, true})
+		// The scan joins paths with the OS separator.
+		path := filepath.Join("home", dir)
 		for file := range 99 {
-			disk["home/"+dir] = append(disk["home/"+dir], entry{fmt.Sprintf("%s %d.txt", name(2), file), false})
+			disk[path] = append(disk[path], entry{fmt.Sprintf("%s %d.txt", name(2), file), false})
 		}
 	}
 	// A real folder lists its entries by name, as fs.ReadDir does.
