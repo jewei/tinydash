@@ -23,3 +23,14 @@ func permissionStep(dir string) string {
 func isWindowsDiskFull(err error) bool {
 	return runtime.GOOS == "windows" && (errors.Is(err, syscall.Errno(112)) || errors.Is(err, syscall.Errno(39)))
 }
+
+// fileManager names the OS file manager in errors of Reveal.
+var fileManager = func() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "Finder"
+	case "windows":
+		return "File Explorer"
+	}
+	return "Files"
+}()
