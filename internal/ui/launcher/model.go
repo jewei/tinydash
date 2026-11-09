@@ -593,10 +593,11 @@ func (m *Model) resumeShortcuts() {
 	}
 	m.paused = false
 	if err := m.backend.PauseShortcuts(false); err != nil {
-		if m.hotkey != nil {
-			m.hotkey.err = err.Error()
-		} else {
+		// A save's own reason stays: the resume error is about other keys.
+		if m.hotkey == nil {
 			m.notice = err.Error()
+		} else if m.hotkey.err == "" {
+			m.hotkey.err = err.Error()
 		}
 	}
 }

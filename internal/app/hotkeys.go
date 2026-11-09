@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/egoist/mygo"
@@ -172,15 +173,18 @@ func (s *shortcuts) pause(paused bool) error {
 	}
 	s.paused = false
 	// Register every saved key again. Keys that another app holds now are
-	// refused and stay saved, so the next resume tries them again.
-	var first error
+	// refused and stay saved, so the next resume tries them again. As in
+	// the Rust app, only the launcher shortcut's error is returned: the
+	// recorder that just ran is not about another result's hotkey, which
+	// is only logged.
+	var err error
 	if s.launcher != "" {
-		first = s.take(s.launcher, s.toggle)
+		err = s.take(s.launcher, s.toggle)
 	}
 	for id, accelerator := range s.hotkeys {
-		if err := s.take(accelerator, func() { go s.run(id) }); err != nil && first == nil {
-			first = err
+		if refused := s.take(accelerator, func() { go s.run(id) }); refused != nil {
+			slog.Warn("A hotkey is off", "id", id, "error", refused)
 		}
 	}
-	return first
+	return err
 }

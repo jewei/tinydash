@@ -164,7 +164,8 @@ func (m *Model) open(s section) {
 // pause, pressing it would show the launcher instead of being recorded, so
 // recording stops and says why.
 func (m *Model) startRecording() {
-	m.recording = true
+	// Each recording reports its own result.
+	m.recording, m.err = true, ""
 	m.recorder.Focus()
 	m.then(func(next func()) {
 		m.backend.PauseShortcuts(true, func(err error) {
@@ -189,7 +190,9 @@ func (m *Model) stopRecording(shortcut string) {
 	m.then(func(next func()) {
 		resume := func(error) {
 			m.backend.PauseShortcuts(false, func(err error) {
-				if err != nil {
+				// A refused save's reason stays: the resume error is
+				// about the old shortcut.
+				if err != nil && m.err == "" {
 					m.err = err.Error()
 				}
 				next()

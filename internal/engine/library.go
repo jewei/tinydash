@@ -64,7 +64,7 @@ func (a *Actions) DeleteLibraryItem(id int64) error {
 		}
 		// Its row is gone; keys the OS kept only say the item is gone.
 		for hotkey, err := range a.hotkeys.Sync(next.Hotkeys) {
-			slog.Warn("Could not release a hotkey", "id", hotkey, "error", err)
+			slog.Warn("A hotkey is off", "id", hotkey, "error", err)
 		}
 		next.Library = library.NewIndex(without(next.Library.Items(), id))
 		return nil

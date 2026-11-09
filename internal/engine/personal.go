@@ -43,9 +43,10 @@ type HotkeyRegistry interface {
 	// error is a sentence for the user.
 	Parse(accelerator string) (Keys, error)
 	// Sync makes the registered hotkeys match wanted: it releases the ones
-	// wanted lacks or changed and registers the new ones. It returns the
-	// error of each hotkey that could not be changed, by result ID; the
-	// others still apply.
+	// wanted lacks or changed and registers the others that the OS does not
+	// hold yet. It returns, by result ID, the error of each hotkey that the
+	// OS refused, also a saved one that it still refuses; the others still
+	// apply.
 	Sync(wanted search.Hotkeys) map[core.ID]error
 }
 
