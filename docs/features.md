@@ -22,7 +22,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. Th
 
 ↑ brings back up to 50 searches that ran a result, newest first, each once. They are kept only until TinyDash quits, never saved. Editing a search brought back makes it a new one, and ↑ selects results again. A held ↑ stops at the first row; press it again to bring back a search.
 
-Mod is Command on macOS and Control elsewhere. Moving the pointer onto a row selects it, and onto an item of the actions menu makes it the active one; a list that scrolls under a still pointer changes nothing. Clicking a row runs it; right-clicking it shows its actions, as Mod+K does. After a copy, the launcher hides and a short "Copied" message shows; it never takes focus from the app you return to, and the pointer passes through it. The launcher never takes focus from the app you were in, so that app has the keyboard again when the launcher hides. The launcher opens with an empty query, centered on the screen with the pointer, a third of the way down, and hides when another app gets focus (optional).
+Mod is Command on macOS and Control elsewhere. Moving the pointer onto a row selects it, and onto an item of the actions menu makes it the active one; a list that scrolls under a still pointer changes nothing. Clicking a row runs it; right-clicking it shows its actions, as Mod+K does. After a copy, the launcher hides and a short "Copied" message shows; it never takes focus from the app you return to, and the pointer passes through it. The launcher never takes focus from the app you were in, so that app has the keyboard again when the launcher hides. The launcher opens with an empty query, centered on the screen with the pointer, a third of the way down, and hides when another app gets focus (optional). Drag the empty parts of the tab bar or the footer to move it; the search field keeps the keyboard.
 
 Command line: `tinydash` (show the launcher; if TinyDash already runs, show its launcher), `--hidden` (start without showing the launcher, as at login), `--data-dir <folder>` (keep settings and data in that folder).
 
@@ -148,7 +148,7 @@ TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same 
 - **Windows:** app IDs changed, so the pins, usage, aliases, and hotkeys of Windows apps reset once.
 - **Ranking:** results with equal scores keep the order in which their source lists them.
 - **Apps** are found by name only, not by bundle name or executable, and show their folder rather than a description.
-- **Launcher position:** the launcher always opens centered and cannot be dragged. A position saved by the Rust app stays in `settings.json`.
+- **Launcher position:** the launcher always opens centered. A position saved by the Rust app stays in `settings.json`.
 - **Aliases and hotkeys** have no lists in Settings. Change or remove them from the result's actions.
 - **A hotkey that cannot run** writes the reason to the log, not to a system notification.
 - **A launcher shortcut that blocks typing**, such as a plain letter in a hand-edited `settings.json`, is no longer replaced with Control+Shift+Space at startup.
