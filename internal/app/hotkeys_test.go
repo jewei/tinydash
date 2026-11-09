@@ -141,3 +141,19 @@ func TestRefusedHotkeysAreTriedAgainByTheNextSync(t *testing.T) {
 		t.Errorf("held %v", held)
 	}
 }
+
+// A resume reports only the launcher shortcut, as the Rust app did: the
+// recorder that just ran is not about another result's hotkey, which stays
+// saved, is logged, and is tried again at the next resume or sync.
+func TestAResumeReportsOnlyTheLauncherShortcut(t *testing.T) {
+	os := newFakeRegistry("Alt+N")
+	s := &shortcuts{os: os, toggle: func() {}, run: func(core.ID) {}}
+	s.sync(search.NewHotkeys(map[core.ID]string{"app:notes": "Alt+N"}))
+	if err := s.setLauncher("Control+Shift+Space", "Control+Shift+Space"); err != nil {
+		t.Fatal(err)
+	}
+	s.pause(true)
+	if err := s.pause(false); err != nil {
+		t.Errorf("resume: %v, want no error for another result's hotkey", err)
+	}
+}

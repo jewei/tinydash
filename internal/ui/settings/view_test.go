@@ -645,3 +645,22 @@ func TestShowsTheTabsUnderGeneral(t *testing.T) {
 		t.Error("Search still has the tabs")
 	}
 }
+
+// A refused new shortcut keeps its reason: the resume error after it is
+// about the old shortcut.
+func TestAResumeErrorDoesNotReplaceTheShortcutSaveError(t *testing.T) {
+	f := newFake()
+	f.refuse = func(settings.Settings) error { return errors.New("Could not register Alt+Space: taken.") }
+	f.pauseErr = func(paused bool) error {
+		if !paused {
+			return errors.New("Could not register Control+Shift+Space: taken.")
+		}
+		return nil
+	}
+	_, tt := open(t, f, general)
+	press(t, tt, ui.RoleButton, "Launcher shortcut: Ctrl Shift Space")
+	tt.Key(ui.Alt, ui.KeySpace)
+	if !tt.HasText("Could not register Alt+Space: taken.") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+}

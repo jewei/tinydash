@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -58,5 +59,21 @@ func TestHidingThePanelDuringAHotkeySaveResumesAfterIt(t *testing.T) {
 	f.finish(nil)
 	if !slices.Equal(f.paused, []bool{true, false}) {
 		t.Errorf("paused %v", f.paused)
+	}
+}
+
+// The dialog keeps the save's own reason: a resume error is about other
+// keys.
+func TestAResumeErrorDoesNotReplaceTheSavesReason(t *testing.T) {
+	f := newFake(always(hotkeyResult("")))
+	f.hold = true
+	_, tt := open(t, f)
+	openHotkey(t, tt, "Set Hotkey…")
+	tt.Key(ui.Ctrl|ui.Alt, ui.KeyK)
+	f.pauseErr = errors.New("Could not register Control+Shift+Space: taken.")
+	f.finish(errors.New("Could not register Control+Alt+K: taken."))
+	tt.Frame()
+	if !tt.HasText("Could not register Control+Alt+K: taken.") {
+		t.Errorf("texts %q", tt.Texts())
 	}
 }
