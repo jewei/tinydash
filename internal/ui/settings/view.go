@@ -40,7 +40,7 @@ const (
 func (m *Model) View(c *ui.Context) {
 	v := m.values()
 	p := themed(c, v.Theme)
-	ui.Row(c).Fill().Background(p.paper).Children(func() {
+	ui.Row(c).Fill().AlignItems(ui.Stretch).Background(p.paper).Children(func() {
 		m.sidebar(c, p)
 		ui.Scroll(c).Grow(1).Padding(24, 32).Gap(12).Children(func() {
 			ui.Text(c, string(m.section)).FontSize(24).FontWeight(700).TextColor(p.ink).Role(ui.RoleHeading)
@@ -72,7 +72,7 @@ func (m *Model) sidebar(c *ui.Context, p palette) {
 	ui.Column(c).Width(180).Padding(16, 8).Gap(2).Background(p.field).Role(ui.RoleNavigation).Label("Settings sections").Children(func() {
 		for _, s := range sections {
 			chosen := s == m.section
-			b := ui.ButtonBase(c).Padding(6, 12).Radius(6).Label(string(s))
+			b := ui.ButtonBase(c).Padding(6, 12).Radius(6).Justify(ui.Start).Label(string(s))
 			ink, weight := p.ink, 400
 			switch {
 			case chosen:
@@ -496,7 +496,7 @@ func (m *Model) libraryView(c *ui.Context, p palette, ed *libraryEditor) {
 					if it.Keyword != "" {
 						name += " " + it.Keyword
 					}
-					b := ui.ButtonBase(c).Key(it.ID).Padding(6, 8).Radius(6).Label(name)
+					b := ui.ButtonBase(c).Key(it.ID).Padding(6, 8).Radius(6).Justify(ui.Start).Label(name)
 					if it.ID == ed.draft.ID {
 						b.Background(p.selected).Current(ui.CurrentPage)
 					} else if b.Hovered() {
