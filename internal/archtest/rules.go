@@ -43,6 +43,7 @@ var layers = []struct {
 	{"internal/engine", []string{"internal/core", "internal/match", "internal/feature/", "internal/search", "internal/settings", "internal/store"}},
 	{"internal/ui/", []string{"internal/core", "internal/search", "internal/settings", "internal/engine"}},
 	{"internal/app", []string{"internal/"}},
+	{"tools/emojigen", nil}, // regenerates emoji data from the Rust app's sources
 }
 
 // external lists every module package outside the standard library that the
