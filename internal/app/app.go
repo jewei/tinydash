@@ -19,7 +19,6 @@ import (
 
 	"github.com/jewei/tinydash/internal/core"
 	"github.com/jewei/tinydash/internal/engine"
-	"github.com/jewei/tinydash/internal/feature/apps"
 	"github.com/jewei/tinydash/internal/feature/clipboard"
 	"github.com/jewei/tinydash/internal/feature/currency"
 	"github.com/jewei/tinydash/internal/platform"
@@ -68,6 +67,7 @@ type App struct {
 	icons    iconCache
 	more     *moreFiles
 	watch    *fileWatch
+	appWatch *fileWatch
 	hud      *hud
 	tray     *mygo.Tray
 	settings *settingsWindow
@@ -93,7 +93,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	if opts.DataDir != "" {
 		dirs.Config, dirs.Data = opts.DataDir, opts.DataDir
 	}
-	a := &App{ctx: ctx, home: dirs.Home, builtAt: map[*engine.Slot]time.Time{}, watch: newFileWatch()}
+	a := &App{ctx: ctx, home: dirs.Home, builtAt: map[*engine.Slot]time.Time{}, watch: newFileWatch(), appWatch: newAppWatch()}
 
 	s, warning, file := engine.LoadSettings(dirs.Config)
 	a.file = file
@@ -119,7 +119,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	a.more = a.newMoreFiles()
 	a.watchFolders()
 
-	a.apps = engine.NewSlot(a.engine.RebuildApps(a.listApps))
+	a.apps = engine.NewSlot(a.engine.RebuildApps(installedApps))
 	a.files = engine.NewSlot(a.engine.RebuildFiles(a.fileDisk()))
 	go a.apps.Run(ctx)
 	go a.files.Run(ctx)
@@ -240,8 +240,8 @@ func (a *App) rebuild(slot *engine.Slot) {
 	a.mu.Lock()
 	a.builtAt[slot] = time.Now()
 	a.mu.Unlock()
-	if slot == a.files {
-		a.watch.dirty.Store(false)
+	if w := a.watchOf(slot); w != nil {
+		w.dirty.Store(false)
 	}
 	slot.Request()
 }
@@ -250,7 +250,7 @@ func (a *App) rebuildIfOld(slot *engine.Slot) {
 	a.mu.Lock()
 	old := time.Since(a.builtAt[slot]) > staleAfter
 	a.mu.Unlock()
-	if old || slot == a.files && a.watch.dirty.Load() {
+	if old || a.changed(slot) {
 		a.rebuild(slot)
 	}
 }
@@ -283,21 +283,6 @@ func (a *App) watchClipboard() {
 			}
 		}
 	}
-}
-
-func (a *App) listApps() ([]apps.App, error) {
-	found, err := mygo.Shell.InstalledApps()
-	if err != nil {
-		return nil, err
-	}
-	byPath := make(map[string]mygo.InstalledApp, len(found))
-	list := make([]apps.App, 0, len(found))
-	for _, app := range found {
-		byPath[app.Path] = app
-		list = append(list, apps.App{Name: app.Name, Path: app.Path})
-	}
-	a.desktop.apps.Store(&byPath)
-	return list, nil
 }
 
 func (a *App) fileDisk() engine.FileDisk {

@@ -202,3 +202,39 @@ func TestAMissingFolderIsSkippedWithoutAWarning(t *testing.T) {
 		t.Errorf("dirty %v, logged %q", f.dirty.Load(), logged.String())
 	}
 }
+
+// A change in an app folder marks the app index dirty, as a change in an
+// indexed folder does the file index; the next show rebuilds it.
+func TestADirtyAppIndexRebuildsAtTheNextShow(t *testing.T) {
+	watches := newFakeWatches()
+	built := make(chan struct{}, 4)
+	a := &App{builtAt: map[*engine.Slot]time.Time{}, watch: &fileWatch{}, appWatch: &fileWatch{start: watches.start, packages: []string{"app"}}}
+	a.apps = engine.NewSlot(func(context.Context) { built <- struct{}{} })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go a.apps.Run(ctx)
+	a.rebuild(a.apps)
+	<-built
+
+	a.appWatch.sync(ctx, []string{golden.Abs("/Applications")}, nil)
+	<-watches.order
+	w, opts := watches.get("/Applications")
+	if !opts.Ignore("Tool.app/Contents", true) || opts.Ignore("Tool.app", true) {
+		t.Error("the app watch follows the inside of bundles, or not the bundles")
+	}
+	w.events <- []mygo.FileEvent{{Op: mygo.FileCreate, Path: "Tool.app", IsDir: true}}
+	w.events <- nil
+	a.rebuildIfOld(a.apps)
+	select {
+	case <-built:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a dirty app index was not rebuilt at the next show")
+	}
+	if a.appWatch.dirty.Load() {
+		t.Error("the rebuild left the app index dirty")
+	}
+	a.rebuildIfOld(a.apps)
+	if n := len(built); n != 0 {
+		t.Errorf("%d rebuilds of a fresh, clean app index", n)
+	}
+}
