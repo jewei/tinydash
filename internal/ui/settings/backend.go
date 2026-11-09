@@ -29,8 +29,10 @@ type Backend interface {
 	// PauseShortcuts turns the launcher shortcut and every hotkey off
 	// while the shortcut recorder records, so pressing the shortcut that
 	// is set records it instead of showing the launcher, and on again
-	// after.
-	PauseShortcuts(paused bool) error
+	// after; done as for UpdateSettings. It waits for a settings change
+	// that holds the shortcuts, which may itself wait for the main thread,
+	// so it must not block.
+	PauseShortcuts(paused bool, done func(error))
 	// Library is every snippet and quicklink. Settings reads it as it
 	// opens, after each save or delete, and on Stale.
 	Library() []LibraryItem

@@ -134,18 +134,45 @@ func TestRecordsANewShortcutWhileTheOldOneIsPaused(t *testing.T) {
 	}
 }
 
+// Pause, save, and resume run one after another, whenever their replies
+// come.
 func TestResumesTheShortcutsOnlyAfterTheSave(t *testing.T) {
 	f := newFake()
 	f.hold = true
 	_, tt := open(t, f, general)
 	press(t, tt, ui.RoleButton, "Launcher shortcut: Ctrl Shift Space")
+	if !tt.Focused("Launcher shortcut: press the new keys, or Escape to cancel") {
+		t.Fatal("the recorder has no focus")
+	}
 	tt.Key(ui.Alt, ui.KeySpace)
+	f.wantUpdates(t, 0)
+	f.release(t, tt) // paused
+	f.wantUpdates(t, 1)
 	if !slices.Equal(f.pauses, []bool{true}) {
 		t.Fatalf("pauses %v while the shortcut saves", f.pauses)
 	}
-	f.release(t, tt)
+	f.release(t, tt) // saved
 	if !slices.Equal(f.pauses, []bool{true, false}) {
 		t.Errorf("pauses %v", f.pauses)
+	}
+	f.release(t, tt) // resumed
+}
+
+func TestRunsEachRecordingRequestAfterTheLast(t *testing.T) {
+	f := newFake()
+	f.hold = true
+	_, tt := open(t, f, general)
+	press(t, tt, ui.RoleButton, "Launcher shortcut: Ctrl Shift Space")
+	press(t, tt, ui.RoleButton, "Launcher shortcut: press the new keys, or Escape to cancel")
+	press(t, tt, ui.RoleButton, "Launcher shortcut: Ctrl Shift Space")
+	if !slices.Equal(f.pauses, []bool{true}) {
+		t.Fatalf("pauses %v before the first reply", f.pauses)
+	}
+	f.release(t, tt)
+	f.release(t, tt)
+	f.release(t, tt)
+	if !slices.Equal(f.pauses, []bool{true, false, true}) || !tt.HasText("Press keys…") {
+		t.Errorf("pauses %v, texts %q", f.pauses, tt.Texts())
 	}
 }
 

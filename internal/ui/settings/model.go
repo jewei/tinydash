@@ -47,8 +47,11 @@ type Model struct {
 	// err is why the last change failed, or another error for the page.
 	err string
 
-	recording, paused bool
-	recorder          ui.Handle
+	recording bool
+	// steps are the pauses, saves, and resumes of recording, in order;
+	// the first one runs.
+	steps    []func(next func())
+	recorder ui.Handle
 	// recorderFocused is whether the recorder had the focus in the last
 	// frame: losing it stops recording.
 	recorderFocused bool
@@ -163,15 +166,15 @@ func (m *Model) open(s section) {
 func (m *Model) startRecording() {
 	m.recording = true
 	m.recorder.Focus()
-	if m.paused {
-		return
-	}
-	if err := m.backend.PauseShortcuts(true); err != nil {
-		m.recording = false
-		m.err = err.Error()
-		return
-	}
-	m.paused = true
+	m.then(func(next func()) {
+		m.backend.PauseShortcuts(true, func(err error) {
+			if err != nil {
+				m.recording = false
+				m.err = err.Error()
+			}
+			next()
+		})
+	})
 }
 
 // stopRecording ends recording with the keys pressed, or "" for none,
@@ -182,22 +185,43 @@ func (m *Model) stopRecording(shortcut string) {
 		return
 	}
 	m.recording = false
-	if shortcut == "" || shortcut == m.values().Shortcut {
-		m.resume()
-		return
-	}
-	m.save(func(s *settings.Settings) { s.Shortcut = shortcut }, func(error) { m.resume() })
+	changed := shortcut != "" && shortcut != m.values().Shortcut
+	m.then(func(next func()) {
+		resume := func(error) {
+			m.backend.PauseShortcuts(false, func(err error) {
+				if err != nil {
+					m.err = err.Error()
+				}
+				next()
+			})
+		}
+		if changed {
+			m.save(func(s *settings.Settings) { s.Shortcut = shortcut }, resume)
+		} else {
+			resume(nil)
+		}
+	})
 }
 
-// resume turns the shortcuts on again once nothing records.
-func (m *Model) resume() {
-	if !m.paused || m.recording {
+// then runs a step of recording after the steps before it, as pausing,
+// saving, and resuming must not overtake each other: a resume that came
+// after a newer pause would turn the shortcut on while recording. work
+// calls next when it is done.
+func (m *Model) then(work func(next func())) {
+	m.steps = append(m.steps, work)
+	if len(m.steps) == 1 {
+		m.runStep()
+	}
+}
+
+func (m *Model) runStep() {
+	if len(m.steps) == 0 {
 		return
 	}
-	m.paused = false
-	if err := m.backend.PauseShortcuts(false); err != nil {
-		m.err = err.Error()
-	}
+	m.steps[0](func() {
+		m.steps = m.steps[1:]
+		m.runStep()
+	})
 }
 
 // moveTab moves a tab one place up or down, in the saved order.

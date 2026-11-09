@@ -80,12 +80,15 @@ func (f *fake) UpdateSettings(change func(*settings.Settings), done func(setting
 	})
 }
 
-func (f *fake) PauseShortcuts(paused bool) error {
+func (f *fake) PauseShortcuts(paused bool, done func(error)) {
 	f.pauses = append(f.pauses, paused)
-	if f.pauseErr != nil {
-		return f.pauseErr(paused)
-	}
-	return nil
+	f.reply(func() {
+		if f.pauseErr != nil {
+			done(f.pauseErr(paused))
+			return
+		}
+		done(nil)
+	})
 }
 
 func (f *fake) Library() []LibraryItem { return slices.Clone(f.library) }
