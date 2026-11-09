@@ -2,109 +2,83 @@
 
 ## Set up
 
-1. Install [Bun](https://bun.sh) 1.4.2, Node.js 24 (Vite+ runs its tools on Node), and Rust through [rustup](https://rustup.rs). `rust-toolchain.toml` selects the Rust version.
-2. Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS. On Ubuntu:
-   ```sh
-   sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-     librsvg2-dev libxdo-dev libssl-dev
-   ```
-3. `bun install`. This also installs the pre-commit hook, which formats staged files.
+1. Install Go 1.27.3 or later (`go.mod` sets the version).
+2. On Linux, install the libraries that CI installs: `sudo apt-get install libgtk-3-dev libayatana-appindicator3-dev`.
+3. Nothing else. `go.mod` pins the tools, and `go tool` runs them: `go tool mygo` (the mygo CLI) and `go tool staticcheck`. TinyDash needs no cgo.
+
+For the formal checks, install Java 11 or later. For the `verify-tinydash` skill, install Docker or OrbStack.
 
 ## Daily commands
 
-| Command          | What it does                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `bun run dev`    | Runs the app with hot reload as "TinyDash Dev", with its own data (see below).                                                        |
-| `bun run web`    | Runs only the Vite server, for styling; IPC calls fail without Tauri.                                                                 |
-| `bun run check`  | `vp check` (Oxfmt, Oxlint, TypeScript), `cargo fmt --check`, Clippy.                                                                  |
-| `bun run test`   | `vp test` (Vitest + jsdom) and `cargo test`. `cargo test` also writes `src/generated`.                                                |
-| `bun run verify` | `check`, `vp test`, `vp build`, then `scripts/bindings.ts`: Rust tests, failing if they changed `src/generated`. Run before every PR. |
-| `bun run fix`    | Formats Rust, then TypeScript, CSS, JSON, and Markdown; Rust is formatted even when TypeScript has errors.                            |
-| `bun run build`  | Builds installers for this OS into `src-tauri/target/release/bundle`.                                                                 |
+| Command                                        | What it does                                                                                                                                 |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bash scripts/verify-go.sh`                    | Every gate: `go vet` and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`. Run it before every commit. |
+| `go test ./internal/<pkg>`                     | The tests of one package.                                                                                                                    |
+| `bash scripts/formal-verify.sh`                | Model-checks the TLA+ models in `formal/` (see "Formal checks").                                                                            |
+| `go build ./cmd/tinydash`                      | Builds the binary for this OS.                                                                                                               |
+| `go run ./cmd/tinydash --data-dir <folder>`    | Runs the app from source with its data in `<folder>` (see below).                                                                           |
+| `go tool mygo build`                           | Builds the packaged app into `build/` (see "Packaging").                                                                                    |
 
-Logs go to stderr. Set `RUST_LOG=tinydash_lib=debug` for more.
+The tests in `go test ./...` include the import rules and the gofmt check (`internal/archtest`). Logs go to stderr.
 
 ## Run the app without touching your own TinyDash
 
-The app identifier decides the data folder and the single-instance lock. `bun run dev` uses `src-tauri/tauri.dev.conf.json`, which sets the identifier `dev.tinydash.dev`, so it never reads or writes an installed TinyDash's settings and history, and does not hand over to it. Its settings and data are in `dev.tinydash.dev` folders; delete them to start fresh. On macOS both are in `~/Library/Application Support/dev.tinydash.dev`. On Linux, settings are in `~/.config/dev.tinydash.dev` and data in `~/.local/share/dev.tinydash.dev`. On Windows, settings are in `%APPDATA%\dev.tinydash.dev` and data in `%LOCALAPPDATA%\dev.tinydash.dev`. Settings > About shows both.
-
-To try a build with the frontend bundled in, without hot reload:
+`--data-dir <folder>` keeps `settings.json` and `tinydash.db` in that folder, so a run from source never reads or writes your settings and history. Use a new, empty folder, and delete it to start fresh:
 
 ```sh
-bunx tauri build --debug --no-bundle --config src-tauri/tauri.dev.conf.json
-./src-tauri/target/debug/tinydash            # shows the launcher
-./src-tauri/target/debug/tinydash --settings # opens Settings
+go run ./cmd/tinydash --data-dir "$(mktemp -d)"
 ```
 
-If another TinyDash holds the global shortcut, run the binary again to toggle the launcher.
+`--hidden` starts without showing the launcher. Quit an installed TinyDash first: both would use the same launcher shortcut. A second start of the same build shows the running launcher and quits.
 
-On macOS, the Up Next widget reads and asks for calendars and reminders only when TinyDash is its own responsible process. macOS checks the access and the Info.plist usage strings of the responsible process, and a program that a terminal starts usually belongs to the terminal. So `bun run dev` and the binary above, started from a terminal, never ask: the widget says that another app opened TinyDash. To test Up Next, build the app bundle and open it with `open`, which starts it through launchd:
-
-```sh
-bunx tauri build --debug --bundles app --config src-tauri/tauri.dev.conf.json
-open "src-tauri/target/debug/bundle/macos/TinyDash Dev.app"
-```
-
-It asks for access as TinyDash Dev. A few terminals make each program its own responsible process. There, `bun run dev` asks for itself, because it embeds `src-tauri/Info.plist` in its binary. The binary above does not embed it, so there the widget says that this build cannot ask.
+Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the user's real data: on macOS, `~/Library/Application Support/dev.tinydash.launcher`. Never run it that way for development.
 
 ## Tests
 
-- **Rust:** unit tests in each module. Platform tests in `platform/macos.rs` read the real system (apps, icons) without changing it.
-- **Frontend:** `*.test.ts(x)` next to the code. Component tests render real components against `src/test/backend.ts`, a fake backend built on `@tauri-apps/api/mocks`. Assert on what the user sees (roles, labels) and on the commands sent.
-- **Coverage:** the Coverage workflow writes the share of code that the tests run to each job's summary. It is a report and never fails. To see it locally: `bunx vp test --coverage`, and for Rust `cargo llvm-cov --manifest-path src-tauri/Cargo.toml --summary-only` (install it with `cargo install cargo-llvm-cov --locked` and `rustup component add llvm-tools-preview`).
+- Tests sit next to the code, in the same package. Pure packages get disk, clock, and randomness as arguments, so their tests need no OS.
+- Write paths in tests as slash paths through `golden.Abs`. It turns `/Users/me` into `C:\Users\me` on Windows.
+- Views are tested headless with mygo's `ui.NewTester` and a fake backend. Tests move time with `Advance`, never `Sleep`.
+- The tests run on this machine's OS only. CI (`.github/workflows/ci.yml`) runs `verify-go.sh` on macOS, Windows, and Linux. After you push, wait for `gh pr checks <branch> --watch`.
+- The Coverage workflow writes the share of code that the tests run to its job summary. It never fails. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
+- `internal/search/search_bench_test.go` measures search against a budget of 8 ms at p95, with 5,000 apps and 50,000 files: `go test ./internal/search -bench .`.
 
-Automated tests do not cover the OS effects. Check these by hand on a real desktop when you change them, with throwaway data:
+Automated tests do not cover these OS effects. Check them by hand on a real desktop, with throwaway data, when you change them: the global shortcut and hotkeys, the panel focus, the tray icon, open at login, the system commands, Spotlight results, and clipboard capture of images and files.
 
-- The global shortcut shows and hides the launcher; Escape returns focus to the previous app.
-- With clipboard history on, copied text appears; a password-manager copy does not; Enter copies an entry back.
-- An app launches; a file opens; Show in Finder/Explorer selects it.
-- Lock Screen works. Cancel the confirmation for Restart, Shut Down, Log Out, and Empty Trash.
-- Settings: record a shortcut, toggle open at login and the tray icon.
+## Golden corpus
 
-## Change the IPC contract
+`testdata/golden` holds what the Rust app answered for each query, at a fixed clock, time zone, and set of rates. It also holds fixtures of the Rust app's `settings.json` loads and a `tinydash.db` that the Rust store wrote. The Rust code is gone, so the corpus is frozen: `testdata/golden/README.md` says how to write it again from the last commit that has the Rust code.
 
-1. Change the Rust type or command (`commands.rs`, `actions.rs`, `search/result.rs`, ...).
-2. Run `bun scripts/bindings.ts`. It rebuilds `src/generated` from scratch (removing bindings of deleted types) and fails once to show that it changed.
-3. Fix the type errors that `bun run check` reports in the frontend. For a new command, also register it in `generate_handler!` in `lib.rs`, add a wrapper in `src/lib/ipc.ts`, and add a default reply in `src/test/backend.ts`.
-4. Commit the generated files with the change.
+A Go answer that differs from the corpus fails its test, unless `testdata/golden/divergences/<feature>.tsv` lists the query with the reason. Ranked lists compare up to the order of equal scores (`golden.CheckRanked`).
 
-## Window configuration
+## Formal checks
 
-`src-tauri/tauri.windows.conf.json` repeats the whole launcher window, because Tauri replaces arrays when it merges configs; it differs only in `"transparent": false`. Change both files together.
+`formal/ClipboardHistory.tla` models clipboard capture against Clear and history on/off. `bash scripts/formal-verify.sh` downloads TLC 1.7.4 once into `~/.cache/tinydash` (or `$XDG_CACHE_HOME/tinydash`), checks its SHA-256, and runs each model. Each `<Model>.cfg` must pass, and each `<Model>Broken.cfg` must fail on its invariant, which shows that the check can catch the bug. CI runs it on Linux. Before you change clipboard capture, Clear, or history on/off, use the `formal-verify-clipboard` skill.
 
-## App icons
+## Drive the real app: the verify-tinydash skill
 
-`app-icon.svg` is the source. Regenerate with `bunx tauri icon app-icon.svg -o src-tauri/icons`, then keep only the files listed under `bundle.icon` in `tauri.conf.json`.
+The `verify-tinydash` skill (`.claude/skills/verify-tinydash/`) builds TinyDash with `-tags e2e` for Linux, starts it in a Docker container on a virtual X display with seeded data, and drives it through mygo's automation socket. It saves evidence (window captures, element trees, `tinydash.db` rows, the X clipboard) in `.local/verify/runs/`. It never touches your desktop, your clipboard, or your TinyDash data. Read its `SKILL.md` before a run.
+
+It needs Docker or OrbStack. The first launch downloads mygo's SQLite library from GitHub.
+
+## Packaging
+
+`go tool mygo build` reads `mygo.json` (name, identifier `dev.tinydash.launcher`, version, `LSUIElement` so that macOS shows no Dock icon) and `resources/icon.png`. On macOS it writes `build/darwin-arm64/TinyDash.app`, ad hoc signed, and `tinydash-<version>-arm64.dmg`, and bundles mygo's SQLite library in the app. `-platform` picks other targets, such as `darwin/universal,windows/amd64,linux/amd64`. Signing and disk images need macOS. `go tool mygo build -h` lists every flag.
+
+The version is in `mygo.json`.
 
 ## Dependencies
 
-- Pin exact versions in `package.json`. `bun install --frozen-lockfile` must pass.
-- Vite+ pins `vite` and `vitest` through `overrides`, and Dependabot ignores all three. To upgrade, set the new `vite-plus` version in `package.json`, run `bun install`, then `bunx vp migrate`; on a project already on Vite+ it only re-pins `vite` and `vitest` to match.
-- The Audit workflow checks `Cargo.lock` against the RustSec advisory database every Monday (or from Actions > Audit > Run workflow) and fails on a known vulnerability. It does not run on pull requests, so a new advisory never blocks unrelated work. To check locally: `cargo install cargo-audit --locked`, then `cargo audit --file src-tauri/Cargo.lock`.
-- CodeQL scans the Rust, TypeScript, and workflow code on each pull request, on `main`, and every Monday. OpenSSF Scorecard grades the repository setup (branch rules, pinned actions, token permissions) on `main` and every Monday. Both report to Security > Code scanning and never block a merge.
-- Dependabot updates the `tauri*` crates and the `@tauri-apps` packages only to new patch versions, because the Tauri CLI refuses to build when the `tauri` crate and the packages have different minor versions, and new plugins need the newest `tauri`. To move to a new minor version, change `tauri`, `tauri-build`, and the `tauri-plugin-*` crates in `src-tauri/Cargo.toml` and both `@tauri-apps` packages in `package.json` in one commit, then run `bun install`, `cargo check --manifest-path src-tauri/Cargo.toml` (which updates `Cargo.lock`), and `bun run verify`.
-- Rust crates follow Cargo semver; commit `Cargo.lock`. Change the Rust version in `rust-toolchain.toml` and fix new Clippy findings in the same PR.
+- `go.mod` lists the modules. `internal/archtest/rules.go` allowlists each module and the packages that may import it. A new module fails the tests until it is added there.
+- Dependabot opens one weekly PR for all Go modules and one for GitHub Actions.
+- The Audit workflow runs `govulncheck` every Monday (or from Actions > Audit > Run workflow) and fails on a vulnerable code path.
+- CodeQL scans the Go and workflow code on each pull request, on `main`, and every Monday. OpenSSF Scorecard grades the repository setup on `main` and every Monday. Both report to Security > Code scanning and never block a merge.
 
 ## Bundled data
 
-`src-tauri/data/README.md` lists sources and licenses. Regenerate emoji keywords with `bun run emoji-data`; the script checks the SHA-256 of each source file.
+- Emoji: `internal/feature/emoji/catalog.go`, generated from the Rust `emojis` crate 0.9.1 (Unicode 18.0), and the keyword files in `internal/feature/emoji/data/` (Unicode License, in `data/LICENSE`). Both are frozen: the generator was removed with the Rust app.
+- Passwords: the EFF large wordlist, in `internal/feature/password/`.
+- Fonts: Figtree and Caprasimo in `internal/ui/kit/fonts/`, under the SIL Open Font License.
 
 ## Release
 
-Merge everything for the release to `main`, including a change that renames Unreleased in `CHANGELOG.md` to the new version and date, and wait for CI to pass. Then run:
-
-```sh
-bun run release 0.2.1           # publish
-bun run release 0.2.1 --draft   # or make a draft, try the installers, then publish it on GitHub
-```
-
-The command starts the Release workflow on `main` and follows it to the end, which takes about 15 minutes. You can also start it from Actions > Release > Run workflow. The workflow:
-
-1. Stops unless it runs on `main`, neither the tag `vVERSION` nor a draft release for it exists, the version is higher than the latest published release, and CI ("Required checks") passed on that commit. It also stops unless the `TAURI_UPDATER_PUBLIC_KEY` and `TAURI_SIGNING_PRIVATE_KEY` secrets exist, so the app can check for updates.
-2. Writes the version into `src-tauri/Cargo.toml` and `Cargo.lock` in each runner (`scripts/set-version.ts`). Both stay at `0.0.0` in the repository, so a release needs no commit, and a local build reports 0.0.0.
-3. Builds a universal macOS DMG (Apple silicon and Intel), the Windows installer, and the Linux packages: Debian (`.deb`), Fedora and openSUSE (`.rpm`), and an AppImage that runs on most distributions. The macOS app is signed with the Developer ID and notarized, from the `APPLE_*` repository secrets: certificate, its password, signing identity, Apple ID, app-specific password, and team ID. The build fails unless Gatekeeper accepts the app as notarized. Windows and Linux builds are not code-signed.
-   On macOS and Windows it also makes update files, signed with `TAURI_SIGNING_PRIVATE_KEY` (and its password), and builds the app with the feed address (`TINYDASH_UPDATE_ENDPOINT`, which the workflow sets to `https://github.com/OWNER/REPO/releases/latest/download/latest.json` for this repository) and the matching `TAURI_UPDATER_PUBLIC_KEY`. A local build has neither, so it never checks for updates.
-4. Only when all three builds pass: tags the commit `vVERSION`, and publishes the release with the installers, the update files, `latest.json` (the update feed), `SHA256SUMS`, and notes made from the merged pull requests. Before that, it signs a build provenance attestation for each installer and update file, which `gh attestation verify FILE --repo jewei/tinydash` checks. Installed copies read `latest.json` from the latest published release, so a draft reaches no one, and publishing one offers it to everyone, including TinyDash 0.1.3 on Apple silicon and Windows, which reads the same address.
-5. After a published (not draft) release, points the Homebrew cask in `jewei/homebrew-tap` (`Casks/tinydash.rb`) at the new DMG: it writes the version and the DMG's SHA-256 and pushes. This needs the `HOMEBREW_TAP_TOKEN` secret, a fine-grained token that can write only to that repository; without it the release still publishes, with a warning. A draft that you publish later on GitHub does not update the cask: change `version` and `sha256` in the cask by hand.
-
-If a build fails, nothing is tagged or published: fix the cause, merge, and run the command again. To replace a published release, release a new version.
+The release process for the Go app is not set up yet. The Tauri release workflow was removed with the Rust app.
