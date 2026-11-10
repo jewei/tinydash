@@ -41,6 +41,10 @@ type Matcher struct {
 	query string
 	fuzzy []atom
 	words []atom
+	// buf holds the runes of the ASCII text being scored, reused so that
+	// a search over 55,000 names allocates no runes for them. A Matcher is
+	// therefore not safe for use by more than one goroutine at a time.
+	buf []rune
 }
 
 // New makes a matcher for a query.
@@ -63,7 +67,7 @@ func (m *Matcher) Query() string { return m.query }
 
 // Name scores a name; ok is false when it does not match.
 func (m *Matcher) Name(name string) (score uint32, ok bool) {
-	fuzzy, ok := scoreAtoms(m.fuzzy, name)
+	fuzzy, ok := m.scoreAtoms(m.fuzzy, name)
 	if !ok {
 		return 0, false
 	}
@@ -101,7 +105,7 @@ func hasWordPrefix(name, query string) bool {
 
 // Words scores text in which every query word appears as written, for long
 // text such as paths, where fuzzy matching finds too much.
-func (m *Matcher) Words(text string) (uint32, bool) { return scoreAtoms(m.words, text) }
+func (m *Matcher) Words(text string) (uint32, bool) { return m.scoreAtoms(m.words, text) }
 
 // Alias scores an alias the user chose. Only an alias that starts with the
 // query matches, and one that equals it ranks above any name match.
@@ -134,11 +138,11 @@ func (m *Matcher) Best(name string, aliases ...string) (uint32, bool) {
 	return best, found
 }
 
-func scoreAtoms(atoms []atom, text string) (uint32, bool) {
-	if isASCII(text) && !mayMatchASCII(atoms, text) {
+func (m *Matcher) scoreAtoms(atoms []atom, text string) (uint32, bool) {
+	if cannotMatchASCII(atoms, text) {
 		return 0, false
 	}
-	hay := newText(text)
+	hay := newText(text, &m.buf)
 	var total uint32
 	for _, a := range atoms {
 		s, ok := a.score(hay)
@@ -150,27 +154,39 @@ func scoreAtoms(atoms []atom, text string) (uint32, bool) {
 	return squeeze(total), true
 }
 
-// mayMatchASCII rejects most ASCII text before it is copied for scoring.
-// Every way nucleo matches an atom in ASCII text finds the atom's runes in
-// order, case ignored, and an atom that is not ASCII never matches ASCII
-// text.
-func mayMatchASCII(atoms []atom, text string) bool {
+// cannotMatchASCII rejects most ASCII text before it is copied for
+// scoring, in one pass. Every way nucleo matches an atom in ASCII text
+// finds the atom's runes in order, case ignored, and an atom that is not
+// ASCII never matches ASCII text. It reports true only when text is ASCII:
+// an atom it rejects was scanned to the end of text without a byte of
+// 0x80 or above, and a byte like that stops the scan with false.
+func cannotMatchASCII(atoms []atom, text string) bool {
 	for _, a := range atoms {
 		if !a.needle.ascii {
-			return false
+			return isASCII(text)
 		}
 		i := 0
 		for _, r := range a.needle.runes {
-			for i < len(text) && !equalFoldASCII(rune(text[i]), r) {
-				i++
+			lower, upper := byte(r), byte(r)
+			if 'a' <= r && r <= 'z' {
+				upper = byte(r - asciiLetterCaseOffset)
+			}
+			for ; i < len(text); i++ {
+				b := text[i]
+				if b >= 0x80 {
+					return false
+				}
+				if b == lower || b == upper {
+					break
+				}
 			}
 			if i == len(text) {
-				return false
+				return true
 			}
 			i++
 		}
 	}
-	return true
+	return false
 }
 
 // squeeze maps a fuzzy score below maxFuzzy. A higher score never maps
