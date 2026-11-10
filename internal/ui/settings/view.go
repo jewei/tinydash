@@ -120,9 +120,19 @@ func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
 	intro(c, p, "Widgets show next to the results of an empty All search.")
 	m.toggle(c, p, "Clocks", "Local time and up to three cities.", v.ShowClocks, func(s *settings.Settings, on bool) { s.ShowClocks = on })
 	m.toggle(c, p, "Disk space", "Free space on the disk of your home folder.", v.ShowDiskSpace, func(s *settings.Settings, on bool) { s.ShowDiskSpace = on })
+	m.toggle(c, p, "Focus timer", "Focus sessions with breaks. A notification says when each one ends.", v.ShowFocusTimer, func(s *settings.Settings, on bool) { s.ShowFocusTimer = on })
 	heading(c, p, "Clock cities")
 	m.listView(c, p, &m.cities, "City to add", "Tokyo, London, or Europe/Paris", v.ClockCities, cityLimit, true,
 		func(s *settings.Settings) *[]string { return &s.ClockCities })
+	heading(c, p, "Focus timer")
+	m.number(c, p, &m.focusMinutes, "Focus minutes", "Minutes in each focus session.", int(v.FocusMinutes), 1, settings.FocusMinutesMax,
+		func(s *settings.Settings, n int) { s.FocusMinutes = uint16(n) })
+	m.number(c, p, &m.shortBreak, "Short break minutes", "Minutes after each session.", int(v.ShortBreakMinutes), 1, settings.BreakMinutesMax,
+		func(s *settings.Settings, n int) { s.ShortBreakMinutes = uint16(n) })
+	m.number(c, p, &m.longBreak, "Long break minutes", "Minutes after the last session of a cycle.", int(v.LongBreakMinutes), 1, settings.BreakMinutesMax,
+		func(s *settings.Settings, n int) { s.LongBreakMinutes = uint16(n) })
+	m.number(c, p, &m.sessions, "Sessions before a long break", "", int(v.SessionsBeforeLongBreak), 1, settings.SessionsMax,
+		func(s *settings.Settings, n int) { s.SessionsBeforeLongBreak = uint8(n) })
 }
 
 func (m *Model) clipboard(c *ui.Context, p kit.Palette, v settings.Settings) {
