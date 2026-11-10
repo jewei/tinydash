@@ -38,7 +38,7 @@ How it was measured, on an Apple M2 Mac with macOS 27.2, on 2026-11-10: each app
 
 - **macOS (download):** the `.dmg` from [Releases](https://github.com/jewei/tinydash/releases). The app is signed with a Developer ID and notarized by Apple.
 - **Windows:** `tinydash-setup-<version>-amd64.exe` from [Releases](https://github.com/jewei/tinydash/releases). It is not signed, so Windows SmartScreen may ask you to confirm (More info > Run anyway).
-- **Linux:** from [Releases](https://github.com/jewei/tinydash/releases), the `.deb` (Debian, Ubuntu), or the `.tar.gz` (other distributions: unpack it and run `install.sh`, which installs TinyDash for your user in `~/.local`). These are not signed.
+- **Linux:** from [Releases](https://github.com/jewei/tinydash/releases), the `.deb` (Debian, Ubuntu), or the `.tar.gz` and `install.sh` (other distributions: download both into one folder and run `sh install.sh` there, which installs TinyDash for your user in `~/.local`). These are not signed.
 
 TinyDash does not update itself. Get new versions from Releases, or with `brew upgrade --cask tinydash`. Version 0.9.0 and earlier, the Rust app, do not offer 0.10.0 as an update.
 

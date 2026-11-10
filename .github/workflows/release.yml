@@ -112,7 +112,8 @@ jobs:
           xcrun notarytool store-credentials tinydash-release --apple-id "$APPLE_ID" \
             --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --keychain "$keychain"
           # Local builds stay ad hoc signed: only this build notarizes.
-          jq '.macos.notarize = {keychainProfile: "tinydash-release"}' mygo.json > "$RUNNER_TEMP/mygo.json"
+          jq --arg keychain "$keychain" '.macos.notarize = {keychainProfile: "tinydash-release", keychain: $keychain}' \
+            mygo.json > "$RUNNER_TEMP/mygo.json"
           mv "$RUNNER_TEMP/mygo.json" mygo.json
       - name: Build
         shell: bash
@@ -137,7 +138,7 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           mkdir installers
-          find build -type f \( -name '*.dmg' -o -name '*-setup-*.exe' -o -name '*.deb' -o -name '*.tar.gz' \) \
+          find build -type f \( -name '*.dmg' -o -name '*-setup-*.exe' -o -name '*.deb' -o -name '*.tar.gz' -o -name install.sh \) \
             -exec cp {} installers/ \;
           # The Homebrew cask downloads TinyDash_<version>_universal.dmg, as
           # for the Rust releases.
@@ -183,6 +184,7 @@ jobs:
             installers/*.exe
             installers/*.deb
             installers/*.tar.gz
+            installers/install.sh
       - name: Tag the commit and make the release
         run: |
           # The notes are this version's CHANGELOG.md section.

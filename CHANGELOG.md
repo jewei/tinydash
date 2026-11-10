@@ -8,7 +8,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Changed
 
-- TinyDash is rewritten in Go, with a native window in place of a web view. On an Apple M2 it indexes apps about 40% faster at start, and uses about 60% less memory and half the CPU while idle. See the [comparison](README.md#compared-with-the-rust-app).
+- TinyDash is rewritten in Go, with a native window in place of a web view. On an Apple M2 it indexes apps about 40% faster at start, and uses about 60% less memory and half the CPU while idle. See the [comparison](https://github.com/jewei/tinydash#compared-with-the-rust-app).
 - Version 0.9.0 does not offer this version as an update. Download it from the Releases page, or run `brew upgrade --cask tinydash`.
 - Your settings, clipboard history, pins, aliases, hotkeys, snippets, quicklinks, and calculator history carry over. The settings of removed features stay in the file, so an older version still finds them.
 - On Windows, pinned apps, app usage, and the aliases and hotkeys of apps reset once, because Windows apps now have new IDs.
