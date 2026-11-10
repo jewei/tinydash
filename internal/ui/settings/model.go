@@ -45,8 +45,8 @@ type Model struct {
 	saved   settings.Settings
 	queue   []pending
 	sending bool
-	// err is why the last change without its own place to say so failed,
-	// or another error for the page.
+	// err is why the last change failed, unless it says so in its own
+	// place (saveOwn), or another error for the page.
 	err string
 
 	// rec is the launcher shortcut's recorder.
@@ -77,6 +77,9 @@ type Model struct {
 type pending struct {
 	change func(*settings.Settings)
 	done   func(error)
+	// own is set when done shows a refusal in its own place, so the page
+	// banner does not show it again.
+	own bool
 }
 
 type tabMove struct {
@@ -129,7 +132,13 @@ func (m *Model) values() settings.Settings {
 // save sends a change after those before it, applied to the settings
 // saved by then. done, if set, gets its outcome.
 func (m *Model) save(change func(*settings.Settings), done func(error)) {
-	m.queue = append(m.queue, pending{change, done})
+	m.queue = append(m.queue, pending{change: change, done: done})
+	m.send()
+}
+
+// saveOwn is save for a change whose done shows a refusal itself.
+func (m *Model) saveOwn(change func(*settings.Settings), done func(error)) {
+	m.queue = append(m.queue, pending{change: change, done: done, own: true})
 	m.send()
 }
 
@@ -145,7 +154,7 @@ func (m *Model) send() {
 		switch {
 		case err == nil:
 			m.saved, m.err = saved, ""
-		case p.done == nil:
+		case !p.own:
 			m.err = err.Error()
 		}
 		if p.done != nil {
@@ -197,7 +206,7 @@ func (m *Model) stopRecording(shortcut string) {
 			})
 		}
 		if changed {
-			m.save(func(s *settings.Settings) { s.Shortcut = shortcut }, resume)
+			m.saveOwn(func(s *settings.Settings) { s.Shortcut = shortcut }, resume)
 		} else {
 			resume(nil)
 		}

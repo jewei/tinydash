@@ -664,3 +664,26 @@ func TestAResumeErrorDoesNotReplaceTheShortcutSaveError(t *testing.T) {
 		t.Errorf("texts %q", tt.Texts())
 	}
 }
+
+// A refused shortcut shows its reason once, under the recorder; a refused
+// list change shows in the page banner, as an alert, and in the list.
+func TestEachRefusalShowsInItsPlace(t *testing.T) {
+	f := newFake()
+	f.refuse = func(settings.Settings) error { return errors.New("Could not save settings.json.") }
+	m, tt := open(t, f, general)
+	press(t, tt, ui.RoleButton, "Launcher shortcut: Ctrl Shift Space")
+	tt.Key(ui.Alt, ui.KeySpace)
+	tt.Frame()
+	if m.err != "" || m.rec.Err() != "Could not save settings.json." {
+		t.Errorf("banner %q, recorder %q", m.err, m.rec.Err())
+	}
+	m.folders.draft = "~/Notes"
+	m.addTo(&m.folders, nil, folderLimit, false, func(s *settings.Settings) *[]string { return &s.FileSearchFolders })
+	tt.Frame()
+	if m.err != "Could not save settings.json." {
+		t.Errorf("banner %q after a refused list change", m.err)
+	}
+	if _, ok := tt.AccessByRole(ui.RoleAlert, "Could not save settings.json."); !ok {
+		t.Errorf("no alert; texts %q", tt.Texts())
+	}
+}
