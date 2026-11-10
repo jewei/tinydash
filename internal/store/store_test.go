@@ -323,6 +323,32 @@ func TestWeatherRoundTripsBesideTheRates(t *testing.T) {
 	}
 }
 
+func TestTheNoteIsEmptyUntilSavedAndKeepsTheLastSave(t *testing.T) {
+	s := memory(t)
+	if note, err := s.Note(ctx); note != "" || err != nil {
+		t.Errorf("before a save: %q %v", note, err)
+	}
+	must(t, s.SaveNote(ctx, "first"))
+	must(t, s.SaveNote(ctx, "line one\nline two 🎉"))
+	if note, err := s.Note(ctx); note != "line one\nline two 🎉" || err != nil {
+		t.Errorf("%q %v", note, err)
+	}
+}
+
+// A note that cannot be read says why, so the Notepad can tell the user.
+func TestANoteThatCannotBeReadSaysWhy(t *testing.T) {
+	s := memory(t)
+	_, err := s.db.Execute(ctx, "DROP TABLE note")
+	must(t, err)
+	var data *DataError
+	if _, err := s.Note(ctx); !errors.As(err, &data) || !strings.HasPrefix(err.Error(), "Could not read or save data:") {
+		t.Errorf("%v", err)
+	}
+	if err := s.SaveNote(ctx, "text"); !errors.As(err, &data) {
+		t.Errorf("save: %v", err)
+	}
+}
+
 func TestOpeningMakesTheFilePrivateOrSaysSo(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "new", "folder")
 	var restricted string

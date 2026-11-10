@@ -26,8 +26,18 @@ var keymap = append([]binding{
 	{ui.Cmd, ui.KeyK, nil, once((*Model).openMenu)},
 	{ui.Cmd, ui.KeyBackspace, (*Model).canDelete, once((*Model).deleteSelected)},
 	{ui.Cmd, ui.KeyComma, nil, once((*Model).openSettings)},
+	{ui.Cmd, ui.KeyJ, nil, once((*Model).focusNote)},
 	{0, ui.KeyEscape, nil, once((*Model).escape)},
 }, rowKeys()...)
+
+// noteKeymap is every key of the launcher while the note has the keyboard.
+var noteKeymap = []binding{
+	{ui.Cmd, ui.KeyJ, nil, once((*Model).leaveNote)},
+	{0, ui.KeyEscape, nil, once((*Model).leaveNote)},
+	// Tab would move the focus to a button, where typing reaches nothing.
+	{0, ui.KeyTab, nil, once((*Model).leaveNote)},
+	{ui.Shift, ui.KeyTab, nil, once((*Model).leaveNote)},
+}
 
 // rowKeys run the main action of rows 1 to 9 with Mod and the digit.
 func rowKeys() []binding {

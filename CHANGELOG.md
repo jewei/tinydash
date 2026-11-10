@@ -8,6 +8,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 - Settings > About shows the version of TinyDash, the folders that hold your settings and saved data, where to get new versions, and the credits.
 - The Weather widget is back. It shows the current weather for one city from Open-Meteo. Turn it on, and set the city and the unit, in Settings > Widgets. A city set in TinyDash 0.9.0 carries over, and so does its saved weather.
+- The Notepad widget is back: one scratch note beside an empty All search. Turn it on in Settings > Widgets. Mod+J moves to the note and back. Your note from an earlier version is still there.
 
 ## [0.10.0] - 2026-11-10
 

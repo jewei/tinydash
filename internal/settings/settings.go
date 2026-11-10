@@ -126,6 +126,8 @@ type Settings struct {
 	// until one is set.
 	WeatherCity     string          `json:"weatherCity"`
 	TemperatureUnit TemperatureUnit `json:"temperatureUnit"`
+	// ShowNotepad shows one scratch note, kept in tinydash.db.
+	ShowNotepad bool `json:"showNotepad"`
 
 	// kept holds the keys this version does not model, as they were.
 	kept map[string]json.RawMessage
