@@ -50,6 +50,9 @@ type Backend interface {
 	// launcher shows and after the data changed; done as for Run. Reading
 	// the disk can wait on the OS, so the app loads it outside the frame.
 	Widgets(done func(Widgets))
+	// SaveNote saves the Notepad's note; done as for Run. Saves end in
+	// the order they were sent.
+	SaveNote(text string, done func(error))
 	// Details loads the details of the selected result, which the pane
 	// beside a typed search shows; done gets them, or false when the
 	// result has none. Only apps, files, folders, clipboard entries, and
@@ -84,6 +87,15 @@ type Widgets struct {
 	Cities []City
 	// Disk is nil while the disk widget is off.
 	Disk *Disk
+	// Note is nil while the Notepad is off.
+	Note *Note
+}
+
+// Note is the Notepad's saved note.
+type Note struct {
+	Text string
+	// Err is why the note could not be read, or nil.
+	Err error
 }
 
 // City is a city's clock, read as the pane loads. The view keeps its time
