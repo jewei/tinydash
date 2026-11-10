@@ -255,9 +255,10 @@ func (m *Model) WidgetsChanged() {
 	}
 }
 
-// focusActions are the focus timer's actions while the pane shows it.
+// focusActions are the focus timer's actions while the pane shows it, and
+// the full JSON view does not cover it.
 func (m *Model) focusActions() []FocusAction {
-	if !m.showsWidgets() || m.widgets.Focus == nil {
+	if !m.showsWidgets() || m.showsJSON() || m.widgets.Focus == nil {
 		return nil
 	}
 	return m.widgets.Focus.Actions

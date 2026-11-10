@@ -339,6 +339,46 @@ func TestTheMenuListsTheTimersActions(t *testing.T) {
 	}
 }
 
+// The menu lists the card's actions, then the timer's, then Up Next's, as
+// 0.9.0 did. The full JSON view covers the timer, so Mod+P and the menu
+// leave it alone.
+func TestTheJSONViewCoversTheTimersActions(t *testing.T) {
+	f := withCard(jsonCard())
+	focus := running(time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC))
+	f.widgets.Focus = &focus
+	f.widgets.UpNext = agenda(focus.EndsAt)
+	m, tt := showLauncher(t, f)
+	tt.Key(ui.Cmd, ui.KeyK)
+	labels := menuLabels(m)
+	card, pause, calendar := slices.Index(labels, "View Full JSON"), slices.Index(labels, "Pause Timer"), slices.Index(labels, "Open Calendar")
+	if card < 0 || pause <= card || calendar <= pause {
+		t.Fatalf("menu %q", labels)
+	}
+	tt.Key(0, ui.KeyEscape)
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	if !hasJSONView(tt) {
+		t.Fatalf("no JSON view; texts %q", tt.Texts())
+	}
+	tt.Key(ui.Cmd, ui.KeyP)
+	if len(f.controls) != 0 {
+		t.Errorf("Mod+P ran %v on a covered timer", f.controls)
+	}
+	tt.Key(ui.Cmd, ui.KeyK)
+	if slices.Contains(menuLabels(m), "Pause Timer") {
+		t.Errorf("the menu lists a covered timer's action: %q", menuLabels(m))
+	}
+}
+
+func menuLabels(m *Model) []string {
+	var labels []string
+	if m.menu != nil {
+		for _, item := range m.menu.items {
+			labels = append(labels, item.label)
+		}
+	}
+	return labels
+}
+
 // Every text of the timer stays inside its card, also in a narrow pane and
 // with the longest labels.
 func TestTheFocusTimerTextStaysInItsCard(t *testing.T) {
