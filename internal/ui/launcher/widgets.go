@@ -11,9 +11,9 @@ import (
 )
 
 // widgetPane shows the widgets that are on, ported from
-// src/launcher/WidgetPane.tsx: the clipboard card, Clocks, Up Next, Disk
-// space, and Notepad. The full JSON view takes the place of the pane while
-// it is open.
+// src/launcher/WidgetPane.tsx: the clipboard card, Clocks, Up Next,
+// Weather, Disk space, and Notepad. The full JSON view takes the place of
+// the pane while it is open.
 func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 	w := m.widgets
 	card := m.card()
@@ -37,6 +37,9 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 		if w.UpNext != nil {
 			m.upNext(c, p, *w.UpNext)
 		}
+		if w.Weather != nil {
+			m.weatherCard(c, p, *w.Weather)
+		}
 		if w.Disk != nil {
 			diskSpace(c, p, *w.Disk)
 		}
@@ -44,7 +47,7 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 			m.notepadCard(c, p, *w.Note)
 		}
 		// Only clipboard cards are on, and the clipboard has none.
-		if card == nil && !w.Clocks && w.UpNext == nil && w.Disk == nil && w.Note == nil {
+		if card == nil && !w.Clocks && w.UpNext == nil && w.Weather == nil && w.Disk == nil && w.Note == nil {
 			ui.Text(c, "Copy a color, a Unix time, or JSON to see it here.").Padding(12).FontSize(12).TextColor(p.Muted)
 		}
 	})

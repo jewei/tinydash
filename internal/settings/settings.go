@@ -30,6 +30,9 @@ const (
 	// Rust datetime feature).
 	maxClockCities = 3
 	maxSkinTone    = 5
+	// MaxWeatherCityChars bounds the weather widget's city, in characters
+	// (MAX_CITY_CHARS in the Rust weather feature).
+	MaxWeatherCityChars = 100
 )
 
 type Theme string
@@ -48,6 +51,14 @@ const (
 	DuckDuckGo SearchEngine = "duckDuckGo"
 	Bing       SearchEngine = "bing"
 	Brave      SearchEngine = "brave"
+)
+
+// TemperatureUnit is the unit of the weather widget.
+type TemperatureUnit string
+
+const (
+	Celsius    TemperatureUnit = "celsius"
+	Fahrenheit TemperatureUnit = "fahrenheit"
 )
 
 // EmojiLanguage is an extra keyword language. English names and shortcodes
@@ -114,6 +125,11 @@ type Settings struct {
 	// to them.
 	ShowUpNext    bool `json:"showUpNext"`
 	ShowDiskSpace bool `json:"showDiskSpace"`
+	ShowWeather   bool `json:"showWeather"`
+	// WeatherCity is the city of the weather widget, as typed; empty
+	// until one is set.
+	WeatherCity     string          `json:"weatherCity"`
+	TemperatureUnit TemperatureUnit `json:"temperatureUnit"`
 	// ShowClipboardCards decodes a copied color, Unix time, or JSON in the
 	// widget pane. It is off until the user turns it on: the pane then
 	// reads the clipboard each time it shows.
@@ -148,6 +164,7 @@ func Default() Settings {
 		ShowClocks:      true,
 		ClockCities:     []string{},
 		ShowDiskSpace:   true,
+		TemperatureUnit: Celsius,
 	}
 }
 
@@ -188,6 +205,10 @@ func (s Settings) Normalize() Settings {
 	s.FileSearchFolders = cleanList(s.FileSearchFolders, func(s string) string { return s }, folderListMax)
 	s.FileSearchExcludedDirs = cleanList(s.FileSearchExcludedDirs, func(s string) string { return s }, folderListMax)
 	s.ClockCities = cleanList(s.ClockCities, strings.ToLower, maxClockCities)
+	s.WeatherCity = strings.TrimSpace(s.WeatherCity)
+	if city := []rune(s.WeatherCity); len(city) > MaxWeatherCityChars {
+		s.WeatherCity = string(city[:MaxWeatherCityChars])
+	}
 	return s
 }
 

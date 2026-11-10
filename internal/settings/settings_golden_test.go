@@ -14,7 +14,6 @@ import (
 var dropped = []string{
 	"expandSnippets", "shellCommands", "showFocusTimer",
 	"focusMinutes", "shortBreakMinutes", "longBreakMinutes", "sessionsBeforeLongBreak",
-	"showWeather", "weatherCity", "temperatureUnit",
 }
 
 type settingsRow struct {
