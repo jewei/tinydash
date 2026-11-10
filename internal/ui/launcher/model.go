@@ -151,11 +151,22 @@ func (m *Model) Show(category core.Category) {
 // Hidden stops recording as the panel hides: recording pauses the
 // launcher shortcut and every hotkey, which must work again while the
 // panel is away. A hide need not blur the view first. The full JSON view
-// closes too, so the next show starts on the widgets.
+// closes too, so the next show starts on the widgets. The clipboard card
+// goes, with any load on its way: the clipboard may change while the
+// panel is away, and the next show reads it again.
 func (m *Model) Hidden() {
 	m.stopRecording("")
 	m.jsonFor = ""
 	m.shown = false
+	m.widgets.Card = nil
+	m.widgetLoads++
+}
+
+// ShownAgain says that the panel shows again as it was, after a command
+// that hid it failed, and loads the widgets again.
+func (m *Model) ShownAgain() {
+	m.shown = true
+	m.loadWidgets()
 }
 
 // Stale searches again after the data changed, keeping the selected

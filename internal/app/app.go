@@ -649,7 +649,9 @@ func (s *appShell) Hide() error {
 func (s *appShell) Dismiss() error { return s.Hide() }
 
 func (s *appShell) ShowAgain() error {
-	s.app().panel.Show()
+	a := s.app()
+	a.model.ShownAgain()
+	a.panel.Show()
 	return nil
 }
 

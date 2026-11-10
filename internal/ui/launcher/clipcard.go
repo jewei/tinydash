@@ -88,7 +88,11 @@ func (m *Model) cardMenuItems() []menuItem {
 	var items []menuItem
 	if c.JSON != nil {
 		// The card the menu showed: a newer one has items of its own.
-		items = append(items, menuItem{label: mainLabel(c), keys: cardKeys, run: func() { m.openJSON(c) }})
+		items = append(items, menuItem{label: mainLabel(c), keys: cardKeys, run: func() {
+			if now := m.card(); now != nil && now.ID == c.ID {
+				m.openJSON(now)
+			}
+		}})
 	}
 	for i, ra := range c.Actions {
 		var keys []string

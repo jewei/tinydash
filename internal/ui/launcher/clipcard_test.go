@@ -219,6 +219,48 @@ func TestAHiddenPanelLoadsNoWidgets(t *testing.T) {
 	}
 }
 
+// A hide drops the card and any load on its way, so the next show never
+// acts on a copy the clipboard no longer holds.
+func TestAHideDropsTheCard(t *testing.T) {
+	f := withCard(colorCard)
+	f.holdWidgets = true
+	m, tt := showLauncher(t, f)
+	f.loading[0](f.widgets)
+	m.Hidden()
+	m.Show("")
+	tt.Frame()
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	if hasCard(tt, "Color") || len(f.runs) != 0 {
+		t.Errorf("the old card shows or ran before its load: %+v", f.runs)
+	}
+	// A load from before the hide lands late: it is dropped.
+	m.Hidden()
+	m.Show("")
+	f.loading[1](f.widgets)
+	tt.Frame()
+	if hasCard(tt, "Color") {
+		t.Error("a load from before the hide showed")
+	}
+	f.loading[2](f.widgets)
+	tt.Frame()
+	if !hasCard(tt, "Color") {
+		t.Error("the latest load did not show")
+	}
+}
+
+// After a failed command shows the panel again, the widgets load again.
+func TestShownAgainLoadsTheWidgets(t *testing.T) {
+	f := withCard(colorCard)
+	m, tt := showLauncher(t, f)
+	m.Hidden()
+	m.ShownAgain()
+	m.Stale()
+	tt.Frame()
+	if f.widgetLoads != 3 || !hasCard(tt, "Color") {
+		t.Errorf("loads %d; texts %q", f.widgetLoads, tt.Texts())
+	}
+}
+
 // JSON too deep to copy pretty has no Copy Pretty.
 func TestJSONWithoutPrettyCopy(t *testing.T) {
 	card := jsonCard()
