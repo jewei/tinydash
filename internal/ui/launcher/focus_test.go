@@ -11,6 +11,20 @@ import (
 	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
+// The hint for an empty clipboard shows only when no other widget does,
+// as the Solid app had it: the focus timer counts.
+func TestTheClipboardHintGivesWayToTheFocusTimer(t *testing.T) {
+	f := newFake(always())
+	m, tt := open(t, f)
+	focus := running(tt.Now())
+	f.widgets = Widgets{ClipCards: true, Focus: &focus}
+	m.Show("")
+	tt.Frame()
+	if tt.HasText("Copy a color, a Unix time, or JSON to see it here.") {
+		t.Errorf("the hint shows beside the timer: %q", tt.Texts())
+	}
+}
+
 // The fake's codes for the controls; the launcher only hands them back.
 const (
 	fakeStart FocusControl = iota + 1

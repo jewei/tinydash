@@ -94,6 +94,11 @@ type Widgets struct {
 	Cities []City
 	// Disk is nil while the disk widget is off.
 	Disk *Disk
+	// ClipCards is on while clipboard cards are: the pane shows, with a
+	// hint while the clipboard holds nothing a card shows.
+	ClipCards bool
+	// Card is the card of the clipboard text, or nil.
+	Card *ClipCard
 	// Focus is nil while the focus timer is off.
 	Focus *FocusTimer
 	// Note is nil while the Notepad is off.
@@ -106,6 +111,85 @@ type Note struct {
 	// Err is why the note could not be read, or nil.
 	Err error
 }
+
+// ClipCard decodes the clipboard text. Exactly one of Color, Time, and
+// JSON is set.
+type ClipCard struct {
+	// ID changes with the text, so a dismissed card comes back only for a
+	// new copy.
+	ID    string
+	Color *ClipColor
+	Time  *ClipTime
+	JSON  *ClipJSON
+	// Rows are a color's or a time's values, each copied by the action of
+	// the same index.
+	Rows []CardRow
+	// Actions copy the content in other forms; the first is the main one.
+	Actions []core.ResultAction
+}
+
+// CardRow is a labeled value, such as HEX and #2F6F5E.
+type CardRow struct{ Label, Value string }
+
+// ClipColor is a copied color.
+type ClipColor struct {
+	// Hex is the swatch's color, such as #2F6F5E.
+	Hex string
+	// CopiedAs is RGB or HSL when the copy was not hex, or "".
+	CopiedAs         string
+	OnWhite, OnBlack Contrast
+}
+
+// Contrast is a WCAG contrast ratio, such as 5.9:1, and its grade: AAA, AA,
+// AA large, or Fail.
+type Contrast struct{ Ratio, Grade string }
+
+// ClipTime is a copied Unix time.
+type ClipTime struct {
+	Raw          string
+	Milliseconds bool
+	// Relative is how long ago or ahead it is, such as 3 days ago.
+	Relative string
+}
+
+// ClipJSON is copied JSON: its shape, and its first lines.
+type ClipJSON struct {
+	Array               bool
+	Count, Depth, Bytes int
+	Keys                []JSONKey
+	// Minified is the start of the JSON without its spaces.
+	Minified string
+	Lines    []JSONLine
+	// MoreLines is how many lines the full view leaves out.
+	MoreLines int
+}
+
+// JSONKey is a top-level key with a hint of its value, such as {3}.
+type JSONKey struct{ Name, Hint string }
+
+// JSONLine is a laid out line, indented by levels of two spaces.
+type JSONLine struct {
+	Indent int
+	Tokens []JSONToken
+}
+
+// JSONToken is a piece of a line, colored by its kind.
+type JSONToken struct {
+	Kind JSONTokenKind
+	Text string
+}
+
+// JSONTokenKind is what a token is in JSON.
+type JSONTokenKind uint8
+
+const (
+	JSONKeyToken JSONTokenKind = iota
+	JSONString
+	JSONNumber
+	// JSONLiteral is true, false, or null.
+	JSONLiteral
+	JSONPunctuation
+)
 
 // City is a city's clock, read as the pane loads. The view keeps its time
 // current from the offset; the difference is new by the next load.

@@ -12,31 +12,91 @@ import (
 	"github.com/jewei/tinydash/internal/core"
 )
 
-// Answer decodes a color such as #2f6f5e, rgb(47 111 94), or
+// Color is a color decoded in its three forms, as the answer and the
+// clipboard card show it.
+type Color struct {
+	// Hex is `#2F6F5E`, for the swatch.
+	Hex, RGB, HSL string
+	// CopiedAs is how the text wrote it when not as hex: `RGB` or `HSL`.
+	CopiedAs string
+	// OnWhite and OnBlack are the contrast of the color as text on white
+	// and on black.
+	OnWhite, OnBlack Contrast
+}
+
+// Contrast is a WCAG contrast ratio and the level it reaches.
+type Contrast struct {
+	// Ratio is written as `5.9:1`.
+	Ratio string
+	// Grade is `AAA`, `AA`, `AA large`, or `Fail`.
+	Grade string
+}
+
+// Decode reads a color such as #2f6f5e, rgb(47 111 94), or
 // hsl(164, 41%, 31%).
+func Decode(text string) (Color, bool) {
+	lower := asciiLower(strings.TrimSpace(text))
+	rgb, ok := parse(lower)
+	if !ok {
+		return Color{}, false
+	}
+	r, g, b := rgb[0], rgb[1], rgb[2]
+	h, s, l := toHSL(rgb)
+	var copiedAs string
+	switch {
+	case strings.HasPrefix(lower, "rgb"):
+		copiedAs = "RGB"
+	case strings.HasPrefix(lower, "hsl"):
+		copiedAs = "HSL"
+	}
+	lum := luminance(rgb)
+	return Color{
+		Hex:      fmt.Sprintf("#%02X%02X%02X", r, g, b),
+		RGB:      fmt.Sprintf("rgb(%d, %d, %d)", r, g, b),
+		HSL:      fmt.Sprintf("hsl(%d, %d%%, %d%%)", h, s, l),
+		CopiedAs: copiedAs,
+		OnWhite:  contrast(1, lum),
+		OnBlack:  contrast(lum, 0),
+	}, true
+}
+
+// Actions copy the color as hex, rgb(), and hsl(), in that order.
+func (c Color) Actions() []core.ResultAction {
+	return []core.ResultAction{
+		core.Do("Copy HEX", core.Copy{Text: c.Hex}),
+		core.Do("Copy RGB", core.Copy{Text: c.RGB}),
+		core.Do("Copy HSL", core.Copy{Text: c.HSL}),
+	}
+}
+
+// Answer decodes a typed color, as Decode does.
 func Answer(query string) (core.Result, bool) {
-	rgb, ok := parse(asciiLower(strings.TrimSpace(query)))
+	c, ok := Decode(query)
 	if !ok {
 		return core.Result{}, false
 	}
-	r, g, b := rgb[0], rgb[1], rgb[2]
-	hex := fmt.Sprintf("#%02X%02X%02X", r, g, b)
-	rgbText := fmt.Sprintf("rgb(%d, %d, %d)", r, g, b)
-	h, s, l := toHSL(rgb)
-	hslText := fmt.Sprintf("hsl(%d, %d%%, %d%%)", h, s, l)
-	onWhite := (1 + 0.05) / (luminance(rgb) + 0.05)
 	return core.Result{
-		ID:       core.ID("color:" + hex),
+		ID:       core.ID("color:" + c.Hex),
 		Kind:     core.KindColor,
-		Title:    hex,
-		Subtitle: fmt.Sprintf("%s · %s · %.1f:1 on white", rgbText, hslText, onWhite),
-		Icon:     core.ColorIcon(hex),
-		Actions: []core.ResultAction{
-			core.Do("Copy HEX", core.Copy{Text: hex}),
-			core.Do("Copy RGB", core.Copy{Text: rgbText}),
-			core.Do("Copy HSL", core.Copy{Text: hslText}),
-		},
+		Title:    c.Hex,
+		Subtitle: c.RGB + " · " + c.HSL + " · " + c.OnWhite.Ratio + " on white",
+		Icon:     core.ColorIcon(c.Hex),
+		Actions:  c.Actions(),
 	}, true
+}
+
+func contrast(lighter, darker float64) Contrast {
+	ratio := (lighter + 0.05) / (darker + 0.05)
+	grade := "Fail"
+	switch {
+	case ratio >= 7:
+		grade = "AAA"
+	case ratio >= 4.5:
+		grade = "AA"
+	case ratio >= 3:
+		grade = "AA large"
+	}
+	return Contrast{Ratio: fmt.Sprintf("%.1f:1", ratio), Grade: grade}
 }
 
 // parse reads lower-case text.

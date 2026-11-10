@@ -38,10 +38,15 @@ var glyphs = func() map[string]*ui.SVG {
 	}
 	out := make(map[string]*ui.SVG, len(shapes))
 	for name, shape := range shapes {
-		out[name] = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">` + shape + `</svg>`))
+		out[name] = glyph(shape)
 	}
 	return out
 }()
+
+// glyph draws a shape on the grid and with the strokes of glyphs.
+func glyph(shape string) *ui.SVG {
+	return ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">` + shape + `</svg>`))
+}
 
 // kinds are each result kind's label, shown on the selected row, and the
 // glyph of a result that has no icon of its own.
