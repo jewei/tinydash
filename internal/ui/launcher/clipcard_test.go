@@ -174,6 +174,20 @@ func TestTheJSONViewClosesWhenThePaneGoes(t *testing.T) {
 	if hasJSONView(tt) || !hasCard(tt, "JSON") {
 		t.Error("a new card opened in the view")
 	}
+
+	// The view of the first card closed for good: copying it again shows
+	// its card, not the view.
+	first := jsonCard()
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	f.widgets.Card = &first
+	m.Stale()
+	tt.Frame()
+	f.widgets.Card = &next
+	m.Stale()
+	tt.Frame()
+	if hasJSONView(tt) || !hasCard(tt, "JSON") {
+		t.Error("the view opened again when its card came back")
+	}
 }
 
 // A click on a line leaves the keyboard with the search field.
