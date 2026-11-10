@@ -174,12 +174,13 @@ func (t *Timer) FinishIfDue(l Lengths, now time.Time) (Finished, bool) {
 	}, true
 }
 
-// Left is the time left in the phase at now.
+// Left is the time left in the phase at now, never more than the phase:
+// a wall clock set back does not make it longer.
 func (t *Timer) Left(now time.Time) time.Duration {
 	if t.EndsAt.IsZero() {
 		return t.Remaining
 	}
-	return max(t.EndsAt.Sub(now), 0)
+	return min(max(t.EndsAt.Sub(now), 0), t.Total)
 }
 
 // Actions are what the user can do now; the first is the main one.

@@ -82,6 +82,9 @@ func TestTheFocusTimerNamesEachState(t *testing.T) {
 			[]string{"Session done", "Done", "Session 4 of 4"}},
 		{"break", FocusTimer{Phase: "Long break", Break: true, Remaining: 15 * time.Minute, Total: 15 * time.Minute, Session: 4, Sessions: 4},
 			[]string{"Long break", "15:00"}},
+		// A wall clock set back a day shows no more than the phase.
+		{"clock set back", FocusTimer{Phase: "Focus", EndsAt: time.Now().Add(24 * time.Hour), Total: 25 * time.Minute, Session: 1, Sessions: 4},
+			[]string{"25:00"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			f := newFake(always())
@@ -95,19 +98,31 @@ func TestTheFocusTimerNamesEachState(t *testing.T) {
 	}
 }
 
-// Mod+P runs the main action while the pane shows the timer, and the
-// widgets load again to show what it did. Typed text hides the pane, and
-// Mod+P with it.
+// Mod+P runs the main action while the pane shows the timer, and the pane
+// shows the timer's new state at once, so a second press acts on it, also
+// while another action runs. Typed text hides the pane, and Mod+P with it.
 func TestModPRunsTheTimersMainAction(t *testing.T) {
-	f := newFake(always())
+	f := newFake(always(safari))
+	f.hold = true
 	_, tt := showTimer(t, f, running)
+	paused := FocusTimer{Phase: "Focus", Paused: true, Remaining: 20 * time.Minute, Total: 25 * time.Minute, Session: 1, Sessions: 4,
+		Actions: []FocusAction{{"Resume Timer", fakeStart}, {"Reset Timer", fakeReset}}}
+	f.controlFocus = func(FocusControl) error {
+		f.widgets.Focus = &paused
+		return nil
+	}
+	tt.Key(0, ui.KeyEnter) // an action that has not ended yet
 	tt.Key(ui.Cmd, ui.KeyP)
-	if !slices.Equal(f.controls, []FocusControl{fakePause}) || f.widgetLoads != 2 {
+	if !tt.HasText("Resume Timer") || !tt.HasText("Focus · Paused") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+	tt.Key(ui.Cmd, ui.KeyP)
+	if !slices.Equal(f.controls, []FocusControl{fakePause, fakeStart}) || f.widgetLoads != 1 {
 		t.Errorf("controls %v, loads %d", f.controls, f.widgetLoads)
 	}
 	tt.Type("x")
 	tt.Key(ui.Cmd, ui.KeyP)
-	if len(f.controls) != 1 {
+	if len(f.controls) != 2 {
 		t.Errorf("Mod+P ran a hidden timer: %v", f.controls)
 	}
 }

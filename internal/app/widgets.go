@@ -16,9 +16,7 @@ func (b *backend) Widgets(done func(launcher.Widgets)) {
 	s := a.engine.Snapshot(time.Now()).Settings
 	go func() {
 		w := loadWidgets(s, a.home, time.Now(), platform.DiskSpace)
-		if s.ShowFocusTimer {
-			w.Focus = a.focus.widget()
-		}
+		w.Focus = a.focus.widget(s)
 		a.panel.Update(func() { done(w) })
 	}()
 }

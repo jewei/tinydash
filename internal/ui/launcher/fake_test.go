@@ -124,13 +124,13 @@ func (f *fake) Widgets(done func(Widgets)) {
 	done(f.widgets)
 }
 
-func (f *fake) ControlFocus(control FocusControl, done func(error)) {
+func (f *fake) ControlFocus(control FocusControl) (*FocusTimer, error) {
 	f.controls = append(f.controls, control)
 	var err error
 	if f.controlFocus != nil {
 		err = f.controlFocus(control)
 	}
-	done(err)
+	return f.widgets.Focus, err
 }
 
 func (f *fake) Details(id core.ID, done func(Details, bool)) {

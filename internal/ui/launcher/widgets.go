@@ -106,12 +106,13 @@ func focusButton(c *ui.Context, p kit.Palette, label string, main bool, ring, ri
 	return b.Children(func() { ui.Text(c, label).FontSize(12).FontWeight(weight).TextColor(ink).SingleLine() })
 }
 
-// left is the time left in the phase at now.
+// left is the time left in the phase at now, never more than the phase,
+// as focus.Timer.Left has it.
 func (t FocusTimer) left(now time.Time) time.Duration {
 	if t.EndsAt.IsZero() {
 		return t.Remaining
 	}
-	return max(t.EndsAt.Sub(now), 0)
+	return min(max(t.EndsAt.Sub(now), 0), t.Total)
 }
 
 // seconds are the whole seconds a countdown shows for d: it reads 00:01

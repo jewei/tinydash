@@ -68,11 +68,10 @@ func (c *focusClock) control(control focus.Control, now time.Time) error {
 	if !c.on {
 		return errFocusOff
 	}
-	if err := c.timer.Control(control, c.lengths, now); err != nil {
-		return err
-	}
+	// A refused control wakes run too: the phase may be up, which only
+	// run ends, and a wait that slept with the computer may be far off.
 	c.wake()
-	return nil
+	return c.timer.Control(control, c.lengths, now)
 }
 
 func (c *focusClock) wake() {
@@ -82,8 +81,12 @@ func (c *focusClock) wake() {
 	}
 }
 
-// widget is the timer as the launcher's pane shows it.
-func (c *focusClock) widget() *launcher.FocusTimer {
+// widget is the timer as the launcher's pane shows it, or nil while the
+// settings s turn it off.
+func (c *focusClock) widget(s settings.Settings) *launcher.FocusTimer {
+	if !s.ShowFocusTimer {
+		return nil
+	}
 	c.mu.Lock()
 	t := c.timer
 	c.mu.Unlock()
@@ -143,6 +146,8 @@ func (a *App) focusFinished(ended focus.Finished) {
 	a.panel.Update(a.model.WidgetsChanged)
 }
 
-func (b *backend) ControlFocus(control launcher.FocusControl, done func(error)) {
-	done(b.app().focus.control(focus.Control(control), time.Now()))
+func (b *backend) ControlFocus(control launcher.FocusControl) (*launcher.FocusTimer, error) {
+	a := b.app()
+	err := a.focus.control(focus.Control(control), time.Now())
+	return a.focus.widget(a.engine.Snapshot(time.Now()).Settings), err
 }

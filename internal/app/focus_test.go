@@ -50,7 +50,7 @@ func TestTheFocusTimerWidgetShowsTheTimer(t *testing.T) {
 	if err := clock.control(focus.Start, start); err != nil {
 		t.Fatal(err)
 	}
-	w := clock.widget()
+	w := clock.widget(focusOn())
 	if w.Phase != "Focus" || w.Break || w.Paused || w.Done || !w.EndsAt.Equal(start.Add(25*time.Minute)) ||
 		w.Total != 25*time.Minute || w.Session != 1 || w.Sessions != 4 || len(w.Actions) != 2 ||
 		w.Actions[0] != (launcher.FocusAction{Label: "Pause Timer", Control: launcher.FocusControl(focus.Pause)}) {
@@ -62,6 +62,13 @@ func TestTheFocusTimerWidgetShowsTheTimer(t *testing.T) {
 	}
 }
 
+func TestTheFocusTimerWidgetIsGoneWhileItIsOff(t *testing.T) {
+	clock := newFocusClock(focusOn())
+	if w := clock.widget(settings.Default()); w != nil {
+		t.Errorf("an off timer shows: %+v", w)
+	}
+}
+
 // The real clock's end is a wall clock time, so a sleep of the computer
 // does not hold it back.
 func TestTheFocusTimerEndFollowsTheWallClock(t *testing.T) {
@@ -69,7 +76,7 @@ func TestTheFocusTimerEndFollowsTheWallClock(t *testing.T) {
 	if err := clock.control(focus.Start, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if end := clock.widget().EndsAt; end != end.Round(0) {
+	if end := clock.widget(focusOn()).EndsAt; end != end.Round(0) {
 		t.Errorf("the end %v holds a monotonic reading", end)
 	}
 }
@@ -163,6 +170,29 @@ func TestTheFocusClockReportsAFocusEndAndThenABreakEnd(t *testing.T) {
 	clocks.set(start.Add(130 * time.Second))
 	clocks.fire <- time.Time{}
 	if f := ended(); f.Title != "Break is over" || f.Body != "Ready for focus session 2 of 4?" {
+		t.Errorf("%+v", f)
+	}
+
+	// Session 2 ends, and its break runs while the computer sleeps
+	// through its end. A pause after waking is refused, and wakes the
+	// clock at once instead of after the wait that slept, so the break
+	// ends now.
+	if err := clock.control(focus.Start, start.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	wait()
+	clocks.set(start.Add(4 * time.Minute))
+	clocks.fire <- time.Time{}
+	ended()
+	if err := clock.control(focus.Start, start.Add(4*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	wait()
+	clocks.set(start.Add(2 * time.Hour))
+	if err := clock.control(focus.Pause, start.Add(2*time.Hour)); !errors.Is(err, focus.ErrChanged) {
+		t.Errorf("paused a phase that is up: %v", err)
+	}
+	if f := ended(); f.Title != "Break is over" || f.Body != "Ready for focus session 3 of 4?" {
 		t.Errorf("%+v", f)
 	}
 }

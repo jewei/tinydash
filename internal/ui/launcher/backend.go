@@ -59,8 +59,10 @@ type Backend interface {
 	// loads them outside the frame.
 	Details(id core.ID, done func(Details, bool))
 	// ControlFocus starts, pauses, skips, or resets the focus timer, as
-	// one of its FocusActions asks; done as for Run.
-	ControlFocus(control FocusControl, done func(error))
+	// one of its FocusActions asks, and returns the timer as it is now,
+	// also when it refused, or nil while it is off. It only changes
+	// memory, so it answers at once.
+	ControlFocus(control FocusControl) (*FocusTimer, error)
 	// Warnings are the problems found since the last call, such as a
 	// hotkey that did not register at startup, each returned once. They
 	// come after the launcher was made, so it asks each time it shows.

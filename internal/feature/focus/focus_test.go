@@ -187,6 +187,15 @@ func TestFewerSessionsKeepTheSessionInTheCycle(t *testing.T) {
 	}
 }
 
+// A wall clock set back never shows more time left than the phase has.
+func TestTimeLeftNeverPassesThePhase(t *testing.T) {
+	timer := New(lengths)
+	start(t, &timer, at(0))
+	if left := timer.Left(at(-24 * 60)); left != 25*time.Minute {
+		t.Errorf("left %v", left)
+	}
+}
+
 // A phase whose time is up, but which FinishIfDue has not ended yet,
 // refuses a pause: it would pause at 00:00 and never notify. Reset still
 // works.

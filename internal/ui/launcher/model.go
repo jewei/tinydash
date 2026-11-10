@@ -184,21 +184,16 @@ func (m *Model) runFocusTimer() {
 	}
 }
 
-// controlFocus runs one of the focus timer's actions, then loads the
-// widgets again to show the timer's new state.
+// controlFocus runs one of the focus timer's actions and shows the
+// timer's new state at once, so a second press acts on it. It does not
+// wait for an action that runs: the timer is separate from them.
 func (m *Model) controlFocus(a FocusAction) {
-	if m.running {
-		return
-	}
-	m.running = true
+	timer, err := m.backend.ControlFocus(a.Control)
+	m.widgets.Focus = timer
 	m.notice = ""
-	m.backend.ControlFocus(a.Control, func(err error) {
-		m.running = false
-		if err != nil {
-			m.notice = err.Error()
-		}
-		m.loadWidgets()
-	})
+	if err != nil {
+		m.notice = err.Error()
+	}
 }
 
 // warning is the startup warning on screen, or "". An action's failure
