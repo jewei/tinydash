@@ -22,33 +22,48 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 		m.jsonView(c, p, card)
 		return
 	}
-	ui.Column(c).Grow(9).Padding(12).Gap(8).Background(p.Raised).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).
-		Role(ui.RoleRegion).Label("Widgets").Children(func() {
-		if card != nil {
-			m.clipCard(c, p, card)
-		}
-		if w.Clocks {
-			// c.Now is the frame's time, which a Tester moves; the local
-			// zone is read each frame, so the clock follows a change of it.
-			now := c.Now().Local()
-			clocks(c, p, now, w.Cities, c.Region().FormatLocale(c.Locale()))
-			// A new frame as the minute turns, not a timer that polls.
-			c.After(now.Truncate(time.Minute).Add(time.Minute).Sub(now))
-		}
-		if w.Focus != nil {
-			m.focusTimer(c, p, *w.Focus)
-		}
-		if w.Disk != nil {
-			diskSpace(c, p, *w.Disk)
-		}
-		if w.Note != nil {
-			m.notepadCard(c, p, *w.Note)
-		}
-		// Only clipboard cards are on, and the clipboard has none.
-		if card == nil && !w.Clocks && w.Focus == nil && w.Disk == nil && w.Note == nil {
-			ui.Text(c, "Copy a color, a Unix time, or JSON to see it here.").Padding(12).FontSize(12).TextColor(p.Muted)
-		}
+	// The pane scrolls when its cards do not fit, as the Solid app's did.
+	// Its column is at least as tall as the pane was in the last frame, so
+	// the note grows into the room that the other cards leave.
+	pane := ui.Scroll(c).Grow(9).Background(p.Raised).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).
+		Role(ui.RoleRegion).Label("Widgets")
+	room := pane.Bounds().H
+	if room == 0 {
+		// A new pane has no last frame: draw again once it has a height.
+		c.After(0)
+	}
+	pane.Children(func() {
+		ui.Column(c).MinHeight(room).Padding(12).Gap(8).Children(func() { m.widgetCards(c, p, w, card) })
 	})
+}
+
+// widgetCards are the cards of the widgets that are on, in the Solid
+// app's order.
+func (m *Model) widgetCards(c *ui.Context, p kit.Palette, w Widgets, card *ClipCard) {
+	if card != nil {
+		m.clipCard(c, p, card)
+	}
+	if w.Clocks {
+		// c.Now is the frame's time, which a Tester moves; the local
+		// zone is read each frame, so the clock follows a change of it.
+		now := c.Now().Local()
+		clocks(c, p, now, w.Cities, c.Region().FormatLocale(c.Locale()))
+		// A new frame as the minute turns, not a timer that polls.
+		c.After(now.Truncate(time.Minute).Add(time.Minute).Sub(now))
+	}
+	if w.Focus != nil {
+		m.focusTimer(c, p, *w.Focus)
+	}
+	if w.Disk != nil {
+		diskSpace(c, p, *w.Disk)
+	}
+	if w.Note != nil {
+		m.notepadCard(c, p, *w.Note)
+	}
+	// Only clipboard cards are on, and the clipboard has none.
+	if card == nil && !w.Clocks && w.Focus == nil && w.Disk == nil && w.Note == nil {
+		ui.Text(c, "Copy a color, a Unix time, or JSON to see it here.").Padding(12).FontSize(12).TextColor(p.Muted)
+	}
 }
 
 // focusTimer shows the phase, a ring of the time left, and the timer's

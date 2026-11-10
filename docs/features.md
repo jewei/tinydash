@@ -60,7 +60,7 @@ Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system co
 
 ## Widgets
 
-An empty All search shows widgets to the right of the results, in place of the details. Typing, or another tab, shows the details again. Settings > Widgets turns each widget on or off; with every widget off, the details stay.
+An empty All search shows widgets to the right of the results, in place of the details. Typing, or another tab, shows the details again. Settings > Widgets turns each widget on or off; with every widget off, the details stay. When the widgets do not fit, the pane scrolls.
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.

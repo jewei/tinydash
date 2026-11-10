@@ -25,6 +25,54 @@ func TestTheClipboardHintGivesWayToTheFocusTimer(t *testing.T) {
 	}
 }
 
+// A phase that ends while the launcher is away loads nothing: a load reads
+// the clipboard for its card. The next show loads the widgets anyway.
+func TestAPhaseEndLoadsTheWidgetsOnlyWhileShown(t *testing.T) {
+	f := newFake(always())
+	m, _ := showTimer(t, f, running)
+	m.WidgetsChanged()
+	if f.widgetLoads != 2 {
+		t.Fatalf("loads %d while shown, want 2", f.widgetLoads)
+	}
+	m.Hidden()
+	m.WidgetsChanged()
+	if f.widgetLoads != 2 {
+		t.Errorf("loaded the widgets while hidden: %d loads", f.widgetLoads)
+	}
+}
+
+// With every widget on, the cards do not fit, so the pane scrolls and each
+// card keeps its height; with fewer, the note fills the room left, from the
+// pane's first frame.
+func TestThePaneScrollsAndTheNoteFillsTheRoomLeft(t *testing.T) {
+	f := newFake(always())
+	m, tt := open(t, f)
+	card := colorCard
+	focus := running(tt.Now())
+	f.widgets = Widgets{ClipCards: true, Card: &card, Clocks: true, Focus: &focus,
+		Disk: &Disk{Name: "Macintosh HD", TotalBytes: 494e9, FreeBytes: 182e9}, Note: &Note{Text: "note"}}
+	m.Show("")
+	tt.Frame()
+	pane, _ := tt.AccessByRole(ui.RoleRegion, "Widgets")
+	timer, _ := tt.AccessByRole(ui.RoleGroup, "Focus timer")
+	if timer.Bounds.H < 120 {
+		t.Errorf("the timer card shrank to %v high in a full pane %+v", timer.Bounds.H, pane.Bounds)
+	}
+	color, _ := tt.AccessByRole(ui.RoleGroup, "Color on the clipboard")
+	if hsl, ok := tt.Find("hsl(164, 41%, 31%)"); !ok || hsl.Y+hsl.H > color.Bounds.Y+color.Bounds.H {
+		t.Errorf("the color card %+v cuts its HSL row %+v", color.Bounds, hsl)
+	}
+
+	f.widgets = Widgets{Clocks: true, Note: &Note{Text: "note"}}
+	tt.Type("x") // the pane goes, and comes back new
+	tt.Key(0, ui.KeyBackspace)
+	note, _ := tt.AccessByRole(ui.RoleGroup, "Notepad")
+	pane, _ = tt.AccessByRole(ui.RoleRegion, "Widgets")
+	if bottom := note.Bounds.Y + note.Bounds.H; bottom < pane.Bounds.Y+pane.Bounds.H-24 {
+		t.Errorf("the note ends at %v, short of the pane's end at %v", bottom, pane.Bounds.Y+pane.Bounds.H)
+	}
+}
+
 // The fake's codes for the controls; the launcher only hands them back.
 const (
 	fakeStart FocusControl = iota + 1
