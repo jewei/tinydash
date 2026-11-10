@@ -1,0 +1,202 @@
+# Started by "Run workflow" on GitHub, or `gh workflow run release.yml -f
+# version=0.10.0 -f draft=true`. Builds main at a commit whose CI passed,
+# checks that the macOS app is signed and notarized, then tags that commit
+# and makes the release (or a draft to try first). Nothing is published
+# unless every build passed. The app does not update itself, so there is no
+# update feed; homebrew.yml updates the cask when the release is published.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, such as 0.10.0; mygo.json must hold it
+        required: true
+        type: string
+      draft:
+        description: Make a draft to try before you publish it
+        type: boolean
+        default: true
+
+concurrency: release
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-24.04
+    permissions:
+      checks: read
+      # Only a token that can write sees draft releases.
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Release from main, at a new version, after CI passed
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "Release from main, not $GITHUB_REF."; exit 1
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "\"$VERSION\" is not a version such as 0.10.0."; exit 1
+          fi
+          if [ "$(jq -r .version mygo.json)" != "$VERSION" ]; then
+            echo "mygo.json holds $(jq -r .version mygo.json), not $VERSION. Change it in a pull request first."; exit 1
+          fi
+          if ! grep -q "^## \[$VERSION\] - " CHANGELOG.md; then
+            echo "CHANGELOG.md has no \"## [$VERSION] - <date>\" section."; exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already exists. Choose a new version."; exit 1
+          fi
+          # A draft has no tag yet, so the check above misses it.
+          drafts=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            -q ".[] | select(.draft and .tag_name == \"v$VERSION\") | .id")
+          if [ -n "$drafts" ]; then
+            echo "A draft release for v$VERSION already exists. Publish or delete it on GitHub, or choose a new version."; exit 1
+          fi
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q '.tag_name | ltrimstr("v")' 2>/dev/null) || latest=""
+          if [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$(printf '%s\n%s\n' "$latest" "$VERSION" | sort -V | tail -n 1)" != "$VERSION" ]; then
+            echo "$VERSION is lower than the latest release, $latest. Choose a higher version."; exit 1
+          fi
+          result=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs?check_name=Required%20checks" \
+            -q '.check_runs | map(.conclusion) | if any(. == "success") then "success" else "not passed" end')
+          if [ "$result" != success ]; then
+            echo "CI has not passed on $GITHUB_SHA yet. Wait for it, then try again."; exit 1
+          fi
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - { os: macos-15, platform: darwin/universal }
+          - { os: windows-2025, platform: windows/amd64 }
+          - { os: ubuntu-24.04, platform: linux/amd64 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # A temporary keychain holds the Developer ID certificate and the
+      # notarytool credentials; the runner is thrown away after the job.
+      - name: Set up signing and notarization
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then echo "Add the $name repository secret."; exit 1; fi
+          done
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          password=$(openssl rand -hex 24)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain"
+          security default-keychain -s "$keychain"
+          xcrun notarytool store-credentials tinydash-release --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --keychain "$keychain"
+          # Local builds stay ad hoc signed: only this build notarizes.
+          jq --arg keychain "$keychain" '.macos.notarize = {keychainProfile: "tinydash-release", keychain: $keychain}' \
+            mygo.json > "$RUNNER_TEMP/mygo.json"
+          mv "$RUNNER_TEMP/mygo.json" mygo.json
+      - name: Build
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+        run: |
+          sign=()
+          if [ "$RUNNER_OS" = macOS ]; then sign=(-sign "$APPLE_SIGNING_IDENTITY"); fi
+          go tool mygo build -platform "$PLATFORM" "${sign[@]}"
+      - name: Check that the macOS app is signed and notarized
+        if: runner.os == 'macOS'
+        run: |
+          app=build/darwin-universal/TinyDash.app
+          codesign --verify --deep --strict "$app"
+          spctl --assess --type execute -vv "$app" 2>&1 | tee assessment.txt
+          grep -q "source=Notarized Developer ID" assessment.txt
+          xcrun stapler validate build/darwin-universal/*.dmg
+      - name: Collect the installers
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir installers
+          find build -type f \( -name '*.dmg' -o -name '*-setup-*.exe' -o -name '*.deb' -o -name '*.tar.gz' -o -name install.sh \) \
+            -exec cp {} installers/ \;
+          # The Homebrew cask downloads TinyDash_<version>_universal.dmg, as
+          # for the Rust releases.
+          if [ -f "installers/tinydash-$VERSION.dmg" ]; then
+            mv "installers/tinydash-$VERSION.dmg" "installers/TinyDash_${VERSION}_universal.dmg"
+          fi
+          ls -l installers
+          [ -n "$(ls installers)" ]
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-${{ matrix.os }}
+          path: installers/
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      # Sign and store the build provenance of each installer.
+      id-token: write
+      attestations: write
+      # Start homebrew.yml: a release made with this token starts no workflow.
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+      DRAFT: ${{ inputs.draft }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: installers
+      # Records that this workflow built each file from this commit, so
+      # `gh attestation verify FILE --repo OWNER/REPO` can prove where it came from.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            installers/*.dmg
+            installers/*.exe
+            installers/*.deb
+            installers/*.tar.gz
+            installers/install.sh
+      - name: Tag the commit and make the release
+        run: |
+          # The notes are this version's CHANGELOG.md section.
+          awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {on=1; next} on && /^## \[/ {exit} on' CHANGELOG.md > notes.md
+          cat notes.md
+          cd installers
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+          draft=()
+          if [ "$DRAFT" = true ]; then draft=(--draft); fi
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "TinyDash v$VERSION" --notes-file ../notes.md "${draft[@]}" -- *
+      - name: Update the Homebrew cask
+        if: ${{ !inputs.draft }}
+        run: gh workflow run homebrew.yml --repo "$GITHUB_REPOSITORY" --ref main -f version="$VERSION"
