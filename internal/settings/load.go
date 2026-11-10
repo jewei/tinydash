@@ -215,6 +215,11 @@ var fields = map[string]func(*Settings, any) bool{
 	"temperatureUnit":         field(func(s *Settings) *TemperatureUnit { return &s.TemperatureUnit }, readEnum(Celsius, Fahrenheit)),
 	"showClipboardCards":      field(func(s *Settings) *bool { return &s.ShowClipboardCards }, readBool),
 	"showNotepad":             field(func(s *Settings) *bool { return &s.ShowNotepad }, readBool),
+	"showFocusTimer":          field(func(s *Settings) *bool { return &s.ShowFocusTimer }, readBool),
+	"focusMinutes":            field(func(s *Settings) *uint16 { return &s.FocusMinutes }, readUint[uint16]),
+	"shortBreakMinutes":       field(func(s *Settings) *uint16 { return &s.ShortBreakMinutes }, readUint[uint16]),
+	"longBreakMinutes":        field(func(s *Settings) *uint16 { return &s.LongBreakMinutes }, readUint[uint16]),
+	"sessionsBeforeLongBreak": field(func(s *Settings) *uint8 { return &s.SessionsBeforeLongBreak }, readUint[uint8]),
 }
 
 func field[T any](at func(*Settings) *T, read func(any) (T, bool)) func(*Settings, any) bool {
@@ -233,7 +238,7 @@ func readBool(v any) (bool, bool) { b, ok := v.(bool); return b, ok }
 
 // readUint takes a whole number in range, as serde does: "1.0" and "1e2"
 // are floats, and "-0" is zero.
-func readUint[T uint8 | uint32](v any) (T, bool) {
+func readUint[T uint8 | uint16 | uint32](v any) (T, bool) {
 	n, ok := v.(json.Number)
 	if !ok {
 		return 0, false

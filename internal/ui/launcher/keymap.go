@@ -27,6 +27,7 @@ var keymap = append([]binding{
 	{ui.Cmd, ui.KeyK, nil, once((*Model).openMenu)},
 	{ui.Cmd, ui.KeyBackspace, (*Model).canDelete, once((*Model).deleteSelected)},
 	{ui.Cmd, ui.KeyComma, nil, once((*Model).openSettings)},
+	{ui.Cmd, ui.KeyP, (*Model).hasFocusTimer, once((*Model).runFocusTimer)},
 	{ui.Cmd, ui.KeyJ, nil, once((*Model).focusNote)},
 	{0, ui.KeyEscape, nil, once((*Model).escape)},
 }, rowKeys()...)

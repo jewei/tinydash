@@ -78,6 +78,7 @@ type App struct {
 	watch    *fileWatch
 	appWatch *fileWatch
 	hud      *hud
+	focus    *focusClock
 	tray     *mygo.Tray
 	settings *settingsWindow
 	// home is the user's home folder, whose disk the disk widget shows.
@@ -137,6 +138,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	}
 
 	a.engine = engine.New(db, first, a.dataChanged)
+	a.focus = newFocusClock(first.Settings)
 	a.desktop = &desktop{clip: NewClipboard(a.capture)}
 	a.actions = engine.NewActions(a.engine, a.desktop, (*appShell)(a), a.keys, time.Now)
 	a.more = a.newMoreFiles()
@@ -202,6 +204,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	go a.watchClipboard()
 	go a.refreshRates(false)
 	go a.refreshWeather(false)
+	go a.focus.run(ctx, time.Now, time.After, a.focusFinished, func() { a.panel.Update(a.model.WidgetsChanged) })
 	open(a, opts.Launch, false)
 	return a, nil
 }
@@ -223,10 +226,12 @@ func (a *App) warn(message any) {
 	}
 }
 
-// dataChanged runs on the writer after each change: the view searches
-// again, and Settings reads the data again.
+// dataChanged runs on the writer after each change: the focus timer
+// follows the settings, the view searches again, and Settings reads the
+// data again.
 func (a *App) dataChanged() {
 	a.watchFolders()
+	a.focus.follow(a.engine.Snapshot(time.Now()).Settings)
 	a.panel.Update(func() {
 		a.model.Stale()
 		a.settingsChanged()

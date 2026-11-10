@@ -11,6 +11,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - The Weather widget is back. It shows the current weather for one city from Open-Meteo. Turn it on, and set the city and the unit, in Settings > Widgets. A city set in TinyDash 0.9.0 carries over, and so does its saved weather.
 - Clipboard cards are back. When you copy a color, a Unix time, or JSON, the widgets show it decoded, with buttons to copy it in other forms. Mod+Shift+Enter copies the main form or opens the full JSON. Turn them on in Settings > Widgets.
 - The Notepad widget is back: one scratch note beside an empty All search. Turn it on in Settings > Widgets. Mod+J moves to the note and back. Your note from an earlier version is still there.
+- The Focus timer widget is back: Pomodoro focus sessions and breaks, with Mod+P and a system notification when each one ends. Turn it on in Settings > Widgets. Its settings from version 0.9.0 carry over.
 
 ## [0.10.0] - 2026-11-10
 

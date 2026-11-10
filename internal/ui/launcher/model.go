@@ -40,6 +40,9 @@ type Model struct {
 	widgets                      Widgets
 	widgetLoads                  int
 	widgetsLoading, widgetsAgain bool
+	// paneRoom is the widget pane's height as the last frame laid it out,
+	// which its column fills.
+	paneRoom float32
 	// dismissedCard is the ID of the clipboard card the user dismissed,
 	// kept while a query hides the pane. jsonFor is the ID of the card
 	// whose full JSON view covers the pane, or "": a new card, a hide, an
@@ -194,6 +197,9 @@ func (m *Model) Stale() {
 }
 
 func (m *Model) loadWidgets() {
+	// The focus timer is in memory: it shows its state at once, also while
+	// a load waits on the calendars.
+	m.widgets.Focus = m.backend.FocusTimer()
 	if m.widgetsLoading {
 		m.widgetsAgain = true
 		return
@@ -208,6 +214,8 @@ func (m *Model) loadWidgets() {
 		// asked for its own load after it.
 		if load == m.widgetLoads {
 			m.widgets = w
+			// The timer may have changed while the load ran.
+			m.widgets.Focus = m.backend.FocusTimer()
 			m.takeNote(w.Note)
 		}
 		if again && m.shown {
@@ -219,7 +227,7 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil || m.widgets.Weather != nil || m.widgets.Note != nil || m.widgets.ClipCards)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil || m.widgets.Weather != nil || m.widgets.Note != nil || m.widgets.ClipCards || m.widgets.Focus != nil)
 }
 
 // upNextChanged loads the widgets again once Up Next changes with the
@@ -235,6 +243,47 @@ func (m *Model) upNextChanged(now time.Time) time.Duration {
 	}
 	m.loadWidgets()
 	return 0
+}
+
+// WidgetsChanged loads the widgets again after one changed on its own, as
+// when a phase of the focus timer ends. While the panel is away it loads
+// nothing: a load reads the clipboard for its card, and the next Show
+// loads anyway.
+func (m *Model) WidgetsChanged() {
+	if m.shown {
+		m.loadWidgets()
+	}
+}
+
+// focusActions are the focus timer's actions while the pane shows it, and
+// the full JSON view does not cover it.
+func (m *Model) focusActions() []FocusAction {
+	if !m.showsWidgets() || m.showsJSON() || m.widgets.Focus == nil {
+		return nil
+	}
+	return m.widgets.Focus.Actions
+}
+
+func (m *Model) hasFocusTimer() bool { return len(m.focusActions()) > 0 }
+
+// runFocusTimer runs the focus timer's main action, as Mod+P does.
+func (m *Model) runFocusTimer() {
+	if actions := m.focusActions(); len(actions) > 0 {
+		m.controlFocus(actions[0])
+	}
+}
+
+// controlFocus runs one of the focus timer's actions and shows the
+// timer's new state at once, so a second press acts on it. It does not
+// wait for an action that runs: the timer is separate from them. A load
+// of the widgets that runs takes the timer's state as it ends.
+func (m *Model) controlFocus(a FocusAction) {
+	timer, err := m.backend.ControlFocus(a.Control)
+	m.widgets.Focus = timer
+	m.notice = ""
+	if err != nil {
+		m.notice = err.Error()
+	}
 }
 
 // warning is the startup warning on screen, or "". An action's failure

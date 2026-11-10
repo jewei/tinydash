@@ -61,6 +61,15 @@ type Backend interface {
 	// snippets have them. Reading them can wait on the disk, so the app
 	// loads them outside the frame.
 	Details(id core.ID, done func(Details, bool))
+	// ControlFocus starts, pauses, skips, or resets the focus timer, as
+	// one of its FocusActions asks, and returns the timer as it is now,
+	// also when it refused, or nil while it is off. It only changes
+	// memory, so it answers at once.
+	ControlFocus(control FocusControl) (*FocusTimer, error)
+	// FocusTimer is the focus timer as it is now, or nil while it is off.
+	// It only reads memory, so a pane that shows again has the timer's
+	// state at once, not the one from before it hid.
+	FocusTimer() *FocusTimer
 	// Warnings are the problems found since the last call, such as a
 	// hotkey that did not register at startup, each returned once. They
 	// come after the launcher was made, so it asks each time it shows.
@@ -102,6 +111,9 @@ type Widgets struct {
 	ClipCards bool
 	// Card is the card of the clipboard text, or nil.
 	Card *ClipCard
+	// Focus is nil while the focus timer is off. The launcher fills it
+	// from FocusTimer, not from a load, which can take seconds.
+	Focus *FocusTimer
 	// Note is nil while the Notepad is off.
 	Note *Note
 }
@@ -272,6 +284,38 @@ const (
 	WeatherNotFound
 	WeatherFailed
 )
+
+// FocusTimer is the focus timer as the pane shows it. The view counts
+// down to EndsAt itself; the app loads it again as a phase ends.
+type FocusTimer struct {
+	// Phase names the phase: Focus, Short break, or Long break.
+	Phase string
+	// Break is set during a break, which the timer shows in calm colors.
+	Break  bool
+	Paused bool
+	// Done is set once a focus session ended and its break waits.
+	Done bool
+	// EndsAt is when the running phase ends, or zero while it does not
+	// run. Remaining is the time left while it does not run, and Total
+	// the length of the phase.
+	EndsAt           time.Time
+	Remaining, Total time.Duration
+	// Session is the session of the cycle, from 1, of Sessions.
+	Session, Sessions int
+	// Actions are what the user can do now. The first is the main one,
+	// which Mod+P runs.
+	Actions []FocusAction
+}
+
+// FocusAction is one control of the focus timer.
+type FocusAction struct {
+	Label   string
+	Control FocusControl
+}
+
+// FocusControl is the app's code for a control of the focus timer. The
+// launcher hands it back to ControlFocus as it came.
+type FocusControl uint8
 
 // Details are a result's details as the pane shows them.
 type Details struct {

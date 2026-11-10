@@ -41,6 +41,10 @@ type fake struct {
 	loading     []func(Widgets)
 	// warnings wait until the launcher asks for them.
 	warnings []string
+	// controls are the focus timer controls asked for; controlFocus, if
+	// set, runs for each and gives its outcome.
+	controls     []FocusControl
+	controlFocus func(FocusControl) error
 
 	// notes are the texts sent to save, in order. noteErr, if set, is the
 	// error of each save. holdNotes keeps their done functions in
@@ -126,6 +130,17 @@ func (f *fake) Widgets(done func(Widgets)) {
 		return
 	}
 	done(f.widgets)
+}
+
+func (f *fake) FocusTimer() *FocusTimer { return f.widgets.Focus }
+
+func (f *fake) ControlFocus(control FocusControl) (*FocusTimer, error) {
+	f.controls = append(f.controls, control)
+	var err error
+	if f.controlFocus != nil {
+		err = f.controlFocus(control)
+	}
+	return f.widgets.Focus, err
 }
 
 func (f *fake) SaveNote(text string, done func(error)) {
