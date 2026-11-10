@@ -6,6 +6,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Added
 
+- Settings > About shows the version of TinyDash, the folders that hold your settings and saved data, where to get new versions, and the credits.
 - The Focus timer widget is back: Pomodoro focus sessions and breaks, with Mod+P and a system notification when each one ends. Turn it on in Settings > Widgets. Its settings from version 0.9.0 carry over.
 
 ## [0.10.0] - 2026-11-10
