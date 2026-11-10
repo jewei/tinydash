@@ -19,6 +19,9 @@ type textField struct {
 	// saving counts the saves on their way. While one is, the saved value
 	// is not the last one committed, so each commit saves.
 	saving int
+	// notice says why the last save failed, next to the field: the
+	// page's error line may be gone or scrolled out of view.
+	notice string
 }
 
 // text is a row with a textField of at most maxLength characters.
@@ -26,17 +29,21 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 	if !f.editing && !f.held {
 		f.draft = value
 	}
-	row(c, p, label, "", func() {
+	row(c, p, label, f.notice, func() {
 		in := ui.TextInput(c, &f.draft).Label(name).Placeholder(placeholder).MaxLength(maxLength).Width(200)
 		in.OnTextKey(func(k ui.TextKey) bool {
 			if k.Key != ui.KeyEnter || k.Mods != 0 {
 				return false
 			}
+			// The editor can be ahead of the bound draft, and writes what
+			// it holds over a draft set here.
+			f.draft = k.Text()
 			m.commitText(f, value, set)
+			k.SetText(f.draft)
 			return true
 		})
 		if in.Changed() {
-			f.editing, f.held = true, false
+			f.editing, f.held, f.notice = true, false, ""
 		}
 		if f.editing && !in.Focused() {
 			m.commitText(f, value, set)
@@ -46,7 +53,7 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 
 // commitText saves the draft without its surrounding spaces, when it
 // changed. The field shows the trimmed text until the save ends; after a
-// failure it keeps it, so the text is not lost.
+// failure it keeps it and says why, so the text is not lost.
 func (m *Model) commitText(f *textField, value string, set func(*settings.Settings, string)) {
 	f.editing = false
 	text := strings.TrimSpace(f.draft)
@@ -56,10 +63,15 @@ func (m *Model) commitText(f *textField, value string, set func(*settings.Settin
 	}
 	f.held = true
 	f.saving++
-	m.save(func(s *settings.Settings) { set(s, text) }, func(err error) {
+	m.saveOwn(func(s *settings.Settings) { set(s, text) }, func(err error) {
 		f.saving--
-		if err == nil && f.draft == text {
-			f.held = false
+		if f.draft != text {
+			return
 		}
+		if err != nil {
+			f.notice = "Not saved. " + err.Error()
+			return
+		}
+		f.held, f.notice = false, ""
 	})
 }

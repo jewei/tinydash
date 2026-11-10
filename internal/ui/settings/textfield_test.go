@@ -61,7 +61,7 @@ func TestKeepsACityThatCouldNotBeSaved(t *testing.T) {
 	_, tt := open(t, f, widgets)
 	typeInto(t, tt, "Weather city", " Ipoh ", true)
 	tt.Frame()
-	if info, _ := tt.AccessByRole(ui.RoleTextField, "Weather city"); info.Value != "Ipoh" || !tt.HasText("Settings cannot be saved now.") {
+	if info, _ := tt.AccessByRole(ui.RoleTextField, "Weather city"); info.Value != "Ipoh" || !tt.HasText("Not saved. Settings cannot be saved now.") {
 		t.Errorf("field %q; texts %q", info.Value, tt.Texts())
 	}
 }
