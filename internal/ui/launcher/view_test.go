@@ -400,7 +400,7 @@ func TestActsOnceOnAKeyHeldInTheHotkeyDialog(t *testing.T) {
 	}
 	// A held Enter neither starts recording again nor clicks a button.
 	tt.KeyRepeat(0, ui.KeyEnter)
-	if m.hotkey.recording {
+	if m.hotkey.rec.On() {
 		t.Fatal("a held Enter started recording")
 	}
 	tt.Key(0, ui.KeyTab)

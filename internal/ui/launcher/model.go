@@ -6,6 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 // historyLimit is how many past searches Up brings back.
@@ -97,11 +98,10 @@ type aliasDialog struct {
 }
 
 type hotkeyDialog struct {
-	id        core.ID
-	title     string
-	shortcut  string // the hotkey the result has now, or ""
-	err       string
-	recording bool
+	id       core.ID
+	title    string
+	shortcut string // the hotkey the result has now, or ""
+	rec      kit.Recording
 	// recorderFocused is whether the recorder had the focus in the last
 	// frame, so losing it, as to another app, stops recording.
 	recorderFocused bool
@@ -436,7 +436,7 @@ func (m *Model) escape() {
 		m.cancelConfirm()
 	case m.alias != nil:
 		m.cancelAlias()
-	case m.hotkey != nil && m.hotkey.recording:
+	case m.hotkey != nil && m.hotkey.rec.On():
 		m.stopRecording("")
 	case m.hotkey != nil:
 		m.closeHotkey()
@@ -520,13 +520,12 @@ func (m *Model) startRecording() {
 	if d == nil {
 		return
 	}
-	d.recording = true
+	n := d.rec.Start()
 	if m.paused {
 		return
 	}
 	if err := m.backend.PauseShortcuts(true); err != nil {
-		d.recording = false
-		d.err = err.Error()
+		d.rec.Fail(n, err)
 		return
 	}
 	m.paused = true
@@ -536,10 +535,10 @@ func (m *Model) startRecording() {
 // saves new keys at once.
 func (m *Model) stopRecording(shortcut string) {
 	d := m.hotkey
-	if d == nil || !d.recording {
+	if d == nil || !d.rec.On() {
 		return
 	}
-	d.recording = false
+	d.rec.Stop()
 	if shortcut != "" && shortcut != d.shortcut {
 		m.saveHotkey(shortcut)
 		return
@@ -554,13 +553,13 @@ func (m *Model) saveHotkey(shortcut string) {
 	if d == nil || m.savingHotkey {
 		return
 	}
-	d.recording = false
-	m.savingHotkey, d.err = true, ""
+	n := d.rec.Save()
+	m.savingHotkey = true
 	m.backend.Run(core.SetHotkey{ID: d.id, Shortcut: shortcut}, "", func(err error) {
 		m.savingHotkey = false
 		if m.hotkey == d {
 			if err != nil {
-				d.err = err.Error()
+				d.rec.Fail(n, err)
 			} else {
 				m.hotkey = nil
 				m.focusInput()
@@ -588,16 +587,15 @@ func (m *Model) closeHotkeyNow() {
 // resumeShortcuts turns the global shortcuts on again once nothing records
 // and no save runs: the app then registers the keys saved last.
 func (m *Model) resumeShortcuts() {
-	if !m.paused || m.savingHotkey || m.hotkey != nil && m.hotkey.recording {
+	if !m.paused || m.savingHotkey || m.hotkey != nil && m.hotkey.rec.On() {
 		return
 	}
 	m.paused = false
-	if err := m.backend.PauseShortcuts(false); err != nil {
-		// A save's own reason stays: the resume error is about other keys.
-		if m.hotkey == nil {
-			m.notice = err.Error()
-		} else if m.hotkey.err == "" {
-			m.hotkey.err = err.Error()
-		}
+	err := m.backend.PauseShortcuts(false)
+	switch {
+	case m.hotkey != nil:
+		m.hotkey.rec.Resumed(m.hotkey.rec.Last(), err)
+	case err != nil:
+		m.notice = err.Error()
 	}
 }

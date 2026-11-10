@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/jewei/tinydash/internal/core"
 )
 
 // Recording pauses the launcher shortcut and every hotkey. Leaving the
@@ -17,7 +18,7 @@ func TestRecordingStopsWhenThePanelLosesFocus(t *testing.T) {
 	m, tt := open(t, f)
 	openHotkey(t, tt, "Set Hotkey…")
 	tt.SetFocused(false)
-	if m.hotkey == nil || m.hotkey.recording {
+	if m.hotkey == nil || m.hotkey.rec.On() {
 		t.Fatalf("dialog %+v", m.hotkey)
 	}
 	if !slices.Equal(f.paused, []bool{true, false}) {
@@ -26,8 +27,8 @@ func TestRecordingStopsWhenThePanelLosesFocus(t *testing.T) {
 	// Back in the panel, a click records again.
 	tt.SetFocused(true)
 	click(t, tt, "Hotkey for Safari: None")
-	if !m.hotkey.recording || !slices.Equal(f.paused, []bool{true, false, true}) {
-		t.Errorf("recording %v, paused %v", m.hotkey.recording, f.paused)
+	if !m.hotkey.rec.On() || !slices.Equal(f.paused, []bool{true, false, true}) {
+		t.Errorf("recording %v, paused %v", m.hotkey.rec.On(), f.paused)
 	}
 }
 
@@ -39,8 +40,8 @@ func TestHidingThePanelStopsRecording(t *testing.T) {
 	openHotkey(t, tt, "Set Hotkey…")
 	m.Hidden()
 	tt.Frame()
-	if m.hotkey.recording || !slices.Equal(f.paused, []bool{true, false}) {
-		t.Errorf("recording %v, paused %v", m.hotkey.recording, f.paused)
+	if m.hotkey.rec.On() || !slices.Equal(f.paused, []bool{true, false}) {
+		t.Errorf("recording %v, paused %v", m.hotkey.rec.On(), f.paused)
 	}
 }
 
@@ -74,6 +75,31 @@ func TestAResumeErrorDoesNotReplaceTheSavesReason(t *testing.T) {
 	f.finish(errors.New("Could not register Control+Alt+K: taken."))
 	tt.Frame()
 	if !tt.HasText("Could not register Control+Alt+K: taken.") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+}
+
+// Each recording shows its own result: a refused save's reason goes when
+// the next recording starts, so a refused resume after it can show.
+func TestANewRecordingClearsTheLastReason(t *testing.T) {
+	f := newFake(always(hotkeyResult("")))
+	f.fail = func(core.Action) error { return errors.New("Could not register Control+Alt+K: taken.") }
+	m, tt := open(t, f)
+	openHotkey(t, tt, "Set Hotkey…")
+	tt.Key(ui.Ctrl|ui.Alt, ui.KeyK)
+	tt.Frame()
+	if !tt.HasText("Could not register Control+Alt+K: taken.") {
+		t.Fatalf("texts %q", tt.Texts())
+	}
+	click(t, tt, "Hotkey for Safari: None")
+	tt.Frame()
+	if tt.HasText("Could not register Control+Alt+K: taken.") {
+		t.Errorf("the last recording's reason stays: %q", tt.Texts())
+	}
+	f.pauseErr = errors.New("Could not register Control+Shift+Space: taken.")
+	tt.Key(0, ui.KeyEscape)
+	tt.Frame()
+	if m.hotkey == nil || !tt.HasText("Could not register Control+Shift+Space: taken.") {
 		t.Errorf("texts %q", tt.Texts())
 	}
 }

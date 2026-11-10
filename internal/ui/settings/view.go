@@ -90,6 +90,9 @@ func (m *Model) sidebar(c *ui.Context, p kit.Palette) {
 
 func (m *Model) general(c *ui.Context, p kit.Palette, v settings.Settings) {
 	row(c, p, "Launcher shortcut", "Shows or hides TinyDash from any app.", func() { m.recorderView(c, p, v.Shortcut) })
+	if err := m.rec.Err(); err != "" {
+		ui.Text(c, err).TextColor(p.Danger).Role(ui.RoleAlert)
+	}
 	m.choice(c, p, "Appearance", "", themes, string(v.Theme), func(s *settings.Settings, value string) { s.Theme = settings.Theme(value) })
 	m.toggle(c, p, "Hide when another app is focused", "", v.HideOnBlur, func(s *settings.Settings, on bool) { s.HideOnBlur = on })
 	m.toggle(c, p, "Open at login", "Starts hidden, ready for the shortcut.", v.LaunchAtLogin, func(s *settings.Settings, on bool) { s.LaunchAtLogin = on })
@@ -304,7 +307,7 @@ func (m *Model) recorderView(c *ui.Context, p kit.Palette, shortcut string) {
 	keys := kit.DisplayKeys(shortcut, m.mac, kit.SuperName)
 	name := label + ": " + strings.Join(keys, " ")
 	edge := p.Border
-	if m.recording {
+	if m.rec.On() {
 		name = label + ": press the new keys, or Escape to cancel"
 		edge = p.Accent
 	}
@@ -316,9 +319,9 @@ func (m *Model) recorderView(c *ui.Context, p kit.Palette, shortcut string) {
 			return false
 		}
 		switch {
-		case m.recording && ev.Key == ui.KeyEscape:
+		case m.rec.On() && ev.Key == ui.KeyEscape:
 			m.stopRecording("")
-		case m.recording:
+		case m.rec.On():
 			if keys := kit.Accelerator(ev, m.mac); keys != "" {
 				m.stopRecording(keys)
 			}
@@ -332,19 +335,19 @@ func (m *Model) recorderView(c *ui.Context, p kit.Palette, shortcut string) {
 		return true
 	})
 	rec.OnClick(func() {
-		if m.recording {
+		if m.rec.On() {
 			m.stopRecording("")
 		} else {
 			m.startRecording()
 		}
 	})
 	focused := rec.Focused()
-	if m.recording && m.recorderFocused && !focused {
+	if m.rec.On() && m.recorderFocused && !focused {
 		m.stopRecording("")
 	}
 	m.recorderFocused = focused
 	rec.Children(func() {
-		if m.recording {
+		if m.rec.On() {
 			ui.Text(c, "Press keys…").TextColor(p.Ink)
 			return
 		}

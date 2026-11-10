@@ -11,6 +11,7 @@ import (
 	"github.com/jewei/tinydash/internal/core"
 	"github.com/jewei/tinydash/internal/engine"
 	"github.com/jewei/tinydash/internal/settings"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 type section string
@@ -44,10 +45,12 @@ type Model struct {
 	saved   settings.Settings
 	queue   []pending
 	sending bool
-	// err is why the last change failed, or another error for the page.
+	// err is why the last change without its own place to say so failed,
+	// or another error for the page.
 	err string
 
-	recording bool
+	// rec is the launcher shortcut's recorder.
+	rec kit.Recording
 	// steps are the pauses, saves, and resumes of recording, in order;
 	// the first one runs.
 	steps    []func(next func())
@@ -139,10 +142,11 @@ func (m *Model) send() {
 	m.backend.UpdateSettings(p.change, func(saved settings.Settings, err error) {
 		m.sending = false
 		m.queue = m.queue[1:]
-		if err != nil {
-			m.err = err.Error()
-		} else {
+		switch {
+		case err == nil:
 			m.saved, m.err = saved, ""
+		case p.done == nil:
+			m.err = err.Error()
 		}
 		if p.done != nil {
 			p.done(err)
@@ -164,15 +168,11 @@ func (m *Model) open(s section) {
 // pause, pressing it would show the launcher instead of being recorded, so
 // recording stops and says why.
 func (m *Model) startRecording() {
-	// Each recording reports its own result.
-	m.recording, m.err = true, ""
+	n := m.rec.Start()
 	m.recorder.Focus()
 	m.then(func(next func()) {
 		m.backend.PauseShortcuts(true, func(err error) {
-			if err != nil {
-				m.recording = false
-				m.err = err.Error()
-			}
+			m.rec.Fail(n, err)
 			next()
 		})
 	})
@@ -182,19 +182,17 @@ func (m *Model) startRecording() {
 // saves new keys, and then turns the shortcuts on again: the saved ones,
 // new or old.
 func (m *Model) stopRecording(shortcut string) {
-	if !m.recording {
+	if !m.rec.On() {
 		return
 	}
-	m.recording = false
+	m.rec.Stop()
+	n := m.rec.Last()
 	changed := shortcut != "" && shortcut != m.values().Shortcut
 	m.then(func(next func()) {
-		resume := func(error) {
+		resume := func(saveErr error) {
+			m.rec.Fail(n, saveErr)
 			m.backend.PauseShortcuts(false, func(err error) {
-				// A refused save's reason stays: the resume error is
-				// about the old shortcut.
-				if err != nil && m.err == "" {
-					m.err = err.Error()
-				}
+				m.rec.Resumed(n, err)
 				next()
 			})
 		}

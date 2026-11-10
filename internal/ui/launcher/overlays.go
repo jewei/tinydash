@@ -167,8 +167,8 @@ func (m *Model) hotkeyView(c *ui.Context, p kit.Palette) {
 	m.dialog(c, p, ui.RoleDialog, label, m.closeHotkey, func() {
 		ui.Text(c, label)
 		m.recorder(c, p, d, label)
-		if d.err != "" {
-			ui.Text(c, d.err).TextColor(p.Danger).Role(ui.RoleAlert)
+		if err := d.rec.Err(); err != "" {
+			ui.Text(c, err).TextColor(p.Danger).Role(ui.RoleAlert)
 		}
 		ui.Text(c, "Press keys with a modifier, such as Control or Alt, or a function key. They run this result from any app. Escape stops recording.").FontSize(12).TextColor(p.Muted)
 		ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
@@ -185,13 +185,13 @@ func (m *Model) hotkeyView(c *ui.Context, p kit.Palette) {
 // app, stops it. A click or a new press of Enter or Space starts it again.
 func (m *Model) recorder(c *ui.Context, p kit.Palette, d *hotkeyDialog, label string) {
 	name := label + ": None"
-	if d.recording {
+	if d.rec.On() {
 		name = label + ": press the new keys, or Escape to cancel"
 	} else if d.shortcut != "" {
 		name = label + ": " + strings.Join(kit.DisplayKeys(d.shortcut, mac, kit.SuperName), " ")
 	}
 	edge := p.Border
-	if d.recording {
+	if d.rec.On() {
 		edge = p.Accent
 	}
 	rec := ui.Row(c).Focusable().AutoFocus().MinWidth(140).Height(32).Padding(0, 12).Radius(6).
@@ -202,9 +202,9 @@ func (m *Model) recorder(c *ui.Context, p kit.Palette, d *hotkeyDialog, label st
 			return false
 		}
 		switch {
-		case d.recording && ev.Key == ui.KeyEscape:
+		case d.rec.On() && ev.Key == ui.KeyEscape:
 			m.stopRecording("")
-		case d.recording:
+		case d.rec.On():
 			if keys := kit.Accelerator(ev, mac); keys != "" {
 				m.stopRecording(keys)
 			}
@@ -218,20 +218,20 @@ func (m *Model) recorder(c *ui.Context, p kit.Palette, d *hotkeyDialog, label st
 		return true
 	})
 	rec.OnClick(func() {
-		if d.recording {
+		if d.rec.On() {
 			m.stopRecording("")
 		} else {
 			m.startRecording()
 		}
 	})
 	focused := rec.Focused()
-	if d.recording && d.recorderFocused && !focused {
+	if d.rec.On() && d.recorderFocused && !focused {
 		m.stopRecording("")
 	}
 	d.recorderFocused = focused
 	rec.Children(func() {
 		switch {
-		case d.recording:
+		case d.rec.On():
 			ui.Text(c, "Press keys…").TextColor(p.Ink)
 		case d.shortcut != "":
 			keyCaps(c, p, kit.DisplayKeys(d.shortcut, mac, kit.SuperName)...)

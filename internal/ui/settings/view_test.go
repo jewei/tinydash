@@ -217,8 +217,8 @@ func TestCancelsRecordingOnASecondClickOrEscape(t *testing.T) {
 	}
 	press(t, tt, ui.RoleButton, "Launcher shortcut: Ctrl Shift Space")
 	tt.Key(0, ui.KeyEscape)
-	if m.recording || !slices.Equal(f.pauses, []bool{true, false, true, false}) {
-		t.Errorf("recording %v, pauses %v", m.recording, f.pauses)
+	if m.rec.On() || !slices.Equal(f.pauses, []bool{true, false, true, false}) {
+		t.Errorf("recording %v, pauses %v", m.rec.On(), f.pauses)
 	}
 	f.wantUpdates(t, 0)
 }

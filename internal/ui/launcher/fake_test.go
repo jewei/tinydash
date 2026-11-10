@@ -22,13 +22,16 @@ type fake struct {
 	hold    bool
 	waiting []func(error)
 
-	searches  []searched
-	runs      []ran
-	paused    []bool
-	pauseErr  error
-	hidden    int
-	enabled   int
-	enableErr error
+	searches []searched
+	runs     []ran
+	paused   []bool
+	pauseErr error
+	// refusePause, if set, is the error of each pause or resume, instead
+	// of pauseErr.
+	refusePause func(paused bool) error
+	hidden      int
+	enabled     int
+	enableErr   error
 
 	// widgets is what a load of the widgets gives; widgetLoads counts
 	// loads. holdWidgets keeps their done functions in loading.
@@ -97,6 +100,9 @@ func (f *fake) DragStarted()               { f.drags++ }
 func (f *fake) DragEnded()                 { f.dragEnds++ }
 func (f *fake) PauseShortcuts(paused bool) error {
 	f.paused = append(f.paused, paused)
+	if f.refusePause != nil {
+		return f.refusePause(paused)
+	}
 	return f.pauseErr
 }
 
