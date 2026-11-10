@@ -138,7 +138,7 @@ func TestModPRunsTheTimersMainAction(t *testing.T) {
 	}
 	tt.Key(ui.Cmd, ui.KeyP)
 	if !slices.Equal(f.controls, []FocusControl{fakePause, fakeStart}) {
-		t.Errorf("controls %v, loads %d", f.controls, f.widgetLoads)
+		t.Errorf("controls %v", f.controls)
 	}
 	tt.Type("x")
 	tt.Key(ui.Cmd, ui.KeyP)
