@@ -30,8 +30,13 @@ const weatherHeight = 74
 
 func (m *Model) weatherContent(c *ui.Context, p kit.Palette, w Weather) {
 	note := func(text string) ui.Element { return ui.Text(c, text).FontSize(12).TextColor(p.Muted) }
+	// The keyboard stays in the search field, as with the pane's other
+	// buttons, for when the launcher stays open.
 	settingsButton := func() {
-		ui.Button(c, "Open Settings").OnClick(m.openSettings)
+		ui.Button(c, "Open Settings").OnClick(func() {
+			m.openSettings()
+			m.focusInput()
+		})
 	}
 	switch w.State {
 	case WeatherReady:
