@@ -77,6 +77,10 @@ var external = map[string][]string{
 	"github.com/egoist/mygo/plugins/automation": []string{"internal/app"},
 	"github.com/ebitengine/purego/":             []string{"internal/platform"},
 	"golang.org/x/text/":                        []string{"internal/match", "internal/feature/"},
+	// Grapheme boundaries, so a long line in a view breaks between whole
+	// characters, as the launcher's JSON view does. mygo already links the
+	// module.
+	"github.com/go-text/typesetting/segmenter": []string{"internal/ui/"},
 }
 
 // e2eOnly packages may be linked only by the e2e build, never a release.

@@ -18,17 +18,15 @@ func (b *backend) Widgets(done func(launcher.Widgets)) {
 	snapshot := a.engine.Snapshot(time.Now())
 	s := snapshot.Settings
 	go func() {
-		now := time.Now()
-		w := loadWidgets(s, a.home, now, platform.DiskSpace, a.engine.Note, a.desktop.clip.Text)
 		// The zone the computer is in now, also after a change of it while
-		// TinyDash runs: today ends at midnight there. It is read once, and
-		// only for the widgets that use it.
-		var zone *time.Location
-		if s.ShowUpNext || s.ShowWeather {
-			zone = platform.LocalZone()
-		}
+		// TinyDash runs (time.Local keeps the zone it started in): the
+		// clocks, the cities' differences, a card's local time, today's
+		// end for Up Next, and the weather's update time all follow it.
+		// Each loader takes it, and puts now in it.
+		zone, now := platform.LocalZone(), time.Now()
+		w := loadWidgets(s, a.home, now, zone, platform.DiskSpace, a.engine.Note, a.desktop.clip.Text)
 		if s.ShowUpNext {
-			w.UpNext = loadUpNext(s, now.In(zone), platform.ReadUpNext)
+			w.UpNext = loadUpNext(s, now, zone, platform.ReadUpNext)
 		}
 		if s.ShowWeather {
 			w.Weather = weatherCard(s, snapshot.Weather, a.weather.failureFor(s.WeatherCity), zone)
@@ -61,10 +59,13 @@ func (b *backend) Warnings() []string {
 // is left out; a disk or a note that cannot be read says why in its card.
 // clipboardText reads the clipboard's text, as Clipboard.Text does, only
 // while clipboard cards are on.
-func loadWidgets(s settings.Settings, home string, now time.Time, diskSpace func(string) (platform.Volume, error), readNote func() (string, error), clipboardText func() (string, bool)) launcher.Widgets {
+// zone is the computer's time zone now, which the clocks, the cities, and
+// a card's local time use.
+func loadWidgets(s settings.Settings, home string, now time.Time, zone *time.Location, diskSpace func(string) (platform.Volume, error), readNote func() (string, error), clipboardText func() (string, bool)) launcher.Widgets {
+	now = now.In(zone)
 	var w launcher.Widgets
 	if s.ShowClocks {
-		w.Clocks = true
+		w.Clocks, w.Zone = true, now.Location()
 		for _, name := range s.ClockCities {
 			if len(w.Cities) == datetime.MaxClockCities {
 				break

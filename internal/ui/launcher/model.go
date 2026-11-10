@@ -213,6 +213,11 @@ func (m *Model) loadWidgets() {
 		// A load that a hide dropped shows nothing; a show since then
 		// asked for its own load after it.
 		if load == m.widgetLoads {
+			if w.Card == nil || w.Card.ID != m.jsonFor {
+				// Another card, or none, closes the view, so the view
+				// never comes back when the first card does.
+				m.jsonFor = ""
+			}
 			m.widgets = w
 			// The timer may have changed while the load ran.
 			m.widgets.Focus = m.backend.FocusTimer()

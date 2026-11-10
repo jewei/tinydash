@@ -12,11 +12,12 @@ import (
 
 // loadUpNext reads the rest of today from the calendars while Up Next is
 // on. It is nil while the widget is off, and where TinyDash reads no
-// calendars.
-func loadUpNext(s settings.Settings, now time.Time, read func(from, to time.Time) (platform.Agenda, bool)) *launcher.UpNext {
+// calendars. Today ends at midnight in zone, the computer's time zone now.
+func loadUpNext(s settings.Settings, now time.Time, zone *time.Location, read func(from, to time.Time) (platform.Agenda, bool)) *launcher.UpNext {
 	if !s.ShowUpNext {
 		return nil
 	}
+	now = now.In(zone)
 	agenda, ok := read(upnext.Window(now))
 	if !ok {
 		return nil

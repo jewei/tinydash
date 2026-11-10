@@ -26,11 +26,12 @@ func TestReadsUpNextOnlyWhileItIsOnAndTheOSHasCalendars(t *testing.T) {
 	}
 
 	s := settings.Default()
-	if got := loadUpNext(s, now, read); got != nil || windows != nil {
+	if got := loadUpNext(s, now, now.Location(), read); got != nil || windows != nil {
 		t.Errorf("Up Next is off by default: %+v, read %v", got, windows)
 	}
 	s.ShowUpNext = true
-	got := loadUpNext(s, now, read)
+	// The clock's time comes in UTC; today ends at midnight in zone.
+	got := loadUpNext(s, now.UTC(), zone, read)
 	midnight := time.Date(2026, 3, 11, 0, 0, 0, 0, zone)
 	if len(windows) != 1 || !windows[0][0].Equal(now) || !windows[0][1].Equal(midnight) {
 		t.Errorf("read %v", windows)
@@ -47,7 +48,7 @@ func TestReadsUpNextOnlyWhileItIsOnAndTheOSHasCalendars(t *testing.T) {
 
 	// Windows and Linux read no calendars: no widget.
 	none := func(time.Time, time.Time) (platform.Agenda, bool) { return platform.Agenda{}, false }
-	if got := loadUpNext(s, now, none); got != nil {
+	if got := loadUpNext(s, now, now.Location(), none); got != nil {
 		t.Errorf("without calendars: %+v", got)
 	}
 }
@@ -69,7 +70,7 @@ func TestNamesEachReasonACalendarCannotBeRead(t *testing.T) {
 		{platform.ErrCannotAskForCalendars, "This build of TinyDash cannot ask to read your calendars and reminders. Use the installed app."},
 		{errors.New("macOS could not load its calendar framework."), "Could not read your calendars and reminders. macOS could not load its calendar framework."},
 	} {
-		got := loadUpNext(s, now, func(time.Time, time.Time) (platform.Agenda, bool) {
+		got := loadUpNext(s, now, now.Location(), func(time.Time, time.Time) (platform.Agenda, bool) {
 			return platform.Agenda{EventsErr: c.err, RemindersErr: c.err}, true
 		})
 		if got == nil || !reflect.DeepEqual(got.Problems, []string{c.want}) {

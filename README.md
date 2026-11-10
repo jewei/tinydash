@@ -4,7 +4,7 @@ A small, keyboard-first launcher for macOS, Windows, and Linux. Press a shortcut
 
 - **Find** apps, files, clipboard history, snippets, quicklinks, emoji, and system commands.
 - **Answer** calculations, unit and currency conversions, dates, time zones, passwords, and clean URLs.
-- **Stay private:** everything runs on your computer. The packaged app downloads only the daily currency rate table, and only after you turn it on. A run from source also downloads the SQLite library once.
+- **Stay private:** everything runs on your computer. The packaged app downloads only two things, and only after you turn them on: the daily currency rate table, and the weather for the city that you set (Open-Meteo receives the city name). A run from source also downloads the SQLite library once.
 
 TinyDash is written in Go with [mygo](https://github.com/egoist/mygo) native UI. Versions up to 0.9.0 were a Rust and Tauri app; the Go app reads their settings and data.
 

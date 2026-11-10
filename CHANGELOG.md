@@ -13,6 +13,11 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 - The Notepad widget is back: one scratch note beside an empty All search. Turn it on in Settings > Widgets. Mod+J moves to the note and back. Your note from an earlier version is still there.
 - The Focus timer widget is back: Pomodoro focus sessions and breaks, with Mod+P and a system notification when each one ends. Turn it on in Settings > Widgets. Its settings from version 0.9.0 carry over.
 
+### Fixed
+
+- The Clocks widget and its cities' time differences follow a change of the computer's time zone the next time the launcher opens, as they did in 0.9.0. Since 0.10.0 they kept the zone that TinyDash started in.
+- Disk space keeps the free size and the low space warning on one line when the disk has a long name.
+
 ## [0.10.0] - 2026-11-10
 
 ### Changed
