@@ -75,14 +75,17 @@ func (m *Model) canClearHistory() bool {
 	return m.category == core.CategoryClipboard && !m.clipboardOff()
 }
 
-// menuItems are the selected result's actions, then the actions of no
-// result.
+// menuItems are the selected result's actions, then the widgets', then the
+// actions of no result.
 func (m *Model) menuItems() []menuItem {
 	var items []menuItem
 	if r, ok := m.selectedRow(); ok {
 		for i, ra := range r.Actions {
 			items = append(items, menuItem{label: ra.Label, keys: shortcutFor(ra.Action, i), run: func() { m.runResult(r, i) }})
 		}
+	}
+	for _, ra := range m.upNextActions() {
+		items = append(items, menuItem{label: ra.Label, run: func() { m.start(ra, "", "") }})
 	}
 	var general []core.ResultAction
 	if m.canClearHistory() {

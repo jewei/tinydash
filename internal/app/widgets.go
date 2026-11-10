@@ -9,13 +9,15 @@ import (
 	"github.com/jewei/tinydash/internal/ui/launcher"
 )
 
-// Widgets reads the widgets off the main thread, since the disk can make
-// it wait, and hands them to the view on it.
+// Widgets reads the widgets off the main thread, since the disk and the
+// calendars can make it wait, and hands them to the view on it.
 func (b *backend) Widgets(done func(launcher.Widgets)) {
 	a := b.app()
 	s := a.engine.Snapshot(time.Now()).Settings
 	go func() {
-		w := loadWidgets(s, a.home, time.Now(), platform.DiskSpace)
+		now := time.Now()
+		w := loadWidgets(s, a.home, now, platform.DiskSpace)
+		w.UpNext = loadUpNext(s, now, platform.ReadUpNext)
 		a.panel.Update(func() { done(w) })
 	}()
 }

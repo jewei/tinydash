@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
@@ -34,6 +35,10 @@ type Model struct {
 	// counts loads, so a slow one that ends after a newer one is dropped.
 	widgets     Widgets
 	widgetLoads int
+	// widgetsLoading is set from a load until the latest one ends, and
+	// shown while the panel shows: Up Next loads again as time passes only
+	// then, as each show loads anyway.
+	widgetsLoading, shown bool
 
 	// detailsWanted is the result whose details were asked for last, and
 	// detailsStale asks for them again after a search.
@@ -131,6 +136,7 @@ func (m *Model) Show(category core.Category) {
 	m.category = category
 	m.warnings = append(m.warnings, m.backend.Warnings()...)
 	m.search(false)
+	m.shown = true
 	m.loadWidgets()
 	m.input.Focus()
 }
@@ -138,21 +144,29 @@ func (m *Model) Show(category core.Category) {
 // Hidden stops recording as the panel hides: recording pauses the
 // launcher shortcut and every hotkey, which must work again while the
 // panel is away. A hide need not blur the view first.
-func (m *Model) Hidden() { m.stopRecording("") }
+func (m *Model) Hidden() {
+	m.shown = false
+	m.stopRecording("")
+}
 
 // Stale searches again after the data changed, keeping the selected
-// result, and loads the widgets again: a setting may have changed them.
+// result, and loads the widgets again while the launcher shows: a setting
+// may have changed them. A hidden launcher loads them as it shows, so a
+// change while it hides, such as a copy, reads no calendars.
 func (m *Model) Stale() {
 	m.search(true)
-	m.loadWidgets()
+	if m.shown {
+		m.loadWidgets()
+	}
 }
 
 func (m *Model) loadWidgets() {
 	m.widgetLoads++
 	load := m.widgetLoads
+	m.widgetsLoading = true
 	m.backend.Widgets(func(w Widgets) {
 		if load == m.widgetLoads {
-			m.widgets = w
+			m.widgets, m.widgetsLoading = w, false
 		}
 	})
 }
@@ -160,7 +174,22 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil)
+}
+
+// upNextChanged loads the widgets again once Up Next changes with the
+// time, as an event starts or ends, while the launcher shows. It reports
+// how long until then, or 0 when it loads now or need not load.
+func (m *Model) upNextChanged(now time.Time) time.Duration {
+	u := m.widgets.UpNext
+	if u == nil || !m.shown || m.widgetsLoading {
+		return 0
+	}
+	if wait := u.ChangesAt.Sub(now); wait > 0 {
+		return wait
+	}
+	m.loadWidgets()
+	return 0
 }
 
 // warning is the startup warning on screen, or "". An action's failure
