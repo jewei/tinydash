@@ -204,7 +204,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	go a.watchClipboard()
 	go a.refreshRates(false)
 	go a.refreshWeather(false)
-	go a.focus.run(ctx, time.Now, time.After, a.focusFinished)
+	go a.focus.run(ctx, time.Now, time.After, a.focusFinished, func() { a.panel.Update(a.model.WidgetsChanged) })
 	open(a, opts.Launch, false)
 	return a, nil
 }

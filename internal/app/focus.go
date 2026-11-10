@@ -103,8 +103,9 @@ func (c *focusClock) widget() *launcher.FocusTimer {
 }
 
 // run ends each phase on time and hands it to finished, until ctx ends.
-// after is time.After, which tests replace.
-func (c *focusClock) run(ctx context.Context, now func() time.Time, after func(time.Duration) <-chan time.Time, finished func(focus.Finished)) {
+// It calls moved after it pulled in the end of a phase that a wall clock
+// set back pushed out. after is time.After, which tests replace.
+func (c *focusClock) run(ctx context.Context, now func() time.Time, after func(time.Duration) <-chan time.Time, finished func(focus.Finished), moved func()) {
 	for {
 		c.mu.Lock()
 		// This pass sees every change made so far; a later one wakes the
@@ -114,12 +115,16 @@ func (c *focusClock) run(ctx context.Context, now func() time.Time, after func(t
 		default:
 		}
 		at := now()
+		pulledIn := c.timer.KeepInPhase(at)
 		ended, ok := c.timer.FinishIfDue(c.lengths, at)
 		var timeout <-chan time.Time
 		if !ok && c.timer.State == focus.Running {
 			timeout = after(min(c.timer.Left(at), focusMaxWait))
 		}
 		c.mu.Unlock()
+		if pulledIn {
+			moved()
+		}
 		if ok {
 			finished(ended)
 			continue

@@ -174,13 +174,25 @@ func (t *Timer) FinishIfDue(l Lengths, now time.Time) (Finished, bool) {
 	}, true
 }
 
-// Left is the time left in the phase at now, never more than the phase:
-// a wall clock set back does not make it longer.
+// Left is the time left in the phase at now, never more than the phase,
+// also after a wall clock was set back. KeepInPhase then pulls the end in.
 func (t *Timer) Left(now time.Time) time.Duration {
 	if t.EndsAt.IsZero() {
 		return t.Remaining
 	}
 	return min(max(t.EndsAt.Sub(now), 0), t.Total)
+}
+
+// KeepInPhase pulls in the end of a running phase that a wall clock set
+// back pushed further away than the phase is long, so the phase counts
+// down again and ends at most its length after now. It reports whether
+// it moved the end.
+func (t *Timer) KeepInPhase(now time.Time) bool {
+	if t.State != Running || t.EndsAt.Sub(now) <= t.Total {
+		return false
+	}
+	t.EndsAt = now.Round(0).Add(t.Total)
+	return true
 }
 
 // Actions are what the user can do now; the first is the main one.

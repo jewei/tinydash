@@ -110,6 +110,41 @@ func (f *fakeTime) After(d time.Duration) <-chan time.Time {
 	return f.fire
 }
 
+// After a wall clock set back, the clock pulls in the phase's end and
+// tells the pane, which would show a countdown held at its full length.
+func TestTheFocusClockPullsInAnEndThatASetBackClockPushedOut(t *testing.T) {
+	clock := newFocusClock(focusOn())
+	start := time.Date(2026, 11, 10, 9, 0, 0, 0, time.UTC)
+	clocks := &fakeTime{now: start, waits: make(chan time.Duration, 8), fire: make(chan time.Time)}
+	moved := make(chan struct{}, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+	stopped := make(chan struct{})
+	if err := clock.control(focus.Start, start); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		clock.run(ctx, clocks.Now, clocks.After, func(focus.Finished) {}, func() { moved <- struct{}{} })
+		close(stopped)
+	}()
+	defer func() {
+		cancel()
+		<-stopped
+	}()
+	<-clocks.waits
+	back := start.Add(10*time.Minute - time.Hour)
+	clocks.set(back)
+	clocks.fire <- time.Time{}
+	select {
+	case <-moved:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the pane was not told")
+	}
+	<-clocks.waits
+	if w := clock.widget(); !w.EndsAt.Equal(back.Add(25 * time.Minute)) {
+		t.Errorf("ends at %v, want 25 minutes after %v", w.EndsAt, back)
+	}
+}
+
 func TestTheFocusClockReportsAFocusEndAndThenABreakEnd(t *testing.T) {
 	s := focusOn()
 	s.FocusMinutes, s.ShortBreakMinutes = 1, 1
@@ -120,7 +155,7 @@ func TestTheFocusClockReportsAFocusEndAndThenABreakEnd(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	stopped := make(chan struct{})
 	go func() {
-		clock.run(ctx, clocks.Now, clocks.After, func(f focus.Finished) { finished <- f })
+		clock.run(ctx, clocks.Now, clocks.After, func(f focus.Finished) { finished <- f }, func() {})
 		close(stopped)
 	}()
 	defer func() {

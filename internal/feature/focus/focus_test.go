@@ -196,6 +196,30 @@ func TestTimeLeftNeverPassesThePhase(t *testing.T) {
 	}
 }
 
+// A wall clock set back an hour 10 minutes into a session would hold the
+// countdown at 25:00 for 50 minutes. KeepInPhase makes it count down again
+// and end at most a session's length later.
+func TestAClockSetBackKeepsThePhaseItsLength(t *testing.T) {
+	timer := New(lengths)
+	start(t, &timer, at(0))
+	if timer.KeepInPhase(at(10)) {
+		t.Fatal("moved the end of a phase on time")
+	}
+	back := at(10 - 60)
+	if !timer.KeepInPhase(back) || timer.KeepInPhase(back) {
+		t.Fatal("did not move the end once")
+	}
+	if left := timer.Left(back.Add(10 * time.Minute)); left != 15*time.Minute {
+		t.Errorf("left %v 10 minutes later, want 15m", left)
+	}
+	if _, ok := timer.FinishIfDue(lengths, back.Add(25*time.Minute)); !ok {
+		t.Error("the session did not end 25 minutes after the set-back")
+	}
+	if timer.KeepInPhase(at(-1000)) {
+		t.Error("moved the end of a phase that does not run")
+	}
+}
+
 // A phase whose time is up, but which FinishIfDue has not ended yet,
 // refuses a pause: it would pause at 00:00 and never notify. Reset still
 // works.
