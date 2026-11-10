@@ -677,13 +677,14 @@ func TestEachRefusalShowsInItsPlace(t *testing.T) {
 	if m.err != "" || m.rec.Err() != "Could not save settings.json." {
 		t.Errorf("banner %q, recorder %q", m.err, m.rec.Err())
 	}
+	f.refuse = func(settings.Settings) error { return errors.New("Could not save the folder list.") }
 	m.folders.draft = "~/Notes"
 	m.addTo(&m.folders, nil, folderLimit, false, func(s *settings.Settings) *[]string { return &s.FileSearchFolders })
 	tt.Frame()
-	if m.err != "Could not save settings.json." {
+	if m.err != "Could not save the folder list." {
 		t.Errorf("banner %q after a refused list change", m.err)
 	}
-	if _, ok := tt.AccessByRole(ui.RoleAlert, "Could not save settings.json."); !ok {
+	if _, ok := tt.AccessByRole(ui.RoleAlert, "Could not save the folder list."); !ok {
 		t.Errorf("no alert; texts %q", tt.Texts())
 	}
 }

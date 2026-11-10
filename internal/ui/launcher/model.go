@@ -59,6 +59,8 @@ type Model struct {
 	// savingHotkey is set while a hotkey saves; the shortcuts stay paused
 	// until it ends, so the saved keys are what the app registers again.
 	savingHotkey bool
+	// savingFor is the dialog whose save runs.
+	savingFor *hotkeyDialog
 	// paused is set while the global shortcuts are off for recording.
 	paused bool
 	// dragPending is set from a press on a drag area until a release. A
@@ -524,8 +526,13 @@ func (m *Model) startRecording() {
 	if d == nil {
 		return
 	}
-	n := d.rec.Start()
 	// Keys recorded now could not be saved until the running save ends.
+	// The dialog's own save keeps its place, so its refusal can show;
+	// another dialog's save is the reason given.
+	if m.savingHotkey && m.savingFor == d {
+		return
+	}
+	n := d.rec.Start()
 	if m.savingHotkey {
 		d.rec.Fail(n, errHotkeySaving)
 		return
@@ -563,9 +570,9 @@ func (m *Model) saveHotkey(shortcut string) {
 		return
 	}
 	n := d.rec.Save()
-	m.savingHotkey = true
+	m.savingHotkey, m.savingFor = true, d
 	m.backend.Run(core.SetHotkey{ID: d.id, Shortcut: shortcut}, "", func(err error) {
-		m.savingHotkey = false
+		m.savingHotkey, m.savingFor = false, nil
 		if m.hotkey == d {
 			if err != nil {
 				d.rec.Fail(n, err)

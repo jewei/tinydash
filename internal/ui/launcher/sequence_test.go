@@ -150,7 +150,7 @@ func runRecorder(pauseRefuses, resumeRefuses bool, seq []int) string {
 					m.stopRecording("")
 					return
 				}
-				busy := m.savingHotkey
+				busy := m.savingHotkey && m.savingFor != d
 				m.startRecording()
 				if d.rec.On() || now.pauseRefused || busy {
 					current++

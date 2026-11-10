@@ -103,3 +103,22 @@ func TestANewRecordingClearsTheLastReason(t *testing.T) {
 		t.Errorf("texts %q", tt.Texts())
 	}
 }
+
+// A click on the recorder during the dialog's own save does nothing, so
+// the save's refusal still shows.
+func TestTheDialogsOwnSaveKeepsItsRefusal(t *testing.T) {
+	f := newFake(always(hotkeyResult("")))
+	f.hold = true
+	m, tt := open(t, f)
+	openHotkey(t, tt, "Set Hotkey…")
+	tt.Key(ui.Ctrl|ui.Alt, ui.KeyS)
+	m.startRecording()
+	if m.hotkey.rec.On() || m.hotkey.rec.Err() != "" {
+		t.Fatalf("recording %v, says %q during its own save", m.hotkey.rec.On(), m.hotkey.rec.Err())
+	}
+	f.finish(errors.New("Could not register Control+Alt+S: taken."))
+	tt.Frame()
+	if !tt.HasText("Could not register Control+Alt+S: taken.") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+}
