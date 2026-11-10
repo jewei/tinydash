@@ -110,6 +110,10 @@ type Settings struct {
 	// ClockCities are the places the clocks widget shows, as typed.
 	ClockCities   []string `json:"clockCities"`
 	ShowDiskSpace bool     `json:"showDiskSpace"`
+	// ShowClipboardCards decodes a copied color, Unix time, or JSON in the
+	// widget pane. It is off until the user turns it on: the pane then
+	// reads the clipboard each time it shows.
+	ShowClipboardCards bool `json:"showClipboardCards"`
 
 	// kept holds the keys this version does not model, as they were.
 	kept map[string]json.RawMessage

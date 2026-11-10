@@ -120,6 +120,8 @@ func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
 	intro(c, p, "Widgets show next to the results of an empty All search.")
 	m.toggle(c, p, "Clocks", "Local time and up to three cities.", v.ShowClocks, func(s *settings.Settings, on bool) { s.ShowClocks = on })
 	m.toggle(c, p, "Disk space", "Free space on the disk of your home folder.", v.ShowDiskSpace, func(s *settings.Settings, on bool) { s.ShowDiskSpace = on })
+	m.toggle(c, p, "Clipboard cards", "When you copy a color, a Unix time, or JSON, a card shows it decoded. The text is read when widgets show, never saved. macOS may ask you to let TinyDash paste.",
+		v.ShowClipboardCards, func(s *settings.Settings, on bool) { s.ShowClipboardCards = on })
 	heading(c, p, "Clock cities")
 	m.listView(c, p, &m.cities, "City to add", "Tokyo, London, or Europe/Paris", v.ClockCities, cityLimit, true,
 		func(s *settings.Settings) *[]string { return &s.ClockCities })

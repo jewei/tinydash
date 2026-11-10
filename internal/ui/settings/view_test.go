@@ -78,6 +78,21 @@ func TestDoesNotSendAFailedChangeAgainWithTheNextOne(t *testing.T) {
 	}
 }
 
+// Clipboard cards stay off until the user turns them on, as in the Rust
+// app: the pane then reads the clipboard each time it shows.
+func TestTurnsClipboardCardsOn(t *testing.T) {
+	f := newFake()
+	_, tt := open(t, f, widgets)
+	if checked(t, tt, "Clipboard cards") {
+		t.Fatal("clipboard cards are on by default")
+	}
+	flip(t, tt, "Clipboard cards")
+	f.wantUpdates(t, 1)
+	if !f.last(t).ShowClipboardCards {
+		t.Error("the change did not turn clipboard cards on")
+	}
+}
+
 func TestDescribesEachSettingToScreenReaders(t *testing.T) {
 	_, tt := open(t, newFake(), clipboard)
 	info, ok := tt.AccessByRole(ui.RoleGroup, "Save clipboard history")
