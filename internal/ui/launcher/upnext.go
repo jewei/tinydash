@@ -27,7 +27,7 @@ func (m *Model) upNext(c *ui.Context, p kit.Palette, u UpNext) {
 		if u.Ask != nil {
 			ask := *u.Ask
 			ui.Row(c).Children(func() {
-				ui.Button(c, ask.Label).OnClick(func() {
+				ui.Button(c, ask.Label).Disabled(m.running).OnClick(func() {
 					m.start(ask, "", "")
 					m.focusInput()
 				})
@@ -70,10 +70,10 @@ func (m *Model) upNextActions() []core.ResultAction {
 func (m *Model) upNextItem(c *ui.Context, p kit.Palette, it UpNextItem) {
 	b := ui.ButtonBase(c).Padding(3, 4).Radius(6).Justify(ui.Start).
 		Label(it.Time + " " + it.Title + " " + it.Source).Description(it.Action.Label)
-	if b.Hovered() {
+	if b.Hovered() && !m.running {
 		b.Background(p.Hover)
 	}
-	b.Children(func() {
+	b.Disabled(m.running).Children(func() {
 		ui.Row(c).Grow(1).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, it.Time).Width(76).FontSize(12).TextColor(p.Muted).FontFeatures("tnum").SingleLine()
 			ui.Row(c).Grow(1).Shrink(1).Gap(6).AlignItems(ui.Center).Children(func() {

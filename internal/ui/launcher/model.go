@@ -31,14 +31,16 @@ type Model struct {
 	// dismissed yet, oldest first.
 	warnings []string
 
-	// widgets is what the pane showed from the last load. widgetLoads
-	// counts loads, so a slow one that ends after a newer one is dropped.
-	widgets     Widgets
-	widgetLoads int
-	// widgetsLoading is set from a load until the latest one ends, and
-	// shown while the panel shows: Up Next loads again as time passes only
-	// then, as each show loads anyway.
-	widgetsLoading, shown bool
+	// widgets is what the pane showed from the last load. One load runs at
+	// a time, as reading the calendars can wait seconds: widgetsLoading is
+	// set while it runs, and widgetsAgain asks for one more after it, so
+	// changes that come quickly cost two loads at most. widgetsLoaded is
+	// set once a load has ended.
+	widgets                                     Widgets
+	widgetsLoading, widgetsAgain, widgetsLoaded bool
+	// shown is set while the panel shows. Up Next loads again as time
+	// passes, and as the data changes, only then: each show loads anyway.
+	shown bool
 
 	// detailsWanted is the result whose details were asked for last, and
 	// detailsStale asks for them again after a search.
@@ -149,24 +151,33 @@ func (m *Model) Hidden() {
 	m.stopRecording("")
 }
 
+// Shown notes that the panel shows, also when the app shows it again as
+// it was, without Show, after an action that hid it failed.
+func (m *Model) Shown() { m.shown = true }
+
 // Stale searches again after the data changed, keeping the selected
 // result, and loads the widgets again while the launcher shows: a setting
 // may have changed them. A hidden launcher loads them as it shows, so a
-// change while it hides, such as a copy, reads no calendars.
+// change while it hides, such as a copy, reads no calendars. Until the
+// first load ends, it loads them anyway, so the first show has them.
 func (m *Model) Stale() {
 	m.search(true)
-	if m.shown {
+	if m.shown || !m.widgetsLoaded {
 		m.loadWidgets()
 	}
 }
 
 func (m *Model) loadWidgets() {
-	m.widgetLoads++
-	load := m.widgetLoads
+	if m.widgetsLoading {
+		m.widgetsAgain = true
+		return
+	}
 	m.widgetsLoading = true
 	m.backend.Widgets(func(w Widgets) {
-		if load == m.widgetLoads {
-			m.widgets, m.widgetsLoading = w, false
+		m.widgets, m.widgetsLoading, m.widgetsLoaded = w, false, true
+		if m.widgetsAgain {
+			m.widgetsAgain = false
+			m.loadWidgets()
 		}
 	})
 }

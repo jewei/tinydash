@@ -188,6 +188,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	})
 	a.panel.OnMove(a.panelMoved)
 	a.panel.OnHide(a.model.Hidden)
+	a.panel.OnShow(a.model.Shown)
 
 	a.warn(a.keys.SetLauncher(s.Shortcut))
 	for id, err := range a.keys.Sync(first.Hotkeys) {
