@@ -196,8 +196,8 @@ func TestAMenuItemActsOnTheCardItShowed(t *testing.T) {
 	f.widgets.Card = &color
 	m.Stale()
 	chooseItem(t, tt, "View Full JSON")
-	if len(f.runs) != 0 || hasJSONView(tt) {
-		t.Errorf("ran %+v; view %v", f.runs, hasJSONView(tt))
+	if len(f.runs) != 0 || hasJSONView(tt) || m.jsonFor != "" {
+		t.Errorf("ran %+v; view %v; open for %q", f.runs, hasJSONView(tt), m.jsonFor)
 	}
 }
 
