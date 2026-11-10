@@ -160,7 +160,45 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil || m.widgets.Focus != nil)
+}
+
+// WidgetsChanged loads the widgets again after one changed on its own, as
+// when a phase of the focus timer ends.
+func (m *Model) WidgetsChanged() { m.loadWidgets() }
+
+// focusActions are the focus timer's actions while the pane shows it.
+func (m *Model) focusActions() []FocusAction {
+	if !m.showsWidgets() || m.widgets.Focus == nil {
+		return nil
+	}
+	return m.widgets.Focus.Actions
+}
+
+func (m *Model) hasFocusTimer() bool { return len(m.focusActions()) > 0 }
+
+// runFocusTimer runs the focus timer's main action, as Mod+P does.
+func (m *Model) runFocusTimer() {
+	if actions := m.focusActions(); len(actions) > 0 {
+		m.controlFocus(actions[0])
+	}
+}
+
+// controlFocus runs one of the focus timer's actions, then loads the
+// widgets again to show the timer's new state.
+func (m *Model) controlFocus(a FocusAction) {
+	if m.running {
+		return
+	}
+	m.running = true
+	m.notice = ""
+	m.backend.ControlFocus(a.Control, func(err error) {
+		m.running = false
+		if err != nil {
+			m.notice = err.Error()
+		}
+		m.loadWidgets()
+	})
 }
 
 // warning is the startup warning on screen, or "". An action's failure

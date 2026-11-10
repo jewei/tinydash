@@ -41,6 +41,10 @@ type fake struct {
 	loading     []func(Widgets)
 	// warnings wait until the launcher asks for them.
 	warnings []string
+	// controls are the focus timer controls asked for; controlFocus, if
+	// set, runs for each and gives its outcome.
+	controls     []FocusControl
+	controlFocus func(FocusControl) error
 
 	// details are what a load of a result's details gives; detailLoads
 	// are the results asked for. holdDetails keeps their done functions
@@ -118,6 +122,15 @@ func (f *fake) Widgets(done func(Widgets)) {
 		return
 	}
 	done(f.widgets)
+}
+
+func (f *fake) ControlFocus(control FocusControl, done func(error)) {
+	f.controls = append(f.controls, control)
+	var err error
+	if f.controlFocus != nil {
+		err = f.controlFocus(control)
+	}
+	done(err)
 }
 
 func (f *fake) Details(id core.ID, done func(Details, bool)) {

@@ -13,6 +13,8 @@ type Palette struct {
 	Accent, AccentHover, AccentIn ui.Color
 	Danger, DangerInk, Notice     ui.Color
 	Shadow, Backdrop              ui.Color
+	// Calm marks a rest, as a focus timer break, and CalmInk is text on it.
+	Calm, CalmInk ui.Color
 }
 
 var Light = Palette{
@@ -22,6 +24,7 @@ var Light = Palette{
 	Accent: ui.Hex("#9c4e28"), AccentHover: ui.Hex("#824020"), AccentIn: ui.Hex("#fff8f1"),
 	Danger: ui.Hex("#a33b2c"), DangerInk: ui.Hex("#fff8f1"), Notice: ui.Hex("#fff2eb"),
 	Shadow: ui.Hex("#302a2433"), Backdrop: ui.Hex("#302a2459"),
+	Calm: ui.Hex("#4f7a63"), CalmInk: ui.Hex("#f4faf5"),
 }
 
 var Dark = Palette{
@@ -31,6 +34,7 @@ var Dark = Palette{
 	Accent: ui.Hex("#efb181"), AccentHover: ui.Hex("#ffd0aa"), AccentIn: ui.Hex("#382819"),
 	Danger: ui.Hex("#ffb4a1"), DangerInk: ui.Hex("#3a1610"), Notice: ui.Hex("#402310"),
 	Shadow: ui.Hex("#0c0b0a80"), Backdrop: ui.Hex("#0c0b0a99"),
+	Calm: ui.Hex("#9fcfb0"), CalmInk: ui.Hex("#1f3326"),
 }
 
 // Themed sets the frame's theme to the palette of the Appearance setting,
