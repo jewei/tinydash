@@ -50,7 +50,7 @@ func TestTheFocusTimerWidgetShowsTheTimer(t *testing.T) {
 	if err := clock.control(focus.Start, start); err != nil {
 		t.Fatal(err)
 	}
-	w := clock.widget(focusOn())
+	w := clock.widget()
 	if w.Phase != "Focus" || w.Break || w.Paused || w.Done || !w.EndsAt.Equal(start.Add(25*time.Minute)) ||
 		w.Total != 25*time.Minute || w.Session != 1 || w.Sessions != 4 || len(w.Actions) != 2 ||
 		w.Actions[0] != (launcher.FocusAction{Label: "Pause Timer", Control: launcher.FocusControl(focus.Pause)}) {
@@ -64,7 +64,11 @@ func TestTheFocusTimerWidgetShowsTheTimer(t *testing.T) {
 
 func TestTheFocusTimerWidgetIsGoneWhileItIsOff(t *testing.T) {
 	clock := newFocusClock(focusOn())
-	if w := clock.widget(settings.Default()); w != nil {
+	if clock.widget() == nil {
+		t.Fatal("an on timer is gone")
+	}
+	clock.follow(settings.Default())
+	if w := clock.widget(); w != nil {
 		t.Errorf("an off timer shows: %+v", w)
 	}
 }
@@ -76,7 +80,7 @@ func TestTheFocusTimerEndFollowsTheWallClock(t *testing.T) {
 	if err := clock.control(focus.Start, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if end := clock.widget(focusOn()).EndsAt; end != end.Round(0) {
+	if end := clock.widget().EndsAt; end != end.Round(0) {
 		t.Errorf("the end %v holds a monotonic reading", end)
 	}
 }

@@ -98,6 +98,26 @@ func TestTheFocusTimerNamesEachState(t *testing.T) {
 	}
 }
 
+// A load of the widgets that started before a control holds the old
+// state; it must not put it back.
+func TestALoadFromBeforeAControlDoesNotUndoIt(t *testing.T) {
+	f := newFake(always())
+	f.holdWidgets = true
+	m, tt := showTimer(t, f, running)
+	old := running(tt.Now())
+	f.loading[0](Widgets{Focus: &old})
+	m.Stale()
+	paused := FocusTimer{Phase: "Focus", Paused: true, Remaining: 20 * time.Minute, Total: 25 * time.Minute, Session: 1, Sessions: 4,
+		Actions: []FocusAction{{"Resume Timer", fakeStart}}}
+	f.widgets.Focus = &paused
+	tt.Key(ui.Cmd, ui.KeyP)
+	f.loading[1](Widgets{Focus: &old}) // read before the control
+	tt.Frame()
+	if !tt.HasText("Resume Timer") {
+		t.Errorf("an older load put back the running timer: %q", tt.Texts())
+	}
+}
+
 // Mod+P runs the main action while the pane shows the timer, and the pane
 // shows the timer's new state at once, so a second press acts on it, also
 // while another action runs. Typed text hides the pane, and Mod+P with it.
@@ -117,7 +137,7 @@ func TestModPRunsTheTimersMainAction(t *testing.T) {
 		t.Errorf("texts %q", tt.Texts())
 	}
 	tt.Key(ui.Cmd, ui.KeyP)
-	if !slices.Equal(f.controls, []FocusControl{fakePause, fakeStart}) || f.widgetLoads != 1 {
+	if !slices.Equal(f.controls, []FocusControl{fakePause, fakeStart}) {
 		t.Errorf("controls %v, loads %d", f.controls, f.widgetLoads)
 	}
 	tt.Type("x")

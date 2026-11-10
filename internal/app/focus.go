@@ -81,15 +81,15 @@ func (c *focusClock) wake() {
 	}
 }
 
-// widget is the timer as the launcher's pane shows it, or nil while the
-// settings s turn it off.
-func (c *focusClock) widget(s settings.Settings) *launcher.FocusTimer {
-	if !s.ShowFocusTimer {
+// widget is the timer as the launcher's pane shows it, or nil while it is
+// off. It reads on as control does, so the two never disagree.
+func (c *focusClock) widget() *launcher.FocusTimer {
+	c.mu.Lock()
+	t, on := c.timer, c.on
+	c.mu.Unlock()
+	if !on {
 		return nil
 	}
-	c.mu.Lock()
-	t := c.timer
-	c.mu.Unlock()
 	w := &launcher.FocusTimer{
 		Phase: t.Phase.String(), Break: t.Phase != focus.Focus,
 		Paused: t.State == focus.Paused, Done: t.State == focus.Done,
@@ -149,5 +149,5 @@ func (a *App) focusFinished(ended focus.Finished) {
 func (b *backend) ControlFocus(control launcher.FocusControl) (*launcher.FocusTimer, error) {
 	a := b.app()
 	err := a.focus.control(focus.Control(control), time.Now())
-	return a.focus.widget(a.engine.Snapshot(time.Now()).Settings), err
+	return a.focus.widget(), err
 }
