@@ -1,8 +1,9 @@
 // Package store is the SQLite database, tinydash.db: the only package that
 // knows the schema or runs SQL. Usage, pins, hidden results, aliases,
-// hotkeys, clipboard history, the snippet library, copied calculations, and
-// cached exchange rates live there. The note and weather tables of the Rust
-// app stay in the file untouched, so going back to it loses nothing.
+// hotkeys, clipboard history, the snippet library, copied calculations,
+// cached exchange rates, and the Notepad's note live there. The weather of
+// the Rust app stays in the file untouched, so going back to it loses
+// nothing.
 package store
 
 import (
@@ -489,6 +490,26 @@ func (s *Store) DeleteCalculation(ctx context.Context, id int64) error {
 
 func (s *Store) ClearCalculations(ctx context.Context) error {
 	return s.exec(ctx, "DELETE FROM calculations")
+}
+
+// Note is the Notepad's scratch note; it is empty until first saved.
+func (s *Store) Note(ctx context.Context) (string, error) {
+	var note string
+	err := s.query(ctx, "SELECT text FROM note WHERE id = 1", nil, func(row []any) error {
+		var err error
+		note, err = text(row[0])
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return note, nil
+}
+
+// SaveNote replaces the note.
+func (s *Store) SaveNote(ctx context.Context, note string) error {
+	return s.exec(ctx, `INSERT INTO note (id, text) VALUES (1, ?1)
+		ON CONFLICT (id) DO UPDATE SET text = ?1`, note)
 }
 
 const ratesKey = "currency_rates"
