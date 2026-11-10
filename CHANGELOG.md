@@ -7,6 +7,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Added
 
 - Settings > About shows the version of TinyDash, the folders that hold your settings and saved data, where to get new versions, and the credits.
+- Clipboard cards are back. When you copy a color, a Unix time, or JSON, the widgets show it decoded, with buttons to copy it in other forms. Mod+Shift+Enter copies the main form or opens the full JSON. Turn them on in Settings > Widgets.
 - The Notepad widget is back: one scratch note beside an empty All search. Turn it on in Settings > Widgets. Mod+J moves to the note and back. Your note from an earlier version is still there.
 
 ## [0.10.0] - 2026-11-10

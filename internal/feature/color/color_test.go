@@ -36,6 +36,23 @@ func TestReadsColorsInThreeForms(t *testing.T) {
 	}
 }
 
+func TestDecodesHowItWasCopiedAndItsContrast(t *testing.T) {
+	for text, want := range map[string]Color{
+		"#fff": {Hex: "#FFFFFF", RGB: "rgb(255, 255, 255)", HSL: "hsl(0, 0%, 100%)",
+			OnWhite: Contrast{"1.0:1", "Fail"}, OnBlack: Contrast{"21.0:1", "AAA"}},
+		"hsl(0, 100%, 50%)": {Hex: "#FF0000", RGB: "rgb(255, 0, 0)", HSL: "hsl(0, 100%, 50%)", CopiedAs: "HSL",
+			OnWhite: Contrast{"4.0:1", "AA large"}, OnBlack: Contrast{"5.3:1", "AA"}},
+		"rgb(47 111 94)": {Hex: "#2F6F5E", RGB: "rgb(47, 111, 94)", HSL: "hsl(164, 41%, 31%)", CopiedAs: "RGB",
+			OnWhite: Contrast{"5.9:1", "AA"}, OnBlack: Contrast{"3.6:1", "AA large"}},
+		"#000": {Hex: "#000000", RGB: "rgb(0, 0, 0)", HSL: "hsl(0, 0%, 0%)",
+			OnWhite: Contrast{"21.0:1", "AAA"}, OnBlack: Contrast{"1.0:1", "Fail"}},
+	} {
+		if got, ok := Decode(text); !ok || got != want {
+			t.Errorf("%q: %+v, want %+v", text, got, want)
+		}
+	}
+}
+
 func TestATypedColorIsAnAnswer(t *testing.T) {
 	r, ok := Answer(" #2f6f5e ")
 	if !ok {
