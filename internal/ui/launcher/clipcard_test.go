@@ -415,11 +415,11 @@ func TestBreakableBreaksOnlyBetweenCharacters(t *testing.T) {
 		strings.Repeat("abcdefgh", 10),
 	} {
 		got := breakable(text)
-		if strings.ReplaceAll(got, "​", "") != text {
+		if strings.ReplaceAll(got, "\u200b", "") != text {
 			t.Errorf("%q: the text changed: %q", text, got)
 			continue
 		}
-		if !strings.Contains(got, "​") {
+		if !strings.Contains(got, "\u200b") {
 			t.Errorf("%q: no break in a long run", text)
 		}
 		var seg segmenter.Segmenter
@@ -431,7 +431,7 @@ func TestBreakableBreaksOnlyBetweenCharacters(t *testing.T) {
 			bounds[it.Grapheme().OffsetInBytes] = true
 		}
 		at := 0
-		for i, part := range strings.Split(got, "​") {
+		for i, part := range strings.Split(got, "\u200b") {
 			if i > 0 && !bounds[at] {
 				t.Errorf("%q: a break at byte %d splits a character", text, at)
 			}
