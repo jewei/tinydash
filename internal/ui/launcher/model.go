@@ -190,6 +190,7 @@ func (m *Model) Stale() {
 }
 
 func (m *Model) loadWidgets() {
+	m.widgets.Focus = m.backend.FocusTimer()
 	m.widgetLoads++
 	load := m.widgetLoads
 	m.backend.Widgets(func(w Widgets) {

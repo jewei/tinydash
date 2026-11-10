@@ -66,6 +66,10 @@ type Backend interface {
 	// also when it refused, or nil while it is off. It only changes
 	// memory, so it answers at once.
 	ControlFocus(control FocusControl) (*FocusTimer, error)
+	// FocusTimer is the focus timer as it is now, or nil while it is off.
+	// It only reads memory, so a pane that shows again has the timer's
+	// state at once, not the one from before it hid.
+	FocusTimer() *FocusTimer
 	// Warnings are the problems found since the last call, such as a
 	// hotkey that did not register at startup, each returned once. They
 	// come after the launcher was made, so it asks each time it shows.

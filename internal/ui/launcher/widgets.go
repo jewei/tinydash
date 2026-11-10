@@ -28,16 +28,19 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 	pane := ui.Scroll(c).Grow(9).Background(p.Raised).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).
 		Role(ui.RoleRegion).Label("Widgets")
 	room := pane.Bounds().H
-	if room != m.paneRoom {
+	if room == 0 || room != m.paneRoom {
 		// A new pane, or a bar above it that came or went, changed its
 		// height after the last frame: draw again with the new one.
-		c.After(0)
+		c.AnimationFrame()
 		m.paneRoom = room
 	}
 	pane.Children(func() {
-		ui.Column(c).MinHeight(room).Padding(12).Gap(8).Children(func() { m.widgetCards(c, p, w, card) })
+		ui.Column(c).MinHeight(room).Padding(panePadding).Gap(8).Children(func() { m.widgetCards(c, p, w, card) })
 	})
 }
+
+// panePadding is the room around the widget pane's cards.
+const panePadding = 12
 
 // widgetCards are the cards of the widgets that are on, in the Solid
 // app's order.

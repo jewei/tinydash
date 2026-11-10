@@ -132,6 +132,8 @@ func (f *fake) Widgets(done func(Widgets)) {
 	done(f.widgets)
 }
 
+func (f *fake) FocusTimer() *FocusTimer { return f.widgets.Focus }
+
 func (f *fake) ControlFocus(control FocusControl) (*FocusTimer, error) {
 	f.controls = append(f.controls, control)
 	var err error

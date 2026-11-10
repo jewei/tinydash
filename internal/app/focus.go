@@ -146,6 +146,8 @@ func (a *App) focusFinished(ended focus.Finished) {
 	a.panel.Update(a.model.WidgetsChanged)
 }
 
+func (b *backend) FocusTimer() *launcher.FocusTimer { return b.app().focus.widget() }
+
 func (b *backend) ControlFocus(control launcher.FocusControl) (*launcher.FocusTimer, error) {
 	a := b.app()
 	err := a.focus.control(focus.Control(control), time.Now())

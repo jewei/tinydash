@@ -144,6 +144,11 @@ func (m *Model) notepadCard(c *ui.Context, p kit.Palette, n Note) {
 	}
 	note := ui.Column(c).Grow(1).Padding(10, 12).Gap(6).Radius(10).Border(1, p.Rule).Background(p.Paper).
 		Role(ui.RoleGroup).Label("Notepad")
+	// The pane scrolls, so nothing else stops a long note from growing it:
+	// the note is at most as tall as the pane holds, and scrolls inside.
+	if room := m.paneRoom - 2*panePadding; room > 0 {
+		note.MaxHeight(room)
+	}
 	if m.note.reveal {
 		note.ScrollIntoView()
 	}

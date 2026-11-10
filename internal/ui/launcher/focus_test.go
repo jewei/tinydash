@@ -3,6 +3,7 @@ package launcher
 import (
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,6 +94,41 @@ func TestTheNoteFollowsThePanesNewHeight(t *testing.T) {
 	f.fail = func(core.Action) error { return errors.New("Safari is gone.") }
 	tt.Key(0, ui.KeyEnter)
 	fills("after a notice came")
+}
+
+// A long note scrolls inside its card: the card is never taller than the
+// pane, so it never grows the pane, and Mod+J shows all of it.
+func TestALongNoteStaysInThePane(t *testing.T) {
+	f := newFake(always())
+	f.widgets = Widgets{Clocks: true, Note: &Note{Text: strings.Repeat("line\n", 80)}}
+	_, tt := showLauncher(t, f)
+	note, _ := tt.AccessByRole(ui.RoleGroup, "Notepad")
+	pane, _ := tt.AccessByRole(ui.RoleRegion, "Widgets")
+	if note.Bounds.H > pane.Bounds.H {
+		t.Errorf("the note is %v high, more than the pane's %v", note.Bounds.H, pane.Bounds.H)
+	}
+	tt.Key(ui.Cmd, ui.KeyJ)
+	note, _ = tt.AccessByRole(ui.RoleGroup, "Notepad")
+	if note.Bounds.Y < pane.Bounds.Y || note.Bounds.Y+note.Bounds.H > pane.Bounds.Y+pane.Bounds.H+1 {
+		t.Errorf("after Mod+J the note %+v is not all in the pane %+v", note.Bounds, pane.Bounds)
+	}
+}
+
+// A phase that ended while the launcher was away shows as the launcher
+// shows, before the slower load of the other widgets lands.
+func TestAShowHasTheTimerAtOnce(t *testing.T) {
+	f := newFake(always())
+	m, tt := showTimer(t, f, running)
+	m.Hidden()
+	done := FocusTimer{Phase: "Focus", Done: true, Total: 25 * time.Minute, Session: 1, Sessions: 4,
+		Actions: []FocusAction{{"Start Break", fakeStart}}}
+	f.widgets.Focus = &done
+	f.holdWidgets = true
+	m.Show("")
+	tt.Frame()
+	if !tt.HasText("Session done") || tt.HasText("Pause Timer") {
+		t.Errorf("texts %q", tt.Texts())
+	}
 }
 
 // Mod+J into a note below the fold of a full pane scrolls it into view, so
