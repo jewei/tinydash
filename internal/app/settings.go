@@ -148,6 +148,9 @@ func (b *settingsBackend) UpdateSettings(change func(*settings.Settings), done f
 			if after.CurrencyRatesEnabled && !before.CurrencyRatesEnabled {
 				go a.refreshRates(true)
 			}
+			if after.ShowUpNext && !before.ShowUpNext {
+				a.askCalendarAccess()
+			}
 		}
 		a.toSettings(func() { done(after, err) })
 	}()

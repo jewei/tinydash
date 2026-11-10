@@ -8,6 +8,13 @@
   "main": "./cmd/tinydash",
   "out": "build",
   "macos": {
-    "infoPlist": { "LSUIElement": true }
+    "entitlements": "Entitlements.plist",
+    "infoPlist": {
+      "LSUIElement": true,
+      "NSCalendarsFullAccessUsageDescription": "The Up Next widget shows the rest of today's events. TinyDash only reads your calendars, and only while the widget is on.",
+      "NSCalendarsUsageDescription": "The Up Next widget shows the rest of today's events. TinyDash only reads your calendars, and only while the widget is on.",
+      "NSRemindersFullAccessUsageDescription": "The Up Next widget shows the reminders due today. TinyDash only reads your reminders, and only while the widget is on.",
+      "NSRemindersUsageDescription": "The Up Next widget shows the reminders due today. TinyDash only reads your reminders, and only while the widget is on."
+    }
   }
 }

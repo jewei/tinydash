@@ -80,3 +80,5 @@ func (d *desktop) ClipboardText(secretToo bool) (string, bool) {
 func (d *desktop) RunSystem(command core.SystemCommand) error {
 	return platform.RunSystemCommand(command, mygo.Shell.OpenExternal)
 }
+
+func (d *desktop) OpenCalendarApp(kind core.UpNextKind) error { return platform.OpenCalendarApp(kind) }

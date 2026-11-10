@@ -40,6 +40,9 @@ type OS interface {
 	// password that a password manager copied.
 	ClipboardText(secretToo bool) (text string, ok bool)
 	RunSystem(command core.SystemCommand) error
+	// OpenCalendarApp opens the app that holds an Up Next item: Calendar
+	// for an event, Reminders for a reminder.
+	OpenCalendarApp(kind core.UpNextKind) error
 }
 
 // Shell is what actions do to TinyDash's own windows and settings.
@@ -67,6 +70,10 @@ type Shell interface {
 	TurnOnCurrencyRates() error
 	// Quit ends TinyDash.
 	Quit()
+	// AskCalendarAccess asks the OS to let Up Next read calendars and
+	// reminders, and loads the widgets again once the user answers. It
+	// returns at once.
+	AskCalendarAccess()
 }
 
 // Origin is where the user ran an action, which decides where its error
@@ -458,6 +465,26 @@ func (h handler) TypeQuery(a core.TypeQuery) error {
 
 // Quit does its work in Run, after the use is saved.
 func (h handler) Quit(core.Quit) error { return nil }
+
+func (h handler) OpenUpNext(a core.OpenUpNext) error {
+	if a.Kind != core.UpNextEvent && a.Kind != core.UpNextReminder {
+		return errors.New("This item cannot be opened.")
+	}
+	if err := h.host.OpenCalendarApp(a.Kind); err != nil {
+		return err
+	}
+	return h.shell.Hide()
+}
+
+// AskCalendarAccess asks only while Up Next is on, as only its widget
+// offers it.
+func (h handler) AskCalendarAccess(core.AskCalendarAccess) error {
+	if !h.state().Settings.ShowUpNext {
+		return errors.New("Turn on Up Next in Settings > Widgets first.")
+	}
+	h.shell.AskCalendarAccess()
+	return nil
+}
 
 // copyAndClose copies, then hides the launcher and hands focus back so the
 // user can paste right away, and says that it worked.

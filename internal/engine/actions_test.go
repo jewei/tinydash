@@ -60,6 +60,8 @@ func TestActionsForWhatTinyDashDidNotOfferNeverReachTheOS(t *testing.T) {
 		{core.CopySavedCalculation{ID: 5}, "This calculation is no longer in the history."},
 		{core.TypeQuery{Text: "  "}, "This keyword cannot be typed. Type it yourself."},
 		{core.TypeQuery{Text: strings.Repeat("x", library.MaxTyped+1)}, "This keyword cannot be typed. Type it yourself."},
+		{core.OpenUpNext{Kind: "calendar"}, "This item cannot be opened."},
+		{core.AskCalendarAccess{}, "Turn on Up Next in Settings > Widgets first."},
 	} {
 		err := w.run(c.action, core.SourceApp.ID(safari))
 		if errorText(err) != c.want {
@@ -99,6 +101,8 @@ func TestOfferedItemsRun(t *testing.T) {
 		{core.OpenSettings{}, []string{"settings"}},
 		{core.CenterLauncher{}, []string{"center"}},
 		{core.TurnOnCurrencyRates{}, []string{"rates on"}},
+		{core.OpenUpNext{Kind: core.UpNextEvent}, []string{"open up next event", "hide"}},
+		{core.OpenUpNext{Kind: core.UpNextReminder}, []string{"open up next reminder", "hide"}},
 	}
 	for _, s := range steps {
 		if err := w.run(s.action, ""); err != nil {
@@ -115,6 +119,15 @@ func TestOfferedItemsRun(t *testing.T) {
 		t.Errorf("open a gone file: %v", err)
 	}
 	wantSteps(t, w)
+}
+
+// The widget's Allow Access button asks; with Up Next off, nothing does.
+func TestAsksForCalendarAccessWhileUpNextIsOn(t *testing.T) {
+	w := newWorld(t, func(first *search.Snapshot, _ *store.Store) { first.Settings.ShowUpNext = true })
+	if err := w.run(core.AskCalendarAccess{}, ""); err != nil {
+		t.Fatal(err)
+	}
+	wantSteps(t, w, "ask calendar access")
 }
 
 func TestOSErrorsSayWhatToDo(t *testing.T) {
