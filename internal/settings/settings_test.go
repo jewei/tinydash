@@ -157,6 +157,9 @@ func TestValuesMustHaveTheirExactType(t *testing.T) {
 		{`{"tabs": [{"category": "apps", "shown": true, "extra": 1}]}`, true},
 		{`{"tabs": {}}`, false},
 		{`{"theme": "Dark"}`, false},
+		{`{"temperatureUnit": "fahrenheit"}`, true},
+		{`{"temperatureUnit": "kelvin"}`, false},
+		{`{"weatherCity": null}`, false},
 	}
 	for _, c := range cases {
 		if got := load(t, c.text); got.Damaged || got.Backup == c.readable {
@@ -201,6 +204,14 @@ func TestNormalizingClampsAndDeduplicates(t *testing.T) {
 	s.ClockCities = []string{" Tokyo", "tokyo", "", "London", "Paris", "Lima"}
 	if got := s.Normalize().ClockCities; !slices.Equal(got, []string{"Tokyo", "London", "Paris"}) {
 		t.Errorf("cities %q", got)
+	}
+	s.WeatherCity = "  Kuala Lumpur" + strings.Repeat(" ", 200)
+	if got := s.Normalize().WeatherCity; got != "Kuala Lumpur" {
+		t.Errorf("weather city %q", got)
+	}
+	s.WeatherCity = strings.Repeat("é", MaxWeatherCityChars+1)
+	if got := s.Normalize().WeatherCity; got != strings.Repeat("é", MaxWeatherCityChars) {
+		t.Errorf("weather city of %d characters", len([]rune(got)))
 	}
 
 	tab := func(c core.Category, shown bool) Tab { return Tab{c, shown, true} }
@@ -268,8 +279,8 @@ func TestExpandsTheHomeFolder(t *testing.T) {
 // Keys this version does not model go back to the file unchanged, so the
 // Rust app reads them again after a downgrade.
 func TestUnknownAndDroppedKeysAreWrittenBack(t *testing.T) {
-	text := `{"theme": "dark", "focusMinutes": 50, "weatherCity": "<Ipoh & co>",
-		"futureFlag": {"nested": [1, 2.50, null]}, "showWeather": true}`
+	text := `{"theme": "dark", "focusMinutes": 50, "futureCity": "<Ipoh & co>",
+		"futureFlag": {"nested": [1, 2.50, null]}, "futureSwitch": true}`
 	loaded := load(t, text)
 	if loaded.Backup {
 		t.Fatal(loaded.Warning("/s", true))
@@ -278,14 +289,14 @@ func TestUnknownAndDroppedKeysAreWrittenBack(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), `"weatherCity": "<Ipoh & co>"`) || !strings.Contains(string(data), "2.50") {
+	if !strings.Contains(string(data), `"futureCity": "<Ipoh & co>"`) || !strings.Contains(string(data), "2.50") {
 		t.Errorf("not kept verbatim:\n%s", data)
 	}
 	var written map[string]any
 	if err := json.Unmarshal(data, &written); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"focusMinutes", "weatherCity", "futureFlag", "showWeather", "shortcut", "tabs"} {
+	for _, key := range []string{"focusMinutes", "futureCity", "futureFlag", "futureSwitch", "shortcut", "tabs"} {
 		if _, ok := written[key]; !ok {
 			t.Errorf("%s was not written", key)
 		}

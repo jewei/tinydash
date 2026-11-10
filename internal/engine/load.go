@@ -12,6 +12,7 @@ import (
 	"github.com/jewei/tinydash/internal/feature/currency"
 	"github.com/jewei/tinydash/internal/feature/files"
 	"github.com/jewei/tinydash/internal/feature/library"
+	"github.com/jewei/tinydash/internal/feature/weather"
 	"github.com/jewei/tinydash/internal/search"
 	"github.com/jewei/tinydash/internal/settings"
 	"github.com/jewei/tinydash/internal/store"
@@ -73,17 +74,26 @@ func Load(ctx context.Context, db *store.Store, s settings.Settings, home string
 		// Rates that are off are not kept, even from a version that did.
 		slog.Warn("Could not delete the saved exchange rates", "error", err)
 	}
+	if w, ok := loadCached[weather.Weather](ctx, db.Weather, "the weather", load); ok {
+		snapshot.Weather = &w
+	}
 	return snapshot, warnings
 }
 
 func loadRates(ctx context.Context, db *store.Store, load func(string, error) bool) (currency.Rates, bool) {
-	text, ok, err := db.Rates(ctx)
-	if !load("exchange rates", err) || !ok {
-		return currency.Rates{}, false
+	return loadCached[currency.Rates](ctx, db.Rates, "exchange rates", load)
+}
+
+// loadCached reads a JSON value of the cache table with read; what names
+// it in a warning.
+func loadCached[T any](ctx context.Context, read func(context.Context) (string, bool, error), what string, load func(string, error) bool) (T, bool) {
+	var value T
+	text, ok, err := read(ctx)
+	if !load(what, err) || !ok {
+		return value, false
 	}
-	var rates currency.Rates
-	if err := json.Unmarshal([]byte(text), &rates); !load("exchange rates", err) {
-		return currency.Rates{}, false
+	if err := json.Unmarshal([]byte(text), &value); !load(what, err) {
+		return value, false
 	}
-	return rates, true
+	return value, true
 }

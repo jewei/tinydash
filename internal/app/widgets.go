@@ -15,9 +15,13 @@ import (
 // to the view on it.
 func (b *backend) Widgets(done func(launcher.Widgets)) {
 	a := b.app()
-	s := a.engine.Snapshot(time.Now()).Settings
+	snapshot := a.engine.Snapshot(time.Now())
+	s := snapshot.Settings
 	go func() {
 		w := loadWidgets(s, a.home, time.Now(), platform.DiskSpace, a.engine.Note, a.desktop.clip.Text)
+		if s.ShowWeather {
+			w.Weather = weatherCard(s, snapshot.Weather, a.weather.failureFor(s.WeatherCity), platform.LocalZone())
+		}
 		a.panel.Update(func() { done(w) })
 	}()
 }

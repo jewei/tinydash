@@ -76,13 +76,13 @@ func TestAnUnreadableValueKeepsACopy(t *testing.T) {
 // an older TinyDash loses nothing.
 func TestASaveKeepsKeysThisVersionDoesNotUse(t *testing.T) {
 	dir := t.TempDir()
-	write(t, dir, `{"showWeather":true,"weatherCity":"Ipoh","futureFlag":1}`)
+	write(t, dir, `{"futureSwitch":true,"futureCity":"Ipoh","futureFlag":1}`)
 	s, _, file := LoadSettings(dir)
 	if err := file.Save(s); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, settings.FileName))
-	for _, key := range []string{`"showWeather": true`, `"weatherCity": "Ipoh"`, `"futureFlag": 1`} {
+	for _, key := range []string{`"futureSwitch": true`, `"futureCity": "Ipoh"`, `"futureFlag": 1`} {
 		if !strings.Contains(string(data), key) {
 			t.Errorf("saved file lost %s:\n%s", key, data)
 		}

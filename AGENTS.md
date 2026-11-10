@@ -21,7 +21,7 @@ TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux, wri
 cmd/tinydash/          main: the command line (app.ParseArgs), then app.Main.
 internal/
   app/                 Wiring: panel, Settings window, HUD, tray, shortcut and hotkeys,
-                       file watcher, Spotlight, clipboard ticker, rates. Start at app.go.
+                       file watcher, Spotlight, clipboard ticker, rates, weather. Start at app.go.
   engine/              Live state: snapshot, single writer, slots, monitor, actions.go
                        (every action, checked before it runs), settingsfile.go.
   search/              Snapshot, Search, Resolve, the order of All, answers(), personal lists.
