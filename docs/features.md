@@ -60,6 +60,7 @@ Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system co
 An empty All search shows widgets to the right of the results, in place of the details. Typing, or another tab, shows the details again. Settings > Widgets turns each widget on or off; with every widget off, the details stay.
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
+- **Weather** (off): the current weather for one city from Open-Meteo: the temperature, the conditions, today's high and low, and the chance of rain. Set the city and the unit (Celsius or Fahrenheit) in Settings > Widgets; a city has up to 100 characters. Open-Meteo's geocoding service receives the city name, and its forecast service the city's location. TinyDash downloads the weather only while the widget is on, at startup, when the launcher opens and the weather is 30 minutes old, when you change the city, and on Refresh. After a download starts, the next one for the same city waits 10 minutes unless you refresh. The latest weather is saved for offline use; when a download fails, the widget shows it greyed with how old it is. The update time follows a change of the computer's time zone (on Windows, as an offset from UTC).
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
 
 ## Instant answers (All only)
@@ -133,7 +134,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | General              | Launcher shortcut, appearance (system, light, dark), hide when another app is focused, open at login, tray or menu bar icon, launcher position, tabs             |
-| Widgets              | Clocks and disk space on or off, clock cities                                                                                                                    |
+| Widgets              | Clocks, disk space, and weather on or off, clock cities, weather city and temperature unit                                                                       |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                                                                      |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, folders to index, folder names to skip, Spotlight (macOS), aliases, hotkeys, hidden results |
 | Snippets, Quicklinks | Create, edit, delete                                                                                                                                             |
@@ -151,7 +152,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same settings and data, with these differences:
 
-- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files and Privacy sections of Settings. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
+- **Removed:** snippet expansion as you type, the Up Next, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files and Privacy sections of Settings. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
 - **Windows:** app IDs changed, so the pins, usage, aliases, and hotkeys of Windows apps reset once.
 - **Ranking:** results with equal scores keep the order in which their source lists them.
 - **Windows apps** are found by name only, not by executable, because the list comes from the Windows Apps folder.
