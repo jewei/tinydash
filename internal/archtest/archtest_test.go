@@ -52,7 +52,9 @@ func TestEachRuleCanFail(t *testing.T) {
 		{"OS-only OS name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_zos.go": []byte("package engine\n")}}, "OS-specific file"},
 		{"OS-only build tag", Package{Path: module + "/internal/engine", Files: file("//go:build hurd\n\npackage engine\n")}, "OS build tag"},
 		{"sqlite outside store", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/sqlite"}}, "only [internal/store] may"},
-		{"automation outside app", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/automation"}}, "only [internal/app] may"},
+		{"automation outside app", Package{Path: module + "/internal/engine", E2EImports: []string{"github.com/egoist/mygo/plugins/automation"}}, "only [internal/app] may"},
+		{"automation in a release", Package{Path: module + "/internal/app", Imports: []string{"github.com/egoist/mygo/plugins/automation"}}, "in a release build; only the e2e build may"},
+		{"e2e build skips a layer", Package{Path: module + "/internal/feature/calc", E2EImports: []string{module + "/internal/store"}}, "imports internal/store"},
 		{"views import each other", Package{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/launcher"}}, "imports internal/ui/launcher"},
 		{"kit imports a view", Package{Path: module + "/internal/ui/kit", Imports: []string{module + "/internal/ui/launcher"}}, "imports internal/ui/launcher"},
 		{"kit imports the engine", Package{Path: module + "/internal/ui/kit", Imports: []string{module + "/internal/engine"}}, "imports internal/engine"},
@@ -207,7 +209,7 @@ func loadModule(t *testing.T) []Package {
 	for i := range pkgs {
 		for _, imp := range e2e[pkgs[i].Path] {
 			if !slices.Contains(pkgs[i].Imports, imp) {
-				pkgs[i].Imports = append(pkgs[i].Imports, imp)
+				pkgs[i].E2EImports = append(pkgs[i].E2EImports, imp)
 			}
 		}
 	}

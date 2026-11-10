@@ -19,7 +19,10 @@ const module = "github.com/jewei/tinydash"
 // Package is what the rules need to know about one Go package.
 type Package struct {
 	Path    string   // import path
-	Imports []string // imports of its non-test files
+	Imports []string // imports of its non-test files in a release build
+	// E2EImports are the imports that only its e2e build adds. They keep
+	// the same rules, and only they may name an e2eOnly package.
+	E2EImports []string
 	// TestImports are the imports of its test files. Tests may cross
 	// layers, as to a fake or to golden, but a new module is a decision
 	// for tests too.
@@ -66,11 +69,14 @@ var external = map[string][]string{
 	"github.com/egoist/mygo/transfer":       []string{"internal/app"}, // clipboard formats and data, as mygo.Clipboard reads them
 	"github.com/egoist/mygo/plugins/sqlite": []string{"internal/store"},
 	// The automation socket lets the verify-tinydash skill drive a built
-	// app; only the e2e build of internal/app links it, never a release.
+	// app; only the e2e build of internal/app links it (see e2eOnly).
 	"github.com/egoist/mygo/plugins/automation": []string{"internal/app"},
 	"github.com/ebitengine/purego/":             []string{"internal/platform"},
 	"golang.org/x/text/":                        []string{"internal/match", "internal/feature/"},
 }
+
+// e2eOnly packages may be linked only by the e2e build, never a release.
+var e2eOnly = []string{"github.com/egoist/mygo/plugins/automation"}
 
 // pure packages get disk, network, clock, and randomness as arguments, so
 // tests control them and a search never blocks on the OS.
@@ -121,27 +127,14 @@ func Check(pkgs []Package) []string {
 			continue
 		}
 		for _, imp := range p.Imports {
-			if dep, ok := strings.CutPrefix(imp, module+"/"); ok {
-				if matchesAny(dep, testOnly) && !matchesAny(rel, testOnly) {
-					out = append(out, fmt.Sprintf("%s imports %s; only tests may", rel, dep))
-				} else if !matchesAny(dep, allow) {
-					out = append(out, fmt.Sprintf("%s imports %s; its layer allows %v", rel, dep, allow))
-				}
+			if matchesAny(imp, e2eOnly) {
+				out = append(out, fmt.Sprintf("%s imports %s in a release build; only the e2e build may", rel, imp))
 				continue
 			}
-			if isStd(imp) {
-				if matchesAny(rel, pure) && matchesAny(imp, impureImports) {
-					out = append(out, fmt.Sprintf("%s imports %s; pure packages take the OS, network, and randomness as arguments", rel, imp))
-				}
-				continue
-			}
-			users, known := externalUsers(imp)
-			switch {
-			case !known:
-				out = append(out, fmt.Sprintf("%s imports %s, which is not in archtest.external", rel, imp))
-			case !matchesAny(rel, users):
-				out = append(out, fmt.Sprintf("%s imports %s; only %v may", rel, imp, users))
-			}
+			out = append(out, checkImport(rel, allow, imp)...)
+		}
+		for _, imp := range p.E2EImports {
+			out = append(out, checkImport(rel, allow, imp)...)
 		}
 		for _, imp := range p.TestImports {
 			if _, known := externalUsers(imp); !known && !isStd(imp) && !strings.HasPrefix(imp, module+"/") {
@@ -151,6 +144,34 @@ func Check(pkgs []Package) []string {
 		out = append(out, checkFiles(rel, p.Files)...)
 	}
 	slices.Sort(out)
+	return out
+}
+
+// checkImport checks one import of a package at rel, whose layer allows
+// allow.
+func checkImport(rel string, allow []string, imp string) []string {
+	var out []string
+	if dep, ok := strings.CutPrefix(imp, module+"/"); ok {
+		if matchesAny(dep, testOnly) && !matchesAny(rel, testOnly) {
+			out = append(out, fmt.Sprintf("%s imports %s; only tests may", rel, dep))
+		} else if !matchesAny(dep, allow) {
+			out = append(out, fmt.Sprintf("%s imports %s; its layer allows %v", rel, dep, allow))
+		}
+		return out
+	}
+	if isStd(imp) {
+		if matchesAny(rel, pure) && matchesAny(imp, impureImports) {
+			out = append(out, fmt.Sprintf("%s imports %s; pure packages take the OS, network, and randomness as arguments", rel, imp))
+		}
+		return out
+	}
+	users, known := externalUsers(imp)
+	switch {
+	case !known:
+		out = append(out, fmt.Sprintf("%s imports %s, which is not in archtest.external", rel, imp))
+	case !matchesAny(rel, users):
+		out = append(out, fmt.Sprintf("%s imports %s; only %v may", rel, imp, users))
+	}
 	return out
 }
 
