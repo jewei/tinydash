@@ -103,6 +103,19 @@ func TestListsEachUpNextActionInTheActionsMenu(t *testing.T) {
 	}
 }
 
+// A load that a hide dropped starts no other while the launcher hides.
+func TestStartsNoLoadWhileHiddenAfterADroppedOne(t *testing.T) {
+	f := newFake(always())
+	f.holdWidgets = true
+	m, _ := showLauncher(t, f)
+	m.Stale()
+	m.Hidden()
+	f.loading[0](Widgets{})
+	if len(f.loading) != 1 || m.widgetsLoading {
+		t.Errorf("%d loads while hidden, loading %v", len(f.loading), m.widgetsLoading)
+	}
+}
+
 // Up Next changes as an event starts or ends: the pane loads again then,
 // but only while the launcher shows, as each show loads anyway.
 func TestLoadsUpNextAgainWhenItChangesWhileTheLauncherShows(t *testing.T) {
@@ -161,8 +174,8 @@ func TestWaitsForASlowLoadBeforeLoadingUpNextAgain(t *testing.T) {
 	}
 }
 
-// A hide drops a slow load on its way, and the next show loads at once
-// instead of waiting for the dropped one.
+// A hide drops a slow load on its way. The next show waits for it, so
+// reads never pile up, and then loads its own.
 func TestLoadsAgainOnShowAfterAHideDroppedASlowLoad(t *testing.T) {
 	f := newFake(always())
 	f.holdWidgets = true
@@ -170,10 +183,13 @@ func TestLoadsAgainOnShowAfterAHideDroppedASlowLoad(t *testing.T) {
 	m.Stale()
 	m.Hidden()
 	m.Show("")
-	if len(f.loading) != 2 {
-		t.Fatalf("%d loads, want the show's own", len(f.loading))
+	if len(f.loading) != 1 {
+		t.Fatalf("%d loads run at once", len(f.loading))
 	}
 	f.loading[0](Widgets{UpNext: agenda(tt.Now())})
+	if len(f.loading) != 2 || m.widgets.UpNext != nil {
+		t.Fatalf("%d loads after the dropped one ended; it showed %+v", len(f.loading), m.widgets)
+	}
 	f.loading[1](Widgets{Clocks: true})
 	tt.Frame()
 	if m.widgets.UpNext != nil || !m.widgets.Clocks || len(f.loading) != 2 {

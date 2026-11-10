@@ -46,7 +46,7 @@ func (m *Model) upNext(c *ui.Context, p kit.Palette, u UpNext) {
 // pane shows, each once: every event opens Calendar.
 func (m *Model) upNextActions() []core.ResultAction {
 	u := m.widgets.UpNext
-	if u == nil || !m.showsWidgets() {
+	if u == nil || !m.showsWidgets() || m.showsJSON() {
 		return nil
 	}
 	var out []core.ResultAction

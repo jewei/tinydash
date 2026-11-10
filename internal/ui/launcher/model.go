@@ -33,9 +33,10 @@ type Model struct {
 
 	// widgets is what the pane showed from the last load. widgetLoads
 	// counts loads, so one that a hide dropped never shows. One load runs
-	// at a time, as reading the calendars can wait seconds: widgetsLoading
-	// is set while it runs, and widgetsAgain asks for one more after it,
-	// so changes that come quickly cost two loads at most.
+	// at a time, also across a hide, as reading the calendars can wait
+	// seconds: widgetsLoading is set while it runs, and widgetsAgain asks
+	// for one more after it, so changes that come quickly cost two loads
+	// at most.
 	widgets                      Widgets
 	widgetLoads                  int
 	widgetsLoading, widgetsAgain bool
@@ -172,7 +173,7 @@ func (m *Model) Hidden() {
 	m.shown = false
 	m.widgets.Card = nil
 	m.widgetLoads++
-	m.widgetsLoading, m.widgetsAgain = false, false
+	m.widgetsAgain = false
 }
 
 // ShownAgain says that the panel shows again as it was, after a command
@@ -201,13 +202,15 @@ func (m *Model) loadWidgets() {
 	m.widgetLoads++
 	load := m.widgetLoads
 	m.backend.Widgets(func(w Widgets) {
-		if load != m.widgetLoads {
-			return
+		again := m.widgetsAgain
+		m.widgetsLoading, m.widgetsAgain = false, false
+		// A load that a hide dropped shows nothing; a show since then
+		// asked for its own load after it.
+		if load == m.widgetLoads {
+			m.widgets = w
+			m.takeNote(w.Note)
 		}
-		m.widgets, m.widgetsLoading = w, false
-		m.takeNote(w.Note)
-		if m.widgetsAgain {
-			m.widgetsAgain = false
+		if again && m.shown {
 			m.loadWidgets()
 		}
 	})
