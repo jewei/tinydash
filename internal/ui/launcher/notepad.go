@@ -63,6 +63,9 @@ func (m *Model) showsNote() bool {
 // note does not show (Mod+J).
 func (m *Model) focusNote() {
 	if m.showsNote() {
+		// The full JSON view covers the note, so typing would go to a
+		// hidden field.
+		m.jsonFor = ""
 		m.note.field.Focus()
 		return
 	}

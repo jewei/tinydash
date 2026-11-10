@@ -56,6 +56,20 @@ func TestReadsUnixTimesInSecondsAndMilliseconds(t *testing.T) {
 	}
 }
 
+func TestDecodesTheDigitsAndTheirUnit(t *testing.T) {
+	got, ok := Decode(" 1791354301\n", now)
+	want := Time{
+		Raw: "1791354301", Local: "Wed 7 Oct 2026, 06:25:01", UTC: "Wed 7 Oct 2026, 06:25:01 UTC",
+		ISO: "2026-10-07T06:25:01Z", Relative: "6 hours ago",
+	}
+	if !ok || got != want {
+		t.Errorf("seconds: %+v", got)
+	}
+	if got, ok := Decode("1791354301250", now); !ok || !got.Milliseconds || got.Raw != "1791354301250" {
+		t.Errorf("milliseconds: %+v", got)
+	}
+}
+
 func TestRelative(t *testing.T) {
 	for seconds, want := range map[int64]string{
 		30:                   "Just now",

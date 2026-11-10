@@ -31,16 +31,25 @@ type Model struct {
 	// dismissed yet, oldest first.
 	warnings []string
 
-	// widgets is what the pane showed from the last load. One load runs at
-	// a time, as reading the calendars can wait seconds: widgetsLoading is
-	// set while it runs, and widgetsAgain asks for one more after it, so
-	// changes that come quickly cost two loads at most. widgetsLoaded is
-	// set once a load has ended.
-	widgets                                     Widgets
-	widgetsLoading, widgetsAgain, widgetsLoaded bool
-	// shown is set while the panel shows. Up Next loads again as time
-	// passes, and as the data changes, only then: each show loads anyway.
-	shown bool
+	// widgets is what the pane showed from the last load. widgetLoads
+	// counts loads, so one that a hide dropped never shows. One load runs
+	// at a time, as reading the calendars can wait seconds: widgetsLoading
+	// is set while it runs, and widgetsAgain asks for one more after it,
+	// so changes that come quickly cost two loads at most.
+	widgets                      Widgets
+	widgetLoads                  int
+	widgetsLoading, widgetsAgain bool
+	// dismissedCard is the ID of the clipboard card the user dismissed,
+	// kept while a query hides the pane. jsonFor is the ID of the card
+	// whose full JSON view covers the pane, or "": a new card, a hide, an
+	// edit, or another tab closes the view, as the Rust app's pane did as
+	// it left the screen.
+	dismissedCard string
+	jsonFor       string
+	// shown is set from Show to Hidden. The widgets load only while the
+	// panel shows, since loading them reads the clipboard.
+	shown    bool
+	jsonList ui.ListState
 	// note is the Notepad's text and save state, which outlive the pane:
 	// it closes while a query is typed.
 	note notepad
@@ -136,6 +145,7 @@ func (m *Model) Show(category core.Category) {
 	}
 	m.menu, m.alias, m.confirm = nil, nil, nil
 	m.closeHotkeyNow()
+	m.jsonFor = ""
 	m.notice, m.enableError = "", ""
 	m.query, m.recalled = "", -1
 	m.category = category
@@ -148,28 +158,36 @@ func (m *Model) Show(category core.Category) {
 
 // Hidden stops recording as the panel hides: recording pauses the
 // launcher shortcut and every hotkey, which must work again while the
-// panel is away. A hide need not blur the view first.
+// panel is away. A hide need not blur the view first. The full JSON view
+// closes too, so the next show starts on the widgets. The clipboard card
+// goes, with any load on its way: the clipboard may change while the
+// panel is away, and the next show reads it again.
 func (m *Model) Hidden() {
-	m.shown = false
 	m.stopRecording("")
 	m.saveNote()
 	// The view draws nothing while hidden: the next show finds the pane
 	// back, and tries again a save that failed.
 	m.note.focused, m.note.shown = false, false
+	m.jsonFor = ""
+	m.shown = false
+	m.widgets.Card = nil
+	m.widgetLoads++
+	m.widgetsLoading, m.widgetsAgain = false, false
 }
 
-// Shown notes that the panel shows, also when the app shows it again as
-// it was, without Show, after an action that hid it failed.
-func (m *Model) Shown() { m.shown = true }
+// ShownAgain says that the panel shows again as it was, after a command
+// that hid it failed, and loads the widgets again.
+func (m *Model) ShownAgain() {
+	m.shown = true
+	m.loadWidgets()
+}
 
 // Stale searches again after the data changed, keeping the selected
-// result, and loads the widgets again while the launcher shows: a setting
-// may have changed them. A hidden launcher loads them as it shows, so a
-// change while it hides, such as a copy, reads no calendars. Until the
-// first load ends, it loads them anyway, so the first show has them.
+// result, and loads the widgets again while the panel shows: a setting may
+// have changed them. A hidden panel loads them as it shows.
 func (m *Model) Stale() {
 	m.search(true)
-	if m.shown || !m.widgetsLoaded {
+	if m.shown {
 		m.loadWidgets()
 	}
 }
@@ -180,8 +198,13 @@ func (m *Model) loadWidgets() {
 		return
 	}
 	m.widgetsLoading = true
+	m.widgetLoads++
+	load := m.widgetLoads
 	m.backend.Widgets(func(w Widgets) {
-		m.widgets, m.widgetsLoading, m.widgetsLoaded = w, false, true
+		if load != m.widgetLoads {
+			return
+		}
+		m.widgets, m.widgetsLoading = w, false
 		m.takeNote(w.Note)
 		if m.widgetsAgain {
 			m.widgetsAgain = false
@@ -193,7 +216,7 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil || m.widgets.Note != nil)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil || m.widgets.Note != nil || m.widgets.ClipCards)
 }
 
 // upNextChanged loads the widgets again once Up Next changes with the
@@ -286,6 +309,7 @@ func (m *Model) scrollToSelected() {
 
 // edited runs after the user changed the search field.
 func (m *Model) edited() {
+	m.jsonFor = ""
 	m.recalled = -1
 	m.notice = ""
 	m.search(false)
@@ -299,6 +323,7 @@ func (m *Model) setQuery(q string) {
 
 func (m *Model) setCategory(category core.Category) {
 	m.category = category
+	m.jsonFor = ""
 	m.notice = ""
 	m.search(false)
 }
@@ -478,9 +503,9 @@ func (m *Model) enableClipboard() {
 	})
 }
 
-// escape closes what is on top: a dialog, then the menu, then a startup
-// warning; with nothing left it hides the launcher with its query, as the
-// Rust app did.
+// escape closes what is on top: a dialog, then the menu, then the full
+// JSON view, then a startup warning; with nothing left it hides the
+// launcher with its query, as the Rust app did.
 func (m *Model) escape() {
 	switch {
 	case m.confirm != nil:
@@ -493,6 +518,8 @@ func (m *Model) escape() {
 		m.closeHotkey()
 	case m.menu != nil:
 		m.closeMenu()
+	case m.showsJSON():
+		m.jsonFor = ""
 	case m.warning() != "":
 		m.dismissWarning()
 	default:

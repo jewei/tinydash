@@ -133,12 +133,12 @@ func TestLoadsUpNextAgainWhenItChangesWhileTheLauncherShows(t *testing.T) {
 		t.Errorf("loaded %d times after the launcher showed again", f.widgetLoads)
 	}
 	// Shown again as it was, after an action that hid it failed, it
-	// loads again as time passes.
+	// loads at once and again as time passes.
 	m.Hidden()
-	m.Shown()
 	f.widgets = Widgets{UpNext: agenda(tt.Now())}
+	m.ShownAgain()
 	tt.Advance(time.Hour)
-	if f.widgetLoads != 4 {
+	if f.widgetLoads != 5 {
 		t.Errorf("loaded %d times after the launcher showed as it was", f.widgetLoads)
 	}
 }
@@ -161,15 +161,22 @@ func TestWaitsForASlowLoadBeforeLoadingUpNextAgain(t *testing.T) {
 	}
 }
 
-// Before the first load, a change of the data loads the widgets even while
-// the launcher hides, so its first show has them.
-func TestLoadsTheWidgetsBeforeTheFirstShow(t *testing.T) {
+// A hide drops a slow load on its way, and the next show loads at once
+// instead of waiting for the dropped one.
+func TestLoadsAgainOnShowAfterAHideDroppedASlowLoad(t *testing.T) {
 	f := newFake(always())
-	f.widgets = Widgets{Clocks: true}
-	m, _ := open(t, f)
+	f.holdWidgets = true
+	m, tt := showLauncher(t, f)
 	m.Stale()
-	m.Stale()
-	if f.widgetLoads != 1 {
-		t.Errorf("%d loads while hidden", f.widgetLoads)
+	m.Hidden()
+	m.Show("")
+	if len(f.loading) != 2 {
+		t.Fatalf("%d loads, want the show's own", len(f.loading))
+	}
+	f.loading[0](Widgets{UpNext: agenda(tt.Now())})
+	f.loading[1](Widgets{Clocks: true})
+	tt.Frame()
+	if m.widgets.UpNext != nil || !m.widgets.Clocks || len(f.loading) != 2 {
+		t.Errorf("widgets %+v after %d loads", m.widgets, len(f.loading))
 	}
 }
