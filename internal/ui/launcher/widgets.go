@@ -11,7 +11,7 @@ import (
 )
 
 // widgetPane shows the widgets that are on, ported from
-// src/launcher/WidgetPane.tsx: Clocks and Disk space.
+// src/launcher/WidgetPane.tsx: Clocks, Disk space, and Notepad.
 func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 	w := m.widgets
 	ui.Column(c).Grow(9).Padding(12).Gap(8).Background(p.Raised).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).
@@ -26,6 +26,9 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 		}
 		if w.Disk != nil {
 			diskSpace(c, p, *w.Disk)
+		}
+		if w.Note != nil {
+			m.notepadCard(c, p, *w.Note)
 		}
 	})
 }

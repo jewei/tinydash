@@ -15,8 +15,18 @@ func (b *backend) Widgets(done func(launcher.Widgets)) {
 	a := b.app()
 	s := a.engine.Snapshot(time.Now()).Settings
 	go func() {
-		w := loadWidgets(s, a.home, time.Now(), platform.DiskSpace)
+		w := loadWidgets(s, a.home, time.Now(), platform.DiskSpace, a.engine.Note)
 		a.panel.Update(func() { done(w) })
+	}()
+}
+
+// SaveNote saves the Notepad's note off the main thread, which must not
+// wait on the writer, not even to queue the save.
+func (b *backend) SaveNote(text string, done func(error)) {
+	a := b.app()
+	go func() {
+		err := <-a.engine.SaveNote(text)
+		a.panel.Update(func() { done(err) })
 	}()
 }
 
@@ -31,8 +41,8 @@ func (b *backend) Warnings() []string {
 }
 
 // loadWidgets gathers the widgets that are on. A city no time zone knows
-// is left out; a disk that cannot be read says why in its card.
-func loadWidgets(s settings.Settings, home string, now time.Time, diskSpace func(string) (platform.Volume, error)) launcher.Widgets {
+// is left out; a disk or a note that cannot be read says why in its card.
+func loadWidgets(s settings.Settings, home string, now time.Time, diskSpace func(string) (platform.Volume, error), readNote func() (string, error)) launcher.Widgets {
 	var w launcher.Widgets
 	if s.ShowClocks {
 		w.Clocks = true
@@ -48,6 +58,10 @@ func loadWidgets(s settings.Settings, home string, now time.Time, diskSpace func
 	if s.ShowDiskSpace {
 		v, err := diskSpace(home)
 		w.Disk = &launcher.Disk{Name: v.Name, TotalBytes: v.TotalBytes, FreeBytes: v.FreeBytes, Err: err}
+	}
+	if s.ShowNotepad {
+		text, err := readNote()
+		w.Note = &launcher.Note{Text: text, Err: err}
 	}
 	return w
 }

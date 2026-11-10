@@ -18,6 +18,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. Th
 | Mod+Backspace      | Delete the selected clipboard entry or calculator history entry                                                                |
 | Tab / Shift+Tab    | Next / previous category                                                                                                       |
 | Mod+,              | Open Settings                                                                                                                  |
+| Mod+J              | Move to the note of the Notepad widget, and back to the search field                                                           |
 | Escape             | Close a dialog or the actions menu, dismiss a warning, or hide and return to the previous app                                  |
 
 ↑ brings back up to 50 searches that ran a result, newest first, each once. They are kept only until TinyDash quits, never saved. Editing a search brought back makes it a new one, and ↑ selects results again. A held ↑ stops at the first row; press it again to bring back a search.
@@ -61,6 +62,7 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
+- **Notepad** (off): one scratch note, kept on this computer in `tinydash.db`. Mod+J moves to the note; Mod+J, Escape, Tab, or Shift+Tab goes back to the search field. Other keys type in the note. It saves when you pause typing, leave the note, start a search, or hide the launcher, and says whether it is saved. A note over 10,000 characters is not saved until you shorten it. A note that cannot save keeps its text and tries again when you leave it or the widgets show again. If the note cannot be read, its card says why, and the other widgets still show.
 
 ## Instant answers (All only)
 
@@ -133,7 +135,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | General              | Launcher shortcut, appearance (system, light, dark), hide when another app is focused, open at login, tray or menu bar icon, launcher position, tabs             |
-| Widgets              | Clocks and disk space on or off, clock cities                                                                                                                    |
+| Widgets              | Clocks, disk space, and Notepad on or off, clock cities                                                                                                          |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                                                                      |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, folders to index, folder names to skip, Spotlight (macOS), aliases, hotkeys, hidden results |
 | Snippets, Quicklinks | Create, edit, delete                                                                                                                                             |
@@ -151,7 +153,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same settings and data, with these differences:
 
-- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files and Privacy sections of Settings. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
+- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files and Privacy sections of Settings. Their settings stay in `settings.json`.
 - **Windows:** app IDs changed, so the pins, usage, aliases, and hotkeys of Windows apps reset once.
 - **Ranking:** results with equal scores keep the order in which their source lists them.
 - **Windows apps** are found by name only, not by executable, because the list comes from the Windows Apps folder.
