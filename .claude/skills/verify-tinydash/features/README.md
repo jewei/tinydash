@@ -16,8 +16,8 @@ This folder is the maintained source for verifying what a user does in the TinyD
 - Start every recipe from a freshly launched box unless its preconditions say otherwise. Recipes that change data (usage, calculations, clipboard, aliases) change the ranking of later recipes in the same box.
 - Prefer result-row keys (`key=file:/root/…`) and labels (`[tab] "Clipboard"`) over refs. Refs change when an overlay opens or closes, so take them from the latest diff, or run `$V ref '<text>'`.
 - Type with `$V auto type` and press keys with `$V auto key`, as the user does. Use `press` only for buttons and tabs that the user clicks.
-- Run X-level actions (the global shortcut, a copy by another app) only through `$V box`. They reach the container's display `:99`.
-- Wait for state (`wait --text`, `wait --gone`, `--settle`), never a fixed sleep. The exceptions are the timing windows that the app has on purpose: wait 1 s after Turn On Clipboard History (Linux baseline read) and 0.5 s after a shortcut hide (`blurWithin`). The X shortcut has no automation event: poll `$V auto windows`.
+- Press the global shortcut only through `$V show` and `$V hide`, and run other X-level actions (a copy by another app) only through `$V box`. They reach the container's display `:99`.
+- Wait for state (`wait --text`, `wait --gone`, `--settle`), never a fixed sleep. The one exception is a timing window that the app has on purpose: wait 1 s after Turn On Clipboard History (Linux baseline read). Show and hide the panel with `$V show` and `$V hide`: they press the real shortcut, wait for the window, and `$V show` waits out `blurWithin` (400 ms) after any hide, by Enter, a digit, or the shortcut.
 
 ## Proof and skip reporting
 

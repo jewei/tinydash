@@ -8,6 +8,8 @@
 #   verify.sh doctor                read-only health check of the running box
 #   verify.sh auto <args...>        mygo-automation inside the box
 #   verify.sh ref <text>            the ref of the first snapshot line holding text
+#   verify.sh show                  the real shortcut shows the panel; waits for focused
+#   verify.sh hide                  the real shortcut hides the panel; waits for hidden
 #   verify.sh box <shell command>   a shell command inside the box (xclip, sqlite3, ...)
 #   verify.sh sql <query>           sqlite3 on the app's tinydash.db
 #   verify.sh evidence <name>       screenshot + snapshot + windows into the run folder
@@ -29,6 +31,23 @@ evidence="$root/runs/$run"
 bin="$root/builds/$run"
 
 in_box() { docker exec -e MYGO_AUTOMATION_SESSION="$run" "$box" "$@"; }
+
+# press_shortcut presses the real launcher shortcut on the virtual display
+# and polls the panel until its window line holds want (focused, hidden).
+press_shortcut() {
+  local want="$1" _
+  in_box xdotool key ctrl+shift+space
+  for _ in $(seq 50); do
+    if in_box /opt/td/mygo-automation windows | grep -q "\"TinyDash\" $want"; then
+      in_box /opt/td/mygo-automation windows
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "the panel was not $want 5 s after the shortcut:" >&2
+  in_box /opt/td/mygo-automation windows >&2
+  return 1
+}
 
 running() { [[ "$(docker inspect -f '{{.State.Running}}' "$box" 2>/dev/null)" == true ]]; }
 
@@ -88,6 +107,21 @@ ref)
   [[ -n "$line" ]] || { echo "no element line holds: $*" >&2; exit 1; }
   sed -E 's/^ *(@e[0-9]+).*/\1/' <<<"$line"
   ;;
+show)
+  if in_box /opt/td/mygo-automation windows | grep -q '"TinyDash" focused'; then
+    in_box /opt/td/mygo-automation windows
+    exit 0
+  fi
+  # The app takes a shortcut press within blurWithin (400 ms) of a hide by
+  # blur as the cause of that blur, and keeps the panel hidden. Any hide,
+  # by Enter, a digit, or the shortcut, may have just happened, so wait it
+  # out here: then no journey needs to know about the window.
+  sleep 0.5
+  press_shortcut focused
+  ;;
+hide)
+  press_shortcut hidden
+  ;;
 box)
   shift
   in_box sh -c "$*"
@@ -115,7 +149,7 @@ cleanup)
   echo "evidence kept in ${evidence#"$repo/"}"
   ;;
 *)
-  sed -n '5,16p' "$0" >&2
+  sed -n '5,18p' "$0" >&2
   exit 2
   ;;
 esac

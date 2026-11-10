@@ -31,10 +31,10 @@ Preconditions:
 - **Run with Enter.** Run `$V auto key Enter --settle`. Then run `$V auto windows`: the panel is `hidden`.
 - **Side effect: launched.** Run `$V box 'cat /scratch/launched-verify-notes' | tee .local/verify/runs/$TD_RUN/search-2-launched.txt`. It prints `launched`.
 - **Side effect: usage.** Run `$V sql 'select id, count from usage' | tee .local/verify/runs/$TD_RUN/search-2-usage.sql.txt`. The output has a row `app:/root/.local/share/applications/verify-notes.desktop|1`.
-- **Second view.** Show the panel again with `$V box 'xdotool key ctrl+shift+space'`, and wait until `$V auto windows` says `focused`. Run `$V auto snapshot`: with an empty query, the All tab now lists `Verify Notes`. Run `$V evidence search-3-suggested`.
+- **Second view.** Run `$V show`. Run `$V auto snapshot`: with an empty query, the All tab now lists `Verify Notes`. Run `$V evidence search-3-suggested`.
 - **Run by digit.** Remove the marker with `$V box 'rm /scratch/launched-verify-notes'`. Empty the field with `$V auto fill "$($V ref '[textField] "Search"')" "" --settle`, then run `$V auto type "verify" --settle` and `$V auto key CmdOrCtrl+1 --settle`. `$V auto windows` says `hidden`, the marker says `launched` again, and `$V sql 'select id, count from usage'` shows `count` `2`.
-- **Open error.** Show the panel, type `$V auto type "grocery" --settle`, and press `$V auto key CmdOrCtrl+1 --settle`. The box has no handler for `.md` files, so the panel stays, and an `[alert]` reads `Could not open /root/Documents/grocery-list.md: No application is registered as handling this file. …`. No `usage` row is added for the file. Run `$V evidence search-4-file-open-error`.
-- **No match.** Show the panel, then type `$V auto type "zzqx" --settle`. The only row is `Search Google for “zzqx”`. Do not press Enter: it opens a browser.
+- **Open error.** Run `$V show`, then type `$V auto type "grocery" --settle`, and press `$V auto key CmdOrCtrl+1 --settle`. The box has no handler for `.md` files, so the panel stays, and an `[alert]` reads `Could not open /root/Documents/grocery-list.md: No application is registered as handling this file. …`. No `usage` row is added for the file. Run `$V evidence search-4-file-open-error`.
+- **No match.** Run `$V show`, then type `$V auto type "zzqx" --settle`. The only row is `Search Google for “zzqx”`. Do not press Enter: it opens a browser.
 
 ## Gotchas
 

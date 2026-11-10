@@ -26,7 +26,7 @@ Preconditions:
 - **Copy with Enter.** Run `$V auto key Enter --settle`. Then `$V auto windows` says `hidden`.
 - **Side effect: X clipboard.** Run `$V box 'xclip -selection clipboard -o' | tee .local/verify/runs/$TD_RUN/calc-2-clipboard.txt`. It prints `96`.
 - **Side effect: history row.** Run `$V sql 'select expression, result from calculations' | tee .local/verify/runs/$TD_RUN/calc-2-history.sql.txt`. It prints `12 * 8|96`.
-- **Second view.** Show the panel with `$V box 'xdotool key ctrl+shift+space'`, then run `$V auto type "=" --settle`. A row for `12 * 8` with the result `96` is listed. Run `$V evidence calc-3-history`.
+- **Second view.** Run `$V show`, then run `$V auto type "=" --settle`. A row for `12 * 8` with the result `96` is listed. Run `$V evidence calc-3-history`.
 
 ## Gotchas
 
