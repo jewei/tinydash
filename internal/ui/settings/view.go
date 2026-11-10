@@ -232,6 +232,7 @@ var credits = []string{
 	"Emoji keywords from Unicode CLDR, Unicode License V3",
 	"EFF Large Wordlist by the Electronic Frontier Foundation, CC BY 4.0",
 	"Exchange rates from the European Central Bank through Frankfurter",
+	"Weather data by Open-Meteo.com, CC BY 4.0",
 	"Built with Go, mygo, purego, and go-text: BSD, MIT, and Apache-2.0 licenses",
 }
 
