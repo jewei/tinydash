@@ -28,9 +28,11 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 	pane := ui.Scroll(c).Grow(9).Background(p.Raised).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).
 		Role(ui.RoleRegion).Label("Widgets")
 	room := pane.Bounds().H
-	if room == 0 {
-		// A new pane has no last frame: draw again once it has a height.
+	if room != m.paneRoom {
+		// A new pane, or a bar above it that came or went, changed its
+		// height after the last frame: draw again with the new one.
 		c.After(0)
+		m.paneRoom = room
 	}
 	pane.Children(func() {
 		ui.Column(c).MinHeight(room).Padding(12).Gap(8).Children(func() { m.widgetCards(c, p, w, card) })

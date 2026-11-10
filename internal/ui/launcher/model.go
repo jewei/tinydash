@@ -34,6 +34,9 @@ type Model struct {
 	// counts loads, so a slow one that ends after a newer one is dropped.
 	widgets     Widgets
 	widgetLoads int
+	// paneRoom is the widget pane's height as the last frame laid it out,
+	// which its column fills.
+	paneRoom float32
 	// dismissedCard is the ID of the clipboard card the user dismissed,
 	// kept while a query hides the pane. jsonFor is the ID of the card
 	// whose full JSON view covers the pane, or "": a new card, a hide, an

@@ -73,6 +73,28 @@ func TestThePaneScrollsAndTheNoteFillsTheRoomLeft(t *testing.T) {
 	}
 }
 
+// A bar above the pane that goes away makes the pane taller, and the note
+// fills the new room at once, not at some later frame.
+func TestTheNoteFollowsThePanesNewHeight(t *testing.T) {
+	f := newFake(always(safari))
+	f.warnings = []string{"The tray icon is unavailable."}
+	f.widgets = Widgets{Clocks: true, Note: &Note{Text: "note"}}
+	_, tt := showLauncher(t, f)
+	fills := func(when string) {
+		t.Helper()
+		note, _ := tt.AccessByRole(ui.RoleGroup, "Notepad")
+		pane, _ := tt.AccessByRole(ui.RoleRegion, "Widgets")
+		if gap := pane.Bounds.Y + pane.Bounds.H - note.Bounds.Y - note.Bounds.H; gap < 0 || gap > 24 {
+			t.Errorf("%s: the note ends %v short of the pane's end", when, gap)
+		}
+	}
+	pressButton(t, tt, "Dismiss")
+	fills("after the warning went")
+	f.fail = func(core.Action) error { return errors.New("Safari is gone.") }
+	tt.Key(0, ui.KeyEnter)
+	fills("after a notice came")
+}
+
 // Mod+J into a note below the fold of a full pane scrolls it into view, so
 // the user sees what they type.
 func TestMovingToTheNoteShowsItInAFullPane(t *testing.T) {
