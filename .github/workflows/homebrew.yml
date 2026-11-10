@@ -1,0 +1,47 @@
+# Points the cask in the owner's homebrew-tap repository at a release when
+# it is published, also when a draft is published by hand on GitHub. A
+# prerelease or a draft reaches no one, so it is left alone.
+name: Homebrew
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published version to point the cask at, such as 0.10.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    name: Update the cask
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      TAG: ${{ github.event.release.tag_name || format('v{0}', inputs.version) }}
+    steps:
+      - name: Point the cask at the release's disk image
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set, so the Homebrew cask still offers the previous version."
+            exit 0
+          fi
+          version="${TAG#v}"
+          dmg="TinyDash_${version}_universal.dmg"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$dmg"
+          sha=$(sha256sum "$dmg" | cut -d ' ' -f 1)
+          git clone -q --depth 1 "https://x-access-token:$TAP_TOKEN@github.com/$GITHUB_REPOSITORY_OWNER/homebrew-tap.git" tap
+          cd tap
+          # From 0.10.0 the app does not update itself, so brew upgrade must.
+          sed -i -E "s/^  version \".*\"/  version \"$version\"/; s/^  sha256 \".*\"/  sha256 \"$sha\"/; /^  auto_updates true$/d" Casks/tinydash.rb
+          git diff
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -am "Update TinyDash to $version"
+          git push -q

@@ -30,7 +30,19 @@ How it was measured, on an Apple M2 Mac with macOS 27.2, on 2026-11-10: each app
 
 ## Install
 
-The Go app has no release yet. The downloads on the [Releases page](https://github.com/jewei/tinydash/releases) and the Homebrew cask are the earlier Rust app. To use the Go app now, build it from source.
+- **macOS (Homebrew):**
+
+  ```sh
+  brew install jewei/tap/tinydash
+  ```
+
+- **macOS (download):** the `.dmg` from [Releases](https://github.com/jewei/tinydash/releases). The app is signed with a Developer ID and notarized by Apple.
+- **Windows:** `tinydash-setup-<version>-amd64.exe` from [Releases](https://github.com/jewei/tinydash/releases). It is not signed, so Windows SmartScreen may ask you to confirm (More info > Run anyway).
+- **Linux:** from [Releases](https://github.com/jewei/tinydash/releases), the `.deb` (Debian, Ubuntu), or the `.tar.gz` (other distributions: unpack it and run `install.sh`, which installs TinyDash for your user in `~/.local`). These are not signed.
+
+TinyDash does not update itself. Get new versions from Releases, or with `brew upgrade --cask tinydash`. Version 0.9.0 and earlier, the Rust app, do not offer 0.10.0 as an update.
+
+You can check that a download was built from this repository by its release workflow. Run `gh attestation verify FILE --repo jewei/tinydash` with the [GitHub CLI](https://cli.github.com).
 
 ## Build from source
 

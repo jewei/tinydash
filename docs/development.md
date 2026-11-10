@@ -84,4 +84,9 @@ The version is in `mygo.json`.
 
 ## Release
 
-The release process for the Go app is not set up yet. The Tauri release workflow was removed with the Rust app.
+1. In a pull request, set `version` in `mygo.json`, and move the `[Unreleased]` notes in `CHANGELOG.md` under `## [<version>] - <date>`, with its compare link. Merge it, and wait for CI on `main`.
+2. Run the Release workflow on `main`: `gh workflow run release.yml -f version=<version>`. It makes a draft by default (`-f draft=false` publishes at once). It checks the version, the changelog section, and CI. It builds macOS (universal, signed with the Developer ID, notarized), Windows (installer), and Linux (`.deb`, `.tar.gz`), records each file's build provenance, and makes the release with the changelog section as its notes and `SHA256SUMS`.
+3. Try the draft's downloads, then publish it on GitHub.
+4. Publishing starts the Homebrew workflow (`homebrew.yml`), which points the cask in `jewei/homebrew-tap` at the new `.dmg`. To run it again: `gh workflow run homebrew.yml -f version=<version>`.
+
+Signing uses the `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID` repository secrets; the cask uses `HOMEBREW_TAP_TOKEN`. Local builds stay ad hoc signed: only the workflow adds `macos.notarize` to `mygo.json`. The app has no update feed, so there is no updater key.
