@@ -20,7 +20,7 @@ Preconditions:
 - A freshly launched box. `$V doctor` passes, and `$V auto windows` prints `TinyDash` `focused`.
 
 - **Type something first.** Run `$V auto type "roadmap" --settle`. The search field value is `roadmap`. Run `$V evidence shortcut-0-typed`.
-- **Hide.** Run `$V hide | tee .local/verify/runs/$TD_RUN/shortcut-1-hidden.txt`. It presses the real shortcut on the display and waits until the panel is `hidden`. As a second view, `$V box 'xdotool search --onlyvisible --name "^TinyDash$"'` prints nothing.
+- **Hide.** First check that `$V auto windows` prints `TinyDash` `focused`: `$V hide` presses no key on a hidden panel, so only a shown panel proves the shortcut. Run `$V hide | tee .local/verify/runs/$TD_RUN/shortcut-1-hidden.txt`. It presses the real shortcut on the display and waits until the panel is `hidden`. If it prints `already hidden: no key pressed`, the check did not run: start again from a shown panel. As a second view, `$V box 'xdotool search --onlyvisible --name "^TinyDash$"'` prints nothing.
 - **Show.** Run `$V show`. It waits out the blur window, presses the real shortcut, and waits until the panel is `focused`. Then `$V box 'xdotool search --onlyvisible --name "^TinyDash$"'` prints a window ID.
 - **Query reset.** Run `$V auto snapshot -i`. `[textField] "Search" focused` has no `value=`, and `[tab] "All"` is `checked`. Run `$V evidence shortcut-2-shown`.
 

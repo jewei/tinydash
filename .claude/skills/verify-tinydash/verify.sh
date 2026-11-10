@@ -109,6 +109,7 @@ ref)
   ;;
 show)
   if in_box /opt/td/mygo-automation windows | grep -q '"TinyDash" focused'; then
+    echo "already focused: no key pressed" >&2
     in_box /opt/td/mygo-automation windows
     exit 0
   fi
@@ -122,6 +123,7 @@ show)
 hide)
   # A press on a hidden panel would show it: hide only a shown one.
   if in_box /opt/td/mygo-automation windows | grep -q '"TinyDash" hidden'; then
+    echo "already hidden: no key pressed" >&2
     in_box /opt/td/mygo-automation windows
     exit 0
   fi
