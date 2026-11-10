@@ -20,7 +20,7 @@ The Go app draws its window natively. The Rust app drew a web page in a WebView,
 | Memory (macOS footprint)         | 36 MB       | 93 MB (26 MB + 67 MB WebKit)    | about 60% less       |
 | Memory (resident)                | 108 MB      | 181 MB (96 MB + 85 MB WebKit)   | about 40% less       |
 | CPU while idle, over 60 s        | 0.15 s      | 0.31 s (0.02 s + 0.29 s WebKit) | about half           |
-| Search, p95 per query            | 0.12–5.0 ms | 0.12–4.4 ms                     | up to 1.9 times slower |
+| Search, p95 per query            | 0.12–5.0 ms | 0.12–4.4 ms                     | up to about 1.9 times slower |
 | App size, universal macOS        | 35 MB       | 22 MB                           | larger               |
 | Download (.dmg), universal macOS | 11.2 MB     | 8 MB                            | larger               |
 
