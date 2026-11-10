@@ -73,6 +73,25 @@ func TestThePaneScrollsAndTheNoteFillsTheRoomLeft(t *testing.T) {
 	}
 }
 
+// Mod+J into a note below the fold of a full pane scrolls it into view, so
+// the user sees what they type.
+func TestMovingToTheNoteShowsItInAFullPane(t *testing.T) {
+	f := newFake(always())
+	m, tt := open(t, f)
+	card := colorCard
+	focus := running(tt.Now())
+	f.widgets = Widgets{ClipCards: true, Card: &card, Clocks: true, Focus: &focus,
+		Disk: &Disk{Name: "Macintosh HD", TotalBytes: 494e9, FreeBytes: 182e9}, Note: &Note{Text: "note"}}
+	m.Show("")
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyJ)
+	pane, _ := tt.AccessByRole(ui.RoleRegion, "Widgets")
+	note, _ := tt.AccessByRole(ui.RoleGroup, "Notepad")
+	if !tt.Focused("Notepad") || note.Bounds.Y+note.Bounds.H > pane.Bounds.Y+pane.Bounds.H+1 {
+		t.Errorf("the note %+v is below the pane %+v", note.Bounds, pane.Bounds)
+	}
+}
+
 // The fake's codes for the controls; the launcher only hands them back.
 const (
 	fakeStart FocusControl = iota + 1

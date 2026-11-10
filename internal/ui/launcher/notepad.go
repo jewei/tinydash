@@ -35,6 +35,9 @@ type notepad struct {
 	// focused and shown are as the last frame had them, so the view sees
 	// the user leave the note and the pane close or come back.
 	focused, shown bool
+	// reveal is set in the frame the note gets the keyboard: the pane
+	// scrolls, and the note may be below its fold.
+	reveal bool
 }
 
 // takeNote takes the note of a widget load.
@@ -127,6 +130,7 @@ func (m *Model) noteFrame(c *ui.Context, inNote bool) {
 			m.saveNote()
 		}
 	}
+	m.note.reveal = inNote && !m.note.focused
 	m.note.focused, m.note.shown = inNote, shown
 }
 
@@ -138,8 +142,12 @@ func (m *Model) notepadCard(c *ui.Context, p kit.Palette, n Note) {
 		})
 		return
 	}
-	ui.Column(c).Grow(1).Padding(10, 12).Gap(6).Radius(10).Border(1, p.Rule).Background(p.Paper).
-		Role(ui.RoleGroup).Label("Notepad").Children(func() {
+	note := ui.Column(c).Grow(1).Padding(10, 12).Gap(6).Radius(10).Border(1, p.Rule).Background(p.Paper).
+		Role(ui.RoleGroup).Label("Notepad")
+	if m.note.reveal {
+		note.ScrollIntoView()
+	}
+	note.Children(func() {
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, "Notepad").FontSize(12).FontWeight(600).TextColor(p.Muted)
 			keyCaps(c, p, modKey, "J")
