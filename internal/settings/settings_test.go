@@ -70,18 +70,17 @@ func TestAValueFromANewerVersionTakesItsDefaultWithoutResettingTheRest(t *testin
 	loaded := load(t, `{"shortcut": "Alt+Space", "searchEngine": "kagi",
 		"emojiLanguages": ["zh", "xx-unknown"], "focusMinutes": "soon"}`)
 	warning := loaded.Warning("/settings", true)
-	for _, field := range []string{"emojiLanguages", "searchEngine"} {
+	for _, field := range []string{"emojiLanguages", "searchEngine", "focusMinutes"} {
 		if !strings.Contains(warning, field) {
 			t.Errorf("%q names no %s", warning, field)
 		}
 	}
-	// focusMinutes belongs to a dropped feature: Go keeps it as it is.
-	if strings.Contains(warning, "shortcut") || strings.Contains(warning, "focusMinutes") {
+	if strings.Contains(warning, "shortcut") {
 		t.Errorf("%q", warning)
 	}
 	s := loaded.Settings
 	if s.Shortcut != "Alt+Space" || s.SearchEngine != Default().SearchEngine ||
-		!slices.Equal(s.EmojiLanguages, []EmojiLanguage{"zh"}) || string(s.kept["focusMinutes"]) != `"soon"` {
+		!slices.Equal(s.EmojiLanguages, []EmojiLanguage{"zh"}) || s.FocusMinutes != Default().FocusMinutes {
 		t.Errorf("%+v", s)
 	}
 }
@@ -268,7 +267,7 @@ func TestExpandsTheHomeFolder(t *testing.T) {
 // Keys this version does not model go back to the file unchanged, so the
 // Rust app reads them again after a downgrade.
 func TestUnknownAndDroppedKeysAreWrittenBack(t *testing.T) {
-	text := `{"theme": "dark", "focusMinutes": 50, "weatherCity": "<Ipoh & co>",
+	text := `{"theme": "dark", "shellCommands": true, "weatherCity": "<Ipoh & co>",
 		"futureFlag": {"nested": [1, 2.50, null]}, "showWeather": true}`
 	loaded := load(t, text)
 	if loaded.Backup {
@@ -285,7 +284,7 @@ func TestUnknownAndDroppedKeysAreWrittenBack(t *testing.T) {
 	if err := json.Unmarshal(data, &written); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"focusMinutes", "weatherCity", "futureFlag", "showWeather", "shortcut", "tabs"} {
+	for _, key := range []string{"shellCommands", "weatherCity", "futureFlag", "showWeather", "shortcut", "tabs"} {
 		if _, ok := written[key]; !ok {
 			t.Errorf("%s was not written", key)
 		}
@@ -296,7 +295,7 @@ func TestUnknownAndDroppedKeysAreWrittenBack(t *testing.T) {
 	}
 	// WithChanges keeps them too, without sharing the map.
 	changed, err := loaded.Settings.WithChanges(map[string]json.RawMessage{"theme": json.RawMessage(`"light"`)})
-	if err != nil || string(changed.kept["focusMinutes"]) != "50" {
+	if err != nil || string(changed.kept["shellCommands"]) != "true" {
 		t.Errorf("%v %v", changed.kept, err)
 	}
 	if !strings.HasPrefix(string(data), "{\n  \"shortcut\": ") {
@@ -311,5 +310,30 @@ func TestDefaultsLoadBackUnchanged(t *testing.T) {
 	}
 	if loaded := Load(data, true); loaded.Backup || !reflect.DeepEqual(loaded.Settings, Default()) {
 		t.Errorf("%+v", loaded)
+	}
+}
+
+// A focus timer saved by the Rust app loads as it was, and lengths out of
+// range clamp to the Rust app's limits.
+func TestFocusTimerSettingsLoadAndClamp(t *testing.T) {
+	loaded := load(t, `{"showFocusTimer": true, "focusMinutes": 50, "shortBreakMinutes": 7,
+		"longBreakMinutes": 20, "sessionsBeforeLongBreak": 3}`)
+	s := loaded.Settings
+	if loaded.Backup || !s.ShowFocusTimer || s.FocusMinutes != 50 || s.ShortBreakMinutes != 7 ||
+		s.LongBreakMinutes != 20 || s.SessionsBeforeLongBreak != 3 {
+		t.Errorf("%+v", s)
+	}
+	low := Settings{}.Normalize()
+	if low.FocusMinutes != 1 || low.ShortBreakMinutes != 1 || low.LongBreakMinutes != 1 || low.SessionsBeforeLongBreak != 1 {
+		t.Errorf("%+v", low)
+	}
+	high := Settings{FocusMinutes: 500, ShortBreakMinutes: 61, LongBreakMinutes: 900, SessionsBeforeLongBreak: 9}.Normalize()
+	if high.FocusMinutes != FocusMinutesMax || high.ShortBreakMinutes != BreakMinutesMax ||
+		high.LongBreakMinutes != BreakMinutesMax || high.SessionsBeforeLongBreak != SessionsMax {
+		t.Errorf("%+v", high)
+	}
+	// A number too large for the Rust field could not be read there either.
+	if big := load(t, `{"focusMinutes": 70000}`); !big.Backup || big.Settings.FocusMinutes != Default().FocusMinutes {
+		t.Errorf("%+v", big.Settings)
 	}
 }

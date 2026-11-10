@@ -30,6 +30,11 @@ const (
 	// Rust datetime feature).
 	maxClockCities = 3
 	maxSkinTone    = 5
+	// The focus timer's limits, in minutes and sessions, as the Rust app
+	// clamped them.
+	FocusMinutesMax = 120
+	BreakMinutesMax = 60
+	SessionsMax     = 8
 )
 
 type Theme string
@@ -108,8 +113,15 @@ type Settings struct {
 	Tabs       []Tab `json:"tabs"`
 	ShowClocks bool  `json:"showClocks"`
 	// ClockCities are the places the clocks widget shows, as typed.
-	ClockCities   []string `json:"clockCities"`
-	ShowDiskSpace bool     `json:"showDiskSpace"`
+	ClockCities       []string `json:"clockCities"`
+	ShowDiskSpace     bool     `json:"showDiskSpace"`
+	ShowFocusTimer    bool     `json:"showFocusTimer"`
+	FocusMinutes      uint16   `json:"focusMinutes"`
+	ShortBreakMinutes uint16   `json:"shortBreakMinutes"`
+	LongBreakMinutes  uint16   `json:"longBreakMinutes"`
+	// SessionsBeforeLongBreak are the focus sessions in a cycle; the last
+	// one earns the long break.
+	SessionsBeforeLongBreak uint8 `json:"sessionsBeforeLongBreak"`
 
 	// kept holds the keys this version does not model, as they were.
 	kept map[string]json.RawMessage
@@ -138,6 +150,12 @@ func Default() Settings {
 		ShowClocks:      true,
 		ClockCities:     []string{},
 		ShowDiskSpace:   true,
+		// The focus timer stays off until the user turns it on, as in
+		// the Rust app.
+		FocusMinutes:            25,
+		ShortBreakMinutes:       5,
+		LongBreakMinutes:        15,
+		SessionsBeforeLongBreak: 4,
 	}
 }
 
@@ -149,6 +167,10 @@ func (s Settings) Normalize() Settings {
 	s.Shortcut = strings.TrimSpace(s.Shortcut)
 	s.ClipboardHistoryLimit = min(max(s.ClipboardHistoryLimit, 1), ClipboardLimitMax)
 	s.EmojiSkinTone = min(s.EmojiSkinTone, maxSkinTone)
+	s.FocusMinutes = min(max(s.FocusMinutes, 1), FocusMinutesMax)
+	s.ShortBreakMinutes = min(max(s.ShortBreakMinutes, 1), BreakMinutesMax)
+	s.LongBreakMinutes = min(max(s.LongBreakMinutes, 1), BreakMinutesMax)
+	s.SessionsBeforeLongBreak = min(max(s.SessionsBeforeLongBreak, 1), SessionsMax)
 
 	languages := slices.Clone(s.EmojiLanguages)
 	slices.SortStableFunc(languages, func(a, b EmojiLanguage) int {

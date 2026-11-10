@@ -12,8 +12,7 @@ import (
 // dropped are the keys of the features the Go port leaves out. Load keeps
 // them as they are.
 var dropped = []string{
-	"expandSnippets", "shellCommands", "showUpNext", "showNotepad", "showFocusTimer",
-	"focusMinutes", "shortBreakMinutes", "longBreakMinutes", "sessionsBeforeLongBreak",
+	"expandSnippets", "shellCommands", "showUpNext", "showNotepad",
 	"showWeather", "weatherCity", "temperatureUnit", "showClipboardCards",
 }
 
