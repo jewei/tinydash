@@ -241,7 +241,7 @@ func diskSpace(c *ui.Context, p kit.Palette, d Disk) {
 			ui.Icon(c, glyphs["disk"]).FontSize(14).TextColor(p.Muted)
 			// A long name ends in an ellipsis; the warning and the sizes
 			// keep their one line.
-			ui.Text(c, d.Name).FontWeight(600).TextColor(p.Ink).SingleLine().Shrink(1).MinWidth(0)
+			ui.Text(c, d.Name).FontWeight(600).TextColor(p.Ink).SingleLine()
 			if low {
 				ui.Row(c).Gap(4).Shrink(0).AlignItems(ui.Center).Children(func() {
 					ui.Icon(c, glyphs["warning"]).FontSize(12).TextColor(p.Danger)
