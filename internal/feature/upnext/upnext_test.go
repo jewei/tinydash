@@ -130,6 +130,19 @@ func TestOrdersRemindersByDueDateAndMarksOverdueOnes(t *testing.T) {
 	}
 }
 
+// A reminder due on a day keeps its date west of UTC too: its date is a
+// UTC midnight, which is the evening before there.
+func TestReadsDueDaysInTheirOwnDateWestOfUTC(t *testing.T) {
+	hawaii := time.FixedZone("UTC-10", -10*3600)
+	evening := time.Date(2026, 3, 10, 20, 0, 0, 0, hawaii)
+	v := Build(Agenda{Reminders: []Reminder{
+		dueOn("Water plants", 2026, 3, 10),
+		dueOn("Pay rent", 2026, 3, 9),
+		dueOn("Next week", 2026, 3, 11),
+	}}, evening)
+	wantRows(t, v, [2]string{"Overdue", "Pay rent"}, [2]string{"Today", "Water plants"})
+}
+
 func TestLoadsAgainWhenTheNextItemStartsEndsOrFallsDue(t *testing.T) {
 	reminders := []Reminder{dueAt("Call back", at(14, 40))}
 	soon := Build(Agenda{Events: []Event{event("Standup", at(13, 30), at(14, 30)), allDay("Off")}, Reminders: reminders}, now)
