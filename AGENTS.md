@@ -33,7 +33,7 @@ internal/
   settings/            settings.json model, load, Normalize, Tauri shortcut translation.
   store/               All SQL and the migrations.
   platform/            OS work that mygo lacks. The only package with _darwin/_windows/_linux files.
-  ui/kit/              Keys, palette, fonts shared by both views.
+  ui/kit/              Keys, recorder state, palette, fonts shared by both views.
   ui/launcher/         Launcher view and model. keymap.go holds the panel's keys;
                        overlays.go holds the keys of the menu and the dialogs.
   ui/settings/         Settings view and model.
