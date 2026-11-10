@@ -1,8 +1,8 @@
 // Package store is the SQLite database, tinydash.db: the only package that
 // knows the schema or runs SQL. Usage, pins, hidden results, aliases,
 // hotkeys, clipboard history, the snippet library, copied calculations, and
-// cached exchange rates live there. The note and weather tables of the Rust
-// app stay in the file untouched, so going back to it loses nothing.
+// cached exchange rates and weather live there. The note table of the Rust
+// app stays in the file untouched, so going back to it loses nothing.
 package store
 
 import (
@@ -491,25 +491,47 @@ func (s *Store) ClearCalculations(ctx context.Context) error {
 	return s.exec(ctx, "DELETE FROM calculations")
 }
 
-const ratesKey = "currency_rates"
+// The keys of the cache table, the Rust app's.
+const (
+	ratesKey   = "currency_rates"
+	weatherKey = "weather"
+)
 
 // Rates is the cached exchange rates as the currency feature wrote them
 // (JSON); ok is false when none are cached.
 func (s *Store) Rates(ctx context.Context) (rates string, ok bool, err error) {
-	err = s.query(ctx, "SELECT value FROM cache WHERE key = ?1", []any{ratesKey}, func(row []any) error {
+	return s.cached(ctx, ratesKey)
+}
+
+func (s *Store) SaveRates(ctx context.Context, rates string) error {
+	return s.saveCached(ctx, ratesKey, rates)
+}
+
+// Weather is the latest weather download as the weather feature wrote it
+// (JSON); ok is false when none is cached.
+func (s *Store) Weather(ctx context.Context) (weather string, ok bool, err error) {
+	return s.cached(ctx, weatherKey)
+}
+
+func (s *Store) SaveWeather(ctx context.Context, weather string) error {
+	return s.saveCached(ctx, weatherKey, weather)
+}
+
+func (s *Store) cached(ctx context.Context, key string) (value string, ok bool, err error) {
+	err = s.query(ctx, "SELECT value FROM cache WHERE key = ?1", []any{key}, func(row []any) error {
 		ok = true
-		rates, err = text(row[0])
+		value, err = text(row[0])
 		return err
 	})
 	if err != nil {
 		return "", false, err
 	}
-	return rates, ok, nil
+	return value, ok, nil
 }
 
-func (s *Store) SaveRates(ctx context.Context, rates string) error {
+func (s *Store) saveCached(ctx context.Context, key, value string) error {
 	return s.exec(ctx, `INSERT INTO cache (key, value) VALUES (?1, ?2)
-		ON CONFLICT (key) DO UPDATE SET value = ?2`, ratesKey, rates)
+		ON CONFLICT (key) DO UPDATE SET value = ?2`, key, value)
 }
 
 func (s *Store) DeleteRates(ctx context.Context) error {
