@@ -42,6 +42,8 @@ type fake struct {
 	// removeErr, if set, is the error of each removal of an alias or a
 	// hotkey.
 	removeErr error
+
+	about About
 }
 
 func newFake() *fake { return &fake{saved: settings.Default(), nextID: 100} }
@@ -173,6 +175,8 @@ func (f *fake) wantUpdates(t *testing.T, n int) {
 		t.Fatalf("%d changes sent, want %d", len(f.updates), n)
 	}
 }
+
+func (f *fake) About() About { return f.about }
 
 var errRefused = errors.New("Could not save settings.")
 

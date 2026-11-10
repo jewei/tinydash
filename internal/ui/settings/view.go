@@ -62,6 +62,8 @@ func (m *Model) View(c *ui.Context) {
 				m.libraryView(c, p, m.editors[false])
 			case quicklinks:
 				m.libraryView(c, p, m.editors[true])
+			case about:
+				aboutView(c, p, m.backend.About())
 			}
 		})
 	})
@@ -212,6 +214,40 @@ func (m *Model) search(c *ui.Context, p kit.Palette, v settings.Settings) {
 		button: "Show Again",
 		label:  func(r engine.Listed) string { return "Show " + r.Title + " again" },
 	}, m.backend.Unhide, m.backend.Hidden)
+}
+
+// credits name what TinyDash ships or downloads that others made.
+var credits = []string{
+	"Figtree and Caprasimo fonts, SIL Open Font License 1.1",
+	"EFF Large Wordlist by the Electronic Frontier Foundation, CC BY 4.0",
+	"Emoji keywords from Unicode CLDR, Unicode License V3",
+	"Exchange rates from the European Central Bank through Frankfurter",
+}
+
+// aboutView shows the version, where TinyDash keeps its files, and the
+// credits. The paths are selectable, so they can be copied.
+func aboutView(c *ui.Context, p kit.Palette, a About) {
+	version := "TinyDash " + a.Version
+	if a.Version == "" {
+		version = "TinyDash, run from source"
+	}
+	ui.Text(c, version).FontSize(17).FontWeight(600).TextColor(p.Ink)
+	intro(c, p, "A small, keyboard-first launcher.")
+	folder := func(label, path string) {
+		row(c, p, label, "", func() { ui.Text(c, path).TextColor(p.Ink).Shrink(1).Wrap().Selectable() })
+	}
+	if a.Settings == a.Data {
+		folder("Settings and saved data", a.Data)
+	} else {
+		folder("Settings", a.Settings)
+		folder("Saved data", a.Data)
+	}
+	row(c, p, "New versions", "", func() { ui.Text(c, "github.com/jewei/tinydash/releases").TextColor(p.Ink).Selectable() })
+	row(c, p, "Source and license", "", func() { ui.Text(c, "github.com/jewei/tinydash (MIT)").TextColor(p.Ink).Selectable() })
+	heading(c, p, "Credits")
+	for _, credit := range credits {
+		ui.Text(c, "• "+credit).TextColor(p.Muted)
+	}
 }
 
 // row is one labeled setting: text on the left, its control on the right.

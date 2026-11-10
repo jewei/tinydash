@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- Settings > About shows the version of TinyDash, the folders that hold your settings and saved data, and the credits.
+
 ## [0.10.0] - 2026-11-10
 
 ### Changed

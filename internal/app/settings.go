@@ -236,3 +236,8 @@ func (b *settingsBackend) runFromSettings(action core.Action, done func(error)) 
 		a.toSettings(func() { done(err) })
 	}()
 }
+
+func (b *settingsBackend) About() settingsview.About {
+	a := b.app()
+	return settingsview.About{Version: mygo.App.Version(), Settings: a.config, Data: a.data}
+}

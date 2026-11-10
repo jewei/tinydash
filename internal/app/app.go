@@ -81,6 +81,8 @@ type App struct {
 	settings *settingsWindow
 	// home is the user's home folder, whose disk the disk widget shows.
 	home string
+	// config and data hold settings.json and tinydash.db; About shows them.
+	config, data string
 	// mu guards builtAt, ratesTriedAt, and warnings.
 	mu      sync.Mutex
 	builtAt map[*engine.Slot]time.Time
@@ -111,7 +113,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	if opts.DataDir != "" {
 		dirs.Config, dirs.Data = opts.DataDir, opts.DataDir
 	}
-	a := &App{ctx: ctx, home: dirs.Home, builtAt: map[*engine.Slot]time.Time{}, watch: newFileWatch(), appWatch: newAppWatch()}
+	a := &App{ctx: ctx, home: dirs.Home, config: dirs.Config, data: dirs.Data, builtAt: map[*engine.Slot]time.Time{}, watch: newFileWatch(), appWatch: newAppWatch()}
 
 	s, warning, file := engine.LoadSettings(dirs.Config)
 	a.file = file
