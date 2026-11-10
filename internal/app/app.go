@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -101,6 +102,7 @@ type App struct {
 	dragSave *time.Timer
 	// warnings wait here until the launcher shows them.
 	warnings []string
+	weather  weatherState
 }
 
 // Start loads the user's data and starts TinyDash. Call it once mygo is
@@ -201,6 +203,7 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	a.warn(keepOpenAtLogin(s.LaunchAtLogin, mygo.App.SetOpenAtLogin))
 	go a.watchClipboard()
 	go a.refreshRates(false)
+	go a.refreshWeather(false)
 	go a.focus.run(ctx, time.Now, time.After, a.focusFinished)
 	open(a, opts.Launch, false)
 	return a, nil
@@ -287,6 +290,7 @@ func (a *App) Show(category core.Category) {
 	a.rebuildIfOld(a.apps)
 	a.rebuildIfOld(a.files)
 	go a.refreshRates(false)
+	go a.refreshWeather(false)
 }
 
 // place moves the panel to saved, or centers it; main thread only.
@@ -619,7 +623,8 @@ func (b *backend) Settings() launcher.ViewSettings {
 			tabs = append(tabs, tab.Category)
 		}
 	}
-	return launcher.ViewSettings{Tabs: tabs, ClipboardHistory: s.ClipboardHistoryEnabled, CurrencyRates: s.CurrencyRatesEnabled, Theme: s.Theme}
+	return launcher.ViewSettings{Tabs: tabs, ClipboardHistory: s.ClipboardHistoryEnabled, CurrencyRates: s.CurrencyRatesEnabled, Theme: s.Theme,
+		Weather: s.ShowWeather && strings.TrimSpace(s.WeatherCity) != ""}
 }
 
 func (b *backend) FileIcon(path string) *ui.Bitmap { return b.app().icons.get(path) }
@@ -689,6 +694,7 @@ func (s *appShell) Refresh() {
 	s.app().rebuild(s.app().apps)
 	s.app().rebuild(s.app().files)
 	go s.app().refreshRates(true)
+	go s.app().refreshWeather(true)
 }
 
 func (s *appShell) TurnOnCurrencyRates() error {

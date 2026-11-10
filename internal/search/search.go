@@ -25,6 +25,7 @@ import (
 	"github.com/jewei/tinydash/internal/feature/password"
 	"github.com/jewei/tinydash/internal/feature/system"
 	"github.com/jewei/tinydash/internal/feature/unixtime"
+	"github.com/jewei/tinydash/internal/feature/weather"
 	"github.com/jewei/tinydash/internal/feature/web"
 	"github.com/jewei/tinydash/internal/match"
 	"github.com/jewei/tinydash/internal/settings"
@@ -59,7 +60,9 @@ type Snapshot struct {
 	Calculations calc.History
 	Emoji        *emoji.Index
 	// Rates is nil while currency rates are off or not downloaded yet.
-	Rates   *currency.Rates
+	Rates *currency.Rates
+	// Weather is the latest weather download, of any city, or nil.
+	Weather *weather.Weather
 	Usage   Usage
 	Pins    Pins
 	Hidden  Hidden

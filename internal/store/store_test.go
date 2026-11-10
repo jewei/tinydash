@@ -305,6 +305,24 @@ func TestRatesRoundTrip(t *testing.T) {
 	}
 }
 
+func TestWeatherRoundTripsBesideTheRates(t *testing.T) {
+	s := memory(t)
+	if _, ok, err := s.Weather(ctx); ok || err != nil {
+		t.Errorf("weather before any: %v %v", ok, err)
+	}
+	must(t, s.SaveRates(ctx, `{"rates":{}}`))
+	must(t, s.SaveWeather(ctx, `{"city":"Oslo"}`))
+	must(t, s.SaveWeather(ctx, `{"city":"Ipoh"}`))
+	weather, ok, err := s.Weather(ctx)
+	if !ok || err != nil || weather != `{"city":"Ipoh"}` {
+		t.Errorf("%q %v %v", weather, ok, err)
+	}
+	must(t, s.DeleteRates(ctx))
+	if _, ok, _ := s.Weather(ctx); !ok {
+		t.Error("deleting the rates deleted the weather")
+	}
+}
+
 func TestTheNoteIsEmptyUntilSavedAndKeepsTheLastSave(t *testing.T) {
 	s := memory(t)
 	if note, err := s.Note(ctx); note != "" || err != nil {

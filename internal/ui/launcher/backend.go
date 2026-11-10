@@ -82,6 +82,9 @@ type ViewSettings struct {
 	// CurrencyRates makes Refresh also download exchange rates, so its
 	// label says so.
 	CurrencyRates bool
+	// Weather makes Refresh also download the weather: the widget is on
+	// and has a city.
+	Weather bool
 	// Theme is the Appearance setting.
 	Theme settings.Theme
 }
@@ -94,6 +97,8 @@ type Widgets struct {
 	Cities []City
 	// Disk is nil while the disk widget is off.
 	Disk *Disk
+	// Weather is nil while the weather widget is off.
+	Weather *Weather
 	// ClipCards is on while clipboard cards are: the pane shows, with a
 	// hint while the clipboard holds nothing a card shows.
 	ClipCards bool
@@ -208,6 +213,44 @@ type Disk struct {
 	// Err is why the OS did not report the disk, or nil.
 	Err error
 }
+
+// Weather is the weather card: the city's weather, or what keeps it from
+// showing.
+type Weather struct {
+	State WeatherState
+	// City is the city setting, in every state but WeatherNoCity.
+	City string
+	// The rest is set in WeatherReady, except Message.
+	Place string
+	// Temperature, High, and Low are whole degrees in the chosen unit.
+	Temperature, High, Low int
+	// Condition is the weather in words, such as Partly cloudy.
+	Condition string
+	// Icon names the picture: clearDay, clearNight, partlyDay,
+	// partlyNight, cloudy, fog, rain, thunder, or snow.
+	Icon string
+	// RainChance is today's chance of rain in percent, or nil.
+	RainChance *uint8
+	// UpdatedAt is when the weather was downloaded, in the computer's
+	// time zone as the pane loaded, so it follows a change of the zone.
+	UpdatedAt time.Time
+	// Offline: the latest download failed, so this is older weather.
+	Offline bool
+	// Message says why the download failed, in WeatherFailed.
+	Message string
+}
+
+type WeatherState uint8
+
+const (
+	// WeatherNoCity: no city is set.
+	WeatherNoCity WeatherState = iota
+	WeatherLoading
+	WeatherReady
+	// WeatherNotFound: no place has the city's name.
+	WeatherNotFound
+	WeatherFailed
+)
 
 // FocusTimer is the focus timer as the pane shows it. The view counts
 // down to EndsAt itself; the app loads it again as a phase ends.

@@ -13,7 +13,6 @@ import (
 // them as they are.
 var dropped = []string{
 	"expandSnippets", "shellCommands", "showUpNext",
-	"showWeather", "weatherCity", "temperatureUnit",
 }
 
 type settingsRow struct {

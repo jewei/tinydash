@@ -200,7 +200,7 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil || m.widgets.Note != nil || m.widgets.ClipCards || m.widgets.Focus != nil)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil || m.widgets.Weather != nil || m.widgets.Note != nil || m.widgets.ClipCards || m.widgets.Focus != nil)
 }
 
 // WidgetsChanged loads the widgets again after one changed on its own, as

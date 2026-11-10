@@ -62,6 +62,7 @@ type Model struct {
 
 	folders, skipped, cities listEditor
 	limit                    numberField
+	weatherCity              textField
 	// The focus timer's lengths.
 	focusMinutes, shortBreak, longBreak, sessions numberField
 	// moved is the tab whose row a move button moved, for the focus to

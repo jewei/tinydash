@@ -112,12 +112,20 @@ func (m *Model) menuItems() []menuItem {
 	return items
 }
 
-// refreshLabel names what Refresh downloads: rates only while they are on.
+// refreshLabel names what Refresh downloads: rates and the weather only
+// while they are on.
 func refreshLabel(s ViewSettings) string {
+	words := []string{"Apps", "Files"}
 	if s.CurrencyRates {
-		return "Refresh Apps, Files, and Rates"
+		words = append(words, "Rates")
 	}
-	return "Refresh Apps and Files"
+	if s.Weather {
+		words = append(words, "Weather")
+	}
+	if len(words) == 2 {
+		return "Refresh Apps and Files"
+	}
+	return "Refresh " + strings.Join(words[:len(words)-1], ", ") + ", and " + words[len(words)-1]
 }
 
 // shortcutFor are the keys that run the action at position i of the

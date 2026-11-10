@@ -28,6 +28,8 @@ var skinTones = []option{
 	{"3", "👋🏽 Medium"}, {"4", "👋🏾 Medium-dark"}, {"5", "👋🏿 Dark"},
 }
 
+var units = []option{{"celsius", "Celsius (°C)"}, {"fahrenheit", "Fahrenheit (°F)"}}
+
 var languages = []option{{"zh", "Chinese (Simplified)"}, {"ms", "Malay"}, {"es", "Spanish"}}
 
 // The limits match those that settings.Normalize and the clocks widget
@@ -122,6 +124,8 @@ func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
 	intro(c, p, "Widgets show next to the results of an empty All search.")
 	m.toggle(c, p, "Clocks", "Local time and up to three cities.", v.ShowClocks, func(s *settings.Settings, on bool) { s.ShowClocks = on })
 	m.toggle(c, p, "Disk space", "Free space on the disk of your home folder.", v.ShowDiskSpace, func(s *settings.Settings, on bool) { s.ShowDiskSpace = on })
+	m.toggle(c, p, "Weather", "Current weather for one city from Open-Meteo, which receives the city name and its location.",
+		v.ShowWeather, func(s *settings.Settings, on bool) { s.ShowWeather = on })
 	m.toggle(c, p, "Clipboard cards", "When you copy a color, a Unix time, or JSON, a card shows it decoded. The text is read when widgets show, never saved. macOS may ask you to let TinyDash paste.",
 		v.ShowClipboardCards, func(s *settings.Settings, on bool) { s.ShowClipboardCards = on })
 	m.toggle(c, p, "Notepad", "One scratch note, saved on this computer.", v.ShowNotepad, func(s *settings.Settings, on bool) { s.ShowNotepad = on })
@@ -129,6 +133,11 @@ func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
 	heading(c, p, "Clock cities")
 	m.listView(c, p, &m.cities, "City to add", "Tokyo, London, or Europe/Paris", v.ClockCities, cityLimit, true,
 		func(s *settings.Settings) *[]string { return &s.ClockCities })
+	heading(c, p, "Weather")
+	m.text(c, p, &m.weatherCity, "City", "Weather city", "Singapore", v.WeatherCity, settings.MaxWeatherCityChars,
+		func(s *settings.Settings, city string) { s.WeatherCity = city })
+	m.choice(c, p, "Temperature", "", units, string(v.TemperatureUnit),
+		func(s *settings.Settings, value string) { s.TemperatureUnit = settings.TemperatureUnit(value) })
 	heading(c, p, "Focus timer")
 	m.number(c, p, &m.focusMinutes, "Focus minutes", "Minutes in each focus session.", int(v.FocusMinutes), 1, settings.FocusMinutesMax,
 		func(s *settings.Settings, n int) { s.FocusMinutes = uint16(n) })
@@ -236,6 +245,7 @@ var credits = []string{
 	"Emoji keywords from Unicode CLDR, Unicode License V3",
 	"EFF Large Wordlist by the Electronic Frontier Foundation, CC BY 4.0",
 	"Exchange rates from the European Central Bank through Frankfurter",
+	"Weather data by Open-Meteo.com, CC BY 4.0",
 	"Built with Go, mygo, purego, and go-text: BSD, MIT, and Apache-2.0 licenses",
 }
 

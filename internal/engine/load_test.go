@@ -29,6 +29,9 @@ func openStore(t *testing.T) *store.Store {
 	return db
 }
 
+// savedWeather is weather as the Rust app saved it.
+const savedWeather = `{"city":"singapore","place":"Singapore","temperature":31.4,"high":33.2,"low":25.6,"rain_chance":null,"code":2,"is_day":true,"fetched_at":100}`
+
 const savedRates = `{"date":"2026-11-06","fetched_at":1762400000,"rates":{"USD":1.1}}`
 
 func TestLoadReadsEverySavedList(t *testing.T) {
@@ -43,6 +46,7 @@ func TestLoadReadsEverySavedList(t *testing.T) {
 		db.SetHotkey(ctx, lock, "Alt+L"),
 		db.SaveCalculation(ctx, "1+1", "2", testNow.Unix()),
 		db.SaveRates(ctx, savedRates),
+		db.SaveWeather(ctx, savedWeather),
 	}
 	withLibrary(&search.Snapshot{}, db)
 	if err := errors.Join(steps...); err != nil {
@@ -57,7 +61,8 @@ func TestLoadReadsEverySavedList(t *testing.T) {
 	alias, _ := first.Aliases.Get(lock)
 	hotkey, _ := first.Hotkeys.Get(lock)
 	if first.Usage.Bonus(lock, testNow.Unix()) == 0 || !first.Pins.Contains(lock) || !first.Hidden.Contains("system:sleep") ||
-		alias != "lk" || hotkey != "Alt+L" || len(first.Library.Items()) != 3 || first.Rates == nil || first.Home != home {
+		alias != "lk" || hotkey != "Alt+L" || len(first.Library.Items()) != 3 || first.Rates == nil || first.Home != home ||
+		first.Weather == nil || first.Weather.Place != "Singapore" {
 		t.Errorf("%+v", first)
 	}
 	if _, ok := first.Calculations.Answer("="); !ok {
@@ -99,7 +104,7 @@ func TestLoadWarnsForEachPartOfAnUnreadableDatabase(t *testing.T) {
 		what, _, _ := strings.Cut(strings.TrimPrefix(w, "Could not load "), ".")
 		parts = append(parts, what)
 	}
-	want := []string{"calculator history", "usage", "pins", "hidden results", "aliases", "hotkeys", "clipboard history", "snippets", "exchange rates"}
+	want := []string{"calculator history", "usage", "pins", "hidden results", "aliases", "hotkeys", "clipboard history", "snippets", "exchange rates", "the weather"}
 	if !slices.Equal(parts, want) {
 		t.Errorf("%q", warnings)
 	}
