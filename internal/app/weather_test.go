@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jewei/tinydash/internal/engine"
 	"github.com/jewei/tinydash/internal/feature/weather"
 	"github.com/jewei/tinydash/internal/settings"
 	"github.com/jewei/tinydash/internal/ui/launcher"
@@ -42,6 +43,17 @@ func TestADownloadForACityTheUserLeftIsDropped(t *testing.T) {
 	if _, ok := a.start("Oslo", false, false, weatherNow.Add(time.Minute)); !ok {
 		t.Error("the dropped city waits for the retry")
 	}
+
+	// The writer can still drop a kept download, when the city changed
+	// after finish looked; changing back must not wait either.
+	bergen, _ := a.start("Bergen", false, false, weatherNow.Add(2*time.Minute))
+	if !a.finish(bergen, "Bergen") {
+		t.Fatal("dropped the latest download")
+	}
+	a.dropped()
+	if _, ok := a.start("Bergen", false, false, weatherNow.Add(3*time.Minute)); !ok {
+		t.Error("a download that the writer dropped waits for the retry")
+	}
 }
 
 func TestWaitsBeforeTryingTheSameCityAgain(t *testing.T) {
@@ -66,6 +78,38 @@ func TestWaitsBeforeTryingTheSameCityAgain(t *testing.T) {
 	}
 	if _, ok := a.start("Bergen", false, false, weatherNow.Add(2*time.Second)); !ok || a.failureFor("Oslo") != nil || a.failureFor("Bergen") != nil {
 		t.Errorf("another city: %+v", a)
+	}
+}
+
+func TestADownloadEndsByStoringOrSayingWhy(t *testing.T) {
+	var s weatherState
+	city := func(name string) func() string { return func() string { return name } }
+	stored := 0
+	store := func(err error) func() error { return func() error { stored++; return err } }
+
+	number, _ := s.attempt.start("Oslo", false, false, weatherNow)
+	if s.end(number, city("Oslo"), nil, store(nil)) || stored != 1 || s.failureFor("Oslo") != nil {
+		t.Errorf("a success: stored %d, %+v", stored, s.attempt)
+	}
+
+	// The writer dropped the weather, as the city changed after finish
+	// looked: changing back downloads at once.
+	number, _ = s.attempt.start("Bergen", false, false, weatherNow)
+	s.end(number, city("Bergen"), nil, store(engine.ErrOtherCity))
+	if _, ok := s.attempt.start("Bergen", false, false, weatherNow.Add(time.Minute)); !ok {
+		t.Error("a download that the writer dropped waits for the retry")
+	}
+
+	number, _ = s.attempt.start("Ipoh", false, false, weatherNow)
+	failure := &weatherFailure{notFound: true}
+	if !s.end(number, city("Ipoh"), failure, store(nil)) || s.failureFor("ipoh") != failure || stored != 2 {
+		t.Errorf("a failure: stored %d, %+v", stored, s.attempt)
+	}
+
+	// A download for a city the user left stores nothing and says nothing.
+	number, _ = s.attempt.start("Oslo", false, false, weatherNow)
+	if s.end(number, city("Ipoh"), nil, store(nil)) || stored != 2 {
+		t.Errorf("a city the user left: stored %d", stored)
 	}
 }
 
@@ -162,8 +206,22 @@ func TestSaysWhyTheWeatherDidNotCome(t *testing.T) {
 	}
 
 	garbled := openMeteoFake(t, reply(`{"results":[{"name":"Oslo","latitude":59.9,"longitude":10.7}]}`), reply("<html>"))
-	if _, failure := fetchWeather(context.Background(), http.DefaultClient, garbled, "Oslo", weatherNow); failure == nil || failure.message != "The weather service sent unexpected data." {
+	if _, failure := fetchWeather(context.Background(), http.DefaultClient, garbled, "Oslo", weatherNow); failure == nil || failure.message != "The weather service sent unexpected data. Try again later." {
 		t.Errorf("garbled forecast: %+v", failure)
+	}
+
+	// The time runs out while the body comes.
+	ctx, cancel := context.WithCancel(context.Background())
+	slow := openMeteoFake(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`{"results":[`))
+		w.(http.Flusher).Flush()
+		// The client has the headers by now and waits for the rest.
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+		time.Sleep(100 * time.Millisecond)
+	}, never)
+	if _, failure := fetchWeather(ctx, http.DefaultClient, slow, "Oslo", weatherNow); failure == nil || !strings.Contains(failure.message, "did not answer in time") {
+		t.Errorf("slow body: %+v", failure)
 	}
 
 	offline := openMeteo{geocoding: "http://127.0.0.1:1/v1/search", forecast: "http://127.0.0.1:1/v1/forecast"}

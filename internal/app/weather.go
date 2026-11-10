@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jewei/tinydash/internal/engine"
 	"github.com/jewei/tinydash/internal/feature/weather"
 	"github.com/jewei/tinydash/internal/settings"
 	"github.com/jewei/tinydash/internal/ui/launcher"
@@ -83,10 +84,14 @@ func (w *weatherAttempt) finish(number uint64, wantedCity string) bool {
 	w.busy = false
 	keep := weather.SameCity(w.city, wantedCity)
 	if !keep {
-		w.started = time.Time{}
+		w.dropped()
 	}
 	return keep
 }
+
+// dropped forgets the latest try: its result was not kept, so changing to
+// its city again downloads at once.
+func (w *weatherAttempt) dropped() { w.started = time.Time{} }
 
 // failureFor is how the latest download for city failed, or nil.
 func (w *weatherAttempt) failureFor(city string) *weatherFailure {
@@ -130,23 +135,37 @@ func (a *App) refreshWeather(force bool) {
 		return
 	}
 	found, failure := fetchWeather(a.ctx, http.DefaultClient, openMeteoAPI, city, now)
-	a.weather.mu.Lock()
-	if !a.weather.attempt.finish(number, a.engine.Snapshot(time.Now()).Settings.WeatherCity) {
-		a.weather.mu.Unlock()
-		return
-	}
-	a.weather.attempt.failure = failure
-	if failure == nil {
-		if err := <-a.engine.SetWeather(found); err != nil {
-			slog.Warn("weather", "error", err)
-		}
-	}
-	a.weather.mu.Unlock()
-	if failure != nil {
-		// Nothing in the data changed, so the widget loads again here
-		// to say why.
+	wantedCity := func() string { return a.engine.Snapshot(time.Now()).Settings.WeatherCity }
+	store := func() error { return <-a.engine.SetWeather(found) }
+	if a.weather.end(number, wantedCity, failure, store) {
 		a.panel.Update(a.model.Stale)
 	}
+}
+
+// end records how download number ended: failure, or nil after a success,
+// whose weather store saves. It reports whether the widget must load again
+// to say why the download failed; a stored success changes the data,
+// which loads it anyway. wantedCity is the city setting now. store runs
+// under mu, so a refresh that starts meanwhile sees the weather as fresh.
+func (s *weatherState) end(number uint64, wantedCity func() string, failure *weatherFailure, store func() error) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.attempt.finish(number, wantedCity()) {
+		return false
+	}
+	s.attempt.failure = failure
+	if failure != nil {
+		return true
+	}
+	switch err := store(); {
+	case errors.Is(err, engine.ErrOtherCity):
+		// The city changed after finish looked: drop the download as
+		// finish would have.
+		s.attempt.dropped()
+	case err != nil:
+		slog.Warn("weather", "error", err)
+	}
+	return false
 }
 
 // fetchWeather finds city and downloads its weather at now, in up to two
@@ -204,7 +223,7 @@ type userMessage struct {
 func (m userMessage) Error() string { return fmt.Sprintf("%s (%v)", m.text, m.err) }
 
 // download gets address and hands its body to read, within ten seconds.
-// Each feature limits how much of the body it reads.
+// read limits how much of the body it reads.
 func download(ctx context.Context, client *http.Client, address string, read func(io.Reader) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -220,7 +239,15 @@ func download(ctx context.Context, client *http.Client, address string, read fun
 	if response.StatusCode != http.StatusOK {
 		return userMessage{fmt.Sprintf("Open-Meteo answered with error %d. Try again later.", response.StatusCode), errors.New(response.Status)}
 	}
-	return read(response.Body)
+	if err := read(response.Body); err != nil {
+		if ctx.Err() != nil {
+			// The time ran out while the body came: a slow connection,
+			// not bad data.
+			return userMessage{"Open-Meteo did not answer in time. Check your internet connection.", err}
+		}
+		return err
+	}
+	return nil
 }
 
 // weatherCard is the weather widget for the settings: the saved weather

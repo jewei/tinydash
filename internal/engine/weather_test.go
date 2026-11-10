@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/jewei/tinydash/internal/feature/weather"
@@ -18,8 +19,8 @@ func TestKeepsWeatherOnlyForTheCityInTheSettings(t *testing.T) {
 	})
 	ctx := context.Background()
 	oslo := weather.Weather{City: "oslo", Place: "Oslo", FetchedAt: 100}
-	if err := <-w.engine.SetWeather(weather.Weather{City: "Bergen", Place: "Bergen"}); err != nil {
-		t.Fatal(err)
+	if err := <-w.engine.SetWeather(weather.Weather{City: "Bergen", Place: "Bergen"}); !errors.Is(err, ErrOtherCity) {
+		t.Fatalf("weather of another city: %v", err)
 	}
 	if _, ok, _ := w.db.Weather(ctx); ok || w.snapshot().Weather != nil {
 		t.Fatal("kept the weather of another city")
