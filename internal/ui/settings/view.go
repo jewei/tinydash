@@ -62,6 +62,8 @@ func (m *Model) View(c *ui.Context) {
 				m.libraryView(c, p, m.editors[false])
 			case quicklinks:
 				m.libraryView(c, p, m.editors[true])
+			case about:
+				aboutView(c, p, m.backend.About())
 			}
 		})
 	})
@@ -212,6 +214,52 @@ func (m *Model) search(c *ui.Context, p kit.Palette, v settings.Settings) {
 		button: "Show Again",
 		label:  func(r engine.Listed) string { return "Show " + r.Title + " again" },
 	}, m.backend.Unhide, m.backend.Hidden)
+}
+
+// credits name the work of others that TinyDash ships or downloads.
+var credits = []string{
+	"Figtree and Caprasimo fonts, SIL Open Font License 1.1",
+	"Emoji names and shortcodes from the emojis crate (MIT or Apache-2.0) and GitHub's gemoji (MIT)",
+	"Emoji keywords from Unicode CLDR, Unicode License V3",
+	"EFF Large Wordlist by the Electronic Frontier Foundation, CC BY 4.0",
+	"Exchange rates from the European Central Bank through Frankfurter",
+	"Built with Go, mygo, purego, and go-text: BSD, MIT, and Apache-2.0 licenses",
+}
+
+// aboutView shows the version, where TinyDash keeps its files, and the
+// credits. Each path and link sits on its own line under its label and can
+// break anywhere, as a Windows path has no spaces; all are selectable, so
+// they can be copied.
+func aboutView(c *ui.Context, p kit.Palette, a About) {
+	version := "TinyDash " + a.Version
+	if a.Version == "" {
+		version = "TinyDash, run from source"
+	}
+	ui.Text(c, version).FontSize(17).FontWeight(600).TextColor(p.Ink).Role(ui.RoleHeading)
+	intro(c, p, "A small, keyboard-first launcher.")
+	if a.Settings == a.Data {
+		labeled(c, p, "Settings and saved data", a.Data)
+	} else {
+		labeled(c, p, "Settings", a.Settings)
+		labeled(c, p, "Saved data", a.Data)
+	}
+	labeled(c, p, "New versions", "https://github.com/jewei/tinydash/releases")
+	labeled(c, p, "Source and license (MIT)", "https://github.com/jewei/tinydash")
+	heading(c, p, "Credits")
+	ui.Column(c).Gap(4).Role(ui.RoleList).Label("Credits").Children(func() {
+		for _, credit := range credits {
+			ui.Text(c, credit).TextColor(p.Muted).Role(ui.RoleListItem)
+		}
+	})
+}
+
+// labeled is a label with a selectable value under it, as a group named by
+// the label.
+func labeled(c *ui.Context, p kit.Palette, label, value string) {
+	ui.Column(c).Gap(2).Padding(8, 0).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule).Role(ui.RoleGroup).Label(label).Children(func() {
+		ui.Text(c, label).TextColor(p.Muted).FontSize(12).AccessHidden(true)
+		ui.Text(c, value).TextColor(p.Ink).Selectable()
+	})
 }
 
 // row is one labeled setting: text on the left, its control on the right.
