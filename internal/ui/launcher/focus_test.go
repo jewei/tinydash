@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
 // The fake's codes for the controls; the launcher only hands them back.
@@ -191,13 +192,39 @@ func TestTheFocusTimerTextStaysInItsCard(t *testing.T) {
 				t.Errorf("width %d: %q at %+v is outside the card at %+v", width, text, r, card.Bounds)
 			}
 		}
-		// The time fits inside the ring: a circle of radius 28 whose
-		// stroke of 5 takes 2.5 inward.
-		if r, _ := tt.Find("119:59"); r.W > 2*(28-2.5) {
-			t.Errorf("width %d: the time is %v wide, more than the ring holds", width, r.W)
+	}
+}
+
+// The time fits inside the ring in the app's display font, for every
+// length that Settings allows.
+func TestTheTimeFitsInsideTheRing(t *testing.T) {
+	if err := kit.RegisterFonts(); err != nil {
+		t.Fatal(err)
+	}
+	f := newFake(always())
+	m := New(f)
+	tt := ui.NewTester(m.View, 880, 560)
+	for minutes := range 121 {
+		focus := FocusTimer{Phase: "Focus", Remaining: time.Duration(minutes)*time.Minute + 58*time.Second, Total: 121 * time.Minute, Session: 1, Sessions: 4}
+		f.widgets = Widgets{Focus: &focus}
+		m.Show("")
+		tt.Frame()
+		shown := minutesAndSeconds(focus.Remaining)
+		r, ok := tt.Find(shown)
+		if !ok {
+			t.Fatalf("no %q", shown)
+		}
+		// The ring is a circle of radius 28, and its stroke of 5 takes
+		// 2.5 of it; the digits, about 12 high, need room at their
+		// corners too.
+		if r.W > ringRoom {
+			t.Errorf("%q is %v wide, more than the ring holds", shown, r.W)
 		}
 	}
 }
+
+// ringRoom is the widest text that fits inside the ring with a margin.
+const ringRoom = 47
 
 func TestMinutesAndSecondsRoundUp(t *testing.T) {
 	for d, want := range map[time.Duration]string{
