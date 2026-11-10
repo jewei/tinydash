@@ -469,6 +469,26 @@ func TestOffersSpotlightOnlyOnMacOS(t *testing.T) {
 	}
 }
 
+// Up Next reads the macOS calendars, so only macOS offers it. It starts
+// off, as turning it on asks for access.
+func TestOffersUpNextOnlyOnMacOS(t *testing.T) {
+	f := newFake()
+	m, tt := open(t, f, widgets)
+	if _, ok := tt.AccessByRole(ui.RoleSwitch, "Up Next"); ok {
+		t.Error("Up Next off macOS")
+	}
+	m.mac = true
+	tt.Frame()
+	if checked(t, tt, "Up Next") {
+		t.Error("Up Next is on by default")
+	}
+	flip(t, tt, "Up Next")
+	f.wantUpdates(t, 1)
+	if !f.updates[0].ShowUpNext {
+		t.Error("the switch did not turn Up Next on")
+	}
+}
+
 func TestReturnsFocusToClearHistoryAfterItsDialogCloses(t *testing.T) {
 	f := newFake()
 	_, tt := open(t, f, clipboard)

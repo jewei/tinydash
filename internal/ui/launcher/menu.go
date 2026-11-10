@@ -75,8 +75,8 @@ func (m *Model) canClearHistory() bool {
 	return m.category == core.CategoryClipboard && !m.clipboardOff()
 }
 
-// menuItems are the selected result's actions, then the clipboard card's,
-// then the focus timer's, then the actions of no result.
+// menuItems are the selected result's actions, then the clipboard card's
+// and Up Next's, then the focus timer's, then the actions of no result.
 func (m *Model) menuItems() []menuItem {
 	var items []menuItem
 	if r, ok := m.selectedRow(); ok {
@@ -85,6 +85,9 @@ func (m *Model) menuItems() []menuItem {
 		}
 	}
 	items = append(items, m.cardMenuItems()...)
+	for _, ra := range m.upNextActions() {
+		items = append(items, menuItem{label: ra.Label, run: func() { m.start(ra, "", "") }})
+	}
 	for i, a := range m.focusActions() {
 		var keys []string
 		if i == 0 {

@@ -707,6 +707,8 @@ func (s *appShell) TurnOnCurrencyRates() error {
 
 func (s *appShell) Quit() { mygo.App.Quit() }
 
+func (s *appShell) AskCalendarAccess() { s.app().askCalendarAccess() }
+
 // maxFileIcons bounds the file icons kept: a 64-pixel icon takes 16 KB,
 // so the cache stays under 8 MB.
 const maxFileIcons = 512

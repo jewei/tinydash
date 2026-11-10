@@ -81,6 +81,9 @@ func (f *fakeOS) ClipboardText(secretToo bool) (string, bool) {
 	return f.clipboard, true
 }
 func (f *fakeOS) RunSystem(c core.SystemCommand) error { return f.act("run " + string(c)) }
+func (f *fakeOS) OpenCalendarApp(kind core.UpNextKind) error {
+	return f.act("open up next " + string(kind))
+}
 
 type fakeShell struct{ *steps }
 
@@ -94,6 +97,7 @@ func (f fakeShell) TypeQuery(text string)      { f.add("type " + text) }
 func (f fakeShell) Refresh()                   { f.add("refresh") }
 func (f fakeShell) TurnOnCurrencyRates() error { f.add("rates on"); return nil }
 func (f fakeShell) Quit()                      { f.add("quit") }
+func (f fakeShell) AskCalendarAccess()         { f.add("ask calendar access") }
 
 // fakeKeys reads the accelerators the tests use as Tauri does: names in
 // any case, and a letter with or without its Key prefix. failing refuses

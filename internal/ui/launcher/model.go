@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/jewei/tinydash/internal/core"
@@ -31,9 +32,14 @@ type Model struct {
 	warnings []string
 
 	// widgets is what the pane showed from the last load. widgetLoads
-	// counts loads, so a slow one that ends after a newer one is dropped.
-	widgets     Widgets
-	widgetLoads int
+	// counts loads, so one that a hide dropped never shows. One load runs
+	// at a time, also across a hide, as reading the calendars can wait
+	// seconds: widgetsLoading is set while it runs, and widgetsAgain asks
+	// for one more after it, so changes that come quickly cost two loads
+	// at most.
+	widgets                      Widgets
+	widgetLoads                  int
+	widgetsLoading, widgetsAgain bool
 	// paneRoom is the widget pane's height as the last frame laid it out,
 	// which its column fills.
 	paneRoom float32
@@ -170,6 +176,7 @@ func (m *Model) Hidden() {
 	m.shown = false
 	m.widgets.Card = nil
 	m.widgetLoads++
+	m.widgetsAgain = false
 }
 
 // ShownAgain says that the panel shows again as it was, after a command
@@ -190,13 +197,29 @@ func (m *Model) Stale() {
 }
 
 func (m *Model) loadWidgets() {
+	// The focus timer is in memory: it shows its state at once, also while
+	// a load waits on the calendars.
 	m.widgets.Focus = m.backend.FocusTimer()
+	if m.widgetsLoading {
+		m.widgetsAgain = true
+		return
+	}
+	m.widgetsLoading = true
 	m.widgetLoads++
 	load := m.widgetLoads
 	m.backend.Widgets(func(w Widgets) {
+		again := m.widgetsAgain
+		m.widgetsLoading, m.widgetsAgain = false, false
+		// A load that a hide dropped shows nothing; a show since then
+		// asked for its own load after it.
 		if load == m.widgetLoads {
 			m.widgets = w
+			// The timer may have changed while the load ran.
+			m.widgets.Focus = m.backend.FocusTimer()
 			m.takeNote(w.Note)
+		}
+		if again && m.shown {
+			m.loadWidgets()
 		}
 	})
 }
@@ -204,7 +227,22 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil || m.widgets.Weather != nil || m.widgets.Note != nil || m.widgets.ClipCards || m.widgets.Focus != nil)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil || m.widgets.Weather != nil || m.widgets.Note != nil || m.widgets.ClipCards || m.widgets.Focus != nil)
+}
+
+// upNextChanged loads the widgets again once Up Next changes with the
+// time, as an event starts or ends, while the launcher shows. It reports
+// how long until then, or 0 when it loads now or need not load.
+func (m *Model) upNextChanged(now time.Time) time.Duration {
+	u := m.widgets.UpNext
+	if u == nil || !m.shown || m.widgetsLoading {
+		return 0
+	}
+	if wait := u.ChangesAt.Sub(now); wait > 0 {
+		return wait
+	}
+	m.loadWidgets()
+	return 0
 }
 
 // WidgetsChanged loads the widgets again after one changed on its own, as
@@ -237,12 +275,10 @@ func (m *Model) runFocusTimer() {
 // controlFocus runs one of the focus timer's actions and shows the
 // timer's new state at once, so a second press acts on it. It does not
 // wait for an action that runs: the timer is separate from them. A load
-// of the widgets that started before may hold the old state, so a new
-// one replaces it.
+// of the widgets that runs takes the timer's state as it ends.
 func (m *Model) controlFocus(a FocusAction) {
 	timer, err := m.backend.ControlFocus(a.Control)
 	m.widgets.Focus = timer
-	m.loadWidgets()
 	m.notice = ""
 	if err != nil {
 		m.notice = err.Error()
