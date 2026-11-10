@@ -234,3 +234,25 @@ func e2eImports(t *testing.T) map[string][]string {
 	}
 	return imports
 }
+
+// A release links no e2e-only package, not even through a dependency.
+func TestReleaseBuildsLinkNoE2EOnlyPackage(t *testing.T) {
+	for _, goos := range []string{"darwin", "linux", "windows"} {
+		cmd := exec.Command("go", "list", "-deps", module+"/cmd/tinydash")
+		cmd.Env = append(os.Environ(), "GOFLAGS=", "GOOS="+goos, "CGO_ENABLED=0")
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("go list -deps for %s: %v", goos, err)
+		}
+		deps := strings.Fields(string(out))
+		if !slices.Contains(deps, module+"/internal/app") {
+			t.Fatalf("%s: the deps miss internal/app: %d packages", goos, len(deps))
+		}
+		for _, line := range CheckRelease(goos, deps) {
+			t.Error(line)
+		}
+	}
+	if got := CheckRelease("linux", []string{"github.com/egoist/mygo/plugins/automation"}); len(got) != 1 {
+		t.Errorf("an automation dep passes: %v", got)
+	}
+}

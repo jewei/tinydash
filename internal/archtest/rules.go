@@ -78,6 +78,18 @@ var external = map[string][]string{
 // e2eOnly packages may be linked only by the e2e build, never a release.
 var e2eOnly = []string{"github.com/egoist/mygo/plugins/automation"}
 
+// CheckRelease returns a line for each e2eOnly package in deps, the
+// packages a release build of the app links on goos, direct or not.
+func CheckRelease(goos string, deps []string) []string {
+	var out []string
+	for _, dep := range deps {
+		if matchesAny(dep, e2eOnly) {
+			out = append(out, fmt.Sprintf("a release build for %s links %s; only the e2e build may", goos, dep))
+		}
+	}
+	return out
+}
+
 // pure packages get disk, network, clock, and randomness as arguments, so
 // tests control them and a search never blocks on the OS.
 // testOnly packages support tests. Only tests and each other import them,
