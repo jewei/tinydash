@@ -90,6 +90,9 @@ type Widgets struct {
 	// Clocks is on while the clocks widget shows: local time, and Cities.
 	Clocks bool
 	Cities []City
+	// UpNext is nil while Up Next is off, and where TinyDash reads no
+	// calendars.
+	UpNext *UpNext
 	// Disk is nil while the disk widget is off.
 	Disk *Disk
 	// Weather is nil while the weather widget is off.
@@ -108,6 +111,31 @@ type Note struct {
 	Text string
 	// Err is why the note could not be read, or nil.
 	Err error
+}
+
+// UpNext is the rest of today's events and the reminders due today.
+type UpNext struct {
+	// Items are the events, then the reminders.
+	Items []UpNextItem
+	// Problems say why a kind of item cannot show, and how to fix it.
+	Problems []string
+	// Ask asks the OS for access, while the user has not answered.
+	Ask *core.ResultAction
+	// ChangesAt is when the list changes as time passes. While the
+	// launcher shows, the pane loads again then.
+	ChangesAt time.Time
+}
+
+// UpNextItem is one event or reminder.
+type UpNextItem struct {
+	Kind  core.UpNextKind
+	Title string
+	// Time is when, in words, such as "Now", "10:30–11:00", or "Overdue".
+	Time string
+	// Source is the calendar or the reminder list.
+	Source string
+	// Action opens Calendar or Reminders.
+	Action core.ResultAction
 }
 
 // ClipCard decodes the clipboard text. Exactly one of Color, Time, and

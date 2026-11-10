@@ -10,17 +10,28 @@ import (
 	"github.com/jewei/tinydash/internal/ui/launcher"
 )
 
-// Widgets reads the widgets off the main thread, since the disk can make
-// it wait and the clipboard read waits for the main thread, and hands them
-// to the view on it.
+// Widgets reads the widgets off the main thread, since the disk and the
+// calendars can make it wait and the clipboard read waits for the main
+// thread, and hands them to the view on it.
 func (b *backend) Widgets(done func(launcher.Widgets)) {
 	a := b.app()
 	snapshot := a.engine.Snapshot(time.Now())
 	s := snapshot.Settings
 	go func() {
-		w := loadWidgets(s, a.home, time.Now(), platform.DiskSpace, a.engine.Note, a.desktop.clip.Text)
+		now := time.Now()
+		w := loadWidgets(s, a.home, now, platform.DiskSpace, a.engine.Note, a.desktop.clip.Text)
+		// The zone the computer is in now, also after a change of it while
+		// TinyDash runs: today ends at midnight there. It is read once, and
+		// only for the widgets that use it.
+		var zone *time.Location
+		if s.ShowUpNext || s.ShowWeather {
+			zone = platform.LocalZone()
+		}
+		if s.ShowUpNext {
+			w.UpNext = loadUpNext(s, now.In(zone), platform.ReadUpNext)
+		}
 		if s.ShowWeather {
-			w.Weather = weatherCard(s, snapshot.Weather, a.weather.failureFor(s.WeatherCity), platform.LocalZone())
+			w.Weather = weatherCard(s, snapshot.Weather, a.weather.failureFor(s.WeatherCity), zone)
 		}
 		a.panel.Update(func() { done(w) })
 	}()

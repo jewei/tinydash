@@ -53,6 +53,7 @@ var actions = []Action{
 	CopyClipText{}, DeleteClip{}, CopyPlainText{}, ClearClipboard{}, CopySnippet{},
 	OpenQuicklink{}, System{}, Pin{}, Unpin{}, Hide{}, SetAlias{}, SetHotkey{},
 	TurnOnCurrencyRates{}, Refresh{}, OpenSettings{}, CenterLauncher{}, TypeQuery{}, Quit{},
+	OpenUpNext{}, AskCalendarAccess{},
 }
 
 // The Rust list of actions that count as use (actions.rs).
@@ -119,3 +120,5 @@ func (r *recorder) OpenSettings(a OpenSettings) error                 { return r
 func (r *recorder) CenterLauncher(a CenterLauncher) error             { return r.note(a) }
 func (r *recorder) TypeQuery(a TypeQuery) error                       { return r.note(a) }
 func (r *recorder) Quit(a Quit) error                                 { return r.note(a) }
+func (r *recorder) OpenUpNext(a OpenUpNext) error                     { return r.note(a) }
+func (r *recorder) AskCalendarAccess(a AskCalendarAccess) error       { return r.note(a) }

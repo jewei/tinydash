@@ -153,18 +153,26 @@ func TestLoadsTheWidgetsAgainWhenTheDataChanges(t *testing.T) {
 	}
 }
 
-// A load that ends after a newer one does not put back older widgets.
+// One load runs at a time, as reading the calendars can wait: changes
+// during a load ask for one more load after it, however many they are, and
+// the last load's widgets show.
 func TestKeepsTheNewestLoad(t *testing.T) {
 	f := newFake(always())
 	f.holdWidgets = true
 	m, tt := showLauncher(t, f)
 	m.Stale()
-	older, newer := f.loading[0], f.loading[1]
-	newer(Widgets{Clocks: true})
-	older(Widgets{})
+	m.Stale()
+	if len(f.loading) != 1 {
+		t.Fatalf("%d loads run at once", len(f.loading))
+	}
+	f.loading[0](Widgets{})
+	if len(f.loading) != 2 {
+		t.Fatalf("%d loads after the first ended, want one more", len(f.loading))
+	}
+	f.loading[1](Widgets{Clocks: true})
 	tt.Frame()
-	if !hasPane(tt) {
-		t.Error("an older load replaced the newer one")
+	if !hasPane(tt) || len(f.loading) != 2 {
+		t.Errorf("pane %v after %d loads", hasPane(tt), len(f.loading))
 	}
 }
 

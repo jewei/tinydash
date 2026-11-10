@@ -123,6 +123,10 @@ func (m *Model) general(c *ui.Context, p kit.Palette, v settings.Settings) {
 func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
 	intro(c, p, "Widgets show next to the results of an empty All search.")
 	m.toggle(c, p, "Clocks", "Local time and up to three cities.", v.ShowClocks, func(s *settings.Settings, on bool) { s.ShowClocks = on })
+	if m.mac {
+		m.toggle(c, p, "Up Next", "Shows the rest of today's events and the reminders due today. macOS asks for access to Calendars and Reminders when you turn this on.",
+			v.ShowUpNext, func(s *settings.Settings, on bool) { s.ShowUpNext = on })
+	}
 	m.toggle(c, p, "Disk space", "Free space on the disk of your home folder.", v.ShowDiskSpace, func(s *settings.Settings, on bool) { s.ShowDiskSpace = on })
 	m.toggle(c, p, "Weather", "Current weather for one city from Open-Meteo, which receives the city name and its location.",
 		v.ShowWeather, func(s *settings.Settings, on bool) { s.ShowWeather = on })

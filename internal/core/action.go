@@ -45,7 +45,17 @@ type Handler interface {
 	CenterLauncher(CenterLauncher) error
 	TypeQuery(TypeQuery) error
 	Quit(Quit) error
+	OpenUpNext(OpenUpNext) error
+	AskCalendarAccess(AskCalendarAccess) error
 }
+
+// UpNextKind is what an Up Next item is.
+type UpNextKind string
+
+const (
+	UpNextEvent    UpNextKind = "event"
+	UpNextReminder UpNextKind = "reminder"
+)
 
 type (
 	// Launch starts an app.
@@ -134,6 +144,14 @@ type (
 		Text string `json:"text"`
 	}
 	Quit struct{}
+	// OpenUpNext opens the app that holds an Up Next item: Calendar for an
+	// event, Reminders for a reminder.
+	OpenUpNext struct {
+		Kind UpNextKind `json:"kind"`
+	}
+	// AskCalendarAccess asks the OS to let Up Next read calendars and
+	// reminders.
+	AskCalendarAccess struct{}
 )
 
 func (a Launch) Dispatch(h Handler) error               { return h.Launch(a) }
@@ -165,6 +183,8 @@ func (a OpenSettings) Dispatch(h Handler) error         { return h.OpenSettings(
 func (a CenterLauncher) Dispatch(h Handler) error       { return h.CenterLauncher(a) }
 func (a TypeQuery) Dispatch(h Handler) error            { return h.TypeQuery(a) }
 func (a Quit) Dispatch(h Handler) error                 { return h.Quit(a) }
+func (a OpenUpNext) Dispatch(h Handler) error           { return h.OpenUpNext(a) }
+func (a AskCalendarAccess) Dispatch(h Handler) error    { return h.AskCalendarAccess(a) }
 
 // Running these ranks their result higher. The commands that act inside
 // TinyDash (clear, settings, quit) count only for the System results that
@@ -198,6 +218,8 @@ func (OpenSettings) CountsAsUse() bool         { return true }
 func (CenterLauncher) CountsAsUse() bool       { return false }
 func (TypeQuery) CountsAsUse() bool            { return false }
 func (Quit) CountsAsUse() bool                 { return true }
+func (OpenUpNext) CountsAsUse() bool           { return false }
+func (AskCalendarAccess) CountsAsUse() bool    { return false }
 
 func (Launch) Name() string               { return "launch" }
 func (Open) Name() string                 { return "open" }
@@ -228,3 +250,5 @@ func (OpenSettings) Name() string         { return "openSettings" }
 func (CenterLauncher) Name() string       { return "centerLauncher" }
 func (TypeQuery) Name() string            { return "typeQuery" }
 func (Quit) Name() string                 { return "quit" }
+func (OpenUpNext) Name() string           { return "openUpNext" }
+func (AskCalendarAccess) Name() string    { return "askCalendarAccess" }

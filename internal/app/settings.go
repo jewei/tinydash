@@ -151,6 +151,9 @@ func (b *settingsBackend) UpdateSettings(change func(*settings.Settings), done f
 			if after.ShowWeather != before.ShowWeather || after.WeatherCity != before.WeatherCity {
 				go a.refreshWeather(false)
 			}
+			if after.ShowUpNext && !before.ShowUpNext {
+				a.askCalendarAccess()
+			}
 		}
 		a.toSettings(func() { done(after, err) })
 	}()

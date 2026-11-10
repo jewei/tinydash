@@ -42,7 +42,16 @@ Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the 
 - The Coverage workflow runs the tests on Linux with coverage, and writes the share of code that they run to its job summary. It fails when a test fails, and its log shows the test output. Branch protection does not require it. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
 - Search has a budget of 8 ms at p95, with 5,000 apps and 50,000 files. `TestSearchStaysWithinBudget` fails above 16 ms, which leaves room for slower CI machines; `verify-go.sh` runs it without the race detector. To see the numbers: `go test ./internal/search -run '^$' -bench .`.
 
-Automated tests do not cover these OS effects. Check them by hand on a real desktop, with throwaway data, when you change them: the global shortcut and hotkeys, the panel focus, the tray icon, open at login, the system commands, Spotlight results, and clipboard capture of images and files.
+Automated tests do not cover these OS effects. Check them by hand on a real desktop, with throwaway data, when you change them: the global shortcut and hotkeys, the panel focus, the tray icon, open at login, the system commands, Spotlight results, clipboard capture of images and files, and the Up Next widget.
+
+On macOS, Up Next reads and asks for calendars and reminders only when TinyDash is its own responsible process, and only when its Info.plist has the usage strings. macOS checks the access and the usage strings of the responsible process, and a program that a terminal starts belongs to the terminal. So `go run`, started from a terminal, never asks: the widget says that another app opened TinyDash. To test Up Next, quit the installed TinyDash, build the app, and open it with `open`, which starts it through launchd:
+
+```sh
+go tool mygo build
+open build/darwin-arm64/TinyDash.app --args --data-dir "$(mktemp -d)"
+```
+
+Turn on Up Next in Settings > Widgets; macOS then asks for access as TinyDash. The local build is ad hoc signed, so macOS may ask again for the installed app.
 
 ## Golden corpus
 
@@ -62,7 +71,7 @@ It needs Docker or OrbStack. The first launch downloads mygo's SQLite library fr
 
 ## Packaging
 
-`go tool mygo build` reads `mygo.json` (name, identifier `dev.tinydash.launcher`, version, `LSUIElement` so that macOS shows no Dock icon) and `resources/icon.png`. On macOS it writes `build/darwin-arm64/TinyDash.app`, ad hoc signed, and `tinydash-<version>-arm64.dmg`, and bundles mygo's SQLite library in the app. `-platform` picks other targets, such as `darwin/universal,windows/amd64,linux/amd64`. Signing and disk images need macOS. `go tool mygo build -h` lists every flag.
+`go tool mygo build` reads `mygo.json` (name, identifier `dev.tinydash.launcher`, version, `LSUIElement` so that macOS shows no Dock icon, the usage strings that Up Next needs to ask for calendars and reminders, and `Entitlements.plist`, which lets the hardened runtime of the signed release read them) and `resources/icon.png`. On macOS it writes `build/darwin-arm64/TinyDash.app`, ad hoc signed, and `tinydash-<version>-arm64.dmg`, and bundles mygo's SQLite library in the app. `-platform` picks other targets, such as `darwin/universal,windows/amd64,linux/amd64`. Signing and disk images need macOS. `go tool mygo build -h` lists every flag.
 
 The version is in `mygo.json`.
 
