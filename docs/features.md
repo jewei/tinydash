@@ -15,7 +15,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. Th
 | Mod+Enter          | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
 | Mod+Shift+Enter    | Run the clipboard card's main action: copy a color as hex or a Unix time as local time, or open the full JSON                  |
 | Mod+1 … Mod+9      | Run the main action of that row                                                                                                |
-| Mod+K              | All actions for the result and, while the widgets show, for Up Next, plus Refresh, Center Launcher, Settings, and Quit TinyDash |
+| Mod+K              | All actions for the result and, while the widgets show, for the clipboard card, the focus timer, and Up Next, plus Refresh, Center Launcher, Settings, and Quit TinyDash |
 | Mod+Backspace      | Delete the selected clipboard entry or calculator history entry                                                                |
 | Tab / Shift+Tab    | Next / previous category                                                                                                       |
 | Mod+,              | Open Settings                                                                                                                  |
