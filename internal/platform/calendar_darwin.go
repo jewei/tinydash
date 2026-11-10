@@ -111,8 +111,9 @@ func ReadUpNext(from, to time.Time) (Agenda, bool) {
 }
 
 // AskCalendarAccess asks the user to let TinyDash read calendars and
-// reminders, for each kind not answered yet, and calls done on another
-// thread once both are answered. It returns at once. It does nothing while
+// reminders, for each kind not answered yet, and calls done once both are
+// answered: on EventKit's queue, or on this thread when EventKit answers
+// before the requests return. It returns at once. It does nothing while
 // an earlier request waits; when TinyDash is not its own responsible
 // process, as macOS would ask for the other app, and end TinyDash if that
 // app lacks the usage strings; and in a build without the usage strings,
