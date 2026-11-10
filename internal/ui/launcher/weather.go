@@ -33,7 +33,7 @@ func (m *Model) weatherContent(c *ui.Context, p kit.Palette, w Weather) {
 	// The keyboard stays in the search field, as with the pane's other
 	// buttons, for when the launcher stays open.
 	settingsButton := func() {
-		ui.Button(c, "Open Settings").OnClick(func() {
+		ui.Button(c, "Open Settings").Shrink(0).OnClick(func() {
 			m.openSettings()
 			m.focusInput()
 		})
@@ -76,7 +76,9 @@ func (m *Model) weatherContent(c *ui.Context, p kit.Palette, w Weather) {
 		})
 	case WeatherNotFound:
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, "No place is named “"+w.City+"”.").TextColor(p.Ink).Grow(1).Shrink(1)
+			// A long city that is one word, as some towns are, ends in an
+			// ellipsis on the second line; the button keeps its room.
+			ui.Text(c, "No place is named “"+w.City+"”.").TextColor(p.Ink).Grow(1).Shrink(1).MinWidth(0).MaxLines(2)
 			settingsButton()
 		})
 	case WeatherFailed:

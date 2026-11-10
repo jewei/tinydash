@@ -16,6 +16,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Fixed
 
 - The Clocks widget, the cities' time differences, and a clipboard card's local time follow a change of the computer's time zone the next time the launcher opens, as in 0.9.0. Since 0.10.0 they kept the zone that TinyDash started in.
+- Disk space keeps the free size and the low space warning on one line when the disk has a long name. The name ends in an ellipsis.
 
 ## [0.10.0] - 2026-11-10
 

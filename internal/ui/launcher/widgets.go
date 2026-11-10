@@ -239,16 +239,18 @@ func diskSpace(c *ui.Context, p kit.Palette, d Disk) {
 		low := d.low()
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 			ui.Icon(c, glyphs["disk"]).FontSize(14).TextColor(p.Muted)
-			ui.Text(c, d.Name).FontWeight(600).TextColor(p.Ink).SingleLine()
+			// A long name ends in an ellipsis; the warning and the sizes
+			// keep their one line.
+			ui.Text(c, d.Name).FontWeight(600).TextColor(p.Ink).SingleLine().Shrink(1).MinWidth(0)
 			if low {
-				ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				ui.Row(c).Gap(4).Shrink(0).AlignItems(ui.Center).Children(func() {
 					ui.Icon(c, glyphs["warning"]).FontSize(12).TextColor(p.Danger)
 					ui.Text(c, "Low space").FontSize(12).FontWeight(600).TextColor(p.Danger)
 				})
 			}
 			ui.Box(c).Grow(1)
-			ui.Text(c, formatBytes(d.FreeBytes)).FontSize(12).FontWeight(600).TextColor(p.Ink)
-			ui.Text(c, "free of "+formatBytes(d.TotalBytes)).FontSize(12).TextColor(p.Muted)
+			ui.Text(c, formatBytes(d.FreeBytes)).FontSize(12).FontWeight(600).TextColor(p.Ink).Shrink(0)
+			ui.Text(c, "free of "+formatBytes(d.TotalBytes)).FontSize(12).TextColor(p.Muted).Shrink(0)
 		})
 		used := d.usedPercent()
 		fill := p.Accent
