@@ -117,10 +117,11 @@ func TestEveryCardKeepsItsTextInside(t *testing.T) {
 				}
 			}
 			// box is a text's own box. A text inside a named row, as an Up
-			// Next item, has only its drawn one, and so does a heading
-			// with the name of its card, as Access gives the card.
+			// Next item, has only its drawn one. A heading with its card's
+			// name ("Up Next", "Clipboard JSON") gives the card's box, so
+			// it goes unmeasured: both are short constant words.
 			box := func(text string) (ui.Rect, bool) {
-				if a, ok := tt.Access(text); ok && !isContainer(a.Role) {
+				if a, ok := tt.Access(text); ok {
 					return a.Bounds, true
 				}
 				return tt.Find(text)
@@ -165,12 +166,16 @@ func TestEveryCardKeepsItsTextInside(t *testing.T) {
 
 func quote(s string) string { return "“" + s + "”" }
 
-func isContainer(r ui.Role) bool {
-	return r == ui.RoleGroup || r == ui.RoleDialog || r == ui.RoleRegion || r == ui.RoleList
+func TestNearColorsDifferByLessThanThree(t *testing.T) {
+	black, white := color.RGBA{0, 0, 0, 255}, color.RGBA{255, 255, 255, 255}
+	if near(black, white) || near(white, black) || !near(black, color.RGBA{2, 1, 0, 255}) || near(black, color.RGBA{3, 0, 0, 255}) {
+		t.Error("near is wrong")
+	}
 }
 
+// near reports whether two colors differ by less than 3 in each channel.
 func near(a, b color.RGBA) bool {
-	d := func(x, y uint8) bool { return x-y < 3 || y-x < 3 }
+	d := func(x, y uint8) bool { return max(x, y)-min(x, y) < 3 }
 	return d(a.R, b.R) && d(a.G, b.G) && d(a.B, b.B)
 }
 
