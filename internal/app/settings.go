@@ -148,6 +148,9 @@ func (b *settingsBackend) UpdateSettings(change func(*settings.Settings), done f
 			if after.CurrencyRatesEnabled && !before.CurrencyRatesEnabled {
 				go a.refreshRates(true)
 			}
+			if after.ShowWeather != before.ShowWeather || after.WeatherCity != before.WeatherCity {
+				go a.refreshWeather(false)
+			}
 		}
 		a.toSettings(func() { done(after, err) })
 	}()

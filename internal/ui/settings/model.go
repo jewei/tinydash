@@ -62,6 +62,7 @@ type Model struct {
 
 	folders, skipped, cities listEditor
 	limit                    numberField
+	weatherCity              textField
 	// moved is the tab whose row a move button moved, for the focus to
 	// follow it.
 	moved *tabMove

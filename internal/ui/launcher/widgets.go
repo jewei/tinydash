@@ -11,7 +11,7 @@ import (
 )
 
 // widgetPane shows the widgets that are on, ported from
-// src/launcher/WidgetPane.tsx: Clocks and Disk space.
+// src/launcher/WidgetPane.tsx: Clocks, Weather, and Disk space.
 func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 	w := m.widgets
 	ui.Column(c).Grow(9).Padding(12).Gap(8).Background(p.Raised).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).
@@ -23,6 +23,9 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 			clocks(c, p, now, w.Cities, c.Region().FormatLocale(c.Locale()))
 			// A new frame as the minute turns, not a timer that polls.
 			c.After(now.Truncate(time.Minute).Add(time.Minute).Sub(now))
+		}
+		if w.Weather != nil {
+			m.weatherCard(c, p, *w.Weather)
 		}
 		if w.Disk != nil {
 			diskSpace(c, p, *w.Disk)

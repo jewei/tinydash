@@ -28,6 +28,8 @@ var skinTones = []option{
 	{"3", "👋🏽 Medium"}, {"4", "👋🏾 Medium-dark"}, {"5", "👋🏿 Dark"},
 }
 
+var units = []option{{"celsius", "Celsius (°C)"}, {"fahrenheit", "Fahrenheit (°F)"}}
+
 var languages = []option{{"zh", "Chinese (Simplified)"}, {"ms", "Malay"}, {"es", "Spanish"}}
 
 // The limits match those that settings.Normalize and the clocks widget
@@ -122,9 +124,16 @@ func (m *Model) widgets(c *ui.Context, p kit.Palette, v settings.Settings) {
 	intro(c, p, "Widgets show next to the results of an empty All search.")
 	m.toggle(c, p, "Clocks", "Local time and up to three cities.", v.ShowClocks, func(s *settings.Settings, on bool) { s.ShowClocks = on })
 	m.toggle(c, p, "Disk space", "Free space on the disk of your home folder.", v.ShowDiskSpace, func(s *settings.Settings, on bool) { s.ShowDiskSpace = on })
+	m.toggle(c, p, "Weather", "Current weather for one city from Open-Meteo, which receives the city name and its location.",
+		v.ShowWeather, func(s *settings.Settings, on bool) { s.ShowWeather = on })
 	heading(c, p, "Clock cities")
 	m.listView(c, p, &m.cities, "City to add", "Tokyo, London, or Europe/Paris", v.ClockCities, cityLimit, true,
 		func(s *settings.Settings) *[]string { return &s.ClockCities })
+	heading(c, p, "Weather")
+	m.text(c, p, &m.weatherCity, "City", "Weather city", "Singapore", v.WeatherCity, settings.MaxWeatherCityChars,
+		func(s *settings.Settings, city string) { s.WeatherCity = city })
+	m.choice(c, p, "Temperature", "", units, string(v.TemperatureUnit),
+		func(s *settings.Settings, value string) { s.TemperatureUnit = settings.TemperatureUnit(value) })
 }
 
 func (m *Model) clipboard(c *ui.Context, p kit.Palette, v settings.Settings) {
