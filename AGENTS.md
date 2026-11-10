@@ -1,97 +1,101 @@
 # TinyDash — agent guide
 
-TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux. The backend is Rust on Tauri 2; the frontend is SolidJS. Read this file before you change anything. Details live in `docs/`.
+TinyDash is a keyboard-first desktop launcher for macOS, Windows, and Linux, written in Go on mygo with native UI. Read this file before you change anything. `docs/architecture.md` explains the design; `docs/rewrite-log.tsv` records each decision of the port from Rust.
 
 ## Commands
 
-| Task                                    | Command                                                  |
-| --------------------------------------- | -------------------------------------------------------- |
-| Install dependencies                    | `bun install`                                            |
-| Run the desktop app (hot reload)        | `bun run dev` (own identifier and data, never yours)     |
-| Format, lint, and type-check everything | `bun run check`                                          |
-| Run all tests                           | `bun run test`                                           |
-| Fix formatting                          | `bun run fix`                                            |
-| **Before every commit or PR**           | `bun run verify` (docs only: `bunx vp check`)            |
-| Release (builds, signs, publishes)      | `bun run release 0.2.1` (see `docs/development.md`)      |
-| One Rust test                           | `cargo test --manifest-path src-tauri/Cargo.toml <name>` |
-| One frontend test file                  | `bunx vp test src/launcher/keymap.test.ts`               |
+| Task                                | Command                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------- |
+| **Before every commit**             | `bash scripts/verify-go.sh`                                                 |
+| Tests of one package                | `go test ./internal/<pkg>`                                                  |
+| Model-check the TLA+ models         | `bash scripts/formal-verify.sh` (Java 11+)                                  |
+| Drive the real app, with evidence   | the `verify-tinydash` skill (Docker or OrbStack; a Linux container)          |
+| Packaged app for this OS            | `go tool mygo build` (into `build/`)                                        |
+| Run from source                     | `go run ./cmd/tinydash --data-dir <scratch folder>`                         |
 
-`bun run verify` runs `check`, the frontend tests, the frontend build, then `scripts/bindings.ts`, which runs the Rust tests and fails if that regenerated anything in `src/generated`. CI runs the frontend checks, rustfmt, and the binding check on Linux, and Clippy and the Rust tests on macOS, Windows, and Linux. A change to Markdown files, `docs/`, or `LICENSE` alone needs only `bunx vp check`, which formats and checks them; CI skips the rest for it. Branch protection requires only the `Required checks` job, which passes when every other job passed; keep its name.
+`verify-go.sh` runs vet and staticcheck as macOS, Windows, and Linux see the code, then `go test -race -count=1 ./...`, which includes the import rules and gofmt, then the search speed gate (p95 under 16 ms) without the race detector. It runs the tests on this machine's OS only. CI runs them on all three: after you push, wait for `gh pr checks <branch> --watch` before you call a change verified. Branch protection requires only the `Required checks` job; keep its name. A change to Markdown, `docs/`, or `LICENSE` alone skips the Go jobs in CI, except `docs/architecture.md`, which a test reads.
 
 ## Where things are
 
 ```
-src-tauri/src/
-  lib.rs               App setup and the list of IPC commands. Start here.
-  cli.rs               Command-line arguments.
-  commands.rs          Every IPC command. TypeScript wrappers: src/lib/ipc.ts.
-  actions.rs           What each Action does to the OS, after checking it.
-  preview.rs           Details for the preview pane.
-  widgets.rs           The widget pane next to an empty All search; timer.rs runs its focus timer.
-  search/              Query → ranked results: result.rs (SearchResult, Action),
-                       id.rs (result IDs), matcher.rs, usage.rs.
-  features/            One file per feature (apps, files, clipboard, emoji, ...).
-  platform/            macOS, Windows, Linux. Each file implements the contract in platform/mod.rs.
-  store.rs             SQLite schema, migrations, and all SQL.
-  settings.rs          settings.json model and defaults.
-  state.rs             In-memory state; indexes are swapped whole (shared.rs).
-  refresh.rs           When indexes, exchange rates, and the weather refresh.
-  watcher.rs           File system events → "index is dirty".
-  spotlight.rs         More Files tab results from the OS's file index (Spotlight on macOS).
-  hud.rs               The "Copied" message window, which never takes focus.
-  monitor.rs           Clipboard capture thread.
-  expander.rs          Snippet expansion as you type: reads keys in other apps, types the snippet.
-  updates.rs           Update checks and installs (macOS and Windows release builds).
-  window.rs, tray.rs, shortcut.rs, images.rs, events.rs, system_clipboard.rs, error.rs
-src/
-  launcher/            Launcher window: state.ts (logic), Launcher.tsx (view), keymap.ts.
-  settings/            Settings window.
-  ui/                  Components shared by both windows.
-  lib/ipc.ts           The only module that calls the backend.
-  generated/           TypeScript types written by ts-rs. Never edit by hand.
-  test/backend.ts      Fake backend for component tests.
-docs/                  architecture.md, features.md, development.md
-scripts/               emoji-data.ts (regenerates CLDR data), bindings.ts (IPC type check),
-                       release.ts and set-version.ts (see docs/development.md)
+cmd/tinydash/          main: the command line (app.ParseArgs), then app.Main.
+internal/
+  app/                 Wiring: panel, Settings window, HUD, tray, shortcut and hotkeys,
+                       file watcher, Spotlight, clipboard ticker, rates. Start at app.go.
+  engine/              Live state: snapshot, single writer, slots, monitor, actions.go
+                       (every action, checked before it runs), settingsfile.go.
+  search/              Snapshot, Search, Resolve, the order of All, answers(), personal lists.
+  core/                Result, Action and Handler, Source traits, Category, SystemCommand.
+  feature/<name>/      One pure feature each (apps, files, clipboard, library, calc, ...).
+  match/               Scoring (a port of nucleo).
+  weburl/              The one WHATWG URL parser.
+  zoneinfo/            Time zone rules built into the binary; never the disk's.
+  settings/            settings.json model, load, Normalize, Tauri shortcut translation.
+  store/               All SQL and the migrations.
+  platform/            OS work that mygo lacks. The only package with _darwin/_windows/_linux files.
+  ui/kit/              Keys, recorder state, palette, fonts shared by both views.
+  ui/launcher/         Launcher view and model. keymap.go holds the panel's keys;
+                       overlays.go holds the keys of the menu and the dialogs.
+  ui/settings/         Settings view and model.
+  archtest/            The import rules as data (rules.go).
+  golden/              Test support for the frozen Rust answers in testdata/golden.
+formal/                TLA+ models.
+testdata/golden/       The Rust app's answers, frozen. Read its README.md.
+.claude/skills/        verify-tinydash, formal-verify-clipboard.
 ```
 
-Keep private notes, plans, and evidence in `.local/` (ignored by git).
+The package table in `docs/architecture.md` lists what each package owns and may import.
 
 ## Rules
 
-1. **Logic lives in Rust.** Search, ranking, validation, and OS work are Rust. The frontend renders results and maps keys to actions; it never decides what an action does.
-2. **Features stay out of the app's plumbing.** Files in `features/` and `search/` never call Tauri, SQLite, the clipboard, or windows, and never change anything in the OS. They may read cheap OS state: the home folder path, the clock and time zone, and the random source (for passwords). The indexers that read the disk or network, `FileIndex::scan`, `currency::fetch`, and `weather::fetch`, run only from `refresh.rs`. Glue modules at the top level do everything else.
-3. **Results carry their actions.** A `SearchResult` lists `ResultAction`s; the frontend sends the chosen `Action` back. `actions.rs` checks every action again before it runs.
-4. **One source of truth for IPC types.** Add `#[derive(TS)] #[ts(export)]` to Rust types that cross IPC. Run `bun scripts/bindings.ts` to regenerate `src/generated` (it also removes bindings of deleted types), then commit the result. Add each new command to `lib.rs`, `commands.rs`, `src/lib/ipc.ts`, and a default reply in `src/test/backend.ts`.
-5. **All SQL lives in `store.rs`.** Change the schema by appending to `MIGRATIONS`. Never edit a migration that has shipped.
-6. **Platform code lives only in `platform/`.** Add a function to all three OS files and document it in `platform/mod.rs`. Outside `platform/`, `cfg!` may choose only a label or a default value, and a test may use `#[cfg(unix)]` only when another OS cannot set up its case (for example, creating a link on Windows).
-7. **Bound what you keep.** Every list, cache, and stored item has a limit (see the constants in each feature).
-8. **No new dependency without need.** Prefer the standard library and existing crates. Pin exact versions in `package.json`.
-9. **No dead code.** No commented-out code, no TODOs, no unused exports, no speculative abstractions.
-10. **Test what you change.** Rust tests sit in a `tests` module in the same file. Frontend tests sit next to the component and use `src/test/backend.ts`.
-11. **Never touch the user's real TinyDash data** when you run the app. Use the isolated build in `docs/development.md`.
+Rules marked _(test)_ fail `go test` when broken.
+
+1. **Logic lives in the pure packages.** `core`, `match`, `weburl`, `zoneinfo`, `feature/*`, `settings`, and `search` take disk, network, clock, and randomness as arguments (`fs.FS`, `io.Reader`, `time.Time`). They import no `os`, `net`, `syscall`, `unsafe`, or random source. They call no `time.Now`, and no standard function that reads the disk, such as `time.LoadLocation` (use `zoneinfo.Load`) or `filepath.Glob`. _(test: `internal/archtest`)_
+2. **Each package imports only its layer.** The layers and the allowlisted modules are data in `internal/archtest/rules.go`. Change them there, in their own commit, with the reason. _(test)_
+3. **OS code lives only in `internal/platform`.** Only it has OS file suffixes or OS build tags. Elsewhere, only a file named `labels.go` reads `runtime.GOOS`, to pick a label or a default. Add a platform function to all three OS files. _(test)_
+4. **The compiler asks for each action.** `core.Handler` has one method per action, so a new action does not compile until `engine` handles it. `engine.Actions` checks each action again before it runs it. _(test: `internal/core`)_
+5. **All SQL lives in `internal/store`.** Change the schema by appending a migration. Never edit a migration that has shipped. _(test: `TestMigrationsNeverChange`)_
+6. **The user's data stays compatible.** Keep the `settings.json` keys, the `tinydash.db` schema, and the result ID prefixes. Unknown settings keys are written back unchanged. _(test: `internal/settings`, `internal/store`, `internal/core`)_
+7. **Ported answers match the Rust app.** `testdata/golden` is frozen. A Go result that differs must be listed, with its reason, in `testdata/golden/divergences/<feature>.tsv`. Add new cases to the feature's own tests, not to the corpus. _(test)_
+8. **Bound what you keep.** Every list, cache, and stored item has a limit, as a named constant in its package (`search.MaxPins`, `clipboard.MaxTextBytes`).
+9. **No new dependency without need.** Prefer the standard library and mygo. A new module goes into `archtest.external` first. _(test)_
+10. **No dead code.** No commented-out code, no TODOs, no unused symbols, no speculative abstractions. _(staticcheck, as each OS sees the code)_
+11. **Test what you change.** Tests sit next to the code. Write paths in tests as slash paths through `golden.Abs` (`/Users/me` becomes `C:\Users\me` on Windows): a literal `/root` is not absolute on Windows. Drive views with mygo's `ui.NewTester` and move time with `Advance`.
+12. **Concurrency that tests reach least has a model.** Before you change clipboard capture, Clear, or history on/off, use the `formal-verify-clipboard` skill.
+13. **Never touch the user's real TinyDash data.** Run the app only with `--data-dir` and a scratch folder, or in the `verify-tinydash` container.
+14. **Never drive the desktop with synthetic input.** No osascript, cliclick, xdotool, or CGEvent on the user's machine, and no reads or writes of the user's clipboard. Test views with `ui.NewTester`. Drive the real app only in the `verify-tinydash` container.
 
 ## Add a feature
 
-- **New search source:** add `features/<name>.rs` with `search`, `browse`, and `get(key)` (see `features/apps.rs`). Add a `Source` variant in `search/id.rs` for its result IDs, add it to `Source::ALL`, and decide `learns_from_use` and `suggestible` (the compiler asks). Add its index to `Snapshot` (`search/mod.rs`) and `State` (`state.rs`), and fill it from `refresh.rs` or `state.rs`. A source that a scan fills needs a `Freshness` slot, its first scan reported in `Freshness::ready` (the compiler asks), and its rebuild called from `setup` (`lib.rs`), `refresh::on_launcher_shown`, and `Action::Refresh` (`actions.rs`), whose label in `src/launcher/Launcher.tsx` names what it refreshes. Wire it into `search/mod.rs`: `all()` (behind `wanted(Category::…)`, so its tab's "in All" switch works), `search()`, `browse()`, and `resolve()`. If its results have details, load them in `preview::load` and add its kind to `LOADED` in `src/launcher/PreviewPane.tsx`. For a new tab, add a `Category` variant to `Category::ALL` and `Category::name`, its label in `CATEGORY_LABELS` in `src/lib/categories.ts`, and its name in `cli::USAGE`. `Settings::normalized` adds it to every saved `tabs` list, shown, at the end.
-- **New instant answer** (computed from the query, like the calculator): add an `answer(query)` function, call it from `answers()` in `search/mod.rs`, and, for a new `ResultKind`, list it in `ANSWERS` in `src/launcher/describe.ts` if its title is the answer.
-- **New action:** add a variant to `Action`, handle it in `actions::run`, and decide whether it counts as use (`counts_as_use`).
-- **New setting:** add a field with a default in `settings.rs` and clamp or clean it in `Settings::normalized`. If it changes the OS (like the shortcut or login item), apply it in `commands::apply_to_system`, which also rolls it back on failure; otherwise apply it in `commands::update_settings`. Add a control in `src/settings/Settings.tsx` and the field to `testSettings` in `src/test/backend.ts`.
-- **New widget:** add its data to `Widgets` in `widgets.rs` (`None` while its `show_…` setting is off), with pure logic in `features/` and OS reads in `platform/`. Draw it in `src/launcher/WidgetPane.tsx`, add its switch to `hasWidgets` there and to Settings > Widgets, and turn it off in `noWidgets` in `src/test/backend.ts`. A widget that changes on its own emits `events::widgets_changed`; its actions are `ResultAction`s, like a result's.
-- **New system command:** add a `SystemCommand` variant, an entry in `features/system.rs`, and an arm in each `platform/*.rs`.
+Each step names what fails when it is missing. Steps without a check need care.
 
-Then update `docs/features.md`, add the change under Unreleased in `CHANGELOG.md`, and run `bun run verify`.
+- **New search source:**
+  1. Add a `Source` constant before `sourceCount` and its row in `sourceTraits` (`internal/core/source.go`). Add its prefix to `TestSourcePrefixesNeverChange`, which fails until then.
+  2. Write `internal/feature/<name>` with `Search`, `Browse`, and `Get`, as `feature/apps` does.
+  3. Add its index to `search.Snapshot`. Wire it into `find`, `browse`, `resolve`, and the `sources` list of `all` in `internal/search/search.go`.
+  4. For a new tab, add a `Category` to `core.Categories()` and its label to `categoryLabels` in `ui/launcher/glyphs.go` and `ui/settings/view.go` (no test checks the labels). `Normalize` adds the tab to saved settings.
+  5. A source that a scan fills gets an `engine.Slot` in `internal/app/app.go`, requested at startup, in `Show` when old, and in `appShell.Refresh`.
+- **New instant answer:** write `Answer(query, …) (core.Result, bool)` in a feature package. Call it from `answers()` in `internal/search/search.go`; its place in that list is its place in All. A new `core.Kind` needs a row in `kinds` in `ui/launcher/glyphs.go`. A new keyword gets a row in `builtIns` in `feature/library/keywords.go`, whose example must get an answer _(test)_.
+- **New action:** add the type, `Dispatch`, `CountsAsUse`, and `Name` in `internal/core/action.go`, and a method to `Handler`. The build fails until `engine`'s `handler` and the test `recorder` have the method. Add it to `actions` and `countsAsUse` in `core_test.go`, which count the `Handler` methods _(test)_.
+- **New setting:** add a field with its JSON key to `settings.Settings`, its default to `Default`, and a clamp to `Normalize`. Add a reader to `fields` in `internal/settings/load.go`; `TestDefaultsLoadBackUnchanged` fails without it unless the default is the zero value. A setting that changes the OS (shortcut, login item, tray) applies in `applyToSystem` in `internal/app/settings.go`, which the engine calls again to roll back a failure. Add its control in `internal/ui/settings/view.go`.
+- **New system command:** add a `SystemCommand` and list it in `SystemCommands()`. Add its row in `feature/system/system.go` _(test)_ and its plan in each `internal/platform/system_*.go` _(test on each OS; CI runs all three)_.
+- **New widget:** add its switch as a setting (above). Add its data to `launcher.Widgets` (`ui/launcher/backend.go`), fill it in `loadWidgets` (`internal/app/widgets.go`) with pure logic in `feature/` and OS reads in `platform/`. Draw it in `ui/launcher/widgets.go` and add it to `showsWidgets` in `ui/launcher/model.go`. Add its toggle to the Widgets section of `ui/settings/view.go`.
+
+Then update `docs/features.md`, add the change under Unreleased in `CHANGELOG.md`, and run `bash scripts/verify-go.sh`.
 
 ## Style
 
-- Names say what a thing is or does: `refresh::files`, `Store::save_clip`, `latestOnly`. No abbreviations except common ones (`id`, `url`).
-- Comments explain why, not what. Every `unsafe` block has a `// SAFETY:` comment.
-- User-facing text: short sentences, active voice, no jargon. Errors say what happened and what to do.
-- Rust: `cargo fmt`, Clippy with `-D warnings`. TypeScript: Oxfmt and Oxlint through `vp check`, where a lint warning fails the check; strict mode.
+- Names say what a thing is or does: `engine.Slot`, `Actions.RunHotkey`, `blurWasThisPress`. No abbreviations except common ones (`id`, `url`).
+- Comments explain why, not what. An `unsafe` pointer cast has a `// SAFETY:` comment that says why it holds.
+- User-facing text: short sentences, active voice, no jargon. Errors say what happened and what to do. They are sentences, so staticcheck's ST1005 is off (`staticcheck.conf`).
+- gofmt, `go vet`, and staticcheck, through `verify-go.sh`.
 
 ## Commits and pull requests
 
 - Conventional commits: `feat(search): …`, `fix(clipboard): …`, `docs: …`. One logical change per commit.
+- Chain the gate and the commit with `&&`, never `;` or a pipe that hides the exit code.
 - A change users notice gets a line under Unreleased in `CHANGELOG.md`, in plain words.
-- The pre-commit hook formats staged files (`vp staged`).
+- The repository has no pre-commit hook. If a commit fails in an old Vite hook, `core.hooksPath` still points at it: tell the user, and leave the git config as it is.
 - A PR explains the change, lists the commands you ran with their results, and includes screenshots for UI changes.
+
+Keep private notes, plans, and evidence in `.local/` (ignored by git).

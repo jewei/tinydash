@@ -1,0 +1,258 @@
+package archtest
+
+import (
+	"bytes"
+	"encoding/json"
+	"go/format"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
+
+// TestModuleFollowsTheRules runs the rules over every package of the module.
+func TestModuleFollowsTheRules(t *testing.T) {
+	for _, problem := range Check(loadModule(t)) {
+		t.Error(problem)
+	}
+}
+
+// TestGoFilesAreFormatted fails on any file that gofmt would change, so a
+// format check needs no separate command.
+func TestGoFilesAreFormatted(t *testing.T) {
+	for _, p := range loadModule(t) {
+		for name, src := range p.Files {
+			formatted, err := format.Source(src)
+			if err != nil {
+				t.Errorf("%s/%s: %v", p.Path, name, err)
+			} else if !bytes.Equal(formatted, src) {
+				t.Errorf("%s/%s is not gofmt-formatted; run gofmt -w", p.Path, name)
+			}
+		}
+	}
+}
+
+// Each rule, shown failing on a package that breaks it.
+func TestEachRuleCanFail(t *testing.T) {
+	file := func(src string) map[string][]byte { return map[string][]byte{"x.go": []byte(src)} }
+	cases := []struct {
+		name string
+		pkg  Package
+		want string
+	}{
+		{"unknown package", Package{Path: module + "/internal/stuff"}, "not in any layer"},
+		{"layer skipped", Package{Path: module + "/internal/feature/calc", Imports: []string{module + "/internal/store"}}, "imports internal/store"},
+		{"features import each other", Package{Path: module + "/internal/feature/calc", Imports: []string{module + "/internal/feature/currency"}}, "imports internal/feature/currency"},
+		{"pure package reads the disk", Package{Path: module + "/internal/feature/files", Imports: []string{"os"}}, "imports os; pure packages"},
+		{"pure package reads randomness", Package{Path: module + "/internal/feature/password", Imports: []string{"crypto/rand"}}, "imports crypto/rand"},
+		{"new dependency", Package{Path: module + "/internal/engine", Imports: []string{"github.com/some/lib"}}, "not in archtest.external"},
+		{"new dependency in a test", Package{Path: module + "/internal/engine", TestImports: []string{"github.com/some/assert"}}, "test imports github.com/some/assert, which is not in archtest.external"},
+		{"OS-only OS name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_zos.go": []byte("package engine\n")}}, "OS-specific file"},
+		{"OS-only build tag", Package{Path: module + "/internal/engine", Files: file("//go:build hurd\n\npackage engine\n")}, "OS build tag"},
+		{"sqlite outside store", Package{Path: module + "/internal/engine", Imports: []string{"github.com/egoist/mygo/plugins/sqlite"}}, "only [internal/store] may"},
+		{"automation outside app", Package{Path: module + "/internal/engine", E2EImports: []string{"github.com/egoist/mygo/plugins/automation"}}, "only [internal/app] may"},
+		{"automation in a release", Package{Path: module + "/internal/app", Imports: []string{"github.com/egoist/mygo/plugins/automation"}}, "in a release build; only the e2e build may"},
+		{"e2e build skips a layer", Package{Path: module + "/internal/feature/calc", E2EImports: []string{module + "/internal/store"}}, "imports internal/store"},
+		{"views import each other", Package{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/launcher"}}, "imports internal/ui/launcher"},
+		{"kit imports a view", Package{Path: module + "/internal/ui/kit", Imports: []string{module + "/internal/ui/launcher"}}, "imports internal/ui/launcher"},
+		{"kit imports the engine", Package{Path: module + "/internal/ui/kit", Imports: []string{module + "/internal/engine"}}, "imports internal/engine"},
+		{"view imports the mygo root", Package{Path: module + "/internal/ui/launcher", Imports: []string{"github.com/egoist/mygo"}}, "only [internal/app internal/platform] may"},
+		{"OS file name", Package{Path: module + "/internal/engine", Files: map[string][]byte{"monitor_darwin.go": []byte("package engine\n")}}, "OS-specific file"},
+		{"OS build tag", Package{Path: module + "/internal/engine", Files: file("//go:build cgo || windows\n\npackage engine\n")}, "OS build tag"},
+		{"clock in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport clock \"time\"\n\nvar now = clock.Now()\n")}, "time.Now in a pure package"},
+		{"zone from the disk in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport \"time\"\n\nvar kl, _ = time.LoadLocation(\"Asia/Kuala_Lumpur\")\n")}, "time.LoadLocation in a pure package"},
+		{"glob in a pure package", Package{Path: module + "/internal/search", Files: file("package search\n\nimport fp \"path/filepath\"\n\nvar m, _ = fp.Glob(\"*\")\n")}, "filepath.Glob in a pure package"},
+		{"absolute path in a pure package", Package{Path: module + "/internal/settings", Files: file("package settings\n\nimport \"path/filepath\"\n\nvar p, _ = filepath.Abs(\"x\")\n")}, "filepath.Abs in a pure package"},
+		{"walk in a pure package", Package{Path: module + "/internal/feature/files", Files: file("package files\n\nimport \"path/filepath\"\n\nvar err = filepath.WalkDir(\".\", nil)\n")}, "filepath.WalkDir in a pure package"},
+		{"mime table in a pure package", Package{Path: module + "/internal/feature/files", Files: file("package files\n\nimport \"mime\"\n\nvar t = mime.TypeByExtension(\".txt\")\n")}, "mime.TypeByExtension in a pure package"},
+		{"user account in a pure package", Package{Path: module + "/internal/core", Imports: []string{"os/user"}}, "imports os/user; pure packages"},
+		{"ioutil in a pure package", Package{Path: module + "/internal/match", Imports: []string{"io/ioutil"}}, "imports io/ioutil; pure packages"},
+		{"dot import of time in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport . \"time\"\n\nvar now = Now()\n")}, "dot import of time in a pure package"},
+		{"local zone in a pure package", Package{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport \"time\"\n\nvar here = time.Local\n")}, "time.Local in a pure package"},
+		{"app imports golden", Package{Path: module + "/internal/app", Imports: []string{module + "/internal/golden"}}, "imports internal/golden; only tests may"},
+		{"engine imports archtest", Package{Path: module + "/internal/engine", Imports: []string{module + "/internal/archtest"}}, "imports internal/archtest"},
+		{"runtime.GOOS outside platform", Package{Path: module + "/internal/engine", Files: file("package engine\n\nimport \"runtime\"\n\nvar mac = runtime.GOOS == \"darwin\"\n")}, "runtime.GOOS outside"},
+	}
+	for _, c := range cases {
+		got := strings.Join(Check([]Package{c.pkg}), "\n")
+		if !strings.Contains(got, c.want) {
+			t.Errorf("%s: want a problem with %q, got %q", c.name, c.want, got)
+		}
+	}
+	// And the allowed shapes pass.
+	ok := []Package{
+		{Path: module + "/internal/feature/calc", Imports: []string{"strings", module + "/internal/core", module + "/internal/match"}, Files: file("package calc\n\nimport \"time\"\n\nvar d = time.Hour\n")},
+		{Path: module + "/internal/feature/datetime", Files: file("package datetime\n\nimport (\n\t\"path/filepath\"\n\t\"time\"\n)\n\nvar kl, _ = time.LoadLocationFromTZData(\"KL\", nil)\n\nvar base = filepath.Base(\"/a/b\")\n")},
+		{Path: module + "/internal/engine", Imports: []string{"os/user"}, Files: file("package engine\n\nimport \"time\"\n\nvar kl, _ = time.LoadLocation(\"Asia/Kuala_Lumpur\")\n")},
+		{Path: module + "/internal/platform", Imports: []string{"github.com/ebitengine/purego"}, Files: map[string][]byte{"clipboard_darwin.go": []byte("//go:build darwin\n\npackage platform\n")}},
+		{Path: module + "/internal/ui/kit", Imports: []string{"github.com/egoist/mygo/ui", module + "/internal/core", module + "/internal/settings"}},
+		{Path: module + "/internal/ui/settings", Imports: []string{module + "/internal/ui/kit"}},
+		{Path: module + "/internal/ui/launcher", Imports: []string{"github.com/egoist/mygo/ui"}, Files: map[string][]byte{"labels.go": []byte("package launcher\n\nimport \"runtime\"\n\nvar mac = runtime.GOOS == \"darwin\"\n")}},
+	}
+	if problems := Check(ok); len(problems) > 0 {
+		t.Errorf("allowed shapes failed: %q", problems)
+	}
+}
+
+// TestArchitectureTableMatchesTheRules keeps the "May import" column of
+// docs/architecture.md equal to the layers and the external allowlist, so
+// the doc can say that the column is complete.
+func TestArchitectureTableMatchesTheRules(t *testing.T) {
+	doc, err := os.ReadFile(filepath.Join("..", "..", "docs", "architecture.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := packageTable(string(doc))
+	for _, l := range layers {
+		got, ok := table[l.pkg]
+		if !ok {
+			t.Errorf("docs/architecture.md has no row for %s", l.pkg)
+			continue
+		}
+		delete(table, l.pkg)
+		if want := allowedImports(l.pkg, l.allow); !slices.Equal(got, want) {
+			t.Errorf("%s: the doc allows %q, the rules allow %q", l.pkg, got, want)
+		}
+	}
+	for pkg := range table {
+		t.Errorf("docs/architecture.md has a row for %s, which is in no layer", pkg)
+	}
+}
+
+// packageTable reads the table under "## Packages": the package of each row
+// (`internal/feature/<name>` as the layer "internal/feature/") and the
+// sorted code spans of its last column.
+func packageTable(doc string) map[string][]string {
+	_, section, _ := strings.Cut(doc, "\n## Packages\n")
+	section, _, _ = strings.Cut(section, "\n## ")
+	spans := func(cell string) []string {
+		var out []string
+		for i, part := range strings.Split(cell, "`") {
+			if i%2 == 1 {
+				out = append(out, part)
+			}
+		}
+		return out
+	}
+	table := map[string][]string{}
+	for line := range strings.Lines(section) {
+		cells := strings.Split(strings.TrimSpace(line), "|")
+		if len(cells) < 4 || !strings.HasPrefix(strings.TrimSpace(cells[1]), "`") {
+			continue
+		}
+		pkg := spans(cells[1])[0]
+		if before, _, ok := strings.Cut(pkg, "<"); ok {
+			pkg = before
+		}
+		imports := spans(cells[len(cells)-2])
+		slices.Sort(imports)
+		table[pkg] = imports
+	}
+	return table
+}
+
+// allowedImports is what the rules let a layer import, as the doc writes
+// it: a prefix ends in "/*".
+func allowedImports(pkg string, allow []string) []string {
+	out := slices.Clone(allow)
+	for dep, users := range external {
+		if matchesAny(pkg, users) {
+			out = append(out, dep)
+		}
+	}
+	for i, dep := range out {
+		if strings.HasSuffix(dep, "/") {
+			out[i] = dep + "*"
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// loadModule lists every package with `go list`, with all of its files,
+// whatever their build tags, and the imports of both its default and its
+// e2e build: the e2e build links test-only packages the rules must see.
+func loadModule(t *testing.T) []Package {
+	t.Helper()
+	cmd := exec.Command("go", "list", "-json", module+"/...")
+	cmd.Env = append(os.Environ(), "GOFLAGS=")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list: %v", err)
+	}
+	var pkgs []Package
+	dec := json.NewDecoder(bytes.NewReader(out))
+	for dec.More() {
+		var listed struct {
+			ImportPath, Dir                                              string
+			Imports, TestImports, XTestImports                           []string
+			GoFiles, IgnoredGoFiles, TestGoFiles, XTestGoFiles, CgoFiles []string
+		}
+		if err := dec.Decode(&listed); err != nil {
+			t.Fatal(err)
+		}
+		p := Package{Path: listed.ImportPath, Imports: listed.Imports, TestImports: append(listed.TestImports, listed.XTestImports...), Files: map[string][]byte{}}
+		for _, group := range [][]string{listed.GoFiles, listed.IgnoredGoFiles, listed.TestGoFiles, listed.XTestGoFiles, listed.CgoFiles} {
+			for _, name := range group {
+				src, err := os.ReadFile(filepath.Join(listed.Dir, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				p.Files[name] = src
+			}
+		}
+		pkgs = append(pkgs, p)
+	}
+	e2e := e2eImports(t)
+	for i := range pkgs {
+		for _, imp := range e2e[pkgs[i].Path] {
+			if !slices.Contains(pkgs[i].Imports, imp) {
+				pkgs[i].E2EImports = append(pkgs[i].E2EImports, imp)
+			}
+		}
+	}
+	return pkgs
+}
+
+// e2eImports maps each package to its imports when built with -tags e2e.
+func e2eImports(t *testing.T) map[string][]string {
+	t.Helper()
+	cmd := exec.Command("go", "list", "-tags", "e2e", "-f", "{{.ImportPath}}{{range .Imports}} {{.}}{{end}}", module+"/...")
+	cmd.Env = append(os.Environ(), "GOFLAGS=")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go list -tags e2e: %v", err)
+	}
+	imports := map[string][]string{}
+	for line := range strings.Lines(string(out)) {
+		fields := strings.Fields(line)
+		if len(fields) > 0 {
+			imports[fields[0]] = fields[1:]
+		}
+	}
+	return imports
+}
+
+// A release links no e2e-only package, not even through a dependency.
+func TestReleaseBuildsLinkNoE2EOnlyPackage(t *testing.T) {
+	for _, goos := range []string{"darwin", "linux", "windows"} {
+		cmd := exec.Command("go", "list", "-deps", module+"/cmd/tinydash")
+		cmd.Env = append(os.Environ(), "GOFLAGS=", "GOOS="+goos, "CGO_ENABLED=0")
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("go list -deps for %s: %v", goos, err)
+		}
+		deps := strings.Fields(string(out))
+		if !slices.Contains(deps, module+"/internal/app") {
+			t.Fatalf("%s: the deps miss internal/app: %d packages", goos, len(deps))
+		}
+		for _, line := range CheckRelease(goos, deps) {
+			t.Error(line)
+		}
+	}
+	if got := CheckRelease("linux", []string{"github.com/egoist/mygo/plugins/automation"}); len(got) != 1 {
+		t.Errorf("an automation dep passes: %v", got)
+	}
+}

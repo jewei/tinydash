@@ -4,6 +4,28 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+
+- TinyDash is rewritten in Go, with a native window in place of a web view.
+- Your settings, clipboard history, pins, aliases, hotkeys, snippets, quicklinks, and calculator history carry over. The settings of removed features stay in the file, so an older version still finds them.
+- On Windows, pinned apps, app usage, and the aliases and hotkeys of apps reset once, because Windows apps now have new IDs.
+- Results with equal scores keep the order in which their source lists them.
+- On Windows, apps are found by their name only, and show their folder.
+- The file folders and Spotlight moved to Settings > Search.
+- Command-line options: `--hidden` and `--data-dir` are new. `--settings`, `--background`, and `--mode` work as before.
+- A launcher position saved on Windows or Linux on a scaled display may open in another spot once. Drag the launcher there again.
+- Clock dates are in English, in the order of your regional formats. Before, they were in the system's language.
+- A `settings.json` that holds `[]` is now moved aside to `settings.invalid.json`, as any other file that is not a JSON object. TinyDash still starts with the default settings.
+
+### Removed
+
+- Snippet expansion as you type.
+- The Up Next, Weather, Focus timer, Notepad, and clipboard card widgets. Clocks and Disk space stay.
+- Shell commands (`>`) and the file permissions answer (`chmod 755`).
+- Update checks and installs. The packaged app no longer connects to GitHub. (A run from source downloads the SQLite library from GitHub once.)
+- The Privacy and About sections of Settings.
+- Hyperbolic functions in the calculator, such as `sinh(40)`.
+
 ## [0.9.0] - 2026-11-01
 
 ### Added

@@ -1,37 +1,14 @@
 version: 2
 updates:
-  - package-ecosystem: cargo
-    directory: /src-tauri
-    schedule: { interval: weekly }
-    groups:
-      rust: { patterns: ["*"] }
-    # The Tauri CLI refuses a tauri crate and @tauri-apps packages of different
-    # minor versions, and Dependabot cannot update both in one PR. Each plugin
-    # release needs the newest tauri, so the plugins wait too.
-    ignore:
-      - dependency-name: "tauri*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # Tauri 2 links GTK 0.18 on Linux, and these bindings must match it.
-      - dependency-name: gio
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      - dependency-name: gtk
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-  - package-ecosystem: bun
+  - package-ecosystem: gomod
     directory: /
     schedule: { interval: weekly }
     groups:
-      javascript: { patterns: ["*"] }
-    # Vite+ pins vite and vitest through overrides; upgrade all three with `bunx vp migrate`.
-    ignore:
-      - dependency-name: vite-plus
-      - dependency-name: vite
-      - dependency-name: vitest
-      - dependency-name: "@tauri-apps/*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      go: { patterns: ["*"] }
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
-    # CodeQL stops when its init, analyze, and upload-sarif steps run different
-    # versions, so they update in one PR.
+    # One PR for every action. It also keeps CodeQL's init and analyze steps
+    # on the same version, which CodeQL needs.
     groups:
-      codeql: { patterns: ["github/codeql-action*"] }
+      actions: { patterns: ["*"] }

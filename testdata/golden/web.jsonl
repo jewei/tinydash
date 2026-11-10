@@ -1,0 +1,239 @@
+{"answer":null,"encode":"%C2%A3","query":"£"}
+{"answer":null,"encode":"-","query":"-"}
+{"answer":null,"encode":"--background","query":"--background"}
+{"answer":null,"encode":"--greedy","query":"--greedy"}
+{"answer":null,"encode":"--mode%20%3Ccategory%3E","query":"--mode <category>"}
+{"answer":null,"encode":"--mode%20clipboard","query":"--mode clipboard"}
+{"answer":null,"encode":"--settings","query":"--settings"}
+{"answer":null,"encode":"-rw-r--r--","query":"-rw-r--r--"}
+{"answer":null,"encode":"%3B","query":";"}
+{"answer":null,"encode":"%3Bsig","query":";sig"}
+{"answer":null,"encode":"%3Bsig2","query":";sig2"}
+{"answer":null,"encode":"%3F","query":"?"}
+{"answer":null,"encode":"%3F%20git","query":"? git"}
+{"answer":null,"encode":"%3F%20jira","query":"? jira"}
+{"answer":null,"encode":"%3F%20search","query":"? search"}
+{"answer":null,"encode":".","query":"."}
+{"answer":null,"encode":"..","query":".."}
+{"answer":null,"encode":".appref-ms","query":".appref-ms"}
+{"answer":null,"encode":".command","query":".command"}
+{"answer":null,"encode":".exe","query":".exe"}
+{"answer":null,"encode":".lnk","query":".lnk"}
+{"answer":null,"encode":".url","query":".url"}
+{"answer":null,"encode":"%28","query":"("}
+{"answer":null,"encode":"%28%5Cx.x%20%2B%201%29%205","query":"(\\x.x + 1) 5"}
+{"answer":null,"encode":"%28x%20%3D%3E%20x%20%2B%201%29%205","query":"(x => x + 1) 5"}
+{"answer":null,"encode":"%28x%3A%20x%20%2B%201%29%205","query":"(x: x + 1) 5"}
+{"answer":null,"encode":"%29","query":")"}
+{"answer":null,"encode":"%7Bclipboard%7D","query":"{clipboard}"}
+{"answer":null,"encode":"%7Bdate%7D","query":"{date}"}
+{"answer":null,"encode":"%7Bdatetime%7D","query":"{datetime}"}
+{"answer":null,"encode":"%7Bquery%7D","query":"{query}"}
+{"answer":null,"encode":"%7Btime%7D","query":"{time}"}
+{"answer":null,"encode":"%2A","query":"*"}
+{"answer":null,"encode":"%2A%2A","query":"**"}
+{"answer":null,"encode":"%2F","query":"/"}
+{"answer":null,"encode":"%232F6F5E","query":"#2F6F5E"}
+{"answer":null,"encode":"%23fff","query":"#fff"}
+{"answer":null,"encode":"%25","query":"%"}
+{"answer":null,"encode":"%2B","query":"+"}
+{"answer":null,"encode":"%3D","query":"="}
+{"answer":null,"encode":"%3D%20cm","query":"= cm"}
+{"answer":null,"encode":"%3D5%2B3","query":"=5+3"}
+{"answer":null,"encode":"%3E","query":">"}
+{"answer":null,"encode":"%3E%20git%20pull","query":"> git pull"}
+{"answer":null,"encode":"%3E%20text","query":"> text"}
+{"answer":null,"encode":"%3Ej","query":">j"}
+{"answer":null,"encode":"~","query":"~"}
+{"answer":null,"encode":"~%2FLibrary","query":"~/Library"}
+{"answer":null,"encode":"~%2FProjects","query":"~/Projects"}
+{"answer":null,"encode":"%24","query":"$"}
+{"answer":null,"encode":"%2430","query":"$30"}
+{"answer":null,"encode":"%2430%20%2B%2020%25","query":"$30 + 20%"}
+{"answer":null,"encode":"%24TERMINAL","query":"$TERMINAL"}
+{"answer":null,"encode":"0.35%20as%20%25","query":"0.35 as %"}
+{"answer":null,"encode":"09%3A05","query":"09:05"}
+{"answer":null,"encode":"10%20%25%203","query":"10 % 3"}
+{"answer":null,"encode":"10%20plus%205","query":"10 plus 5"}
+{"answer":null,"encode":"10%3A30","query":"10:30"}
+{"answer":null,"encode":"10%25","query":"10%"}
+{"answer":null,"encode":"10%25%20%2B%2020%25","query":"10% + 20%"}
+{"answer":null,"encode":"10%25%20of%20200","query":"10% of 200"}
+{"answer":null,"encode":"10%25%20of%20200%20%2B%2020%25%20of%20300","query":"10% of 200 + 20% of 300"}
+{"answer":null,"encode":"10%25%20of%20200%20%2B%2050","query":"10% of 200 + 50"}
+{"answer":null,"encode":"10%25%20off%20200","query":"10% off 200"}
+{"answer":null,"encode":"10%25%20on%20200","query":"10% on 200"}
+{"answer":null,"encode":"100%20%2B%2010%25%20%2B%205","query":"100 + 10% + 5"}
+{"answer":null,"encode":"100%20twd%20to%20myr","query":"100 twd to myr"}
+{"answer":null,"encode":"100%20USD%20MYR","query":"100 USD MYR"}
+{"answer":null,"encode":"100%20usd%20to%20eur","query":"100 usd to eur"}
+{"answer":null,"encode":"10am%20pacific%20to%20kl","query":"10am pacific to kl"}
+{"answer":null,"encode":"12%20%2A%208","query":"12 * 8"}
+{"answer":null,"encode":"12-3-4","query":"12-3-4"}
+{"answer":null,"encode":"1791354301","query":"1791354301"}
+{"answer":null,"encode":"1791354301250","query":"1791354301250"}
+{"answer":null,"encode":"180%20is%20what%20%25%20off%20200","query":"180 is what % off 200"}
+{"answer":null,"encode":"180%20is%20what%20%25%20on%20150","query":"180 is what % on 150"}
+{"answer":null,"encode":"2%20months%203%20days%20after%202026-06-05","query":"2 months 3 days after 2026-06-05"}
+{"answer":null,"encode":"2%20weeks%20from%20tomorrow","query":"2 weeks from tomorrow"}
+{"answer":null,"encode":"%E2%82%AC20","query":"€20"}
+{"answer":null,"encode":"20%20as%20a%20%25%20of%20200","query":"20 as a % of 200"}
+{"answer":null,"encode":"20%20is%2010%25%20of%20what","query":"20 is 10% of what"}
+{"answer":null,"encode":"20%20is%20what%20%25%20of%20200","query":"20 is what % of 200"}
+{"answer":null,"encode":"200","query":"200"}
+{"answer":null,"encode":"200%20-%2010%25","query":"200 - 10%"}
+{"answer":null,"encode":"200%20-%2010%25%20-%205%25","query":"200 - 10% - 5%"}
+{"answer":null,"encode":"200%20%2A%2010%25","query":"200 * 10%"}
+{"answer":null,"encode":"200%20%2F%2010%25","query":"200 / 10%"}
+{"answer":null,"encode":"2026-10","query":"2026-10"}
+{"answer":null,"encode":"2026-10-11","query":"2026-10-11"}
+{"answer":null,"encode":"2026-10-17","query":"2026-10-17"}
+{"answer":null,"encode":"2026-12-15%209%3A30%20new%20york","query":"2026-12-15 9:30 new york"}
+{"answer":null,"encode":"2026-12-25","query":"2026-12-25"}
+{"answer":null,"encode":"20k%20rmb%20to%20myr","query":"20k rmb to myr"}
+{"answer":null,"encode":"25%20dec","query":"25 dec"}
+{"answer":null,"encode":"28%20days%20before%20mar%2012","query":"28 days before mar 12"}
+{"answer":null,"encode":"2e-3%25","query":"2e-3%"}
+{"answer":null,"encode":"3%20days%20ago","query":"3 days ago"}
+{"answer":null,"encode":"3%20days%20from%20now","query":"3 days from now"}
+{"answer":null,"encode":"3%2F20%20is%20what%20%25","query":"3/20 is what %"}
+{"answer":null,"encode":"30%20%2B%2020%25","query":"30 + 20%"}
+{"answer":null,"encode":"3pm","query":"3pm"}
+{"answer":null,"encode":"400%20%2F%2010%25%20of%20200","query":"400 / 10% of 200"}
+{"answer":null,"encode":"5%20%2B%2010%25%20of%20200","query":"5 + 10% of 200"}
+{"answer":null,"encode":"5%20ft%20to%20cm","query":"5 ft to cm"}
+{"answer":null,"encode":"5%20kg","query":"5 kg"}
+{"answer":null,"encode":"5%2B3","query":"5+3"}
+{"answer":null,"encode":"50%20%2A%202%20%2B%2010%25","query":"50 * 2 + 10%"}
+{"answer":null,"encode":"50%20to%2075%20is%20what%20%25","query":"50 to 75 is what %"}
+{"answer":null,"encode":"755","query":"755"}
+{"answer":null,"encode":"8%20Mbps%20to%20MBps","query":"8 Mbps to MBps"}
+{"answer":null,"encode":"a%20%3D%205%3B%20a%20%2A%202","query":"a = 5; a * 2"}
+{"answer":null,"encode":"a%20week%20ago","query":"a week ago"}
+{"answer":null,"encode":"a%3Bsig","query":"a;sig"}
+{"answer":null,"encode":"a%26b%3Dc%20%E6%9D%B1%E4%BA%AC","query":"a&b=c 東京"}
+{"answer":null,"encode":"America%2FNew_York","query":"America/New_York"}
+{"answer":null,"encode":"bing","query":"bing"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://www.bing.com/search?q=weather"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://www.bing.com/search?q=weather","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Bing:weather","kind":"webSearch","pinned":false,"subtitle":"https://www.bing.com/search?q=weather","title":"Search Bing for “weather”"},"encode":"bing%20weather","query":"bing weather"}
+{"answer":null,"encode":"brave","query":"brave"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://search.brave.com/search?q=search%20engine"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://search.brave.com/search?q=search%20engine","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Brave:search engine","kind":"webSearch","pinned":false,"subtitle":"https://search.brave.com/search?q=search%20engine","title":"Search Brave for “search engine”"},"encode":"brave%20search%20engine","query":"brave search engine"}
+{"answer":null,"encode":"brew%20install%20jewei%2Ftap%2Ftinydash","query":"brew install jewei/tap/tinydash"}
+{"answer":null,"encode":"brew%20upgrade","query":"brew upgrade"}
+{"answer":null,"encode":"chmod","query":"chmod"}
+{"answer":null,"encode":"chmod%204755","query":"chmod 4755"}
+{"answer":null,"encode":"chmod%20755","query":"chmod 755"}
+{"answer":null,"encode":"d","query":"d"}
+{"answer":null,"encode":"days%20between%203%20mar%20and%2030%20may","query":"days between 3 mar and 30 may"}
+{"answer":null,"encode":"days%20between%20A%20and%20B","query":"days between A and B"}
+{"answer":null,"encode":"days%20between%20dec%2020%20and%20jan%205","query":"days between dec 20 and jan 5"}
+{"answer":null,"encode":"days%20since","query":"days since"}
+{"answer":null,"encode":"days%20since%202026-01-01","query":"days since 2026-01-01"}
+{"answer":null,"encode":"days%20since%20dec%2025","query":"days since dec 25"}
+{"answer":null,"encode":"days%20until","query":"days until"}
+{"answer":null,"encode":"days%20until%20dec%2025","query":"days until dec 25"}
+{"answer":null,"encode":"ddg","query":"ddg"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://duckduckgo.com/?q=100%25"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://duckduckgo.com/?q=100%25","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:DuckDuckGo:100%","kind":"webSearch","pinned":false,"subtitle":"https://duckduckgo.com/?q=100%25","title":"Search DuckDuckGo for “100%”"},"encode":"ddg%20100%25","query":"ddg 100%"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://duckduckgo.com/?q=privacy"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://duckduckgo.com/?q=privacy","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:DuckDuckGo:privacy","kind":"webSearch","pinned":false,"subtitle":"https://duckduckgo.com/?q=privacy","title":"Search DuckDuckGo for “privacy”"},"encode":"ddg%20privacy","query":"ddg privacy"}
+{"answer":null,"encode":"dec%2025","query":"dec 25"}
+{"answer":null,"encode":"dec%2025%20-%203%20weeks","query":"dec 25 - 3 weeks"}
+{"answer":null,"encode":"December%2025%2C%202026","query":"December 25, 2026"}
+{"answer":null,"encode":"desktop.ini","query":"desktop.ini"}
+{"answer":null,"encode":"divided%20by","query":"divided by"}
+{"answer":null,"encode":"dollar","query":"dollar"}
+{"answer":null,"encode":"%C3%A9","query":"é"}
+{"answer":null,"encode":"euro","query":"euro"}
+{"answer":null,"encode":"Europe%2FLondon","query":"Europe/London"}
+{"answer":null,"encode":"fbclid","query":"fbclid"}
+{"answer":null,"encode":"feb%2029","query":"feb 29"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://www.google.com/search?q=a%26b%3Dc"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://www.google.com/search?q=a%26b%3Dc","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Google:a&b=c","kind":"webSearch","pinned":false,"subtitle":"https://www.google.com/search?q=a%26b%3Dc","title":"Search Google for “a&b=c”"},"encode":"g%20a%26b%3Dc","query":"g a&b=c"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://www.google.com/search?q=rust"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://www.google.com/search?q=rust","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Google:rust","kind":"webSearch","pinned":false,"subtitle":"https://www.google.com/search?q=rust","title":"Search Google for “rust”"},"encode":"g%20rust","query":"g rust"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://www.google.com/search?q=Rust%20Lang"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://www.google.com/search?q=Rust%20Lang","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Google:Rust Lang","kind":"webSearch","pinned":false,"subtitle":"https://www.google.com/search?q=Rust%20Lang","title":"Search Google for “Rust Lang”"},"encode":"G%20Rust%20Lang","query":"G Rust Lang"}
+{"answer":null,"encode":"gh","query":"gh"}
+{"answer":null,"encode":"gh%20%20","query":"gh  "}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://github.com/search?q=tauri%20app"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://github.com/search?q=tauri%20app","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:GitHub:tauri app","kind":"webSearch","pinned":false,"subtitle":"https://github.com/search?q=tauri%20app","title":"Search GitHub for “tauri app”"},"encode":"gh%20tauri%20app","query":"gh tauri app"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://github.com/search?q=tauri%20app"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://github.com/search?q=tauri%20app","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:GitHub:tauri app","kind":"webSearch","pinned":false,"subtitle":"https://github.com/search?q=tauri%20app","title":"Search GitHub for “tauri app”"},"encode":"GH%20tauri%20app","query":"GH tauri app"}
+{"answer":null,"encode":"gh%2C%20github","query":"gh, github"}
+{"answer":null,"encode":"ghostty%20settings","query":"ghostty settings"}
+{"answer":null,"encode":"Hello%20%7Bquery%7D%2C","query":"Hello {query},"}
+{"answer":null,"encode":"Hello%20Sam%2C","query":"Hello Sam,"}
+{"answer":null,"encode":"hi","query":"hi"}
+{"answer":null,"encode":"hi%20Sam","query":"hi Sam"}
+{"answer":null,"encode":"hsl%28164%2C%2041%25%2C%2031%25%29","query":"hsl(164, 41%, 31%)"}
+{"answer":null,"encode":"https%3A%2F%2Fduckduckgo.com%2F","query":"https://duckduckgo.com/"}
+{"answer":null,"encode":"https%3A%2F%2Fgithub.com%2Fsearch%3Fq%3Dtauri%2520app","query":"https://github.com/search?q=tauri%20app"}
+{"answer":null,"encode":"https%3A%2F%2Fjira.example.com%2Fbrowse%2F%7Bquery%7D","query":"https://jira.example.com/browse/{query}"}
+{"answer":null,"encode":"https%3A%2F%2Fx.test%2F%3Fq%3D%7Bquery%7D","query":"https://x.test/?q={query}"}
+{"answer":null,"encode":"https%3A%2F%2Fx.test%2F%3Fq%3Da%2526b%253Dc%2520%25E6%259D%25B1%25E4%25BA%25AC","query":"https://x.test/?q=a%26b%3Dc%20%E6%9D%B1%E4%BA%AC"}
+{"answer":null,"encode":"in%20%25","query":"in %"}
+{"answer":null,"encode":"in%2010%20days","query":"in 10 days"}
+{"answer":null,"encode":"jira","query":"jira"}
+{"answer":null,"encode":"jira%20ABC-12","query":"jira ABC-12"}
+{"answer":null,"encode":"Jira%3A%20ABC-12","query":"Jira: ABC-12"}
+{"answer":null,"encode":"kl","query":"kl"}
+{"answer":null,"encode":"last%20monday","query":"last monday"}
+{"answer":null,"encode":"london%20time","query":"london time"}
+{"answer":null,"encode":"minus","query":"minus"}
+{"answer":null,"encode":"mo","query":"mo"}
+{"answer":null,"encode":"mod","query":"mod"}
+{"answer":null,"encode":"multiplied%20by","query":"multiplied by"}
+{"answer":null,"encode":"MYR","query":"MYR"}
+{"answer":null,"encode":"next%20friday","query":"next friday"}
+{"answer":null,"encode":"next%20friday%20%2B%202%20weeks","query":"next friday + 2 weeks"}
+{"answer":null,"encode":"node_modules","query":"node_modules"}
+{"answer":null,"encode":"now","query":"now"}
+{"answer":null,"encode":"off%20what","query":"off what"}
+{"answer":null,"encode":"on%20what","query":"on what"}
+{"answer":null,"encode":"pacific","query":"pacific"}
+{"answer":null,"encode":"passphrase","query":"passphrase"}
+{"answer":null,"encode":"passphrase%208","query":"passphrase 8"}
+{"answer":null,"encode":"password","query":"password"}
+{"answer":null,"encode":"per","query":"per"}
+{"answer":null,"encode":"percent","query":"percent"}
+{"answer":null,"encode":"pi%20%2B%2010%25%20of%20200","query":"pi + 10% of 200"}
+{"answer":null,"encode":"pin","query":"pin"}
+{"answer":null,"encode":"pin%204","query":"pin 4"}
+{"answer":null,"encode":"plus","query":"plus"}
+{"answer":null,"encode":"project%20readme","query":"project readme"}
+{"answer":null,"encode":"project%2Freadme","query":"project/readme"}
+{"answer":null,"encode":"project%2FREADME.md","query":"project/README.md"}
+{"answer":null,"encode":"pst","query":"pst"}
+{"answer":null,"encode":"pw","query":"pw"}
+{"answer":null,"encode":"pw%2032","query":"pw 32"}
+{"answer":null,"encode":"renminbi","query":"renminbi"}
+{"answer":null,"encode":"rgb%2847%2C%20111%2C%2094%29","query":"rgb(47, 111, 94)"}
+{"answer":null,"encode":"rmb","query":"rmb"}
+{"answer":null,"encode":"rust","query":"rust"}
+{"answer":null,"encode":"rwxr-xr-x","query":"rwxr-xr-x"}
+{"answer":null,"encode":"sept%201st","query":"sept 1st"}
+{"answer":null,"encode":"sh","query":"sh"}
+{"answer":null,"encode":"sig","query":"sig"}
+{"answer":null,"encode":"sig2","query":"sig2"}
+{"answer":null,"encode":"sqrt%28144%29","query":"sqrt(144)"}
+{"answer":null,"encode":"target","query":"target"}
+{"answer":null,"encode":"till","query":"till"}
+{"answer":null,"encode":"time%20in","query":"time in"}
+{"answer":null,"encode":"time%20in%20tokyo","query":"time in tokyo"}
+{"answer":null,"encode":"times","query":"times"}
+{"answer":null,"encode":"tinydash","query":"tinydash"}
+{"answer":null,"encode":"tinydash.db","query":"tinydash.db"}
+{"answer":null,"encode":"to","query":"to"}
+{"answer":null,"encode":"to%20%25","query":"to %"}
+{"answer":null,"encode":"today","query":"today"}
+{"answer":null,"encode":"today%20%2B%203%20days","query":"today + 3 days"}
+{"answer":null,"encode":"Tokyo","query":"Tokyo"}
+{"answer":null,"encode":"tomorrow","query":"tomorrow"}
+{"answer":null,"encode":"unexpected%20action%20%7Bother%3A%3F%7D","query":"unexpected action {other:?}"}
+{"answer":null,"encode":"usd","query":"usd"}
+{"answer":null,"encode":"using","query":"using"}
+{"answer":null,"encode":"utm_%2A","query":"utm_*"}
+{"answer":null,"encode":"vsc","query":"vsc"}
+{"answer":null,"encode":"w","query":"w"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://en.wikipedia.org/w/index.php?search=%E6%9D%B1%E4%BA%AC%20tower"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://en.wikipedia.org/w/index.php?search=%E6%9D%B1%E4%BA%AC%20tower","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Wikipedia:東京 tower","kind":"webSearch","pinned":false,"subtitle":"https://en.wikipedia.org/w/index.php?search=%E6%9D%B1%E4%BA%AC%20tower","title":"Search Wikipedia for “東京 tower”"},"encode":"w%20%20%E6%9D%B1%E4%BA%AC%20tower","query":"w  東京 tower"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://en.wikipedia.org/w/index.php?search=Kuala%20Lumpur"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://en.wikipedia.org/w/index.php?search=Kuala%20Lumpur","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Wikipedia:Kuala Lumpur","kind":"webSearch","pinned":false,"subtitle":"https://en.wikipedia.org/w/index.php?search=Kuala%20Lumpur","title":"Search Wikipedia for “Kuala Lumpur”"},"encode":"w%20Kuala%20Lumpur","query":"w Kuala Lumpur"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://en.wikipedia.org/w/index.php?search=tokyo"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://en.wikipedia.org/w/index.php?search=tokyo","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:Wikipedia:tokyo","kind":"webSearch","pinned":false,"subtitle":"https://en.wikipedia.org/w/index.php?search=tokyo","title":"Search Wikipedia for “tokyo”"},"encode":"w%20tokyo","query":"w tokyo"}
+{"answer":null,"encode":"y","query":"y"}
+{"answer":null,"encode":"yesterday","query":"yesterday"}
+{"answer":null,"encode":"yt","query":"yt"}
+{"answer":{"actions":[{"action":{"type":"openUrl","url":"https://www.youtube.com/results?search_query=lofi"},"confirm":null,"label":"Open in Browser"},{"action":{"text":"https://www.youtube.com/results?search_query=lofi","type":"copy"},"confirm":null,"label":"Copy URL"}],"icon":{"name":"globe","type":"symbol"},"id":"web:YouTube:lofi","kind":"webSearch","pinned":false,"subtitle":"https://www.youtube.com/results?search_query=lofi","title":"Search YouTube for “lofi”"},"encode":"yt%20lofi","query":"yt lofi"}
+{"answer":null,"encode":"yuan","query":"yuan"}
+{"answer":null,"encode":"YYYY-MM-DD","query":"YYYY-MM-DD"}
