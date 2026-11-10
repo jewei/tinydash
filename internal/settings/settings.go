@@ -108,8 +108,12 @@ type Settings struct {
 	Tabs       []Tab `json:"tabs"`
 	ShowClocks bool  `json:"showClocks"`
 	// ClockCities are the places the clocks widget shows, as typed.
-	ClockCities   []string `json:"clockCities"`
-	ShowDiskSpace bool     `json:"showDiskSpace"`
+	ClockCities []string `json:"clockCities"`
+	// ShowUpNext shows the rest of today's events and the reminders due
+	// today (macOS). Off by default: turning it on asks the OS for access
+	// to them.
+	ShowUpNext    bool `json:"showUpNext"`
+	ShowDiskSpace bool `json:"showDiskSpace"`
 
 	// kept holds the keys this version does not model, as they were.
 	kept map[string]json.RawMessage
