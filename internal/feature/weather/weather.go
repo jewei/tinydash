@@ -47,7 +47,7 @@ type Weather struct {
 // SameCity reports whether two city settings name the same city: case and
 // surrounding spaces do not count.
 func SameCity(a, b string) bool {
-	return strings.ToLower(strings.TrimSpace(a)) == strings.ToLower(strings.TrimSpace(b))
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 // IsFor reports whether the weather is that of the city setting.
