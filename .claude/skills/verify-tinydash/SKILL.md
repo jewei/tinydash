@@ -68,7 +68,7 @@ It also prints any `WARN`/`ERROR` lines from the app. Run doctor first whenever 
 - **Wait for state, not time.** Use `$V auto wait --text "<text>" --timeout 5s`, `wait --gone <ref>`, or `--settle` on an action. Work that the app does on a goroutine, such as turning on clipboard history or the capture tick, draws after `--settle` returns. Wait for its text.
 - **An action that hides the panel** sometimes prints `warning: the window did not settle in 10s`: a hidden window draws no more frames. Check the result with `$V auto windows` and the side effect, not with the diff.
 - **Restarting the app inside a box** is not supported. Clean up and launch again. A second instance quits at once because of the single-instance lock.
-- **Show and hide** the panel with `$V show` and `$V hide`. They press the real shortcut on the virtual display and wait until `$V auto windows` shows `focused` or `hidden`. Do not press the shortcut with a raw `xdotool key`: a press within `blurWithin` (400 ms) of a hide by Enter or a digit counts as the cause of that blur, so the panel stays hidden. `$V show` waits out that window.
+- **Show and hide** the panel with `$V show` and `$V hide`. They press the real shortcut on the virtual display and wait until `$V auto windows` shows `focused` or `hidden`. Do not press the shortcut with a raw `xdotool key`: a press within `blurWithin` (400 ms) of a hide by Enter or a digit counts as the cause of that blur, so the panel stays hidden. `$V show` waits out that window. Each does nothing when the panel is already in its state; to start a fresh query on a shown panel, empty the field instead.
 
 ## Evidence
 

@@ -120,6 +120,11 @@ show)
   press_shortcut focused
   ;;
 hide)
+  # A press on a hidden panel would show it: hide only a shown one.
+  if in_box /opt/td/mygo-automation windows | grep -q '"TinyDash" hidden'; then
+    in_box /opt/td/mygo-automation windows
+    exit 0
+  fi
   press_shortcut hidden
   ;;
 box)
