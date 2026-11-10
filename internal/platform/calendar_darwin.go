@@ -136,20 +136,24 @@ func AskCalendarAccess(done func()) {
 	if len(kinds) == 0 || askingForCalendars.Swap(true) {
 		return
 	}
-	// The store must live until EventKit answers: the last answer
-	// releases it.
+	// The store must live until EventKit answers and the requests below
+	// return: each answer and this function hold one count, and the last
+	// to let go releases it. EventKit may answer at once, on its own queue,
+	// while a request still runs here.
 	store := newEventStore()
 	var waiting atomic.Int32
-	waiting.Store(int32(len(kinds)))
-	// EventKit calls this once per request, on a queue of its own, and
-	// keeps its own copy of the block until then.
-	answered := objc.NewBlock(func(objc.Block, bool, objc.ID) {
+	waiting.Store(int32(len(kinds) + 1))
+	letGo := func() {
 		if waiting.Add(-1) == 0 {
 			store.Send(objc.RegisterName("release"))
 			askingForCalendars.Store(false)
 			done()
 		}
-	})
+	}
+	defer letGo()
+	// EventKit calls this once per request, on a queue of its own, and
+	// keeps its own copy of the block until then.
+	answered := objc.NewBlock(func(objc.Block, bool, objc.ID) { letGo() })
 	defer answered.Release()
 	modern := objc.Send[bool](store, objc.RegisterName("respondsToSelector:"), objc.RegisterName("requestFullAccessToEventsWithCompletion:"))
 	for _, kind := range kinds {
