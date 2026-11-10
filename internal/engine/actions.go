@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -341,10 +340,10 @@ func (h handler) DeleteClip(a core.DeleteClip) error {
 		if err := db.DeleteClip(ctx, a.ID); err != nil {
 			return err
 		}
-		next.Pins = next.Pins.Remove(core.SourceClip.ID(strconv.FormatInt(a.ID, 10)))
-		if err := reloadClips(ctx, next, db); err != nil {
-			return afterWrite{err}
-		}
+		next.Pins = next.Pins.Remove(clipID(a.ID))
+		// Dropped here too, without reading the history back, so a failed
+		// read cannot keep it on screen.
+		next.Clipboard = next.Clipboard.Keep(func(entry clipboard.Entry) bool { return entry.ID != a.ID })
 		return nil
 	})
 }

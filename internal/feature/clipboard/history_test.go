@@ -93,3 +93,19 @@ func TestDescribesAge(t *testing.T) {
 		}
 	}
 }
+
+func TestKeepLeavesOnlyTheEntriesAsked(t *testing.T) {
+	h := NewHistory([]Entry{{ID: 3, Kind: KindText, Text: "c"}, {ID: 2, Kind: KindText, Text: "b"}, {ID: 1, Kind: KindText, Text: "a"}})
+	kept := h.Keep(func(e Entry) bool { return e.ID != 2 })
+	var ids []int64
+	for _, e := range kept.entries {
+		ids = append(ids, e.ID)
+	}
+	if !slices.Equal(ids, []int64{3, 1}) || len(h.entries) != 3 {
+		t.Errorf("kept %v, history %d entries", ids, len(h.entries))
+	}
+	var none *History
+	if got := none.Keep(func(Entry) bool { return true }); got == nil || len(got.entries) != 0 {
+		t.Errorf("Keep on no history: %+v", got)
+	}
+}

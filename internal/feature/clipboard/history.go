@@ -37,6 +37,21 @@ func NewHistory(entries []Entry) *History {
 	return h
 }
 
+// Keep is the history with only the entries that keep reports true for,
+// as a delete or a clear leaves it.
+func (h *History) Keep(keep func(Entry) bool) *History {
+	out := &History{}
+	if h == nil {
+		return out
+	}
+	for _, e := range h.entries {
+		if keep(e.Entry) {
+			out.entries = append(out.entries, e)
+		}
+	}
+	return out
+}
+
 // Search finds the entries that hold every word of the query, newest first.
 // Newer entries score higher, and clipboard text never outranks a strong
 // name match elsewhere.

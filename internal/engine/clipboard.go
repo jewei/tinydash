@@ -2,6 +2,9 @@ package engine
 
 import (
 	"context"
+	"strconv"
+
+	"github.com/jewei/tinydash/internal/core"
 
 	"github.com/jewei/tinydash/internal/feature/clipboard"
 	"github.com/jewei/tinydash/internal/search"
@@ -27,7 +30,7 @@ func (e *Engine) SaveClip(epoch uint64, content clipboard.Content, now int64) <-
 	})
 }
 
-// ClearClipboard deletes the whole clipboard history.
+// ClearClipboard deletes the clipboard history, except pinned entries.
 func (e *Engine) ClearClipboard() <-chan error {
 	return e.Change(func(next *search.Snapshot, db *store.Store) error {
 		e.clipEpoch.Add(1)
@@ -35,7 +38,12 @@ func (e *Engine) ClearClipboard() <-chan error {
 		if err := db.ClearClipboard(ctx); err != nil {
 			return err
 		}
-		return reloadClips(ctx, next, db)
+		// The rows are gone: drop them here too, without reading the
+		// history back, so a failed read cannot keep them on screen.
+		next.Clipboard = next.Clipboard.Keep(func(entry clipboard.Entry) bool {
+			return next.Pins.Contains(clipID(entry.ID))
+		})
+		return nil
 	})
 }
 
@@ -47,3 +55,5 @@ func reloadClips(ctx context.Context, next *search.Snapshot, db *store.Store) er
 	next.Clipboard = clipboard.NewHistory(entries)
 	return nil
 }
+
+func clipID(id int64) core.ID { return core.SourceClip.ID(strconv.FormatInt(id, 10)) }
