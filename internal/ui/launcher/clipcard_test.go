@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/go-text/typesetting/segmenter"
 	"github.com/jewei/tinydash/internal/core"
 )
 
@@ -397,5 +398,47 @@ func TestLongTextStaysInsideItsCard(t *testing.T) {
 	copyButton, ok := tt.AccessByRole(ui.RoleButton, "Copy Local")
 	if !ok || copyButton.Bounds.X+copyButton.Bounds.W > group.Bounds.X+group.Bounds.W {
 		t.Errorf("the copy button %+v left the card %+v", copyButton.Bounds, group.Bounds)
+	}
+}
+
+// breakable puts its zero-width spaces only between whole characters, so
+// a flag, an emoji with a skin tone or a variation selector, and a Hangul
+// syllable of jamo draw as they are; without them the text is unchanged.
+func TestBreakableBreaksOnlyBetweenCharacters(t *testing.T) {
+	for _, text := range []string{
+		// Each starts so that 16 runes would end inside a character.
+		"x" + strings.Repeat("\U0001F1F2\U0001F1FE", 20),                           // flags
+		strings.Repeat("x", 15) + "\U0001F44D\U0001F3FD" + strings.Repeat("x", 15), // skin tone
+		strings.Repeat("x", 15) + "\u2764\uFE0F" + strings.Repeat("y", 15),         // emoji heart
+		"x" + strings.Repeat("\u1100\u1161", 20),                                   // Hangul jamo
+		"x" + strings.Repeat("e\u0301", 20),                                        // combining accent
+		strings.Repeat("abcdefgh", 10),
+	} {
+		got := breakable(text)
+		if strings.ReplaceAll(got, "​", "") != text {
+			t.Errorf("%q: the text changed: %q", text, got)
+			continue
+		}
+		if !strings.Contains(got, "​") {
+			t.Errorf("%q: no break in a long run", text)
+		}
+		var seg segmenter.Segmenter
+		if err := seg.InitWithString(text); err != nil {
+			t.Fatal(err)
+		}
+		bounds := map[int]bool{}
+		for it := seg.GraphemeIterator(); it.Next(); {
+			bounds[it.Grapheme().OffsetInBytes] = true
+		}
+		at := 0
+		for i, part := range strings.Split(got, "​") {
+			if i > 0 && !bounds[at] {
+				t.Errorf("%q: a break at byte %d splits a character", text, at)
+			}
+			at += len(part)
+		}
+	}
+	if got := breakable("short and spaced words stay as they are"); got != "short and spaced words stay as they are" {
+		t.Errorf("spaced text changed: %q", got)
 	}
 }
