@@ -110,6 +110,8 @@ type Settings struct {
 	// ClockCities are the places the clocks widget shows, as typed.
 	ClockCities   []string `json:"clockCities"`
 	ShowDiskSpace bool     `json:"showDiskSpace"`
+	// ShowNotepad shows one scratch note, kept in tinydash.db.
+	ShowNotepad bool `json:"showNotepad"`
 
 	// kept holds the keys this version does not model, as they were.
 	kept map[string]json.RawMessage
