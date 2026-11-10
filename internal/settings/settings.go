@@ -114,6 +114,8 @@ type Settings struct {
 	// widget pane. It is off until the user turns it on: the pane then
 	// reads the clipboard each time it shows.
 	ShowClipboardCards bool `json:"showClipboardCards"`
+	// ShowNotepad shows one scratch note, kept in tinydash.db.
+	ShowNotepad bool `json:"showNotepad"`
 
 	// kept holds the keys this version does not model, as they were.
 	kept map[string]json.RawMessage

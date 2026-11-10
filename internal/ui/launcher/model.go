@@ -45,6 +45,9 @@ type Model struct {
 	// panel shows, since loading them reads the clipboard.
 	shown    bool
 	jsonList ui.ListState
+	// note is the Notepad's text and save state, which outlive the pane:
+	// it closes while a query is typed.
+	note notepad
 
 	// detailsWanted is the result whose details were asked for last, and
 	// detailsStale asks for them again after a search.
@@ -156,6 +159,10 @@ func (m *Model) Show(category core.Category) {
 // panel is away, and the next show reads it again.
 func (m *Model) Hidden() {
 	m.stopRecording("")
+	m.saveNote()
+	// The view draws nothing while hidden: the next show finds the pane
+	// back, and tries again a save that failed.
+	m.note.focused, m.note.shown = false, false
 	m.jsonFor = ""
 	m.shown = false
 	m.widgets.Card = nil
@@ -185,6 +192,7 @@ func (m *Model) loadWidgets() {
 	m.backend.Widgets(func(w Widgets) {
 		if load == m.widgetLoads {
 			m.widgets = w
+			m.takeNote(w.Note)
 		}
 	})
 }
@@ -192,7 +200,7 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil || m.widgets.ClipCards)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil || m.widgets.Note != nil || m.widgets.ClipCards)
 }
 
 // warning is the startup warning on screen, or "". An action's failure

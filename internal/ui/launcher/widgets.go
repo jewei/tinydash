@@ -11,8 +11,8 @@ import (
 )
 
 // widgetPane shows the widgets that are on, ported from
-// src/launcher/WidgetPane.tsx: the clipboard card, Clocks, and Disk space.
-// The full JSON view takes the place of the pane while it is open.
+// src/launcher/WidgetPane.tsx: the clipboard card, Clocks, Disk space, and
+// Notepad. The full JSON view takes the place of the pane while it is open.
 func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 	w := m.widgets
 	card := m.card()
@@ -36,8 +36,11 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 		if w.Disk != nil {
 			diskSpace(c, p, *w.Disk)
 		}
+		if w.Note != nil {
+			m.notepadCard(c, p, *w.Note)
+		}
 		// Only clipboard cards are on, and the clipboard has none.
-		if card == nil && !w.Clocks && w.Disk == nil {
+		if card == nil && !w.Clocks && w.Disk == nil && w.Note == nil {
 			ui.Text(c, "Copy a color, a Unix time, or JSON to see it here.").Padding(12).FontSize(12).TextColor(p.Muted)
 		}
 	})

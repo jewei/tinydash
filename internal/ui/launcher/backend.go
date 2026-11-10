@@ -50,6 +50,9 @@ type Backend interface {
 	// launcher shows and after the data changed; done as for Run. Reading
 	// the disk can wait on the OS, so the app loads it outside the frame.
 	Widgets(done func(Widgets))
+	// SaveNote saves the Notepad's note; done as for Run. The launcher
+	// sends one save at a time.
+	SaveNote(text string, done func(error))
 	// Details loads the details of the selected result, which the pane
 	// beside a typed search shows; done gets them, or false when the
 	// result has none. Only apps, files, folders, clipboard entries, and
@@ -89,6 +92,15 @@ type Widgets struct {
 	ClipCards bool
 	// Card is the card of the clipboard text, or nil.
 	Card *ClipCard
+	// Note is nil while the Notepad is off.
+	Note *Note
+}
+
+// Note is the Notepad's saved note.
+type Note struct {
+	Text string
+	// Err is why the note could not be read, or nil.
+	Err error
 }
 
 // ClipCard decodes the clipboard text. Exactly one of Color, Time, and

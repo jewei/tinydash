@@ -261,6 +261,25 @@ func TestShownAgainLoadsTheWidgets(t *testing.T) {
 	}
 }
 
+// Mod+J closes the full JSON view before it moves to the note, so the user
+// sees what they type. While the note has the keyboard, Mod+Shift+Enter
+// types nothing and runs nothing.
+func TestTheNoteAndTheJSONView(t *testing.T) {
+	f := withCard(jsonCard())
+	f.widgets.Note = &Note{Text: "todo"}
+	_, tt := showLauncher(t, f)
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	tt.Key(ui.Cmd, ui.KeyJ)
+	tt.Frame()
+	if hasJSONView(tt) || !tt.Focused("Notepad") {
+		t.Fatalf("view %v, note focused %v", hasJSONView(tt), tt.Focused("Notepad"))
+	}
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	if hasJSONView(tt) || len(f.runs) != 0 {
+		t.Errorf("the card acted while the note had the keyboard: view %v, runs %+v", hasJSONView(tt), f.runs)
+	}
+}
+
 // JSON too deep to copy pretty has no Copy Pretty.
 func TestJSONWithoutPrettyCopy(t *testing.T) {
 	card := jsonCard()

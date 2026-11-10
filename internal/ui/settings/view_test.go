@@ -284,6 +284,22 @@ func TestSaysWhenAFolderIsAlreadyInTheList(t *testing.T) {
 	}
 }
 
+// The Notepad is off until the user turns it on, as in the Rust app.
+func TestTurnsTheNotepadOn(t *testing.T) {
+	f := newFake()
+	_, tt := open(t, f, widgets)
+	if info, ok := tt.AccessByRole(ui.RoleSwitch, "Notepad"); !ok || info.Checked {
+		t.Fatalf("switch %+v; texts %q", info, tt.Texts())
+	}
+	if !tt.HasText("One scratch note, saved on this computer.") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+	flip(t, tt, "Notepad")
+	if !f.last(t).ShowNotepad {
+		t.Error("the Notepad did not turn on")
+	}
+}
+
 func TestAddsAClockCityAndShowsWhyAnUnknownOneIsRefused(t *testing.T) {
 	f := newFake()
 	f.refuse = func(s settings.Settings) error {
