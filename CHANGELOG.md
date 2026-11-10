@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+
+- The Notepad widget is back: one scratch note beside an empty All search. Turn it on in Settings > Widgets. Mod+J moves to the note and back. Your note from an earlier version is still there.
+
 ## [0.10.0] - 2026-11-10
 
 ### Changed
