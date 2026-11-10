@@ -239,15 +239,34 @@ func download(ctx context.Context, client *http.Client, address string, read fun
 	if response.StatusCode != http.StatusOK {
 		return userMessage{fmt.Sprintf("Open-Meteo answered with error %d. Try again later.", response.StatusCode), errors.New(response.Status)}
 	}
-	if err := read(response.Body); err != nil {
-		if ctx.Err() != nil {
+	body := &bodyReader{r: response.Body}
+	if err := read(body); err != nil {
+		switch {
+		case ctx.Err() != nil:
 			// The time ran out while the body came: a slow connection,
 			// not bad data.
 			return userMessage{"Open-Meteo did not answer in time. Check your internet connection.", err}
+		case body.err != nil:
+			return userMessage{"The connection to Open-Meteo broke. Check your internet connection.", body.err}
 		}
 		return err
 	}
 	return nil
+}
+
+// bodyReader keeps the first error of a body read other than its end, so
+// a broken connection is told apart from data a parse could not read.
+type bodyReader struct {
+	r   io.Reader
+	err error
+}
+
+func (b *bodyReader) Read(p []byte) (int, error) {
+	n, err := b.r.Read(p)
+	if err != nil && err != io.EOF && b.err == nil {
+		b.err = err
+	}
+	return n, err
 }
 
 // weatherCard is the weather widget for the settings: the saved weather

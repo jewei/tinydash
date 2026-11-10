@@ -16,6 +16,9 @@ type textField struct {
 	// held: the draft was committed and is not saved yet, or its save
 	// failed, so the field keeps it rather than the saved value.
 	held bool
+	// saving counts the saves on their way. While one is, the saved value
+	// is not the last one committed, so each commit saves.
+	saving int
 }
 
 // text is a row with a textField of at most maxLength characters.
@@ -48,11 +51,13 @@ func (m *Model) commitText(f *textField, value string, set func(*settings.Settin
 	f.editing = false
 	text := strings.TrimSpace(f.draft)
 	f.draft = text
-	if text == value {
+	if text == value && f.saving == 0 {
 		return
 	}
 	f.held = true
+	f.saving++
 	m.save(func(s *settings.Settings) { set(s, text) }, func(err error) {
+		f.saving--
 		if err == nil && f.draft == text {
 			f.held = false
 		}

@@ -35,6 +35,25 @@ func TestSetsTheWeatherCityAndUnit(t *testing.T) {
 	}
 }
 
+// Going back to the saved city while another city is still saving saves
+// the city typed last.
+func TestTheLastCityTypedWinsOverASaveOnItsWay(t *testing.T) {
+	f := newFake()
+	f.saved.WeatherCity = "Oslo"
+	f.hold = true
+	_, tt := open(t, f, widgets)
+	typeInto(t, tt, "Weather city", "Ipoh", true)
+	typeInto(t, tt, "Weather city", "Oslo", true)
+	f.release(t, tt)
+	f.release(t, tt)
+	if got := f.last(t).WeatherCity; got != "Oslo" {
+		t.Errorf("city %q", got)
+	}
+	if info, _ := tt.AccessByRole(ui.RoleTextField, "Weather city"); info.Value != "Oslo" {
+		t.Errorf("field %q", info.Value)
+	}
+}
+
 // A city that could not be saved stays in the field, so it is not lost.
 func TestKeepsACityThatCouldNotBeSaved(t *testing.T) {
 	f := newFake()

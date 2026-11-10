@@ -224,6 +224,15 @@ func TestSaysWhyTheWeatherDidNotCome(t *testing.T) {
 		t.Errorf("slow body: %+v", failure)
 	}
 
+	// The connection breaks while the body comes.
+	broken := openMeteoFake(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "1000")
+		w.Write([]byte(`{"results":[`))
+	}, never)
+	if _, failure := fetchWeather(context.Background(), http.DefaultClient, broken, "Oslo", weatherNow); failure == nil || !strings.Contains(failure.message, "The connection to Open-Meteo broke.") {
+		t.Errorf("broken body: %+v", failure)
+	}
+
 	offline := openMeteo{geocoding: "http://127.0.0.1:1/v1/search", forecast: "http://127.0.0.1:1/v1/forecast"}
 	if _, failure := fetchWeather(context.Background(), http.DefaultClient, offline, "Oslo", weatherNow); failure == nil || !strings.Contains(failure.message, "Check your internet connection.") {
 		t.Errorf("offline: %+v", failure)
