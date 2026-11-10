@@ -20,7 +20,9 @@ func (b *backend) Widgets(done func(launcher.Widgets)) {
 	go func() {
 		now := time.Now()
 		w := loadWidgets(s, a.home, now, platform.DiskSpace, a.engine.Note, a.desktop.clip.Text)
-		w.UpNext = loadUpNext(s, now, platform.ReadUpNext)
+		// Today ends at midnight in the zone the computer is in now, also
+		// after a change of it while TinyDash runs.
+		w.UpNext = loadUpNext(s, now.In(platform.LocalZone()), platform.ReadUpNext)
 		if s.ShowWeather {
 			w.Weather = weatherCard(s, snapshot.Weather, a.weather.failureFor(s.WeatherCity), platform.LocalZone())
 		}
