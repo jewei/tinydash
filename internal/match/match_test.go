@@ -1,7 +1,10 @@
 package match
 
 import (
+	"cmp"
+	"math/rand/v2"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -202,9 +205,9 @@ func TestTheASCIIPrefilterKeepsEveryMatch(t *testing.T) {
 	for _, query := range []string{"s", "sa", "rep bud", "12 * 8", "zzzz", "ab", "café", "REP"} {
 		m := New(query)
 		for _, c := range candidates {
-			_, fuzzy := scoreAtoms(m.fuzzy, c)
-			_, words := scoreAtoms(m.words, c)
-			hay := newText(c)
+			_, fuzzy := m.scoreAtoms(m.fuzzy, c)
+			_, words := m.scoreAtoms(m.words, c)
+			hay := newText(c, new([]rune))
 			wantFuzzy, wantWords := true, true
 			for _, a := range m.fuzzy {
 				_, ok := a.score(hay)
@@ -216,6 +219,70 @@ func TestTheASCIIPrefilterKeepsEveryMatch(t *testing.T) {
 			}
 			if fuzzy != wantFuzzy || words != wantWords {
 				t.Errorf("%q in %q: fuzzy %v, words %v; want %v, %v", query, c, fuzzy, words, wantFuzzy, wantWords)
+			}
+		}
+	}
+}
+
+// Top is the first limit hits of a stable sort, ties in input order, for
+// every size and limit, with many equal scores.
+func TestTopIsTheStartOfAStableSort(t *testing.T) {
+	r := rand.New(rand.NewPCG(3, 4))
+	for range 2000 {
+		n := r.IntN(60)
+		hits := make([]Hit[int], n)
+		for i := range hits {
+			hits[i] = Hit[int]{Score: uint32(r.IntN(6)), Item: i}
+		}
+		limit := r.IntN(70)
+		want := slices.Clone(hits)
+		slices.SortStableFunc(want, func(a, b Hit[int]) int { return cmp.Compare(b.Score, a.Score) })
+		want = want[:min(limit, n)]
+		if got := Top(slices.Clone(hits), limit); !slices.Equal(got, want) {
+			t.Fatalf("n %d limit %d:\ngot  %v\nwant %v", n, limit, got, want)
+		}
+	}
+}
+
+// cannotMatchASCII rejects exactly what the two-pass check it replaced
+// rejected: ASCII text in which some atom's runes do not appear in order.
+func TestCannotMatchASCIIIsTheTwoPassCheck(t *testing.T) {
+	twoPass := func(atoms []atom, text string) bool {
+		if !isASCII(text) {
+			return false
+		}
+		for _, a := range atoms {
+			if !a.needle.ascii {
+				return true
+			}
+			i := 0
+			for _, r := range a.needle.runes {
+				for i < len(text) && !equalFoldASCII(rune(text[i]), r) {
+					i++
+				}
+				if i == len(text) {
+					return true
+				}
+				i++
+			}
+		}
+		return false
+	}
+	alphabet := []string{"a", "b", "s", "A", "B", "S", " ", "-", "é", "ß", "1"}
+	r := rand.New(rand.NewPCG(5, 6))
+	word := func(n int) string {
+		var b strings.Builder
+		for range n {
+			b.WriteString(alphabet[r.IntN(len(alphabet))])
+		}
+		return b.String()
+	}
+	for range 20_000 {
+		m := New(word(1+r.IntN(3)) + " " + word(r.IntN(3)))
+		text := word(r.IntN(12))
+		for _, atoms := range [][]atom{m.fuzzy, m.words} {
+			if got, want := cannotMatchASCII(atoms, text), twoPass(atoms, text); got != want {
+				t.Fatalf("query %q text %q: got %v, want %v", m.query, text, got, want)
 			}
 		}
 	}

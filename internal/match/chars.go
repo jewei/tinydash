@@ -15,7 +15,9 @@ type text struct {
 	ascii bool
 }
 
-func newText(s string) text {
+// newText makes the text of s. ASCII text reuses *buf for its runes, so
+// the result is valid only until the next call with the same buf.
+func newText(s string, buf *[]rune) text {
 	if !isASCII(s) {
 		starts := graphemeStarts(s)
 		for _, r := range starts {
@@ -24,7 +26,10 @@ func newText(s string) text {
 			}
 		}
 	}
-	bytes := make([]rune, len(s))
+	if cap(*buf) < len(s) {
+		*buf = make([]rune, len(s))
+	}
+	bytes := (*buf)[:len(s)]
 	for i := range len(s) {
 		bytes[i] = rune(s[i])
 	}
