@@ -140,17 +140,14 @@ func (s *shortcuts) SetLauncher(stored string) error {
 	if err != nil {
 		return err
 	}
-	mygo.RunOnMain(func() { err = s.setLauncher(stored, accelerator) })
+	mygo.RunOnMain(func() { err = s.setLauncher(accelerator) })
 	return err
 }
 
-func (s *shortcuts) setLauncher(stored, accelerator string) error {
+func (s *shortcuts) setLauncher(accelerator string) error {
 	s.release(s.launcher)
 	s.launcher = accelerator
-	if err := s.take(accelerator, s.toggle); err != nil {
-		return registerError(stored, err)
-	}
-	return nil
+	return s.take(accelerator, s.toggle)
 }
 
 // Pause turns every shortcut off while the hotkey dialog records keys, so a

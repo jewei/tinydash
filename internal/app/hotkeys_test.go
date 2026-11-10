@@ -75,7 +75,7 @@ func TestAHotkeySyncedWhilePausedIsStillCheckedWithTheOS(t *testing.T) {
 func TestResumingSaysWhichKeysTheOSRefused(t *testing.T) {
 	os := newFakeRegistry()
 	s := &shortcuts{os: os, toggle: func() {}, run: func(core.ID) {}}
-	if err := s.setLauncher("Control+Shift+Space", "Control+Shift+Space"); err != nil {
+	if err := s.setLauncher("Control+Shift+Space"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.pause(true); err != nil {
@@ -102,7 +102,7 @@ func TestRefusedKeysAreTriedAgainByTheNextResume(t *testing.T) {
 			os.taken["Alt+N"], os.taken["Control+Shift+Space"] = true, true
 		}
 		s.sync(wanted)
-		s.setLauncher("Control+Shift+Space", "Control+Shift+Space")
+		s.setLauncher("Control+Shift+Space")
 		if at == "resume" {
 			s.pause(true)
 			os.taken["Alt+N"], os.taken["Control+Shift+Space"] = true, true
@@ -149,11 +149,21 @@ func TestAResumeReportsOnlyTheLauncherShortcut(t *testing.T) {
 	os := newFakeRegistry("Alt+N")
 	s := &shortcuts{os: os, toggle: func() {}, run: func(core.ID) {}}
 	s.sync(search.NewHotkeys(map[core.ID]string{"app:notes": "Alt+N"}))
-	if err := s.setLauncher("Control+Shift+Space", "Control+Shift+Space"); err != nil {
+	if err := s.setLauncher("Control+Shift+Space"); err != nil {
 		t.Fatal(err)
 	}
 	s.pause(true)
 	if err := s.pause(false); err != nil {
 		t.Errorf("resume: %v, want no error for another result's hotkey", err)
+	}
+}
+
+// A refused launcher shortcut names the keys once, as a refused resume
+// does.
+func TestARefusedLauncherShortcutSaysSoOnce(t *testing.T) {
+	s := &shortcuts{os: newFakeRegistry("Alt+Space"), toggle: func() {}}
+	err := s.setLauncher("Alt+Space")
+	if err == nil || strings.Count(err.Error(), "Could not register") != 1 {
+		t.Errorf("error %q, want one reason", err)
 	}
 }
