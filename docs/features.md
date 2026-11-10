@@ -18,6 +18,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. Th
 | Mod+Backspace      | Delete the selected clipboard entry or calculator history entry                                                                |
 | Tab / Shift+Tab    | Next / previous category                                                                                                       |
 | Mod+,              | Open Settings                                                                                                                  |
+| Mod+P              | Start, pause, or resume the focus timer, or start its break, while the widgets show it                                         |
 | Escape             | Close a dialog or the actions menu, dismiss a warning, or hide and return to the previous app                                  |
 
 ↑ brings back up to 50 searches that ran a result, newest first, each once. They are kept only until TinyDash quits, never saved. Editing a search brought back makes it a new one, and ↑ selects results again. A held ↑ stops at the first row; press it again to bring back a search.
@@ -61,6 +62,7 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
+- **Focus timer** (off): Pomodoro focus sessions with a short break after each one, and a long break after the last session of a cycle. Mod+P, or the first button, starts, pauses, or resumes the timer, or starts the break that is due; Skip Break and Reset Timer are buttons too, and in the actions menu (Mod+K). A system notification says when a session or a break ends; on macOS the first one asks to allow notifications. Settings > Widgets sets the lengths: focus 1–120 minutes (25), short break 1–60 (5), long break 1–60 (15), and 1–8 sessions before a long break (4). New lengths count from the next phase. The timer runs while the launcher is hidden. It starts over when TinyDash quits, and when you turn it off.
 
 ## Instant answers (All only)
 
@@ -133,7 +135,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | General              | Launcher shortcut, appearance (system, light, dark), hide when another app is focused, open at login, tray or menu bar icon, launcher position, tabs             |
-| Widgets              | Clocks and disk space on or off, clock cities                                                                                                                    |
+| Widgets              | Clocks, disk space, and focus timer on or off, clock cities, focus timer lengths                                                                                 |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                                                                      |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, folders to index, folder names to skip, Spotlight (macOS), aliases, hotkeys, hidden results |
 | Snippets, Quicklinks | Create, edit, delete                                                                                                                                             |
@@ -150,7 +152,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same settings and data, with these differences:
 
-- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files, Privacy, and About sections of Settings. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
+- **Removed:** snippet expansion as you type, the Up Next, Weather, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files, Privacy, and About sections of Settings. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
 - **Windows:** app IDs changed, so the pins, usage, aliases, and hotkeys of Windows apps reset once.
 - **Ranking:** results with equal scores keep the order in which their source lists them.
 - **Windows apps** are found by name only, not by executable, because the list comes from the Windows Apps folder.
