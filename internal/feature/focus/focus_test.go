@@ -186,3 +186,23 @@ func TestFewerSessionsKeepTheSessionInTheCycle(t *testing.T) {
 		t.Errorf("%+v", timer)
 	}
 }
+
+// A phase whose time is up, but which FinishIfDue has not ended yet,
+// refuses a pause: it would pause at 00:00 and never notify. Reset still
+// works.
+func TestAPhaseThatIsUpWaitsToFinish(t *testing.T) {
+	timer := New(lengths)
+	start(t, &timer, at(0))
+	before := timer
+	if err := timer.Control(Pause, lengths, at(26)); !errors.Is(err, ErrChanged) || timer != before {
+		t.Errorf("%+v %v", timer, err)
+	}
+	if _, ok := timer.FinishIfDue(lengths, at(26)); !ok {
+		t.Error("the phase did not finish")
+	}
+
+	start(t, &timer, at(30))
+	if err := timer.Control(Reset, lengths, at(40)); err != nil || timer != New(lengths) {
+		t.Errorf("%+v %v", timer, err)
+	}
+}

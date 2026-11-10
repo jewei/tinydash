@@ -118,6 +118,11 @@ func (t *Timer) SetLengths(l Lengths) {
 // Control does what the user asked at now, or returns ErrChanged when it
 // does not fit the state.
 func (t *Timer) Control(c Control, l Lengths, now time.Time) error {
+	// A phase whose time is up waits for FinishIfDue, which reports it.
+	// Pausing or skipping it now would act on a phase that is over.
+	if c != Reset && t.State == Running && t.Left(now) == 0 {
+		return ErrChanged
+	}
 	switch {
 	case c == Start && (t.State == Idle || t.State == Paused):
 		t.run(now)
