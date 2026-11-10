@@ -14,7 +14,8 @@ import (
 // missed. After each event the shortcuts are off exactly while a recording
 // or a save runs, a recording has nothing to say, and the dialog says what
 // its last attempt, a recording or a save, should say:
-//   - its own refused save, or else its own refused pause;
+//   - its own refused save, or else its own refused pause, or else that
+//     another save still runs;
 //   - else a refused resume since it began;
 //   - else nothing.
 
@@ -61,6 +62,7 @@ func eachSequence(n, length int, fn func([]int)) {
 
 // attempt is what the test saw of the dialog's last attempt.
 type attempt struct {
+	busy         bool // it began while a save ran
 	pauseRefused bool
 	saveRefused  bool
 	resumed      bool
@@ -148,17 +150,22 @@ func runRecorder(pauseRefuses, resumeRefuses bool, seq []int) string {
 					m.stopRecording("")
 					return
 				}
+				busy := m.savingHotkey
 				m.startRecording()
-				if d.rec.On() || now.pauseRefused {
+				if d.rec.On() || now.pauseRefused || busy {
 					current++
-					now = attempt{}
+					now = attempt{busy: busy}
 				}
 			})
 		case evKeys:
 			if d == nil || !d.rec.On() {
 				continue
 			}
+			runs := len(f.runs)
 			watch(ev.String(), func() { m.stopRecording(fmt.Sprintf("Control+Alt+%d", len(trail))) })
+			if len(f.runs) == runs {
+				return strings.Join(trail, ", ") + ": the keys pressed were not saved"
+			}
 		case evEscape:
 			if d == nil {
 				continue
@@ -220,6 +227,8 @@ func checkRecorder(m *Model, f *fake, now attempt, pauseRefuses, resumeRefuses b
 		want = errSave.Error()
 	case now.pauseRefused:
 		want = errPause.Error()
+	case now.busy:
+		want = errHotkeySaving.Error()
 	case now.resumed && resumeRefuses:
 		want = errResume.Error()
 	}

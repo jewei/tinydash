@@ -441,8 +441,13 @@ func TestAHotkeySaveThatEndsLateLeavesANewerDialogOpen(t *testing.T) {
 	if m.hotkey == nil {
 		t.Fatal("an old save closed the dialog opened since")
 	}
-	// The newer dialog records, so the shortcuts stay paused.
-	if f.paused[len(f.paused)-1] != true {
+	// The newer dialog opened while the old save ran, so it did not
+	// record: keys pressed then could not be saved. It says why, and the
+	// shortcuts come back on once the save ends.
+	if m.hotkey.rec.On() || !tt.HasText(errHotkeySaving.Error()) {
+		t.Errorf("recording %v, texts %q", m.hotkey.rec.On(), tt.Texts())
+	}
+	if f.paused[len(f.paused)-1] != false {
 		t.Errorf("paused %v", f.paused)
 	}
 }

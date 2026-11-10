@@ -1,6 +1,7 @@
 package launcher
 
 import (
+	"errors"
 	"slices"
 	"strings"
 
@@ -512,6 +513,9 @@ func (m *Model) cancelAlias() {
 	m.focusInput()
 }
 
+// errHotkeySaving is why recording does not start while a save runs.
+var errHotkeySaving = errors.New("Another hotkey is still saving. Record again when it ends.")
+
 // startRecording pauses the global shortcuts, so pressing one records it.
 // If they cannot pause, pressing the current one would open the launcher,
 // so recording stops and says why.
@@ -521,6 +525,11 @@ func (m *Model) startRecording() {
 		return
 	}
 	n := d.rec.Start()
+	// Keys recorded now could not be saved until the running save ends.
+	if m.savingHotkey {
+		d.rec.Fail(n, errHotkeySaving)
+		return
+	}
 	if m.paused {
 		return
 	}
