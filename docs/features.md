@@ -14,7 +14,7 @@ Press **Control+Shift+Space** (change it in Settings > General) from any app. Th
 | Enter              | Run the selected result's main action                                                                                          |
 | Mod+Enter          | Run its second action: Show in Finder for apps and files, Pin for clipboard entries, snippets, quicklinks, emoji, and commands |
 | Mod+1 … Mod+9      | Run the main action of that row                                                                                                |
-| Mod+K              | All actions for the result, plus Refresh, Center Launcher, Settings, and Quit TinyDash                                         |
+| Mod+K              | All actions for the result and for Up Next, plus Refresh, Center Launcher, Settings, and Quit TinyDash                         |
 | Mod+Backspace      | Delete the selected clipboard entry or calculator history entry                                                                |
 | Tab / Shift+Tab    | Next / previous category                                                                                                       |
 | Mod+,              | Open Settings                                                                                                                  |
@@ -60,6 +60,7 @@ Usage ranking: each run of an app, file, emoji, snippet, quicklink, or system co
 An empty All search shows widgets to the right of the results, in place of the details. Typing, or another tab, shows the details again. Settings > Widgets turns each widget on or off; with every widget off, the details stay.
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
+- **Up Next** (off, macOS only): the rest of today. It lists up to six events from now to midnight, including events in progress, with all-day events first. It leaves out events that you declined or that were canceled. Below them, it lists up to six reminders that are not done and are due by the end of today: overdue ones first, then the others by due date. Each item shows its time (All day, Now, 10:30–11:00, Today, a due time, or Overdue) and its calendar or list. A click opens Calendar or Reminders, and Mod+K lists Open Calendar and Open Reminders. When you turn it on, macOS asks for access to Calendars and Reminders. If access is off, the widget says so. Allow it under Calendars and Reminders in System Settings > Privacy & Security (on macOS 12: System Preferences > Security & Privacy > Privacy). When another app, such as a terminal or a hotkey tool, starts TinyDash, macOS would check that app's access instead. Then the widget does not read or ask, and says to quit TinyDash and open it from Finder or Launchpad. Open at login starts TinyDash as itself. TinyDash reads your calendars and reminders only to fill the widget, and saves nothing. It reads them each time the launcher opens, and, while the launcher shows, when your data or settings change, when an event starts or ends, and when a reminder falls due.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
 
 ## Instant answers (All only)
@@ -133,7 +134,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | General              | Launcher shortcut, appearance (system, light, dark), hide when another app is focused, open at login, tray or menu bar icon, launcher position, tabs             |
-| Widgets              | Clocks and disk space on or off, clock cities                                                                                                                    |
+| Widgets              | Clocks, Up Next (macOS), and disk space on or off, clock cities                                                                                                  |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                                                                      |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, folders to index, folder names to skip, Spotlight (macOS), aliases, hotkeys, hidden results |
 | Snippets, Quicklinks | Create, edit, delete                                                                                                                                             |
@@ -151,7 +152,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same settings and data, with these differences:
 
-- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files and Privacy sections of Settings. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
+- **Removed:** snippet expansion as you type, the Weather, Focus timer, Notepad, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files and Privacy sections of Settings. Their settings stay in `settings.json`, and the Notepad's text stays in `tinydash.db`.
 - **Windows:** app IDs changed, so the pins, usage, aliases, and hotkeys of Windows apps reset once.
 - **Ranking:** results with equal scores keep the order in which their source lists them.
 - **Windows apps** are found by name only, not by executable, because the list comes from the Windows Apps folder.

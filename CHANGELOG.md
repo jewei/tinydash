@@ -7,6 +7,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 ### Added
 
 - Settings > About shows the version of TinyDash, the folders that hold your settings and saved data, where to get new versions, and the credits.
+- The Up Next widget is back on macOS. It shows the rest of today's events and the reminders due today. Click one to open Calendar or Reminders. Turn it on in Settings > Widgets; macOS then asks for access to Calendars and Reminders.
 
 ## [0.10.0] - 2026-11-10
 
