@@ -42,6 +42,7 @@ Each feature file starts with an H1 title and one paragraph about the user-visib
 - [Clipboard history](./clipboard-history.md): turn history on from the Clipboard tab, and see a copy made by another app appear and persist.
 - [Global shortcut](./global-shortcut.md): `Control+Shift+Space` on the display shows and hides the panel and resets the query.
 - [Alias](./alias.md): add an alias from the Actions menu, then type it to put the result first.
+- [Clipboard cards](./clipboard-cards.md): turn cards on in Settings, copy a color or JSON, run the card's main action, and open the full JSON view.
 
 ## Known app failures
 
