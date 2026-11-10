@@ -14,7 +14,6 @@ import (
 var dropped = []string{
 	"expandSnippets", "shellCommands", "showUpNext", "showFocusTimer",
 	"focusMinutes", "shortBreakMinutes", "longBreakMinutes", "sessionsBeforeLongBreak",
-	"showClipboardCards",
 }
 
 type settingsRow struct {

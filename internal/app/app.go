@@ -654,7 +654,10 @@ func (s *appShell) Hide() error {
 func (s *appShell) Dismiss() error { return s.Hide() }
 
 func (s *appShell) ShowAgain() error {
-	s.app().panel.Show()
+	a := s.app()
+	// The model is main-thread state; this runs on an action's goroutine.
+	a.panel.Update(a.model.ShownAgain)
+	a.panel.Show()
 	return nil
 }
 

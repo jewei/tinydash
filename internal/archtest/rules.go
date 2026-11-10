@@ -46,6 +46,10 @@ var layers = []struct {
 	// Time zones from the binary, never from the disk, so answers and the
 	// golden tests do not depend on the host.
 	{"internal/zoneinfo", nil},
+	// A clipboard card decodes a color or a Unix time as their answers do,
+	// so it reads them through those features instead of a second copy. It
+	// comes before "internal/feature/" because the first matching layer wins.
+	{"internal/feature/clipcard", []string{"internal/core", "internal/feature/color", "internal/feature/unixtime"}},
 	{"internal/feature/", []string{"internal/core", "internal/match", "internal/weburl", "internal/zoneinfo"}},
 	{"internal/settings", []string{"internal/core"}},
 	{"internal/search", []string{"internal/core", "internal/match", "internal/feature/", "internal/settings"}},

@@ -15,10 +15,15 @@ func TestShowsTheWeatherOfTheCity(t *testing.T) {
 	f.widgets = Widgets{Weather: &Weather{
 		State: WeatherReady, City: "singapore", Place: "Singapore", Temperature: 31, High: 33, Low: 26,
 		Condition: "Partly cloudy", Icon: "partlyDay", RainChance: &rain, UpdatedAt: updated,
-	}}
+	}, ClipCards: true}
 	_, tt := showLauncher(t, f)
 	if _, ok := tt.AccessByRole(ui.RoleGroup, "Weather"); !ok || !hasPane(tt) {
 		t.Fatalf("no weather; texts %q", tt.Texts())
+	}
+	// The weather fills the pane, so the hint of an empty clipboard card
+	// does not show.
+	if tt.HasText("Copy a color, a Unix time, or JSON to see it here.") {
+		t.Error("the empty-pane hint shows beside the weather")
 	}
 	for _, text := range []string{"Singapore", "31°", "Partly cloudy", "H 33° · L 26° · Rain 40%", "Updated 14:05"} {
 		if !tt.HasText(text) {
