@@ -49,9 +49,14 @@ func (m *Model) widgetCards(c *ui.Context, p kit.Palette, w Widgets, card *ClipC
 		m.clipCard(c, p, card)
 	}
 	if w.Clocks {
-		// c.Now is the frame's time, which a Tester moves; the local
-		// zone is read each frame, so the clock follows a change of it.
-		now := c.Now().Local()
+		// c.Now is the frame's time, which a Tester moves. The zone is
+		// the one the last load read, so the clock follows a change of
+		// it each time the launcher shows.
+		zone := w.Zone
+		if zone == nil {
+			zone = time.Local
+		}
+		now := c.Now().In(zone)
 		clocks(c, p, now, w.Cities, c.Region().FormatLocale(c.Locale()))
 		// A new frame as the minute turns, not a timer that polls.
 		c.After(now.Truncate(time.Minute).Add(time.Minute).Sub(now))

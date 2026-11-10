@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,26 @@ import (
 	"github.com/jewei/tinydash/internal/settings"
 	"github.com/jewei/tinydash/internal/ui/launcher"
 )
+
+// The widgets use the zone of now, which Widgets reads from the computer
+// at each load: the cities' differences, the zone of the local clock, and
+// a Unix time card's local time.
+func TestTheWidgetsUseTheZoneOfNow(t *testing.T) {
+	tokyo := time.FixedZone("JST", 9*3600)
+	now := time.Date(2026, 11, 9, 21, 0, 0, 0, tokyo)
+	s := settings.Default()
+	s.ShowDiskSpace = false
+	s.ClockCities = []string{"London"}
+	s.ShowClipboardCards = true
+	// 2025-11-09 12:00 UTC is 21:00 in Tokyo.
+	got := loadWidgets(s, "", now, nil, nil, func() (string, bool) { return "1762689600", true })
+	if got.Zone != tokyo || len(got.Cities) != 1 || got.Cities[0].Difference != "−9h" {
+		t.Errorf("zone %v, cities %+v", got.Zone, got.Cities)
+	}
+	if got.Card == nil || got.Card.Rows[0].Label != "Local" || !strings.Contains(got.Card.Rows[0].Value, "21:00") {
+		t.Errorf("card %+v", got.Card)
+	}
+}
 
 func TestLoadsTheWidgetsThatAreOn(t *testing.T) {
 	home := golden.Abs("/Users/me")
@@ -33,6 +54,7 @@ func TestLoadsTheWidgetsThatAreOn(t *testing.T) {
 	got := loadWidgets(s, home, now, disk, note, noClipboard(t))
 	want := launcher.Widgets{
 		Clocks: true,
+		Zone:   time.UTC,
 		Cities: []launcher.City{
 			{Name: "Tokyo", OffsetSeconds: 9 * 3600, Difference: "+9h"},
 			{Name: "London", OffsetSeconds: 0, Difference: "Same time"},

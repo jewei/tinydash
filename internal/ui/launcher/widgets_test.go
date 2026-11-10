@@ -97,6 +97,20 @@ func TestTheClocksTickEachMinute(t *testing.T) {
 	}
 }
 
+// The clock shows the time in the zone that the load read, not in the zone
+// TinyDash started in: the computer's zone may have changed since.
+func TestTheClockFollowsTheZoneOfTheLoad(t *testing.T) {
+	f := newFake(always())
+	_, offset := time.Now().Zone()
+	moved := time.FixedZone("Moved", offset+5*3600+30*60)
+	f.widgets = Widgets{Clocks: true, Zone: moved}
+	_, tt := showLauncher(t, f)
+	there := tt.Now().In(moved)
+	if !tt.HasText(there.Format("15:04")) || tt.HasText(tt.Now().Local().Format("15:04")) {
+		t.Errorf("want %s in the moved zone; texts %q", there.Format("15:04"), tt.Texts())
+	}
+}
+
 func TestShowsLocalTimeAloneWithoutCities(t *testing.T) {
 	f := newFake(always())
 	f.widgets = Widgets{Clocks: true}

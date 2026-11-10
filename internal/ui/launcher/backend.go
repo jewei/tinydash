@@ -97,7 +97,10 @@ type ViewSettings struct {
 // widget on, there is no pane.
 type Widgets struct {
 	// Clocks is on while the clocks widget shows: local time, and Cities.
+	// Zone is the computer's time zone as the load read it, for the local
+	// time; Go's time.Local keeps the zone that TinyDash started in.
 	Clocks bool
+	Zone   *time.Location
 	Cities []City
 	// UpNext is nil while Up Next is off, and where TinyDash reads no
 	// calendars.
