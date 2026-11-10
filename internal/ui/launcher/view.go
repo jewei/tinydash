@@ -15,8 +15,8 @@ func (m *Model) View(c *ui.Context) {
 	p := kit.Themed(c, m.backend.Settings().Theme)
 	inNote := c.Focused(m.note.field)
 	// The menu and the dialogs take the keyboard while they show; keys
-	// behind them must not act. Keys in the note type there: only Mod+J
-	// and Escape leave it, for the search field.
+	// behind them must not act. Keys in the note type there: Mod+J,
+	// Escape, Tab, and Shift+Tab leave it, for the search field.
 	switch {
 	case m.overlay():
 	case inNote:

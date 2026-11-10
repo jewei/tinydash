@@ -41,9 +41,10 @@ type notepad struct {
 func (m *Model) takeNote(n *Note) {
 	switch {
 	case n == nil:
-		// The Notepad is off. A note with nothing left to save loads
-		// again when it is turned on; one not saved keeps its text, which
-		// shows and saves again then.
+		// The Notepad is off. A note with nothing left to save, and no
+		// save running, loads again when it is turned on. Otherwise it
+		// keeps its text: a load may have read the note before the save
+		// landed, and a note not saved shows and saves again then.
 		if !m.note.unsaved && !m.note.saving {
 			m.note.loaded = false
 		}

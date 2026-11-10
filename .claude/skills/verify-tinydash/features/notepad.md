@@ -1,6 +1,6 @@
 # Notepad
 
-The user turns the Notepad widget on in Settings > Widgets. Beside an empty All search, the widget pane then shows one scratch note. `Ctrl+J` moves the keyboard to it, and `Ctrl+J`, `Escape`, or `Tab` moves it back to the search field. The note saves after a pause in typing, when the user leaves it, and when a search starts or the launcher hides. It is the row `id = 1` of the `note` table in `tinydash.db`.
+The user turns the Notepad widget on in Settings > Widgets. Beside an empty All search, the widget pane then shows one scratch note. `Ctrl+J` moves the keyboard to it, and `Ctrl+J`, `Escape`, `Tab`, or `Shift+Tab` moves it back to the search field. The note saves after a pause in typing, when the user leaves it, and when a search starts or the launcher hides. It is the row `id = 1` of the `note` table in `tinydash.db`.
 
 ## Sub-features
 

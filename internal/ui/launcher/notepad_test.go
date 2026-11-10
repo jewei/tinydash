@@ -222,6 +222,28 @@ func TestTurningTheNotepadOffKeepsTextNotSaved(t *testing.T) {
 	}
 }
 
+// Turning the Notepad off and on while a save runs keeps the text typed:
+// the load may have read the note before the save landed.
+func TestTurningTheNotepadOffAndOnWhileASaveRunsKeepsTheText(t *testing.T) {
+	f := newFake(always())
+	f.holdNotes = true
+	m, tt := showNote(t, f, "old")
+	tt.Key(ui.Cmd, ui.KeyA)
+	tt.Type("new")
+	tt.Advance(saveDelay)
+	f.widgets = Widgets{Clocks: true}
+	m.Stale()
+	tt.Frame()
+	f.widgets.Note = &Note{Text: "old"}
+	m.Stale()
+	tt.Frame()
+	f.notesWaiting[0]()
+	tt.Frame()
+	if m.note.text != "new" || !slices.Equal(f.notes, []string{"new"}) {
+		t.Errorf("note %q, saved %q", m.note.text, f.notes)
+	}
+}
+
 // Every change of data loads the widgets again, and a load may have read
 // the note before a save landed. The note keeps the text typed.
 func TestALoadNeverReplacesTheTextTyped(t *testing.T) {
