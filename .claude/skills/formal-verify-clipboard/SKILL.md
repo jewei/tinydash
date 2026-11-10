@@ -41,7 +41,7 @@ Each part of the model is one step of this code:
 | `EpochFirst = TRUE` | `epoch := m.engine.ClipEpoch()` before `content, got := m.read()` |
 | `queue`, `WriterApplies` | `Engine.Change` and `Engine.Run` in `internal/engine/engine.go`: one writer, changes in order |
 | `WriterApplies` "save" | `Engine.SaveClip` in `internal/engine/clipboard.go`: the epoch and enabled check |
-| `WriterApplies` "clear" | `Engine.ClearClipboard` in `internal/engine/clipboard.go`: bumps `clipEpoch`, deletes the unpinned rows, and drops them from the snapshot without reading the history back |
+| `WriterApplies` "clear" | `Engine.ClearClipboard` in `internal/engine/clipboard.go`: bumps `clipEpoch`, deletes the unpinned rows, and reads the history back; if that read fails, drops every entry the snapshot does not pin |
 | `WriterApplies` "off" / "on" | `Engine.UpdateSettings` in `internal/engine/settings.go`: turning history off bumps `historyOffs` and `clipEpoch` |
 
 Sync commit: the model was last confirmed to describe the code at the commit that last changed this skill (`git log -1 --format=%h -- .claude/skills/formal-verify-clipboard/SKILL.md`). Move it forward only after you confirm, file by file, that the table above still describes the code. To see what changed since: `git diff <sync commit> -- internal/engine/monitor.go internal/engine/clipboard.go internal/engine/engine.go internal/engine/settings.go internal/app/clipboard.go`.

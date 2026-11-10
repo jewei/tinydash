@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"log/slog"
 	"strconv"
 
 	"github.com/jewei/tinydash/internal/core"
@@ -38,11 +39,15 @@ func (e *Engine) ClearClipboard() <-chan error {
 		if err := db.ClearClipboard(ctx); err != nil {
 			return err
 		}
-		// The rows are gone: drop them here too, without reading the
-		// history back, so a failed read cannot keep them on screen.
-		next.Clipboard = next.Clipboard.Keep(func(entry clipboard.Entry) bool {
-			return next.Pins.Contains(clipID(entry.ID))
-		})
+		// Show what the database kept. If it cannot be read back, drop
+		// every entry the snapshot does not pin, so a failed read never
+		// keeps cleared text on screen.
+		if err := reloadClips(ctx, next, db); err != nil {
+			slog.Warn("Could not read the clipboard history after a clear", "error", err)
+			next.Clipboard = next.Clipboard.Keep(func(entry clipboard.Entry) bool {
+				return next.Pins.Contains(clipID(entry.ID))
+			})
+		}
 		return nil
 	})
 }

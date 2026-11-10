@@ -95,3 +95,46 @@ func TestADeleteHidesTheEntryEvenWhenTheHistoryCannotBeReadBack(t *testing.T) {
 		t.Error("the deleted entry still shows")
 	}
 }
+
+// When the pins did not load, the snapshot does not know which entries
+// the database keeps: a clear then shows what the database still holds.
+func TestAClearShowsWhatTheDatabaseKeepsWhenThePinsDidNotLoad(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	db, _, err := store.Open(ctx, dir, func(string) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	for i, text := range []string{"kept", "secret"} {
+		if err := db.SaveClip(ctx, clipboard.Text(text), int64(i+1), 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.SetPinned(ctx, clipID(1), true); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := sqlite.Open(ctx, filepath.Join(dir, store.FileName), sqlite.OpenOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Execute(ctx, "INSERT INTO pins (id, position) VALUES (x'00', 99)"); err != nil {
+		t.Fatal(err)
+	}
+	raw.Close()
+	first, warnings := Load(ctx, db, settings.Default(), home, rand.NewChaCha8([32]byte{1}))
+	if len(warnings) == 0 || first.Pins.Len() != 0 {
+		t.Fatalf("the pins loaded: %v", warnings)
+	}
+	run, stop := context.WithCancel(ctx)
+	t.Cleanup(stop)
+	e := New(db, first, nil)
+	go e.Run(run)
+	log := &steps{}
+	w := &world{t: t, engine: e, host: &fakeOS{steps: log}, keys: &fakeKeys{}, steps: log, db: db}
+	w.actions = NewActions(e, w.host, fakeShell{log}, w.keys, func() time.Time { return testNow })
+	w.run(core.ClearClipboard{}, "")
+	if !shows(w, clipID(1)) || shows(w, clipID(2)) {
+		t.Errorf("kept shows %v, secret shows %v", shows(w, clipID(1)), shows(w, clipID(2)))
+	}
+}
