@@ -136,7 +136,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Section              | Settings                                                                                                                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | General              | Launcher shortcut, appearance (system, light, dark), hide when another app is focused, open at login, tray or menu bar icon, launcher position, tabs             |
-| Widgets              | Clocks, disk space, Notepad, and weather on or off, clock cities, weather city and temperature unit                                                              |
+| Widgets              | Clocks, disk space, weather, and Notepad on or off, clock cities, weather city and temperature unit                                                              |
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                                                                      |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, folders to index, folder names to skip, Spotlight (macOS), aliases, hotkeys, hidden results |
 | Snippets, Quicklinks | Create, edit, delete                                                                                                                                             |

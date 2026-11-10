@@ -22,6 +22,10 @@ type textField struct {
 	// notice says why the last save failed, next to the field: the
 	// page's error line may be gone or scrolled out of view.
 	notice string
+	// committed is the text of the last commit. Typing that reaches the
+	// field in the same frame as Enter shows as a change in the next
+	// frame, though Enter already committed it.
+	committed string
 }
 
 // text is a row with a textField of at most maxLength characters.
@@ -29,7 +33,7 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 	if !f.editing && !f.held {
 		f.draft = value
 	}
-	row(c, p, label, f.notice, func() {
+	row(c, p, label, "", func() {
 		in := ui.TextInput(c, &f.draft).Label(name).Placeholder(placeholder).MaxLength(maxLength).Width(200)
 		in.OnTextKey(func(k ui.TextKey) bool {
 			if k.Key != ui.KeyEnter || k.Mods != 0 {
@@ -42,13 +46,16 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 			k.SetText(f.draft)
 			return true
 		})
-		if in.Changed() {
+		if in.Changed() && !(f.held && f.draft == f.committed) {
 			f.editing, f.held, f.notice = true, false, ""
 		}
 		if f.editing && !in.Focused() {
 			m.commitText(f, value, set)
 		}
 	})
+	if f.notice != "" {
+		ui.Text(c, f.notice).TextColor(p.Danger).Role(ui.RoleAlert)
+	}
 }
 
 // commitText saves the draft without its surrounding spaces, when it
@@ -57,7 +64,7 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 func (m *Model) commitText(f *textField, value string, set func(*settings.Settings, string)) {
 	f.editing = false
 	text := strings.TrimSpace(f.draft)
-	f.draft = text
+	f.draft, f.committed = text, text
 	if text == value && f.saving == 0 {
 		return
 	}
