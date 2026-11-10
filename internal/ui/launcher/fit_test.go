@@ -2,6 +2,7 @@ package launcher
 
 import (
 	"errors"
+	"image/color"
 	"strings"
 	"testing"
 	"time"
@@ -20,7 +21,10 @@ import (
 // card's clip leaves: a clipped text has its full width there, and a text
 // pushed out entirely keeps its place. A text, a button named in buttons,
 // or a button with the name of a text fails when it runs past the card's
-// side; a value in oneLine fails when it wraps.
+// side; a value in oneLine fails when it wraps. A text that draws past its
+// own box shows in the strip of pane to the card's right, which must stay
+// the pane's color. The JSON card's key chips are cut at the card's side
+// on purpose, as in 0.9.0.
 func TestEveryCardKeepsItsTextInside(t *testing.T) {
 	long := strings.Repeat("Llanfairpwllgwyngyll", 5) // 100 characters, one word
 	rain := uint8(100)
@@ -32,7 +36,7 @@ func TestEveryCardKeepsItsTextInside(t *testing.T) {
 	running := FocusTimer{Phase: "Focus", EndsAt: time.Now().Add(119 * time.Minute), Total: 120 * time.Minute, Session: 1, Sessions: 8,
 		Actions: []FocusAction{{"Pause Timer", fakePause}, {"Reset Timer", fakeReset}}}
 	allow := core.Do("Allow Access", core.AskCalendarAccess{})
-	color, object := colorCard, jsonCard()
+	colorFound, object := colorCard, longJSONCard()
 	millis := ClipCard{ID: "t2", Time: &ClipTime{Raw: "1791354301123", Milliseconds: true, Relative: "in 11 months, 3 weeks"},
 		Rows: []CardRow{{"Local", "Wednesday 7 October 2026, 14:25:01.123"}, {"UTC", "Wednesday 7 October 2026, 06:25:01.123 UTC"}, {"ISO", "2026-10-07T06:25:01.123Z"}},
 		Actions: []core.ResultAction{
@@ -73,7 +77,7 @@ func TestEveryCardKeepsItsTextInside(t *testing.T) {
 		{name: "disk error", group: "Disk space", widgets: Widgets{Disk: &Disk{Err: errors.New("The folder " + long + " is gone.")}}},
 		{name: "notepad", group: "Notepad", widgets: Widgets{Note: &Note{Text: long + " " + long}}},
 		{name: "notepad error", group: "Notepad", widgets: Widgets{Note: &Note{Err: errors.New("The note table " + long + " is gone.")}}},
-		{name: "color card", group: "Color on the clipboard", widgets: Widgets{ClipCards: true, Card: &color},
+		{name: "color card", group: "Color on the clipboard", widgets: Widgets{ClipCards: true, Card: &colorFound},
 			buttons: []string{"Dismiss", "Copy HEX", "Copy RGB", "Copy HSL"}, oneLine: []string{"hsl(164, 41%, 31%)"}},
 		{name: "time card", group: "Unix time on the clipboard", widgets: Widgets{ClipCards: true, Card: &millis},
 			buttons: []string{"Dismiss", "Copy Local", "Copy UTC", "Copy ISO"}},
@@ -101,17 +105,22 @@ func TestEveryCardKeepsItsTextInside(t *testing.T) {
 				t.Fatalf("no %q; texts %q", c.group, tt.Texts())
 			}
 			right, bottom := card.Bounds.X+card.Bounds.W, card.Bounds.Y+card.Bounds.H
+			keys, _ := tt.AccessByRole(ui.RoleList, "Keys")
 			check := func(what string, r ui.Rect) {
 				t.Helper()
+				if keys.Bounds.H > 0 && r.Y >= keys.Bounds.Y && r.Y < keys.Bounds.Y+keys.Bounds.H {
+					return // a key chip, cut on purpose
+				}
 				in := r.X >= card.Bounds.X-0.5 && r.Y >= card.Bounds.Y-0.5 && r.Y < bottom
 				if in && max(r.X, r.X+r.W) > right+0.5 {
 					t.Errorf("%s %+v runs past the side of %q at x %v", what, r, c.group, right)
 				}
 			}
-			// box is a text's own box; a text inside a named row, as an
-			// Up Next item, has only its drawn one.
+			// box is a text's own box. A text inside a named row, as an Up
+			// Next item, has only its drawn one, and so does a heading
+			// with the name of its card, as Access gives the card.
 			box := func(text string) (ui.Rect, bool) {
-				if a, ok := tt.Access(text); ok {
+				if a, ok := tt.Access(text); ok && !isContainer(a.Role) {
 					return a.Bounds, true
 				}
 				return tt.Find(text)
@@ -132,6 +141,19 @@ func TestEveryCardKeepsItsTextInside(t *testing.T) {
 				}
 				check("button "+quote(name), b.Bounds)
 			}
+			// Nothing draws on the pane between the card and the window's
+			// side.
+			if img := tt.Image(); right+8 < 880 {
+				scale := float32(img.Bounds().Dx()) / 880
+				pane := img.RGBAAt(int((right+4)*scale), int((card.Bounds.Y-4)*scale))
+				for y := card.Bounds.Y; y < bottom; y++ {
+					for _, x := range []float32{right + 4, 876} {
+						if got := img.RGBAAt(int(x*scale), int(y*scale)); !near(got, pane) {
+							t.Fatalf("something draws past the side of %q at (%v, %v): %v, not the pane's %v", c.group, x, y, got, pane)
+						}
+					}
+				}
+			}
 			for _, text := range c.oneLine {
 				if r, ok := box(text); !ok || r.H > 24 {
 					t.Errorf("%q is %v high, more than one line; texts %q", text, r.H, tt.Texts())
@@ -142,3 +164,29 @@ func TestEveryCardKeepsItsTextInside(t *testing.T) {
 }
 
 func quote(s string) string { return "“" + s + "”" }
+
+func isContainer(r ui.Role) bool {
+	return r == ui.RoleGroup || r == ui.RoleDialog || r == ui.RoleRegion || r == ui.RoleList
+}
+
+func near(a, b color.RGBA) bool {
+	d := func(x, y uint8) bool { return x-y < 3 || y-x < 3 }
+	return d(a.R, b.R) && d(a.G, b.G) && d(a.B, b.B)
+}
+
+// longJSONCard is a JSON card with long keys and a long string, which the
+// view must wrap.
+func longJSONCard() ClipCard {
+	c := jsonCard()
+	j := *c.JSON
+	long := `"` + strings.Repeat("abcdefgh", 40) + `"`
+	j.Keys = nil
+	for i := range 12 {
+		j.Keys = append(j.Keys, JSONKey{Name: strings.Repeat("k", 10+i), Hint: "{12}"})
+	}
+	j.Minified = `{"a":[` + long + `,true]}`
+	j.Lines = append([]JSONLine{}, j.Lines...)
+	j.Lines[2] = JSONLine{Indent: 2, Tokens: []JSONToken{{JSONString, long}, {JSONPunctuation, ","}}}
+	c.JSON = &j
+	return c
+}
