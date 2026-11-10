@@ -320,11 +320,35 @@ func jsonLine(c *ui.Context, p kit.Palette, number int, line JSONLine) ui.Elemen
 			spans = append(spans, ui.Span{Text: strings.Repeat("  ", line.Indent)})
 		}
 		for _, t := range line.Tokens {
-			spans = append(spans, ui.Span{Text: t.Text, Color: tokenColor(p, t.Kind)})
+			spans = append(spans, ui.Span{Text: breakable(t.Text), Color: tokenColor(p, t.Kind)})
 		}
 		ui.RichText(c, spans...).Font(monoFont).FontSize(12).PreserveSpaces().Grow(1).Shrink(1)
 	})
 }
+
+// breakable lets a long run without spaces, such as a long string or
+// number, wrap inside the view: it puts a zero-width space after every
+// breakEvery runes of the run. Only the view shows it; the copies come
+// from the card's actions.
+func breakable(text string) string {
+	var b strings.Builder
+	run := 0
+	for _, r := range text {
+		if run == breakEvery {
+			b.WriteRune('\u200b')
+			run = 0
+		}
+		b.WriteRune(r)
+		run++
+		if r == ' ' {
+			run = 0
+		}
+	}
+	return b.String()
+}
+
+// breakEvery is how many runes without a space breakable leaves whole.
+const breakEvery = 16
 
 func tokenColor(p kit.Palette, kind JSONTokenKind) ui.Color {
 	switch kind {
