@@ -466,9 +466,14 @@ func (h handler) TypeQuery(a core.TypeQuery) error {
 // Quit does its work in Run, after the use is saved.
 func (h handler) Quit(core.Quit) error { return nil }
 
+// OpenUpNext opens only what the Up Next widget offers, so only while it
+// is on.
 func (h handler) OpenUpNext(a core.OpenUpNext) error {
 	if a.Kind != core.UpNextEvent && a.Kind != core.UpNextReminder {
 		return errors.New("This item cannot be opened.")
+	}
+	if !h.state().Settings.ShowUpNext {
+		return errors.New("Turn on Up Next in Settings > Widgets first.")
 	}
 	if err := h.host.OpenCalendarApp(a.Kind); err != nil {
 		return err

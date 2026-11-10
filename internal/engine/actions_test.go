@@ -61,6 +61,7 @@ func TestActionsForWhatTinyDashDidNotOfferNeverReachTheOS(t *testing.T) {
 		{core.TypeQuery{Text: "  "}, "This keyword cannot be typed. Type it yourself."},
 		{core.TypeQuery{Text: strings.Repeat("x", library.MaxTyped+1)}, "This keyword cannot be typed. Type it yourself."},
 		{core.OpenUpNext{Kind: "calendar"}, "This item cannot be opened."},
+		{core.OpenUpNext{Kind: core.UpNextEvent}, "Turn on Up Next in Settings > Widgets first."},
 		{core.AskCalendarAccess{}, "Turn on Up Next in Settings > Widgets first."},
 	} {
 		err := w.run(c.action, core.SourceApp.ID(safari))
@@ -101,8 +102,6 @@ func TestOfferedItemsRun(t *testing.T) {
 		{core.OpenSettings{}, []string{"settings"}},
 		{core.CenterLauncher{}, []string{"center"}},
 		{core.TurnOnCurrencyRates{}, []string{"rates on"}},
-		{core.OpenUpNext{Kind: core.UpNextEvent}, []string{"open up next event", "hide"}},
-		{core.OpenUpNext{Kind: core.UpNextReminder}, []string{"open up next reminder", "hide"}},
 	}
 	for _, s := range steps {
 		if err := w.run(s.action, ""); err != nil {
@@ -121,13 +120,23 @@ func TestOfferedItemsRun(t *testing.T) {
 	wantSteps(t, w)
 }
 
-// The widget's Allow Access button asks; with Up Next off, nothing does.
-func TestAsksForCalendarAccessWhileUpNextIsOn(t *testing.T) {
+// The widget's items open Calendar or Reminders, and its Allow Access
+// button asks; with Up Next off, none of them runs.
+func TestRunsUpNextActionsWhileUpNextIsOn(t *testing.T) {
 	w := newWorld(t, func(first *search.Snapshot, _ *store.Store) { first.Settings.ShowUpNext = true })
-	if err := w.run(core.AskCalendarAccess{}, ""); err != nil {
-		t.Fatal(err)
+	for _, s := range []struct {
+		action core.Action
+		want   []string
+	}{
+		{core.OpenUpNext{Kind: core.UpNextEvent}, []string{"open up next event", "hide"}},
+		{core.OpenUpNext{Kind: core.UpNextReminder}, []string{"open up next reminder", "hide"}},
+		{core.AskCalendarAccess{}, []string{"ask calendar access"}},
+	} {
+		if err := w.run(s.action, ""); err != nil {
+			t.Fatalf("%#v: %v", s.action, err)
+		}
+		wantSteps(t, w, s.want...)
 	}
-	wantSteps(t, w, "ask calendar access")
 }
 
 func TestOSErrorsSayWhatToDo(t *testing.T) {
