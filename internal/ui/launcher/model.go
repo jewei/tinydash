@@ -34,6 +34,12 @@ type Model struct {
 	// counts loads, so a slow one that ends after a newer one is dropped.
 	widgets     Widgets
 	widgetLoads int
+	// dismissedCard is the ID of the clipboard card the user dismissed,
+	// kept while a query hides the pane. jsonOpen is set while the full
+	// JSON view covers the pane.
+	dismissedCard string
+	jsonOpen      bool
+	jsonList      ui.ListState
 
 	// detailsWanted is the result whose details were asked for last, and
 	// detailsStale asks for them again after a search.
@@ -126,6 +132,7 @@ func (m *Model) Show(category core.Category) {
 	}
 	m.menu, m.alias, m.confirm = nil, nil, nil
 	m.closeHotkeyNow()
+	m.jsonOpen = false
 	m.notice, m.enableError = "", ""
 	m.query, m.recalled = "", -1
 	m.category = category
@@ -137,8 +144,12 @@ func (m *Model) Show(category core.Category) {
 
 // Hidden stops recording as the panel hides: recording pauses the
 // launcher shortcut and every hotkey, which must work again while the
-// panel is away. A hide need not blur the view first.
-func (m *Model) Hidden() { m.stopRecording("") }
+// panel is away. A hide need not blur the view first. The full JSON view
+// closes too, so the next show starts on the widgets.
+func (m *Model) Hidden() {
+	m.stopRecording("")
+	m.jsonOpen = false
+}
 
 // Stale searches again after the data changed, keeping the selected
 // result, and loads the widgets again: a setting may have changed them.
@@ -160,7 +171,7 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.Disk != nil || m.widgets.ClipCards)
 }
 
 // warning is the startup warning on screen, or "". An action's failure
@@ -430,8 +441,8 @@ func (m *Model) enableClipboard() {
 	})
 }
 
-// escape closes what is on top: a dialog, then the menu, then a startup
-// warning; with nothing left it hides the launcher with its query, as the
+// escape closes what is on top: a dialog, then the menu, then the full
+// JSON view, then a startup warning; with nothing left it hides the launcher with its query, as the
 // Rust app did.
 func (m *Model) escape() {
 	switch {
@@ -445,6 +456,8 @@ func (m *Model) escape() {
 		m.closeHotkey()
 	case m.menu != nil:
 		m.closeMenu()
+	case m.showsJSON():
+		m.jsonOpen = false
 	case m.warning() != "":
 		m.dismissWarning()
 	default:

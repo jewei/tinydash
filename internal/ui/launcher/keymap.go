@@ -21,6 +21,7 @@ var keymap = append([]binding{
 	{0, ui.KeyUp, nil, (*Model).up},
 	{0, ui.KeyEnter, nil, once((*Model).runSelected)},
 	{ui.Cmd, ui.KeyEnter, nil, once((*Model).runSecondary)},
+	{ui.Cmd | ui.Shift, ui.KeyEnter, nil, once((*Model).runCard)},
 	{0, ui.KeyTab, nil, once(func(m *Model) { m.moveCategory(1) })},
 	{ui.Shift, ui.KeyTab, nil, once(func(m *Model) { m.moveCategory(-1) })},
 	{ui.Cmd, ui.KeyK, nil, once((*Model).openMenu)},

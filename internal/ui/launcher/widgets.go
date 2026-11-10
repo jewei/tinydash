@@ -11,11 +11,20 @@ import (
 )
 
 // widgetPane shows the widgets that are on, ported from
-// src/launcher/WidgetPane.tsx: Clocks and Disk space.
+// src/launcher/WidgetPane.tsx: the clipboard card, Clocks, and Disk space.
+// The full JSON view takes the place of the pane while it is open.
 func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 	w := m.widgets
+	card := m.card()
+	if m.showsJSON() {
+		m.jsonView(c, p, card)
+		return
+	}
 	ui.Column(c).Grow(9).Padding(12).Gap(8).Background(p.Raised).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).
 		Role(ui.RoleRegion).Label("Widgets").Children(func() {
+		if card != nil {
+			m.clipCard(c, p, card)
+		}
 		if w.Clocks {
 			// c.Now is the frame's time, which a Tester moves; the local
 			// zone is read each frame, so the clock follows a change of it.
@@ -26,6 +35,10 @@ func (m *Model) widgetPane(c *ui.Context, p kit.Palette) {
 		}
 		if w.Disk != nil {
 			diskSpace(c, p, *w.Disk)
+		}
+		// Only clipboard cards are on, and the clipboard has none.
+		if card == nil && !w.Clocks && w.Disk == nil {
+			ui.Text(c, "Copy a color, a Unix time, or JSON to see it here.").Padding(12).FontSize(12).TextColor(p.Muted)
 		}
 	})
 }
