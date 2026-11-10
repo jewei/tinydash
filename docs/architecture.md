@@ -70,15 +70,15 @@ Other folders:
 
 ## UI
 
-Views read a model and call methods on it. The launcher panel's keys are one table in `internal/ui/launcher/keymap.go`. The commands they map to are plain methods with table tests. The actions menu, the alias dialog, the hotkey dialog, and confirmations are overlays drawn in the panel, so the nonactivating panel keeps the keyboard. These overlays take their own keys in `internal/ui/launcher/overlays.go`. Tests drive views with mygo's `ui.NewTester` against a fixture snapshot and a fake backend, and move time with `Advance`, never `Sleep`.
+Views read a model and call methods on it. The launcher panel's keys are tables in `internal/ui/launcher/keymap.go`: `keymap`, and `noteKeymap` while the note has the keyboard. The commands they map to are plain methods with table tests. The actions menu, the alias dialog, the hotkey dialog, and confirmations are overlays drawn in the panel, so the nonactivating panel keeps the keyboard. These overlays take their own keys in `internal/ui/launcher/overlays.go`. Tests drive views with mygo's `ui.NewTester` against a fixture snapshot and a fake backend, and move time with `Advance`, never `Sleep`.
 
-The widget pane (clocks, focus timer, and disk space) shows beside the results of an empty All search. The HUD is a second panel. It shows "Copied" with `ShowInactive`, so it never takes focus, and the pointer passes through it.
+The widget pane (clocks, focus timer, disk space, and the Notepad) shows beside the results of an empty All search. While the note has the keyboard, the launcher's keys are off. Its own table, `noteKeymap`, maps Mod+J, Escape, Tab, and Shift+Tab back to the search field. The HUD is a second panel. It shows "Copied" with `ShowInactive`, so it never takes focus, and the pointer passes through it.
 
 ## Storage
 
 - **Folders.** `platform.AppDirs("dev.tinydash.launcher")` gives the folders of the Tauri app: `settings.json` in the config folder (`os.UserConfigDir`), and `tinydash.db` in the local data folder. `--data-dir` puts both in one folder of your choice.
 - **Settings.** `internal/settings` reads `settings.json`, and `engine/settingsfile.go` writes it. Missing fields take defaults. Keys that this version does not model, such as those of removed features, are kept and written back. A value that cannot be read takes its default, and the file is first copied to `settings.invalid.json`. A damaged file (bad JSON, or not a JSON object, such as `[]`) is moved to `settings.invalid.json`. A file that cannot be read for another reason stays in place, and saves are refused until the next launch. A save writes a synced temporary file, then renames it.
-- **Data.** `tinydash.db`, SQLite through mygo's `plugins/sqlite`, without cgo. `go tool mygo build` bundles the SQLite library. A run from source downloads it once into the user cache and checks its SHA-256. Tables: `usage` (the 1,000 most recently used IDs), `pins`, `clipboard`, `library`, `hidden`, `aliases`, `hotkeys`, `calculations`, `cache` (exchange rates), and `note` (the text of the removed Notepad, kept untouched). The file is owner-only on Unix. Migrations are append-only and refuse a database from a newer version.
+- **Data.** `tinydash.db`, SQLite through mygo's `plugins/sqlite`, without cgo. `go tool mygo build` bundles the SQLite library. A run from source downloads it once into the user cache and checks its SHA-256. Tables: `usage` (the 1,000 most recently used IDs), `pins`, `clipboard`, `library`, `hidden`, `aliases`, `hotkeys`, `calculations`, `cache` (exchange rates), and `note` (the Notepad's text, one row). The file is owner-only on Unix. Migrations are append-only and refuse a database from a newer version.
 
 ## Compatibility with the Rust app
 

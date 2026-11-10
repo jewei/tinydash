@@ -113,12 +113,14 @@ type Settings struct {
 	Tabs       []Tab `json:"tabs"`
 	ShowClocks bool  `json:"showClocks"`
 	// ClockCities are the places the clocks widget shows, as typed.
-	ClockCities       []string `json:"clockCities"`
-	ShowDiskSpace     bool     `json:"showDiskSpace"`
-	ShowFocusTimer    bool     `json:"showFocusTimer"`
-	FocusMinutes      uint16   `json:"focusMinutes"`
-	ShortBreakMinutes uint16   `json:"shortBreakMinutes"`
-	LongBreakMinutes  uint16   `json:"longBreakMinutes"`
+	ClockCities   []string `json:"clockCities"`
+	ShowDiskSpace bool     `json:"showDiskSpace"`
+	// ShowNotepad shows one scratch note, kept in tinydash.db.
+	ShowNotepad       bool   `json:"showNotepad"`
+	ShowFocusTimer    bool   `json:"showFocusTimer"`
+	FocusMinutes      uint16 `json:"focusMinutes"`
+	ShortBreakMinutes uint16 `json:"shortBreakMinutes"`
+	LongBreakMinutes  uint16 `json:"longBreakMinutes"`
 	// SessionsBeforeLongBreak are the focus sessions in a cycle; the last
 	// one earns the long break.
 	SessionsBeforeLongBreak uint8 `json:"sessionsBeforeLongBreak"`

@@ -252,11 +252,7 @@ func TestReplaysTheRustCalls(t *testing.T) {
 	must(s.SetHotkey(ctx, core.SourceSnippet.ID(strconv.FormatInt(snippet.ID, 10)), "Control+Alt+S"))
 	must(s.SaveCalculation(ctx, "12 * 8", "96", now-5))
 	must(s.SaveCalculation(ctx, "5 ft to cm", "152.4 cm", now))
-	// The note belongs to a dropped feature: the store keeps its table but
-	// has no method for it, so the test writes it as save_note did.
-	_, err = s.db.Execute(ctx, `INSERT INTO note (id, text) VALUES (1, ?1)
-		ON CONFLICT (id) DO UPDATE SET text = ?1`, "scratch note")
-	must(err)
+	must(s.SaveNote(ctx, "scratch note"))
 	// The currency feature owns the JSON of its rates; this is the text
 	// the Rust app wrote.
 	must(s.SaveRates(ctx, f.Tables["cache"][0]["value"].(string)))

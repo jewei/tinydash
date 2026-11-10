@@ -46,6 +46,14 @@ type fake struct {
 	controls     []FocusControl
 	controlFocus func(FocusControl) error
 
+	// notes are the texts sent to save, in order. noteErr, if set, is the
+	// error of each save. holdNotes keeps their done functions in
+	// notesWaiting.
+	notes        []string
+	noteErr      func(text string) error
+	holdNotes    bool
+	notesWaiting []func()
+
 	// details are what a load of a result's details gives; detailLoads
 	// are the results asked for. holdDetails keeps their done functions
 	// in detailsWaiting.
@@ -131,6 +139,19 @@ func (f *fake) ControlFocus(control FocusControl) (*FocusTimer, error) {
 		err = f.controlFocus(control)
 	}
 	return f.widgets.Focus, err
+}
+
+func (f *fake) SaveNote(text string, done func(error)) {
+	f.notes = append(f.notes, text)
+	var err error
+	if f.noteErr != nil {
+		err = f.noteErr(text)
+	}
+	if f.holdNotes {
+		f.notesWaiting = append(f.notesWaiting, func() { done(err) })
+		return
+	}
+	done(err)
 }
 
 func (f *fake) Details(id core.ID, done func(Details, bool)) {
