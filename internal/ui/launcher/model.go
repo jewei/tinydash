@@ -204,8 +204,14 @@ func (m *Model) showsWidgets() bool {
 }
 
 // WidgetsChanged loads the widgets again after one changed on its own, as
-// when a phase of the focus timer ends.
-func (m *Model) WidgetsChanged() { m.loadWidgets() }
+// when a phase of the focus timer ends. While the panel is away it loads
+// nothing: a load reads the clipboard for its card, and the next Show
+// loads anyway.
+func (m *Model) WidgetsChanged() {
+	if m.shown {
+		m.loadWidgets()
+	}
+}
 
 // focusActions are the focus timer's actions while the pane shows it.
 func (m *Model) focusActions() []FocusAction {
