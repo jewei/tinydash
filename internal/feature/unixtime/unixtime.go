@@ -18,16 +18,30 @@ const (
 	maxSeconds = 4_200_000_000
 )
 
-// Answer decodes 10 digits as seconds or 13 as milliseconds since 1970. The
+// Time is a Unix time decoded, as the answer and the clipboard card show
+// it.
+type Time struct {
+	// Raw is the digits as typed or copied.
+	Raw string
+	// Milliseconds is set for 13 digits, clear for 10 (seconds).
+	Milliseconds bool
+	// Local, UTC, and ISO are the time in now's location, in UTC, and as
+	// ISO 8601.
+	Local, UTC, ISO string
+	// Relative is `3 days ago` or `In 2 hours`, from now.
+	Relative string
+}
+
+// Decode reads 10 digits as seconds or 13 as milliseconds since 1970. The
 // local time is in now's location.
-func Answer(query string, now time.Time) (core.Result, bool) {
-	text := strings.TrimSpace(query)
+func Decode(text string, now time.Time) (Time, bool) {
+	text = strings.TrimSpace(text)
 	if strings.Trim(text, "0123456789") != "" || len(text) != 10 && len(text) != 13 {
-		return core.Result{}, false
+		return Time{}, false
 	}
 	number, err := strconv.ParseInt(text, 10, 64)
 	if err != nil {
-		return core.Result{}, false
+		return Time{}, false
 	}
 	milliseconds := len(text) == 13
 	seconds := number
@@ -35,7 +49,7 @@ func Answer(query string, now time.Time) (core.Result, bool) {
 		seconds = number / 1000
 	}
 	if seconds < minSeconds || seconds >= maxSeconds {
-		return core.Result{}, false
+		return Time{}, false
 	}
 	layout, iso := "Mon 2 Jan 2006, 15:04:05", time.RFC3339
 	at := time.Unix(seconds, 0)
@@ -44,20 +58,38 @@ func Answer(query string, now time.Time) (core.Result, bool) {
 		at = time.UnixMilli(number)
 	}
 	utc := at.UTC()
-	localText := at.In(now.Location()).Format(layout)
-	utcText := utc.Format(layout) + " UTC"
-	isoText := utc.Format(iso)
+	return Time{
+		Raw:          text,
+		Milliseconds: milliseconds,
+		Local:        at.In(now.Location()).Format(layout),
+		UTC:          utc.Format(layout) + " UTC",
+		ISO:          utc.Format(iso),
+		Relative:     relative(seconds - now.Unix()),
+	}, true
+}
+
+// Actions copy the local, UTC, and ISO 8601 times, in that order.
+func (t Time) Actions() []core.ResultAction {
+	return []core.ResultAction{
+		core.Do("Copy Local Time", core.Copy{Text: t.Local}),
+		core.Do("Copy UTC Time", core.Copy{Text: t.UTC}),
+		core.Do("Copy ISO 8601", core.Copy{Text: t.ISO}),
+	}
+}
+
+// Answer decodes a typed Unix time, as Decode does.
+func Answer(query string, now time.Time) (core.Result, bool) {
+	t, ok := Decode(query, now)
+	if !ok {
+		return core.Result{}, false
+	}
 	return core.Result{
-		ID:       core.ID("unix:" + text),
+		ID:       core.ID("unix:" + t.Raw),
 		Kind:     core.KindDateTime,
-		Title:    localText,
-		Subtitle: utcText + " · " + relative(seconds-now.Unix()),
+		Title:    t.Local,
+		Subtitle: t.UTC + " · " + t.Relative,
 		Icon:     core.SymbolIcon(core.SymbolClock),
-		Actions: []core.ResultAction{
-			core.Do("Copy Local Time", core.Copy{Text: localText}),
-			core.Do("Copy UTC Time", core.Copy{Text: utcText}),
-			core.Do("Copy ISO 8601", core.Copy{Text: isoText}),
-		},
+		Actions:  t.Actions(),
 	}, true
 }
 
