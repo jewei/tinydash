@@ -64,36 +64,52 @@ func TestThePaneScrollsAndTheNoteFillsTheRoomLeft(t *testing.T) {
 		t.Errorf("the color card %+v cuts its HSL row %+v", color.Bounds, hsl)
 	}
 
+	// Turning widgets off loads the pane again with fewer cards.
 	f.widgets = Widgets{Clocks: true, Note: &Note{Text: "note"}}
-	tt.Type("x") // the pane goes, and comes back new
-	tt.Key(0, ui.KeyBackspace)
+	m.Stale()
+	tt.Frame()
+	if _, ok := tt.AccessByRole(ui.RoleGroup, "Focus timer"); ok {
+		t.Fatal("the pane did not load again")
+	}
+	noteFillsThePane(t, tt, "with fewer widgets")
+}
+
+// noteFillsThePane fails unless the note ends at the pane's end, give or
+// take the pane's padding.
+func noteFillsThePane(t *testing.T, tt *ui.Tester, when string) {
+	t.Helper()
 	note, _ := tt.AccessByRole(ui.RoleGroup, "Notepad")
-	pane, _ = tt.AccessByRole(ui.RoleRegion, "Widgets")
-	if bottom := note.Bounds.Y + note.Bounds.H; bottom < pane.Bounds.Y+pane.Bounds.H-24 {
-		t.Errorf("the note ends at %v, short of the pane's end at %v", bottom, pane.Bounds.Y+pane.Bounds.H)
+	pane, _ := tt.AccessByRole(ui.RoleRegion, "Widgets")
+	if gap := pane.Bounds.Y + pane.Bounds.H - note.Bounds.Y - note.Bounds.H; gap < 0 || gap > 24 {
+		t.Errorf("%s: the note ends %v short of the pane's end; note %+v, pane %+v", when, gap, note.Bounds, pane.Bounds)
 	}
 }
 
-// A bar above the pane that goes away makes the pane taller, and the note
-// fills the new room at once, not at some later frame.
+// A bar above the pane that comes or goes changes the pane's height, and
+// the note fills the new room in the same draw, not at some later frame.
+// The second warning goes, and the notice comes, with no input that would
+// draw again.
 func TestTheNoteFollowsThePanesNewHeight(t *testing.T) {
 	f := newFake(always(safari))
-	f.warnings = []string{"The tray icon is unavailable."}
+	f.warnings = []string{"The tray icon is unavailable.", "The shortcut is taken."}
 	f.widgets = Widgets{Clocks: true, Note: &Note{Text: "note"}}
-	_, tt := showLauncher(t, f)
-	fills := func(when string) {
-		t.Helper()
-		note, _ := tt.AccessByRole(ui.RoleGroup, "Notepad")
-		pane, _ := tt.AccessByRole(ui.RoleRegion, "Widgets")
-		if gap := pane.Bounds.Y + pane.Bounds.H - note.Bounds.Y - note.Bounds.H; gap < 0 || gap > 24 {
-			t.Errorf("%s: the note ends %v short of the pane's end", when, gap)
-		}
-	}
+	m, tt := showLauncher(t, f)
 	pressButton(t, tt, "Dismiss")
-	fills("after the warning went")
-	f.fail = func(core.Action) error { return errors.New("Safari is gone.") }
+	noteFillsThePane(t, tt, "after a warning went")
+	m.dismissWarning()
+	tt.Frame()
+	if m.warning() != "" {
+		t.Fatalf("warning %q", m.warning())
+	}
+	noteFillsThePane(t, tt, "after the last warning went")
+	f.hold = true
 	tt.Key(0, ui.KeyEnter)
-	fills("after a notice came")
+	f.finish(errors.New("Safari is gone."))
+	tt.Frame()
+	if !tt.HasText("Safari is gone.") {
+		t.Fatalf("no notice; texts %q", tt.Texts())
+	}
+	noteFillsThePane(t, tt, "after a notice came")
 }
 
 // A long note scrolls inside its card: the card is never taller than the
@@ -271,9 +287,14 @@ func TestModPRunsTheTimersMainAction(t *testing.T) {
 		return nil
 	}
 	tt.Key(0, ui.KeyEnter) // an action that has not ended yet
+	loads := f.widgetLoads
 	tt.Key(ui.Cmd, ui.KeyP)
 	if !tt.HasText("Resume Timer") || !tt.HasText("Focus · Paused") {
 		t.Errorf("texts %q", tt.Texts())
+	}
+	// The timer is in memory: a control reads no clipboard or calendar.
+	if f.widgetLoads != loads {
+		t.Errorf("a control loaded the widgets %d times", f.widgetLoads-loads)
 	}
 	tt.Key(ui.Cmd, ui.KeyP)
 	if !slices.Equal(f.controls, []FocusControl{fakePause, fakeStart}) {
