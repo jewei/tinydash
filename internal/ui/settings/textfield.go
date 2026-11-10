@@ -46,8 +46,8 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 			k.SetText(f.draft)
 			return true
 		})
-		if in.Changed() && !(f.held && f.draft == f.committed) {
-			f.editing, f.held, f.notice = true, false, ""
+		if in.Changed() {
+			f.changed()
 		}
 		if f.editing && !in.Focused() {
 			m.commitText(f, value, set)
@@ -58,6 +58,16 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 	}
 }
 
+// changed notes an edit of the field. Typing that reached the field in
+// the same frame as Enter shows as a change in the next frame, though
+// Enter committed it already: that one keeps the commit and its notice.
+func (f *textField) changed() {
+	if f.held && f.draft == f.committed {
+		return
+	}
+	f.editing, f.held, f.notice = true, false, ""
+}
+
 // commitText saves the draft without its surrounding spaces, when it
 // changed. The field shows the trimmed text until the save ends; after a
 // failure it keeps it and says why, so the text is not lost.
@@ -66,6 +76,9 @@ func (m *Model) commitText(f *textField, value string, set func(*settings.Settin
 	text := strings.TrimSpace(f.draft)
 	f.draft, f.committed = text, text
 	if text == value && f.saving == 0 {
+		// Back to the saved value with no save on its way: nothing is
+		// held, and an earlier failure no longer applies.
+		f.held, f.notice = false, ""
 		return
 	}
 	f.held = true

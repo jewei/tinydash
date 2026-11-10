@@ -67,4 +67,25 @@ func TestKeepsACityThatCouldNotBeSaved(t *testing.T) {
 	if _, ok := tt.AccessByRole(ui.RoleAlert, "Not saved. Settings cannot be saved now."); !ok {
 		t.Errorf("no alert; texts %q", tt.Texts())
 	}
+
+	// Going back to the saved city drops the refusal.
+	typeInto(t, tt, "Weather city", "", true)
+	if _, ok := tt.AccessByRole(ui.RoleAlert, ""); ok {
+		t.Errorf("the refusal stays; texts %q", tt.Texts())
+	}
+}
+
+// The change that mygo reports in the frame after an Enter commit, for
+// typing that came in the same frame, does not undo the commit.
+func TestAChangeAlreadyCommittedKeepsTheCommit(t *testing.T) {
+	f := textField{draft: "Ipoh", committed: "Ipoh", held: true, notice: "Not saved. No disk."}
+	f.changed()
+	if f.editing || !f.held || f.notice == "" {
+		t.Errorf("the commit was undone: %+v", f)
+	}
+	f.draft = "Ipoh2"
+	f.changed()
+	if !f.editing || f.held || f.notice != "" {
+		t.Errorf("a new edit kept the commit: %+v", f)
+	}
 }
