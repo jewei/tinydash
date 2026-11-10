@@ -114,6 +114,8 @@ type Settings struct {
 	// to them.
 	ShowUpNext    bool `json:"showUpNext"`
 	ShowDiskSpace bool `json:"showDiskSpace"`
+	// ShowNotepad shows one scratch note, kept in tinydash.db.
+	ShowNotepad bool `json:"showNotepad"`
 
 	// kept holds the keys this version does not model, as they were.
 	kept map[string]json.RawMessage

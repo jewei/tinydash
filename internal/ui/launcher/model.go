@@ -41,6 +41,9 @@ type Model struct {
 	// shown is set while the panel shows. Up Next loads again as time
 	// passes, and as the data changes, only then: each show loads anyway.
 	shown bool
+	// note is the Notepad's text and save state, which outlive the pane:
+	// it closes while a query is typed.
+	note notepad
 
 	// detailsWanted is the result whose details were asked for last, and
 	// detailsStale asks for them again after a search.
@@ -149,6 +152,10 @@ func (m *Model) Show(category core.Category) {
 func (m *Model) Hidden() {
 	m.shown = false
 	m.stopRecording("")
+	m.saveNote()
+	// The view draws nothing while hidden: the next show finds the pane
+	// back, and tries again a save that failed.
+	m.note.focused, m.note.shown = false, false
 }
 
 // Shown notes that the panel shows, also when the app shows it again as
@@ -175,6 +182,7 @@ func (m *Model) loadWidgets() {
 	m.widgetsLoading = true
 	m.backend.Widgets(func(w Widgets) {
 		m.widgets, m.widgetsLoading, m.widgetsLoaded = w, false, true
+		m.takeNote(w.Note)
 		if m.widgetsAgain {
 			m.widgetsAgain = false
 			m.loadWidgets()
@@ -185,7 +193,7 @@ func (m *Model) loadWidgets() {
 // showsWidgets reports whether the widget pane shows: on All with nothing
 // typed, while a widget is on.
 func (m *Model) showsWidgets() bool {
-	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil)
+	return m.category == core.CategoryAll && m.query == "" && (m.widgets.Clocks || m.widgets.UpNext != nil || m.widgets.Disk != nil || m.widgets.Note != nil)
 }
 
 // upNextChanged loads the widgets again once Up Next changes with the

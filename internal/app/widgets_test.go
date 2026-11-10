@@ -21,10 +21,16 @@ func TestLoadsTheWidgetsThatAreOn(t *testing.T) {
 		read = append(read, path)
 		return volume, nil
 	}
+	notes := 0
+	note := func() (string, error) {
+		notes++
+		return "Buy milk", nil
+	}
 
 	s := settings.Default()
 	s.ClockCities = []string{"Tokyo", "Atlantis", "London"}
-	got := loadWidgets(s, home, now, disk)
+	s.ShowNotepad = true
+	got := loadWidgets(s, home, now, disk, note)
 	want := launcher.Widgets{
 		Clocks: true,
 		Cities: []launcher.City{
@@ -32,18 +38,19 @@ func TestLoadsTheWidgetsThatAreOn(t *testing.T) {
 			{Name: "London", OffsetSeconds: 0, Difference: "Same time"},
 		},
 		Disk: &launcher.Disk{Name: "Macintosh HD", TotalBytes: 494e9, FreeBytes: 182e9},
+		Note: &launcher.Note{Text: "Buy milk"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("widgets %+v, want %+v", got, want)
 	}
-	if len(read) != 1 || read[0] != home {
-		t.Errorf("read the disk of %q, want %q once", read, home)
+	if len(read) != 1 || read[0] != home || notes != 1 {
+		t.Errorf("read the disk of %q, want %q once; read the note %d times", read, home, notes)
 	}
 
-	s.ShowClocks, s.ShowDiskSpace = false, false
-	read = nil
-	if got := loadWidgets(s, home, now, disk); !reflect.DeepEqual(got, launcher.Widgets{}) || len(read) != 0 {
-		t.Errorf("with every widget off: %+v, disk read %q", got, read)
+	s.ShowClocks, s.ShowDiskSpace, s.ShowNotepad = false, false, false
+	read, notes = nil, 0
+	if got := loadWidgets(s, home, now, disk, note); !reflect.DeepEqual(got, launcher.Widgets{}) || len(read) != 0 || notes != 0 {
+		t.Errorf("with every widget off: %+v, disk read %q, note read %d times", got, read, notes)
 	}
 }
 
@@ -51,7 +58,7 @@ func TestShowsAtMostThreeCities(t *testing.T) {
 	s := settings.Default()
 	s.ClockCities = []string{"Tokyo", "London", "Paris", "Sydney"}
 	s.ShowDiskSpace = false
-	got := loadWidgets(s, "", time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC), nil)
+	got := loadWidgets(s, "", time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC), nil, nil)
 	if len(got.Cities) != 3 || got.Cities[2].Name != "Paris" {
 		t.Errorf("cities %+v", got.Cities)
 	}
@@ -63,9 +70,23 @@ func TestSaysWhyTheDiskCouldNotBeRead(t *testing.T) {
 	failure := errors.New("The folder is gone.")
 	got := loadWidgets(s, golden.Abs("/Users/me"), time.Now(), func(string) (platform.Volume, error) {
 		return platform.Volume{}, failure
-	})
+	}, nil)
 	if got.Disk == nil || got.Disk.Err != failure {
 		t.Errorf("disk %+v", got.Disk)
+	}
+}
+
+// A note that cannot be read says why in its own card, and the other
+// widgets still load.
+func TestANoteThatCannotBeReadLeavesTheOtherWidgets(t *testing.T) {
+	s := settings.Default()
+	s.ShowNotepad = true
+	failure := errors.New("Could not read or save data: no such table: note. Try again, or restart TinyDash.")
+	got := loadWidgets(s, golden.Abs("/Users/me"), time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC),
+		func(string) (platform.Volume, error) { return platform.Volume{Name: "Disk"}, nil },
+		func() (string, error) { return "", failure })
+	if got.Note == nil || got.Note.Err != failure || !got.Clocks || got.Disk == nil {
+		t.Errorf("widgets %+v, note %+v", got, got.Note)
 	}
 }
 

@@ -42,6 +42,14 @@ type fake struct {
 	// warnings wait until the launcher asks for them.
 	warnings []string
 
+	// notes are the texts sent to save, in order. noteErr, if set, is the
+	// error of each save. holdNotes keeps their done functions in
+	// notesWaiting.
+	notes        []string
+	noteErr      func(text string) error
+	holdNotes    bool
+	notesWaiting []func()
+
 	// details are what a load of a result's details gives; detailLoads
 	// are the results asked for. holdDetails keeps their done functions
 	// in detailsWaiting.
@@ -118,6 +126,19 @@ func (f *fake) Widgets(done func(Widgets)) {
 		return
 	}
 	done(f.widgets)
+}
+
+func (f *fake) SaveNote(text string, done func(error)) {
+	f.notes = append(f.notes, text)
+	var err error
+	if f.noteErr != nil {
+		err = f.noteErr(text)
+	}
+	if f.holdNotes {
+		f.notesWaiting = append(f.notesWaiting, func() { done(err) })
+		return
+	}
+	done(err)
 }
 
 func (f *fake) Details(id core.ID, done func(Details, bool)) {

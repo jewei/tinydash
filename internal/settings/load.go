@@ -210,6 +210,7 @@ var fields = map[string]func(*Settings, any) bool{
 	"clockCities":             field(func(s *Settings) *[]string { return &s.ClockCities }, readList(readString)),
 	"showUpNext":              field(func(s *Settings) *bool { return &s.ShowUpNext }, readBool),
 	"showDiskSpace":           field(func(s *Settings) *bool { return &s.ShowDiskSpace }, readBool),
+	"showNotepad":             field(func(s *Settings) *bool { return &s.ShowNotepad }, readBool),
 }
 
 func field[T any](at func(*Settings) *T, read func(any) (T, bool)) func(*Settings, any) bool {
