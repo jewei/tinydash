@@ -6,7 +6,6 @@ package clipcard
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -29,6 +28,10 @@ const (
 	MaxJSONKeys = 12
 	// MaxMinifiedChars is how much of the minified JSON the card shows.
 	MaxMinifiedChars = 300
+	// MaxPrettyBytes is the longest pretty JSON the card copies. Indents
+	// grow with depth, so deep JSON under MaxCardBytes could otherwise
+	// take gigabytes; such JSON has no Copy Pretty JSON.
+	MaxPrettyBytes = 4 * MaxCardBytes
 )
 
 // Card is what the clipboard text decodes to. Exactly one of Color, Time,
@@ -120,7 +123,12 @@ func Detect(text string, now time.Time) (Card, bool) {
 		return Card{}, false
 	}
 	tokens := tokenize(trimmed)
-	lines, shape := layout(tokens, MaxJSONLines)
+	var lines []Line
+	shape := layout(tokens, true, func(line Line) {
+		if len(lines) < MaxJSONLines {
+			lines = append(lines, line)
+		}
+	})
 	minified := minify(tokens)
 	card.JSON = &JSON{
 		Array:     trimmed[0] == '[',
@@ -132,10 +140,10 @@ func Detect(text string, now time.Time) (Card, bool) {
 		Lines:     lines,
 		MoreLines: shape.lines - len(lines),
 	}
-	card.Actions = []core.ResultAction{
-		core.Do("Copy Pretty JSON", core.Copy{Text: pretty(tokens)}),
-		core.Do("Copy Minified JSON", core.Copy{Text: minified}),
+	if text, ok := pretty(tokens); ok {
+		card.Actions = append(card.Actions, core.Do("Copy Pretty JSON", core.Copy{Text: text}))
 	}
+	card.Actions = append(card.Actions, core.Do("Copy Minified JSON", core.Copy{Text: minified}))
 	return card, true
 }
 
@@ -172,20 +180,35 @@ func minify(tokens []Token) string {
 	return b.String()
 }
 
-// pretty lays out all of the JSON, two spaces a level, for Copy.
-func pretty(tokens []Token) string {
-	lines, _ := layout(tokens, math.MaxInt)
+// pretty lays out all of the JSON, two spaces a level, for Copy, or
+// false when that takes more than MaxPrettyBytes.
+func pretty(tokens []Token) (string, bool) {
 	var b strings.Builder
-	for i, line := range lines {
-		if i > 0 {
+	fits := true
+	layout(tokens, false, func(line Line) {
+		size := 2 * line.Indent
+		for _, t := range line.Tokens {
+			size += len(t.Text)
+		}
+		if b.Len() > 0 {
+			size++
+		}
+		if !fits || b.Len()+size > MaxPrettyBytes {
+			fits = false
+			return
+		}
+		if b.Len() > 0 {
 			b.WriteByte('\n')
 		}
 		b.WriteString(strings.Repeat("  ", line.Indent))
 		for _, t := range line.Tokens {
 			b.WriteString(t.Text)
 		}
+	})
+	if !fits {
+		return "", false
 	}
-	return b.String()
+	return b.String(), true
 }
 
 // tokenize splits valid JSON into tokens and skips the space between them.
@@ -251,11 +274,9 @@ type container struct {
 }
 
 // layout lays the tokens out in lines, indented a level for each open
-// object or array, and keeps at most maxLines of them. An empty object or
-// array stays on one line. With a limit, a token over MaxTokenChars is cut.
-func layout(tokens []Token, maxLines int) ([]Line, shape) {
-	cutLong := maxLines != math.MaxInt
-	var lines []Line
+// object or array, and hands each line to emit. An empty object or array
+// stays on one line. With cutLong, a token over MaxTokenChars is cut.
+func layout(tokens []Token, cutLong bool, emit func(Line)) shape {
 	var line Line
 	var open []container
 	var s shape
@@ -266,9 +287,7 @@ func layout(tokens []Token, maxLines int) ([]Line, shape) {
 	endLine := func(indent int) {
 		if len(line.Tokens) > 0 {
 			s.lines++
-			if len(lines) < maxLines {
-				lines = append(lines, line)
-			}
+			emit(line)
 		}
 		line = Line{Indent: indent}
 	}
@@ -348,5 +367,5 @@ func layout(tokens []Token, maxLines int) ([]Line, shape) {
 		}
 	}
 	endLine(0)
-	return lines, s
+	return s
 }

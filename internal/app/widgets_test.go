@@ -65,6 +65,9 @@ func TestReadsTheClipboardOnlyForItsCards(t *testing.T) {
 	text := func(t string, ok bool) func() (string, bool) { return func() (string, bool) { return t, ok } }
 
 	got := loadWidgets(s, "", now, nil, text("#2F6F5E", true))
+	if got.Card == nil {
+		t.Fatal("no card for a color")
+	}
 	want := &launcher.ClipCard{
 		ID:    got.Card.ID,
 		Color: &launcher.ClipColor{Hex: "#2F6F5E", OnWhite: launcher.Contrast{Ratio: "5.9:1", Grade: "AA"}, OnBlack: launcher.Contrast{Ratio: "3.6:1", Grade: "AA large"}},

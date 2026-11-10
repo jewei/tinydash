@@ -35,11 +35,16 @@ type Model struct {
 	widgets     Widgets
 	widgetLoads int
 	// dismissedCard is the ID of the clipboard card the user dismissed,
-	// kept while a query hides the pane. jsonOpen is set while the full
-	// JSON view covers the pane.
+	// kept while a query hides the pane. jsonFor is the ID of the card
+	// whose full JSON view covers the pane, or "": a new card, a hide, an
+	// edit, or another tab closes the view, as the Rust app's pane did as
+	// it left the screen.
 	dismissedCard string
-	jsonOpen      bool
-	jsonList      ui.ListState
+	jsonFor       string
+	// shown is set from Show to Hidden. The widgets load only while the
+	// panel shows, since loading them reads the clipboard.
+	shown    bool
+	jsonList ui.ListState
 
 	// detailsWanted is the result whose details were asked for last, and
 	// detailsStale asks for them again after a search.
@@ -132,12 +137,13 @@ func (m *Model) Show(category core.Category) {
 	}
 	m.menu, m.alias, m.confirm = nil, nil, nil
 	m.closeHotkeyNow()
-	m.jsonOpen = false
+	m.jsonFor = ""
 	m.notice, m.enableError = "", ""
 	m.query, m.recalled = "", -1
 	m.category = category
 	m.warnings = append(m.warnings, m.backend.Warnings()...)
 	m.search(false)
+	m.shown = true
 	m.loadWidgets()
 	m.input.Focus()
 }
@@ -148,14 +154,18 @@ func (m *Model) Show(category core.Category) {
 // closes too, so the next show starts on the widgets.
 func (m *Model) Hidden() {
 	m.stopRecording("")
-	m.jsonOpen = false
+	m.jsonFor = ""
+	m.shown = false
 }
 
 // Stale searches again after the data changed, keeping the selected
-// result, and loads the widgets again: a setting may have changed them.
+// result, and loads the widgets again while the panel shows: a setting may
+// have changed them. A hidden panel loads them as it shows.
 func (m *Model) Stale() {
 	m.search(true)
-	m.loadWidgets()
+	if m.shown {
+		m.loadWidgets()
+	}
 }
 
 func (m *Model) loadWidgets() {
@@ -249,6 +259,7 @@ func (m *Model) scrollToSelected() {
 
 // edited runs after the user changed the search field.
 func (m *Model) edited() {
+	m.jsonFor = ""
 	m.recalled = -1
 	m.notice = ""
 	m.search(false)
@@ -262,6 +273,7 @@ func (m *Model) setQuery(q string) {
 
 func (m *Model) setCategory(category core.Category) {
 	m.category = category
+	m.jsonFor = ""
 	m.notice = ""
 	m.search(false)
 }
@@ -442,8 +454,8 @@ func (m *Model) enableClipboard() {
 }
 
 // escape closes what is on top: a dialog, then the menu, then the full
-// JSON view, then a startup warning; with nothing left it hides the launcher with its query, as the
-// Rust app did.
+// JSON view, then a startup warning; with nothing left it hides the
+// launcher with its query, as the Rust app did.
 func (m *Model) escape() {
 	switch {
 	case m.confirm != nil:
@@ -457,7 +469,7 @@ func (m *Model) escape() {
 	case m.menu != nil:
 		m.closeMenu()
 	case m.showsJSON():
-		m.jsonOpen = false
+		m.jsonFor = ""
 	case m.warning() != "":
 		m.dismissWarning()
 	default:

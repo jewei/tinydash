@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/jewei/tinydash/internal/core"
 	"github.com/jewei/tinydash/internal/ui/kit"
 )
 
@@ -37,7 +38,7 @@ func (m *Model) card() *ClipCard {
 // showsJSON reports whether the full JSON view covers the pane.
 func (m *Model) showsJSON() bool {
 	c := m.card()
-	return m.jsonOpen && c != nil && c.JSON != nil
+	return c != nil && c.JSON != nil && m.jsonFor == c.ID
 }
 
 // runCard runs the card's main action: it opens the full JSON view, or
@@ -47,7 +48,7 @@ func (m *Model) runCard() {
 	switch {
 	case c == nil:
 	case c.JSON != nil:
-		m.jsonOpen = true
+		m.openJSON(c)
 	case len(c.Actions) > 0:
 		m.start(c.Actions[0], "", "")
 	}
@@ -57,8 +58,13 @@ func (m *Model) dismissCard() {
 	if c := m.card(); c != nil {
 		m.dismissedCard = c.ID
 	}
-	m.jsonOpen = false
-	m.focusInput()
+	m.jsonFor = ""
+}
+
+// openJSON opens the full view of c at its first line.
+func (m *Model) openJSON(c *ClipCard) {
+	m.jsonFor = c.ID
+	m.jsonList.ScrollTo(0, ui.Start)
 }
 
 // mainLabel names what the card's keys do.
@@ -81,7 +87,8 @@ func (m *Model) cardMenuItems() []menuItem {
 	}
 	var items []menuItem
 	if c.JSON != nil {
-		items = append(items, menuItem{label: mainLabel(c), keys: cardKeys, run: m.runCard})
+		// The card the menu showed: a newer one has items of its own.
+		items = append(items, menuItem{label: mainLabel(c), keys: cardKeys, run: func() { m.openJSON(c) }})
 	}
 	for i, ra := range c.Actions {
 		var keys []string
@@ -257,7 +264,7 @@ func (m *Model) jsonCard(c *ui.Context, p kit.Palette, cc *ClipCard) {
 	ui.Text(c, j.Minified).Font(monoFont).FontSize(12).TextColor(p.Ink).SingleLine().
 		Padding(5, 8).Radius(6).Border(1, p.Edge).Background(p.Paper)
 	ui.Row(c).Gap(6).Children(func() {
-		m.cardButton(c, p, "View Full", true, func() { m.jsonOpen = true })
+		m.cardButton(c, p, "View Full", true, func() { m.openJSON(cc) })
 		for _, ra := range cc.Actions {
 			m.cardButton(c, p, strings.Replace(ra.Label, " JSON", "", 1), false, func() { m.start(ra, "", "") })
 		}
@@ -271,13 +278,13 @@ func (m *Model) jsonView(c *ui.Context, p kit.Palette, cc *ClipCard) {
 	ui.Column(c).Grow(9).Background(p.Paper).BorderWidth(0, 0, 0, 1).BorderColor(p.Rule).Clip().
 		Role(ui.RoleDialog).Label("Clipboard JSON").Children(func() {
 		ui.Row(c).Padding(10, 12).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.Rule).Children(func() {
-			m.iconButton(c, p, "back", "Back to widgets", true, func() { m.jsonOpen = false })
+			m.iconButton(c, p, "back", "Back to widgets", true, func() { m.jsonFor = "" })
 			ui.Column(c).Grow(1).Shrink(1).Children(func() {
 				ui.Text(c, "Clipboard JSON").FontWeight(700).TextColor(p.Ink).SingleLine()
 				ui.Text(c, jsonSummary(j)).FontSize(12).TextColor(p.Muted).SingleLine()
 			})
-			if len(cc.Actions) > 0 {
-				m.cardButton(c, p, "Copy Pretty", false, func() { m.start(cc.Actions[0], "", "") })
+			if pretty, ok := prettyAction(cc); ok {
+				m.cardButton(c, p, "Copy Pretty", false, func() { m.start(pretty, "", "") })
 			}
 			keyCaps(c, p, "esc")
 		})
@@ -287,17 +294,22 @@ func (m *Model) jsonView(c *ui.Context, p kit.Palette, cc *ClipCard) {
 		}
 		ui.List(c, &m.jsonList, rows, func(i int) {
 			if i == len(j.Lines) {
-				ui.Text(c, formatCount(j.MoreLines)+" more lines. Copy Pretty has all of them.").
+				note := formatCount(j.MoreLines) + " more lines."
+				if _, ok := prettyAction(cc); ok {
+					note += " Copy Pretty has all of them."
+				}
+				ui.Text(c, note).
 					FontSize(12).TextColor(p.Muted).Padding(8, 12, 8, 48)
 				return
 			}
-			jsonLine(c, p, i+1, j.Lines[i])
+			// A click leaves the keyboard with the search field.
+			jsonLine(c, p, i+1, j.Lines[i]).OnClick(m.focusInput)
 		}).Grow(1).Padding(8, 12, 8, 0).Label("Lines")
 	})
 }
 
-func jsonLine(c *ui.Context, p kit.Palette, number int, line JSONLine) {
-	ui.Row(c).Gap(12).AlignItems(ui.Start).Children(func() {
+func jsonLine(c *ui.Context, p kit.Palette, number int, line JSONLine) ui.Element {
+	return ui.Row(c).Gap(12).AlignItems(ui.Start).Children(func() {
 		ui.Text(c, strconv.Itoa(number)).Font(monoFont).FontSize(12).TextColor(p.Muted).Opacity(0.7).Width(36).TextAlign(ui.End).SingleLine()
 		spans := make([]ui.Span, 0, len(line.Tokens)+1)
 		if line.Indent > 0 {
@@ -322,6 +334,17 @@ func tokenColor(p kit.Palette, kind JSONTokenKind) ui.Color {
 		return p.CodeLiteral
 	}
 	return p.Muted
+}
+
+// prettyAction is the card's Copy Pretty JSON, which JSON too deep to
+// copy pretty lacks.
+func prettyAction(cc *ClipCard) (core.ResultAction, bool) {
+	for _, ra := range cc.Actions {
+		if ra.Label == "Copy Pretty JSON" {
+			return ra, true
+		}
+	}
+	return core.ResultAction{}, false
 }
 
 // formatCount writes n with thousands separators, as 1,002.

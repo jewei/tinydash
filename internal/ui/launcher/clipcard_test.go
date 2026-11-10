@@ -143,6 +143,93 @@ func TestOpensAndClosesTheFullJSON(t *testing.T) {
 	}
 }
 
+func hasJSONView(tt *ui.Tester) bool {
+	_, ok := tt.AccessByRole(ui.RoleDialog, "Clipboard JSON")
+	return ok
+}
+
+// Typing or another tab closes the view, as the Rust pane left the screen;
+// so does a new card.
+func TestTheJSONViewClosesWhenThePaneGoes(t *testing.T) {
+	f := withCard(jsonCard())
+	m, tt := showLauncher(t, f)
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	tt.Type("x")
+	tt.Key(0, ui.KeyBackspace)
+	if hasJSONView(tt) || !hasCard(tt, "JSON") {
+		t.Error("the view came back after typing")
+	}
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	tt.Key(0, ui.KeyTab)
+	tt.Key(ui.Shift, ui.KeyTab)
+	if hasJSONView(tt) {
+		t.Error("the view came back after another tab")
+	}
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	next := jsonCard()
+	next.ID = "j2"
+	f.widgets.Card = &next
+	m.Stale()
+	tt.Frame()
+	if hasJSONView(tt) || !hasCard(tt, "JSON") {
+		t.Error("a new card opened in the view")
+	}
+}
+
+// A click on a line leaves the keyboard with the search field.
+func TestAClickInTheJSONKeepsTheSearchFocused(t *testing.T) {
+	_, tt := showLauncher(t, withCard(jsonCard()))
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	view, _ := tt.AccessByRole(ui.RoleDialog, "Clipboard JSON")
+	tt.ClickAt(view.Bounds.X+view.Bounds.W/2, view.Bounds.Y+70)
+	if !tt.Focused("Search") {
+		t.Error("the search field lost the keyboard")
+	}
+}
+
+// The menu's View Full JSON opens the card the menu showed, not a newer one.
+func TestAMenuItemActsOnTheCardItShowed(t *testing.T) {
+	f := withCard(jsonCard())
+	m, tt := showLauncher(t, f)
+	tt.Key(ui.Cmd, ui.KeyK)
+	color := colorCard
+	f.widgets.Card = &color
+	m.Stale()
+	chooseItem(t, tt, "View Full JSON")
+	if len(f.runs) != 0 || hasJSONView(tt) {
+		t.Errorf("ran %+v; view %v", f.runs, hasJSONView(tt))
+	}
+}
+
+// Loading the widgets reads the clipboard, so a hidden panel loads them
+// only as it shows.
+func TestAHiddenPanelLoadsNoWidgets(t *testing.T) {
+	f := withCard(colorCard)
+	m, tt := showLauncher(t, f)
+	m.Hidden()
+	m.Stale()
+	if f.widgetLoads != 1 {
+		t.Errorf("loaded the widgets %d times, want once", f.widgetLoads)
+	}
+	m.Show("")
+	m.Stale()
+	tt.Frame()
+	if f.widgetLoads != 3 {
+		t.Errorf("loaded the widgets %d times, want 3", f.widgetLoads)
+	}
+}
+
+// JSON too deep to copy pretty has no Copy Pretty.
+func TestJSONWithoutPrettyCopy(t *testing.T) {
+	card := jsonCard()
+	card.Actions = card.Actions[1:]
+	_, tt := showLauncher(t, withCard(card))
+	tt.Key(ui.Cmd|ui.Shift, ui.KeyEnter)
+	if !tt.HasText("1,500 more lines.") || tt.HasText("Copy Pretty") {
+		t.Errorf("texts %q", tt.Texts())
+	}
+}
+
 // A dismissed card stays away until the clipboard holds a new copy, also
 // after a search hid the pane.
 func TestDismissesACardUntilANewCopy(t *testing.T) {

@@ -157,6 +157,23 @@ func TestLongJSONShowsItsFirstLines(t *testing.T) {
 	}
 }
 
+// Indents grow with depth, so deep JSON under the card limit would be
+// gigabytes pretty: it gets no Copy Pretty JSON.
+func TestDeepJSONHasNoPrettyCopy(t *testing.T) {
+	deep := strings.Repeat("[", 3000) + strings.Repeat("]", 3000)
+	items := make([]string, MaxCardBytes/(len(deep)+1))
+	for i := range items {
+		items[i] = deep
+	}
+	card := detect(t, "["+strings.Join(items, ",")+"]")
+	if len(card.Actions) != 1 || card.Actions[0].Label != "Copy Minified JSON" {
+		t.Errorf("actions %+v", card.Actions)
+	}
+	if len(card.JSON.Lines) != MaxJSONLines || card.JSON.Depth != 3001 {
+		t.Errorf("%d lines, depth %d", len(card.JSON.Lines), card.JSON.Depth)
+	}
+}
+
 func TestCutsALongTokenInTheViewOnly(t *testing.T) {
 	long := strings.Repeat("é", MaxTokenChars+10)
 	card := detect(t, `["`+long+`"]`)
