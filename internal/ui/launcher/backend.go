@@ -50,8 +50,8 @@ type Backend interface {
 	// launcher shows and after the data changed; done as for Run. Reading
 	// the disk can wait on the OS, so the app loads it outside the frame.
 	Widgets(done func(Widgets))
-	// SaveNote saves the Notepad's note; done as for Run. Saves end in
-	// the order they were sent.
+	// SaveNote saves the Notepad's note; done as for Run. The launcher
+	// sends one save at a time.
 	SaveNote(text string, done func(error))
 	// Details loads the details of the selected result, which the pane
 	// beside a typed search shows; done gets them, or false when the

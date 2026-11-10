@@ -69,9 +69,9 @@ Other folders:
 
 ## UI
 
-Views read a model and call methods on it. The launcher panel's keys are one table in `internal/ui/launcher/keymap.go`. The commands they map to are plain methods with table tests. The actions menu, the alias dialog, the hotkey dialog, and confirmations are overlays drawn in the panel, so the nonactivating panel keeps the keyboard. These overlays take their own keys in `internal/ui/launcher/overlays.go`. Tests drive views with mygo's `ui.NewTester` against a fixture snapshot and a fake backend, and move time with `Advance`, never `Sleep`.
+Views read a model and call methods on it. The launcher panel's keys are tables in `internal/ui/launcher/keymap.go`: `keymap`, and `noteKeymap` while the note has the keyboard. The commands they map to are plain methods with table tests. The actions menu, the alias dialog, the hotkey dialog, and confirmations are overlays drawn in the panel, so the nonactivating panel keeps the keyboard. These overlays take their own keys in `internal/ui/launcher/overlays.go`. Tests drive views with mygo's `ui.NewTester` against a fixture snapshot and a fake backend, and move time with `Advance`, never `Sleep`.
 
-The widget pane (clocks, disk space, and the Notepad) shows beside the results of an empty All search. While the note has the keyboard, the launcher's keys are off except Mod+J and Escape, which go back to the search field. The HUD is a second panel. It shows "Copied" with `ShowInactive`, so it never takes focus, and the pointer passes through it.
+The widget pane (clocks, disk space, and the Notepad) shows beside the results of an empty All search. While the note has the keyboard, the launcher's keys are off. Its own table, `noteKeymap`, maps Mod+J, Escape, Tab, and Shift+Tab back to the search field. The HUD is a second panel. It shows "Copied" with `ShowInactive`, so it never takes focus, and the pointer passes through it.
 
 ## Storage
 

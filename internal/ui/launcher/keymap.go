@@ -34,6 +34,9 @@ var keymap = append([]binding{
 var noteKeymap = []binding{
 	{ui.Cmd, ui.KeyJ, nil, once((*Model).leaveNote)},
 	{0, ui.KeyEscape, nil, once((*Model).leaveNote)},
+	// Tab would move the focus to a button, where typing reaches nothing.
+	{0, ui.KeyTab, nil, once((*Model).leaveNote)},
+	{ui.Shift, ui.KeyTab, nil, once((*Model).leaveNote)},
 }
 
 // rowKeys run the main action of rows 1 to 9 with Mod and the digit.

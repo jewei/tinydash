@@ -237,9 +237,9 @@ func TestALoadNeverReplacesTheTextTyped(t *testing.T) {
 	}
 }
 
-// Saves end in order in the engine, but their answers can come back in
-// any order. Only the newest one decides what the note says.
-func TestOnlyTheNewestSaveDecidesTheStatus(t *testing.T) {
+// One save runs at a time, so an older text never lands last. Text typed
+// while a save runs saves when it ends, also when it failed.
+func TestSavesOneAtATimeAndSendsTheNewestTextNext(t *testing.T) {
 	f := newFake(always())
 	f.holdNotes = true
 	f.noteErr = func(text string) error {
@@ -248,20 +248,59 @@ func TestOnlyTheNewestSaveDecidesTheStatus(t *testing.T) {
 		}
 		return nil
 	}
-	_, tt := showNote(t, f, "")
+	m, tt := showNote(t, f, "")
 	tt.Type("a")
 	tt.Advance(saveDelay)
 	tt.Type("b")
 	tt.Advance(saveDelay)
-	if noteStatus(tt) != "1 word · Saving…" {
-		t.Errorf("status %q while saves run", noteStatus(tt))
+	m.Hidden()
+	if !slices.Equal(f.notes, []string{"a"}) || noteStatus(tt) != "1 word · Saving…" {
+		t.Fatalf("sent %q while a save runs, status %q", f.notes, noteStatus(tt))
 	}
-	older, newer := f.notesWaiting[0], f.notesWaiting[1]
-	newer()
-	older()
+	f.notesWaiting[0]()
+	if !slices.Equal(f.notes, []string{"a", "ab"}) {
+		t.Fatalf("after the first save ended: sent %q", f.notes)
+	}
+	f.notesWaiting[1]()
 	tt.Frame()
-	if noteStatus(tt) != "1 word · Saved" || tt.HasText("The disk is full.") {
-		t.Errorf("status %q; texts %q", noteStatus(tt), tt.Texts())
+	if noteStatus(tt) != "1 word · Saved" || tt.HasText("The disk is full.") || len(f.notes) != 2 {
+		t.Errorf("sent %q, status %q; texts %q", f.notes, noteStatus(tt), tt.Texts())
+	}
+}
+
+// Tab would move the focus to a button, where typing reaches nothing: in
+// the note it goes back to the search field.
+func TestTabInTheNoteGoesBackToTheSearchField(t *testing.T) {
+	for _, mods := range []ui.Modifiers{0, ui.Shift} {
+		f := newFake(always(safari))
+		m, tt := showNote(t, f, "")
+		tt.Type("x")
+		tt.Key(mods, ui.KeyTab)
+		tt.Type("saf")
+		if !tt.Focused("Search") || m.query != "saf" || m.note.text != "x" || m.category != core.CategoryAll {
+			t.Errorf("mods %v: query %q, note %q, tab %s", mods, m.query, m.note.text, m.category)
+		}
+		if !slices.Equal(f.notes, []string{"x"}) {
+			t.Errorf("mods %v: saved %q", mods, f.notes)
+		}
+	}
+}
+
+// A load that cannot read the note takes its field away while the user
+// types there: the search field takes the keyboard, and the text is kept.
+func TestANoteThatGoesAwayWhileTypedInGivesTheKeysToTheSearchField(t *testing.T) {
+	f := newFake(always(safari))
+	m, tt := showNote(t, f, "")
+	tt.Type("abc")
+	f.widgets.Note = &Note{Err: errors.New("The database is locked.")}
+	m.Stale()
+	tt.Frame()
+	tt.Type("saf")
+	if !tt.Focused("Search") || m.query != "saf" {
+		t.Errorf("search focused %v, query %q", tt.Focused("Search"), m.query)
+	}
+	if m.note.text != "abc" || !slices.Equal(f.notes, []string{"abc"}) {
+		t.Errorf("note %q, saved %q", m.note.text, f.notes)
 	}
 }
 

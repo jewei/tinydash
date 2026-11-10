@@ -26,10 +26,10 @@ type notepad struct {
 	unsaved bool
 	// saveAt is when the pause in typing ends and the note saves, or zero.
 	saveAt time.Time
-	// sent counts the saves sent, and pending those that have not ended.
-	// Saves land in order, so only the newest one's outcome counts.
-	sent, pending int
-	// failure is why the newest save failed, until the next edit.
+	// One save runs at a time, so an older text never lands last. saving
+	// is set while it runs; again asks for one more save when it ends.
+	saving, again bool
+	// failure is why the last save failed, until the next edit.
 	failure string
 	field   ui.Handle
 	// focused and shown are as the last frame had them, so the view sees
@@ -44,7 +44,7 @@ func (m *Model) takeNote(n *Note) {
 		// The Notepad is off. A note with nothing left to save loads
 		// again when it is turned on; one not saved keeps its text, which
 		// shows and saves again then.
-		if !m.note.unsaved && m.note.pending == 0 {
+		if !m.note.unsaved && !m.note.saving {
 			m.note.loaded = false
 		}
 	case n.Err == nil && !m.note.loaded:
@@ -55,7 +55,7 @@ func (m *Model) takeNote(n *Note) {
 // showsNote reports whether the note's field is on screen.
 func (m *Model) showsNote() bool {
 	n := m.widgets.Note
-	return m.showsWidgets() && n != nil && n.Err == nil && m.note.loaded
+	return m.showsWidgets() && n != nil && n.Err == nil
 }
 
 // focusNote moves the keyboard to the note, or to the search field when the
@@ -68,31 +68,35 @@ func (m *Model) focusNote() {
 	m.input.Focus()
 }
 
-// leaveNote moves the keyboard to the search field (Mod+J or Escape in the
-// note). The next frame sees the note lose it, and saves.
+// leaveNote moves the keyboard to the search field (Mod+J, Escape, Tab, or
+// Shift+Tab in the note). The next frame sees the note lose it, and saves.
 func (m *Model) leaveNote() { m.input.Focus() }
 
 // saveNote sends the note to save, if it has changes no save has sent.
+// While a save runs, it waits for that one to end.
 func (m *Model) saveNote() {
 	m.note.saveAt = time.Time{}
 	if !m.note.unsaved {
 		return
 	}
-	m.note.unsaved = false
-	m.note.sent++
-	m.note.pending++
-	n := m.note.sent
+	if m.note.saving {
+		m.note.again = true
+		return
+	}
+	m.note.unsaved, m.note.saving = false, true
 	m.backend.SaveNote(m.note.text, func(err error) {
-		m.note.pending--
-		if n != m.note.sent {
-			return
-		}
+		m.note.saving = false
 		if err != nil {
 			m.note.unsaved = true
 			m.note.failure = err.Error()
-			return
+		} else {
+			m.note.failure = ""
 		}
-		m.note.failure = ""
+		// A save asked for while this one ran has newer text to send.
+		if m.note.again {
+			m.note.again = false
+			m.saveNote()
+		}
 	})
 }
 
@@ -106,6 +110,11 @@ func (m *Model) noteFrame(c *ui.Context, inNote bool) {
 	back := !m.note.shown && shown
 	if left || closed || back {
 		m.saveNote()
+	}
+	// A note that closes with the keyboard, as when a load cannot read
+	// it, leaves no field to type in: the search field takes the keys.
+	if m.note.focused && closed && !m.overlay() {
+		m.input.Focus()
 	}
 	if !m.note.saveAt.IsZero() {
 		if wait := m.note.saveAt.Sub(c.Now()); wait > 0 {
@@ -123,9 +132,6 @@ func (m *Model) notepadCard(c *ui.Context, p kit.Palette, n Note) {
 		card(c, p, "Notepad", func() {
 			ui.Text(c, "Could not read the note. "+n.Err.Error()).FontSize(12).TextColor(p.Muted)
 		})
-		return
-	}
-	if !m.note.loaded {
 		return
 	}
 	ui.Column(c).Grow(1).Padding(10, 12).Gap(6).Radius(10).Border(1, p.Rule).Background(p.Paper).
@@ -158,7 +164,7 @@ func (n *notepad) status() string {
 	switch {
 	case n.failure != "":
 		return "Not saved"
-	case n.unsaved || n.pending > 0:
+	case n.unsaved || n.saving:
 		return "Saving…"
 	}
 	return "Saved"

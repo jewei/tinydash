@@ -62,7 +62,7 @@ An empty All search shows widgets to the right of the results, in place of the d
 
 - **Clocks** (on): local time and date, and up to three cities with their time and difference from local time. A city is any name that time zone answers know: `Tokyo`, `kl`, `Europe/London`, `pst`. Dates follow your regional formats, such as `January 5, 2026` or `5 January 2026`; times are 24-hour.
 - **Disk space** (on): the free space on the disk of your home folder, and how full it is. Below 10% free, it warns. On macOS, free space counts purgeable files, as Finder does.
-- **Notepad** (off): one scratch note, kept on this computer in `tinydash.db`. Mod+J moves to the note; Mod+J or Escape goes back to the search field. Other keys type in the note. It saves when you pause typing, leave the note, start a search, or hide the launcher, and says whether it is saved. A note over 10,000 characters is not saved until you shorten it. A note that cannot save keeps its text and tries again when you leave it or the widgets show again. If the note cannot be read, its card says why, and the other widgets still show.
+- **Notepad** (off): one scratch note, kept on this computer in `tinydash.db`. Mod+J moves to the note; Mod+J, Escape, or Tab goes back to the search field. Other keys type in the note. It saves when you pause typing, leave the note, start a search, or hide the launcher, and says whether it is saved. A note over 10,000 characters is not saved until you shorten it. A note that cannot save keeps its text and tries again when you leave it or the widgets show again. If the note cannot be read, its card says why, and the other widgets still show.
 
 ## Instant answers (All only)
 

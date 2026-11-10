@@ -21,12 +21,11 @@ func (b *backend) Widgets(done func(launcher.Widgets)) {
 }
 
 // SaveNote saves the Notepad's note off the main thread, which must not
-// wait on the writer.
+// wait on the writer, not even to queue the save.
 func (b *backend) SaveNote(text string, done func(error)) {
 	a := b.app()
-	saved := a.engine.SaveNote(text)
 	go func() {
-		err := <-saved
+		err := <-a.engine.SaveNote(text)
 		a.panel.Update(func() { done(err) })
 	}()
 }
