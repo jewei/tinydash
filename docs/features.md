@@ -139,6 +139,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 | Clipboard            | History on/off, entries to keep, save images and copied files (not on Linux), clear history                                                                      |
 | Search               | Web search engine, currency rates on/off, emoji skin tone, emoji keyword languages, folders to index, folder names to skip, Spotlight (macOS), aliases, hotkeys, hidden results |
 | Snippets, Quicklinks | Create, edit, delete                                                                                                                                             |
+| About                | The version, the folders that hold settings and saved data, where to get new versions, credits                                                                   |
 
 `settings.json` keeps keys that this version does not use, such as those of removed features, and writes them back unchanged.
 
@@ -152,7 +153,7 @@ Changes save at once. If a change cannot apply (for example, the shortcut is tak
 
 TinyDash 0.9.0 and earlier were a Rust and Tauri app. The Go app reads the same settings and data, with these differences:
 
-- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files, Privacy, and About sections of Settings. Their settings stay in `settings.json`.
+- **Removed:** snippet expansion as you type, the Up Next, Weather, Focus timer, and clipboard card widgets, shell commands (`>`), the file permissions answer (`chmod`), update checks and installs, and the Files and Privacy sections of Settings. Their settings stay in `settings.json`.
 - **Windows:** app IDs changed, so the pins, usage, aliases, and hotkeys of Windows apps reset once.
 - **Ranking:** results with equal scores keep the order in which their source lists them.
 - **Windows apps** are found by name only, not by executable, because the list comes from the Windows Apps folder.

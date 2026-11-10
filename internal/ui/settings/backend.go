@@ -1,5 +1,5 @@
 // Package settings is the Settings window's native view and its model:
-// General, Widgets, Clipboard, Search, Snippets, and Quicklinks. It owns no
+// General, Widgets, Clipboard, Search, Snippets, Quicklinks, and About. It owns no
 // window: the app creates one, shows the view, and implements Backend.
 //
 // Changes save at once. Each change is a function of the saved settings,
@@ -56,6 +56,18 @@ type Backend interface {
 	RemoveHotkey(id core.ID, done func(error))
 	// ClearClipboard deletes the clipboard history except pins.
 	ClearClipboard(done func(error))
+	// About is the version and the folders that About shows.
+	About() About
+}
+
+// About is what the About section shows.
+type About struct {
+	// Version is the packaged app's version, or "" when it runs from
+	// source.
+	Version string
+	// Settings holds settings.json; Data holds tinydash.db. They are the
+	// same folder with --data-dir.
+	Settings, Data string
 }
 
 // LibraryItem is a snippet or a quicklink as the editor holds it.

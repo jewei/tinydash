@@ -23,9 +23,10 @@ const (
 	search     section = "Search"
 	snippets   section = "Snippets"
 	quicklinks section = "Quicklinks"
+	about      section = "About"
 )
 
-var sections = []section{general, widgets, clipboard, search, snippets, quicklinks}
+var sections = []section{general, widgets, clipboard, search, snippets, quicklinks, about}
 
 // modKeys is the app-shortcut modifier as the user knows it, on macOS and
 // elsewhere.
