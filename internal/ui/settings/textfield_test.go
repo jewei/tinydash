@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -31,5 +32,17 @@ func TestSetsTheWeatherCityAndUnit(t *testing.T) {
 	press(t, tt, ui.RoleOption, "Fahrenheit (°F)")
 	if s := f.last(t); s.WeatherCity != "Ipoh" || s.TemperatureUnit != settings.Fahrenheit {
 		t.Errorf("city %q, unit %q", s.WeatherCity, s.TemperatureUnit)
+	}
+}
+
+// A city that could not be saved stays in the field, so it is not lost.
+func TestKeepsACityThatCouldNotBeSaved(t *testing.T) {
+	f := newFake()
+	f.refuse = func(settings.Settings) error { return errors.New("Settings cannot be saved now.") }
+	_, tt := open(t, f, widgets)
+	typeInto(t, tt, "Weather city", " Ipoh ", true)
+	tt.Frame()
+	if info, _ := tt.AccessByRole(ui.RoleTextField, "Weather city"); info.Value != "Ipoh" || !tt.HasText("Settings cannot be saved now.") {
+		t.Errorf("field %q; texts %q", info.Value, tt.Texts())
 	}
 }

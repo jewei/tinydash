@@ -14,56 +14,70 @@ import (
 // from showing, ported from src/launcher/Weather.tsx.
 func (m *Model) weatherCard(c *ui.Context, p kit.Palette, w Weather) {
 	card(c, p, "Weather", func() {
-		note := func(text string) ui.Element { return ui.Text(c, text).FontSize(12).TextColor(p.Muted) }
-		settingsButton := func() {
-			ui.Button(c, "Open Settings").OnClick(m.openSettings)
+		// As tall in each state, so the cards below do not jump when the
+		// weather comes; the last line sits at the bottom, and a lone row
+		// in the middle.
+		justify := ui.SpaceBetween
+		if w.State == WeatherNoCity || w.State == WeatherNotFound {
+			justify = ui.Center
 		}
-		switch w.State {
-		case WeatherReady:
-			now := c.Now()
-			ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-				ui.Column(c).Grow(1).Shrink(1).Gap(2).Children(func() {
-					note(w.Place).SingleLine()
-					ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-						temperature := p.Ink
-						if w.Offline {
-							temperature = p.Muted
-						}
-						ui.Text(c, strconv.Itoa(w.Temperature)+"°").Font(kit.DisplayFont).FontSize(34).TextColor(temperature).FontFeatures("tnum")
-						ui.Column(c).Shrink(1).Children(func() {
-							ui.Text(c, w.Condition).FontWeight(600).TextColor(p.Ink)
-							note(highLow(w))
-						})
+		ui.Column(c).MinHeight(weatherHeight).Gap(6).Justify(justify).Children(func() { m.weatherContent(c, p, w) })
+	})
+}
+
+// weatherHeight is the height of the ready card's content.
+const weatherHeight = 74
+
+func (m *Model) weatherContent(c *ui.Context, p kit.Palette, w Weather) {
+	note := func(text string) ui.Element { return ui.Text(c, text).FontSize(12).TextColor(p.Muted) }
+	settingsButton := func() {
+		ui.Button(c, "Open Settings").OnClick(m.openSettings)
+	}
+	switch w.State {
+	case WeatherReady:
+		now := c.Now()
+		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
+			ui.Column(c).Grow(1).Shrink(1).Gap(2).Children(func() {
+				note(w.Place).SingleLine()
+				ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+					temperature := p.Ink
+					if w.Offline {
+						temperature = p.Muted
+					}
+					ui.Text(c, strconv.Itoa(w.Temperature)+"°").Font(kit.DisplayFont).FontSize(34).TextColor(temperature).FontFeatures("tnum")
+					ui.Column(c).Shrink(1).Children(func() {
+						ui.Text(c, w.Condition).FontWeight(600).TextColor(p.Ink)
+						note(highLow(w))
 					})
 				})
-				ui.Image(c, weatherIcon(p, w.Icon)).Width(36).Height(36)
 			})
-			if w.Offline {
-				note("Offline · updated " + ago(w.UpdatedAt, now))
-				// A new frame as the minute since the download turns.
-				c.After(time.Minute - now.Sub(w.UpdatedAt)%time.Minute)
-			} else {
-				note("Updated " + w.UpdatedAt.Format("15:04"))
-			}
-		case WeatherLoading:
-			note(w.City).SingleLine()
-			note("Getting the weather…").Role(ui.RoleStatus)
-		case WeatherNoCity:
-			ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-				ui.Image(c, weatherIcon(p, "partlyDay")).Width(28).Height(28)
-				ui.Text(c, "Set a city in Settings.").TextColor(p.Ink).Grow(1)
-				settingsButton()
-			})
-		case WeatherNotFound:
-			ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, "No place is named “"+w.City+"”.").TextColor(p.Ink).Grow(1).Shrink(1)
-				settingsButton()
-			})
-		case WeatherFailed:
-			note(w.City).SingleLine()
-			note("Could not get the weather. " + w.Message)
+			ui.Image(c, weatherIcon(p, w.Icon)).Width(36).Height(36)
+		})
+		if w.Offline {
+			note("Offline · updated " + ago(w.UpdatedAt, now))
+			// A new frame as the minute since the download turns.
+			c.After(time.Minute - now.Sub(w.UpdatedAt)%time.Minute)
+		} else {
+			note("Updated " + w.UpdatedAt.Format("15:04"))
 		}
-	})
+	case WeatherLoading:
+		note(w.City).SingleLine()
+		note("Getting the weather…").Role(ui.RoleStatus)
+	case WeatherNoCity:
+		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+			ui.Image(c, weatherIcon(p, "partlyDay")).Width(28).Height(28)
+			ui.Text(c, "Set a city in Settings.").TextColor(p.Ink).Grow(1)
+			settingsButton()
+		})
+	case WeatherNotFound:
+		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+			ui.Text(c, "No place is named “"+w.City+"”.").TextColor(p.Ink).Grow(1).Shrink(1)
+			settingsButton()
+		})
+	case WeatherFailed:
+		note(w.City).SingleLine()
+		note("Could not get the weather. " + w.Message)
+	}
 }
 
 // highLow is today's high and low, and the chance of rain when known.

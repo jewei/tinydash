@@ -67,7 +67,7 @@ type Place struct {
 	Latitude, Longitude float64
 }
 
-var errUnexpected = errors.New("The weather service sent unexpected data.")
+var errUnexpected = errors.New("The weather service sent unexpected data. Try again later.")
 
 // ParsePlace reads a geocoding response: the first place found, or false
 // when there is none.

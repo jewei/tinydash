@@ -13,11 +13,14 @@ import (
 type textField struct {
 	draft   string
 	editing bool
+	// held: the draft was committed and is not saved yet, or its save
+	// failed, so the field keeps it rather than the saved value.
+	held bool
 }
 
 // text is a row with a textField of at most maxLength characters.
 func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, placeholder, value string, maxLength int, set func(*settings.Settings, string)) {
-	if !f.editing {
+	if !f.editing && !f.held {
 		f.draft = value
 	}
 	row(c, p, label, "", func() {
@@ -30,7 +33,7 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 			return true
 		})
 		if in.Changed() {
-			f.editing = true
+			f.editing, f.held = true, false
 		}
 		if f.editing && !in.Focused() {
 			m.commitText(f, value, set)
@@ -39,10 +42,19 @@ func (m *Model) text(c *ui.Context, p kit.Palette, f *textField, label, name, pl
 }
 
 // commitText saves the draft without its surrounding spaces, when it
-// changed.
+// changed. The field shows the trimmed text until the save ends; after a
+// failure it keeps it, so the text is not lost.
 func (m *Model) commitText(f *textField, value string, set func(*settings.Settings, string)) {
 	f.editing = false
-	if text := strings.TrimSpace(f.draft); text != value {
-		m.save(func(s *settings.Settings) { set(s, text) }, nil)
+	text := strings.TrimSpace(f.draft)
+	f.draft = text
+	if text == value {
+		return
 	}
+	f.held = true
+	m.save(func(s *settings.Settings) { set(s, text) }, func(err error) {
+		if err == nil && f.draft == text {
+			f.held = false
+		}
+	})
 }
