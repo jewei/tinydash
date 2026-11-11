@@ -13,6 +13,7 @@ import (
 	"github.com/egoist/mygo"
 
 	"github.com/jewei/tinydash/internal/core"
+	"github.com/jewei/tinydash/internal/platform"
 )
 
 // Usage is the help text of the command line. The Rust app took the same
@@ -119,6 +120,12 @@ func Main(opts Options) error {
 		}
 	})
 	mygo.App.WhenReady(func() {
+		// GTK has started, and no window exists yet. Setting the class
+		// earlier is overwritten while GTK starts, and a window shown
+		// first keeps the capitalized class.
+		if err := platform.AlignWindowClass(); err != nil {
+			slog.Warn("Could not set the window class", "error", err)
+		}
 		opts.Launch.Background = opts.Launch.Background || mygo.App.WasOpenedAtLogin()
 		started, err := Start(ctx, opts)
 		if err != nil {

@@ -131,6 +131,31 @@ func (f *fakeTray) PopUpMenu()                    { f.popped = append(f.popped, 
 func (f *fakeTray) OnClick(fn func()) func()      { f.click = fn; return func() {} }
 func (f *fakeTray) OnRightClick(fn func()) func() { f.right = fn; return func() {} }
 
+// A missing AppIndicator library is not "this platform". The warning names
+// the library and the package that installs it, and leaves the platform
+// phrase out. Another failure keeps its own cause.
+func TestAMissingTrayLibraryNamesThePackage(t *testing.T) {
+	missing := errors.New("mygo: tray icons need libayatana-appindicator3: not supported on this platform")
+	got := trayUnavailable(missing)
+	if got == nil || got.Error() != trayLibraryMissing {
+		t.Fatalf("%v", got)
+	}
+	if strings.Contains(got.Error(), "not supported on this platform") {
+		t.Fatalf("the warning still blames the platform: %q", got)
+	}
+	if !strings.Contains(got.Error(), "sudo apt install libayatana-appindicator3-1") {
+		t.Fatalf("no install command: %q", got)
+	}
+	other := trayUnavailable(errors.New("the display is closed"))
+	want := "The tray icon is unavailable: the display is closed. Open TinyDash with its shortcut instead."
+	if other == nil || other.Error() != want {
+		t.Fatalf("%v", other)
+	}
+	if trayUnavailable(nil) != nil {
+		t.Fatal("nil became an error")
+	}
+}
+
 // The tray menu has Open, Settings…, and Quit, and a click on the icon
 // opens the launcher, as in the Rust app.
 func TestTheTrayOpensTheLauncherAndSettings(t *testing.T) {
