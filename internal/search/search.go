@@ -70,6 +70,10 @@ type Snapshot struct {
 	Hotkeys Hotkeys
 	// Now is the clock of the search, in the user's time zone.
 	Now time.Time
+	// AvailableSystem is the OS commands this machine can run. Nil offers
+	// every command. Linux sets it so a command whose program is missing,
+	// or whose desktop cannot run it, is left out of search.
+	AvailableSystem map[core.SystemCommand]bool
 	// Home is the user's home folder, shown as "~".
 	Home string
 	// Random draws passwords.
@@ -126,7 +130,9 @@ func (v view) library() library.Context { return library.Context{Personal: v.per
 func (v view) emoji() emoji.Context {
 	return emoji.Context{Personal: v.personal, SkinTone: emoji.SkinTone(v.Settings.EmojiSkinTone)}
 }
-func (v view) system() system.Context { return system.Context{Personal: v.personal} }
+func (v view) system() system.Context {
+	return system.Context{Personal: v.personal, Available: v.AvailableSystem}
+}
 
 // keywordEngines are the web engines in the `?` list.
 var keywordEngines = func() []library.Engine {

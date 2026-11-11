@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -29,6 +30,13 @@ func TestSystemPlanCoversEveryCommand(t *testing.T) {
 		if !reflect.DeepEqual(got, want[cmd]) {
 			t.Errorf("%s: plan %+v, want %+v", cmd, got, want[cmd])
 		}
+	}
+}
+
+func TestEveryCommandStaysAvailable(t *testing.T) {
+	missing := func(string) error { return errors.New("not found") }
+	if got := availableSystemCommands(func(string) string { return "" }, missing); got != nil {
+		t.Fatalf("available %v, want every command", got)
 	}
 }
 

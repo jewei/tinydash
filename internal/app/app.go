@@ -136,6 +136,9 @@ func Start(ctx context.Context, opts Options) (*App, error) {
 	for _, w := range warnings {
 		a.warn(w)
 	}
+	// Leave out a system command this desktop cannot run, so choosing it
+	// does something. Nil means this OS can run every command.
+	first.AvailableSystem = platform.AvailableSystemCommands()
 
 	a.engine = engine.New(db, first, a.dataChanged)
 	a.focus = newFocusClock(first.Settings)
