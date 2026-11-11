@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
@@ -44,6 +45,13 @@ func TestOpenTrashNeedsAHomeFolder(t *testing.T) {
 		if err == nil || err.Error() != "Could not find your home folder." {
 			t.Errorf("HOME=%q: error %v", home, err)
 		}
+	}
+}
+
+func TestEveryCommandStaysAvailable(t *testing.T) {
+	missing := func(string) error { return errors.New("not found") }
+	if got := availableSystemCommands(func(string) string { return "" }, missing); got != nil {
+		t.Fatalf("available %v, want every command", got)
 	}
 }
 

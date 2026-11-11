@@ -15,6 +15,7 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ### Fixed
 
+- On Linux, a System command appears only when this desktop can run it and its program is installed. System Settings also opens on Cinnamon, MATE, and LXQt, and on KDE Plasma 5. Open Trash uses xdg-open when gio is not installed.
 - The Clocks widget and its cities' time differences follow a change of the computer's time zone the next time the launcher opens, as they did in 0.9.0. Since 0.10.0 they kept the zone that TinyDash started in.
 - Disk space keeps the free size and the low space warning on one line when the disk has a long name.
 

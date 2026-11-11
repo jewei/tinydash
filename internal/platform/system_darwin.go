@@ -24,6 +24,16 @@ type plan struct {
 
 const lockScreen = "SACLockScreenImmediate"
 
+func resolvePlan(cmd core.SystemCommand, env func(string) string, _ func(string) error) (plan, error) {
+	return systemPlan(cmd, env)
+}
+
+// availableSystemCommands is nil: every OS command can run. The programs
+// are part of macOS, so a missing helper on PATH does not apply.
+func availableSystemCommands(func(string) string, func(string) error) map[core.SystemCommand]bool {
+	return nil
+}
+
 func systemPlan(cmd core.SystemCommand, env func(string) string) (plan, error) {
 	switch cmd {
 	case core.CommandLock:

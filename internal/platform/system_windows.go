@@ -57,6 +57,16 @@ var (
 	procRegSetKeyValue     = advapi32.NewProc("RegSetKeyValueW")
 )
 
+func resolvePlan(cmd core.SystemCommand, env func(string) string, _ func(string) error) (plan, error) {
+	return systemPlan(cmd, env)
+}
+
+// availableSystemCommands is nil: every OS command can run. The calls are
+// Win32 or Windows' own shutdown, so a missing helper on PATH does not apply.
+func availableSystemCommands(func(string) string, func(string) error) map[core.SystemCommand]bool {
+	return nil
+}
+
 func systemPlan(cmd core.SystemCommand, _ func(string) string) (plan, error) {
 	switch cmd {
 	case core.CommandLock:
