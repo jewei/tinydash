@@ -232,6 +232,29 @@ func TestAQuicklinkKeywordGoesBeforeAWebKeyword(t *testing.T) {
 	}
 }
 
+func TestASystemCommandThisMachineCannotRunIsLeftOut(t *testing.T) {
+	s := empty()
+	s.AvailableSystem = map[core.SystemCommand]bool{core.CommandLock: true}
+	s.Pins = NewPins([]core.ID{"system:sleep", "system:lock"})
+	s.Aliases = NewAliases(map[core.ID]string{"system:sleep": "lo"})
+	got := ids(Search(s, "", core.CategorySystem))
+	if slices.Contains(got, "system:sleep") || !slices.Contains(got, "system:lock") || !slices.Contains(got, "system:quit-tinydash") {
+		t.Fatalf("%q", got)
+	}
+	if !slices.Contains(ids(Search(s, "", core.CategoryAll)), "system:lock") || slices.Contains(ids(Search(s, "", core.CategoryAll)), "system:sleep") {
+		t.Fatalf("all %q", ids(Search(s, "", core.CategoryAll)))
+	}
+	if slices.Contains(ids(Search(s, "lo", core.CategoryAll)), "system:sleep") || slices.Contains(ids(Search(s, "sleep", core.CategorySystem)), "system:sleep") {
+		t.Fatal("a command this machine cannot run was found")
+	}
+	if _, ok := Resolve(s, "system:sleep"); ok {
+		t.Fatal("sleep resolved")
+	}
+	if _, ok := Resolve(s, "system:lock"); !ok {
+		t.Fatal("lock did not resolve")
+	}
+}
+
 func TestAnAliasLiftsItsResultOnceInAllAndInItsTab(t *testing.T) {
 	s := empty()
 	s.Aliases = NewAliases(map[core.ID]string{"system:sleep": "lo"})

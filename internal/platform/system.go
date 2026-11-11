@@ -15,7 +15,7 @@ import (
 // RunSystemCommand runs an OS command from the System tab. openURL opens a
 // URL with the app's opener; Windows opens its Settings app that way.
 func RunSystemCommand(cmd core.SystemCommand, openURL func(string) error) error {
-	p, err := systemPlan(cmd, os.Getenv)
+	p, err := resolvePlan(cmd, os.Getenv, lookup)
 	if err != nil {
 		return err
 	}
@@ -26,6 +26,21 @@ func RunSystemCommand(cmd core.SystemCommand, openURL func(string) error) error 
 }
 
 var errUnsupported = errors.New("This command is not supported on your desktop.")
+
+// AvailableSystemCommands reports the OS commands this machine can run.
+// Nil means every command, which is macOS and Windows. On Linux a command
+// is left out when this desktop cannot run it or its program is not
+// installed, so search does not offer a command that would fail.
+func AvailableSystemCommands() map[core.SystemCommand]bool {
+	return availableSystemCommands(os.Getenv, lookup)
+}
+
+// lookup reports whether name is an executable on PATH. exec.LookPath also
+// returns the path, which the plans do not need.
+func lookup(name string) error {
+	_, err := exec.LookPath(name)
+	return err
+}
 
 // waitForKeyRelease waits until the user lets go of the key that ran Sleep
 // Displays, which would wake the displays again.

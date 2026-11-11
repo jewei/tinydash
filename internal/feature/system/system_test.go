@@ -56,6 +56,29 @@ func TestOnlyRestartsThatAskAppsToQuitSaySo(t *testing.T) {
 	}
 }
 
+func TestACommandThisMachineCannotRunIsLeftOut(t *testing.T) {
+	ctx := Context{Available: map[core.SystemCommand]bool{core.CommandLock: true}}
+	if _, ok := Get("lock", ctx); !ok {
+		t.Fatal("lock is hidden")
+	}
+	if _, ok := Get("sleep", ctx); ok {
+		t.Fatal("sleep is offered")
+	}
+	if _, ok := Get("quit-tinydash", ctx); !ok {
+		t.Fatal("quit is hidden")
+	}
+	var titles []string
+	for _, r := range Browse(ctx) {
+		titles = append(titles, r.Title)
+	}
+	if !slices.Contains(titles, "Lock Screen") || slices.Contains(titles, "Sleep") || !slices.Contains(titles, "Quit TinyDash") {
+		t.Fatalf("browse %q", titles)
+	}
+	if hits := Search(match.New("sleep"), ctx); len(hits) != 0 {
+		t.Fatalf("search found %+v", hits)
+	}
+}
+
 func TestEveryCommandHasAUniqueKeyAndEveryOSCommandIsListed(t *testing.T) {
 	keys := map[string]bool{}
 	listed := map[core.SystemCommand]bool{}
