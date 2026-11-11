@@ -3,7 +3,7 @@
 ## Set up
 
 1. Install Go 1.27.3 or later (`go.mod` sets the version).
-2. On Linux, install the libraries that CI installs: `sudo apt-get install libgtk-3-dev libayatana-appindicator3-dev`.
+2. On Linux, install the libraries a run needs: `sudo apt install libgtk-3-0 libayatana-appindicator3-1`. The window needs GTK (`libgtk-3-0`; Ubuntu 24.04 provides it as `libgtk-3-0t64`). The tray icon needs `libayatana-appindicator3-1`. Without that library TinyDash still starts, and the launcher says the install command. Compiling and packaging do not need the header packages `libgtk-3-dev` and `libayatana-appindicator3-dev`. CI installs the same two runtime libraries.
 3. Nothing else. `go.mod` pins the tools, and `go tool` runs them: `go tool mygo` (the mygo CLI) and `go tool staticcheck`. TinyDash needs no cgo.
 
 For the formal checks, install Java 11 or later. For the `verify-tinydash` skill, install Docker or OrbStack.
@@ -31,7 +31,11 @@ go run ./cmd/tinydash --data-dir "$(mktemp -d)"
 
 `--hidden` starts without showing the launcher. Quit an installed TinyDash first: both would use the same launcher shortcut. A second start of the same build hands its options to the running one (with none, it toggles the launcher) and quits. `--settings`, `--mode <category>`, and `--background` (the same as `--hidden`) are the Rust app's options.
 
-Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the user's real data: on macOS, `~/Library/Application Support/dev.tinydash.launcher`. Never run it that way for development.
+Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the user's real data. Never run it that way for development.
+
+- **macOS:** `~/Library/Application Support/dev.tinydash.launcher` holds both `settings.json` and `tinydash.db`.
+- **Linux:** `settings.json` is in `~/.config/dev.tinydash.launcher`. `tinydash.db` is in `~/.local/share/dev.tinydash.launcher`. An absolute `XDG_CONFIG_HOME` replaces `~/.config`, and an absolute `XDG_DATA_HOME` replaces `~/.local/share`. A relative `XDG_DATA_HOME` is ignored. A relative `XDG_CONFIG_HOME` is refused, and TinyDash does not start.
+- **Windows:** `settings.json` is in `%AppData%\dev.tinydash.launcher`. `tinydash.db` is in `%LocalAppData%\dev.tinydash.launcher`.
 
 ## Tests
 
@@ -72,6 +76,8 @@ It needs Docker or OrbStack. The first launch downloads mygo's SQLite library fr
 ## Packaging
 
 `go tool mygo build` reads `mygo.json` (name, identifier `dev.tinydash.launcher`, version, `LSUIElement` so that macOS shows no Dock icon, the usage strings that Up Next needs to ask for calendars and reminders, and `Entitlements.plist`, which lets the hardened runtime of the signed release read them) and `resources/icon.png`. On macOS it writes `build/darwin-arm64/TinyDash.app`, ad hoc signed, and `tinydash-<version>-arm64.dmg`, and bundles mygo's SQLite library in the app. `-platform` picks other targets, such as `darwin/universal,windows/amd64,linux/amd64`. Signing and disk images need macOS. `go tool mygo build -h` lists every flag.
+
+On Linux, `mygo.json` sets `linux.webview` to false, so the `.deb` and the Arch `PKGBUILD` depend on GTK and not on WebKitGTK: every window draws with the native UI and never loads WebKit. `linux.depends` adds `libayatana-appindicator3-1` (Arch: `libayatana-appindicator`), which the tray icon loads. The tray is on by default, so the package depends on the library rather than recommending it. The app still starts if the library is removed later, and says how to install it. The desktop entry's `StartupWMClass` is the executable name, `tinydash`. TinyDash sets the window class to that same string after GTK starts, because GTK would otherwise capitalize it to `Tinydash` and a dock would not match the window to the icon.
 
 The version is in `mygo.json`.
 
