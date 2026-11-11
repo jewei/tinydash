@@ -18,6 +18,6 @@ Include what you did, what happened, and the TinyDash version and OS. A fix is r
 
 ## How the code is checked
 
-- CodeQL scans the Go and workflow code on each pull request, on `main`, and every Monday.
-- `govulncheck` checks the Go dependencies every Monday.
+- CodeQL scans the Go and workflow code on each pull request, on `main`, and on the first day of the month.
+- `govulncheck` checks the Go dependencies on the first day of the month.
 - The release process for the Go app is not set up yet. The earlier Rust releases are signed and notarized on macOS, and each file has a build provenance attestation: check one with `gh attestation verify FILE --repo jewei/tinydash`.
