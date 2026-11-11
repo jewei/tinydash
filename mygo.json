@@ -16,5 +16,9 @@
       "NSRemindersFullAccessUsageDescription": "The Up Next widget shows the reminders due today. TinyDash only reads your reminders, and only while the widget is on.",
       "NSRemindersUsageDescription": "The Up Next widget shows the reminders due today. TinyDash only reads your reminders, and only while the widget is on."
     }
+  },
+  "linux": {
+    "webview": false,
+    "depends": ["libayatana-appindicator3-1"]
   }
 }

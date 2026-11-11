@@ -6,6 +6,7 @@ package app
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -533,7 +534,7 @@ func (a *App) setTray(visible bool) error {
 	}
 	tray, err := mygo.NewTray(mygo.TrayOptions{ID: "tinydash", Icon: trayIcon(), IconIsTemplate: templateTrayIcon, ToolTip: "TinyDash"})
 	if err != nil {
-		return fmt.Errorf("The tray icon is unavailable: %v. Open TinyDash with its shortcut instead.", err)
+		return trayUnavailable(err)
 	}
 	show := func() { a.Show("") }
 	openSettings := func() {
@@ -544,6 +545,26 @@ func (a *App) setTray(visible bool) error {
 	wireTray(tray, mygo.NewMenu(trayMenu(show, openSettings, mygo.App.Quit)), show, menuTakesEveryTrayClick)
 	a.tray = tray
 	return nil
+}
+
+// trayLibraryMissing is the warning when Linux has no AppIndicator
+// library. mygo reports that as "not supported on this platform", which
+// names the wrong cause: the desktop can show a tray, the library is
+// absent. The package name is the one the .deb depends on.
+const trayLibraryMissing = "The tray icon needs libayatana-appindicator3, which is not installed. On Debian or Ubuntu, install it with sudo apt install libayatana-appindicator3-1. Open TinyDash with its shortcut instead."
+
+// trayUnavailable is the warning for a tray that could not be shown.
+// When the error names libayatana-appindicator3, the library is missing
+// and the warning says how to install it. Any other failure keeps the
+// cause it was given.
+func trayUnavailable(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "libayatana-appindicator3") {
+		return errors.New(trayLibraryMissing)
+	}
+	return fmt.Errorf("The tray icon is unavailable: %v. Open TinyDash with its shortcut instead.", err)
 }
 
 // trayMenu is the tray icon's menu, as the Rust app had it.
