@@ -46,7 +46,13 @@ You can check that a download was built from this repository by its release work
 
 ## Build from source
 
-Install Go 1.27.3 or later. On Linux, also install `libgtk-3-dev` and `libayatana-appindicator3-dev`. Then:
+Install Go 1.27.3 or later. Compiling needs nothing else: TinyDash loads its libraries when it runs, and it does not use cgo. On Linux, running it needs `libgtk-3-0` and, for the tray icon, `libayatana-appindicator3-1`:
+
+```sh
+sudo apt install libgtk-3-0 libayatana-appindicator3-1
+```
+
+Then:
 
 ```sh
 go tool mygo build                                # the packaged app, into build/
