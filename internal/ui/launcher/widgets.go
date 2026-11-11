@@ -49,9 +49,14 @@ func (m *Model) widgetCards(c *ui.Context, p kit.Palette, w Widgets, card *ClipC
 		m.clipCard(c, p, card)
 	}
 	if w.Clocks {
-		// c.Now is the frame's time, which a Tester moves; the local
-		// zone is read each frame, so the clock follows a change of it.
-		now := c.Now().Local()
+		// c.Now is the frame's time, which a Tester moves. The zone is
+		// the one the last load read, so the clock follows a change of
+		// it each time the launcher shows.
+		zone := w.Zone
+		if zone == nil {
+			zone = time.Local
+		}
+		now := c.Now().In(zone)
 		clocks(c, p, now, w.Cities, c.Region().FormatLocale(c.Locale()))
 		// A new frame as the minute turns, not a timer that polls.
 		c.After(now.Truncate(time.Minute).Add(time.Minute).Sub(now))
@@ -234,16 +239,18 @@ func diskSpace(c *ui.Context, p kit.Palette, d Disk) {
 		low := d.low()
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 			ui.Icon(c, glyphs["disk"]).FontSize(14).TextColor(p.Muted)
+			// A long name ends in an ellipsis; the warning and the sizes
+			// keep their one line.
 			ui.Text(c, d.Name).FontWeight(600).TextColor(p.Ink).SingleLine()
 			if low {
-				ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				ui.Row(c).Gap(4).Shrink(0).AlignItems(ui.Center).Children(func() {
 					ui.Icon(c, glyphs["warning"]).FontSize(12).TextColor(p.Danger)
 					ui.Text(c, "Low space").FontSize(12).FontWeight(600).TextColor(p.Danger)
 				})
 			}
 			ui.Box(c).Grow(1)
-			ui.Text(c, formatBytes(d.FreeBytes)).FontSize(12).FontWeight(600).TextColor(p.Ink)
-			ui.Text(c, "free of "+formatBytes(d.TotalBytes)).FontSize(12).TextColor(p.Muted)
+			ui.Text(c, formatBytes(d.FreeBytes)).FontSize(12).FontWeight(600).TextColor(p.Ink).Shrink(0)
+			ui.Text(c, "free of "+formatBytes(d.TotalBytes)).FontSize(12).TextColor(p.Muted).Shrink(0)
 		})
 		used := d.usedPercent()
 		fill := p.Accent

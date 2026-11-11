@@ -81,6 +81,9 @@ func TestSaysWhatKeepsTheWeatherFromShowing(t *testing.T) {
 			if len(f.runs) != 1 || f.runs[0] != (ran{core.OpenSettings{}, ""}) {
 				t.Errorf("%v: runs %+v", c.weather.State, f.runs)
 			}
+			if !tt.Focused("Search") {
+				t.Errorf("%v: the keyboard left the search field", c.weather.State)
+			}
 		}
 	}
 }

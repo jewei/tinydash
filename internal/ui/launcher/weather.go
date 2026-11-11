@@ -30,8 +30,13 @@ const weatherHeight = 74
 
 func (m *Model) weatherContent(c *ui.Context, p kit.Palette, w Weather) {
 	note := func(text string) ui.Element { return ui.Text(c, text).FontSize(12).TextColor(p.Muted) }
+	// The keyboard stays in the search field, as with the pane's other
+	// buttons, for when the launcher stays open.
 	settingsButton := func() {
-		ui.Button(c, "Open Settings").OnClick(m.openSettings)
+		ui.Button(c, "Open Settings").OnClick(func() {
+			m.openSettings()
+			m.focusInput()
+		})
 	}
 	switch w.State {
 	case WeatherReady:
@@ -71,7 +76,9 @@ func (m *Model) weatherContent(c *ui.Context, p kit.Palette, w Weather) {
 		})
 	case WeatherNotFound:
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, "No place is named “"+w.City+"”.").TextColor(p.Ink).Grow(1).Shrink(1)
+			// A long city that is one word, as some towns are, ends in an
+			// ellipsis on the second line, and leaves the button its room.
+			ui.Text(c, "No place is named “"+w.City+"”.").TextColor(p.Ink).Grow(1).Shrink(1).MinWidth(0).MaxLines(2)
 			settingsButton()
 		})
 	case WeatherFailed:

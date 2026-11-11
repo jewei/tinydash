@@ -1,10 +1,13 @@
 package launcher
 
 import (
+	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/go-text/typesetting/segmenter"
 	"github.com/jewei/tinydash/internal/core"
 	"github.com/jewei/tinydash/internal/ui/kit"
 )
@@ -320,11 +323,46 @@ func jsonLine(c *ui.Context, p kit.Palette, number int, line JSONLine) ui.Elemen
 			spans = append(spans, ui.Span{Text: strings.Repeat("  ", line.Indent)})
 		}
 		for _, t := range line.Tokens {
-			spans = append(spans, ui.Span{Text: t.Text, Color: tokenColor(p, t.Kind)})
+			spans = append(spans, ui.Span{Text: breakable(t.Text), Color: tokenColor(p, t.Kind)})
 		}
 		ui.RichText(c, spans...).Font(monoFont).FontSize(12).PreserveSpaces().Grow(1).Shrink(1)
 	})
 }
+
+// breakable lets a long run without spaces, such as a long string or
+// number, wrap inside the view: it puts a zero-width space after every
+// breakEvery characters of the run. It counts graphemes, not runes, so it
+// never splits a character such as a flag, an emoji with a skin tone, or
+// a Hangul syllable. Only the view shows it; the copies come from the
+// card's actions.
+func breakable(text string) string {
+	if utf8.RuneCountInString(text) <= breakEvery {
+		return text
+	}
+	var seg segmenter.Segmenter
+	if seg.InitWithString(text) != nil {
+		return text
+	}
+	var b strings.Builder
+	run := 0
+	for it := seg.GraphemeIterator(); it.Next(); {
+		g := it.Grapheme()
+		if run == breakEvery {
+			b.WriteRune('\u200b')
+			run = 0
+		}
+		b.WriteString(string(g.Text))
+		run++
+		if slices.Contains(g.Text, ' ') {
+			run = 0
+		}
+	}
+	return b.String()
+}
+
+// breakEvery is how many characters without a space breakable leaves
+// whole.
+const breakEvery = 16
 
 func tokenColor(p kit.Palette, kind JSONTokenKind) ui.Color {
 	switch kind {

@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,26 @@ import (
 	"github.com/jewei/tinydash/internal/settings"
 	"github.com/jewei/tinydash/internal/ui/launcher"
 )
+
+// The widgets use the zone that Widgets reads from the computer at each
+// load, not the zone of the time they get: the cities' differences, the
+// zone of the local clock, and a Unix time card's local time.
+func TestTheWidgetsUseTheZoneOfTheComputer(t *testing.T) {
+	tokyo := time.FixedZone("JST", 9*3600)
+	now := time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
+	s := settings.Default()
+	s.ShowDiskSpace = false
+	s.ClockCities = []string{"London"}
+	s.ShowClipboardCards = true
+	// 2025-11-09 12:00 UTC is 21:00 in Tokyo.
+	got := loadWidgets(s, "", now, tokyo, nil, nil, func() (string, bool) { return "1762689600", true })
+	if got.Zone != tokyo || len(got.Cities) != 1 || got.Cities[0].Difference != "−9h" {
+		t.Errorf("zone %v, cities %+v", got.Zone, got.Cities)
+	}
+	if got.Card == nil || got.Card.Rows[0].Label != "Local" || !strings.Contains(got.Card.Rows[0].Value, "21:00") {
+		t.Errorf("card %+v", got.Card)
+	}
+}
 
 func TestLoadsTheWidgetsThatAreOn(t *testing.T) {
 	home := golden.Abs("/Users/me")
@@ -30,9 +51,10 @@ func TestLoadsTheWidgetsThatAreOn(t *testing.T) {
 	s := settings.Default()
 	s.ClockCities = []string{"Tokyo", "Atlantis", "London"}
 	s.ShowNotepad = true
-	got := loadWidgets(s, home, now, disk, note, noClipboard(t))
+	got := loadWidgets(s, home, now, now.Location(), disk, note, noClipboard(t))
 	want := launcher.Widgets{
 		Clocks: true,
+		Zone:   time.UTC,
 		Cities: []launcher.City{
 			{Name: "Tokyo", OffsetSeconds: 9 * 3600, Difference: "+9h"},
 			{Name: "London", OffsetSeconds: 0, Difference: "Same time"},
@@ -49,7 +71,7 @@ func TestLoadsTheWidgetsThatAreOn(t *testing.T) {
 
 	s.ShowClocks, s.ShowDiskSpace, s.ShowNotepad = false, false, false
 	read, notes = nil, 0
-	if got := loadWidgets(s, home, now, disk, note, noClipboard(t)); !reflect.DeepEqual(got, launcher.Widgets{}) || len(read) != 0 || notes != 0 {
+	if got := loadWidgets(s, home, now, now.Location(), disk, note, noClipboard(t)); !reflect.DeepEqual(got, launcher.Widgets{}) || len(read) != 0 || notes != 0 {
 		t.Errorf("with every widget off: %+v, disk read %q, note read %d times", got, read, notes)
 	}
 }
@@ -71,7 +93,7 @@ func TestReadsTheClipboardOnlyForItsCards(t *testing.T) {
 	now := time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC)
 	text := func(t string, ok bool) func() (string, bool) { return func() (string, bool) { return t, ok } }
 
-	got := loadWidgets(s, "", now, nil, nil, text("#2F6F5E", true))
+	got := loadWidgets(s, "", now, now.Location(), nil, nil, text("#2F6F5E", true))
 	if got.Card == nil {
 		t.Fatal("no card for a color")
 	}
@@ -85,19 +107,19 @@ func TestReadsTheClipboardOnlyForItsCards(t *testing.T) {
 		t.Errorf("color card %+v", got.Card)
 	}
 
-	unix := loadWidgets(s, "", now, nil, nil, text("1762689600", true)).Card
+	unix := loadWidgets(s, "", now, now.Location(), nil, nil, text("1762689600", true)).Card
 	if unix == nil || unix.Time == nil || unix.Rows[1] != (launcher.CardRow{Label: "UTC", Value: "Sun 9 Nov 2025, 12:00:00 UTC"}) || unix.Time.Relative != "1 year ago" {
 		t.Errorf("time card %+v", unix)
 	}
 
-	object := loadWidgets(s, "", now, nil, nil, text(`{"a": [1, true]}`, true)).Card
+	object := loadWidgets(s, "", now, now.Location(), nil, nil, text(`{"a": [1, true]}`, true)).Card
 	if object == nil || object.JSON == nil || len(object.JSON.Lines) != 6 || object.JSON.Keys[0] != (launcher.JSONKey{Name: "a", Hint: "[2]"}) ||
 		object.JSON.Lines[2].Tokens[1].Kind != launcher.JSONPunctuation || object.JSON.Lines[3].Tokens[0].Kind != launcher.JSONLiteral {
 		t.Errorf("json card %+v", object.JSON)
 	}
 
 	for _, read := range []func() (string, bool){text("hello", true), text("#fff", false)} {
-		if got := loadWidgets(s, "", now, nil, nil, read); !got.ClipCards || got.Card != nil {
+		if got := loadWidgets(s, "", now, now.Location(), nil, nil, read); !got.ClipCards || got.Card != nil {
 			t.Errorf("no card to show: %+v", got)
 		}
 	}
@@ -107,7 +129,7 @@ func TestShowsAtMostThreeCities(t *testing.T) {
 	s := settings.Default()
 	s.ClockCities = []string{"Tokyo", "London", "Paris", "Sydney"}
 	s.ShowDiskSpace = false
-	got := loadWidgets(s, "", time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC), nil, nil, noClipboard(t))
+	got := loadWidgets(s, "", time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC), time.UTC, nil, nil, noClipboard(t))
 	if len(got.Cities) != 3 || got.Cities[2].Name != "Paris" {
 		t.Errorf("cities %+v", got.Cities)
 	}
@@ -117,7 +139,7 @@ func TestSaysWhyTheDiskCouldNotBeRead(t *testing.T) {
 	s := settings.Default()
 	s.ShowClocks = false
 	failure := errors.New("The folder is gone.")
-	got := loadWidgets(s, golden.Abs("/Users/me"), time.Now(), func(string) (platform.Volume, error) {
+	got := loadWidgets(s, golden.Abs("/Users/me"), time.Now(), time.Local, func(string) (platform.Volume, error) {
 		return platform.Volume{}, failure
 	}, nil, noClipboard(t))
 	if got.Disk == nil || got.Disk.Err != failure {
@@ -131,7 +153,7 @@ func TestANoteThatCannotBeReadLeavesTheOtherWidgets(t *testing.T) {
 	s := settings.Default()
 	s.ShowNotepad = true
 	failure := errors.New("Could not read or save data: no such table: note. Try again, or restart TinyDash.")
-	got := loadWidgets(s, golden.Abs("/Users/me"), time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC),
+	got := loadWidgets(s, golden.Abs("/Users/me"), time.Date(2026, 11, 9, 12, 0, 0, 0, time.UTC), time.UTC,
 		func(string) (platform.Volume, error) { return platform.Volume{Name: "Disk"}, nil },
 		func() (string, error) { return "", failure }, noClipboard(t))
 	if got.Note == nil || got.Note.Err != failure || !got.Clocks || got.Disk == nil {
