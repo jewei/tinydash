@@ -10,6 +10,10 @@ import (
 // Context is how one search ranks and shows its results.
 type Context struct {
 	Personal core.Personal
+	// Available is the OS commands this machine can run. Nil offers every
+	// command, which is macOS, Windows, and tests. An empty map offers
+	// none. Commands that are not OS commands are always offered.
+	Available map[core.SystemCommand]bool
 }
 
 func (c Context) boost(id core.ID) uint32 {
@@ -20,6 +24,17 @@ func (c Context) boost(id core.ID) uint32 {
 }
 
 func (c Context) pinned(id core.ID) bool { return c.Personal != nil && c.Personal.Pinned(id) }
+
+// offers reports whether this machine can run cmd. A nil Available offers
+// every OS command. A command that stays inside TinyDash, such as Quit, is
+// always offered.
+func (c Context) offers(cmd *command) bool {
+	action, ok := cmd.action.(core.System)
+	if !ok || c.Available == nil {
+		return true
+	}
+	return c.Available[action.Command]
+}
 
 type command struct {
 	// key is the stable part of the result ID "system:<key>".
@@ -58,6 +73,9 @@ func Search(m *match.Matcher, ctx Context) []core.Scored {
 	var out []core.Scored
 	for i := range commands {
 		c := &commands[i]
+		if !ctx.offers(c) {
+			continue
+		}
 		if score, ok := m.Best(c.name, c.aliases...); ok {
 			out = append(out, core.Scored{Score: score + ctx.boost(core.SourceSystem.ID(c.key)), Result: result(c, ctx)})
 		}
@@ -67,9 +85,11 @@ func Search(m *match.Matcher, ctx Context) []core.Scored {
 
 // Browse lists every command.
 func Browse(ctx Context) []core.Result {
-	out := make([]core.Result, len(commands))
+	var out []core.Result
 	for i := range commands {
-		out[i] = result(&commands[i], ctx)
+		if ctx.offers(&commands[i]) {
+			out = append(out, result(&commands[i], ctx))
+		}
 	}
 	return out
 }
@@ -77,7 +97,7 @@ func Browse(ctx Context) []core.Result {
 // Get is the result of the command with this key.
 func Get(key string, ctx Context) (core.Result, bool) {
 	for i := range commands {
-		if commands[i].key == key {
+		if commands[i].key == key && ctx.offers(&commands[i]) {
 			return result(&commands[i], ctx), true
 		}
 	}
