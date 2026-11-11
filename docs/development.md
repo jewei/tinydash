@@ -42,8 +42,8 @@ Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the 
 - Tests sit next to the code, in the same package. Pure packages get disk, clock, and randomness as arguments, so their tests need no OS.
 - Write paths in tests as slash paths through `golden.Abs`. It turns `/Users/me` into `C:\Users\me` on Windows.
 - Views are tested headless with mygo's `ui.NewTester` and a fake backend. Tests move time with `Advance`, never `Sleep`.
-- The tests run on this machine's OS only. CI (`.github/workflows/ci.yml`) runs `verify-go.sh` on macOS, Windows, and Linux. After you push, wait for `gh pr checks <branch> --watch`.
-- The Coverage workflow runs the tests on Linux with coverage, and writes the share of code that they run to its job summary. It fails when a test fails, and its log shows the test output. Branch protection does not require it. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
+- The tests run on this machine's OS only. CI (`.github/workflows/ci.yml`) runs `verify-go.sh` on Linux for every pull request that changes code. macOS and Windows run on a push to `main`, and on a pull request that changes that OS's code or the build (`go.mod`, `mygo.json`, the CI workflow). `scripts/ci-changed.sh` is that list. A file named `*_darwin.go`, `*_windows.go`, or `*_linux.go`, and a `//go:build` line that names an OS, counts for the OS it builds on. After you push, wait for `gh pr checks <branch> --watch`.
+- The Linux job writes the share of code the tests run to its job summary. The same `go test` produces it. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
 - Search has a budget of 8 ms at p95, with 5,000 apps and 50,000 files. `TestSearchStaysWithinBudget` fails above 16 ms, which leaves room for slower CI machines; `verify-go.sh` runs it without the race detector. To see the numbers: `go test ./internal/search -run '^$' -bench .`.
 
 Automated tests do not cover these OS effects. Check them by hand on a real desktop, with throwaway data, when you change them: the global shortcut and hotkeys, the panel focus, the tray icon, open at login, the system commands, Spotlight results, clipboard capture of images and files, and the Up Next widget.
@@ -86,9 +86,9 @@ The version is in `mygo.json`.
 ## Dependencies
 
 - `go.mod` lists the modules. `internal/archtest/rules.go` allowlists each module and the packages that may import it. A new module fails the tests until it is added there, also when only a test imports it.
-- Dependabot opens one weekly PR for all Go modules and one for GitHub Actions.
-- The Audit workflow runs `govulncheck` every Monday (or from Actions > Audit > Run workflow) and fails on a vulnerable code path.
-- CodeQL scans the Go and workflow code on each pull request, on `main`, and every Monday. OpenSSF Scorecard grades the repository setup on `main` and every Monday. Both report to Security > Code scanning and never block a merge.
+- Dependabot opens one monthly PR for all Go modules and one for GitHub Actions.
+- The Audit workflow runs `govulncheck` on the first day of the month (or from Actions > Audit > Run workflow) and fails on a vulnerable code path.
+- CodeQL scans the Go and workflow code on each pull request, on `main`, and on the first day of the month. A pull request that changes only docs or images does not start it. OpenSSF Scorecard grades the repository setup on that same monthly schedule, and when you run the workflow by hand. Both report to Security > Code scanning and never block a merge.
 
 ## Bundled data
 

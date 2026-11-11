@@ -27,6 +27,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       checks: read
       # Only a token that can write sees draft releases.
@@ -73,6 +74,7 @@ jobs:
     name: Build (${{ matrix.platform }})
     needs: check
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       matrix:
         include:
@@ -84,6 +86,17 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: true
+      - name: Remember the Go build cache path
+        id: gocache
+        shell: bash
+        run: echo "path=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.gocache.outputs.path }}
+          key: go-build-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-
       # A temporary keychain holds the Developer ID certificate and the
       # notarytool credentials; the runner is thrown away after the job.
       - name: Set up signing and notarization
@@ -157,6 +170,7 @@ jobs:
     name: Publish
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: write
       # Sign and store the build provenance of each installer.

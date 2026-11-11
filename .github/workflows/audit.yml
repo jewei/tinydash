@@ -2,8 +2,12 @@ name: Audit
 
 on:
   schedule:
-    - cron: "17 3 * * 1"
+    - cron: "17 3 1 * *"
   workflow_dispatch:
+
+concurrency:
+  group: audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -12,11 +16,23 @@ jobs:
   go:
     name: Go vulnerabilities
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: true
+      - name: Remember the Go build cache path
+        id: gocache
+        shell: bash
+        run: echo "path=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.gocache.outputs.path }}
+          key: go-build-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-
       # Fails on a known vulnerability in code that TinyDash calls.
       - name: Check for vulnerable code paths
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

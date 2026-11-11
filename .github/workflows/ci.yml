@@ -5,59 +5,81 @@ on:
   push:
     branches: [main]
 
+# A pull request push is not also a push event: push runs only for main,
+# so one commit is not tested twice while it is still on the branch.
+# A new commit on a pull request cancels the run it replaces. A push to
+# main waits, so a result already in progress is kept.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  # A change to Markdown or docs/ alone has no code to build or test, so the
-  # other jobs skip their slow steps. Unknown history counts as code.
+  # Docs, images, and the workflows this file does not run have nothing to
+  # build. scripts/ci-changed.sh decides the rest: Linux for every code
+  # change, macOS and Windows when that OS's files or the build changed.
+  # A push to main runs every OS. Unknown history counts as code on every OS.
   # docs/architecture.md counts as code: TestArchitectureTableMatchesTheRules
   # reads it.
   changes:
     name: Changes
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      darwin: ${{ steps.diff.outputs.darwin }}
+      windows: ${{ steps.diff.outputs.windows }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - name: Check the path rules
+        run: bash scripts/ci-changed.sh --check
       - id: diff
         env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          EVENT: ${{ github.event_name }}
         run: |
           # --no-renames lists both paths of a rename, so a code file moved
           # into docs/ still counts as a code change.
           if ! changed=$(git diff --name-only --no-renames "$BASE" "$GITHUB_SHA"); then
-            echo "code=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "code=true"
+              echo "darwin=true"
+              echo "windows=true"
+            } | tee -a "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "$changed"
-          if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '(\.md$|^docs/|^LICENSE$)' \
-            && ! echo "$changed" | grep -qxF 'docs/architecture.md'; then
-            echo "code=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "code=true" >> "$GITHUB_OUTPUT"
-          fi
+          CI_CHANGED_SHA="$GITHUB_SHA" CI_CHANGED_BASE="$BASE" \
+            bash scripts/ci-changed.sh "$EVENT" <<< "$changed" | tee -a "$GITHUB_OUTPUT"
 
-  go:
-    name: Go (${{ matrix.os }})
+  go-linux:
+    name: Go (ubuntu-24.04)
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-15, windows-2025, ubuntu-24.04]
-    steps:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps: &go-steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: true
+      # The key is the module list, not the commit. A hit skips the upload,
+      # and the next run still recompiles this repo's own packages.
+      - name: Remember the Go build cache path
+        id: gocache
+        shell: bash
+        run: echo "path=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.gocache.outputs.path }}
+          key: go-build-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-
       # Runtime libraries only. The app loads them with purego, so the
       # -dev packages (headers) are not needed to vet or test.
       - name: Install Linux libraries
@@ -67,29 +89,77 @@ jobs:
           sudo apt-get install -y libgtk-3-0 libayatana-appindicator3-1
       - name: Vet, lint, and test
         shell: bash
+        env:
+          # The same test run records coverage. A second job used to repeat it.
+          COVERAGE_OUT: ${{ runner.os == 'Linux' && 'coverage.out' || '' }}
         run: bash scripts/verify-go.sh
+      - name: Report coverage
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          total=$(go tool cover -func=coverage.out | tail -1)
+          echo "$total"
+          { echo '```'; echo "$total"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - name: Model-check the TLA+ models
         if: runner.os == 'Linux'
         run: bash scripts/formal-verify.sh
 
+  go-macos:
+    name: Go (macos-15)
+    needs: changes
+    if: needs.changes.outputs.darwin == 'true'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps: *go-steps
+
+  go-windows:
+    name: Go (windows-2025)
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps: *go-steps
+
   # Branch protection on main requires this one name, so the job list can
   # change without a settings change. It runs even when a job fails, and
-  # passes only when every job passed. A skipped job counts only for a
-  # docs-only change; otherwise it fails, as a cancelled one does.
+  # passes only when every job that had work passed. A skipped Go job is
+  # expected for a docs-only change, and for an OS this diff does not build.
+  # A failure or a cancellation fails the check.
   required:
     name: Required checks
     if: always()
-    needs: [changes, go]
+    needs: [changes, go-linux, go-macos, go-windows]
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - name: Fail unless every job passed
+      - name: Fail unless every required job passed
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          CHANGES: ${{ needs.changes.result }}
+          LINUX: ${{ needs.go-linux.result }}
+          MACOS: ${{ needs.go-macos.result }}
+          WINDOWS: ${{ needs.go-windows.result }}
           CODE: ${{ needs.changes.outputs.code }}
+          WANT_MACOS: ${{ needs.changes.outputs.darwin }}
+          WANT_WINDOWS: ${{ needs.changes.outputs.windows }}
         run: |
-          echo "Results: $RESULTS (code changed: $CODE)"
-          for result in $RESULTS; do
-            [ "$result" = success ] && continue
-            [ "$result" = skipped ] && [ "$CODE" = false ] && continue
-            exit 1
-          done
+          echo "changes=$CHANGES linux=$LINUX macos=$MACOS windows=$WINDOWS code=$CODE macos job=$WANT_MACOS windows job=$WANT_WINDOWS"
+          fail=0
+          [ "$CHANGES" = success ] || fail=1
+          check() {
+            result="$1"
+            want="$2"
+            name="$3"
+            if [ "$want" = true ]; then
+              if [ "$result" != success ]; then
+                echo "$name is $result"
+                fail=1
+              fi
+            elif [ "$result" != skipped ] && [ "$result" != success ]; then
+              echo "$name is $result"
+              fail=1
+            fi
+          }
+          check "$LINUX" "$CODE" "Go (ubuntu-24.04)"
+          check "$MACOS" "$WANT_MACOS" "Go (macos-15)"
+          check "$WINDOWS" "$WANT_WINDOWS" "Go (windows-2025)"
+          exit "$fail"
