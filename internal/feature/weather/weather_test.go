@@ -115,19 +115,44 @@ func TestShowsWholeDegreesInTheChosenUnit(t *testing.T) {
 	if got := [3]int{Degrees(w.Temperature, true), Degrees(w.High, true), Degrees(w.Low, false)}; got != [3]int{89, 92, 26} {
 		t.Errorf("degrees %v", got)
 	}
-	for _, c := range []struct {
-		code      uint8
-		day       bool
+}
+
+// The words and icon of each WMO code, as the Rust app gave them. Codes
+// that Open-Meteo does not document read as Unknown under a cloud.
+func TestDescribesEveryWeatherCodeAsTheRustAppDid(t *testing.T) {
+	type answer struct {
 		condition string
 		icon      Icon
-	}{
-		{2, true, "Partly cloudy", PartlyDay},
-		{0, false, "Clear", ClearNight},
-		{96, true, "Thunderstorm with hail", Thunder},
-		{200, true, "Unknown", Cloudy},
-	} {
-		if condition, icon := Describe(c.code, c.day); condition != c.condition || icon != c.icon {
-			t.Errorf("Describe(%d, %v) = %q, %q", c.code, c.day, condition, icon)
+	}
+	byCode := map[uint8]answer{
+		3:  {"Cloudy", Cloudy},
+		45: {"Fog", Fog}, 48: {"Fog", Fog},
+		51: {"Drizzle", Rain}, 53: {"Drizzle", Rain}, 55: {"Drizzle", Rain},
+		56: {"Freezing drizzle", Rain}, 57: {"Freezing drizzle", Rain},
+		61: {"Light rain", Rain}, 63: {"Rain", Rain}, 65: {"Heavy rain", Rain},
+		66: {"Freezing rain", Rain}, 67: {"Freezing rain", Rain},
+		71: {"Light snow", Snow}, 73: {"Snow", Snow}, 75: {"Heavy snow", Snow}, 77: {"Snow", Snow},
+		80: {"Rain showers", Rain}, 81: {"Rain showers", Rain}, 82: {"Rain showers", Rain},
+		85: {"Snow showers", Snow}, 86: {"Snow showers", Snow},
+		95: {"Thunderstorm", Thunder},
+		96: {"Thunderstorm with hail", Thunder}, 99: {"Thunderstorm with hail", Thunder},
+	}
+	for _, isDay := range []bool{true, false} {
+		want := map[uint8]answer{0: {"Clear", ClearDay}, 1: {"Mostly clear", PartlyDay}, 2: {"Partly cloudy", PartlyDay}}
+		if !isDay {
+			want = map[uint8]answer{0: {"Clear", ClearNight}, 1: {"Mostly clear", PartlyNight}, 2: {"Partly cloudy", PartlyNight}}
+		}
+		for code, a := range byCode {
+			want[code] = a
+		}
+		for code := 0; code <= 255; code++ {
+			w, ok := want[uint8(code)]
+			if !ok {
+				w = answer{"Unknown", Cloudy}
+			}
+			if condition, icon := Describe(uint8(code), isDay); condition != w.condition || icon != w.icon {
+				t.Errorf("Describe(%d, %v) = %q, %q, want %q, %q", code, isDay, condition, icon, w.condition, w.icon)
+			}
 		}
 	}
 }
