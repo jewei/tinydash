@@ -15,6 +15,7 @@ import (
 	"github.com/jewei/tinydash/internal/feature/emoji"
 	"github.com/jewei/tinydash/internal/feature/files"
 	"github.com/jewei/tinydash/internal/feature/library"
+	"github.com/jewei/tinydash/internal/golden"
 	"github.com/jewei/tinydash/internal/settings"
 )
 
@@ -281,6 +282,28 @@ func TestAnAliasLiftsItsResultOnceInAllAndInItsTab(t *testing.T) {
 	s.Hidden = NewHidden("system:sleep")
 	if slices.Contains(ids(Search(s, "lo", core.CategoryAll)), "system:sleep") {
 		t.Error("a hidden result found by its alias")
+	}
+}
+
+// In All, an alias the query only starts ranks with its own source, so an
+// app named like the query still comes first; a whole alias goes above
+// every source. A source kept out of All stays out, alias and all.
+func TestAnAliasPrefixRanksWithItsSourceInAll(t *testing.T) {
+	s := empty()
+	s.Apps = apps.NewIndex([]apps.App{{Name: "Safari", Path: golden.Abs("/Applications/Safari.app")}})
+	safari := s.Apps.Browse(apps.Context{})[0].ID
+	s.Aliases = NewAliases(map[core.ID]string{"system:sleep": "safari"})
+	if found := ids(Search(s, "saf", core.CategoryAll)); len(found) < 2 || found[0] != safari || found[1] != "system:sleep" {
+		t.Errorf("saf: %q", found)
+	}
+	if found := ids(Search(s, "safari", core.CategoryAll)); len(found) < 2 || found[0] != "system:sleep" || found[1] != safari {
+		t.Errorf("safari: %q", found)
+	}
+	withTabs(s, func(c core.Category) bool { return c != core.CategorySystem })
+	for _, query := range []string{"saf", "safari"} {
+		if slices.Contains(ids(Search(s, query, core.CategoryAll)), "system:sleep") {
+			t.Errorf("%s: an alias brought a source kept out of All", query)
+		}
 	}
 }
 
