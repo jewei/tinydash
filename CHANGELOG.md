@@ -4,6 +4,8 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-13
+
 ### Added
 
 - Settings > About shows the version of TinyDash, the folders that hold your settings and saved data, where to get new versions, and the credits.
@@ -301,7 +303,8 @@ A rewrite: the same keyboard-first launcher, with much less code.
 
 The first public release: search apps, files, folders, and clipboard history; calculate, convert units, currencies, dates, and times; find emoji; generate passwords; clean URLs; and search the web.
 
-[Unreleased]: https://github.com/jewei/tinydash/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/jewei/tinydash/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/jewei/tinydash/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/jewei/tinydash/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/jewei/tinydash/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jewei/tinydash/compare/v0.7.0...v0.8.0
