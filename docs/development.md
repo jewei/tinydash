@@ -66,7 +66,7 @@ A Go answer that differs from the corpus fails its test, unless `testdata/golden
 
 ## Formal checks
 
-`formal/ClipboardHistory.tla` models clipboard capture against Clear and history on/off. `bash scripts/formal-verify.sh` downloads TLC 1.7.4 once into `~/.cache/tinydash` (or `$XDG_CACHE_HOME/tinydash`), checks its SHA-256, and runs each model. Each config is `<Spec>.<variant>.cfg`. A config whose name holds `.broken` models a known bug: it must fail on the invariant that its `\* must break: <Invariant>` line names, which shows that the check can catch the bug. Every other config must pass. CI runs it on Linux. Before you change clipboard capture, Clear, or history on/off, use the `formal-verify-clipboard` skill.
+`formal/ClipboardHistory.tla` models clipboard capture against Clear and history on/off. `bash scripts/formal-verify.sh` downloads TLC 1.7.4 once into `~/.cache/tinydash` (or `$XDG_CACHE_HOME/tinydash`), checks its SHA-256, and runs each model. Each config is `<Spec>.<variant>.cfg`. A config whose name holds `.broken` models a known bug: it must fail on the invariant that its `\* must break: <Invariant>` line names, which shows that the check can catch the bug. Every other config must pass. CI runs it in its own Linux job, beside the Go jobs, for every pull request that changes code. Before you change clipboard capture, Clear, or history on/off, use the `formal-verify-clipboard` skill.
 
 ## Drive the real app: the verify-tinydash skill
 

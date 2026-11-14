@@ -123,8 +123,18 @@ jobs:
             ${{ steps.gocache.outputs.modules }}
             ${{ steps.gocache.outputs.lint }}
           key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+
+  # The models need only Java, so they run beside the Go jobs instead of
+  # after the Linux tests.
+  formal:
+    name: TLA+ models
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Model-check the TLA+ models
-        if: runner.os == 'Linux'
         run: bash scripts/formal-verify.sh
 
   go-macos:
@@ -151,7 +161,7 @@ jobs:
   required:
     name: Required checks
     if: always()
-    needs: [changes, go-linux, go-macos, go-windows]
+    needs: [changes, go-linux, go-macos, go-windows, formal]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -161,11 +171,12 @@ jobs:
           LINUX: ${{ needs.go-linux.result }}
           MACOS: ${{ needs.go-macos.result }}
           WINDOWS: ${{ needs.go-windows.result }}
+          FORMAL: ${{ needs.formal.result }}
           CODE: ${{ needs.changes.outputs.code }}
           WANT_MACOS: ${{ needs.changes.outputs.darwin }}
           WANT_WINDOWS: ${{ needs.changes.outputs.windows }}
         run: |
-          echo "changes=$CHANGES linux=$LINUX macos=$MACOS windows=$WINDOWS code=$CODE macos job=$WANT_MACOS windows job=$WANT_WINDOWS"
+          echo "changes=$CHANGES linux=$LINUX macos=$MACOS windows=$WINDOWS formal=$FORMAL code=$CODE macos job=$WANT_MACOS windows job=$WANT_WINDOWS"
           fail=0
           [ "$CHANGES" = success ] || fail=1
           check() {
@@ -185,4 +196,5 @@ jobs:
           check "$LINUX" "$CODE" "Go (ubuntu-24.04)"
           check "$MACOS" "$WANT_MACOS" "Go (macos-15)"
           check "$WINDOWS" "$WANT_WINDOWS" "Go (windows-2025)"
+          check "$FORMAL" "$CODE" "TLA+ models"
           exit "$fail"
