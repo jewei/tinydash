@@ -30,8 +30,30 @@ Terminal=false
 EOF
 }
 
+# prepare makes the launch options real before the app starts: a stub
+# logs each call to /scratch/stub-calls and succeeds, and a hidden
+# library moves out of the loader's path.
+prepare() {
+  mkdir -p /opt/stubs
+  for name in ${TD_STUBS:-}; do
+    printf '#!/bin/sh\necho "%s $*" >>/scratch/stub-calls\n' "$name" >"/opt/stubs/$name"
+    chmod +x "/opt/stubs/$name"
+  done
+  for lib in ${TD_WITHOUT_LIBS:-}; do
+    mkdir -p /root/without-libs
+    found=0
+    for file in /usr/lib/*/"$lib".so*; do
+      [ -e "$file" ] || continue
+      mv "$file" /root/without-libs/ && found=1
+    done
+    [ "$found" = 1 ] || { echo "--without-lib $lib: no /usr/lib/*/$lib.so* in the box" >&2; exit 1; }
+  done
+  ldconfig
+}
+
 start() {
   seed
+  prepare
   mkdir -p /run/td && chmod 700 /run/td
   Xvfb :99 -screen 0 1440x900x24 -nolisten tcp >/scratch/xvfb.log 2>&1 &
   i=0
@@ -88,6 +110,10 @@ doctor() {
   fi
   for line in "Indexed applications" "Indexed files"; do
     if grep -q "$line" "$log"; then echo "ok   log: $(grep -m1 "$line" "$log" | cut -d' ' -f3-)"; else echo "FAIL log lacks \"$line\""; fail=1; fi
+  done
+  for name in ${TD_STUBS:-}; do echo "ok   stub $name: $(command -v "$name")"; done
+  for lib in ${TD_WITHOUT_LIBS:-}; do
+    if ls /usr/lib/*/"$lib".so* >/dev/null 2>&1; then echo "FAIL $lib is loadable"; fail=1; else echo "ok   without $lib"; fi
   done
   if grep -E ' (WARN|ERROR) |panic' "$log" >/dev/null; then
     echo "WARN app logged:"; grep -E ' (WARN|ERROR) |panic' "$log"

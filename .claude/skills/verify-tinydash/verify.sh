@@ -4,7 +4,10 @@
 # data. Run from anywhere in the repo; see SKILL.md for the journeys.
 #
 #   verify.sh build                 image + linux binaries (e2e build) for this run
-#   verify.sh launch                start a box, seed it, start the app, wait
+#   verify.sh launch [options]      start a box, seed it, start the app, wait
+#       --env KEY=VALUE             set a variable for the box and the app
+#       --stub NAME                 a program NAME on PATH that logs its call
+#       --without-lib NAME          hide /usr/lib/*/NAME.so* before the app starts
 #   verify.sh doctor                read-only health check of the running box
 #   verify.sh auto <args...>        mygo-automation inside the box
 #   verify.sh ref <text>            the ref of the first snapshot line holding text
@@ -68,6 +71,29 @@ build)
   cat "$bin/BUILD"
   ;;
 launch)
+  shift
+  # Options change what the app finds at start: the desktop it reads from
+  # the environment, the programs on PATH, the libraries it can load. The
+  # app reads them once, so they are set before it starts.
+  env_args=() stubs="" without_libs=""
+  name_re='^[A-Za-z0-9._+-]+$'
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --env)
+      [[ "${2:-}" =~ ^[A-Za-z_][A-Za-z0-9_]*=.*$ ]] || { echo "--env takes KEY=VALUE" >&2; exit 2; }
+      case "${2%%=*}" in DISPLAY | PATH | XDG_CACHE_HOME | TD_STUBS | TD_WITHOUT_LIBS)
+        echo "--env cannot set ${2%%=*}: the box needs its own" >&2; exit 2 ;;
+      esac
+      env_args+=(-e "$2"); shift 2 ;;
+    --stub)
+      [[ "${2:-}" =~ $name_re ]] || { echo "--stub takes a program name" >&2; exit 2; }
+      stubs="$stubs $2"; shift 2 ;;
+    --without-lib)
+      [[ "${2:-}" =~ $name_re ]] || { echo "--without-lib takes a library name, such as libayatana-appindicator3" >&2; exit 2; }
+      without_libs="$without_libs $2"; shift 2 ;;
+    *) echo "unknown launch option: $1" >&2; exit 2 ;;
+    esac
+  done
   [[ -x "$bin/tinydash" ]] || { echo "no build for $run: run verify.sh build with this TD_RUN" >&2; exit 1; }
   if docker inspect "$box" >/dev/null 2>&1; then
     echo "$box exists: run verify.sh cleanup first, or set another TD_RUN" >&2
@@ -75,12 +101,20 @@ launch)
   fi
   mkdir -p "$evidence" "$root/cache"
   cp "$bin/BUILD" "$evidence/BUILD"
+  {
+    for e in ${env_args[@]+"${env_args[@]}"}; do [[ "$e" == -e ]] || echo "env $e"; done
+    for s in $stubs; do echo "stub $s"; done
+    for l in $without_libs; do echo "without-lib $l"; done
+  } >"$evidence/LAUNCH"
   # cache: mygo's SQLite library, downloaded once and SHA-256-checked.
   # --init reaps exited processes, so a pid that ended is gone, not a zombie.
   docker run -d --rm --init --name "$box" --label tinydash-verify="$run" \
     -v "$bin:/opt/td:ro" -v "$skill:/opt/skill:ro" \
     -v "$root/cache:/cache" -v "$evidence:/evidence" \
     -e XDG_CACHE_HOME=/cache -e DISPLAY=:99 \
+    -e PATH=/opt/stubs:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    -e TD_STUBS="${stubs# }" -e TD_WITHOUT_LIBS="${without_libs# }" \
+    ${env_args[@]+"${env_args[@]}"} \
     "$image" sleep infinity >/dev/null
   in_box /opt/skill/box.sh start
   echo "ready: $box, evidence in ${evidence#"$repo/"}"

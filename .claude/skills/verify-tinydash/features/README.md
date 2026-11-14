@@ -44,6 +44,7 @@ Each feature file starts with an H1 title and one paragraph about the user-visib
 - [Alias](./alias.md): add an alias from the Actions menu, then type it to put the result first.
 - [Clipboard cards](./clipboard-cards.md): turn cards on in Settings, copy a color or JSON, run the card's main action, and open the full JSON view.
 - [Notepad](./notepad.md): turn the Notepad on, type in it with Ctrl+J, and see the note saved, kept, and retried after a failure.
+- [Linux desktop](./linux-desktop.md): System commands offered only when the desktop can run them, the missing-tray warning, and the window class, with launch options for the desktop, stub programs, and a hidden library.
 
 ## Known app failures
 
