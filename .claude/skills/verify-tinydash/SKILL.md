@@ -1,6 +1,6 @@
 ---
 name: verify-tinydash
-description: Launch and drive the Go (mygo) port of TinyDash, the keyboard launcher, inside a Linux container on a virtual X display, through mygo's automation socket, and capture proof (window captures, element trees, tinydash.db rows, the X clipboard). Use to prove that a Go launcher change works in the real app (search and run, calculator, clipboard history, the global shortcut, aliases), never on the Mac's desktop.
+description: Launch and drive the Go (mygo) port of TinyDash, the keyboard launcher, inside a Linux container on a virtual X display, through mygo's automation socket, and capture proof (window captures, element trees, tinydash.db rows, the X clipboard). Use to prove that a Go launcher change works in the real app (search and run, calculator, clipboard history, the global shortcut, aliases, Linux System commands and tray), never on the Mac's desktop.
 ---
 
 # Verify TinyDash (Go port)
@@ -23,6 +23,7 @@ V=.claude/skills/verify-tinydash/verify.sh
 export TD_RUN=proof-1          # names the box and the evidence folder; default "local"
 $V build                       # Docker image + this run's linux binaries; prints BUILD (commit, sha256, arch)
 $V launch                      # start the box, seed it, start TinyDash, wait until ready
+$V launch --env K=V --stub P --without-lib L   # the same, with a changed environment (below)
 $V doctor                      # read-only health check; exit 1 on a failure
 $V auto <mygo-automation args> # e.g. $V auto snapshot -i ; $V auto key Enter --settle
 $V ref '[tab] "Clipboard"'     # the ref (@eN) of the first snapshot line that holds the text
@@ -46,6 +47,16 @@ The `mygo-automation` guide for the pinned mygo version: `$V auto skills`. Read 
 3. Ready output ends with `ready: tinydash-verify-<run>, evidence in .local/verify/runs/<run>` and the panel shows as `w1 [content] "TinyDash" focused`.
 
 SQLite: mygo's SQLite plugin downloads `libmygo-sqlite3.so` on first use and checks its SHA-256. The box sets `XDG_CACHE_HOME=/cache`, mounted from `.local/verify/cache/`, so the download happens once and later runs reuse the checked file. The first launch needs network access to GitHub releases.
+
+### Launch options
+
+The app reads the desktop, its programs, and its libraries once, at start. To test what it does on another Linux desktop, change them with options to `launch`, never inside a running box. Each option can repeat.
+
+- `--env KEY=VALUE` sets a variable for the box and the app, such as `XDG_CURRENT_DESKTOP=GNOME` or `XDG_SESSION_TYPE=x11`. `DISPLAY`, `PATH`, and `XDG_CACHE_HOME` stay the box's own.
+- `--stub NAME` puts a program `NAME` first on `PATH`. It appends `NAME <args>` to `/scratch/stub-calls` and succeeds. Use it to prove which program and arguments the app runs, such as `loginctl lock-session`, without running the real one.
+- `--without-lib NAME` moves `/usr/lib/*/NAME.so*` out of the loader's path, such as `libayatana-appindicator3`. The launch fails if the box has no such library.
+
+`launch` writes the options to `LAUNCH` in the run folder, and `doctor` checks each stub and hidden library. See [the Linux desktop journey](features/linux-desktop.md).
 
 ## Doctor
 
