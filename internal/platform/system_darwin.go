@@ -12,7 +12,7 @@ import (
 	"github.com/jewei/tinydash/internal/core"
 )
 
-// plan is what one system command runs. Exactly one of program, script,
+// plan is what a system command runs. Exactly one of program, script,
 // and native is set.
 type plan struct {
 	program           string
