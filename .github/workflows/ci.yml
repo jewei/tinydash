@@ -67,19 +67,34 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: true
-      # The key is the module list, not the commit. A hit skips the upload,
-      # and the next run still recompiles this repo's own packages.
-      - name: Remember the Go build cache path
+          # The step below caches modules, builds, and staticcheck together.
+          cache: false
+      - name: Find the Go caches
         id: gocache
         shell: bash
-        run: echo "path=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        run: |
+          {
+            echo "build=$(go env GOCACHE)"
+            echo "modules=$(go env GOMODCACHE)"
+            echo "lint=$RUNNER_TEMP/staticcheck"
+          } >> "$GITHUB_OUTPUT"
+          echo "STATICCHECK_CACHE=$RUNNER_TEMP/staticcheck" >> "$GITHUB_ENV"
+      # main saves a cache under its commit, and every run restores the
+      # newest one, so a pull request starts from main's latest build. A
+      # key without the commit was written once and never refreshed. Pull
+      # requests do not save: GitHub would scope the entry to that branch,
+      # where no other run can read it, and it would push main's out of
+      # the 10 GB quota.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ${{ steps.gocache.outputs.path }}
-          key: go-build-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          path: |
+            ${{ steps.gocache.outputs.build }}
+            ${{ steps.gocache.outputs.modules }}
+            ${{ steps.gocache.outputs.lint }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
-            go-build-${{ runner.os }}-
+            go-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+            go-${{ runner.os }}-
       # Runtime libraries only. The app loads them with purego, so the
       # -dev packages (headers) are not needed to vet or test.
       - name: Install Linux libraries
@@ -100,6 +115,14 @@ jobs:
           total=$(go tool cover -func=coverage.out | tail -1)
           echo "$total"
           { echo '```'; echo "$total"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - if: github.event_name == 'push'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.gocache.outputs.build }}
+            ${{ steps.gocache.outputs.modules }}
+            ${{ steps.gocache.outputs.lint }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
       - name: Model-check the TLA+ models
         if: runner.os == 'Linux'
         run: bash scripts/formal-verify.sh

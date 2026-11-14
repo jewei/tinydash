@@ -43,6 +43,7 @@ Without `--data-dir`, TinyDash uses the folders of the Rust app, which hold the 
 - Write paths in tests as slash paths through `golden.Abs`. It turns `/Users/me` into `C:\Users\me` on Windows.
 - Views are tested headless with mygo's `ui.NewTester` and a fake backend. Tests move time with `Advance`, never `Sleep`.
 - The tests run on this machine's OS only. CI (`.github/workflows/ci.yml`) runs `verify-go.sh` on Linux for every pull request that changes code. macOS and Windows run on a push to `main`, and on a pull request that changes that OS's code or the build (`go.mod`, `mygo.json`, the CI workflow). `scripts/ci-changed.sh` is that list. A file named `*_darwin.go`, `*_windows.go`, or `*_linux.go`, and a `//go:build` line that names an OS, counts for the OS it builds on. After you push, wait for `gh pr checks <branch> --watch`.
+- Each Go job restores one cache of modules, builds, and staticcheck results. Only a push to `main` saves it, under its commit, so a pull request starts from the latest build on `main`.
 - The Linux job writes the share of code the tests run to its job summary. The same `go test` produces it. To see it locally: `go test -coverprofile=coverage.out ./...`, then `go tool cover -func=coverage.out`.
 - Search has a budget of 8 ms at p95, with 5,000 apps and 50,000 files. `TestSearchStaysWithinBudget` fails above 16 ms, which leaves room for slower CI machines; `verify-go.sh` runs it without the race detector. To see the numbers: `go test ./internal/search -run '^$' -bench .`.
 
