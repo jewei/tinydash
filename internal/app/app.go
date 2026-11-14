@@ -516,7 +516,7 @@ func (a *App) refreshRates(force bool) {
 	<-a.engine.SetRates(rates)
 }
 
-// ratesDue reports whether to download rates now: when forced, or when
+// ratesDue reports whether to download rates now: when forced, or while
 // they are missing or old and the last try was rateRetry ago or more.
 func ratesDue(force, fresh bool, triedAt, now time.Time) bool {
 	return force || !fresh && now.Sub(triedAt) >= rateRetry
