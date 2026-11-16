@@ -550,3 +550,29 @@ func TestFormatsNumbersAsFendDoes(t *testing.T) {
 		}
 	}
 }
+
+// A power that no fraction can hold is rounded, and one with no finite
+// real value gets no answer.
+func TestRoundsPowersThatCannotBeExact(t *testing.T) {
+	expect(t, value, map[string]string{
+		"2^0.5":   "approx. 1.4142135624",
+		"2^1.5":   "approx. 2.8284271247",
+		"2^(1/3)": "approx. 1.2599210499",
+	})
+	expectNone(t, value, "10^400.5", "0^-0.3", "(-8)^0.3", "2 m ^ 0.3")
+}
+
+// `US$`, `AU$`, `HK$`, and `NZ$` are one name each, before or after the
+// amount. Another word keeps its `$` apart, so `to$` still converts.
+func TestReadsDollarsWrittenWithTheirCountry(t *testing.T) {
+	rates := testRates{"2026-10-02", map[string]float64{"USD": 1.17, "MYR": 4.7, "AUD": 1.8, "HKD": 9, "NZD": 2}}
+	get := func(q string) string { return valueWith(rates, q) }
+	expect(t, get, map[string]string{
+		"US$100 to myr":  "401.71 MYR",
+		"100 US$ to MYR": "401.71 MYR",
+		"AU$18 to eur":   "10.00 EUR",
+		"HK$90 to eur":   "10.00 EUR",
+		"NZ$ 20 to eur":  "10.00 EUR",
+		"100 eur to$":    "$117",
+	})
+}
