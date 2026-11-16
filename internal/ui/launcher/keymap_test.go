@@ -134,3 +134,39 @@ func TestMenuFilterMatchesEveryWord(t *testing.T) {
 		}
 	}
 }
+
+// The menu's arrows stop at its ends, a filter starts again at its first
+// match, and Enter runs the item the arrows reached.
+func TestArrowsChooseTheMenuItemEnterRuns(t *testing.T) {
+	f := newFake(always(safari))
+	m, tt := open(t, f)
+	tt.Key(ui.Cmd, ui.KeyK)
+	last := len(m.menu.visible()) - 1
+	tt.Key(0, ui.KeyUp)
+	if m.menu.active != 0 {
+		t.Fatalf("Up on the first item moved to %d", m.menu.active)
+	}
+	for range last + 3 {
+		tt.Key(0, ui.KeyDown)
+	}
+	if m.menu.active != last {
+		t.Fatalf("Down past the last item reached %d, want %d", m.menu.active, last)
+	}
+	for range last - 1 {
+		tt.Key(0, ui.KeyUp)
+	}
+	tt.Key(0, ui.KeyEnter)
+	wantRuns(t, f, ran{safari.Actions[1].Action, ""})
+	if m.menu != nil {
+		t.Error("the menu stayed open after Enter")
+	}
+
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Key(0, ui.KeyDown)
+	tt.Type("open")
+	if m.menu.active != 0 {
+		t.Fatalf("a filter kept item %d", m.menu.active)
+	}
+	tt.Key(0, ui.KeyEnter)
+	wantRuns(t, f, ran{safari.Actions[1].Action, ""}, ran{safari.Actions[0].Action, safari.ID})
+}
