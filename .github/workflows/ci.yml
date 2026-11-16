@@ -73,6 +73,15 @@ jobs:
         id: gocache
         shell: bash
         run: |
+          # Windows keeps Go's caches on C:, where restoring them took about
+          # a minute. The workspace and RUNNER_TEMP are on the faster D:.
+          if [ "$RUNNER_OS" = Windows ]; then
+            export GOCACHE="$RUNNER_TEMP\\go-build" GOMODCACHE="$RUNNER_TEMP\\go-mod"
+            {
+              echo "GOCACHE=$GOCACHE"
+              echo "GOMODCACHE=$GOMODCACHE"
+            } >> "$GITHUB_ENV"
+          fi
           {
             echo "build=$(go env GOCACHE)"
             echo "modules=$(go env GOMODCACHE)"
