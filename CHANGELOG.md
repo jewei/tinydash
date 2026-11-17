@@ -4,6 +4,10 @@ What changed in each release of TinyDash, newest first. The format follows [Keep
 
 ## [Unreleased]
 
+### Fixed
+
+- The calculator gives exact roots of perfect powers: `8^(1/3)` is 2, not approx. 2.
+
 ## [0.11.0] - 2026-11-13
 
 ### Added

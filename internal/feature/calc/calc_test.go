@@ -1,6 +1,7 @@
 package calc
 
 import (
+	"math/big"
 	"reflect"
 	"strings"
 	"testing"
@@ -562,6 +563,21 @@ func TestRoundsPowersThatCannotBeExact(t *testing.T) {
 	expectNone(t, value, "10^400.5", "0^-0.3", "(-8)^0.3", "2 m ^ 0.3")
 }
 
+// fend takes the exact root of a perfect power, so these answers are exact.
+func TestTakesExactRootsOfPerfectPowers(t *testing.T) {
+	expect(t, value, map[string]string{
+		"8^(1/3)":       "2",
+		"16^0.25":       "2",
+		"8^(2/3)":       "4",
+		"32^0.2":        "2",
+		"8^(-1/3)":      "0.5",
+		"0^(1/3)":       "0",
+		"(2^60)^(1/60)": "2",
+		"(8/27)^(1/3)":  value("2/3"),
+	})
+	expectNone(t, value, "(-8)^(1/3)")
+}
+
 // `US$`, `AU$`, `HK$`, and `NZ$` are one name each, before or after the
 // amount. Another word keeps its `$` apart, so `to$` still converts.
 func TestReadsDollarsWrittenWithTheirCountry(t *testing.T) {
@@ -575,4 +591,27 @@ func TestReadsDollarsWrittenWithTheirCountry(t *testing.T) {
 		"NZ$ 20 to eur":  "10.00 EUR",
 		"100 eur to$":    "$117",
 	})
+}
+
+// intRoot finds every root a count up from zero finds, and no other.
+func TestIntRootFindsExactlyThePerfectPowers(t *testing.T) {
+	roots := map[[2]int64]int64{}
+	for n := int64(1); n <= 9; n++ {
+		for k := int64(0); ; k++ {
+			p := new(big.Int).Exp(big.NewInt(k), big.NewInt(n), nil).Int64()
+			if p >= 1500 {
+				break
+			}
+			roots[[2]int64{p, n}] = k
+		}
+	}
+	for x := int64(0); x < 1500; x++ {
+		for n := int64(1); n <= 9; n++ {
+			r, ok := intRoot(big.NewInt(x), big.NewInt(n))
+			want, perfect := roots[[2]int64{x, n}]
+			if ok != perfect || ok && r.Int64() != want {
+				t.Errorf("root %d of %d = %v, %v; want %d, %v", n, x, r, ok, want, perfect)
+			}
+		}
+	}
 }
