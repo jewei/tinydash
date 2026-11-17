@@ -651,9 +651,52 @@ func power(x, y quantity) (quantity, error) {
 		}
 		return power(root, plain(new(big.Rat).SetInt(y.value.Num())))
 	}
+	// fend takes the exact root of a perfect power, so 8^(1/3) is 2.
+	if root, ok := exactRoot(x.value, y.value.Denom()); ok {
+		return power(quantity{value: root, inexact: x.inexact, style: x.style}, plain(new(big.Rat).SetInt(y.value.Num())))
+	}
 	base, _ := x.value.Float64()
 	exponent, _ := y.value.Float64()
 	return fromFloat(math.Pow(base, exponent))
+}
+
+// exactRoot is the nth root of a non-negative x, when its numerator and
+// denominator are both nth powers.
+func exactRoot(x *big.Rat, n *big.Int) (*big.Rat, bool) {
+	num, ok := intRoot(x.Num(), n)
+	if !ok {
+		return nil, false
+	}
+	den, ok := intRoot(x.Denom(), n)
+	if !ok {
+		return nil, false
+	}
+	return new(big.Rat).SetFrac(num, den), true
+}
+
+// intRoot is the nth root of a non-negative x, when x is an nth power. A
+// root of 2 or more has an nth power of at least 2^n, so a larger n than
+// x has bits leaves only 0 and 1.
+func intRoot(x, n *big.Int) (*big.Int, bool) {
+	if x.Cmp(big.NewInt(1)) <= 0 {
+		return new(big.Int).Set(x), true
+	}
+	if !n.IsInt64() || n.Int64() >= int64(x.BitLen()) {
+		return nil, false
+	}
+	// Newton's method from above: r = ((n-1)r + x/r^(n-1)) / n falls to
+	// the floor of the root, then stops falling.
+	less := new(big.Int).Sub(n, big.NewInt(1))
+	r := new(big.Int).Lsh(big.NewInt(1), uint((int64(x.BitLen())+n.Int64()-1)/n.Int64()))
+	for {
+		next := new(big.Int).Quo(x, new(big.Int).Exp(r, less, nil))
+		next.Add(next, new(big.Int).Mul(less, r)).Quo(next, n)
+		if next.Cmp(r) >= 0 {
+			break
+		}
+		r = next
+	}
+	return r, new(big.Int).Exp(r, n, nil).Cmp(x) == 0
 }
 
 func abs(n int64) int64 {
